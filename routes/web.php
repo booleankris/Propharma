@@ -128,3 +128,7 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
 Route::get('/products/search', [SalesController::class, 'search'])
     ->middleware('auth') // optional
     ->name('products.search');
+
+Route::get('/debtors/search', [SalesController::class, 'searchDebtors'])
+    ->middleware('auth') // optional
+    ->name('debtors.search');

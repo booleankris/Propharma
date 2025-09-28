@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-
+use App\Models\Debtors;
 use App\Models\Item;
 use App\Models\ItemCart;
 use App\Models\MedicineCart;
@@ -29,10 +29,66 @@ class SalesController extends Controller
             $parameters = PaymentParameters::where('id', 1)->first();
             $rounding = $parameters->rounding;
             $parameters = $parameters->pdu;
+            $type = "UPDS";
+
+            // Clear Cart If Different Payment Type
+            $transaction = MedicineTransactions::where('pharmacy_id', Auth()->user()->pharmacy_id)->where('status', '0')->first();
+            if($transaction) {
+                if ($transaction->transaction_type != "UPDS") {
+                    $transaction->update([
+                        'transaction_type' => $type
+                    ]);
+                    $clearTransaction = MedicineCart::where('transaction_id', $transaction->id)->delete();
+                }
+            }
         } else if ($slug == "hv") {
             $parameters = PaymentParameters::where('id', 1)->first();
             $rounding = $parameters->rounding;
             $parameters = $parameters->otc;
+            $type = "HV/OTC";
+
+            // Clear Cart If Different Payment Type
+            $transaction = MedicineTransactions::where('pharmacy_id', Auth()->user()->pharmacy_id)->where('status', '0')->first();
+            if($transaction) {
+                if ($transaction->transaction_type != $type) {
+                    $transaction->update([
+                        'transaction_type' => $type
+                    ]);
+                    $clearTransaction = MedicineCart::where('transaction_id', $transaction->id)->delete();
+                }
+            }
+        } else if ($slug == "resep") {
+            $parameters = PaymentParameters::where('id', 1)->first();
+            $rounding = "0";
+            $parameters = "0";
+            $type = "RESEP TUNAI";
+
+            // Clear Cart If Different Payment Type
+            $transaction = MedicineTransactions::where('pharmacy_id', Auth()->user()->pharmacy_id)->where('status', '0')->first();
+            if($transaction){
+                if ($transaction->transaction_type != $type) {
+                    $transaction->update([
+                        'transaction_type' => $type
+                    ]);
+                    $clearTransaction = MedicineCart::where('transaction_id', $transaction->id)->delete();
+                }
+            }
+        } else if ($slug == "kredit") {
+            $parameters = PaymentParameters::where('id', 1)->first();
+            $rounding = "0";
+            $parameters = "0";
+            $type = "KREDIT";
+            
+            // Clear Cart If Different Payment Type
+            $transaction = MedicineTransactions::where('pharmacy_id', Auth()->user()->pharmacy_id)->where('status', '0')->first();
+            if($transaction) {
+                if ($transaction->transaction_type != $type) {
+                    $transaction->update([
+                        'transaction_type' => $type
+                    ]);
+                    $clearTransaction = MedicineCart::where('transaction_id', $transaction->id)->delete();
+                }
+            }
         }
 
         // Checking Transaction Status
@@ -43,7 +99,7 @@ class SalesController extends Controller
         // Get Item Inside Cart based on user id and cart item status
         $itemInCart = MedicineCart::with('medicine')->where('status', 0)->where('user_id', Auth()->user()->id)->get();
 
-        
+
         return view('kasir.transaction', compact('check_transaction', 'transaction', 'parameters', 'rounding', 'itemInCart', 'totaltransaction'));
     }
 
@@ -85,6 +141,43 @@ class SalesController extends Controller
                 });
             })
             ->select(['id', 'code', 'name', 'net_price', 'stock', 'unit', 'packaging', 'content', 'dosage'])
+            ->orderByRaw("CASE WHEN code LIKE ? THEN 0 ELSE 1 END, code ASC", [$q . '%'])
+            ->limit(10)
+            ->get();
+
+        return response()->json($items);
+    }
+    public function searchDebtors(Request $request)
+    {
+        $q = trim($request->get('q', ''));
+
+        $items = Debtors::with('parameters')
+            ->when($q !== '', function ($builder) use ($q) {
+                $builder->where(function ($x) use ($q) {
+                    $x->where('code', 'like', '%' . $q . '%')
+                        ->orWhere('name', 'like', '%' . $q . '%');
+                });
+            })
+            ->select(['id', 'code', 'name', 'address', 'city', 'phone', 'contact', 'email', 'status'])
+            ->orderByRaw("CASE WHEN code LIKE ? THEN 0 ELSE 1 END, code ASC", [$q . '%'])
+            ->limit(10)
+            ->get();
+
+        return response()->json($items);
+    }
+
+    public function searchPatients(Request $request)
+    {
+        $q = trim($request->get('q', ''));
+
+        $items = Debtors::with('parameters')
+            ->when($q !== '', function ($builder) use ($q) {
+                $builder->where(function ($x) use ($q) {
+                    $x->where('code', 'like', '%' . $q . '%')
+                        ->orWhere('name', 'like', '%' . $q . '%');
+                });
+            })
+            ->select(['id', 'code', 'name', 'address', 'city', 'phone', 'contact', 'email', 'status'])
             ->orderByRaw("CASE WHEN code LIKE ? THEN 0 ELSE 1 END, code ASC", [$q . '%'])
             ->limit(10)
             ->get();
@@ -222,14 +315,17 @@ class SalesController extends Controller
         // $cart = MedicineCart::with('medicine')->where('transaction_id', $request->get('transaction_id'))->get();
         try {
             $transaction = MedicineTransactions::findOrFail($request->get('transaction_id'));
-           
+
             $transaction->update([
                 'status' => 1,
+                'paid' => $request->get('paid'),
+                'subtotal' => $request->get('subtotal'),
+                'changes' => $request->get('changes'),
             ]);
             $carts = MedicineCart::where('transaction_id', $request->get('transaction_id'))
-            ->update([
-                'status' => 1,
-            ]);
+                ->update([
+                    'status' => 1
+                ]);
 
             DB::beginTransaction();
             // $change_transaction_status =          

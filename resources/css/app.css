@@ -48,7 +48,12 @@ Use a better box model (opinionated).
   font-size: 0.75rem;
   color: #4b5563;
 }
-
+#invoiceItems{
+  font-size:10px;
+}
+#invoiceTotal{
+  font-size:10px;
+}
 .invoice-info {
   display: flex;
   flex-direction: column;

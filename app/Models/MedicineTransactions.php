@@ -14,6 +14,8 @@ class MedicineTransactions extends Model
         'debtor_id',
         'transaction_type',
         'transaction_code',
+        'paid',
+        'changes',
         'subtotal',
         'discount',
         'status',

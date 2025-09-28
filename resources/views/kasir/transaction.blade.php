@@ -31,7 +31,7 @@
 
 
                 <!-- Transaction Type Chips -->
-                <div class="flex gap-4 pt-3">
+                <div class="flex flex-wrap justify-start gap-4 pt-3">
                     <!-- Resep Credit -->
                     <a href="{{ url('transaction/kredit') }}">
                         <button
@@ -100,6 +100,26 @@
             @if ($check_transaction == 1)
                 <div class="card p-6  flex flex-wrap items-center bg-white dashboard-panel">
 
+                    @if ($transaction->transaction_type == 'KREDIT')
+                        <div class="w-full">
+                            <div class="w-full my-2">
+                                <label class="px-2">Cari Debitur</label>
+
+                            </div>
+                            <input autofocus id="debtorSearch" type="text" placeholder="Ketik ID / Nama…"
+                                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                                autocomplete="off" />
+
+                            <!-- Dropdown -->
+                            <div id="debtorResults"
+                                class="absolute z-50 mt-2 w-[50%] rounded-xl border border-gray-200 bg-white shadow-lg hidden">
+                                <ul id="debtorList" role="listbox" class="max-h-80 overflow-auto py-2"></ul>
+                            </div>
+
+                            <!-- Hidden field to hold selection (optional) -->
+                            <input type="hidden" id="selectedDebtorId" />
+                        </div>
+                    @endif
                     <div class="w-full">
                         <div class="w-full my-2">
                             <label class="px-2">Cari Obat</label>
@@ -119,6 +139,18 @@
                         <input type="hidden" id="selectedProductId" />
                     </div>
                     <div class="w-full flex mt-2">
+                        @if ($transaction->transaction_type == 'KREDIT')
+                            <div class="mr-2 w-full">
+                                <div class="w-full my-2">
+                                    <label class="px-2">Nama Debitur</label>
+
+                                </div>
+                                <input id="debtorname" type="text" name="debtorname" readonly
+                                    placeholder="Nama Debitur"
+                                    class="w-full rounded-xl readonly border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                                    autocomplete="off" />
+                            </div>
+                        @endif
                         <div class="mr-2 w-full">
                             <div class="w-full my-2">
                                 <label class="px-2">Nama Obat</label>
@@ -279,6 +311,8 @@
                     <div class="mt-5">
                         <form id="checkoutForm" action="{{ route('transaction.checkout') }}" method="POST">
                             @csrf
+                            <input type="hidden" name="paid" id="paid">
+                            <input type="hidden" name="changes" id="changes">
                             <input type="hidden" name="transaction_id" id="transaction_id">
                             <button type="button" id="checkout" disabled onclick="checkoutItem()"
                                 class="btn btn-pharma !rounded-[5.3px] !bg-gray-400 btn-lg btn-icon icon-right mb-1">Selesaikan</button>
@@ -366,13 +400,35 @@
                         </tr>
                     </tbody>
                 </table>
+                <div class="divider"></div>
+
+                <div>
+                    <table class="invoice-table">
+                        <thead>
+                            <tr>
+                                <th></th>
+                                <th></th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="invoiceTotal">
+                            <tr>
+                                <td>Shawarma Big</td>
+                                <td>4</td>
+                                <td>$12</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
 
                 <div class="divider"></div>
 
-                <div class="contact-info">
-                    <p>📧 info@example.com</p>
-                    <p>📞 +234XXXXXXXX</p>
+                <div id="paymentstotal" class="payment">
+                    <p id="paid">📧 info@example.com</p>
+                    <p id="change">📞 +234XXXXXXXX</p>
                 </div>
+
+                <div class="divider"></div>
 
                 <div class="button-row">
                     <button class="btn btn-gray" onclick="closeInvoice()">Tutup</button>
@@ -386,10 +442,18 @@
 
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script>
-        // --- EndPioint ---
+        // ===============================
+        // Konstanta & Variabel Global
+        // ===============================
         const endpoint = "{{ route('products.search') }}";
+        const endpointDebtor = "{{ route('debtors.search') }}";
 
         const trx_id = {{ $transaction?->id ?? 'null' }};
+        var rounding = {{ $rounding }};
+        var parameters = {{ $parameters }};
+        var totaltransaction = {{ $totaltransaction }};
+
+        // Elemen DOM
         const input = document.getElementById('productSearch');
         const name = document.getElementById('name');
         const stock = document.getElementById('stock');
@@ -397,28 +461,37 @@
         const quantity = document.getElementById('quantity');
         const price = document.getElementById('price');
         const totalprice = document.getElementById('total');
-
-        var transaction_id = {{ $transaction?->id ?? 'null' }};
-        var discount = document.getElementById('discount');
-        var total_discount = "";
-        var total_item = "";
-        var medicine_id = "";
-        var rounding = {{ $rounding }};
-        var parameters = {{ $parameters }};
-        var price2 = "";
-        var subtotal = "";
-        var final_price = "";
-        var totaltransaction = {{ $totaltransaction }};
-
-
+        const discountInput = document.getElementById('discount');
+        const cartTotalInput = document.getElementById('carttotal');
         const box = document.getElementById('productResults');
         const list = document.getElementById('productList');
         const hidden = document.getElementById('selectedProductId');
 
-        let items = []; // current results
+        // Debtor
+        const inputdebtor = document.getElementById('debtorSearch');
+        const debtorname = document.getElementById('debtorname');
+        const debtorbox = document.getElementById('debtorResults');
+        const debtorlist = document.getElementById('debtorList');
+        const debtorhidden = document.getElementById('selectedDebtorId');
+
+        // Variabel kerja
+        var transaction_id = trx_id;
+        var total_discount = "";
+        var total_item = "";
+        var medicine_id = "";
+        var price2 = "";
+        var subtotal = "";
+        var final_price = "";
+        let items = [];
         let activeIndex = -1;
         let closeTimeout;
 
+        // Set nilai awal
+        cartTotalInput.value = formatRupiah(totaltransaction);
+
+        // ===============================
+        // Helper Functions
+        // ===============================
         function formatRupiah(value) {
             const number = Number(value) || 0;
             return new Intl.NumberFormat('id-ID', {
@@ -430,16 +503,10 @@
 
         function parseRupiah(rupiahString) {
             return Number(
-                rupiahString
-                .replace(/[^0-9,-]/g, '') // remove "Rp", dots, spaces
-                .replace(',', '.') // handle decimal comma if any
+                rupiahString.replace(/[^0-9,-]/g, '').replace(',', '.')
             ) || 0;
         }
 
-        // Count All Total Price in Cart
-        document.getElementById('carttotal').value = formatRupiah(totaltransaction);
-
-        // Debounce helper
         function debounce(fn, wait = 250) {
             let t;
             return (...args) => {
@@ -448,6 +515,19 @@
             };
         }
 
+        function escapeHtml(s) {
+            return String(s ?? '').replace(/[&<>"']/g, m => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;'
+            } [m]));
+        }
+
+        // ===============================
+        // Autocomplete Box Control
+        // ===============================
         function openBox() {
             box.classList.remove('hidden');
         }
@@ -464,12 +544,25 @@
             });
         }
 
+        function ensureVisible() {
+            const li = list.children[activeIndex];
+            if (!li) return;
+            const lTop = list.scrollTop;
+            const lBottom = lTop + list.clientHeight;
+            const liTop = li.offsetTop;
+            const liBottom = liTop + li.offsetHeight;
+
+            if (liTop < lTop) list.scrollTop = liTop;
+            else if (liBottom > lBottom) list.scrollTop = liBottom - list.clientHeight;
+        }
+
         function render(items) {
             list.innerHTML = '';
             if (!items.length) {
                 list.innerHTML = `<li class="px-4 py-3 text-sm text-gray-500">Tidak ada hasil</li>`;
                 return;
             }
+
             for (const it of items) {
                 const li = document.createElement('li');
                 li.setAttribute('role', 'option');
@@ -477,19 +570,18 @@
                 li.dataset.id = it.id;
 
                 li.innerHTML = `
-            <div class="flex items-start justify-between gap-2">
-              <div>
-                <div class="font-medium">${escapeHtml(it.name)}</div>
-                <div class="text-xs text-gray-500">
-                  Kode: ${escapeHtml(it.code)} • Stok: ${it.stock} • Tipe: ${escapeHtml(it.type || '-')}
-                </div>
-              </div>
-              <div class="text-sm font-semibold whitespace-nowrap">${formatRupiah(it.net_price)}</div>
-            </div>
-          `;
+                    <div class="flex items-start justify-between gap-2">
+                        <div>
+                            <div class="font-medium">${escapeHtml(it.name)}</div>
+                            <div class="text-xs text-gray-500">
+                                Kode: ${escapeHtml(it.code)} • Stok: ${it.stock} • Tipe: ${escapeHtml(it.type || '-')}
+                            </div>
+                        </div>
+                        <div class="text-sm font-semibold whitespace-nowrap">${formatRupiah(it.net_price)}</div>
+                    </div>
+                `;
 
                 li.addEventListener('mousedown', (e) => {
-                    // mousedown so it fires before input loses focus
                     selectItem(it);
                     e.preventDefault();
                 });
@@ -498,17 +590,26 @@
             }
         }
 
-        function escapeHtml(s) {
-            return String(s ?? '').replace(/[&<>"']/g, m => ({
-                '&': '&amp;',
-                '<': '&lt;',
-                '>': '&gt;',
-                '"': '&quot;',
-                "'": '&#39;'
-            } [m]));
+        function selectItem(it) {
+            hidden.value = it.id;
+            medicine_id = it.id;
+            input.value = '';
+            stock.value = it.stock;
+            unit.value = it.unit;
+            name.value = it.name;
+            console.log("Harga : " + it.net_price + "Parameter : " + parameters + "Pembulatan : " + rounding);
+            let raw = (+it.net_price * +parameters) + +rounding;
+            let rounded = Math.floor(raw / 1000) * 1000;
+            price.value = formatRupiah(rounded);
+            console.log("harga Total : " + raw);
+            price2 = rounded;
+            quantity.focus();
+            quantity.select();
+            closeBox();
         }
-
-        // Fetch results
+        // ===============================
+        // Search (Debounced)
+        // ===============================
         const doSearch = debounce(async (term) => {
             if (!term.trim()) {
                 list.innerHTML = '';
@@ -522,15 +623,12 @@
                 }
             });
             if (!res.ok) return;
+
             items = await res.json();
             render(items);
             openBox();
         }, 250);
-
-        // Input events
-        input.addEventListener('input', (e) => {
-            doSearch(e.target.value);
-        });
+        input.addEventListener('input', (e) => doSearch(e.target.value));
 
         input.addEventListener('keydown', (e) => {
             const max = items.length - 1;
@@ -547,124 +645,208 @@
                 activeIndex = Math.max(0, activeIndex - 1);
                 highlight();
                 ensureVisible();
-            } else if (e.key === 'Enter') {
-                if (activeIndex >= 0 && items[activeIndex]) {
-                    e.preventDefault();
-                    selectItem(items[activeIndex]);
-                }
+            } else if (e.key === 'Enter' && activeIndex >= 0 && items[activeIndex]) {
+                e.preventDefault();
+                selectItem(items[activeIndex]);
             } else if (e.key === 'Escape') {
                 closeBox();
             }
         });
 
-        function ensureVisible() {
-            const li = list.children[activeIndex];
-            if (!li) return;
-            const lTop = list.scrollTop;
-            const lBottom = lTop + list.clientHeight;
-            const liTop = li.offsetTop;
-            const liBottom = liTop + li.offsetHeight;
-            if (liTop < lTop) list.scrollTop = liTop;
-            else if (liBottom > lBottom) list.scrollTop = liBottom - list.clientHeight;
+
+        // ===============================
+        // Pencarian Debitur
+        // ===============================
+
+        function opendebtorBox() {
+            debtorbox.classList.remove('hidden');
         }
 
+        function closedebtorBox() {
+            debtorbox.classList.add('hidden');
+            activeIndex = -1;
+            highlight();
+        }
+
+        function debtorhighlight() {
+            [...debtorlist.children].forEach((li, i) => {
+                li.classList.toggle('bg-gray-100', i === activeIndex);
+            });
+        }
+
+        function ensuredebtorVisible() {
+            const li = debtorlist.children[activeIndex];
+            if (!li) return;
+            const lTop = debtorlist.scrollTop;
+            const lBottom = lTop + debtorlist.clientHeight;
+            const liTop = li.offsetTop;
+            const liBottom = liTop + li.offsetHeight;
+
+            if (liTop < lTop) debtorlist.scrollTop = liTop;
+            else if (liBottom > lBottom) debtorlist.scrollTop = liBottom - debtorlist.clientHeight;
+        }
+
+        function renderdebtor(items) {
+            debtorlist.innerHTML = '';
+            if (!items.length) {
+                debtorlist.innerHTML = `<li class="px-4 py-3 text-sm text-gray-500">Tidak ada hasil</li>`;
+                return;
+            }
+
+            for (const it of items) {
+                const li = document.createElement('li');
+                li.setAttribute('role', 'option');
+                li.className = 'cursor-pointer px-4 py-3 hover:bg-gray-100';
+                li.dataset.id = it.id;
+
+                li.innerHTML = `
+                    <div class="flex items-start justify-between gap-2">
+                        <div>
+                            <div class="font-medium">${escapeHtml(it.name)}</div>
+                            <div class="text-xs text-gray-500">
+                                Kode: ${escapeHtml(it.code)}
+                            </div>
+                            <div class="text-xs text-gray-500">
+                                Alamat: ${escapeHtml(it.address)}
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                li.addEventListener('mousedown', (e) => {
+                    selectDebtor(it);
+                    e.preventDefault();
+                });
+
+                debtorlist.appendChild(li);
+            }
+        }
+
+        // ===============================
+        // Search (Debounced)
+        // ===============================
+        const dodebtorSearch = debounce(async (term) => {
+            if (!term.trim()) {
+                debtorlist.innerHTML = '';
+                closedebtorBox();
+                return;
+            }
+            const url = `${endpointDebtor}?q=${encodeURIComponent(term)}`;
+            const res = await fetch(url, {
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
+            if (!res.ok) return;
+
+            items = await res.json();
+            renderdebtor(items);
+            opendebtorBox();
+        }, 250);
+        if (inputdebtor) {
+            inputdebtor.addEventListener('input', (e) => dodebtorSearch(e.target.value));
+
+            inputdebtor.addEventListener('keydown', (e) => {
+                const max = items.length - 1;
+
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    if (max < 0) return;
+                    activeIndex = Math.min(max, activeIndex + 1);
+                    debtorhighlight();
+                    ensuredebtorVisible();
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    if (max < 0) return;
+                    activeIndex = Math.max(0, activeIndex - 1);
+                    debtorhighlight();
+                    ensuredebtorVisible();
+                } else if (e.key === 'Enter' && activeIndex >= 0 && items[activeIndex]) {
+                    e.preventDefault();
+                    selectDebtor(items[activeIndex]);
+                } else if (e.key === 'Escape') {
+                    closedebtorBox();
+                }
+            });
+        }
+
+        function selectDebtor(it) {
+            debtorname.value = it.name;
+            parameters = it.parameters[0].receipt;
+            rounding = it.parameters[0].rounding;
+            console.log(rounding);
+            input.focus();
+
+
+            closedebtorBox();
+        }
+        // ===============================
+        // Perhitungan Harga & Diskon
+        // ===============================
         function count(val) {
             total_item = val;
-            var total = price2 * val;
-            subtotal = total;
-            totalprice.value = formatRupiah(total);
+            subtotal = price2 * val;
+            totalprice.value = formatRupiah(subtotal);
         }
 
         function countDiscount(val) {
-
             if (val > 100) {
-                totalprice.value = formatRupiah(subtotal - val);
                 final_price = subtotal - val;
                 total_discount = val;
             } else {
-                discount = subtotal * val / 100;
-                totalprice.value = formatRupiah(subtotal - discount);
-                final_price = subtotal - discount;
+                const d = subtotal * val / 100;
+                final_price = subtotal - d;
                 total_discount = `${val}%`;
             }
-
+            totalprice.value = formatRupiah(final_price);
         }
 
-        function selectItem(it) {
-            hidden.value = it.id;
-            medicine_id = it.id;
-            input.value = ``;
-            stock.value = `${it.stock}`;
-            unit.value = `${it.unit}`;
-            name.value = `${it.name}`;
-            // 
-            let raw = it.net_price * parameters + rounding;
-            let rounded = Math.floor(raw / 1000) * 1000;
-            price.value = formatRupiah(rounded);
-            // 
-            price2 = rounded;
-            console.log(parameters);
-            quantity.focus();
-            quantity.select();
-            closeBox();
-
-            // TODO: Integrate action after select (e.g., add to cart)
-            // example:
-            // addToCart(it.id);
-        }
-        // set CSRF token for Axios globally
-
+        // ===============================
+        // Cart Actions
+        // ===============================
         axios.defaults.headers.common['X-CSRF-TOKEN'] = '{{ csrf_token() }}';
 
         function addToCart(medicine_id, transaction_id, quantity, discount, total_price) {
             axios.post("{{ route('transaction.addToCart') }}", {
-                    medicine_id: medicine_id,
-                    transaction_id: transaction_id,
-                    quantity: quantity,
-                    discount: discount,
-                    total_price: total_price
-                })
-                .then(response => {
-                    console.log("✅ Added to cart:", response.data);
-                    stock.value = "";
-                    unit.value = "";
-                    document.getElementById('quantity').value = "";
-                    price.value = "";
-                    name.value = "";
-                    totalprice.value = "";
-                    document.getElementById('pay').value = "";
-                    document.getElementById('change').value = "";
-                    totaltransaction += total_price;
+                medicine_id,
+                transaction_id,
+                quantity,
+                discount,
+                total_price
+            }).then(response => {
+                let item = response.data;
+                totaltransaction += total_price;
+                cartTotalInput.value = formatRupiah(totaltransaction);
 
-                    // var removeUrl = "http/dawdad";
+                // Reset form input
+                stock.value = "";
+                unit.value = "";
+                quantity.value = "";
+                price.value = "";
+                name.value = "";
+                totalprice.value = "";
+                document.getElementById('pay').value = "";
+                document.getElementById('change').value = "";
+                discountInput.value = "";
 
-                    document.getElementById('carttotal').value = formatRupiah(totaltransaction);
-                    document.getElementById('pay').focus();
-                    document.getElementById('discount').value = "";
+                document.getElementById('productSearch').focus();
+                closeBox();
 
-                    document.getElementById('productSearch').focus();
-                    closeBox();
-
-                    let item = response.data;
-                    document.getElementById('carts').innerHTML += `
+                // Append ke cart
+                document.getElementById('carts').innerHTML += `
                     <div id="itemincart${item.id}">
                         <div class="flex justify-between mx-[15px] mt-[5px] py-[20px] mb-[8px] rounded-lg bg-[#fff]">
                             <div>
                                 <div class="px-[20px] font-poppins font-semibold">${item.name}</div>
-                                <div class="px-[20px] font-poppins text-[10px]">
-                                    ${formatRupiah(item.total_price)}
-                                </div>
+                                <div class="px-[20px] font-poppins text-[10px]">${formatRupiah(item.total_price)}</div>
                             </div>
                             <div class="mx-[10px]">
                                 <button onclick="removeItem(${item.id})"
                                     class="flex justify-center items-center mr-1 px-2 py-1 text-[#DF1463] border border-[#DF1463] rounded hover:bg-[#DF1463] hover:text-white">
-                                    <svg viewBox="0 0 24 24" fill="none"
-                                        xmlns="http://www.w3.org/2000/svg" class="w-5 h-5">
-                                        <path
-                                            d="M8 6V4.41421C8 3.63317 8.63317 3 9.41421 3H14.5858C15.3668 3 16 3.63317 16 4.41421V6"
+                                    <svg viewBox="0 0 24 24" class="w-5 h-5">
+                                        <path d="M8 6V4.41421C8 3.63317 8.63317 3 9.41421 3H14.5858C15.3668 3 16 3.63317 16 4.41421V6"
                                             stroke="#DF1463" stroke-width="1.7" stroke-linecap="round" />
-                                        <path
-                                            d="M5.7372 6.54395V18.9857C5.7372 19.7449 6.35269 20.3604 7.11194 20.3604H16.8894C17.6487 20.3604 18.2642 19.7449 18.2642 18.9857V6.54395M2.90918 6.54395H21.091"
+                                        <path d="M5.7372 6.54395V18.9857C5.7372 19.7449 6.35269 20.3604 7.11194 20.3604H16.8894C17.6487 20.3604 18.2642 19.7449 18.2642 18.9857V6.54395M2.90918 6.54395H21.091"
                                             stroke="#c60653" stroke-width="1.7" stroke-linecap="round" />
                                     </svg>
                                 </button>
@@ -672,66 +854,88 @@
                         </div>
                     </div>
                 `;
-
-
-                })
-                .catch(error => {
-                    console.error("❌ Error adding to cart:", error.response ? error.response.data : error.message);
-                });
+            }).catch(error => {
+                console.error("❌ Error adding to cart:", error.response ? error.response.data : error.message);
+            });
         }
 
         function submit() {
             addToCart(medicine_id, transaction_id, total_item, total_discount, final_price);
         }
 
-        function checkoutItem() {
-            axios.post("{{ route('transaction.getTransactionItem') }}", {
-                    transaction_id: transaction_id,
+        function removeItem(id) {
+            document.getElementById("itemincart" + id).remove();
+
+            axios.post("{{ route('transaction.removeItem') }}", {
+                    id
                 })
                 .then(response => {
-                    console.log("✅ Items In Cart:", response.data);
-                    var transaction_items = response.data.itemTransaction;
-                    var transaction = response.data.transaction;
+                    let item = response.data;
+                    totaltransaction -= item.total_price;
+                    cartTotalInput.value = formatRupiah(totaltransaction);
+                    document.getElementById('pay').value = "";
+                    document.getElementById('change').value = "";
+                }).catch(error => {
+                    console.error("❌ Error removing item:", error.response ? error.response.data : error.message);
+                });
+        }
 
-                    document.getElementById('receipt').textContent = transaction.transactions.transaction_code;
-                    document.getElementById('type').textContent = transaction.transactions.transaction_type;
-                    document.getElementById('cashier').textContent = transaction.user.name;
-                    document.getElementById('customer').textContent = "Client";
-                    document.getElementById('invoiceItems').innerHTML = "";
+        // ===============================
+        // Checkout & Invoice
+        // ===============================
+        function checkoutItem() {
+            const paid = document.getElementById('pay').value;
+            const changes = document.getElementById('change').value;
+            const subtotal = tot
+            axios.post("{{ route('transaction.getTransactionItem') }}", {
+                transaction_id,
+                paid,
+                subtotal,
+                changes
+            }).then(response => {
+                var transaction_items = response.data.itemTransaction;
+                var transaction = response.data.transaction;
 
-                    transaction_items.forEach(item => {
-                        document.getElementById('invoiceItems').innerHTML += `
+                document.getElementById('receipt').textContent = transaction.transactions.transaction_code;
+                document.getElementById('type').textContent = transaction.transactions.transaction_type;
+                document.getElementById('cashier').textContent = transaction.user.name;
+                document.getElementById('customer').textContent = "Client";
+                document.getElementById('invoiceItems').innerHTML = "";
+                document.getElementById('invoiceTotal').innerHTML = "";
+
+                transaction_items.forEach(item => {
+                    document.getElementById('invoiceItems').innerHTML += `
                         <tr>
                             <td>${item.medicine.name}</td>
                             <td>${item.quantity}</td>
                             <td>${formatRupiah(item.total_price)}</td>
                         </tr>
-                        `;
+                    `;
+                });
 
+                document.getElementById('invoiceTotal').innerHTML += `
+                    <tr><td>Total</td><td></td><td>${formatRupiah(totaltransaction)}</td></tr>
+                    <tr><td>Tunai</td><td></td><td>${paid}</td></tr>
+                    <tr><td>Kembali</td><td></td><td>${changes}</td></tr>
+                `;
+
+                if (confirm("Apakah anda ingin mencetak struk?")) {
+                    const modal = document.getElementById("invoiceModal");
+                    const content = document.getElementById("invoiceContent");
+                    modal.classList.remove("hidden");
+
+                    requestAnimationFrame(() => {
+                        modal.classList.add("opacity-100");
+                        content.classList.remove("scale-95");
+                        content.classList.add("scale-100");
                     });
-
-                })
-                .catch(error => {
-                    console.error("❌ Error getting from cart:", error.response ? error.response.data : error.message);
-                });
-            if (confirm("Apakah anda ingin mencetak struk?")) {
-                const modal = document.getElementById("invoiceModal");
-                const content = document.getElementById("invoiceContent");
-                modal.classList.remove("hidden");
-
-                requestAnimationFrame(() => {
-                    modal.classList.add("opacity-100");
-                    content.classList.remove("scale-95");
-                    content.classList.add("scale-100");
-                });
-
-            } else {
-                return false;
-                document.getElementById("transaction_id").value = transaction_id;
-                document.getElementById("checkoutForm").submit();
-
-            }
-
+                } else {
+                    document.getElementById("transaction_id").value = transaction_id;
+                    document.getElementById("checkoutForm").submit();
+                }
+            }).catch(error => {
+                console.error("❌ Error getting cart:", error.response ? error.response.data : error.message);
+            });
         }
 
         function closeInvoice() {
@@ -742,7 +946,6 @@
             content.classList.remove("scale-100");
             content.classList.add("scale-95");
 
-            // Wait for animation to finish before hiding
             setTimeout(() => {
                 document.getElementById("transaction_id").value = transaction_id;
                 document.getElementById("checkoutForm").submit();
@@ -758,200 +961,50 @@
             iframe.style.width = '0px';
             iframe.style.height = '0px';
             iframe.style.border = 'none';
-
             document.body.appendChild(iframe);
+
             const doc = iframe.contentWindow.document;
-
             doc.open();
-            doc.write(`
-                <html>
-                <head>
-                    <title>Invoice</title>
-
-                    <style>
-                        @page {
-                        size: 80mm auto;
-                        margin: 0;
-                        }
-
-                        html, body {
-                        margin: 0;
-                        padding: 0;
-                        background: white;
-                        }
-
-                        body {
-                        display: flex;
-                        justify-content: center;
-                        align-items: flex-start;
-                        min-height: 100%;
-                        }
-
-                        .invoice-container {
-                        width: 100mm;
-                        padding: 4px 8px; 
-                        background: #fff;
-                        font-family: sans-serif;
-                        box-sizing: border-box;
-                        }
-
-                        @media print {
-                        .invoice-container {
-                            box-shadow: none;
-                            margin: 0;
-                            padding: 4px 8px;
-                        }
-                        }
-
-                        .invoice-logo {
-                        display: block;
-                        margin: 0 auto 2px;
-                        width: 3rem; 
-                        }
-
-                        .invoice-header {
-                        display: flex;
-                        flex-direction: column;
-                        align-items: center;
-                        text-align: center;
-                        margin-bottom: 4px;
-                        }
-
-                        .invoice-header h4 {
-                        margin: 0;
-                        font-size: 1rem;
-                        }
-
-                        .small-text {
-                        font-size: 0.7rem;
-                        color: #6b7280;
-                        margin: 0;
-                        }
-
-                        .invoice-info {
-                        display: flex;
-                        flex-direction: column;
-                        border-bottom: 1px solid #e5e7eb;
-                        padding-bottom: 4px;
-                        margin-bottom: 4px;
-                        font-size: 0.7rem;
-                        gap: 2px;
-                        }
-
-                        .invoice-row {
-                        display: flex;
-                        justify-content: space-between;
-                        }
-
-                        .muted-text {
-                        color: #9ca3af;
-                        }
-
-                        .invoice-table {
-                        width: 100%;
-                        border-collapse: collapse;
-                        font-size: 0.7rem;
-                        }
-
-                        .invoice-table th,
-                        .invoice-table td {
-                        padding: 2px 0;
-                        }
-
-                        .divider {
-                        border-bottom: 1px dashed #9ca3af;
-                        margin: 4px 0;
-                        }
-
-                        .contact-info {
-                        text-align: center;
-                        font-size: 0.7rem;
-                        margin: 4px 0;
-                        }
-
-                        .button-row {
-                            display:none;
-                        }
-
-                        .btn {
-                        padding: 0.2rem 0.4rem;
-                        border-radius: 0.25rem;
-                        cursor: pointer;
-                        font-size: 0.7rem;
-                        border: none;
-                        }
-
-                        .btn-gray {
-                        background: #d1d5db;
-                        }
-
-                        .btn-blue {
-                        background: #2563eb;
-                        color: white;
-                        }
-                    </style>
-                </head>
-                <body>
-                    ${invoiceContent}
-                </body>
-                </html>
-                `);
+            doc.write(`<!DOCTYPE html><html><head><title>Invoice</title>
+                <style>
+                    @page { size: 80mm auto; margin: 0; }
+                    body { margin:0; padding:0; background:#fff; font-family:sans-serif; }
+                    .invoice-container { width:100mm; padding:4px 8px; }
+                    .invoice-table { width:100%; font-size:0.7rem; }
+                    .divider { border-bottom:1px dashed #9ca3af; margin:4px 0; }
+                </style>
+            </head><body>${invoiceContent}</body></html>`);
             doc.close();
 
             iframe.contentWindow.focus();
             iframe.contentWindow.print();
+
             document.getElementById("transaction_id").value = transaction_id;
             document.getElementById("checkoutForm").submit();
             document.body.removeChild(iframe);
         }
 
-
-
-        function removeItem(id) {
-            document.getElementById("itemincart" + id).remove();
-
-            axios.post("{{ route('transaction.removeItem') }}", {
-                    id: id,
-                })
-                .then(response => {
-                    console.log("✅ Removed to cart:", response.data);
-                    let item = response.data;
-                    totaltransaction = totaltransaction - item.total_price;
-                    document.getElementById('carttotal').value = formatRupiah(totaltransaction);
-                    document.getElementById('pay').value = "";
-                    document.getElementById('change').value = "";
-
-
-                })
-                .catch(error => {
-                    console.error("❌ Error adding to cart:", error.response ? error.response.data : error.message);
-                });
-        }
-
-        function onF1Key(e) {
-            const key = e.key || e.code;
-            const isF1 = key === 'F1' || e.keyCode === 112;
-
-            if (isF1) {
-                e.preventDefault();
-                document.getElementById('pay').focus();
-            }
-        }
-
+        // ===============================
+        // Payment & Button State
+        // ===============================
         function activeButton() {
-            document.getElementById("checkout").disabled = false;
-            document.getElementById("checkout").classList.remove("!bg-gray-400");
-            document.getElementById("checkout").classList.add("!bg-[#2196F3]");
+            const btn = document.getElementById("checkout");
+            btn.disabled = false;
+            btn.classList.remove("!bg-gray-400");
+            btn.classList.add("!bg-[#2196F3]");
         }
 
         function resetButton() {
-            document.getElementById("checkout").disabled = false;
-            document.getElementById("checkout").classList.remove("!bg-[#2196F3]");
-            document.getElementById("checkout").classList.add("!bg-gray-400");
+            const btn = document.getElementById("checkout");
+            btn.disabled = true;
+            btn.classList.remove("!bg-[#2196F3]");
+            btn.classList.add("!bg-gray-400");
         }
 
-        function pay(e) {
-            let raw = document.getElementById('pay').value.replace(/\D/g, ""); // only digits
+        function pay() {
+            const paidInput = document.getElementById('paid');
+            const changesInput = document.getElementById('changes');
+            let raw = document.getElementById('pay').value.replace(/\D/g, "");
             let bayar = parseInt(raw) || 0;
             document.getElementById('pay').value = "Rp. " + bayar.toLocaleString("id-ID");
 
@@ -959,23 +1012,36 @@
                 document.getElementById('change').value = "Duitnya Kurang";
                 resetButton();
             } else {
-                if (totaltransaction > 0) {
-                    activeButton();
-                }
+                if (totaltransaction > 0) activeButton();
+                paidInput.value = totaltransaction;
+                changesInput.value = bayar - totaltransaction;
                 document.getElementById('change').value = formatRupiah(bayar - totaltransaction);
             }
         }
 
+        // ===============================
+        // Keyboard Shortcut
+        // ===============================
+        function onF1Key(e) {
+            const isF1 = e.key === 'F1' || e.keyCode === 112;
+            if (isF1) {
+                e.preventDefault();
+                document.getElementById('pay').focus();
+            }
+        }
+
+        // ===============================
+        // Global Event Listeners
+        // ===============================
         window.addEventListener('keydown', onF1Key, {
             capture: true
         });
-
         document.addEventListener('click', (e) => {
             if (!box.contains(e.target) && e.target !== input) closeBox();
+            if (!box.contains(e.target) && e.target !== input) closedebtorBox();
+
         });
-        input.addEventListener('blur', () => {
-            closeTimeout = setTimeout(closeBox, 120);
-        });
+        input.addEventListener('blur', () => closeTimeout = setTimeout(closeBox, 120));
         input.addEventListener('focus', () => {
             clearTimeout(closeTimeout);
             if (list.children.length) openBox();
