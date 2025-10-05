@@ -12,6 +12,8 @@ class MedicineTransactions extends Model
     protected $fillable = [
         'pharmacy_id',
         'debtor_id',
+        'doctor_id',
+        'patient_id',
         'transaction_type',
         'transaction_code',
         'paid',

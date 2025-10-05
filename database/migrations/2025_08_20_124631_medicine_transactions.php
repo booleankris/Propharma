@@ -17,6 +17,8 @@ return new class extends Migration
             $table->id();
             $table->foreignId('pharmacy_id')->constrained('pharmacies')->onDelete('cascade');
             $table->foreignId('debtor_id')->nullable()->constrained('debtors')->onDelete('cascade');
+            $table->foreignId('doctor_id')->nullable()->constrained('doctors')->onDelete('cascade');
+            $table->foreignId('patient_id')->nullable()->constrained('patients')->onDelete('cascade');
             $table->string('transaction_type')->nullable();
             $table->string('transaction_code')->nullable();
             $table->string('paid')->nullable();

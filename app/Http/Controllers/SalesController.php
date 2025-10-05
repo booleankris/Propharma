@@ -3,11 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\Debtors;
+use App\Models\Doctors;
 use App\Models\Item;
 use App\Models\ItemCart;
 use App\Models\MedicineCart;
 use App\Models\Medicines;
 use App\Models\MedicineTransactions;
+use App\Models\Patients;
 use App\Models\PaymentParameters;
 use App\Models\Sales;
 use App\Models\TicketPayment;
@@ -33,7 +35,7 @@ class SalesController extends Controller
 
             // Clear Cart If Different Payment Type
             $transaction = MedicineTransactions::where('pharmacy_id', Auth()->user()->pharmacy_id)->where('status', '0')->first();
-            if($transaction) {
+            if ($transaction) {
                 if ($transaction->transaction_type != "UPDS") {
                     $transaction->update([
                         'transaction_type' => $type
@@ -49,7 +51,7 @@ class SalesController extends Controller
 
             // Clear Cart If Different Payment Type
             $transaction = MedicineTransactions::where('pharmacy_id', Auth()->user()->pharmacy_id)->where('status', '0')->first();
-            if($transaction) {
+            if ($transaction) {
                 if ($transaction->transaction_type != $type) {
                     $transaction->update([
                         'transaction_type' => $type
@@ -59,13 +61,13 @@ class SalesController extends Controller
             }
         } else if ($slug == "resep") {
             $parameters = PaymentParameters::where('id', 1)->first();
-            $rounding = "0";
-            $parameters = "0";
+            $rounding = $parameters->rounding;
+            $parameters = $parameters->otc;
             $type = "RESEP TUNAI";
 
             // Clear Cart If Different Payment Type
             $transaction = MedicineTransactions::where('pharmacy_id', Auth()->user()->pharmacy_id)->where('status', '0')->first();
-            if($transaction){
+            if ($transaction) {
                 if ($transaction->transaction_type != $type) {
                     $transaction->update([
                         'transaction_type' => $type
@@ -78,10 +80,10 @@ class SalesController extends Controller
             $rounding = "0";
             $parameters = "0";
             $type = "KREDIT";
-            
+
             // Clear Cart If Different Payment Type
             $transaction = MedicineTransactions::where('pharmacy_id', Auth()->user()->pharmacy_id)->where('status', '0')->first();
-            if($transaction) {
+            if ($transaction) {
                 if ($transaction->transaction_type != $type) {
                     $transaction->update([
                         'transaction_type' => $type
@@ -170,14 +172,27 @@ class SalesController extends Controller
     {
         $q = trim($request->get('q', ''));
 
-        $items = Debtors::with('parameters')
-            ->when($q !== '', function ($builder) use ($q) {
-                $builder->where(function ($x) use ($q) {
-                    $x->where('code', 'like', '%' . $q . '%')
-                        ->orWhere('name', 'like', '%' . $q . '%');
-                });
+        $items = Patients::select(['id', 'code', 'name', 'address', 'city', 'phone', 'birth', 'status'])
+            ->where(function ($query) use ($q) {
+                $query->where('code', 'like', "%{$q}%")
+                    ->orWhere('name', 'like', "%{$q}%");
             })
-            ->select(['id', 'code', 'name', 'address', 'city', 'phone', 'contact', 'email', 'status'])
+            ->orderByRaw("CASE WHEN code LIKE ? THEN 0 ELSE 1 END, code ASC", [$q . '%'])
+            ->limit(10)
+            ->get();
+
+        return response()->json($items);
+    }
+
+    public function searchDoctors(Request $request)
+    {
+        $q = trim($request->get('q', ''));
+
+        $items = Doctors::select(['id', 'code', 'name', 'address', 'city', 'phone', 'status'])
+            ->where(function ($query) use ($q) {
+                $query->where('code', 'like', "%{$q}%")
+                    ->orWhere('name', 'like', "%{$q}%");
+            })
             ->orderByRaw("CASE WHEN code LIKE ? THEN 0 ELSE 1 END, code ASC", [$q . '%'])
             ->limit(10)
             ->get();
@@ -238,7 +253,29 @@ class SalesController extends Controller
             'remove_url'  => route('sales.removeItem', $transaction->id),
         ]);
     }
+    public function addPatient(Request $request)
+    {
+        $request->validate([
+            'name'    => 'required|string|max:255',
+            'address' => 'nullable|string|max:255',
+            'phone'   => 'nullable|string|max:50',
+            'city'    => 'nullable|string|max:100',
+            'birth'   => 'nullable|date',
+        ]);
 
+        $patient = Patients::create([
+            'name'    => $request->get('name'),
+            'address' => $request->get('address'),
+            'phone'   => $request->get('phone'),
+            'city'    => $request->get('city'),
+            'birth'   => $request->get('birth'),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'patient' => $patient
+        ]);
+    }
     /**
      * Store a newly created resource in storage.
      *
@@ -313,26 +350,31 @@ class SalesController extends Controller
     {
         // $transaction = MedicineTransactions::where('id', $request->get('transaction_id'))->first();
         // $cart = MedicineCart::with('medicine')->where('transaction_id', $request->get('transaction_id'))->get();
+    
+
+        DB::beginTransaction();
         try {
             $transaction = MedicineTransactions::findOrFail($request->get('transaction_id'));
-
+            
             $transaction->update([
                 'status' => 1,
                 'paid' => $request->get('paid'),
                 'subtotal' => $request->get('subtotal'),
                 'changes' => $request->get('changes'),
+                'patient_id' => $request->get('patient_id'),
+                'doctor_id' => $request->get('doctor_id'),
+                'debtor_id' => $request->get('debtor_id'),
             ]);
-            $carts = MedicineCart::where('transaction_id', $request->get('transaction_id'))
-                ->update([
-                    'status' => 1
-                ]);
 
-            DB::beginTransaction();
-            // $change_transaction_status =          
-            return redirect()->back()->with('message', "Berhasil Menyimpan! ");
+            MedicineCart::where('transaction_id', $request->get('transaction_id'))
+                ->update(['status' => 1]);
+
+            DB::commit();
+
+            return redirect()->back()->with('message', 'Berhasil menyimpan!');
         } catch (\Exception $e) {
             DB::rollBack();
-            return redirect()->back()->with('message', "Gagal Menyimpan! " . $e->getMessage());
+            return redirect()->back()->with('message', 'Gagal menyimpan! ' . $e->getMessage());
         }
     }
     public function getTransactionItem(Request $request)

@@ -7,6 +7,7 @@
     @if ((isset($_SERVER['REQUEST_SCHEME']) && $_SERVER['REQUEST_SCHEME'] === 'https') || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https'))
         <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
     @endif
+
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 
 

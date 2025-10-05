@@ -156,6 +156,14 @@ Use a better box model (opinionated).
   background-color:#F44336;
   color: #fff!important;
 }
+.btn-add{
+  box-shadow: 0 2px 6px #009de457;
+  border-color: #62b9ff;
+  border: 1px solid;
+  background-color: transparent;
+  color: #009de4 !important;
+  font-family: 'Poppins';
+}
 .transaction-item-active{
   @apply bg-[#0074ce] !text-white;
   border: none;

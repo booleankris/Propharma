@@ -124,11 +124,26 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     Route::post('lessitem', [SalesController::class, 'lessItem'])->name('sales.lessItem');
     Route::post('removeitem/{id}', [SalesController::class, 'removeItem'])->name('sales.removeItem');
     Route::post('checkoutitem', [SalesController::class, 'checkoutItem'])->name('sales.checkout');
+
+
+    // ================================================================== Add Data =========================================================================
+    Route::post('/addpatient', [SalesController::class, 'addPatient'])
+    ->name('transaction.addPatient');
+    // ================================================================== Add Data =========================================================================
+
 });
 Route::get('/products/search', [SalesController::class, 'search'])
-    ->middleware('auth') // optional
+    ->middleware('auth') 
     ->name('products.search');
 
 Route::get('/debtors/search', [SalesController::class, 'searchDebtors'])
-    ->middleware('auth') // optional
+    ->middleware('auth') 
     ->name('debtors.search');
+
+Route::get('/patients/search', [SalesController::class, 'searchPatients'])
+    ->middleware('auth') 
+    ->name('patients.search');
+
+    Route::get('/doctors/search', [SalesController::class, 'searchDoctors'])
+    ->middleware('auth') 
+    ->name('doctors.search');

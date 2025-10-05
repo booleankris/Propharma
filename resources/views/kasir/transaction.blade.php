@@ -83,7 +83,183 @@
                             <span class="text-sm font-medium">UPDS</span>
                         </button>
                     </a>
+                    @if ($check_transaction == 1)
+                        @if ($transaction->transaction_type == 'KREDIT' || $transaction->transaction_type == 'RESEP TUNAI')
+                            <div class="w-full">
+                                <div class="w-full my-2">
+                                    <label class="px-2">Cari Pasien</label>
+
+                                </div>
+                                <div class="flex items-center">
+                                    <div class="searchdebtors w-full">
+
+                                        <input autofocus required id="patientSearch" type="text"
+                                            placeholder="Ketik ID / Nama…"
+                                            class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                                            autocomplete="off" />
+                                        <!-- Dropdown -->
+                                        <div id="patientResults"
+                                            class="absolute z-50 mt-2 w-[50%] rounded-xl border border-gray-200 bg-white shadow-lg hidden">
+                                            <ul id="patientList" role="listbox" class="max-h-80 overflow-auto py-2"></ul>
+                                        </div>
+                                    </div>
+
+                                    <div class="adddebtors w-[120px] ml-[10px]">
+                                        <button type="button" id="btnNewPatient"
+                                            class="btn btn-add my-1 !rounded-[10px] !bg-[##FFC107] p-1 py-3 font-poppin font-bold">
+                                            <div class="flex items-center justify-center gap-2">
+                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                                                    class="w-6 h-6 text-[#62b9ff]"> <!-- color controlled by text-* -->
+                                                    <circle cx="15" cy="8" r="4" fill="currentColor" />
+                                                    <path d="M15,14c-6.1,0-8,4-8,4v2h16v-2C23,18,21.1,14,15,14z"
+                                                        fill="currentColor" />
+                                                    <line stroke="currentColor" stroke-miterlimit="10" stroke-width="2"
+                                                        x1="5" x2="5" y1="7" y2="15" />
+                                                    <line stroke="currentColor" stroke-miterlimit="10" stroke-width="2"
+                                                        x1="9" x2="1" y1="11" y2="11" />
+                                                </svg>
+
+                                                <div class="text-[#62b9ff]">
+                                                    Baru
+                                                </div>
+                                            </div>
+
+
+
+                                        </button>
+                                    </div>
+
+
+                                    <!-- Hidden field to hold selection (optional) -->
+                                    <input type="hidden" id="selectedPatientId" />
+
+                                </div>
+                                <div class="w-full flex mt-1 mb-2">
+                                    <div class="mr-2 w-full">
+                                        <div class="w-full my-2">
+                                            <label class="px-2">Nama Pasien</label>
+
+                                        </div>
+                                        <input id="patientname" type="text" name="patientname" readonly
+                                            placeholder="Nama Pasien"
+                                            class="w-full rounded-xl readonly border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                                            autocomplete="off" />
+                                    </div>
+                                    <div class="mr-2 w-full">
+                                        <div class="w-full my-2">
+                                            <label class="px-2">Alamat</label>
+
+                                        </div>
+                                        <input id="patientaddress" type="text" name="patientaddress" readonly
+                                            placeholder="Alamat Pasien"
+                                            class="w-full rounded-xl readonly border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                                            autocomplete="off" />
+                                    </div>
+                                    <div class="mr-2 w-full">
+                                        <div class="w-full my-2">
+                                            <label class="px-2">No.Telp</label>
+
+                                        </div>
+                                        <input id="patientphone" type="text" name="patientphone" readonly
+                                            placeholder="Nama Pasien"
+                                            class="w-full rounded-xl readonly border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                                            autocomplete="off" />
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="w-full">
+                                <div class="w-full my-2">
+                                    <label class="px-2">Cari Dokter</label>
+
+                                </div>
+                                <div class="flex items-center">
+                                    <div class="searchdoctors w-full">
+
+                                        <input autofocus required id="doctorSearch" type="text"
+                                            placeholder="Ketik ID / Nama…"
+                                            class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                                            autocomplete="off" />
+                                        <!-- Dropdown -->
+                                        <div id="doctorResults"
+                                            class="absolute z-50 mt-2 w-[50%] rounded-xl border border-gray-200 bg-white shadow-lg hidden">
+                                            <ul id="doctorList" role="listbox" class="max-h-80 overflow-auto py-2"></ul>
+                                        </div>
+                                    </div>
+
+
+
+
+                                    <!-- Hidden field to hold selection (optional) -->
+                                    <input type="hidden" id="selectedDoctorId" />
+
+                                </div>
+                                <div class="w-full flex mt-1 mb-2">
+                                    <div class="mr-2 w-full">
+                                        <div class="w-full my-2">
+                                            <label class="px-2">Nama Dokter</label>
+
+                                        </div>
+                                        <input id="doctorname" type="text" name="doctorname" readonly
+                                            placeholder="Nama Pasien"
+                                            class="w-full rounded-xl readonly border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                                            autocomplete="off" />
+                                    </div>
+                                    <div class="mr-2 w-full">
+                                        <div class="w-full my-2">
+                                            <label class="px-2">Alamat</label>
+
+                                        </div>
+                                        <input id="doctoraddress" type="text" name="doctoraddress" readonly
+                                            placeholder="Alamat Pasien"
+                                            class="w-full rounded-xl readonly border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                                            autocomplete="off" />
+                                    </div>
+                                    <div class="mr-2 w-full">
+                                        <div class="w-full my-2">
+                                            <label class="px-2">No.Telp</label>
+
+                                        </div>
+                                        <input id="doctorphone" type="text" name="doctorphone" readonly
+                                            placeholder="Nomor Telepon"
+                                            class="w-full rounded-xl readonly border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                                            autocomplete="off" />
+                                    </div>
+                                </div>
+                            </div>
+                            @if ($transaction->transaction_type == 'KREDIT')
+                                <div class="w-full">
+                                    <div class="w-full my-2">
+                                        <label class="px-2">Cari Debitur</label>
+
+                                    </div>
+                                    <input autofocus required id="debtorSearch" type="text"
+                                        placeholder="Ketik ID / Nama…"
+                                        class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                                        autocomplete="off" />
+
+                                    <!-- Dropdown -->
+                                    <div id="debtorResults"
+                                        class="absolute z-50 mt-2 w-[50%] rounded-xl border border-gray-200 bg-white shadow-lg hidden">
+                                        <ul id="debtorList" role="listbox" class="max-h-80 overflow-auto py-2"></ul>
+                                    </div>
+
+                                    <!-- Hidden field to hold selection (optional) -->
+                                    <input type="hidden" id="selectedDebtorId" />
+                                </div>
+                                <div class="mr-2 w-full">
+                                    <div class="w-full my-2">
+                                        <label class="px-2">Nama Debitur</label>
+
+                                    </div>
+                                    <input id="debtorname" type="text" name="debtorname" readonly
+                                        placeholder="Nama Debitur"
+                                        class="w-full rounded-xl readonly border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                                        autocomplete="off" />
+                                </div>
+                            @endif
+                        @endif
                 </div>
+                @endif
                 <br>
                 @if ($check_transaction == 0)
                     <form method="post" action="{{ route('transaction.createnew') }}" class="">
@@ -100,26 +276,7 @@
             @if ($check_transaction == 1)
                 <div class="card p-6  flex flex-wrap items-center bg-white dashboard-panel">
 
-                    @if ($transaction->transaction_type == 'KREDIT')
-                        <div class="w-full">
-                            <div class="w-full my-2">
-                                <label class="px-2">Cari Debitur</label>
 
-                            </div>
-                            <input autofocus id="debtorSearch" type="text" placeholder="Ketik ID / Nama…"
-                                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                                autocomplete="off" />
-
-                            <!-- Dropdown -->
-                            <div id="debtorResults"
-                                class="absolute z-50 mt-2 w-[50%] rounded-xl border border-gray-200 bg-white shadow-lg hidden">
-                                <ul id="debtorList" role="listbox" class="max-h-80 overflow-auto py-2"></ul>
-                            </div>
-
-                            <!-- Hidden field to hold selection (optional) -->
-                            <input type="hidden" id="selectedDebtorId" />
-                        </div>
-                    @endif
                     <div class="w-full">
                         <div class="w-full my-2">
                             <label class="px-2">Cari Obat</label>
@@ -138,19 +295,9 @@
                         <!-- Hidden field to hold selection (optional) -->
                         <input type="hidden" id="selectedProductId" />
                     </div>
-                    <div class="w-full flex mt-2">
-                        @if ($transaction->transaction_type == 'KREDIT')
-                            <div class="mr-2 w-full">
-                                <div class="w-full my-2">
-                                    <label class="px-2">Nama Debitur</label>
 
-                                </div>
-                                <input id="debtorname" type="text" name="debtorname" readonly
-                                    placeholder="Nama Debitur"
-                                    class="w-full rounded-xl readonly border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                                    autocomplete="off" />
-                            </div>
-                        @endif
+                    <div class="w-full flex mt-2">
+
                         <div class="mr-2 w-full">
                             <div class="w-full my-2">
                                 <label class="px-2">Nama Obat</label>
@@ -314,6 +461,10 @@
                             <input type="hidden" name="paid" id="paid">
                             <input type="hidden" name="changes" id="changes">
                             <input type="hidden" name="transaction_id" id="transaction_id">
+                            <input type="hidden" required name="patient_id" id="patient_id" />
+                            <input type="hidden" @if($transaction->transaction_type == "RESEP TUNAI") value="0" @endif required name="doctor_id" id="doctor_id" />
+                            <input type="hidden" required name="debtor_id" id="debtor_id" />
+
                             <button type="button" id="checkout" disabled onclick="checkoutItem()"
                                 class="btn btn-pharma !rounded-[5.3px] !bg-gray-400 btn-lg btn-icon icon-right mb-1">Selesaikan</button>
                         </form>
@@ -439,19 +590,79 @@
     </div>
     {{-- ============================================================== Modal Invoice  ============================================================== --}}
 
+    {{-- ============================================================== Patient Invoice  ============================================================== --}}
+    <div id="newPatientModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-xl shadow-lg w-full max-w-lg p-6 relative" id="newPatientModalContent">
+            <h3 class="text-lg font-semibold mb-4">Tambah Pasien Baru</h3>
+            <form id="newPatientForm" class="space-y-3">
+
+                <div>
+                    <label for="patientName" class="block mb-1 text-sm font-medium text-gray-700">Nama</label>
+                    <input id="patientName" type="text" name="name" placeholder="Nama"
+                        class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300">
+                </div>
+
+                <div>
+                    <label for="patientAddress" class="block mb-1 text-sm font-medium text-gray-700">Alamat</label>
+                    <input id="patientAddress" type="text" name="address" placeholder="Alamat"
+                        class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300">
+                </div>
+
+                <div>
+                    <label for="patientPhone" class="block mb-1 text-sm font-medium text-gray-700">No. Telepon</label>
+                    <input id="patientPhone" type="text" name="phone" placeholder="No. Telepon"
+                        class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300">
+                </div>
+
+                <div>
+                    <label for="patientCity" class="block mb-1 text-sm font-medium text-gray-700">Kota</label>
+                    <input id="patientCity" type="text" name="city" placeholder="Kota"
+                        class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300">
+                </div>
+
+                <div>
+                    <label for="patientBirth" class="block mb-1 text-sm font-medium text-gray-700">Tanggal Lahir</label>
+                    <input id="patientBirth" type="date" name="birth"
+                        class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300">
+                </div>
+
+                <div class="flex justify-end space-x-2 mt-4">
+                    <button type="button" id="closeNewPatientModal" class="px-4 py-2 bg-gray-300 rounded">Batal</button>
+                    <button type="submit"
+                        class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600">Simpan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {{-- ============================================================== Patient Invoice  ============================================================== --}}
 
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script>
         // ===============================
         // Konstanta & Variabel Global
         // ===============================
+
+        // Patien Modal Variable
+        const newPatientModal = document.getElementById('newPatientModal');
+        const newPatientModalContent = document.getElementById('newPatientModalContent');
+        const openNewPatientBtn = document.getElementById('btnNewPatient');
+        const closeNewPatientBtn = document.getElementById('closeNewPatientModal');
+        const newPatientForm = document.getElementById('newPatientForm');
+
+
+        // Endpoints
         const endpoint = "{{ route('products.search') }}";
         const endpointDebtor = "{{ route('debtors.search') }}";
+        const endpointPatient = "{{ route('patients.search') }}";
+        const endpointDoctor = "{{ route('doctors.search') }}";
+
 
         const trx_id = {{ $transaction?->id ?? 'null' }};
         var rounding = {{ $rounding }};
         var parameters = {{ $parameters }};
         var totaltransaction = {{ $totaltransaction }};
+        var transaction_type = "{{ $transaction->transaction_type }}";
 
         // Elemen DOM
         const input = document.getElementById('productSearch');
@@ -474,11 +685,30 @@
         const debtorlist = document.getElementById('debtorList');
         const debtorhidden = document.getElementById('selectedDebtorId');
 
+
+        // Patient
+        const inputpatient = document.getElementById('patientSearch');
+        const patientname = document.getElementById('patientname');
+        const patientbox = document.getElementById('patientResults');
+        const patientlist = document.getElementById('patientList');
+        const patienthidden = document.getElementById('selectedPatientId');
+
+        // Doctor
+        const inputdoctor = document.getElementById('doctorSearch');
+        const doctorname = document.getElementById('doctorname');
+        const doctorbox = document.getElementById('doctorResults');
+        const doctorlist = document.getElementById('doctorList');
+        const doctorhidden = document.getElementById('selectedDoctorId');
+
         // Variabel kerja
         var transaction_id = trx_id;
         var total_discount = "";
         var total_item = "";
         var medicine_id = "";
+        // var debtor_id = "";
+        // var patient_id = "";
+        // var doctor_id = "";
+
         var price2 = "";
         var subtotal = "";
         var final_price = "";
@@ -655,6 +885,276 @@
 
 
         // ===============================
+        // Pencarian Pasien
+        // ===============================
+
+        function openpatientBox() {
+            patientbox.classList.remove('hidden');
+        }
+
+        function closepatientBox() {
+            patientbox.classList.add('hidden');
+            activeIndex = -1;
+            highlight();
+        }
+
+        function patienthighlight() {
+            [...patientlist.children].forEach((li, i) => {
+                li.classList.toggle('bg-gray-100', i === activeIndex);
+            });
+        }
+
+        function ensurepatientVisible() {
+            const li = patientlist.children[activeIndex];
+            if (!li) return;
+            const lTop = patientlist.scrollTop;
+            const lBottom = lTop + patientlist.clientHeight;
+            const liTop = li.offsetTop;
+            const liBottom = liTop + li.offsetHeight;
+
+            if (liTop < lTop) patientlist.scrollTop = liTop;
+            else if (liBottom > lBottom) patientlist.scrollTop = liBottom - patientlist.clientHeight;
+        }
+
+        function renderpatient(items) {
+            patientlist.innerHTML = '';
+            if (!items.length) {
+                patientlist.innerHTML = `<li class="px-4 py-3 text-sm text-gray-500">Tidak ada hasil</li>`;
+                return;
+            }
+
+            for (const it of items) {
+                const li = document.createElement('li');
+                li.setAttribute('role', 'option');
+                li.className = 'cursor-pointer px-4 py-3 hover:bg-gray-100';
+                li.dataset.id = it.id;
+
+                li.innerHTML = `
+                    <div class="flex items-start justify-between gap-2">
+                        <div>
+                            <div class="font-bold font-poppins text-[#E91E63] capitalize">${escapeHtml(it.name)}</div>
+                            <div class="text-xs pb-1 text-gray-500">
+                                <b>Kode:</b> ${escapeHtml(it.code)}
+                            </div>
+                            <div class="text-xs pb-1 text-gray-500">
+                                <b>Alamat:</b> ${escapeHtml(it.address)}
+                            </div>
+                            <div class="text-xs pb-1 text-gray-500">
+                                <b>Phone:</b> ${escapeHtml(it.phone)}
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                li.addEventListener('mousedown', (e) => {
+                    selectPatient(it);
+                    e.preventDefault();
+                });
+
+                patientlist.appendChild(li);
+            }
+        }
+
+        // ===============================
+        // Search (Debounced)
+        // ===============================
+        const dopatientSearch = debounce(async (term) => {
+            if (!term.trim()) {
+                patientlist.innerHTML = '';
+                closepatientBox();
+                return;
+            }
+            const url = `${endpointPatient}?q=${encodeURIComponent(term)}`;
+            const res = await fetch(url, {
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
+            if (!res.ok) return;
+
+            items = await res.json();
+            renderpatient(items);
+            openpatientBox();
+        }, 250);
+        if (inputpatient) {
+            inputpatient.addEventListener('input', (e) => dopatientSearch(e.target.value));
+
+            inputpatient.addEventListener('keydown', (e) => {
+                const max = items.length - 1;
+
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    if (max < 0) return;
+                    activeIndex = Math.min(max, activeIndex + 1);
+                    patienthighlight();
+                    ensurepatientVisible();
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    if (max < 0) return;
+                    activeIndex = Math.max(0, activeIndex - 1);
+                    patienthighlight();
+                    ensurepatientVisible();
+                } else if (e.key === 'Enter' && activeIndex >= 0 && items[activeIndex]) {
+                    e.preventDefault();
+                    selectPatient(items[activeIndex]);
+                } else if (e.key === 'Escape') {
+                    closepatientBox();
+                }
+            });
+        }
+
+        function selectPatient(it) {
+            patientname.value = it.name;
+            patientaddress.value = it.address;
+            patientphone.value = it.phone
+            document.getElementById('patient_id').value = it.id;
+            if(transaction_type == 'RESEP TUNAI'){
+                document.getElementById('doctorSearch').focus();
+            }else{
+                document.getElementById('debtorSearch').focus();
+            }
+            document.getElementById('patientSearch').value = '';
+            closepatientBox();
+        }
+
+
+        // ===============================
+        // Pencarian Dokter
+        // ===============================
+
+        function opendoctorBox() {
+            doctorbox.classList.remove('hidden');
+        }
+
+        function closedoctorBox() {
+            doctorbox.classList.add('hidden');
+            activeIndex = -1;
+            highlight();
+        }
+
+        function doctorhighlight() {
+            [...doctorlist.children].forEach((li, i) => {
+                li.classList.toggle('bg-gray-100', i === activeIndex);
+            });
+        }
+
+        function ensuredoctorVisible() {
+            const li = doctorlist.children[activeIndex];
+            if (!li) return;
+            const lTop = doctorlist.scrollTop;
+            const lBottom = lTop + doctorlist.clientHeight;
+            const liTop = li.offsetTop;
+            const liBottom = liTop + li.offsetHeight;
+
+            if (liTop < lTop) doctorlist.scrollTop = liTop;
+            else if (liBottom > lBottom) doctorlist.scrollTop = liBottom - doctorlist.clientHeight;
+        }
+
+        function renderdoctor(items) {
+            doctorlist.innerHTML = '';
+            if (!items.length) {
+                doctorlist.innerHTML = `<li class="px-4 py-3 text-sm text-gray-500">Tidak ada hasil</li>`;
+                return;
+            }
+
+            for (const it of items) {
+                const li = document.createElement('li');
+                li.setAttribute('role', 'option');
+                li.className = 'cursor-pointer px-4 py-3 hover:bg-gray-100';
+                li.dataset.id = it.id;
+
+                li.innerHTML = `
+                    <div class="flex items-start justify-between gap-2">
+                        <div>
+                            <div class="font-bold font-poppins text-[#E91E63] capitalize">${escapeHtml(it.name)}</div>
+                            <div class="text-xs pb-1 text-gray-500">
+                                <b>Kode:</b> ${escapeHtml(it.code)}
+                            </div>
+                            <div class="text-xs pb-1 text-gray-500">
+                                <b>Alamat:</b> ${escapeHtml(it.address)}
+                            </div>
+                            <div class="text-xs pb-1 text-gray-500">
+                                <b>Phone:</b> ${escapeHtml(it.phone)}
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                li.addEventListener('mousedown', (e) => {
+                    selectDoctor(it);
+                    e.preventDefault();
+                });
+
+                doctorlist.appendChild(li);
+            }
+        }
+
+        // ===============================
+        // Search (Debounced)
+        // ===============================
+        const dodoctorSearch = debounce(async (term) => {
+            if (!term.trim()) {
+                doctorlist.innerHTML = '';
+                closedoctorBox();
+                return;
+            }
+            const url = `${endpointDoctor}?q=${encodeURIComponent(term)}`;
+            const res = await fetch(url, {
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
+            if (!res.ok) return;
+
+            items = await res.json();
+            renderdoctor(items);
+            opendoctorBox();
+        }, 250);
+        if (inputdoctor) {
+            inputdoctor.addEventListener('input', (e) => dodoctorSearch(e.target.value));
+
+            inputdoctor.addEventListener('keydown', (e) => {
+                const max = items.length - 1;
+
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    if (max < 0) return;
+                    activeIndex = Math.min(max, activeIndex + 1);
+                    doctorhighlight();
+                    ensuredoctorVisible();
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    if (max < 0) return;
+                    activeIndex = Math.max(0, activeIndex - 1);
+                    doctorhighlight();
+                    ensuredoctorVisible();
+                } else if (e.key === 'Enter' && activeIndex >= 0 && items[activeIndex]) {
+                    e.preventDefault();
+                    selectDoctor(items[activeIndex]);
+                } else if (e.key === 'Escape') {
+                    closedoctorBox();
+                }
+            });
+        }
+
+        function selectDoctor(it) {
+            doctorname.value = it.name;
+            doctoraddress.value = it.address;
+            doctorphone.value = it.phone;
+            if(transaction_type == 'RESEP TUNAI'){
+                document.getElementById('productSearch').focus();
+            }else{
+                document.getElementById('debtorSearch').focus();
+            }
+            document.getElementById('doctor_id').value = it.id;
+            document.getElementById('doctorSearch').value = '';
+
+
+            closedoctorBox();
+        }
+
+
+        // ===============================
         // Pencarian Debitur
         // ===============================
 
@@ -774,8 +1274,10 @@
             debtorname.value = it.name;
             parameters = it.parameters[0].receipt;
             rounding = it.parameters[0].rounding;
+            document.getElementById('debtor_id').value = it.id;
             console.log(rounding);
             input.focus();
+            document.getElementById('debtorSearch').value = '';
 
 
             closedebtorBox();
@@ -886,56 +1388,73 @@
         function checkoutItem() {
             const paid = document.getElementById('pay').value;
             const changes = document.getElementById('change').value;
-            const subtotal = tot
-            axios.post("{{ route('transaction.getTransactionItem') }}", {
-                transaction_id,
-                paid,
-                subtotal,
-                changes
-            }).then(response => {
-                var transaction_items = response.data.itemTransaction;
-                var transaction = response.data.transaction;
+            const doctor_id = document.getElementById('doctor_id').value;
+            const debtor_id = document.getElementById('debtor_id').value;
+            const patient_id = document.getElementById('patient_id').value;
 
-                document.getElementById('receipt').textContent = transaction.transactions.transaction_code;
-                document.getElementById('type').textContent = transaction.transactions.transaction_type;
-                document.getElementById('cashier').textContent = transaction.user.name;
-                document.getElementById('customer').textContent = "Client";
-                document.getElementById('invoiceItems').innerHTML = "";
-                document.getElementById('invoiceTotal').innerHTML = "";
+            if (doctor_id == "") {
+                alert("Silahkan Pilih Dokter Dulu")
+            } else if (debtor_id == "") {
+                alert("Silahkan Pilih Debitur DUlu")
 
-                transaction_items.forEach(item => {
-                    document.getElementById('invoiceItems').innerHTML += `
+            } else if (patient_id == "") {
+                alert("Silahkan Pilih Pasien")
+
+            } else {
+                axios.post("{{ route('transaction.getTransactionItem') }}", {
+                    transaction_id,
+                    paid,
+                    subtotal,
+                    doctor_id,
+                    debtor_id,
+                    patient_id,
+                    changes
+                }).then(response => {
+                    var transaction_items = response.data.itemTransaction;
+                    var transaction = response.data.transaction;
+
+                    document.getElementById('receipt').textContent = transaction.transactions.transaction_code;
+                    document.getElementById('type').textContent = transaction.transactions.transaction_type;
+                    document.getElementById('cashier').textContent = transaction.user.name;
+                    document.getElementById('customer').textContent = "Client";
+                    document.getElementById('invoiceItems').innerHTML = "";
+                    document.getElementById('invoiceTotal').innerHTML = "";
+
+                    transaction_items.forEach(item => {
+                        document.getElementById('invoiceItems').innerHTML += `
                         <tr>
                             <td>${item.medicine.name}</td>
                             <td>${item.quantity}</td>
                             <td>${formatRupiah(item.total_price)}</td>
                         </tr>
                     `;
-                });
+                    });
 
-                document.getElementById('invoiceTotal').innerHTML += `
+                    document.getElementById('invoiceTotal').innerHTML += `
                     <tr><td>Total</td><td></td><td>${formatRupiah(totaltransaction)}</td></tr>
                     <tr><td>Tunai</td><td></td><td>${paid}</td></tr>
                     <tr><td>Kembali</td><td></td><td>${changes}</td></tr>
                 `;
 
-                if (confirm("Apakah anda ingin mencetak struk?")) {
-                    const modal = document.getElementById("invoiceModal");
-                    const content = document.getElementById("invoiceContent");
-                    modal.classList.remove("hidden");
+                    if (confirm("Apakah anda ingin mencetak struk?")) {
+                        const modal = document.getElementById("invoiceModal");
+                        const content = document.getElementById("invoiceContent");
+                        modal.classList.remove("hidden");
 
-                    requestAnimationFrame(() => {
-                        modal.classList.add("opacity-100");
-                        content.classList.remove("scale-95");
-                        content.classList.add("scale-100");
-                    });
-                } else {
-                    document.getElementById("transaction_id").value = transaction_id;
-                    document.getElementById("checkoutForm").submit();
-                }
-            }).catch(error => {
-                console.error("❌ Error getting cart:", error.response ? error.response.data : error.message);
-            });
+                        requestAnimationFrame(() => {
+                            modal.classList.add("opacity-100");
+                            content.classList.remove("scale-95");
+                            content.classList.add("scale-100");
+                        });
+                    } else {
+                        document.getElementById("transaction_id").value = transaction_id;
+                        document.getElementById("checkoutForm").submit();
+                    }
+                }).catch(error => {
+                    console.error("❌ Error getting cart:", error.response ? error.response.data : error.message);
+                });
+            }
+
         }
 
         function closeInvoice() {
@@ -1045,6 +1564,60 @@
         input.addEventListener('focus', () => {
             clearTimeout(closeTimeout);
             if (list.children.length) openBox();
+        });
+
+        // ===============================
+        // Patient Modal Control
+        // ===============================
+        openNewPatientBtn.addEventListener('click', () => {
+            newPatientModal.classList.remove('hidden');
+            document.getElementById('patientName').focus();
+        });
+
+        // Close button
+        closeNewPatientBtn.addEventListener('click', () => {
+            newPatientModal.classList.add('hidden');
+        });
+
+        // Outside click
+        newPatientModal.addEventListener('click', (e) => {
+            if (!newPatientModalContent.contains(e.target)) {
+                newPatientModal.classList.add('hidden');
+            }
+        });
+
+        // Inset Patient
+        newPatientForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            let formData = new FormData(this);
+
+            axios.post("{{ route('transaction.addPatient') }}", formData, {
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'Content-Type': 'multipart/form-data'
+                    }
+                })
+                .then(response => {
+                    if (response.data.success) {
+                        alert("Pasien berhasil ditambahkan!");
+                        newPatientModal.classList.add('hidden');
+                        newPatientForm.reset();
+
+                        // Auto-fill patient field with new patient
+                        document.getElementById("patientname").value = response.data.patient.name;
+                        document.getElementById("patientaddress").value = response.data.patient.address;
+                        document.getElementById("patientphone").value = response.data.patient.phone;
+
+                        document.getElementById("selectedPatientId").value = response.data.patient.id;
+                    } else {
+                        alert("Gagal menambahkan pasien.");
+                    }
+                })
+                .catch(error => {
+                    console.error(error);
+                    alert("Terjadi kesalahan, coba lagi.");
+                });
         });
     </script>
 
