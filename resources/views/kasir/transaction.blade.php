@@ -35,232 +35,55 @@
                     <!-- Resep Credit -->
                     <a href="{{ url('transaction/kredit') }}">
                         <button
-                            class="flex flex-col items-center justify-center w-40 h-24  {{ request()->is('transaction/kredit') ? 'transaction-item-active shadow-none' : '' }}  border-[#D6D5D5] border rounded-2xl shadow-sm hover:bg-gray-50">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 mb-2" fill="none" viewBox="0 0 24 24"
+                            class="flex flex-col items-center justify-center w-[90px] h-[75px]  {{ request()->is('transaction/kredit') ? 'transaction-item-active shadow-none' : '' }}  border-[#D6D5D5] border rounded-2xl shadow-sm hover:bg-gray-50">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mb-2" fill="none" viewBox="0 0 24 24"
                                 stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M2.25 6.75h19.5v10.5H2.25zM2.25 9.75h19.5" />
                             </svg>
-                            <span class="text-sm font-medium">Resep Credit</span>
+                            <span class="text-[10px] font-semibold font-poppins">Resep Credit</span>
                         </button>
                     </a>
 
                     <!-- Resep Tunai -->
                     <a href="{{ url('transaction/resep') }}">
                         <button
-                            class="flex flex-col items-center justify-center w-40 h-24 {{ request()->is('transaction/resep') ? 'transaction-item-active shadow-none' : '' }} border-[#D6D5D5] border rounded-2xl shadow-sm hover:bg-gray-50">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 mb-2" fill="none" viewBox="0 0 24 24"
+                            class="flex flex-col items-center justify-center w-[90px] h-[75px] {{ request()->is('transaction/resep') ? 'transaction-item-active shadow-none' : '' }} border-[#D6D5D5] border rounded-2xl shadow-sm hover:bg-gray-50">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mb-2" fill="none" viewBox="0 0 24 24"
                                 stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M2.25 6.75h19.5v10.5H2.25zM2.25 9.75h19.5" />
                             </svg>
-                            <span class="text-sm font-medium">Resep Tunai</span>
+                            <span class="text-[10px] font-semibold font-poppins">Resep Tunai</span>
                         </button>
                     </a>
 
                     <!-- HV/OTC -->
                     <a href="{{ url('transaction/hv') }}">
                         <button
-                            class="flex flex-col items-center justify-center w-40 h-24 border-[#D6D5D5] {{ request()->is('transaction/hv') ? 'transaction-item-active shadow-none' : '' }} border rounded-2xl shadow-sm hover:bg-gray-50">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 mb-2" fill="none" viewBox="0 0 24 24"
+                            class="flex flex-col items-center justify-center w-[90px] h-[75px] border-[#D6D5D5] {{ request()->is('transaction/hv') ? 'transaction-item-active shadow-none' : '' }} border rounded-2xl shadow-sm hover:bg-gray-50">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mb-2" fill="none" viewBox="0 0 24 24"
                                 stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M2.25 6.75h19.5v10.5H2.25zM2.25 9.75h19.5" />
                             </svg>
-                            <span class="text-sm font-medium">HV/OTC</span>
+                            <span class="text-[10px] font-semibold font-poppins">HV/OTC</span>
                         </button>
                     </a>
 
                     <!-- UPDS -->
                     <a href="{{ url('transaction/upds') }}">
                         <button
-                            class="flex flex-col items-center justify-center w-40 h-24 border-[#D6D5D5] {{ request()->is('transaction/upds') ? 'transaction-item-active shadow-none' : '' }} border rounded-2xl shadow-sm hover:bg-gray-50">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 mb-2" fill="none" viewBox="0 0 24 24"
+                            class="flex flex-col items-center justify-center w-[90px] h-[75px] border-[#D6D5D5] {{ request()->is('transaction/upds') ? 'transaction-item-active shadow-none' : '' }} border rounded-2xl shadow-sm hover:bg-gray-50">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mb-2" fill="none" viewBox="0 0 24 24"
                                 stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M2.25 6.75h19.5v10.5H2.25zM2.25 9.75h19.5" />
                             </svg>
-                            <span class="text-sm font-medium">UPDS</span>
+                            <span class="text-[10px] font-semibold font-poppins">UPDS</span>
                         </button>
                     </a>
-                    @if ($check_transaction == 1)
-                        @if ($transaction->transaction_type == 'KREDIT' || $transaction->transaction_type == 'RESEP TUNAI')
-                            <div class="w-full">
-                                <div class="w-full my-2">
-                                    <label class="px-2">Cari Pasien</label>
-
-                                </div>
-                                <div class="flex items-center">
-                                    <div class="searchdebtors w-full">
-
-                                        <input autofocus required id="patientSearch" type="text"
-                                            placeholder="Ketik ID / Nama…"
-                                            class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                                            autocomplete="off" />
-                                        <!-- Dropdown -->
-                                        <div id="patientResults"
-                                            class="absolute z-50 mt-2 w-[50%] rounded-xl border border-gray-200 bg-white shadow-lg hidden">
-                                            <ul id="patientList" role="listbox" class="max-h-80 overflow-auto py-2"></ul>
-                                        </div>
-                                    </div>
-
-                                    <div class="adddebtors w-[120px] ml-[10px]">
-                                        <button type="button" id="btnNewPatient"
-                                            class="btn btn-add my-1 !rounded-[10px] !bg-[##FFC107] p-1 py-3 font-poppin font-bold">
-                                            <div class="flex items-center justify-center gap-2">
-                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-                                                    class="w-6 h-6 text-[#62b9ff]"> <!-- color controlled by text-* -->
-                                                    <circle cx="15" cy="8" r="4" fill="currentColor" />
-                                                    <path d="M15,14c-6.1,0-8,4-8,4v2h16v-2C23,18,21.1,14,15,14z"
-                                                        fill="currentColor" />
-                                                    <line stroke="currentColor" stroke-miterlimit="10" stroke-width="2"
-                                                        x1="5" x2="5" y1="7" y2="15" />
-                                                    <line stroke="currentColor" stroke-miterlimit="10" stroke-width="2"
-                                                        x1="9" x2="1" y1="11" y2="11" />
-                                                </svg>
-
-                                                <div class="text-[#62b9ff]">
-                                                    Baru
-                                                </div>
-                                            </div>
-
-
-
-                                        </button>
-                                    </div>
-
-
-                                    <!-- Hidden field to hold selection (optional) -->
-                                    <input type="hidden" id="selectedPatientId" />
-
-                                </div>
-                                <div class="w-full flex mt-1 mb-2">
-                                    <div class="mr-2 w-full">
-                                        <div class="w-full my-2">
-                                            <label class="px-2">Nama Pasien</label>
-
-                                        </div>
-                                        <input id="patientname" type="text" name="patientname" readonly
-                                            placeholder="Nama Pasien"
-                                            class="w-full rounded-xl readonly border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                                            autocomplete="off" />
-                                    </div>
-                                    <div class="mr-2 w-full">
-                                        <div class="w-full my-2">
-                                            <label class="px-2">Alamat</label>
-
-                                        </div>
-                                        <input id="patientaddress" type="text" name="patientaddress" readonly
-                                            placeholder="Alamat Pasien"
-                                            class="w-full rounded-xl readonly border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                                            autocomplete="off" />
-                                    </div>
-                                    <div class="mr-2 w-full">
-                                        <div class="w-full my-2">
-                                            <label class="px-2">No.Telp</label>
-
-                                        </div>
-                                        <input id="patientphone" type="text" name="patientphone" readonly
-                                            placeholder="Nama Pasien"
-                                            class="w-full rounded-xl readonly border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                                            autocomplete="off" />
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="w-full">
-                                <div class="w-full my-2">
-                                    <label class="px-2">Cari Dokter</label>
-
-                                </div>
-                                <div class="flex items-center">
-                                    <div class="searchdoctors w-full">
-
-                                        <input autofocus required id="doctorSearch" type="text"
-                                            placeholder="Ketik ID / Nama…"
-                                            class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                                            autocomplete="off" />
-                                        <!-- Dropdown -->
-                                        <div id="doctorResults"
-                                            class="absolute z-50 mt-2 w-[50%] rounded-xl border border-gray-200 bg-white shadow-lg hidden">
-                                            <ul id="doctorList" role="listbox" class="max-h-80 overflow-auto py-2"></ul>
-                                        </div>
-                                    </div>
-
-
-
-
-                                    <!-- Hidden field to hold selection (optional) -->
-                                    <input type="hidden" id="selectedDoctorId" />
-
-                                </div>
-                                <div class="w-full flex mt-1 mb-2">
-                                    <div class="mr-2 w-full">
-                                        <div class="w-full my-2">
-                                            <label class="px-2">Nama Dokter</label>
-
-                                        </div>
-                                        <input id="doctorname" type="text" name="doctorname" readonly
-                                            placeholder="Nama Pasien"
-                                            class="w-full rounded-xl readonly border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                                            autocomplete="off" />
-                                    </div>
-                                    <div class="mr-2 w-full">
-                                        <div class="w-full my-2">
-                                            <label class="px-2">Alamat</label>
-
-                                        </div>
-                                        <input id="doctoraddress" type="text" name="doctoraddress" readonly
-                                            placeholder="Alamat Pasien"
-                                            class="w-full rounded-xl readonly border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                                            autocomplete="off" />
-                                    </div>
-                                    <div class="mr-2 w-full">
-                                        <div class="w-full my-2">
-                                            <label class="px-2">No.Telp</label>
-
-                                        </div>
-                                        <input id="doctorphone" type="text" name="doctorphone" readonly
-                                            placeholder="Nomor Telepon"
-                                            class="w-full rounded-xl readonly border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                                            autocomplete="off" />
-                                    </div>
-                                </div>
-                            </div>
-                            @if ($transaction->transaction_type == 'KREDIT')
-                                <div class="w-full">
-                                    <div class="w-full my-2">
-                                        <label class="px-2">Cari Debitur</label>
-
-                                    </div>
-                                    <input autofocus required id="debtorSearch" type="text"
-                                        placeholder="Ketik ID / Nama…"
-                                        class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                                        autocomplete="off" />
-
-                                    <!-- Dropdown -->
-                                    <div id="debtorResults"
-                                        class="absolute z-50 mt-2 w-[50%] rounded-xl border border-gray-200 bg-white shadow-lg hidden">
-                                        <ul id="debtorList" role="listbox" class="max-h-80 overflow-auto py-2"></ul>
-                                    </div>
-
-                                    <!-- Hidden field to hold selection (optional) -->
-                                    <input type="hidden" id="selectedDebtorId" />
-                                </div>
-                                <div class="mr-2 w-full">
-                                    <div class="w-full my-2">
-                                        <label class="px-2">Nama Debitur</label>
-
-                                    </div>
-                                    <input id="debtorname" type="text" name="debtorname" readonly
-                                        placeholder="Nama Debitur"
-                                        class="w-full rounded-xl readonly border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                                        autocomplete="off" />
-                                </div>
-                            @endif
-                        @endif
                 </div>
-                @endif
-                <br>
                 @if ($check_transaction == 0)
                     <form method="post" action="{{ route('transaction.createnew') }}" class="">
                         @csrf
@@ -278,97 +101,178 @@
 
 
                     <div class="w-full">
-                        <div class="w-full my-2">
-                            <label class="px-2">Cari Obat</label>
 
+                        <div class="flex gap-2 items-center">
+
+                            @if ($transaction->transaction_type == 'KREDIT')
+                                <div class="w-full">
+                                    <div class="w-full my-1">
+                                        <label class="text-[13px] font-poppins font-semibold">Cari Debitur</label>
+
+                                    </div>
+                                    <input autofocus required id="debtorSearch" type="text"
+                                        placeholder="Ketik ID / Nama…"
+                                        class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300 text-[11px] font-poppins"
+                                        autocomplete="off" />
+
+                                    <!-- Dropdown -->
+                                    <div id="debtorResults"
+                                        class="absolute z-50 mt-2 w-[50%] rounded-xl border border-gray-200 bg-white shadow-lg hidden">
+                                        <ul id="debtorList" role="listbox" class="max-h-80 overflow-auto py-2"></ul>
+                                    </div>
+
+                                    <!-- Hidden field to hold selection (optional) -->
+                                    <input type="hidden" id="selectedDebtorId" />
+                                </div>
+                                <div class="mr-2 w-full hidden">
+                                    <div class="w-full my-1">
+                                        <label class="text-[13px] font-poppins font-semibold">Nama Debitur</label>
+
+                                    </div>
+                                    <input id="debtorname" type="text" name="debtorname" readonly
+                                        placeholder="Nama Debitur"
+                                        class="w-full rounded-md readonly border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300 text-[11px] font-poppins"
+                                        autocomplete="off" />
+                                </div>
+                            @endif
+                            <div class="w-full">
+                                <div class="w-full my-1">
+                                    <label class="text-[13px] font-poppins font-semibold">Cari Obat</label>
+
+                                </div>
+                                <input autofocus id="productSearch" type="text" placeholder="Ketik KODE / ID / Nama…"
+                                    class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300 text-[11px] font-poppins"
+                                    autocomplete="off" />
+
+                                <!-- Dropdown -->
+                                <div id="productResults"
+                                    class="absolute z-50 mt-2 w-[50%] rounded-xl border border-gray-200 bg-white shadow-lg hidden">
+                                    <ul id="productList" role="listbox" class="max-h-80 overflow-auto py-2"></ul>
+                                </div>
+
+                                <!-- Hidden field to hold selection (optional) -->
+                                <input type="hidden" id="selectedProductId" />
+                            </div>
                         </div>
-                        <input autofocus id="productSearch" type="text" placeholder="Ketik KODE / ID / Nama…"
-                            class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                            autocomplete="off" />
 
-                        <!-- Dropdown -->
-                        <div id="productResults"
-                            class="absolute z-50 mt-2 w-[50%] rounded-xl border border-gray-200 bg-white shadow-lg hidden">
-                            <ul id="productList" role="listbox" class="max-h-80 overflow-auto py-2"></ul>
-                        </div>
-
-                        <!-- Hidden field to hold selection (optional) -->
-                        <input type="hidden" id="selectedProductId" />
                     </div>
 
-                    <div class="w-full flex mt-2">
+                    <div class="w-full flex">
 
                         <div class="mr-2 w-full">
-                            <div class="w-full my-2">
-                                <label class="px-2">Nama Obat</label>
+                            <div class="w-full my-1">
+                                <label class="text-[13px] font-poppins font-semibold">Nama Obat</label>
 
                             </div>
                             <input id="name" type="text" name="name" readonly placeholder="Nama obat"
-                                class="w-full rounded-xl readonly border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                                class="w-full rounded-md readonly border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300 text-[11px] font-poppins"
                                 autocomplete="off" />
                         </div>
                         <div class="mr-2">
-                            <div class="w-full my-2">
-                                <label class="px-2">Stok</label>
+                            <div class="w-full my-1">
+                                <label class="text-[13px] font-poppins font-semibold">Stok</label>
 
                             </div>
                             <input id="stock" name="stock" readonly type="text" placeholder="Stok"
-                                class="w-full rounded-xl readonly border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                                class="w-full rounded-md readonly border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300 text-[11px] font-poppins"
                                 autocomplete="off" />
                         </div>
                         <div class="mr-2">
-                            <div class="w-full my-2">
-                                <label class="px-2">Satuan</label>
+                            <div class="w-full my-1">
+                                <label class="text-[13px] font-poppins font-semibold">Satuan</label>
 
                             </div>
                             <input type="text" id="unit" name="unit" readonly placeholder="Satuan"
-                                class="w-full rounded-xl readonly border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                                class="w-full rounded-md readonly border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300 text-[11px] font-poppins"
                                 autocomplete="off" />
                         </div>
                     </div>
-                    <div class="flex justify-start mt-2 w-full">
-                        <div class="mr-2 w-[90%]">
-                            <div class="w-full my-2">
-                                <label class="px-2">Harga</label>
-
-                            </div>
-                            <input id="price" type="text" name="price" readonly placeholder="Harga obat"
-                                class="w-full rounded-xl readonly border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                                autocomplete="off" />
-                        </div>
-                        <div class="mr-2">
-                            <div class="w-full my-2">
-                                <label class="px-2">Jumlah Beli</label>
-
-                            </div>
-                            <input id="quantity" required name="quantity" onkeyup="count(this.value)" type="number"
-                                placeholder="Quantity"
-                                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                                autocomplete="off" />
+                    <div>
+                        <div class="flex pt-2 items-center">
+                            <input id="receiptbox" type="checkbox" value=""
+                                class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded-sm focus:ring-blue-500 dark:focus:ring-blue-600">
+                            <label for="receiptbox" class="ms-2 text-sm font-medium text-gray-900"><a href="#"
+                                    class="text-blue-600 dark:text-blue-500 hover:underline">Resep Racik?</a></label>
                         </div>
                     </div>
-                    <div class="flex justify-start mt-2 w-full">
+                    @if ($transaction->transaction_type == 'KREDIT' || $transaction->transaction_type == 'RESEP TUNAI')
+                        <div class="w-full flex">
+
+                            <div class="mr-2">
+                                <div class="w-full my-1">
+                                    <label class="text-[13px] font-poppins font-semibold">Dosis</label>
+
+                                </div>
+                                <input id="dosage" name="dosage" readonly type="text" placeholder="Dosis"
+                                    class="w-full rounded-md readonly border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300 text-[11px] font-poppins"
+                                    autocomplete="off" />
+                            </div>
+                            <div class="mr-2">
+                                <div class="w-full my-1">
+                                    <label class="text-[13px] font-poppins font-semibold">Bungkus</label>
+
+                                </div>
+                                <input type="text" id="package" name="package" readonly placeholder="Bungkus"
+                                    class="w-full rounded-md readonly border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300 text-[11px] font-poppins"
+                                    autocomplete="off" />
+                            </div>
+                            <div class="mr-2">
+                                <div class="w-full my-1">
+                                    <label class="text-[13px] font-poppins font-semibold">Dosis R/</label>
+
+                                </div>
+                                <input onkeyup="calculatePackage()" id="dosage_r" name="dosage_r" readonly
+                                    type="text" placeholder="Dosis Resep"
+                                    class="w-full rounded-md readonly border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300 text-[11px] font-poppins"
+                                    autocomplete="off" />
+                            </div>
+
+                            <div class="mr-2 w-[90%]">
+                                <div class="w-full my-1">
+                                    <label class="text-[13px] font-poppins font-semibold">Harga</label>
+
+                                </div>
+                                <input id="price" type="text" name="price" readonly placeholder="Harga obat"
+                                    class="w-full rounded-md readonly border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300 text-[11px] font-poppins"
+                                    autocomplete="off" />
+                            </div>
+                            <div class="mr-2">
+                                <div class="w-full my-1">
+                                    <label class="text-[13px] font-poppins font-semibold">Jumlah Beli</label>
+
+                                </div>
+                                <input id="quantity" required name="quantity" onkeyup="count(this.value)"
+                                    type="number" placeholder="Quantity"
+                                    class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300 text-[11px] font-poppins"
+                                    autocomplete="off" />
+                            </div>
+                        </div>
+                    @endif
+                    {{-- <div class="flex justify-start mt-1 w-full"> --}}
+
+                    {{-- </div> --}}
+                    <div class="flex justify-start w-full">
                         <div class="mr-2 w-[40%]">
-                            <div class="w-full my-2">
-                                <label class="px-2">Discount</label>
+                            <div class="w-full my-1">
+                                <label class="text-[13px] font-poppins font-semibold">Discount</label>
 
                             </div>
                             <input id="discount" name="discount" onkeyup="countDiscount(this.value)" type="text"
                                 placeholder="Discount"
-                                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                                class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300 text-[11px] font-poppins"
                                 autocomplete="off" />
                         </div>
                         <div class="mr-2 w-full">
-                            <div class="w-full my-2">
-                                <label class="px-2">Total Harga</label>
+                            <div class="w-full my-1">
+                                <label class="text-[13px] font-poppins font-semibold">Total Harga</label>
                             </div>
                             <input type="text" name="total_price" readonly tabindex="-1" id="total"
                                 placeholder="Total Harga"
-                                class="w-full readonly rounded-xl border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                                class="w-full readonly rounded-xl border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300 text-[11px] font-poppins"
                                 autocomplete="off" />
                         </div>
                         <div class="mr-2 w-full self-end">
-                            <div class="w-full my-2">
+                            <div class="w-full my-1">
                             </div>
                             <button type="button" onclick="submit()"
                                 class="btn btn-pos my-1 !bg-[##FFC107] p-1 py-3 font-poppin font-bold">
@@ -386,7 +290,7 @@
             <aside class="col-span-12 lg:col-span-4 space-y-6 dashboard-panel">
                 <div class="card p-6 bg-white">
                     <h2 class="text-xl font-semibold mb-4">Barang Dibeli</h2>
-                    <div tabindex="-1" class="mt-4 rounded-2xl bg-gray-100 h-64 overflow-y-scroll md:h-80">
+                    <div tabindex="-1" class="mt-4 rounded-2xl bg-gray-100 h-64 overflow-y-scroll md:h-[230px]">
                         <div class="flex flex-col justify-between">
                             <br>
                             <div id="carts">
@@ -423,36 +327,136 @@
                         </div>
                     </div>
                     <div class="mr-2 w-[100%]">
-                        <div class="w-full my-2">
-                            <label class="px-2">Total</label>
+                        @if ($check_transaction == 1)
+                            @if ($transaction->transaction_type == 'KREDIT' || $transaction->transaction_type == 'RESEP TUNAI')
+                                <div class="w-full">
+                                    <label class="text-[13px] font-poppins font-semibold">Cari Pasien</label>
+
+                                    <div class="flex items-center">
+                                        <div class="searchdebtors w-full">
+
+                                            <input autofocus required id="patientSearch" type="text"
+                                                placeholder="Ketik ID / Nama…"
+                                                class="w-full rounded-xl border my-1 border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                                                autocomplete="off" />
+                                            <!-- Dropdown -->
+                                            <div id="patientResults"
+                                                class="absolute z-50 mt-2 w-[50%] rounded-xl border border-gray-200 bg-white shadow-lg hidden">
+                                                <ul id="patientList" role="listbox" class="max-h-80 overflow-auto py-2">
+                                                </ul>
+                                            </div>
+                                        </div>
+
+                                        <div class="adddebtors w-[120px] ml-[10px]">
+                                            <button type="button" id="btnNewPatient"
+                                                class="btn btn-add !rounded-[10px] !bg-[##FFC107] p-1 py-2 font-poppin font-bold">
+                                                <div class="flex items-center justify-center gap-2">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                                                        class="w-6 h-6 text-[#62b9ff]"> <!-- color controlled by text-* -->
+                                                        <circle cx="15" cy="8" r="4"
+                                                            fill="currentColor" />
+                                                        <path d="M15,14c-6.1,0-8,4-8,4v2h16v-2C23,18,21.1,14,15,14z"
+                                                            fill="currentColor" />
+                                                        <line stroke="currentColor" stroke-miterlimit="10"
+                                                            stroke-width="2" x1="5" x2="5"
+                                                            y1="7" y2="15" />
+                                                        <line stroke="currentColor" stroke-miterlimit="10"
+                                                            stroke-width="2" x1="9" x2="1"
+                                                            y1="11" y2="11" />
+                                                    </svg>
+
+                                                    <div class="text-[#62b9ff]">
+                                                        Baru
+                                                    </div>
+                                                </div>
+                                            </button>
+                                        </div>
+                                        <!-- Hidden field to hold selection (optional) -->
+                                        <input type="hidden" id="selectedPatientId" />
+
+                                    </div>
+                                    <div class="w-full hidden mt-1 mb-1">
+                                        <div class="mr-2 w-full">
+                                            <div class="w-full">
+                                                <label class="text-[13px] font-poppins font-semibold pb-1">Nama
+                                                    Pasien</label>
+                                            </div>
+                                            <input id="patientname" class="hidden" type="text" name="patientname"
+                                                readonly placeholder="Nama Pasien"
+                                                class="w-full rounded-xl readonly border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                                                autocomplete="off" />
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="w-full">
+                                    <div class="w-full">
+                                        <label class="text-[13px] font-poppins font-semibold pb-1">Cari Dokter</label>
+
+                                    </div>
+                                    <div class="flex items-center">
+                                        <div class="searchdoctors w-full">
+
+                                            <input autofocus required id="doctorSearch" type="text"
+                                                placeholder="Ketik ID / Nama…"
+                                                class="w-full rounded-xl border my-1 border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                                                autocomplete="off" />
+                                            <!-- Dropdown -->
+                                            <div id="doctorResults"
+                                                class="absolute z-50 mt-2 w-[50%] rounded-xl border border-gray-200 bg-white shadow-lg hidden">
+                                                <ul id="doctorList" role="listbox" class="max-h-80 overflow-auto py-2">
+                                                </ul>
+                                            </div>
+                                        </div>
+                                        <!-- Hidden field to hold selection (optional) -->
+                                        <input type="hidden" id="selectedDoctorId" />
+
+                                    </div>
+                                    <div class="w-full hidden mt-1 mb-2">
+                                        <div class="mr-2 w-full">
+                                            <div class="w-full">
+                                                <label class="text-[13px] font-poppins font-semibold pb-1">Nama
+                                                    Dokter</label>
+
+                                            </div>
+                                            <input id="doctorname" type="text" name="doctorname" readonly
+                                                placeholder="Nama Pasien"
+                                                class="w-full rounded-xl readonly border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                                                autocomplete="off" />
+                                        </div>
+                                    </div>
+                                </div>
+                            @endif
+                        @endif
+                    </div>
+                    <div class="mr-2 w-[100%] mt-1">
+                        <div class="w-full">
+                            <label class="text-[13px] font-poppins font-semibold pb-1">Total</label>
 
                         </div>
                         <input id="carttotal" tabindex="-1" readonly type="text" name="carttotal"
                             placeholder="Total obat"
-                            class="w-full rounded-xl readonly border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                            class="w-full rounded-xl my-1 readonly border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
                             autocomplete="off" />
 
                     </div>
-                    <div class="mr-2 w-[100%]">
-                        <div class="w-full my-2">
-                            <label class="px-2">Bayar</label>
+                    <div class="mr-2 flex gap-2 w-[100%] mt-1">
+                        <div class="w-full">
+                            <label class="text-[13px] font-poppins font-semibold pb-1">Bayar</label>
+                            <input id="pay" onkeyup="pay(this.value)" type="text" name="pay"
+                                placeholder="Bayar obat"
+                                class="w-full rounded-xl border my-1 border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                                autocomplete="off" />
+
 
                         </div>
-                        <input id="pay" onkeyup="pay(this.value)" type="text" name="pay"
-                            placeholder="Bayar obat"
-                            class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                            autocomplete="off" />
-
-                    </div>
-                    <div class="mr-2 w-[100%]">
-                        <div class="w-full my-2">
-                            <label class="px-2">Kembalian</label>
-
+                        <div class="w-full">
+                            <label class="text-[13px] font-poppins font-semibold pb-1">Kembalian</label>
+                            <input id="change" tabindex="-1" readonly type="text" name="change"
+                                placeholder="Bayar obat"
+                                class="w-full rounded-xl border my-1 readonly border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                                autocomplete="off" />
                         </div>
-                        <input id="change" tabindex="-1" readonly type="text" name="change"
-                            placeholder="Bayar obat"
-                            class="w-full rounded-xl border readonly border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                            autocomplete="off" />
+
 
                     </div>
                     <div class="mt-5">
@@ -462,7 +466,8 @@
                             <input type="hidden" name="changes" id="changes">
                             <input type="hidden" name="transaction_id" id="transaction_id">
                             <input type="hidden" required name="patient_id" id="patient_id" />
-                            <input type="hidden" @if($transaction->transaction_type == "RESEP TUNAI") value="0" @endif required name="doctor_id" id="doctor_id" />
+                            <input type="hidden" @if ($transaction->transaction_type == 'RESEP TUNAI') value="0" @endif required
+                                name="doctor_id" id="doctor_id" />
                             <input type="hidden" required name="debtor_id" id="debtor_id" />
 
                             <button type="button" id="checkout" disabled onclick="checkoutItem()"
@@ -594,7 +599,7 @@
     <div id="newPatientModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div class="bg-white rounded-xl shadow-lg w-full max-w-lg p-6 relative" id="newPatientModalContent">
             <h3 class="text-lg font-semibold mb-4">Tambah Pasien Baru</h3>
-            <form id="newPatientForm" class="space-y-3">
+            <form id="newPatientForm" method="POST" class="space-y-3">
 
                 <div>
                     <label for="patientName" class="block mb-1 text-sm font-medium text-gray-700">Nama</label>
@@ -662,7 +667,7 @@
         var rounding = {{ $rounding }};
         var parameters = {{ $parameters }};
         var totaltransaction = {{ $totaltransaction }};
-        var transaction_type = "{{ $transaction->transaction_type }}";
+        var transaction_type = "{{ $transaction?->transaction_type ?? 'null' }}";
 
         // Elemen DOM
         const input = document.getElementById('productSearch');
@@ -670,6 +675,7 @@
         const stock = document.getElementById('stock');
         const unit = document.getElementById('unit');
         const quantity = document.getElementById('quantity');
+        const dosage = document.getElementById('dosage');
         const price = document.getElementById('price');
         const totalprice = document.getElementById('total');
         const discountInput = document.getElementById('discount');
@@ -699,6 +705,13 @@
         const doctorbox = document.getElementById('doctorResults');
         const doctorlist = document.getElementById('doctorList');
         const doctorhidden = document.getElementById('selectedDoctorId');
+
+
+        // Dosage
+        const checkbox = document.getElementById('receiptbox');
+        const dosageInput = document.getElementById('dosage');
+        const dosageRInput = document.getElementById('dosage_r');
+        const packageInput = document.getElementById('package');
 
         // Variabel kerja
         var transaction_id = trx_id;
@@ -827,13 +840,19 @@
             stock.value = it.stock;
             unit.value = it.unit;
             name.value = it.name;
+            dosage.value = it.dosage;
+
             console.log("Harga : " + it.net_price + "Parameter : " + parameters + "Pembulatan : " + rounding);
             let raw = (+it.net_price * +parameters) + +rounding;
             let rounded = Math.floor(raw / 1000) * 1000;
             price.value = formatRupiah(rounded);
             console.log("harga Total : " + raw);
             price2 = rounded;
-            quantity.focus();
+            if (transaction_type == 'RESEP TUNAI') {
+                discountInput.focus();
+            } else {
+                quantity.focus();
+            }
             quantity.select();
             closeBox();
         }
@@ -1005,15 +1024,13 @@
 
         function selectPatient(it) {
             patientname.value = it.name;
-            patientaddress.value = it.address;
-            patientphone.value = it.phone
             document.getElementById('patient_id').value = it.id;
-            if(transaction_type == 'RESEP TUNAI'){
+            if (transaction_type == 'RESEP TUNAI') {
                 document.getElementById('doctorSearch').focus();
-            }else{
+            } else {
                 document.getElementById('debtorSearch').focus();
             }
-            document.getElementById('patientSearch').value = '';
+            patientSearch.value = it.name;
             closepatientBox();
         }
 
@@ -1139,15 +1156,14 @@
 
         function selectDoctor(it) {
             doctorname.value = it.name;
-            doctoraddress.value = it.address;
-            doctorphone.value = it.phone;
-            if(transaction_type == 'RESEP TUNAI'){
-                document.getElementById('productSearch').focus();
-            }else{
+
+            if (transaction_type == 'RESEP TUNAI') {
+                document.getElementById('pay').focus();
+            } else {
                 document.getElementById('debtorSearch').focus();
             }
             document.getElementById('doctor_id').value = it.id;
-            document.getElementById('doctorSearch').value = '';
+            document.getElementById('doctorSearch').value = it.name;
 
 
             closedoctorBox();
@@ -1272,12 +1288,18 @@
 
         function selectDebtor(it) {
             debtorname.value = it.name;
+            debtorSearch.value = it.name;
+
             parameters = it.parameters[0].receipt;
             rounding = it.parameters[0].rounding;
             document.getElementById('debtor_id').value = it.id;
             console.log(rounding);
-            input.focus();
-            document.getElementById('debtorSearch').value = '';
+            if (transaction_type == 'KREDIT') {
+                input.focus();
+            } else {
+                discountInput.focus();
+            }
+            document.getElementById('debtorSearch').value = it.name;
 
 
             closedebtorBox();
@@ -1292,6 +1314,7 @@
         }
 
         function countDiscount(val) {
+            console_log();
             if (val > 100) {
                 final_price = subtotal - val;
                 total_discount = val;
@@ -1345,10 +1368,13 @@
                             <div class="mx-[10px]">
                                 <button onclick="removeItem(${item.id})"
                                     class="flex justify-center items-center mr-1 px-2 py-1 text-[#DF1463] border border-[#DF1463] rounded hover:bg-[#DF1463] hover:text-white">
-                                    <svg viewBox="0 0 24 24" class="w-5 h-5">
-                                        <path d="M8 6V4.41421C8 3.63317 8.63317 3 9.41421 3H14.5858C15.3668 3 16 3.63317 16 4.41421V6"
+                                    <svg viewBox="0 0 24 24" fill="none"
+                                        xmlns="http://www.w3.org/2000/svg" class="w-5 h-5">
+                                        <path
+                                            d="M8 6V4.41421C8 3.63317 8.63317 3 9.41421 3H14.5858C15.3668 3 16 3.63317 16 4.41421V6"
                                             stroke="#DF1463" stroke-width="1.7" stroke-linecap="round" />
-                                        <path d="M5.7372 6.54395V18.9857C5.7372 19.7449 6.35269 20.3604 7.11194 20.3604H16.8894C17.6487 20.3604 18.2642 19.7449 18.2642 18.9857V6.54395M2.90918 6.54395H21.091"
+                                        <path
+                                            d="M5.7372 6.54395V18.9857C5.7372 19.7449 6.35269 20.3604 7.11194 20.3604H16.8894C17.6487 20.3604 18.2642 19.7449 18.2642 18.9857V6.54395M2.90918 6.54395H21.091"
                                             stroke="#c60653" stroke-width="1.7" stroke-linecap="round" />
                                     </svg>
                                 </button>
@@ -1389,7 +1415,11 @@
             const paid = document.getElementById('pay').value;
             const changes = document.getElementById('change').value;
             const doctor_id = document.getElementById('doctor_id').value;
-            const debtor_id = document.getElementById('debtor_id').value;
+            if (transaction_type == 'RESEP TUNAI') {
+                const debtor_id = 0;
+            } else {
+                const debtor_id = document.getElementById('debtor_id').value;
+            }
             const patient_id = document.getElementById('patient_id').value;
 
             if (doctor_id == "") {
@@ -1606,8 +1636,10 @@
 
                         // Auto-fill patient field with new patient
                         document.getElementById("patientname").value = response.data.patient.name;
-                        document.getElementById("patientaddress").value = response.data.patient.address;
-                        document.getElementById("patientphone").value = response.data.patient.phone;
+                        inputpatient.value = response.data.patient.name;
+                        document.getElementById("patient_id").value = response.data.patient.id;
+
+
 
                         document.getElementById("selectedPatientId").value = response.data.patient.id;
                     } else {
@@ -1619,6 +1651,40 @@
                     alert("Terjadi kesalahan, coba lagi.");
                 });
         });
+
+
+        // ===============================
+        // Resep
+        // ===============================
+        checkbox.addEventListener('change', function() {
+            if (this.checked) {
+                packageInput.removeAttribute('readonly');
+                dosageRInput.removeAttribute('readonly');
+                packageInput.classList.remove('readonly');
+                dosageRInput.classList.remove('readonly');
+                quantity.setAttribute('readonly', true);
+                quantity.classList.add('readonly');
+            } else {
+                packageInput.setAttribute('readonly', true);
+                dosageRInput.setAttribute('readonly', true);
+                packageInput.classList.add('readonly');
+                dosageRInput.classList.add('readonly');
+            }
+        });
+
+        function calculatePackage() {
+            const dosage = parseFloat(dosageInput.value) || 0;
+            const dosageR = parseFloat(dosageRInput.value) || 0;
+            const package = parseFloat(packageInput.value) || 0;
+
+            if (dosageR > 0) {
+                const result = dosageR / dosage * package;
+                quantity.value = result; // rounded to 2 decimals
+                count(quantity.value);
+            } else {
+                quantity.value = '';
+            }
+        }
     </script>
 
     {{-- ------------------- Fixed Cart Card --------------------- --}}

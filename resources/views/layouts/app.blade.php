@@ -10,7 +10,7 @@
     <link href="/src/style.css" rel="stylesheet">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
-    <title>MyPOS | Dashboard</title>
+    <title>Propharma | Dashboard</title>
 </head>
 
 <body class="dashboard-body">

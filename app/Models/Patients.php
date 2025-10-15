@@ -16,5 +16,7 @@ class Patients extends Model
         'address',
         'phone',
         'city',
+        'birth',
+
     ];
 }

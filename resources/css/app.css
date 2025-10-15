@@ -4075,7 +4075,9 @@ video {
 .font-pt-serif {
   font-family: PT Serif, serif;
 }
-
+.font-poppins{
+  font-family: Poppins, sans-serif;
+}
 .font-montserrat {
   font-family: Montserrat, sans-serif;
 }
