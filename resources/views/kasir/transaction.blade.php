@@ -5,10 +5,41 @@
         <!-- LEFT COLUMN -->
         <section class="col-span-12 lg:col-span-8 space-y-6">
             <!-- Header Card -->
-            <div class="card p-6 bg-white dashboard-panel">
+            <div class="card py-3 px-6 bg-white dashboard-panel">
                 <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div class="flex items-end justify-between md:block">
                         <h1 class="text-4xl font-semibold tracking-tight">Transaksi</h1>
+                        <h5 class="text-[15px] py-1">
+                            <div class="flex gap-1 items-center">
+                                <a href="" class="font-regular tracking-tight font-poppins">Faktur : </a>
+                                @if ($check_transaction == 1)
+                                    @if ($transaction->transaction_type == 'KREDIT')
+                                        <div id="faktur">
+                                            <span
+                                                class="bg-yellow-100 text-yellow-800 text-xs font-medium me-2 px-2.5 py-0.5 rounded-full dark:bg-yellow-900 dark:text-yellow-300">Resep
+                                                Kredit</span>
+                                        </div>
+                                    @elseif($transaction->transaction_type == 'RESEP TUNAI')
+                                        <div id="faktur">
+                                            <span
+                                                class="bg-red-100 text-red-800 text-xs font-medium me-2 px-2.5 py-0.5 rounded-full dark:bg-red-900 dark:text-red-300">Resep
+                                                Tunai</span>
+                                        </div>
+                                    @elseif($transaction->transaction_type == 'UPDS')
+                                        <div id="faktur">
+                                            <span
+                                                class="bg-green-100 text-green-800 text-xs font-medium me-2 px-2.5 py-0.5 rounded-full dark:bg-green-900 dark:text-green-300">UPDS</span>
+                                        </div>
+                                    @elseif($transaction->transaction_type == 'HV/OTC')
+                                        <div id="faktur">
+                                            <span
+                                                class="bg-blue-100 text-blue-800 text-xs font-medium me-2 px-2.5 py-0.5 rounded-full dark:bg-blue-900 dark:text-blue-300">HV/OTC</span>
+                                        </div>
+                                    @endif
+                                @endif
+
+                            </div>
+                        </h5>
                     </div>
                     <div class="flex items-center justify-between gap-6 w-full md:w-auto">
                         <!-- Date / Time -->
@@ -35,7 +66,7 @@
                     <!-- Resep Credit -->
                     <a href="{{ url('transaction/kredit') }}">
                         <button
-                            class="flex flex-col items-center justify-center w-[90px] h-[75px]  {{ request()->is('transaction/kredit') ? 'transaction-item-active shadow-none' : '' }}  border-[#D6D5D5] border rounded-2xl shadow-sm hover:bg-gray-50">
+                            class="flex flex-col items-center justify-center w-[90px] h-[60px]  {{ request()->is('transaction/kredit') ? 'transaction-item-active shadow-none' : '' }}  border-[#D6D5D5] border rounded-2xl shadow-sm hover:bg-gray-50">
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mb-2" fill="none" viewBox="0 0 24 24"
                                 stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -48,7 +79,7 @@
                     <!-- Resep Tunai -->
                     <a href="{{ url('transaction/resep') }}">
                         <button
-                            class="flex flex-col items-center justify-center w-[90px] h-[75px] {{ request()->is('transaction/resep') ? 'transaction-item-active shadow-none' : '' }} border-[#D6D5D5] border rounded-2xl shadow-sm hover:bg-gray-50">
+                            class="flex flex-col items-center justify-center w-[90px] h-[60px] {{ request()->is('transaction/resep') ? 'transaction-item-active shadow-none' : '' }} border-[#D6D5D5] border rounded-2xl shadow-sm hover:bg-gray-50">
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mb-2" fill="none" viewBox="0 0 24 24"
                                 stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -61,7 +92,7 @@
                     <!-- HV/OTC -->
                     <a href="{{ url('transaction/hv') }}">
                         <button
-                            class="flex flex-col items-center justify-center w-[90px] h-[75px] border-[#D6D5D5] {{ request()->is('transaction/hv') ? 'transaction-item-active shadow-none' : '' }} border rounded-2xl shadow-sm hover:bg-gray-50">
+                            class="flex flex-col items-center justify-center w-[90px] h-[60px] border-[#D6D5D5] {{ request()->is('transaction/hv') ? 'transaction-item-active shadow-none' : '' }} border rounded-2xl shadow-sm hover:bg-gray-50">
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mb-2" fill="none" viewBox="0 0 24 24"
                                 stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -74,7 +105,7 @@
                     <!-- UPDS -->
                     <a href="{{ url('transaction/upds') }}">
                         <button
-                            class="flex flex-col items-center justify-center w-[90px] h-[75px] border-[#D6D5D5] {{ request()->is('transaction/upds') ? 'transaction-item-active shadow-none' : '' }} border rounded-2xl shadow-sm hover:bg-gray-50">
+                            class="flex flex-col items-center justify-center w-[90px] h-[60px] border-[#D6D5D5] {{ request()->is('transaction/upds') ? 'transaction-item-active shadow-none' : '' }} border rounded-2xl shadow-sm hover:bg-gray-50">
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mb-2" fill="none" viewBox="0 0 24 24"
                                 stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -283,6 +314,73 @@
                     </div>
                 </div>
             @endif
+            @if ($check_transaction == 1)
+                <div class="card p-6  flex flex-wrap items-center bg-white dashboard-panel">
+
+
+                    <div class="w-full">
+                        <div class="flex gap-4 items-center">
+
+                            {{-- F1 - Pembayaran --}}
+                            <div class="flex items-center gap-2">
+                                <div
+                                    class="py-[10px] bg-[#0074ce] text-white shadow-[0_0_11px_2px_#0097dd] border-none px-[16px] rounded-md">
+                                    F1
+                                </div>
+                                <div class="font-semibold font-poppins">
+                                    Pembayaran
+                                </div>
+                            </div>
+
+                            {{-- F2 - Resep --}}
+                            @if ($transaction->transaction_type == 'KREDIT' || $transaction->transaction_type == 'RESEP TUNAI')
+                                <div class="flex items-center gap-2">
+                                    <div
+                                        class="py-[10px] bg-[#16a34a] text-white shadow-[0_0_11px_2px_#22c55e] border-none px-[16px] rounded-md">
+                                        F2
+                                    </div>
+                                    <div class="font-semibold font-poppins">
+                                        Resep
+                                    </div>
+                                </div>
+                            @endif
+
+                            {{-- F3 - Pembayaran --}}
+                            <div class="flex items-center gap-2">
+                                <div
+                                    class="py-[10px] bg-[#eab308] text-white shadow-[0_0_11px_2px_#facc15] border-none px-[16px] rounded-md">
+                                    F3
+                                </div>
+                                <div class="font-semibold font-poppins">
+                                    Faktur UPDS
+                                </div>
+                            </div>
+
+                            {{-- F4 - Pembayaran --}}
+                            <div class="flex items-center gap-2">
+                                <div
+                                    class="py-[10px] bg-[#dc2626] text-white shadow-[0_0_11px_2px_#ef4444] border-none px-[16px] rounded-md">
+                                    F4
+                                </div>
+                                <div class="font-semibold font-poppins">
+                                    Faktur HV/OTC
+                                </div>
+                            </div>
+
+                            {{-- F5 - Reset / Refresh --}}
+                            <div class="flex items-center gap-2">
+                                <div
+                                    class="py-[10px] bg-[#9333ea] text-white shadow-[0_0_11px_2px_#a855f7] border-none px-[16px] rounded-md">
+                                    F5
+                                </div>
+                                <div class="font-semibold font-poppins">
+                                    Reset / Refresh
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            @endif
         </section>
 
         @if ($check_transaction == 1)
@@ -328,66 +426,63 @@
                     </div>
                     <div class="mr-2 w-[100%]">
                         @if ($check_transaction == 1)
-                            @if ($transaction->transaction_type == 'KREDIT' || $transaction->transaction_type == 'RESEP TUNAI')
-                                <div class="w-full">
-                                    <label class="text-[13px] font-poppins font-semibold">Cari Pasien</label>
+                            <div class="w-full">
+                                <label class="text-[13px] font-poppins font-semibold">Cari Pasien</label>
 
-                                    <div class="flex items-center">
-                                        <div class="searchdebtors w-full">
+                                <div class="flex items-center">
+                                    <div class="searchdebtors w-full">
 
-                                            <input autofocus required id="patientSearch" type="text"
-                                                placeholder="Ketik ID / Nama…"
-                                                class="w-full rounded-xl border my-1 border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                                                autocomplete="off" />
-                                            <!-- Dropdown -->
-                                            <div id="patientResults"
-                                                class="absolute z-50 mt-2 w-[50%] rounded-xl border border-gray-200 bg-white shadow-lg hidden">
-                                                <ul id="patientList" role="listbox" class="max-h-80 overflow-auto py-2">
-                                                </ul>
-                                            </div>
+                                        <input autofocus required id="patientSearch" type="text"
+                                            placeholder="Ketik ID / Nama…"
+                                            class="w-full rounded-xl border my-1 border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                                            autocomplete="off" />
+                                        <!-- Dropdown -->
+                                        <div id="patientResults"
+                                            class="absolute z-50 mt-2 w-[50%] rounded-xl border border-gray-200 bg-white shadow-lg hidden">
+                                            <ul id="patientList" role="listbox" class="max-h-80 overflow-auto py-2">
+                                            </ul>
                                         </div>
-
-                                        <div class="adddebtors w-[120px] ml-[10px]">
-                                            <button type="button" id="btnNewPatient"
-                                                class="btn btn-add !rounded-[10px] !bg-[##FFC107] p-1 py-2 font-poppin font-bold">
-                                                <div class="flex items-center justify-center gap-2">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-                                                        class="w-6 h-6 text-[#62b9ff]"> <!-- color controlled by text-* -->
-                                                        <circle cx="15" cy="8" r="4"
-                                                            fill="currentColor" />
-                                                        <path d="M15,14c-6.1,0-8,4-8,4v2h16v-2C23,18,21.1,14,15,14z"
-                                                            fill="currentColor" />
-                                                        <line stroke="currentColor" stroke-miterlimit="10"
-                                                            stroke-width="2" x1="5" x2="5"
-                                                            y1="7" y2="15" />
-                                                        <line stroke="currentColor" stroke-miterlimit="10"
-                                                            stroke-width="2" x1="9" x2="1"
-                                                            y1="11" y2="11" />
-                                                    </svg>
-
-                                                    <div class="text-[#62b9ff]">
-                                                        Baru
-                                                    </div>
-                                                </div>
-                                            </button>
-                                        </div>
-                                        <!-- Hidden field to hold selection (optional) -->
-                                        <input type="hidden" id="selectedPatientId" />
-
                                     </div>
-                                    <div class="w-full hidden mt-1 mb-1">
-                                        <div class="mr-2 w-full">
-                                            <div class="w-full">
-                                                <label class="text-[13px] font-poppins font-semibold pb-1">Nama
-                                                    Pasien</label>
+
+                                    <div class="adddebtors w-[120px] ml-[10px]">
+                                        <button type="button" id="btnNewPatient"
+                                            class="btn btn-add !rounded-[10px] !bg-[##FFC107] p-1 py-2 font-poppin font-bold">
+                                            <div class="flex items-center justify-center gap-2">
+                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                                                    class="w-6 h-6 text-[#62b9ff]"> <!-- color controlled by text-* -->
+                                                    <circle cx="15" cy="8" r="4" fill="currentColor" />
+                                                    <path d="M15,14c-6.1,0-8,4-8,4v2h16v-2C23,18,21.1,14,15,14z"
+                                                        fill="currentColor" />
+                                                    <line stroke="currentColor" stroke-miterlimit="10" stroke-width="2"
+                                                        x1="5" x2="5" y1="7" y2="15" />
+                                                    <line stroke="currentColor" stroke-miterlimit="10" stroke-width="2"
+                                                        x1="9" x2="1" y1="11" y2="11" />
+                                                </svg>
+
+                                                <div class="text-[#62b9ff]">
+                                                    Baru
+                                                </div>
                                             </div>
-                                            <input id="patientname" class="hidden" type="text" name="patientname"
-                                                readonly placeholder="Nama Pasien"
-                                                class="w-full rounded-xl readonly border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                                                autocomplete="off" />
+                                        </button>
+                                    </div>
+                                    <!-- Hidden field to hold selection (optional) -->
+                                    <input type="hidden" id="selectedPatientId" />
+
+                                </div>
+                                <div class="w-full hidden mt-1 mb-1">
+                                    <div class="mr-2 w-full">
+                                        <div class="w-full">
+                                            <label class="text-[13px] font-poppins font-semibold pb-1">Nama
+                                                Pasien</label>
                                         </div>
+                                        <input id="patientname" class="hidden" type="text" name="patientname"
+                                            readonly placeholder="Nama Pasien"
+                                            class="w-full rounded-xl readonly border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                                            autocomplete="off" />
                                     </div>
                                 </div>
+                            </div>
+                            @if ($transaction->transaction_type == 'KREDIT' || $transaction->transaction_type == 'RESEP TUNAI')
                                 <div class="w-full">
                                     <div class="w-full">
                                         <label class="text-[13px] font-poppins font-semibold pb-1">Cari Dokter</label>
@@ -429,18 +524,19 @@
                         @endif
                     </div>
                     <div class="mr-2 w-[100%] mt-1 flex gap-2">
-                        @if ($transaction->transaction_type == 'KREDIT' || $transaction->transaction_type == 'RESEP TUNAI')
+                        @if ($check_transaction == 1)
+                            @if ($transaction->transaction_type == 'KREDIT' || $transaction->transaction_type == 'RESEP TUNAI')
+                                <div class="w-[40%]">
+                                    <div>
+                                        <label class="text-[13px] font-poppins font-semibold pb-1">Embalase</label>
 
-                        <div class="w-[40%]">
-                            <div>
-                                <label class="text-[13px] font-poppins font-semibold pb-1">Embalase</label>
-
-                            </div>
-                            <input id="embalase" tabindex="-1" readonly type="text" name="embalase"
-                                placeholder="Embalase"
-                                class="w-full rounded-xl my-1 readonly border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                                autocomplete="off" />
-                        </div>
+                                    </div>
+                                    <input id="embalase" tabindex="-1" readonly type="text" name="embalase"
+                                        placeholder="Embalase"
+                                        class="w-full rounded-xl my-1 readonly border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                                        autocomplete="off" />
+                                </div>
+                            @endif
                         @endif
                         <div class="w-full">
                             <div class="w-full">
@@ -663,6 +759,10 @@
         // Konstanta & Variabel Global
         // ===============================
 
+        const faktur = document.getElementById('faktur');
+
+
+
         // Patien Modal Variable
         const newPatientModal = document.getElementById('newPatientModal');
         const newPatientModalContent = document.getElementById('newPatientModalContent');
@@ -729,11 +829,12 @@
         const dosageRInput = document.getElementById('dosage_r');
         const packageInput = document.getElementById('package');
 
-        // Variabel kerja
+        // Variabel 
         var transaction_id = trx_id;
         var total_discount = "";
         var total_item = "";
         var medicine_id = "";
+
         // var debtor_id = "";
         // var patient_id = "";
         // var doctor_id = "";
@@ -1045,7 +1146,7 @@
             if (transaction_type == 'RESEP TUNAI' || transaction_type == 'KREDIT') {
                 document.getElementById('doctorSearch').focus();
             } else {
-                document.getElementById('debtorSearch').focus();
+                document.getElementById('pay').focus();
             }
             patientSearch.value = it.name;
             closepatientBox();
@@ -1431,11 +1532,14 @@
         function checkoutItem() {
             const paid = document.getElementById('pay').value;
             const changes = document.getElementById('change').value;
-            const doctor_id = document.getElementById('doctor_id').value;
             if (transaction_type == 'RESEP TUNAI') {
                 const debtor_id = 0;
+            } else if (transaction_type == 'UPDS' || transaction_type == 'HV/OTC') {
+                const debtor_id = 0;
+                const doctor_id = 0;
             } else {
                 const debtor_id = document.getElementById('debtor_id').value;
+                const doctor_id = document.getElementById('doctor_id').value;
             }
             const patient_id = document.getElementById('patient_id').value;
 
@@ -1601,6 +1705,64 @@
             if (isF2) {
                 e.preventDefault();
                 if (checkbox) {
+                    checkbox.checked = !checkbox.checked;
+                    checkbox.dispatchEvent(new Event('change'));
+                }
+                // if (checkbox.checked) {
+                //     document.getElementById('receiptbox').checked = false;
+
+                //     packageInput.removeAttribute('readonly');
+                //     dosageRInput.removeAttribute('readonly');
+                //     packageInput.classList.remove('readonly');
+                //     dosageRInput.classList.remove('readonly');
+                //     quantity.setAttribute('readonly', true);
+                //     quantity.classList.add('readonly');
+                // } else {
+                //     document.getElementById('receiptbox').checked = true;
+                //     packageInput.setAttribute('readonly', true);
+                //     dosageRInput.setAttribute('readonly', true);
+                //     packageInput.classList.add('readonly');
+                //     dosageRInput.classList.add('readonly');
+                // }
+
+            }
+        }
+
+        function onF3Key(e) {
+            const isF3 = e.key === 'F3' || e.keyCode === 114;
+            if (isF3) {
+
+                faktur.innerHTML = `
+                    <span class="bg-green-100 text-green-800 text-xs font-medium me-2 px-2.5 py-0.5 rounded-full dark:bg-green-900 dark:text-green-300">
+                        UPDS
+                    </span>
+                `;
+
+                // if (checkbox.checked) {
+                //     document.getElementById('receiptbox').checked = false;
+
+                //     packageInput.removeAttribute('readonly');
+                //     dosageRInput.removeAttribute('readonly');
+                //     packageInput.classList.remove('readonly');
+                //     dosageRInput.classList.remove('readonly');
+                //     quantity.setAttribute('readonly', true);
+                //     quantity.classList.add('readonly');
+                // } else {
+                //     document.getElementById('receiptbox').checked = true;
+                //     packageInput.setAttribute('readonly', true);
+                //     dosageRInput.setAttribute('readonly', true);
+                //     packageInput.classList.add('readonly');
+                //     dosageRInput.classList.add('readonly');
+                // }
+
+            }
+        }
+
+        function onF4Key(e) {
+            const isF4 = e.key === 'F4' || e.keyCode === 115;
+            if (isF4) {
+                e.preventDefault();
+                if (checkbox) {
                     checkbox.checked = !checkbox.checked; // ✅ toggle
                     checkbox.dispatchEvent(new Event('change')); // optional: trigger change event
                 }
@@ -1631,6 +1793,9 @@
             capture: true
         });
         window.addEventListener('keydown', onF2Key, {
+            capture: true
+        });
+        window.addEventListener('keydown', onF3Key, {
             capture: true
         });
         document.addEventListener('click', (e) => {
