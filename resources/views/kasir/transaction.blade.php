@@ -85,7 +85,7 @@
                     </a>
                 </div>
                 @if ($check_transaction == 0)
-                    <form method="post" action="{{ route('transaction.createnew') }}" class="">
+                    <form method="post" action="{{ route('transaction.createnew') }}" class="mt-3">
                         @csrf
                         <input type="hidden" value="{{ request()->segment(2) }}" name="type" id="type">
                         <button type="submit" class="btn btn-pharma !bg-[#2196F3] btn-lg btn-icon icon-right"
@@ -168,7 +168,7 @@
                                 class="w-full rounded-md readonly border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300 text-[11px] font-poppins"
                                 autocomplete="off" />
                         </div>
-                        <div class="mr-2">
+                        <div class="mr-2 hidden">
                             <div class="w-full my-1">
                                 <label class="text-[13px] font-poppins font-semibold">Stok</label>
 
@@ -187,14 +187,16 @@
                                 autocomplete="off" />
                         </div>
                     </div>
-                    <div>
-                        <div class="flex pt-2 items-center">
-                            <input id="receiptbox" type="checkbox" value=""
-                                class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded-sm focus:ring-blue-500 dark:focus:ring-blue-600">
-                            <label for="receiptbox" class="ms-2 text-sm font-medium text-gray-900"><a href="#"
-                                    class="text-blue-600 dark:text-blue-500 hover:underline">Resep Racik?</a></label>
+                    @if ($transaction->transaction_type == 'KREDIT' || $transaction->transaction_type == 'RESEP TUNAI')
+                        <div>
+                            <div class="flex pt-2 items-center">
+                                <input id="receiptbox" type="checkbox" value=""
+                                    class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded-sm focus:ring-blue-500 dark:focus:ring-blue-600">
+                                <label for="receiptbox" class="ms-2 text-sm font-medium text-gray-900"><a href="#"
+                                        class="text-blue-600 dark:text-blue-500 hover:underline">Resep Racik?</a></label>
+                            </div>
                         </div>
-                    </div>
+                    @endif
                     <div class="w-full flex">
                         @if ($transaction->transaction_type == 'KREDIT' || $transaction->transaction_type == 'RESEP TUNAI')
                             <div class="mr-2">
@@ -426,15 +428,30 @@
                             @endif
                         @endif
                     </div>
-                    <div class="mr-2 w-[100%] mt-1">
-                        <div class="w-full">
-                            <label class="text-[13px] font-poppins font-semibold pb-1">Total</label>
+                    <div class="mr-2 w-[100%] mt-1 flex gap-2">
+                        @if ($transaction->transaction_type == 'KREDIT' || $transaction->transaction_type == 'RESEP TUNAI')
 
+                        <div class="w-[40%]">
+                            <div>
+                                <label class="text-[13px] font-poppins font-semibold pb-1">Embalase</label>
+
+                            </div>
+                            <input id="embalase" tabindex="-1" readonly type="text" name="embalase"
+                                placeholder="Embalase"
+                                class="w-full rounded-xl my-1 readonly border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                                autocomplete="off" />
                         </div>
-                        <input id="carttotal" tabindex="-1" readonly type="text" name="carttotal"
-                            placeholder="Total obat"
-                            class="w-full rounded-xl my-1 readonly border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                            autocomplete="off" />
+                        @endif
+                        <div class="w-full">
+                            <div class="w-full">
+                                <label class="text-[13px] font-poppins font-semibold pb-1">Total</label>
+
+                            </div>
+                            <input id="carttotal" tabindex="-1" readonly type="text" name="carttotal"
+                                placeholder="Total obat"
+                                class="w-full rounded-xl my-1 readonly border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                                autocomplete="off" />
+                        </div>
 
                     </div>
                     <div class="mr-2 flex gap-2 w-[100%] mt-1">
@@ -688,6 +705,7 @@
         const debtorbox = document.getElementById('debtorResults');
         const debtorlist = document.getElementById('debtorList');
         const debtorhidden = document.getElementById('selectedDebtorId');
+        let debtoritems = [];
 
 
         // Patient
@@ -838,8 +856,9 @@
             stock.value = it.stock;
             unit.value = it.unit;
             name.value = it.name;
-            dosage.value = it.dosage;
-
+            if (transaction_type == 'KREDIT' || transaction_type == 'RESEP TUNAI') {
+                dosage.value = it.dosage;
+            }
             console.log("Harga : " + it.net_price + "Parameter : " + parameters + "Pembulatan : " + rounding);
             let raw = (+it.net_price * +parameters) + +rounding;
             let rounded = Math.floor(raw / 1000) * 1000;
@@ -1023,7 +1042,7 @@
         function selectPatient(it) {
             patientname.value = it.name;
             document.getElementById('patient_id').value = it.id;
-            if (transaction_type == 'RESEP TUNAI') {
+            if (transaction_type == 'RESEP TUNAI' || transaction_type == 'KREDIT') {
                 document.getElementById('doctorSearch').focus();
             } else {
                 document.getElementById('debtorSearch').focus();
@@ -1200,14 +1219,14 @@
             else if (liBottom > lBottom) debtorlist.scrollTop = liBottom - debtorlist.clientHeight;
         }
 
-        function renderdebtor(items) {
+        function renderdebtor(debtoritems) {
             debtorlist.innerHTML = '';
-            if (!items.length) {
+            if (!debtoritems.length) {
                 debtorlist.innerHTML = `<li class="px-4 py-3 text-sm text-gray-500">Tidak ada hasil</li>`;
                 return;
             }
 
-            for (const it of items) {
+            for (const it of debtoritems) {
                 const li = document.createElement('li');
                 li.setAttribute('role', 'option');
                 li.className = 'cursor-pointer px-4 py-3 hover:bg-gray-100';
@@ -1253,15 +1272,15 @@
             });
             if (!res.ok) return;
 
-            items = await res.json();
-            renderdebtor(items);
+            debtoritems = await res.json();
+            renderdebtor(debtoritems);
             opendebtorBox();
         }, 250);
         if (inputdebtor) {
             inputdebtor.addEventListener('input', (e) => dodebtorSearch(e.target.value));
 
             inputdebtor.addEventListener('keydown', (e) => {
-                const max = items.length - 1;
+                const max = debtoritems.length - 1;
 
                 if (e.key === 'ArrowDown') {
                     e.preventDefault();
@@ -1275,9 +1294,9 @@
                     activeIndex = Math.max(0, activeIndex - 1);
                     debtorhighlight();
                     ensuredebtorVisible();
-                } else if (e.key === 'Enter' && activeIndex >= 0 && items[activeIndex]) {
+                } else if (e.key === 'Enter' && activeIndex >= 0 && debtoritems[activeIndex]) {
                     e.preventDefault();
-                    selectDebtor(items[activeIndex]);
+                    selectDebtor(debtoritems[activeIndex]);
                 } else if (e.key === 'Escape') {
                     closedebtorBox();
                 }
@@ -1298,6 +1317,7 @@
                 discountInput.focus();
             }
             document.getElementById('debtorSearch').value = it.name;
+            document.getElementById('embalase').value = it.parameters[0].embalas;;
 
 
             closedebtorBox();
@@ -1312,7 +1332,6 @@
         }
 
         function countDiscount(val) {
-            console_log();
             if (val > 100) {
                 final_price = subtotal - val;
                 total_discount = val;
@@ -1576,11 +1595,42 @@
                 document.getElementById('pay').focus();
             }
         }
+        // ===============================
+        function onF2Key(e) {
+            const isF2 = e.key === 'F2' || e.keyCode === 113;
+            if (isF2) {
+                e.preventDefault();
+                if (checkbox) {
+                    checkbox.checked = !checkbox.checked; // ✅ toggle
+                    checkbox.dispatchEvent(new Event('change')); // optional: trigger change event
+                }
+                // if (checkbox.checked) {
+                //     document.getElementById('receiptbox').checked = false;
+
+                //     packageInput.removeAttribute('readonly');
+                //     dosageRInput.removeAttribute('readonly');
+                //     packageInput.classList.remove('readonly');
+                //     dosageRInput.classList.remove('readonly');
+                //     quantity.setAttribute('readonly', true);
+                //     quantity.classList.add('readonly');
+                // } else {
+                //     document.getElementById('receiptbox').checked = true;
+                //     packageInput.setAttribute('readonly', true);
+                //     dosageRInput.setAttribute('readonly', true);
+                //     packageInput.classList.add('readonly');
+                //     dosageRInput.classList.add('readonly');
+                // }
+
+            }
+        }
 
         // ===============================
         // Global Event Listeners
         // ===============================
         window.addEventListener('keydown', onF1Key, {
+            capture: true
+        });
+        window.addEventListener('keydown', onF2Key, {
             capture: true
         });
         document.addEventListener('click', (e) => {
@@ -1662,6 +1712,7 @@
                 dosageRInput.classList.remove('readonly');
                 quantity.setAttribute('readonly', true);
                 quantity.classList.add('readonly');
+                packageInput.focus();
             } else {
                 packageInput.setAttribute('readonly', true);
                 dosageRInput.setAttribute('readonly', true);
