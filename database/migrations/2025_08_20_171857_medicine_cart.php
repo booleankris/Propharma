@@ -21,6 +21,9 @@ return new class extends Migration
             $table->string('quantity');
             $table->string('discount');
             $table->string('embalase')->default(null)->nullable(); 
+            $table->string('cart_type')->default(null)->nullable();
+            $table->string('package')->default(null)->nullable();
+            $table->string('dosage_r')->default(null)->nullable();  
             $table->string('total_price');
             $table->string('final_price')->default(null)->nullable();
             $table->integer('status')->default('0')->nullable(); 

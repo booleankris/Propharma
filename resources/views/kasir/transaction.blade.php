@@ -1526,6 +1526,7 @@
             subtotal = price2 * val;
             totalprice.value = formatRupiah(subtotal);
             pharmacy_price = subtotal;
+            final_price = subtotal;
         }
 
         function countDiscount(val) {
@@ -1612,7 +1613,6 @@
 
                 }
                 console.log(item);
-
                 // Insert Values
                 cartTotalInput.value = formatRupiah(totaltransaction);
                 previewdiscounttotal.value = formatRupiah(total_discount);
@@ -1628,7 +1628,7 @@
                     <td class="px-4 py-3 text-center">${item.quantity}</td>
                     <td class="px-4 py-3 text-center">${formatRupiah(item.discount)}</td>
                     <td class="px-4 py-3 text-center">${formatRupiah(item.total_price)}</td>
-                    ${(transaction_type === 'RESEP TUNAI' || transaction_type === 'KREDIT')
+                    ${(currenttransaction === 'RESEP TUNAI' || currenttransaction === 'KREDIT')
                     ? `<td class="px-4 py-3 text-center clEmbalase">${formatRupiah(item.jasa)}</td>`
                     : ''
                     }
@@ -1644,7 +1644,7 @@
 
 
         function submit() {
-            if (discount === "") {
+            if (discountInput.value === "") {
                 final_price = subtotal;
                 discount = 0;
             }
@@ -1666,6 +1666,7 @@
             // Optional fields — safely handled
             const pkg = document.getElementById('package')?.value || '';
             const dose = document.getElementById('dosage_r')?.value || '';
+            
             addToCart(
                 medicine_id,
                 transaction_id,
