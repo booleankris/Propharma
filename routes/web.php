@@ -124,6 +124,8 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     Route::post('lessitem', [SalesController::class, 'lessItem'])->name('sales.lessItem');
     Route::post('removeitem/{id}', [SalesController::class, 'removeItem'])->name('sales.removeItem');
     Route::post('checkoutitem', [SalesController::class, 'checkoutItem'])->name('sales.checkout');
+    Route::post('sendembalase', [SalesController::class, 'sendEmbalase'])->name('sales.sendembalase');
+    Route::post('deleteTransaction', [SalesController::class, 'deleteTransaction'])->name('sales.deletetransaction');
 
 
     // ================================================================== Add Data =========================================================================

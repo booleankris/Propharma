@@ -3,43 +3,13 @@
     {{-- Section Product Preview --}}
     <div class="mx-4 max-w-8xl grid grid-cols-12 gap-6">
         <!-- LEFT COLUMN -->
-        <section class="col-span-12 lg:col-span-8 space-y-6">
+        <section class="col-span-12 lg:col-span-5 space-y-6">
             <!-- Header Card -->
             <div class="card py-3 px-6 bg-white dashboard-panel">
                 <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div class="flex items-end justify-between md:block">
                         <h1 class="text-4xl font-semibold tracking-tight">Transaksi</h1>
-                        <h5 class="text-[15px] py-1">
-                            <div class="flex gap-1 items-center">
-                                <a href="" class="font-regular tracking-tight font-poppins">Faktur : </a>
-                                @if ($check_transaction == 1)
-                                    @if ($transaction->transaction_type == 'KREDIT')
-                                        <div id="faktur">
-                                            <span
-                                                class="bg-yellow-100 text-yellow-800 text-xs font-medium me-2 px-2.5 py-0.5 rounded-full dark:bg-yellow-900 dark:text-yellow-300">Resep
-                                                Kredit</span>
-                                        </div>
-                                    @elseif($transaction->transaction_type == 'RESEP TUNAI')
-                                        <div id="faktur">
-                                            <span
-                                                class="bg-red-100 text-red-800 text-xs font-medium me-2 px-2.5 py-0.5 rounded-full dark:bg-red-900 dark:text-red-300">Resep
-                                                Tunai</span>
-                                        </div>
-                                    @elseif($transaction->transaction_type == 'UPDS')
-                                        <div id="faktur">
-                                            <span
-                                                class="bg-green-100 text-green-800 text-xs font-medium me-2 px-2.5 py-0.5 rounded-full dark:bg-green-900 dark:text-green-300">UPDS</span>
-                                        </div>
-                                    @elseif($transaction->transaction_type == 'HV/OTC')
-                                        <div id="faktur">
-                                            <span
-                                                class="bg-blue-100 text-blue-800 text-xs font-medium me-2 px-2.5 py-0.5 rounded-full dark:bg-blue-900 dark:text-blue-300">HV/OTC</span>
-                                        </div>
-                                    @endif
-                                @endif
 
-                            </div>
-                        </h5>
                     </div>
                     <div class="flex items-center justify-between gap-6 w-full md:w-auto">
                         <!-- Date / Time -->
@@ -270,11 +240,11 @@
                         </div>
                         <div class="mr-2">
                             <div class="w-full my-1">
-                                <label class="text-[13px] font-poppins font-semibold">Jumlah Beli</label>
+                                <label class="text-[13px] font-poppins font-semibold">Qty</label>
 
                             </div>
                             <input id="quantity" required name="quantity" onkeyup="count(this.value)" type="number"
-                                placeholder="Quantity"
+                                placeholder="QTY"
                                 class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300 text-[11px] font-poppins"
                                 autocomplete="off" />
                         </div>
@@ -315,19 +285,19 @@
                 </div>
             @endif
             @if ($check_transaction == 1)
-                <div class="card p-6  flex flex-wrap items-center bg-white dashboard-panel">
+                <div class="card p-4 px-6  flex flex-wrap items-center bg-white dashboard-panel">
 
 
                     <div class="w-full">
-                        <div class="flex gap-4 items-center">
+                        <div class="flex flex-wrap gap-4 items-center">
 
                             {{-- F1 - Pembayaran --}}
                             <div class="flex items-center gap-2">
                                 <div
-                                    class="py-[10px] bg-[#0074ce] text-white shadow-[0_0_11px_2px_#0097dd] border-none px-[16px] rounded-md">
+                                    class="py-[5px] bg-[#0074ce] text-white shadow-[0_0_11px_2px_#0097dd] border-none px-[10px] rounded-md">
                                     F1
                                 </div>
-                                <div class="font-semibold font-poppins">
+                                <div class="font-semibold font-poppins text-[11px]">
                                     Pembayaran
                                 </div>
                             </div>
@@ -336,10 +306,10 @@
                             @if ($transaction->transaction_type == 'KREDIT' || $transaction->transaction_type == 'RESEP TUNAI')
                                 <div class="flex items-center gap-2">
                                     <div
-                                        class="py-[10px] bg-[#16a34a] text-white shadow-[0_0_11px_2px_#22c55e] border-none px-[16px] rounded-md">
+                                        class="py-[5px] bg-[#16a34a] text-white shadow-[0_0_11px_2px_#22c55e] border-none px-[10px] rounded-md">
                                         F2
                                     </div>
-                                    <div class="font-semibold font-poppins">
+                                    <div class="font-semibold font-poppins text-[11px]">
                                         Resep
                                     </div>
                                 </div>
@@ -348,35 +318,15 @@
                             {{-- F3 - Pembayaran --}}
                             <div class="flex items-center gap-2">
                                 <div
-                                    class="py-[10px] bg-[#eab308] text-white shadow-[0_0_11px_2px_#facc15] border-none px-[16px] rounded-md">
+                                    class="py-[5px] bg-[#eab308] text-white shadow-[0_0_11px_2px_#facc15] border-none px-[10px] rounded-md">
                                     F3
                                 </div>
-                                <div class="font-semibold font-poppins">
-                                    Faktur UPDS
+                                <div class="font-semibold font-poppins text-[11px]">
+                                    Ganti Faktor
                                 </div>
                             </div>
 
-                            {{-- F4 - Pembayaran --}}
-                            <div class="flex items-center gap-2">
-                                <div
-                                    class="py-[10px] bg-[#dc2626] text-white shadow-[0_0_11px_2px_#ef4444] border-none px-[16px] rounded-md">
-                                    F4
-                                </div>
-                                <div class="font-semibold font-poppins">
-                                    Faktur HV/OTC
-                                </div>
-                            </div>
 
-                            {{-- F5 - Reset / Refresh --}}
-                            <div class="flex items-center gap-2">
-                                <div
-                                    class="py-[10px] bg-[#9333ea] text-white shadow-[0_0_11px_2px_#a855f7] border-none px-[16px] rounded-md">
-                                    F5
-                                </div>
-                                <div class="font-semibold font-poppins">
-                                    Reset / Refresh
-                                </div>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -385,209 +335,183 @@
 
         @if ($check_transaction == 1)
             <!-- RIGHT COLUMN -->
-            <aside class="col-span-12 lg:col-span-4 space-y-6 dashboard-panel">
-                <div class="card p-6 bg-white">
-                    <h2 class="text-xl font-semibold mb-4">Barang Dibeli</h2>
-                    <div tabindex="-1" class="mt-4 rounded-2xl bg-gray-100 h-64 overflow-y-scroll md:h-[230px]">
-                        <div class="flex flex-col justify-between">
-                            <br>
-                            <div id="carts">
-                                @foreach ($itemInCart as $cart)
-                                    <div id="itemincart{{ $cart->id }}">
-                                        <div
-                                            class="flex justify-between mx-[15px] mt-[5px] py-[20px] mb-[8px] rounded-lg bg-[#fff]">
-                                            <div>
-                                                <div class="px-[20px] font-poppins font-semibold">
-                                                    {{ $cart->medicine->name }}
-                                                </div>
-                                                <div class="px-[20px] font-poppins text-[10px]">
-                                                    Rp.{{ number_format($cart->total_price, 0, ',', '.') }}</div>
-                                            </div>
-                                            <div class="mx-[10px]">
-                                                <button tabindex="-1" onclick="removeItem({{ $cart->id }})"
-                                                    class="flex justify-center items-center mr-1 px-2 py-1 text-[#DF1463] border border-[#DF1463] rounded hover:bg-[#DF1463] hover:text-white">
-                                                    <svg viewBox="0 0 24 24" fill="none"
-                                                        xmlns="http://www.w3.org/2000/svg" class="w-5 h-5">
-                                                        <path
-                                                            d="M8 6V4.41421C8 3.63317 8.63317 3 9.41421 3H14.5858C15.3668 3 16 3.63317 16 4.41421V6"
-                                                            stroke="#DF1463" stroke-width="1.7" stroke-linecap="round" />
-                                                        <path
-                                                            d="M5.7372 6.54395V18.9857C5.7372 19.7449 6.35269 20.3604 7.11194 20.3604H16.8894C17.6487 20.3604 18.2642 19.7449 18.2642 18.9857V6.54395M2.90918 6.54395H21.091"
-                                                            stroke="#c60653" stroke-width="1.7" stroke-linecap="round" />
-                                                    </svg>
-                                                </button>
-                                            </div>
+            <aside class="col-span-12 lg:col-span-7  dashboard-panel">
+                <div class="card px-6 bg-white">
+                    <div class="w-full flex">
+                        <div class="w-1/2 flex">
+                            <div class="mr-2">
+                                <div class="w-full my-1">
+                                    <label class="text-[13px] font-poppins font-semibold">Faktur</label>
+
+                                </div>
+                                @if ($check_transaction == 1)
+                                    @if ($transaction->transaction_type == 'KREDIT')
+                                        <div id="faktur" class="py-2">
+                                            <span
+                                                class="bg-yellow-100 text-yellow-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md dark:bg-yellow-900 dark:text-yellow-300">Resep
+                                                Kredit</span>
                                         </div>
-                                    </div>
-                                @endforeach
+                                    @elseif($transaction->transaction_type == 'RESEP TUNAI')
+                                        <div id="faktur" class="py-2">
+                                            <span
+                                                class="bg-red-100 text-red-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md dark:bg-red-900 dark:text-red-300">Resep
+                                                Tunai</span>
+                                        </div>
+                                    @elseif($transaction->transaction_type == 'UPDS')
+                                        <div id="faktur" class="py-2">
+                                            <span
+                                                class="bg-green-100 text-green-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md dark:bg-green-900 dark:text-green-300">UPDS</span>
+                                        </div>
+                                    @elseif($transaction->transaction_type == 'HV/OTC')
+                                        <div id="faktur" class="py-2">
+                                            <span
+                                                class="bg-blue-100 text-blue-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md dark:bg-blue-900 dark:text-blue-300">HV/OTC</span>
+                                        </div>
+                                    @endif
+                                @endif
                             </div>
-                            <br>
-                        </div>
-                    </div>
-                    <div class="mr-2 w-[100%]">
-                        @if ($check_transaction == 1)
-                            <div class="w-full">
-                                <label class="text-[13px] font-poppins font-semibold">Cari Pasien</label>
+                            @if ($check_transaction == 1)
+                                <div class="mr-2 w-[20%] @if ($transaction->transaction_type != 'RESEP TUNAI' && $transaction->transaction_type != 'KREDIT') hidden @endif">
+                                    <div class="w-full my-1">
+                                        <label class="text-[13px] font-poppins font-semibold">Racik?</label>
 
-                                <div class="flex items-center">
-                                    <div class="searchdebtors w-full">
-
-                                        <input autofocus required id="patientSearch" type="text"
-                                            placeholder="Ketik ID / Nama…"
-                                            class="w-full rounded-xl border my-1 border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                                            autocomplete="off" />
-                                        <!-- Dropdown -->
-                                        <div id="patientResults"
-                                            class="absolute z-50 mt-2 w-[50%] rounded-xl border border-gray-200 bg-white shadow-lg hidden">
-                                            <ul id="patientList" role="listbox" class="max-h-80 overflow-auto py-2">
-                                            </ul>
-                                        </div>
                                     </div>
-
-                                    <div class="adddebtors w-[120px] ml-[10px]">
-                                        <button type="button" id="btnNewPatient"
-                                            class="btn btn-add !rounded-[10px] !bg-[##FFC107] p-1 py-2 font-poppin font-bold">
-                                            <div class="flex items-center justify-center gap-2">
-                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-                                                    class="w-6 h-6 text-[#62b9ff]"> <!-- color controlled by text-* -->
-                                                    <circle cx="15" cy="8" r="4" fill="currentColor" />
-                                                    <path d="M15,14c-6.1,0-8,4-8,4v2h16v-2C23,18,21.1,14,15,14z"
-                                                        fill="currentColor" />
-                                                    <line stroke="currentColor" stroke-miterlimit="10" stroke-width="2"
-                                                        x1="5" x2="5" y1="7" y2="15" />
-                                                    <line stroke="currentColor" stroke-miterlimit="10" stroke-width="2"
-                                                        x1="9" x2="1" y1="11" y2="11" />
-                                                </svg>
-
-                                                <div class="text-[#62b9ff]">
-                                                    Baru
-                                                </div>
-                                            </div>
-                                        </button>
-                                    </div>
-                                    <!-- Hidden field to hold selection (optional) -->
-                                    <input type="hidden" id="selectedPatientId" />
-
+                                    <input id="dosage_r2" name="dosage_r2" readonly type="text" placeholder="Tidak"
+                                        class="w-full rounded-md readonly border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300 text-[11px] font-poppins"
+                                        autocomplete="off" />
                                 </div>
-                                <div class="w-full hidden mt-1 mb-1">
-                                    <div class="mr-2 w-full">
-                                        <div class="w-full">
-                                            <label class="text-[13px] font-poppins font-semibold pb-1">Nama
-                                                Pasien</label>
-                                        </div>
-                                        <input id="patientname" class="hidden" type="text" name="patientname"
-                                            readonly placeholder="Nama Pasien"
-                                            class="w-full rounded-xl readonly border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                                            autocomplete="off" />
-                                    </div>
-                                </div>
-                            </div>
-                            @if ($transaction->transaction_type == 'KREDIT' || $transaction->transaction_type == 'RESEP TUNAI')
-                                <div class="w-full">
-                                    <div class="w-full">
-                                        <label class="text-[13px] font-poppins font-semibold pb-1">Cari Dokter</label>
+                                <div class="mr-2 w-[35%] @if ($transaction->transaction_type != 'RESEP TUNAI' && $transaction->transaction_type != 'KREDIT') hidden @endif">
+                                    <div class="w-[full] my-1">
+                                        <label class="text-[13px] font-poppins font-semibold">Jasa</label>
 
                                     </div>
-                                    <div class="flex items-center">
-                                        <div class="searchdoctors w-full">
-
-                                            <input autofocus required id="doctorSearch" type="text"
-                                                placeholder="Ketik ID / Nama…"
-                                                class="w-full rounded-xl border my-1 border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                                                autocomplete="off" />
-                                            <!-- Dropdown -->
-                                            <div id="doctorResults"
-                                                class="absolute z-50 mt-2 w-[50%] rounded-xl border border-gray-200 bg-white shadow-lg hidden">
-                                                <ul id="doctorList" role="listbox" class="max-h-80 overflow-auto py-2">
-                                                </ul>
-                                            </div>
-                                        </div>
-                                        <!-- Hidden field to hold selection (optional) -->
-                                        <input type="hidden" id="selectedDoctorId" />
-
-                                    </div>
-                                    <div class="w-full hidden mt-1 mb-2">
-                                        <div class="mr-2 w-full">
-                                            <div class="w-full">
-                                                <label class="text-[13px] font-poppins font-semibold pb-1">Nama
-                                                    Dokter</label>
-
-                                            </div>
-                                            <input id="doctorname" type="text" name="doctorname" readonly
-                                                placeholder="Nama Pasien"
-                                                class="w-full rounded-xl readonly border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                                                autocomplete="off" />
-                                        </div>
-                                    </div>
-                                </div>
-                            @endif
-                        @endif
-                    </div>
-                    <div class="mr-2 w-[100%] mt-1 flex gap-2">
-                        @if ($check_transaction == 1)
-                            @if ($transaction->transaction_type == 'KREDIT' || $transaction->transaction_type == 'RESEP TUNAI')
-                                <div class="w-[40%]">
-                                    <div>
-                                        <label class="text-[13px] font-poppins font-semibold pb-1">Embalase</label>
-
-                                    </div>
-                                    <input id="embalase" tabindex="-1" readonly type="text" name="embalase"
-                                        placeholder="Embalase"
-                                        class="w-full rounded-xl my-1 readonly border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                                    <input type="text" onkeyup="countEmbalase(this.value)" id="jasa"
+                                        name="jasa" placeholder="Jasa"
+                                        class="w-full rounded-md  border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300 text-[11px] font-poppins"
                                         autocomplete="off" />
                                 </div>
                             @endif
-                        @endif
-                        <div class="w-full">
-                            <div class="w-full">
-                                <label class="text-[13px] font-poppins font-semibold pb-1">Total</label>
+                        </div>
+                        <div class="w-1/2">
+                            <div class="flex gap-2 justify-end flex-col w-full">
+                                <div class="mr-2 flex items-center justify-end">
 
+                                    <div class="w-[40%] text-right">
+                                        <label class="text-[13px] font-poppins font-semibold text-right pr-2">Total
+                                            Biaya</label>
+                                    </div>
+
+                                    <div class="w-[100%]">
+                                        <input type="text" readonly id="price2" name="price2" placeholder="Total"
+                                            class="w-full text-right rounded-md text-[20px] font-bold readonly border border-gray-300 bg-white px-3 py-4  focus:outline-none focus:ring-2 focus:ring-gray-300  font-poppins"
+                                            autocomplete="off" />
+                                    </div>
+                                </div>
+                                <div class="mr-2 flex items-center justify-end">
+
+                                    <div class="w-[40%] text-right">
+                                        <label class="text-[13px] font-poppins font-semibold text-right pr-2">Total
+                                            Diskon</label>
+
+                                    </div>
+                                    <div class="w-[100%]">
+                                        <input type="text" readonly id="discount_total" name="discount_total"
+                                            placeholder="Total"
+                                            class="w-full text-right rounded-md text-[20px] font-bold readonly border border-gray-300 bg-white px-3 py-4  focus:outline-none focus:ring-2 focus:ring-gray-300  font-poppins"
+                                            autocomplete="off" />
+                                    </div>
+                                </div>
                             </div>
-                            <input id="carttotal" tabindex="-1" readonly type="text" name="carttotal"
-                                placeholder="Total obat"
-                                class="w-full rounded-xl my-1 readonly border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                                autocomplete="off" />
                         </div>
-
                     </div>
-                    <div class="mr-2 flex gap-2 w-[100%] mt-1">
-                        <div class="w-full">
-                            <label class="text-[13px] font-poppins font-semibold pb-1">Bayar</label>
-                            <input id="pay" onkeyup="pay(this.value)" type="text" name="pay"
-                                placeholder="Bayar obat"
-                                class="w-full rounded-xl border my-1 border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                                autocomplete="off" />
+                    <h2 class="text-xl font-semibold mb-3 mt-2">Barang Dibeli</h2>
+                    <div tabindex="-1" class="mt-4 rounded-2xl bg-gray-100 h-[40vh] overflow-y-scroll md:h-[55vh]">
+                        <div class="flex flex-col justify-between">
+                            <table class="min-w-full text-sm text-left font-poppins text-gray-700">
+                                <thead class="bg-blue-50 text-gray-600 uppercase text-xs border-b border-blue-200">
+                                    <tr>
+                                        <th scope="col" class="px-4 py-3 text-center w-[40px]">No</th>
+                                        <th scope="col" class="px-4 py-3">Nama Obat</th>
+                                        <th scope="col" class="px-4 py-3 text-center">Satuan</th>
+                                        <th scope="col" class="px-4 py-3 text-center">Harga</th>
+                                        <th scope="col" class="px-4 py-3 text-center">Qty</th>
+                                        <th scope="col" class="px-4 py-3 text-center">Diskon</th>
+                                        <th scope="col" class="px-4 py-3 text-center">Subtotal</th>
+                                        @if ($transaction->transaction_type == 'KREDIT' || $transaction->transaction_type == 'RESEP TUNAI')
+                                            <th scope="col" class="px-4 py-3 text-center">Jasa</th>
+                                        @endif
+                                        <th scope="col" class="px-4 py-3 text-center">Total</th>
+                                        <th scope="col" class="px-4 py-3 text-center">Tipe</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="carts">
+                                    @foreach ($itemInCart as $index => $cart)
+                                        @php
 
+                                            $raw = $cart->medicine->net_price * $parameters + $rounding;
+                                            $rounded = floor($raw / 1000) * 1000;
 
+                                        @endphp
+                                        <tr id="itemincart{{ $cart->id }}" data-id="{{ $cart->id }}"
+                                            class="cart-row border-b hover:bg-blue-50 transition text-[10px] cursor-pointer">
+                                            <td class="px-4 py-3 text-center text-gray-600">{{ $index + 1 }}</td>
+                                            <td class="px-4 py-3 font-semibold text-gray-800">{{ $cart->medicine->name }}
+                                            </td>
+                                            <td class="px-4 py-3 text-center">{{ $cart->medicine->unit }}</td>
+                                            <td class="px-4 py-3 text-center">Rp
+                                                {{ number_format($rounded, 0, ',', '.') }}</td>
+                                            <td class="px-4 py-3 text-center">{{ $cart->quantity }}</td>
+                                            <td class="px-4 py-3 text-center">
+                                                Rp.{{ number_format($cart->discount, 0, ',', ',') }}</td>
+                                            <td class="px-4 py-3 text-center">Rp
+                                                {{ number_format($cart->total_price, 0, ',', '.') }}</td>
+                                            @if ($transaction->transaction_type == 'KREDIT' || $transaction->transaction_type == 'RESEP TUNAI')
+                                                <td class="clEmbalase px-4 py-3 text-center">Rp
+                                                    {{ number_format($cart->embalase, 0, ',', '.') }}</td>
+                                            @endif
+                                            <td class="clFinalprice px-4 py-3 text-center font-semibold text-blue-600">
+                                                Rp {{ number_format($cart->final_price, 0, ',', '.') }}
+                                            </td>
+                                            <td class="px-4 py-3 text-center font-semibold text-blue-600">
+                                                {{ $cart->cart_type }}
+                                            </td>
+
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+
+                            {{-- @foreach ($itemInCart as $cart)
+                                    <div id="itemincart{{ $cart->id }}">
+
+                                    </div>
+                                @endforeach --}}
                         </div>
-                        <div class="w-full">
-                            <label class="text-[13px] font-poppins font-semibold pb-1">Kembalian</label>
-                            <input id="change" tabindex="-1" readonly type="text" name="change"
-                                placeholder="Bayar obat"
-                                class="w-full rounded-xl border my-1 readonly border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                                autocomplete="off" />
-                        </div>
-
-
-                    </div>
-                    <div class="mt-5">
-                        <form id="checkoutForm" action="{{ route('transaction.checkout') }}" method="POST">
-                            @csrf
-                            <input type="hidden" name="paid" id="paid">
-                            <input type="hidden" name="changes" id="changes">
-                            <input type="hidden" name="transaction_id" id="transaction_id">
-                            <input type="hidden" required name="patient_id" id="patient_id" />
-                            <input type="hidden" @if ($transaction->transaction_type == 'RESEP TUNAI') value="0" @endif required
-                                name="doctor_id" id="doctor_id" />
-                            <input type="hidden" required name="debtor_id" id="debtor_id" />
-
-                            <button type="button" id="checkout" disabled onclick="checkoutItem()"
-                                class="btn btn-pharma !rounded-[5.3px] !bg-gray-400 btn-lg btn-icon icon-right mb-1">Selesaikan</button>
-                        </form>
+                        <br>
                     </div>
                 </div>
-            </aside>
+                <div class="button-container flex gap-2 mt-3 mx-auto w-[95%]">
+                    <div class="w-[50%]">
+                        <form method="POST" action="{{ route('sales.deletetransaction') }}">
+                            @csrf
+                            <input type="hidden" name="trxtype"
+                                value="{{ $transaction?->transaction_type ?? 'null' }}">
+                            <input type="hidden" name="trxid" value="{{ $transaction?->id ?? 'null' }}">
+                            <button type="submit" id="deletebtn"
+                                class="py-[15px] mt-2 w-full font-poppins bg-[#e95050] text-white shadow-[0_0_11px_2px_#e95050] border-none px-[16px] rounded-md transition">
+                                Batal
+                            </button>
+                        </form>
+                    </div>
+                    <button id="openModalPayment"
+                        class="py-[15px] mt-2 w-full font-poppins bg-[#0074ce] text-white shadow-[0_0_11px_2px_#0097dd] border-none px-[16px] rounded-md transition">
+                        Pembayaran
+                    </button>
+
+                </div>
         @endif
+    </div>
+    </aside>
     </div>
     {{-- ------------------- Fixed Cart Card --------------------- --}}
     {{-- @if (request()->routeIs('sales*') != true)
@@ -634,8 +558,8 @@
             class="bg-white rounded-lg shadow-lg w-96 p-6 transform scale-95 transition-transform duration-300">
             <div class="invoice-container" id="invoiceReceipt">
                 <div class="invoice-header">
-                    <h4>Propharma</h4>
-                    <p class="small-text">Some address goes here</p>
+                    <h4>Apotek Sahabat</h4>
+                    <p class="small-text">Jl. Palang Merah Indonesia</p>
                 </div>
 
                 <div class="invoice-info">
@@ -750,6 +674,151 @@
             </form>
         </div>
     </div>
+    @if ($check_transaction == 1)
+        {{-- Modal Pembayaran --}}
+        <div id="paymentModal" class="fixed inset-0 bg-black/50 hidden justify-center items-center z-40">
+            <!-- Modal content -->
+            <div class="bg-white w-full max-w-3xl rounded-xl shadow-xl p-6 relative overflow-y-auto max-h-[90vh]">
+
+                <!-- Close button -->
+                <button id="closeModal"
+                    class="absolute top-3 right-3 text-gray-500 hover:text-gray-800 text-xl font-bold">
+                    ×
+                </button>
+
+                <!-- === Your existing form section === -->
+                <div class="mr-2 w-[100%]">
+                    <div class="flex items-end justify-between md:block py-2">
+                        <h1 class="text-4xl font-semibold tracking-tight">Pembayaran</h1>
+
+                    </div>
+                    @if ($check_transaction == 1)
+                        <div class="w-full">
+                            <label class="text-[13px] font-poppins font-semibold">Cari Pasien</label>
+
+                            <div class="flex items-center">
+                                <div class="searchdebtors w-full">
+                                    <input autofocus required id="patientSearch" type="text"
+                                        placeholder="Ketik ID / Nama…"
+                                        class="w-full rounded-xl border my-1 border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                                        autocomplete="off" />
+                                    <!-- Dropdown -->
+                                    <div id="patientResults"
+                                        class="absolute z-50 mt-2 w-[50%] rounded-xl border border-gray-200 bg-white shadow-lg hidden">
+                                        <ul id="patientList" role="listbox" class="max-h-80 overflow-auto py-2">
+                                        </ul>
+                                    </div>
+                                </div>
+
+                                <div class="adddebtors w-[120px] ml-[10px]">
+                                    <button type="button" id="btnNewPatient"
+                                        class="rounded-[10px] border border-[#62b9ff] px-3 py-2 font-poppins font-bold text-[#62b9ff] flex items-center justify-center gap-2 transition">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                                            class="w-6 h-6 text-[#62b9ff]">
+                                            <circle cx="15" cy="8" r="4" fill="currentColor" />
+                                            <path d="M15,14c-6.1,0-8,4-8,4v2h16v-2C23,18,21.1,14,15,14z"
+                                                fill="currentColor" />
+                                            <line stroke="currentColor" stroke-miterlimit="10" stroke-width="2"
+                                                x1="5" x2="5" y1="7" y2="15" />
+                                            <line stroke="currentColor" stroke-miterlimit="10" stroke-width="2"
+                                                x1="9" x2="1" y1="11" y2="11" />
+                                        </svg>
+                                        Baru
+                                    </button>
+                                </div>
+                                <input type="hidden" id="selectedPatientId" />
+                            </div>
+                        </div>
+                        @if ($transaction->transaction_type == 'KREDIT' || $transaction->transaction_type == 'RESEP TUNAI')
+                            <div class="w-full mt-3">
+                                <label class="text-[13px] font-poppins font-semibold pb-1">Cari Dokter</label>
+                                <div class="flex items-center">
+                                    <div class="searchdoctors w-full">
+                                        <input autofocus required id="doctorSearch" type="text"
+                                            placeholder="Ketik ID / Nama…"
+                                            class="w-full rounded-xl border my-1 border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                                            autocomplete="off" />
+                                        <!-- Dropdown -->
+                                        <div id="doctorResults"
+                                            class="absolute z-50 mt-2 w-[50%] rounded-xl border border-gray-200 bg-white shadow-lg hidden">
+                                            <ul id="doctorList" role="listbox" class="max-h-80 overflow-auto py-2">
+                                            </ul>
+                                        </div>
+                                    </div>
+                                    <input type="hidden" id="selectedDoctorId" />
+                                </div>
+                            </div>
+                        @endif
+                    @endif
+                </div>
+
+                <div class="mr-2 w-[100%] mt-3 flex gap-2">
+                    @if ($check_transaction == 1)
+                        @if ($transaction->transaction_type == 'KREDIT')
+                            <div class="w-[40%]">
+                                <label class="text-[13px] font-poppins font-semibold pb-1">Embalase</label>
+                                <input id="embalase" tabindex="-1" readonly type="text" name="embalase"
+                                    placeholder="Embalase"
+                                    class="w-full rounded-xl my-1 readonly border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                                    autocomplete="off" />
+                            </div>
+                        @endif
+                    @endif
+                    <div class="w-full gap-2 flex">
+                        <div class="w-full">
+                            <label class="text-[13px] font-poppins font-semibold pb-1">Total</label>
+                            <input id="carttotal" tabindex="-1" readonly type="text" name="carttotal"
+                                placeholder="Total obat"
+                                class="w-full rounded-xl my-1 readonly border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                                autocomplete="off" />
+                        </div>
+                        <div class="w-full">
+                            <label class="text-[13px] font-poppins font-semibold pb-1">Discount</label>
+                            <input onkeyup="countSubtotalDiscount(this.value)" id="discounsubtotal" tabindex="-1"
+                                type="number" name="discounsubtotal" placeholder="Discount"
+                                class="w-full rounded-xl my-1 border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                                autocomplete="off" />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mr-2 flex gap-2 w-[100%] mt-3">
+                    <div class="w-full">
+                        <label class="text-[13px] font-poppins font-semibold pb-1">Bayar</label>
+                        <input id="pay" onkeyup="pay(this.value)" type="text" name="pay"
+                            placeholder="Bayar obat"
+                            class="w-full rounded-xl border my-1 border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                            autocomplete="off" />
+                    </div>
+                    <div class="w-full">
+                        <label class="text-[13px] font-poppins font-semibold pb-1">Kembalian</label>
+                        <input id="trchange" tabindex="-1" readonly type="text" name="change"
+                            placeholder="Bayar obat"
+                            class="w-full rounded-xl border my-1 readonly border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                            autocomplete="off" />
+                    </div>
+                </div>
+
+                <div class="mt-5">
+                    <form id="checkoutForm" action="{{ route('transaction.checkout') }}" method="POST">
+                        @csrf
+                        <input type="hidden" name="paid" id="paid">
+                        <input type="hidden" name="changes" id="changes">
+                        <input type="hidden" name="transaction_id" id="transaction_id">
+                        <input type="hidden" required name="patient_id" id="patient_id" />
+                        <input type="hidden" @if ($transaction->transaction_type == 'RESEP TUNAI') value="0" @endif required
+                            name="doctor_id" id="doctor_id" />
+                        <input type="hidden" required name="debtor_id" id="debtor_id" />
+
+                        <button type="button" id="checkout" disabled onclick="checkoutItem()"
+                            class="w-full mt-3 rounded-lg bg-gray-400 hover:bg-gray-500 text-white font-semibold py-4 transition">
+                            Selesaikan
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    @endif
 
     {{-- ============================================================== Patient Invoice  ============================================================== --}}
 
@@ -831,23 +900,46 @@
 
         // Variabel 
         var transaction_id = trx_id;
-        var total_discount = "";
+        var total_discount = {{ $discount_total }};
+        var discount = "";
+        var subtotal_discount = "";
         var total_item = "";
         var medicine_id = "";
-
+        var price2 = "";
+        var item_finalprice = "";
+        var payInput = document.getElementById('pay');
         // var debtor_id = "";
         // var patient_id = "";
         // var doctor_id = "";
 
-        var price2 = "";
         var subtotal = "";
         var final_price = "";
         let items = [];
         let activeIndex = -1;
         let closeTimeout;
+        let true_price = "";
+        var embalase = 0;
+        var jasa = "";
+        var cart_type = "";
+        let existingpackage = {!! json_encode($existingpackage->package ?? '') !!};
+        var currenttransaction = transaction_type;
+
+        var racikstatus = 0;
+        var racikembalaseprice = 0;
+        var previewdiscounttotal = document.getElementById('discount_total');
+        var previewtransactiontotal = document.getElementById('price2');
+
 
         // Set nilai awal
         cartTotalInput.value = formatRupiah(totaltransaction);
+
+
+
+        previewdiscounttotal.value = formatRupiah(total_discount);
+        previewtransactiontotal.value = formatRupiah(totaltransaction);
+        if (packageInput) {
+            document.getElementById('package').value = existingpackage;
+        }
 
         // ===============================
         // Helper Functions
@@ -966,13 +1058,16 @@
             price.value = formatRupiah(rounded);
             console.log("harga Total : " + raw);
             price2 = rounded;
-            if (transaction_type == 'RESEP TUNAI') {
-                discountInput.focus();
+            item_finalprice = rounded;
+            if (transaction_type == 'RESEP TUNAI' && racikstatus == 1) {
+                dosageRInput.focus();
+                closeBox();
+
             } else {
                 quantity.focus();
+                closeBox();
+
             }
-            quantity.select();
-            closeBox();
         }
         // ===============================
         // Search (Debounced)
@@ -1141,14 +1236,13 @@
         }
 
         function selectPatient(it) {
-            patientname.value = it.name;
             document.getElementById('patient_id').value = it.id;
             if (transaction_type == 'RESEP TUNAI' || transaction_type == 'KREDIT') {
                 document.getElementById('doctorSearch').focus();
             } else {
                 document.getElementById('pay').focus();
             }
-            patientSearch.value = it.name;
+            document.getElementById('patientSearch').value = it.name;
             closepatientBox();
         }
 
@@ -1273,7 +1367,6 @@
         }
 
         function selectDoctor(it) {
-            doctorname.value = it.name;
 
             if (transaction_type == 'RESEP TUNAI') {
                 document.getElementById('pay').focus();
@@ -1292,48 +1385,49 @@
         // Pencarian Debitur
         // ===============================
 
-        function opendebtorBox() {
-            debtorbox.classList.remove('hidden');
-        }
-
-        function closedebtorBox() {
-            debtorbox.classList.add('hidden');
-            activeIndex = -1;
-            highlight();
-        }
-
-        function debtorhighlight() {
-            [...debtorlist.children].forEach((li, i) => {
-                li.classList.toggle('bg-gray-100', i === activeIndex);
-            });
-        }
-
-        function ensuredebtorVisible() {
-            const li = debtorlist.children[activeIndex];
-            if (!li) return;
-            const lTop = debtorlist.scrollTop;
-            const lBottom = lTop + debtorlist.clientHeight;
-            const liTop = li.offsetTop;
-            const liBottom = liTop + li.offsetHeight;
-
-            if (liTop < lTop) debtorlist.scrollTop = liTop;
-            else if (liBottom > lBottom) debtorlist.scrollTop = liBottom - debtorlist.clientHeight;
-        }
-
-        function renderdebtor(debtoritems) {
-            debtorlist.innerHTML = '';
-            if (!debtoritems.length) {
-                debtorlist.innerHTML = `<li class="px-4 py-3 text-sm text-gray-500">Tidak ada hasil</li>`;
-                return;
+        if (debtorbox) {
+            function opendebtorBox() {
+                debtorbox.classList.remove('hidden');
             }
 
-            for (const it of debtoritems) {
-                const li = document.createElement('li');
-                li.setAttribute('role', 'option');
-                li.className = 'cursor-pointer px-4 py-3 hover:bg-gray-100';
-                li.dataset.id = it.id;
+            function closedebtorBox() {
+                debtorbox.classList.add('hidden');
+                activeIndex = -1;
+                highlight();
+            }
 
-                li.innerHTML = `
+            function debtorhighlight() {
+                [...debtorlist.children].forEach((li, i) => {
+                    li.classList.toggle('bg-gray-100', i === activeIndex);
+                });
+            }
+
+            function ensuredebtorVisible() {
+                const li = debtorlist.children[activeIndex];
+                if (!li) return;
+                const lTop = debtorlist.scrollTop;
+                const lBottom = lTop + debtorlist.clientHeight;
+                const liTop = li.offsetTop;
+                const liBottom = liTop + li.offsetHeight;
+
+                if (liTop < lTop) debtorlist.scrollTop = liTop;
+                else if (liBottom > lBottom) debtorlist.scrollTop = liBottom - debtorlist.clientHeight;
+            }
+
+            function renderdebtor(debtoritems) {
+                debtorlist.innerHTML = '';
+                if (!debtoritems.length) {
+                    debtorlist.innerHTML = `<li class="px-4 py-3 text-sm text-gray-500">Tidak ada hasil</li>`;
+                    return;
+                }
+
+                for (const it of debtoritems) {
+                    const li = document.createElement('li');
+                    li.setAttribute('role', 'option');
+                    li.className = 'cursor-pointer px-4 py-3 hover:bg-gray-100';
+                    li.dataset.id = it.id;
+
+                    li.innerHTML = `
                     <div class="flex items-start justify-between gap-2">
                         <div>
                             <div class="font-medium">${escapeHtml(it.name)}</div>
@@ -1347,81 +1441,82 @@
                     </div>
                 `;
 
-                li.addEventListener('mousedown', (e) => {
-                    selectDebtor(it);
-                    e.preventDefault();
-                });
+                    li.addEventListener('mousedown', (e) => {
+                        selectDebtor(it);
+                        e.preventDefault();
+                    });
 
-                debtorlist.appendChild(li);
-            }
-        }
-
-        // ===============================
-        // Search (Debounced)
-        // ===============================
-        const dodebtorSearch = debounce(async (term) => {
-            if (!term.trim()) {
-                debtorlist.innerHTML = '';
-                closedebtorBox();
-                return;
-            }
-            const url = `${endpointDebtor}?q=${encodeURIComponent(term)}`;
-            const res = await fetch(url, {
-                headers: {
-                    'Accept': 'application/json'
+                    debtorlist.appendChild(li);
                 }
-            });
-            if (!res.ok) return;
+            }
 
-            debtoritems = await res.json();
-            renderdebtor(debtoritems);
-            opendebtorBox();
-        }, 250);
-        if (inputdebtor) {
-            inputdebtor.addEventListener('input', (e) => dodebtorSearch(e.target.value));
-
-            inputdebtor.addEventListener('keydown', (e) => {
-                const max = debtoritems.length - 1;
-
-                if (e.key === 'ArrowDown') {
-                    e.preventDefault();
-                    if (max < 0) return;
-                    activeIndex = Math.min(max, activeIndex + 1);
-                    debtorhighlight();
-                    ensuredebtorVisible();
-                } else if (e.key === 'ArrowUp') {
-                    e.preventDefault();
-                    if (max < 0) return;
-                    activeIndex = Math.max(0, activeIndex - 1);
-                    debtorhighlight();
-                    ensuredebtorVisible();
-                } else if (e.key === 'Enter' && activeIndex >= 0 && debtoritems[activeIndex]) {
-                    e.preventDefault();
-                    selectDebtor(debtoritems[activeIndex]);
-                } else if (e.key === 'Escape') {
+            // ===============================
+            // Search (Debounced)
+            // ===============================
+            const dodebtorSearch = debounce(async (term) => {
+                if (!term.trim()) {
+                    debtorlist.innerHTML = '';
                     closedebtorBox();
+                    return;
                 }
-            });
-        }
+                const url = `${endpointDebtor}?q=${encodeURIComponent(term)}`;
+                const res = await fetch(url, {
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                if (!res.ok) return;
 
-        function selectDebtor(it) {
-            debtorname.value = it.name;
-            debtorSearch.value = it.name;
+                debtoritems = await res.json();
+                renderdebtor(debtoritems);
+                opendebtorBox();
+            }, 250);
+            if (inputdebtor) {
+                inputdebtor.addEventListener('input', (e) => dodebtorSearch(e.target.value));
 
-            parameters = it.parameters[0].receipt;
-            rounding = it.parameters[0].rounding;
-            document.getElementById('debtor_id').value = it.id;
-            console.log(rounding);
-            if (transaction_type == 'KREDIT') {
-                input.focus();
-            } else {
-                discountInput.focus();
+                inputdebtor.addEventListener('keydown', (e) => {
+                    const max = debtoritems.length - 1;
+
+                    if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        if (max < 0) return;
+                        activeIndex = Math.min(max, activeIndex + 1);
+                        debtorhighlight();
+                        ensuredebtorVisible();
+                    } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        if (max < 0) return;
+                        activeIndex = Math.max(0, activeIndex - 1);
+                        debtorhighlight();
+                        ensuredebtorVisible();
+                    } else if (e.key === 'Enter' && activeIndex >= 0 && debtoritems[activeIndex]) {
+                        e.preventDefault();
+                        selectDebtor(debtoritems[activeIndex]);
+                    } else if (e.key === 'Escape') {
+                        closedebtorBox();
+                    }
+                });
             }
-            document.getElementById('debtorSearch').value = it.name;
-            document.getElementById('embalase').value = it.parameters[0].embalas;;
+
+            function selectDebtor(it) {
+                debtorname.value = it.name;
+                debtorSearch.value = it.name;
+
+                parameters = it.parameters[0].receipt;
+                rounding = it.parameters[0].rounding;
+                document.getElementById('debtor_id').value = it.id;
+                console.log(rounding);
+                if (transaction_type == 'KREDIT') {
+                    input.focus();
+                } else {
+                    discountInput.focus();
+                }
+                document.getElementById('debtorSearch').value = it.name;
+                document.getElementById('embalase').value = it.parameters[0].embalas;;
 
 
-            closedebtorBox();
+                closedebtorBox();
+            }
         }
         // ===============================
         // Perhitungan Harga & Diskon
@@ -1430,18 +1525,34 @@
             total_item = val;
             subtotal = price2 * val;
             totalprice.value = formatRupiah(subtotal);
+            pharmacy_price = subtotal;
         }
 
         function countDiscount(val) {
             if (val > 100) {
                 final_price = subtotal - val;
-                total_discount = val;
+                discount = val;
             } else {
                 const d = subtotal * val / 100;
                 final_price = subtotal - d;
-                total_discount = `${val}%`;
+                discount = d;
             }
             totalprice.value = formatRupiah(final_price);
+        }
+
+        function countSubtotalDiscount(val) {
+            if (val > 100) {
+                final_price = totaltransaction - val;
+                subtotal_discount = val;
+                totaltransaction = totaltransaction - val;
+            } else {
+                const d = totaltransaction * val / 100;
+                final_price = totaltransaction - d;
+                subtotal_discount = `${val}%`;
+                totaltransaction = totaltransaction - d;
+            }
+            cartTotalInput.value = formatRupiah(final_price);
+
         }
 
         // ===============================
@@ -1449,65 +1560,128 @@
         // ===============================
         axios.defaults.headers.common['X-CSRF-TOKEN'] = '{{ csrf_token() }}';
 
-        function addToCart(medicine_id, transaction_id, quantity, discount, total_price) {
+        function resetInputs() {
+            const ids = ['pay', 'change', 'quantity', 'dosage', 'dosage_r'];
+
+            ids.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.value = "";
+            });
+
+            const pkg = document.getElementById('package');
+            if (pkg) pkg.focus();
+
+        }
+
+        function addToCart(medicine_id, transaction_id, quantity, discount, embalase, cart_type, package, dosage_r,
+            total_price, final_price, racikstatus) {
             axios.post("{{ route('transaction.addToCart') }}", {
                 medicine_id,
                 transaction_id,
                 quantity,
                 discount,
-                total_price
+                embalase,
+                cart_type,
+                package,
+                dosage_r,
+                total_price,
+                final_price,
+                racikstatus,
+
             }).then(response => {
-                let item = response.data;
+                const item = response.data;
+
                 totaltransaction += total_price;
-                cartTotalInput.value = formatRupiah(totaltransaction);
+                total_discount += parseFloat(discount);
+                price2 = formatRupiah(totaltransaction);
 
-                // Reset form input
-                stock.value = "";
-                unit.value = "";
-                quantity.value = "";
-                price.value = "";
-                name.value = "";
-                totalprice.value = "";
-                document.getElementById('pay').value = "";
-                document.getElementById('change').value = "";
+                // Reset input fields
+                [stock, unit, quantity, price, name, totalprice].forEach(el => el.value = "");
+
+                resetInputs();
+
+
                 discountInput.value = "";
+                if (racikstatus == 1 && transaction_type != 'UPDS' && transaction_type != 'HV/OTC') {
+                    document.getElementById('productSearch').focus();
+                    closeBox();
 
-                document.getElementById('productSearch').focus();
-                closeBox();
+                } else {
+                    document.getElementById('productSearch').focus();
+                    closeBox();
 
-                // Append ke cart
-                document.getElementById('carts').innerHTML += `
-                    <div id="itemincart${item.id}">
-                        <div class="flex justify-between mx-[15px] mt-[5px] py-[20px] mb-[8px] rounded-lg bg-[#fff]">
-                            <div>
-                                <div class="px-[20px] font-poppins font-semibold">${item.name}</div>
-                                <div class="px-[20px] font-poppins text-[10px]">${formatRupiah(item.total_price)}</div>
-                            </div>
-                            <div class="mx-[10px]">
-                                <button onclick="removeItem(${item.id})"
-                                    class="flex justify-center items-center mr-1 px-2 py-1 text-[#DF1463] border border-[#DF1463] rounded hover:bg-[#DF1463] hover:text-white">
-                                    <svg viewBox="0 0 24 24" fill="none"
-                                        xmlns="http://www.w3.org/2000/svg" class="w-5 h-5">
-                                        <path
-                                            d="M8 6V4.41421C8 3.63317 8.63317 3 9.41421 3H14.5858C15.3668 3 16 3.63317 16 4.41421V6"
-                                            stroke="#DF1463" stroke-width="1.7" stroke-linecap="round" />
-                                        <path
-                                            d="M5.7372 6.54395V18.9857C5.7372 19.7449 6.35269 20.3604 7.11194 20.3604H16.8894C17.6487 20.3604 18.2642 19.7449 18.2642 18.9857V6.54395M2.90918 6.54395H21.091"
-                                            stroke="#c60653" stroke-width="1.7" stroke-linecap="round" />
-                                    </svg>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                `;
+                }
+                console.log(item);
+
+                // Insert Values
+                cartTotalInput.value = formatRupiah(totaltransaction);
+                previewdiscounttotal.value = formatRupiah(total_discount);
+                previewtransactiontotal.value = formatRupiah(totaltransaction);
+
+
+                document.getElementById('carts').insertAdjacentHTML('beforeend', `
+                    <tr id="itemincart${item.id}" class="border-b hover:bg-blue-50 transition text-[10px]">
+                    <td class="px-4 py-3 text-center text-gray-600">${document.querySelectorAll('#carts tr').length + 1}</td>
+                    <td class="px-4 py-3 font-semibold text-gray-800">${item.name}</td>
+                    <td class="px-4 py-3 text-center">${item.unit}</td>
+                    <td class="px-4 py-3 text-center">${formatRupiah(item_finalprice)}</td>
+                    <td class="px-4 py-3 text-center">${item.quantity}</td>
+                    <td class="px-4 py-3 text-center">${formatRupiah(item.discount)}</td>
+                    <td class="px-4 py-3 text-center">${formatRupiah(item.total_price)}</td>
+                    ${(transaction_type === 'RESEP TUNAI' || transaction_type === 'KREDIT')
+                    ? `<td class="px-4 py-3 text-center clEmbalase">${formatRupiah(item.jasa)}</td>`
+                    : ''
+                    }
+                    <td class="px-4 py-3 text-center clFinalprice font-semibold text-blue-600">${formatRupiah(item.final_price)}</td>
+                    <td class="px-4 py-3 text-center font-semibold text-blue-600">${ item.cart_type }</td>  
+                </tr>
+                
+        `);
             }).catch(error => {
                 console.error("❌ Error adding to cart:", error.response ? error.response.data : error.message);
             });
         }
 
+
         function submit() {
-            addToCart(medicine_id, transaction_id, total_item, total_discount, final_price);
+            if (discount === "") {
+                final_price = subtotal;
+                discount = 0;
+            }
+            if (jasa === "") {
+                jasa = 0;
+            }
+
+            // Determine cart type
+            if (transaction_type === "KREDIT" || transaction_type === "RESEP TUNAI") {
+                cart_type = "UM";
+            } else if (transaction_type === "UPDS") {
+                cart_type = "UP";
+            } else if (transaction_type === "HV/OTC") {
+                cart_type = "HV";
+            }
+
+            true_price = final_price + jasa;
+
+            // Optional fields — safely handled
+            const pkg = document.getElementById('package')?.value || '';
+            const dose = document.getElementById('dosage_r')?.value || '';
+            addToCart(
+                medicine_id,
+                transaction_id,
+                total_item,
+                discount,
+                jasa,
+                cart_type,
+                pkg,
+                dose,
+                pharmacy_price,
+                true_price,
+                racikstatus
+            );
+            pkg.value = pkg;
         }
+
 
         function removeItem(id) {
             document.getElementById("itemincart" + id).remove();
@@ -1671,6 +1845,10 @@
             btn.classList.add("!bg-gray-400");
         }
 
+        function payment() {
+
+        }
+
         function pay() {
             const paidInput = document.getElementById('paid');
             const changesInput = document.getElementById('changes');
@@ -1679,14 +1857,23 @@
             document.getElementById('pay').value = "Rp. " + bayar.toLocaleString("id-ID");
 
             if (bayar < totaltransaction) {
-                document.getElementById('change').value = "Duitnya Kurang";
+                document.getElementById('trchange').value = "Duitnya Kurang";
                 resetButton();
             } else {
                 if (totaltransaction > 0) activeButton();
                 paidInput.value = totaltransaction;
                 changesInput.value = bayar - totaltransaction;
-                document.getElementById('change').value = formatRupiah(bayar - totaltransaction);
+                document.getElementById('trchange').value = formatRupiah(bayar - totaltransaction);
             }
+        }
+
+        function countEmbalase() {
+
+            let raw = document.getElementById('jasa').value.replace(/\D/g, "");
+            let bayar = parseInt(raw) || 0;
+            document.getElementById('jasa').value = "Rp. " + bayar.toLocaleString("id-ID");
+            embalase = bayar;
+
         }
 
         // ===============================
@@ -1696,7 +1883,18 @@
             const isF1 = e.key === 'F1' || e.keyCode === 112;
             if (isF1) {
                 e.preventDefault();
-                document.getElementById('pay').focus();
+                const modal = document.getElementById('paymentModal');
+                const isHidden = modal.classList.contains('hidden');
+
+                if (isHidden) {
+                    // Open modal
+                    modal.classList.remove('hidden');
+                    modal.classList.add('flex');
+                } else {
+                    // Close modal
+                    modal.classList.add('hidden');
+                    modal.classList.remove('flex');
+                }
             }
         }
         // ===============================
@@ -1706,6 +1904,7 @@
                 e.preventDefault();
                 if (checkbox) {
                     checkbox.checked = !checkbox.checked;
+
                     checkbox.dispatchEvent(new Event('change'));
                 }
                 // if (checkbox.checked) {
@@ -1731,12 +1930,27 @@
         function onF3Key(e) {
             const isF3 = e.key === 'F3' || e.keyCode === 114;
             if (isF3) {
+                if (transaction_type == 'RESEP TUNAI') {
+                    parameters = {{ $ChangeFakturParameters }};
+                    transaction_type = "UPDS";
+                    faktur.innerHTML = `
+                            <span
+                            class="bg-green-100 text-green-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md dark:bg-green-900 dark:text-green-300">UPDS</span>
+                    `;
+                } else if (transaction_type == "UPDS") {
+                    parameters = {{ $ChangeFakturParameters }};
+                    transaction_type = "HV/OTC";
+                    faktur.innerHTML = `
+                        <span class="bg-blue-100 text-blue-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md dark:bg-blue-900 dark:text-blue-300">HV/OTC</span>
+                    `;
+                } else if (transaction_type == "HV/OTC") {
+                    parameters = {{ $ChangeFakturParameters }};
+                    transaction_type = "RESEP TUNAI";
+                    faktur.innerHTML = `
+                            <span class="bg-red-100 text-red-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md dark:bg-red-900 dark:text-red-300">Resep Tunai</span>
+                    `;
+                }
 
-                faktur.innerHTML = `
-                    <span class="bg-green-100 text-green-800 text-xs font-medium me-2 px-2.5 py-0.5 rounded-full dark:bg-green-900 dark:text-green-300">
-                        UPDS
-                    </span>
-                `;
 
                 // if (checkbox.checked) {
                 //     document.getElementById('receiptbox').checked = false;
@@ -1786,6 +2000,13 @@
             }
         }
 
+        function onF10Key(e) {
+            if (e.key === 'F10' || e.keyCode === 121) {
+                e.preventDefault();
+
+                // do something
+            }
+        }
         // ===============================
         // Global Event Listeners
         // ===============================
@@ -1798,10 +2019,15 @@
         window.addEventListener('keydown', onF3Key, {
             capture: true
         });
+        window.addEventListener('keydown', onF10Key, {
+            capture: true
+        });
+
         document.addEventListener('click', (e) => {
             if (!box.contains(e.target) && e.target !== input) closeBox();
-            if (!box.contains(e.target) && e.target !== input) closedebtorBox();
-
+            if (debtorbox) {
+                if (!box.contains(e.target) && e.target !== input) closedebtorBox();
+            }
         });
         input.addEventListener('blur', () => closeTimeout = setTimeout(closeBox, 120));
         input.addEventListener('focus', () => {
@@ -1867,38 +2093,203 @@
 
 
         // ===============================
-        // Resep
+        // Modal Pembayaran
         // ===============================
-        checkbox.addEventListener('change', function() {
-            if (this.checked) {
-                packageInput.removeAttribute('readonly');
-                dosageRInput.removeAttribute('readonly');
-                packageInput.classList.remove('readonly');
-                dosageRInput.classList.remove('readonly');
-                quantity.setAttribute('readonly', true);
-                quantity.classList.add('readonly');
-                packageInput.focus();
-            } else {
-                packageInput.setAttribute('readonly', true);
-                dosageRInput.setAttribute('readonly', true);
-                packageInput.classList.add('readonly');
-                dosageRInput.classList.add('readonly');
+        document.getElementById('openModalPayment').addEventListener('click', () => {
+            document.getElementById('paymentModal').classList.remove('hidden');
+            document.getElementById('paymentModal').classList.add('flex');
+        });
+
+        document.getElementById('closeModal').addEventListener('click', () => {
+            document.getElementById('paymentModal').classList.add('hidden');
+            document.getElementById('paymentModal').classList.remove('flex');
+        });
+
+        // Optional: close when clicking outside modal
+        document.getElementById('paymentModal').addEventListener('click', (e) => {
+            if (e.target.id === 'paymentModal') {
+                e.currentTarget.classList.add('hidden');
+                e.currentTarget.classList.remove('flex');
             }
         });
+        // ===============================
+        // Resep
+        // ===============================
+        if (checkbox) {
+            checkbox.addEventListener('change', function() {
+                const packageInput = document.getElementById('package');
+                const dosageRInput = document.getElementById('dosage_r');
+                const dosageR2 = document.getElementById('dosage_r2');
+
+                if (this.checked) {
+                    packageInput?.removeAttribute('readonly');
+                    dosageRInput?.removeAttribute('readonly');
+                    packageInput?.classList.remove('readonly');
+                    dosageRInput?.classList.remove('readonly');
+                    if (dosageR2) dosageR2.value = "Ya";
+                    racikstatus = 1;
+
+                    packageInput?.focus();
+                } else {
+                    packageInput?.setAttribute('readonly', true);
+                    dosageRInput?.setAttribute('readonly', true);
+                    packageInput?.classList.add('readonly');
+                    dosageRInput?.classList.add('readonly');
+                    if (dosageR2) dosageR2.value = "Tidak";
+                    racikstatus = 0;
+                }
+            });
+        }
 
         function calculatePackage() {
             const dosage = parseFloat(dosageInput.value) || 0;
             const dosageR = parseFloat(dosageRInput.value) || 0;
-            const package = parseFloat(packageInput.value) || 0;
+            const packageVal = parseFloat(packageInput.value) || 0;
 
-            if (dosageR > 0) {
-                const result = dosageR / dosage * package;
-                quantity.value = result; // rounded to 2 decimals
-                count(quantity.value);
+            if (dosageR > 0 && dosage > 0) {
+                const result = (dosageR / dosage) * packageVal;
+                const rounded = Math.ceil(result);
+                quantity.value = rounded;
+                count(rounded);
             } else {
                 quantity.value = '';
             }
         }
+
+        function sendEmbalase(valEmbalase) {
+            var valEmbalase = document.getElementById('jasa').value;
+            let jasaValue = parseInt(valEmbalase.replace(/[^0-9]/g, ""), 10);
+            axios.post("{{ route('sales.sendembalase') }}", {
+                jasaValue,
+                transaction_id,
+            }).then(response => {
+                const item = response.data;
+                console.log(item);
+                // Reset input fields
+                // [stock, unit, quantity, price, name, totalprice].forEach(el => el.value = "");
+                // document.getElementById('pay').value = "";
+                // document.getElementById('change').value = "";
+                // document.getElementById('package').value = "";
+                // document.getElementById('quantity').value = "";
+                // document.getElementById('dosage').value = "";
+                racikembalaseprice = item.finalprice;
+
+
+                let embalaseEls = document.querySelectorAll('.clEmbalase');
+                let finalPriceEls = document.querySelectorAll('.clFinalprice');
+
+
+                // Get The Last Record
+                let lastEmbalase = embalaseEls[embalaseEls.length - 1];
+                let lastFinalPrice = finalPriceEls[finalPriceEls.length - 1];
+
+                // Update The Last Record
+                if (lastEmbalase && lastFinalPrice) {
+                    lastEmbalase.innerHTML = formatRupiah(jasaValue);
+                    lastFinalPrice.innerHTML = formatRupiah(racikembalaseprice);
+                }
+
+                document.getElementById('jasa').value = "";
+                document.getElementById('dosage_r2').value = "Tidak";
+                checkbox.checked = false;
+                checkbox.dispatchEvent(new Event('change'));
+
+                document.getElementById('productSearch').focus();
+
+
+            }).catch(error => {
+                console.error("Error Updating Embalase:", error.response ? error.response.data : error.message);
+            });
+        }
+        // Recipe Redirecting inputs
+        if (packageInput) {
+            packageInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Tab') {
+                    e.preventDefault();
+                    document.getElementById('productSearch').focus();
+                }
+            });
+        }
+
+
+        if (dosageRInput) {
+            dosageRInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    submit();
+                    packageInput.focus();
+
+                } else if (e.key === 'Tab') {
+                    e.preventDefault();
+                    document.getElementById('quantity').focus();
+                }
+            });
+        }
+
+        quantity.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                submit();
+            } else if (e.key === 'Tab') {
+                e.preventDefault();
+                document.getElementById('discount').focus();
+            }
+        });
+
+        document.getElementById('jasa').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+
+                Swal.fire({
+                    title: "Selesai Untuk Racikan?",
+                    icon: "question",
+                    showCancelButton: true,
+                    confirmButtonText: "Save",
+                    denyButtonText: `Don't save`
+                }).then((result) => {
+                    /* Read more about isConfirmed, isDenied below */
+                    if (result.isConfirmed) {
+                        Swal.fire("Racikan Telah Diselesaikan!", "", "success");
+                        sendEmbalase(this.value);
+
+                    }
+                });
+            }
+        });
+        discountInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                submit();
+            }
+        });
+        payInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                pay(this.value);
+            }
+        });
+
+        // ===============================
+        // TABLE CONTROL
+        // ===============================
+
+
+        // When user clicks on a table row
+        document.querySelectorAll('.cart-row').forEach(row => {
+            row.addEventListener('click', function() {
+                // Remove highlight from previously selected row
+                document.querySelectorAll('.cart-row').forEach(r => r.classList.remove('bg-blue-100'));
+
+                // Highlight the selected row
+                this.classList.add('bg-blue-100');
+
+                // Store selected ID
+                selectedRowId = this.dataset.id;
+                console.log('Selected item ID:', selectedRowId);
+            });
+        });
+
+        // Listen for Delete key
     </script>
 
     {{-- ------------------- Fixed Cart Card --------------------- --}}

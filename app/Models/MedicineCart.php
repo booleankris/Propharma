@@ -16,7 +16,15 @@ class MedicineCart extends Model
         'transaction_id',
         'quantity',
         'discount', 
+        'embalase',
+        'cart_type',
+        'package',
+        'dosage_r',
         'total_price',
+        'final_price',
+        'status',
+        'recipe_status',
+        'recipe_number',
     ];
     public function medicine()
     {

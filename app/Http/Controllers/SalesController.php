@@ -29,10 +29,11 @@ class SalesController extends Controller
 
         if ($slug == "upds") {
             $parameters = PaymentParameters::where('id', 1)->first();
+            $ChangeFakturParameters = $parameters->pdu;
+            $ChangeFakturRounding = $parameters->rounding;
             $rounding = $parameters->rounding;
             $parameters = $parameters->pdu;
             $type = "UPDS";
-
             // Clear Cart If Different Payment Type
             $transaction = MedicineTransactions::where('pharmacy_id', Auth()->user()->pharmacy_id)->where('status', '0')->first();
             if ($transaction) {
@@ -45,6 +46,8 @@ class SalesController extends Controller
             }
         } else if ($slug == "hv") {
             $parameters = PaymentParameters::where('id', 1)->first();
+            $ChangeFakturParameters = $parameters->pdu;
+            $ChangeFakturRounding = $parameters->rounding;
             $rounding = $parameters->rounding;
             $parameters = $parameters->otc;
             $type = "HV/OTC";
@@ -61,9 +64,12 @@ class SalesController extends Controller
             }
         } else if ($slug == "resep") {
             $parameters = PaymentParameters::where('id', 1)->first();
+            $ChangeFakturParameters = $parameters->pdu;
+            $ChangeFakturRounding = $parameters->rounding;
             $rounding = $parameters->rounding;
             $parameters = $parameters->otc;
             $type = "RESEP TUNAI";
+
 
             // Clear Cart If Different Payment Type
             $transaction = MedicineTransactions::where('pharmacy_id', Auth()->user()->pharmacy_id)->where('status', '0')->first();
@@ -77,10 +83,11 @@ class SalesController extends Controller
             }
         } else if ($slug == "kredit") {
             $parameters = PaymentParameters::where('id', 1)->first();
+            $ChangeFakturParameters = $parameters->pdu;
+            $ChangeFakturRounding = $parameters->rounding;
             $rounding = "0";
             $parameters = "0";
             $type = "KREDIT";
-
             // Clear Cart If Different Payment Type
             $transaction = MedicineTransactions::where('pharmacy_id', Auth()->user()->pharmacy_id)->where('status', '0')->first();
             if ($transaction) {
@@ -95,14 +102,19 @@ class SalesController extends Controller
 
         // Checking Transaction Status
         $transaction = MedicineTransactions::where('pharmacy_id', Auth()->user()->pharmacy_id)->where('status', '0')->first();
-        $totaltransaction =  MedicineCart::where('user_id', Auth()->user()->id)->where('status', '0')->sum('total_price');
+        $totaltransaction =  MedicineCart::where('user_id', Auth()->user()->id)->where('status', '0')->sum('final_price');
+        $existingpackage = MedicineCart::where('user_id', auth()->id())
+            ->where('status', '0')
+            ->where('recipe_status', '0')
+            ->whereNotNull('package')
+            ->first();
+        $discount_total =  MedicineCart::where('user_id', Auth()->user()->id)->where('status', '0')->sum('discount');
         $check_transaction = MedicineTransactions::where('pharmacy_id', Auth()->user()->pharmacy_id)->where('status', '0')->count();
 
         // Get Item Inside Cart based on user id and cart item status
         $itemInCart = MedicineCart::with('medicine')->where('status', 0)->where('user_id', Auth()->user()->id)->get();
 
-
-        return view('kasir.transaction', compact('check_transaction', 'transaction', 'parameters', 'rounding', 'itemInCart', 'totaltransaction'));
+        return view('kasir.transaction', compact('check_transaction', 'transaction','existingpackage', 'parameters', 'rounding', 'itemInCart', 'totaltransaction', 'discount_total', 'ChangeFakturParameters', 'ChangeFakturRounding'));
     }
 
     /**
@@ -233,23 +245,91 @@ class SalesController extends Controller
             }
         }
     }
+    public function deleteTransaction(Request $request)
+    {
+        $item = MedicineTransactions::findOrFail($request->get('trxid'));
+
+        if ($item) {
+            $item->delete();
+            if ($request->get('trxtype') == "UPDS") {
+                $url = 'upds';
+            } else if ($request->get('trxtype') == "HV/OTC") {
+                $url = 'hv';
+            } else if ($request->get('trxtype') == "RESEP TUNAI") {
+                $url = 'resep';
+            } else if ($request->get('trxtype') == "KREDIT") {
+                $url = 'kredit';
+            }
+            return redirect()->route('transaction', $url);
+        }
+    }
 
     // Flow 4 Add to Cart
 
     public function addToCart(Request $request)
     {
+
+        if ($request->get('racikstatus') == 1) {
+            $hasRacikan = MedicineCart::where('transaction_id', $request->get('transaction_id'))
+                ->where('user_id', auth()->id())
+                ->whereNotNull('recipe_number')
+                ->exists();
+
+            if ($hasRacikan) {
+                $latestRecord = MedicineCart::where('transaction_id', $request->get('transaction_id'))
+                    ->where('user_id', auth()->id())
+                    ->whereNotNull('recipe_number')
+                    ->latest('id')
+                    ->first();
+
+                if ($latestRecord->recipe_status == 0) {
+                    $recipeNumber = $latestRecord->recipe_number;
+                    $recipeStatus = 0;
+                } else {
+                    $recipeNumber = $latestRecord->recipe_number + 1;
+                    $recipeStatus = 0;
+                }
+            } else {
+                $recipeNumber = 1;
+                $recipeStatus = 0;
+            }
+        } else {
+            $recipeNumber = null;
+            $recipeStatus = null;
+        }
+
         $transaction = MedicineCart::create([
             'user_id'        => Auth()->user()->id,
             'medicine_id'    => $request->get('medicine_id'),
             'transaction_id' => $request->get('transaction_id'),
             'quantity'       => $request->get('quantity'),
             'discount'       => $request->get('discount'),
+            'embalase'       => $request->get('embalase'),
+            'cart_type'      => $request->get('cart_type'),
+            'package'      => $request->get('package'),
+            'dosage_r'      => $request->get('dosage_r'),
             'total_price'    => $request->get('total_price'),
+            'final_price'    => $request->get('final_price'),
+            'status'         => 0,
+            'recipe_status'  => $recipeStatus,
+            'recipe_number'  => $recipeNumber,
+
+
+
         ]);
+        $itemInCart = MedicineCart::with('medicine')->where('transaction_id', $transaction->transaction_id)->where('user_id', Auth()->user()->id)->first();
+
         return response()->json([
             'id'          => $transaction->id,
             'name'        => $transaction->medicine->name,
+            'unit'        => $itemInCart->medicine->unit,
+            'price'       => $itemInCart->medicine->net_price,
+            'quantity'    => $transaction->quantity,
+            'discount'    => $transaction->discount,
             'total_price' => $transaction->total_price,
+            'embalase'    => $transaction->embalase,
+            'final_price' => $transaction->final_price,
+            'cart_type'   => $transaction->cart_type,
             'remove_url'  => route('sales.removeItem', $transaction->id),
         ]);
     }
@@ -346,16 +426,18 @@ class SalesController extends Controller
         //     return redirect()->back()->with('message', "Gagal Menyimpan! " . $e->getMessage());
         // }
     }
+
+    // Flow 5 : Checkout
     public function checkout(Request $request)
     {
         // $transaction = MedicineTransactions::where('id', $request->get('transaction_id'))->first();
         // $cart = MedicineCart::with('medicine')->where('transaction_id', $request->get('transaction_id'))->get();
-    
+
 
         DB::beginTransaction();
         try {
             $transaction = MedicineTransactions::findOrFail($request->get('transaction_id'));
-            
+
             $transaction->update([
                 'status' => 1,
                 'paid' => $request->get('paid'),
@@ -389,12 +471,72 @@ class SalesController extends Controller
             'itemTransaction' => $itemTransaction,
         ]);
     }
+
+
+
     /**
      * Display the specified resource.
      *
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
+
+    public function sendEmbalase(Request $request)
+    {
+        DB::beginTransaction();
+
+        try {
+            $transactionId = $request->get('transaction_id');
+            $jasaValue = $request->get('jasaValue');
+
+            $transaction = MedicineCart::where('transaction_id', $transactionId)
+                ->latest()
+                ->first();
+
+            if (!$transaction) {
+                throw new \Exception('Data transaksi tidak ditemukan.');
+            }
+
+
+            $hasRacikan = MedicineCart::where('transaction_id', $request->get('transaction_id'))
+                ->where('user_id', auth()->id())
+                ->whereNotNull('recipe_number')
+                ->latest('id')
+                ->first();
+            if ($hasRacikan) {
+
+                $recipeStatus = $hasRacikan->recipe_status;
+                $recipeNumber = $hasRacikan->recipe_number;
+
+                // Update recipe status
+                $update_recipe = MedicineCart::where('recipe_number', $recipeNumber)->update([
+                    'recipe_status' => 1,
+                ]);
+            }
+            // Update embalase value
+            $finalprice = $jasaValue + $transaction->total_price;
+            $transaction->update([
+                'embalase'    => $jasaValue,
+                'final_price' => $finalprice,
+            ]);
+
+
+            DB::commit();
+            $racikStatus = 1;
+            return response()->json([
+                'success' => true,
+                'message' => 'Data embalase berhasil disimpan.',
+                'racikStatus' => $racikStatus,
+                'finalprice' => $finalprice,
+
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Gagal menyimpan! ' . $e->getMessage());
+        }
+    }
+
+
     public function show($id)
     {
         //
