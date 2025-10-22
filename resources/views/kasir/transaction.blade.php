@@ -472,7 +472,7 @@
                                         <tr id="itemincart{{ $cart->id }}" data-id="{{ $cart->id }}"
                                             class="cart-row border-b hover:bg-blue-50 transition text-[10px] cursor-pointer">
                                             <td class="px-1 py-1 text-center text-gray-600">{{ $index + 1 }}</td>
-                                            <td colspan="7" class="text-[10px] px-1 py-1 font-semibold text-gray-800">{{ $cart->medicine->name }}
+                                            <td colspan="7" class="text-[10px] leading-normal px-1 py-1 font-semibold text-gray-800">{{ $cart->medicine->name }}
                                             </td>
                                             <td class="px-1 py-1 text-center">{{ $cart->medicine->unit }}</td>
                                             <td class="px-1 py-1 text-center">Rp
@@ -1069,7 +1069,7 @@
             stock.value = it.stock;
             unit.value = it.unit;
             name.value = it.name;
-            if (transaction_type == 'KREDIT' || transaction_type == 'RESEP TUNAI') {
+            if (currenttransaction == 'KREDIT' || currenttransaction == 'RESEP TUNAI') {
                 dosage.value = it.dosage;
             }
             console.log("Harga : " + it.net_price + "Parameter : " + parameters + "Pembulatan : " + rounding);
@@ -1257,7 +1257,7 @@
 
         function selectPatient(it) {
             document.getElementById('patient_id').value = it.id;
-            if (transaction_type == 'RESEP TUNAI' || transaction_type == 'KREDIT') {
+            if (currenttransaction == 'RESEP TUNAI' || currenttransaction == 'KREDIT') {
                 document.getElementById('doctorSearch').focus();
             } else {
                 document.getElementById('pay').focus();
@@ -1388,9 +1388,9 @@
 
         function selectDoctor(it) {
 
-            if (transaction_type == 'RESEP TUNAI') {
+            if (currenttransaction == 'RESEP TUNAI') {
                 document.getElementById('pay').focus();
-            } else if(transaction_type == 'KREDIT') {
+            } else if(currenttransaction == 'KREDIT') {
                 document.getElementById('debtorSearch').focus();
             }
             document.getElementById('doctor_id').value = it.id;
@@ -1647,7 +1647,7 @@
                 document.getElementById('carts').insertAdjacentHTML('beforeend', `
                     <tr id="itemincart${item.id}" class="border-b hover:bg-blue-50 transition text-[10px]">
                     <td class="px-1 py-1 text-center text-gray-600">${document.querySelectorAll('#carts tr').length + 1}</td>
-                    <td colspan="7" class="text-[10px] px-1 py-1 font-semibold text-gray-800">${item.name}</td>
+                    <td colspan="7" class="leading-normal text-[10px] px-1 py-1 font-semibold text-gray-800">${item.name}</td>
                     <td class="px-1 py-1 text-center">${item.unit}</td>
                     <td class="px-1 py-1 text-center">${formatRupiah(item_finalprice)}</td>
                     <td class="px-1 py-1 text-center">${item.quantity}</td>
