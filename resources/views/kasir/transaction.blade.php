@@ -1646,19 +1646,19 @@
 
                 document.getElementById('carts').insertAdjacentHTML('beforeend', `
                     <tr id="itemincart${item.id}" class="border-b hover:bg-blue-50 transition text-[10px]">
-                    <td class="px-4 py-3 text-center text-gray-600">${document.querySelectorAll('#carts tr').length + 1}</td>
-                    <td colspan="7" class="text-[10px] px-4 py-3 font-semibold text-gray-800">${item.name}</td>
-                    <td class="px-4 py-3 text-center">${item.unit}</td>
-                    <td class="px-4 py-3 text-center">${formatRupiah(item_finalprice)}</td>
-                    <td class="px-4 py-3 text-center">${item.quantity}</td>
-                    <td class="px-4 py-3 text-center">${formatRupiah(item.discount)}</td>
-                    <td class="px-4 py-3 text-center">${formatRupiah(item.total_price)}</td>
+                    <td class="px-1 py-1 text-center text-gray-600">${document.querySelectorAll('#carts tr').length + 1}</td>
+                    <td colspan="7" class="text-[10px] px-1 py-1 font-semibold text-gray-800">${item.name}</td>
+                    <td class="px-1 py-1 text-center">${item.unit}</td>
+                    <td class="px-1 py-1 text-center">${formatRupiah(item_finalprice)}</td>
+                    <td class="px-1 py-1 text-center">${item.quantity}</td>
+                    <td class="px-1 py-1 text-center">${formatRupiah(item.discount)}</td>
+                    <td class="px-1 py-1 text-center">${formatRupiah(item.total_price)}</td>
                     ${(currenttransaction === 'RESEP TUNAI' || currenttransaction === 'KREDIT')
-                    ? `<td class="px-4 py-3 text-center clEmbalase">${formatRupiah(item.jasa)}</td>`
+                    ? `<td class="px-1 py-1 text-center clEmbalase">${formatRupiah(item.jasa)}</td>`
                     : ''
                     }
-                    <td class="px-4 py-3 text-center clFinalprice font-semibold text-blue-600">${formatRupiah(item.final_price)}</td>
-                    <td class="px-4 py-3 text-center font-semibold text-blue-600">${ item.cart_type }</td>  
+                    <td class="px-1 py-1 text-center clFinalprice font-semibold text-blue-600">${formatRupiah(item.final_price)}</td>
+                    <td class="px-1 py-1 text-center font-semibold text-blue-600">${ item.cart_type }</td>  
                 </tr>
                 
         `);
