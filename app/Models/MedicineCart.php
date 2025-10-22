@@ -20,6 +20,7 @@ class MedicineCart extends Model
         'cart_type',
         'package',
         'dosage_r',
+        'raw_total',
         'total_price',
         'final_price',
         'status',

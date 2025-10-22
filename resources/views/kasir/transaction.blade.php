@@ -399,14 +399,16 @@
                                     <div class="w-[40%] text-right">
                                         <label class="text-[13px] font-poppins font-semibold text-right pr-2">Total
                                             Biaya</label>
-                                    </div>
 
+                                    </div>
                                     <div class="w-[100%]">
-                                        <input type="text" readonly id="price2" name="price2" placeholder="Total"
-                                            class="w-full text-right rounded-md text-[20px] font-bold readonly border border-gray-300 bg-white px-3 py-4  focus:outline-none focus:ring-2 focus:ring-gray-300  font-poppins"
+                                        <input type="text" readonly id="payment_total" name="payment_total"
+                                            placeholder="Total"
+                                            class="w-full text-right rounded-md text-[20px] font-bold readonly border border-gray-300 bg-white px-3 py-2  focus:outline-none focus:ring-2 focus:ring-gray-300  font-poppins"
                                             autocomplete="off" />
                                     </div>
                                 </div>
+
                                 <div class="mr-2 flex items-center justify-end">
 
                                     <div class="w-[40%] text-right">
@@ -417,10 +419,25 @@
                                     <div class="w-[100%]">
                                         <input type="text" readonly id="discount_total" name="discount_total"
                                             placeholder="Total"
-                                            class="w-full text-right rounded-md text-[20px] font-bold readonly border border-gray-300 bg-white px-3 py-4  focus:outline-none focus:ring-2 focus:ring-gray-300  font-poppins"
+                                            class="w-full text-right rounded-md text-[20px] font-bold readonly border border-gray-300 bg-white px-3 py-2  focus:outline-none focus:ring-2 focus:ring-gray-300  font-poppins"
                                             autocomplete="off" />
                                     </div>
                                 </div>
+
+                                <div class="mr-2 flex items-center justify-end">
+
+                                    <div class="w-[40%] text-right">
+                                        <label class="text-[13px] font-poppins font-semibold text-right pr-2">Total
+                                            Beli</label>
+                                    </div>
+
+                                    <div class="w-[100%]">
+                                        <input type="text" readonly id="price2" name="price2" placeholder="Total"
+                                            class="w-full text-right rounded-md text-[20px] font-bold readonly border border-gray-300 bg-white px-3 py-2  focus:outline-none focus:ring-2 focus:ring-gray-300  font-poppins"
+                                            autocomplete="off" />
+                                    </div>
+                                </div>
+
                             </div>
                         </div>
                     </div>
@@ -431,8 +448,8 @@
                                 <thead class="bg-blue-50 text-gray-600 uppercase text-xs border-b border-blue-200">
                                     <tr>
                                         <th scope="col" class="px-4 py-3 text-center w-[40px]">No</th>
-                                        <th scope="col" class="px-4 py-3">Nama Obat</th>
-                                        <th scope="col" class="px-4 py-3 text-center">Satuan</th>
+                                        <th scope="col" colspan="7" class="px-4 py-3">Nama Obat</th>
+                                        <th scope="col" class="px-2 py-3 text-center">Satuan</th>
                                         <th scope="col" class="px-4 py-3 text-center">Harga</th>
                                         <th scope="col" class="px-4 py-3 text-center">Qty</th>
                                         <th scope="col" class="px-4 py-3 text-center">Diskon</th>
@@ -454,25 +471,25 @@
                                         @endphp
                                         <tr id="itemincart{{ $cart->id }}" data-id="{{ $cart->id }}"
                                             class="cart-row border-b hover:bg-blue-50 transition text-[10px] cursor-pointer">
-                                            <td class="px-4 py-3 text-center text-gray-600">{{ $index + 1 }}</td>
-                                            <td class="px-4 py-3 font-semibold text-gray-800">{{ $cart->medicine->name }}
+                                            <td class="px-1 py-1 text-center text-gray-600">{{ $index + 1 }}</td>
+                                            <td colspan="7" class="text-[10px] px-1 py-1 font-semibold text-gray-800">{{ $cart->medicine->name }}
                                             </td>
-                                            <td class="px-4 py-3 text-center">{{ $cart->medicine->unit }}</td>
-                                            <td class="px-4 py-3 text-center">Rp
+                                            <td class="px-1 py-1 text-center">{{ $cart->medicine->unit }}</td>
+                                            <td class="px-1 py-1 text-center">Rp
                                                 {{ number_format($rounded, 0, ',', '.') }}</td>
-                                            <td class="px-4 py-3 text-center">{{ $cart->quantity }}</td>
-                                            <td class="px-4 py-3 text-center">
+                                            <td class="px-1 py-1 text-center">{{ $cart->quantity }}</td>
+                                            <td class="px-1 py-1 text-center">
                                                 Rp.{{ number_format($cart->discount, 0, ',', ',') }}</td>
-                                            <td class="px-4 py-3 text-center">Rp
+                                            <td class="px-1 py-1 text-center">Rp
                                                 {{ number_format($cart->total_price, 0, ',', '.') }}</td>
                                             @if ($transaction->transaction_type == 'KREDIT' || $transaction->transaction_type == 'RESEP TUNAI')
-                                                <td class="clEmbalase px-4 py-3 text-center">Rp
+                                                <td class="clEmbalase px-1 py-1 text-center">Rp
                                                     {{ number_format($cart->embalase, 0, ',', '.') }}</td>
                                             @endif
-                                            <td class="clFinalprice px-4 py-3 text-center font-semibold text-blue-600">
+                                            <td class="clFinalprice px-1 py-1 text-center font-semibold text-blue-600">
                                                 Rp {{ number_format($cart->final_price, 0, ',', '.') }}
                                             </td>
-                                            <td class="px-4 py-3 text-center font-semibold text-blue-600">
+                                            <td class="px-1 py-1 text-center font-semibold text-blue-600">
                                                 {{ $cart->cart_type }}
                                             </td>
 
@@ -907,11 +924,14 @@
         var medicine_id = "";
         var price2 = "";
         var item_finalprice = "";
+        let grossprice = "";
         var payInput = document.getElementById('pay');
+        var payment_total = document.getElementById('payment_total');
         // var debtor_id = "";
         // var patient_id = "";
         // var doctor_id = "";
 
+        let totalbought = {{ $rawtotal }};
         var subtotal = "";
         var final_price = "";
         let items = [];
@@ -932,7 +952,7 @@
 
         // Set nilai awal
         cartTotalInput.value = formatRupiah(totaltransaction);
-
+        payment_total.value = formatRupiah(totalbought);
 
 
         previewdiscounttotal.value = formatRupiah(total_discount);
@@ -1527,6 +1547,9 @@
             totalprice.value = formatRupiah(subtotal);
             pharmacy_price = subtotal;
             final_price = subtotal;
+            grossprice = subtotal;
+            console.log("count() => subtotal:", subtotal, "grossprice:", grossprice);
+
         }
 
         function countDiscount(val) {
@@ -1574,7 +1597,7 @@
 
         }
 
-        function addToCart(medicine_id, transaction_id, quantity, discount, embalase, cart_type, package, dosage_r,
+        function addToCart(medicine_id, transaction_id, quantity, discount, embalase, cart_type, package, dosage_r, raw_total,
             total_price, final_price, racikstatus) {
             axios.post("{{ route('transaction.addToCart') }}", {
                 medicine_id,
@@ -1585,17 +1608,19 @@
                 cart_type,
                 package,
                 dosage_r,
+                raw_total,
                 total_price,
                 final_price,
+                grossprice,
                 racikstatus,
 
             }).then(response => {
                 const item = response.data;
 
                 totaltransaction += total_price;
+                totalbought =  parseFloat(totalbought) + parseFloat(grossprice);
                 total_discount += parseFloat(discount);
                 price2 = formatRupiah(totaltransaction);
-
                 // Reset input fields
                 [stock, unit, quantity, price, name, totalprice].forEach(el => el.value = "");
 
@@ -1617,12 +1642,12 @@
                 cartTotalInput.value = formatRupiah(totaltransaction);
                 previewdiscounttotal.value = formatRupiah(total_discount);
                 previewtransactiontotal.value = formatRupiah(totaltransaction);
-
+                payment_total.value = formatRupiah(totalbought);
 
                 document.getElementById('carts').insertAdjacentHTML('beforeend', `
                     <tr id="itemincart${item.id}" class="border-b hover:bg-blue-50 transition text-[10px]">
                     <td class="px-4 py-3 text-center text-gray-600">${document.querySelectorAll('#carts tr').length + 1}</td>
-                    <td class="px-4 py-3 font-semibold text-gray-800">${item.name}</td>
+                    <td colspan="6" class="px-4 py-3 font-semibold text-gray-800">${item.name}</td>
                     <td class="px-4 py-3 text-center">${item.unit}</td>
                     <td class="px-4 py-3 text-center">${formatRupiah(item_finalprice)}</td>
                     <td class="px-4 py-3 text-center">${item.quantity}</td>
@@ -1644,6 +1669,8 @@
 
 
         function submit() {
+            console.log('grossprice =', grossprice);
+
             if (discountInput.value === "") {
                 final_price = subtotal;
                 discount = 0;
@@ -1651,7 +1678,7 @@
             if (jasa === "") {
                 jasa = 0;
             }
-
+            
             // Determine cart type
             if (transaction_type === "KREDIT" || transaction_type === "RESEP TUNAI") {
                 cart_type = "UM";
@@ -1662,11 +1689,11 @@
             }
 
             true_price = final_price + jasa;
-
             // Optional fields — safely handled
             const pkg = document.getElementById('package')?.value || '';
             const dose = document.getElementById('dosage_r')?.value || '';
-            
+            console.log("count() => subtotal:", subtotal, "grossprice:", grossprice);
+
             addToCart(
                 medicine_id,
                 transaction_id,
@@ -1678,6 +1705,7 @@
                 dose,
                 pharmacy_price,
                 true_price,
+                grossprice,
                 racikstatus
             );
             pkg.value = pkg;
@@ -2196,7 +2224,9 @@
                 checkbox.dispatchEvent(new Event('change'));
 
                 document.getElementById('productSearch').focus();
-
+                
+                cartTotalInput.value = formatRupiah(totaltransaction + jasaValue);
+                previewtransactiontotal.value = formatRupiah(totaltransaction + jasaValue);
 
             }).catch(error => {
                 console.error("Error Updating Embalase:", error.response ? error.response.data : error.message);

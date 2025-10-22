@@ -103,6 +103,8 @@ class SalesController extends Controller
         // Checking Transaction Status
         $transaction = MedicineTransactions::where('pharmacy_id', Auth()->user()->pharmacy_id)->where('status', '0')->first();
         $totaltransaction =  MedicineCart::where('user_id', Auth()->user()->id)->where('status', '0')->sum('final_price');
+        $rawtotal =  MedicineCart::where('user_id', Auth()->user()->id)->where('status', '0')->sum('raw_total');
+
         $existingpackage = MedicineCart::where('user_id', auth()->id())
             ->where('status', '0')
             ->where('recipe_status', '0')
@@ -114,7 +116,7 @@ class SalesController extends Controller
         // Get Item Inside Cart based on user id and cart item status
         $itemInCart = MedicineCart::with('medicine')->where('status', 0)->where('user_id', Auth()->user()->id)->get();
 
-        return view('kasir.transaction', compact('check_transaction', 'transaction','existingpackage', 'parameters', 'rounding', 'itemInCart', 'totaltransaction', 'discount_total', 'ChangeFakturParameters', 'ChangeFakturRounding'));
+        return view('kasir.transaction', compact('check_transaction', 'transaction','existingpackage','rawtotal', 'parameters', 'rounding', 'itemInCart', 'totaltransaction', 'discount_total', 'ChangeFakturParameters', 'ChangeFakturRounding'));
     }
 
     /**
@@ -308,8 +310,9 @@ class SalesController extends Controller
             'cart_type'      => $request->get('cart_type'),
             'package'      => $request->get('package'),
             'dosage_r'      => $request->get('dosage_r'),
-            'total_price'    => $request->get('total_price'),
-            'final_price'    => $request->get('final_price'),
+            'raw_total'    => $request->get('raw_total'),
+            'total_price'    => $request->get('final_price'),
+            'final_price'    => $request->get('total_price'),
             'status'         => 0,
             'recipe_status'  => $recipeStatus,
             'recipe_number'  => $recipeNumber,
