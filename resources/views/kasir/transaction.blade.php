@@ -1647,7 +1647,7 @@
                 document.getElementById('carts').insertAdjacentHTML('beforeend', `
                     <tr id="itemincart${item.id}" class="border-b hover:bg-blue-50 transition text-[10px]">
                     <td class="px-4 py-3 text-center text-gray-600">${document.querySelectorAll('#carts tr').length + 1}</td>
-                    <td colspan="6" class="px-4 py-3 font-semibold text-gray-800">${item.name}</td>
+                    <td colspan="7" class="text-[10px] px-4 py-3 font-semibold text-gray-800">${item.name}</td>
                     <td class="px-4 py-3 text-center">${item.unit}</td>
                     <td class="px-4 py-3 text-center">${formatRupiah(item_finalprice)}</td>
                     <td class="px-4 py-3 text-center">${item.quantity}</td>
