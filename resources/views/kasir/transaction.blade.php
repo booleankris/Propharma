@@ -1390,7 +1390,7 @@
 
             if (transaction_type == 'RESEP TUNAI') {
                 document.getElementById('pay').focus();
-            } else {
+            } else if(transaction_type == 'KREDIT') {
                 document.getElementById('debtorSearch').focus();
             }
             document.getElementById('doctor_id').value = it.id;
