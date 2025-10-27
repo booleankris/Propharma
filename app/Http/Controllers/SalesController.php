@@ -100,6 +100,7 @@ class SalesController extends Controller
             }
         }
 
+
         // Checking Transaction Status
         $transaction = MedicineTransactions::where('pharmacy_id', Auth()->user()->pharmacy_id)->where('status', '0')->first();
         $totaltransaction =  MedicineCart::where('user_id', Auth()->user()->id)->where('status', '0')->sum('final_price');
@@ -116,7 +117,7 @@ class SalesController extends Controller
         // Get Item Inside Cart based on user id and cart item status
         $itemInCart = MedicineCart::with('medicine')->where('status', 0)->where('user_id', Auth()->user()->id)->get();
 
-        return view('kasir.transaction', compact('check_transaction', 'transaction','existingpackage','rawtotal', 'parameters', 'rounding', 'itemInCart', 'totaltransaction', 'discount_total', 'ChangeFakturParameters', 'ChangeFakturRounding'));
+        return view('kasir.transaction', compact('check_transaction', 'transaction', 'existingpackage', 'rawtotal', 'parameters', 'rounding', 'itemInCart', 'totaltransaction', 'discount_total', 'ChangeFakturParameters', 'ChangeFakturRounding'));
     }
 
     /**
@@ -336,6 +337,33 @@ class SalesController extends Controller
             'remove_url'  => route('sales.removeItem', $transaction->id),
         ]);
     }
+    public function getCartItem($id)
+    {
+        $cart = MedicineCart::with('medicine')->findOrFail($id);
+        return response()->json($cart);
+    }
+    public function deleteCartItem($id)
+    {
+        $cart = MedicineCart::findOrFail($id);
+        $cart->delete();
+
+        $total_transaction = MedicineCart::where('transaction_id', $cart->transaction_id)
+            ->where('user_id', auth()->id())
+            ->sum('final_price');
+        $total_discount = MedicineCart::where('transaction_id', $cart->transaction_id)
+            ->where('user_id', auth()->id())
+            ->sum('discount');
+        $totalbought = MedicineCart::where('transaction_id', $cart->transaction_id)
+            ->where('user_id', auth()->id())
+            ->sum('total_price');
+        return response()->json([
+            'success' => true,
+            'item' => $cart,
+            'total_transaction' => $total_transaction,
+            'total_discount' => $total_discount,
+            'totalbought' => $totalbought,
+        ]);
+    }
     public function addPatient(Request $request)
     {
         $request->validate([
@@ -490,7 +518,7 @@ class SalesController extends Controller
 
         try {
             $transactionId = $request->get('transaction_id');
-            $jasaValue = $request->get('jasaValue');
+            $jasaValue = (int) $request->get('jasaValue');
 
             $transaction = MedicineCart::where('transaction_id', $transactionId)
                 ->latest()
@@ -500,45 +528,92 @@ class SalesController extends Controller
                 throw new \Exception('Data transaksi tidak ditemukan.');
             }
 
-
-            $hasRacikan = MedicineCart::where('transaction_id', $request->get('transaction_id'))
+            $hasRacikan = MedicineCart::where('transaction_id', $transactionId)
                 ->where('user_id', auth()->id())
                 ->whereNotNull('recipe_number')
                 ->latest('id')
                 ->first();
-            if ($hasRacikan) {
 
-                $recipeStatus = $hasRacikan->recipe_status;
+            if ($hasRacikan) {
                 $recipeNumber = $hasRacikan->recipe_number;
 
-                // Update recipe status
-                $update_recipe = MedicineCart::where('recipe_number', $recipeNumber)->update([
+                MedicineCart::where('recipe_number', $recipeNumber)->update([
                     'recipe_status' => 1,
                 ]);
             }
-            // Update embalase value
-            $finalprice = $jasaValue + $transaction->total_price;
+
+            $finalprice = $transaction->total_price + $jasaValue;
+
             $transaction->update([
                 'embalase'    => $jasaValue,
                 'final_price' => $finalprice,
             ]);
 
-
             DB::commit();
-            $racikStatus = 1;
+
+            $total_transaction = MedicineCart::where('transaction_id', $transactionId)
+                ->where('user_id', auth()->id())
+                ->sum('final_price');
+
             return response()->json([
                 'success' => true,
                 'message' => 'Data embalase berhasil disimpan.',
-                'racikStatus' => $racikStatus,
-                'finalprice' => $finalprice,
-
+                'racikStatus' => 1,
+                'finalprice' => $transaction->final_price,
+                'message' => 'Data embalase berhasil disimpan.',
+                'totaltransaction' => $total_transaction,
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()->with('error', 'Gagal menyimpan! ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal menyimpan! ' . $e->getMessage(),
+            ], 500);
         }
     }
 
+    public function updateCart(Request $request)
+    {
+        $cart = MedicineCart::where('medicine_id', $request->medicine_id)
+            ->where('transaction_id', $request->transaction_id)
+            ->first();
+
+        if (!$cart) {
+            return response()->json(['success' => false, 'message' => 'Cart item not found.'], 404);
+        }
+
+        $cart->update([
+            'quantity'     => $request->quantity,
+            'discount'     => $request->discount,
+            'embalase'     => $request->embalase,
+            'package'      => $request->package,
+            'dosage_r'     => $request->dosage_r,
+            'raw_total'    => $request->raw_total,
+            'total_price'  => $request->final_price,
+            'final_price'  => $request->total_price,
+        ]);
+
+        $cart->load('medicine'); // eager-load medicine relation
+
+        // Calculate new transaction total
+        $total_transaction = MedicineCart::where('transaction_id', $request->transaction_id)
+            ->where('user_id', auth()->id())
+            ->sum('final_price');
+        $total_discount = MedicineCart::where('transaction_id', $request->transaction_id)
+            ->where('user_id', auth()->id())
+            ->sum('discount');
+        $totalbought = MedicineCart::where('transaction_id', $request->transaction_id)
+            ->where('user_id', auth()->id())
+            ->sum('raw_total');
+
+        return response()->json([
+            'success' => true,
+            'item' => $cart,
+            'total_transaction' => $total_transaction,
+            'total_discount' => $total_discount,
+            'totalbought' => $totalbought,
+        ]);
+    }
 
     public function show($id)
     {

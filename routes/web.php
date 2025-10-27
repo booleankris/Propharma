@@ -118,6 +118,13 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     Route::get('/transaction/{slug}/', [SalesController::class, 'index'])->name('transaction');
     Route::post('/transaction/checkout', [SalesController::class, 'checkout'])->name('transaction.checkout');
     Route::post('/gettransaction/', [SalesController::class, 'getTransactionItem'])->name('transaction.getTransactionItem');
+    Route::get('/transaction/cartItem/{id}', [SalesController::class, 'getCartItem']);
+    Route::get('/transaction/cartItem/{id}', [SalesController::class, 'getCartItem']);
+    Route::post('/transaction/update-cart', [SalesController::class, 'updateCart'])
+    ->name('transaction.updateCart');
+
+    Route::delete('/transaction/cartItem/{id}', [SalesController::class, 'deleteCartItem'])
+    ->name('transaction.cartItem.delete');
     
     // Route::post('addtocart', [SalesController::class, 'addToCart'])->name('sales.addToCart');
     Route::post('moreitem', [SalesController::class, 'moreItem'])->name('sales.moreItem');

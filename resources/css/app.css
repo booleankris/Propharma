@@ -194,6 +194,9 @@ Use a better box model (opinionated).
 .readonly{
   @apply !bg-[#f0f0f0];
 }
+table, tr, td, th {
+  user-select: none;
+}
 .chip {
   @apply inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 transition;
 }

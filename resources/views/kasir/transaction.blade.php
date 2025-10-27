@@ -3,7 +3,7 @@
     {{-- Section Product Preview --}}
     <div class="mx-4 max-w-8xl grid grid-cols-12 gap-6">
         <!-- LEFT COLUMN -->
-        <section class="col-span-12 lg:col-span-5 space-y-6">
+        <section class="col-span-12 lg:col-span-5 space-y-3">
             <!-- Header Card -->
             <div class="card py-3 px-6 bg-white dashboard-panel">
                 <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -276,7 +276,7 @@
                             <div class="w-full my-1">
                             </div>
                             <button type="button" onclick="submit()"
-                                class="btn btn-pos my-1 !bg-[##FFC107] p-1 py-3 font-poppin font-bold">
+                                class="btn btn-pos !bg-[##FFC107] p-1 py-3 font-poppin font-bold">
                                 Lanjutkan
                             </button>
                         </div>
@@ -442,7 +442,7 @@
                         </div>
                     </div>
                     <h2 class="text-xl font-semibold mb-3 mt-2">Barang Dibeli</h2>
-                    <div tabindex="-1" class="mt-4 rounded-2xl bg-gray-100 h-[40vh] overflow-y-scroll md:h-[55vh]">
+                    <div class="mt-4 rounded-2xl bg-gray-100 h-[40vh] overflow-y-scroll md:h-[53vh]">
                         <div class="flex flex-col justify-between">
                             <table class="min-w-full text-sm text-left font-poppins text-gray-700">
                                 <thead class="bg-blue-50 text-gray-600 uppercase text-xs border-b border-blue-200">
@@ -472,7 +472,9 @@
                                         <tr id="itemincart{{ $cart->id }}" data-id="{{ $cart->id }}"
                                             class="cart-row border-b hover:bg-blue-50 transition text-[10px] cursor-pointer">
                                             <td class="px-1 py-1 text-center text-gray-600">{{ $index + 1 }}</td>
-                                            <td colspan="7" class="text-[10px] leading-normal px-1 py-1 font-semibold text-gray-800">{{ $cart->medicine->name }}
+                                            <td colspan="7"
+                                                class="text-[10px] leading-normal px-1 py-1 font-semibold text-gray-800">
+                                                {{ $cart->medicine->name }}
                                             </td>
                                             <td class="px-1 py-1 text-center">{{ $cart->medicine->unit }}</td>
                                             <td class="px-1 py-1 text-center">Rp
@@ -841,6 +843,14 @@
 
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script>
+        // WHEN PAGE LOADED
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Attach events to all existing rows
+            document.querySelectorAll('.cart-row').forEach(row => {
+                attachRowEvents(row);
+            });
+        });
         // ===============================
         // Konstanta & Variabel Global
         // ===============================
@@ -915,7 +925,7 @@
         const dosageRInput = document.getElementById('dosage_r');
         const packageInput = document.getElementById('package');
 
-        // Variabel 
+        // Variabel Transaksi & Cart
         var transaction_id = trx_id;
         var total_discount = {{ $discount_total }};
         var discount = "";
@@ -927,6 +937,7 @@
         let grossprice = "";
         var payInput = document.getElementById('pay');
         var payment_total = document.getElementById('payment_total');
+        var edit_status = 0;
         // var debtor_id = "";
         // var patient_id = "";
         // var doctor_id = "";
@@ -961,6 +972,13 @@
             document.getElementById('package').value = existingpackage;
         }
 
+
+
+        // Table
+
+        let selectedRowId = null;
+
+
         // ===============================
         // Helper Functions
         // ===============================
@@ -971,6 +989,11 @@
                 currency: 'IDR',
                 minimumFractionDigits: 0
             }).format(number);
+        }
+        function roundUpToNearestThousand(value) {
+            // remove everything except digits and comma
+            const num = parseInt(String(value).replace(/\D/g, ""), 10) || 0;
+            return Math.ceil(num / 1000) * 1000;
         }
 
         function parseRupiah(rupiahString) {
@@ -1079,7 +1102,7 @@
             console.log("harga Total : " + raw);
             price2 = rounded;
             item_finalprice = rounded;
-            if (transaction_type == 'RESEP TUNAI' && racikstatus == 1) {
+            if (currenttransaction == 'RESEP TUNAI' && racikstatus == 1) {
                 dosageRInput.focus();
                 closeBox();
 
@@ -1390,7 +1413,7 @@
 
             if (currenttransaction == 'RESEP TUNAI') {
                 document.getElementById('pay').focus();
-            } else if(currenttransaction == 'KREDIT') {
+            } else if (currenttransaction == 'KREDIT') {
                 document.getElementById('debtorSearch').focus();
             }
             document.getElementById('doctor_id').value = it.id;
@@ -1542,13 +1565,17 @@
         // Perhitungan Harga & Diskon
         // ===============================
         function count(val) {
+            if (discount == "") {
+                discount = 0;
+            }
+            console.log('harganya itu adalah : ' + price2);
             total_item = val;
-            subtotal = price2 * val;
+            subtotal = price2 * val - discount;
             totalprice.value = formatRupiah(subtotal);
-            pharmacy_price = subtotal;
+            pharmacy_price = price2 * val;
             final_price = subtotal;
             grossprice = subtotal;
-            console.log("count() => subtotal:", subtotal, "grossprice:", grossprice);
+            console.log("count() => subtotal:", subtotal, "grossprice:", grossprice, "pharmacy_price price :", pharmacy_price);
 
         }
 
@@ -1597,137 +1624,381 @@
 
         }
 
-        function addToCart(medicine_id, transaction_id, quantity, discount, embalase, cart_type, package, dosage_r, raw_total,
-            total_price, final_price, racikstatus) {
-            axios.post("{{ route('transaction.addToCart') }}", {
-                medicine_id,
-                transaction_id,
-                quantity,
-                discount,
-                embalase,
-                cart_type,
-                package,
-                dosage_r,
-                raw_total,
-                total_price,
-                final_price,
-                grossprice,
-                racikstatus,
+        function addToCart(medicine_id, transaction_id, quantity, discount, embalase, cart_type, package, dosage_r,
+            raw_total, total_price, final_price, racikstatus) {
+            if (edit_status == 1) {
+                axios.post("{{ route('transaction.updateCart') }}", {
+                        medicine_id,
+                        transaction_id,
+                        quantity,
+                        discount,
+                        embalase,
+                        cart_type,
+                        package,
+                        dosage_r,
+                        raw_total,
+                        total_price,
+                        final_price,
+                        grossprice,
+                        racikstatus,
+                    })
+                    .then(response => {
 
-            }).then(response => {
-                const item = response.data;
+                        const item = response.data.item;
+                        totaltransaction = response.data.total_transaction;
+                        total_discount = response.data.total_discount;
+                        totalbought = response.data.totalbought;
 
-                totaltransaction += total_price;
-                totalbought =  parseFloat(totalbought) + parseFloat(grossprice);
-                total_discount += parseFloat(discount);
-                price2 = formatRupiah(totaltransaction);
-                // Reset input fields
-                [stock, unit, quantity, price, name, totalprice].forEach(el => el.value = "");
+                        console.log("✅ Updated cart item:", item);
+                        // Reset Inputs
+                        [stock, unit, quantity, price, name, totalprice].forEach(el => el.value = "");
+                        discountInput.value = "";
+                        resetInputs();
+                        document.getElementById('productSearch').focus();
+                        closeBox();
 
-                resetInputs();
+                        cartTotalInput.value = formatRupiah(totaltransaction);
+                        previewdiscounttotal.value = formatRupiah(total_discount);
+                        previewtransactiontotal.value = formatRupiah(totaltransaction);
+                        payment_total.value = formatRupiah(totalbought);
+
+                        const existingRow = document.getElementById(`itemincart${item.id}`);
+
+                        if (existingRow) {
+                            //   bakcup
+                            existingRow.innerHTML = `
+                            <td class="px-1 py-1 text-center text-gray-600">${existingRow.rowIndex}</td>
+                            <td colspan="7" class="leading-normal text-[10px] px-1 py-1 font-semibold text-gray-800">
+                                ${item.medicine.name}
+                            </td>
+                            <td class="px-1 py-1 text-center">${item.medicine.unit}</td>
+                            <td class="px-1 py-1 text-center">${formatRupiah(item_finalprice)}</td>
+                            <td class="px-1 py-1 text-center">${item.quantity}</td>
+                            <td class="px-1 py-1 text-center">${formatRupiah(item.discount)}</td>
+                            <td class="px-1 py-1 text-center">${formatRupiah(item.total_price)}</td>
+                            ${(currenttransaction === 'RESEP TUNAI' || currenttransaction === 'KREDIT')
+                                ? `<td class="px-1 py-1 text-center clEmbalase">${formatRupiah(item.embalase)}</td>`
+                                : ''
+                            }
+                            <td class="px-1 py-1 text-center clFinalprice font-semibold text-blue-600">
+                                ${formatRupiah(item.final_price)}
+                            </td>
+                            <td class="px-1 py-1 text-center font-semibold text-blue-600">${item.cart_type}</td>
+                        `;
+                        } else {
+                            // If not found (failsafe)
+                            console.warn("⚠️ Row not found, inserting new one");
+                            document.getElementById('carts').insertAdjacentHTML('beforeend', `
+                            <tr id="itemincart${item.id}" data-id="${item.id}" class="cart-row border-b hover:bg-blue-50 transition text-[10px] cursor-pointer">
+                                <td class="px-1 py-1 text-center text-gray-600">${document.querySelectorAll('#carts tr').length + 1}</td>
+                                <td colspan="7" class="leading-normal text-[10px] px-1 py-1 font-semibold text-gray-800">${item.medicine.name}</td>
+                                <td class="px-1 py-1 text-center">${item.medicine.unit}</td>
+                                <td class="px-1 py-1 text-center">${formatRupiah(item.final_price)}</td>
+                                <td class="px-1 py-1 text-center">${item.quantity}</td>
+                                <td class="px-1 py-1 text-center">${formatRupiah(item.discount)}</td>
+                                <td class="px-1 py-1 text-center">${formatRupiah(item.total_price)}</td>
+                                ${(currenttransaction === 'RESEP TUNAI' || currenttransaction === 'KREDIT')
+                                    ? `<td class="px-1 py-1 text-center clEmbalase">${formatRupiah(item.embalase)}</td>`
+                                    : ''
+                                }
+                                <td class="px-1 py-1 text-center clFinalprice font-semibold text-blue-600">${formatRupiah(item.final_price)}</td>
+                                <td class="px-1 py-1 text-center font-semibold text-blue-600">${item.cart_type}</td>
+                            </tr>
+                        `);
+                        }
+
+                        // Reattach event listeners if needed
+                        attachRowEvents(document.getElementById(`itemincart${item.id}`));
+                    })
+                    .catch(error => {
+                        console.error("❌ Error updating cart:", error.response ? error.response.data : error.message);
+                    });
+            } else {
+                axios.post("{{ route('transaction.addToCart') }}", {
+                    medicine_id,
+                    transaction_id,
+                    quantity,
+                    discount,
+                    embalase,
+                    cart_type,
+                    package,
+                    dosage_r,
+                    raw_total,
+                    total_price,
+                    final_price,
+                    grossprice,
+                    racikstatus,
+
+                }).then(response => {
+                    const item = response.data;
+
+                    totaltransaction += total_price;
+                    totalbought = parseFloat(totalbought) + parseFloat(grossprice);
+                    total_discount += parseFloat(discount);
+                    price2 = formatRupiah(totaltransaction);
+                    // Reset input fields
+                    [stock, unit, quantity, price, name, totalprice].forEach(el => el.value = "");
+
+                    resetInputs();
 
 
-                discountInput.value = "";
-                if (racikstatus == 1 && transaction_type != 'UPDS' && transaction_type != 'HV/OTC') {
-                    document.getElementById('productSearch').focus();
-                    closeBox();
+                    discountInput.value = "";
+                    if (racikstatus == 1 && transaction_type != 'UPDS' && transaction_type != 'HV/OTC') {
+                        document.getElementById('productSearch').focus();
+                        closeBox();
 
-                } else {
-                    document.getElementById('productSearch').focus();
-                    closeBox();
+                    } else {
+                        document.getElementById('productSearch').focus();
+                        closeBox();
 
-                }
-                console.log(item);
-                // Insert Values
-                cartTotalInput.value = formatRupiah(totaltransaction);
-                previewdiscounttotal.value = formatRupiah(total_discount);
-                previewtransactiontotal.value = formatRupiah(totaltransaction);
-                payment_total.value = formatRupiah(totalbought);
-
-                document.getElementById('carts').insertAdjacentHTML('beforeend', `
-                    <tr id="itemincart${item.id}" class="border-b hover:bg-blue-50 transition text-[10px]">
-                    <td class="px-1 py-1 text-center text-gray-600">${document.querySelectorAll('#carts tr').length + 1}</td>
-                    <td colspan="7" class="leading-normal text-[10px] px-1 py-1 font-semibold text-gray-800">${item.name}</td>
-                    <td class="px-1 py-1 text-center">${item.unit}</td>
-                    <td class="px-1 py-1 text-center">${formatRupiah(item_finalprice)}</td>
-                    <td class="px-1 py-1 text-center">${item.quantity}</td>
-                    <td class="px-1 py-1 text-center">${formatRupiah(item.discount)}</td>
-                    <td class="px-1 py-1 text-center">${formatRupiah(item.total_price)}</td>
-                    ${(currenttransaction === 'RESEP TUNAI' || currenttransaction === 'KREDIT')
-                    ? `<td class="px-1 py-1 text-center clEmbalase">${formatRupiah(item.jasa)}</td>`
-                    : ''
                     }
-                    <td class="px-1 py-1 text-center clFinalprice font-semibold text-blue-600">${formatRupiah(item.final_price)}</td>
-                    <td class="px-1 py-1 text-center font-semibold text-blue-600">${ item.cart_type }</td>  
-                </tr>
-                
-        `);
-            }).catch(error => {
-                console.error("❌ Error adding to cart:", error.response ? error.response.data : error.message);
-            });
+                    console.log(item);
+                    
+                    // UPDATE PREVIEW
+                    cartTotalInput.value = formatRupiah(totaltransaction);
+                    previewdiscounttotal.value = formatRupiah(total_discount);
+                    previewtransactiontotal.value = formatRupiah(totaltransaction);
+                    payment_total.value = formatRupiah(totalbought);
+
+                    document.getElementById('carts').insertAdjacentHTML('beforeend', `
+                    <tr id="itemincart${item.id}" data-id="${item.id}" 
+                        class="cart-row border-b hover:bg-blue-50 transition text-[10px] cursor-pointer">
+                        <td class="px-1 py-1 text-center text-gray-600">
+                            ${document.querySelectorAll('#carts tr').length + 1}
+                        </td>
+                        <td colspan="7" class="leading-normal text-[10px] px-1 py-1 font-semibold text-gray-800">
+                            ${item.name}
+                        </td>
+                        <td class="px-1 py-1 text-center">${item.unit}</td>
+                        <td class="px-1 py-1 text-center">${formatRupiah(item_finalprice)}</td>
+                        <td class="px-1 py-1 text-center">${item.quantity}</td>
+                        <td class="px-1 py-1 text-center">${formatRupiah(item.discount)}</td>
+                        <td class="px-1 py-1 text-center">${formatRupiah(item.total_price)}</td>
+                        ${(currenttransaction === 'RESEP TUNAI' || currenttransaction === 'KREDIT')
+                            ? `<td class="px-1 py-1 text-center clEmbalase">${formatRupiah(item.jasa)}</td>`
+                            : ''
+                        }
+                        <td class="px-1 py-1 text-center clFinalprice font-semibold text-blue-600">
+                            ${formatRupiah(item.final_price)}
+                        </td>
+                        <td class="px-1 py-1 text-center font-semibold text-blue-600">${item.cart_type}</td>
+                    </tr>
+                `);
+
+                    const newRow = document.getElementById(`itemincart${item.id}`); // ✅ safer
+                    console.log('Newly inserted row:', newRow);
+                    attachRowEvents(newRow);
+
+
+                }).catch(error => {
+                    console.error("❌ Error adding to cart:", error.response ? error.response.data : error.message);
+                });
+            }
+
+
         }
+
 
 
         function submit() {
-            console.log('grossprice =', grossprice);
 
-            if (discountInput.value === "") {
-                final_price = subtotal;
-                discount = 0;
-            }
-            if (jasa === "") {
-                jasa = 0;
-            }
-            
-            // Determine cart type
-            if (transaction_type === "KREDIT" || transaction_type === "RESEP TUNAI") {
-                cart_type = "UM";
-            } else if (transaction_type === "UPDS") {
-                cart_type = "UP";
-            } else if (transaction_type === "HV/OTC") {
-                cart_type = "HV";
-            }
-
-            true_price = final_price + jasa;
-            // Optional fields — safely handled
-            const pkg = document.getElementById('package')?.value || '';
-            const dose = document.getElementById('dosage_r')?.value || '';
-            console.log("count() => subtotal:", subtotal, "grossprice:", grossprice);
-
-            addToCart(
-                medicine_id,
-                transaction_id,
-                total_item,
-                discount,
-                jasa,
-                cart_type,
-                pkg,
-                dose,
-                pharmacy_price,
-                true_price,
-                grossprice,
-                racikstatus
-            );
-            pkg.value = pkg;
-        }
-
-
-        function removeItem(id) {
-            document.getElementById("itemincart" + id).remove();
-
-            axios.post("{{ route('transaction.removeItem') }}", {
-                    id
-                })
-                .then(response => {
-                    let item = response.data;
-                    totaltransaction -= item.total_price;
-                    cartTotalInput.value = formatRupiah(totaltransaction);
-                    document.getElementById('pay').value = "";
-                    document.getElementById('change').value = "";
-                }).catch(error => {
-                    console.error("❌ Error removing item:", error.response ? error.response.data : error.message);
+            if (edit_status == 1) {
+                true_price = final_price + jasa;
+                const pkg = document.getElementById('package')?.value || '';
+                const dose = document.getElementById('dosage_r')?.value || '';
+                console.log("🧾 Cart Item Details:", {
+                    medicine_id,
+                    transaction_id,
+                    total_item,
+                    discount,
+                    jasa,
+                    cart_type,
+                    pkg,
+                    dose,
+                    pharmacy_price,
+                    true_price,
+                    grossprice,
+                    racikstatus
                 });
+                addToCart(
+                    medicine_id,
+                    transaction_id,
+                    total_item,
+                    discount,
+                    jasa,
+                    cart_type,
+                    pkg,
+                    dose,
+                    pharmacy_price,
+                    true_price,
+                    grossprice,
+                    racikstatus
+                );
+                pkg.value = pkg;
+
+
+
+            } else {
+                console.log('grossprice =', grossprice);
+
+                if (discountInput.value === "") {
+                    final_price = subtotal;
+                    discount = 0;
+                }
+                if (jasa === "") {
+                    jasa = 0;
+                }
+
+                // Determine cart type
+                if (transaction_type === "KREDIT" || transaction_type === "RESEP TUNAI") {
+                    cart_type = "UM";
+                } else if (transaction_type === "UPDS") {
+                    cart_type = "UP";
+                } else if (transaction_type === "HV/OTC") {
+                    cart_type = "HV";
+                }
+
+                true_price = final_price + jasa;
+                const pkg = document.getElementById('package')?.value || '';
+                const dose = document.getElementById('dosage_r')?.value || '';
+                console.log("count() => subtotal:", subtotal, "grossprice:", grossprice);
+
+                addToCart(
+                    medicine_id,
+                    transaction_id,
+                    total_item,
+                    discount,
+                    jasa,
+                    cart_type,
+                    pkg,
+                    dose,
+                    pharmacy_price,
+                    true_price,
+                    grossprice,
+                    racikstatus
+                );
+                pkg.value = pkg;
+            }
+            edit_status = 0;
         }
+
+        // edit cart
+        function attachRowEvents(row) {
+            row.addEventListener('click', function() {
+                document.querySelectorAll('.cart-row').forEach(r => r.classList.remove('bg-blue-100'));
+                this.classList.add('bg-blue-100');
+                selectedRowId = this.dataset.id;
+                console.log('Selected item ID:', selectedRowId);
+            });
+
+            row.addEventListener('dblclick', function() {
+                const id = this.dataset.id;
+                console.log('Editing item:', id);
+                editCartItem(id);
+            });
+        }
+
+        function deleteCartItem(id) {
+            console.log('Deleting item:', id);
+            axios.delete(`/transaction/cartItem/${id}`)
+                .then(response => {
+                    console.log('Deleted:', response.data);
+                    const row = document.querySelector(`#itemincart${id}`);
+                    if (row) row.remove();
+                    selectedRowId = null;
+
+                    // UPDATE PREVIEW
+                    cartTotalInput.value = formatRupiah(response.data.total_transaction);
+                    previewdiscounttotal.value = formatRupiah(response.data.total_discount);
+                    previewtransactiontotal.value = formatRupiah(response.data.total_transaction);
+                    payment_total.value = formatRupiah(response.data.totalbought);
+
+                })
+                .catch(err => console.error('Failed to delete item:', err));
+        }
+        document.addEventListener('keydown', e => {
+            const activeTag = e.target.tagName.toLowerCase();
+
+            if (['input', 'textarea', 'select'].includes(activeTag)) return;
+
+            if (e.key === 'Delete' || e.key === 'Backspace') {
+                console.log('Delete key');
+                console.log('SelectedRowId =', selectedRowId);
+
+                if (!selectedRowId) {
+                    alert('Pilih Item Dulu.');
+                    return;
+                }
+
+                if (confirm('Hapus item ini dari keranjang?')) {
+                    deleteCartItem(selectedRowId);
+                }
+            }
+        });
+
+
+
+        function editCartItem(id) {
+
+            axios.get(`/transaction/cartItem/${id}`)
+                .then(response => {
+                    edit_status = 1;
+                    const item = response.data;
+                    let raw = (+item.medicine.net_price * +parameters) + +rounding;
+                    let rounded = Math.floor(raw / 1000) * 1000;
+
+                    medicine_id = item.medicine_id;
+                    total_item = item.quantity;
+                    item_finalprice = rounded;
+                    price2 = rounded;
+                    subtotal = price2 * item.quantity;
+                    pharmacy_price = subtotal;
+                    final_price = subtotal - item.discount;
+                    discount = item.discount;
+                    grossprice = subtotal;
+                    name.value = item.medicine.name;
+                    unit.value = item.medicine.unit;
+                    if (currenttransaction == 'RESEP TUNAI') {
+                        dosage.value = item.medicine.dosage;
+                        if (dosageRInput || packageInput) {
+                            dosageRInput.value = item.dosage_r;
+                            packageInput.value = item.package;
+                        }
+                        const dosageR2 = document.getElementById('dosage_r2');
+                        if (item.cart_type == "UM") {
+                            if (checkbox) {
+                                packageInput?.removeAttribute('readonly');
+                                dosageRInput?.removeAttribute('readonly');
+                                packageInput?.classList.remove('readonly');
+                                dosageRInput?.classList.remove('readonly');
+                                if (dosageR2) dosageR2.value = "Ya";
+                                racikstatus = 1;
+                            }
+                        } else {
+                            if (checkbox) {
+                                packageInput?.setAttribute('readonly', true);
+                                dosageRInput?.setAttribute('readonly', true);
+                                packageInput?.classList.add('readonly');
+                                dosageRInput?.classList.add('readonly');
+                                if (dosageR2) dosageR2.value = "Tidak";
+                                racikstatus = 0;
+                            }
+                        }
+                    }
+                    totalprice.value = formatRupiah(item.total_price);
+                    quantity.value = item.quantity;
+                    price.value = formatRupiah(rounded);
+                    discountInput.value = item.discount;
+
+
+
+                    console.log('Received item data:', response.data);
+
+                })
+                .catch(err => console.error('Failed to load item data:', err));
+        }
+
+
 
         // ===============================
         // Checkout & Invoice
@@ -2222,15 +2493,21 @@
                 document.getElementById('dosage_r2').value = "Tidak";
                 checkbox.checked = false;
                 checkbox.dispatchEvent(new Event('change'));
-
                 document.getElementById('productSearch').focus();
-                
-                cartTotalInput.value = formatRupiah(totaltransaction + jasaValue);
-                previewtransactiontotal.value = formatRupiah(totaltransaction + jasaValue);
+                totaltransaction = response.data.totaltransaction;
+                const roundedtotal = roundUpToNearestThousand(totaltransaction);
+                cartTotalInput.value = formatRupiah(roundedtotal);
+                console.log('Before:', totaltransaction);
+                console.log('After:', roundUpToNearestThousand(totaltransaction));
+
+                previewtransactiontotal.value = formatRupiah(totaltransaction);
+
+
 
             }).catch(error => {
                 console.error("Error Updating Embalase:", error.response ? error.response.data : error.message);
             });
+
         }
         // Recipe Redirecting inputs
         if (packageInput) {
@@ -2305,20 +2582,9 @@
         // ===============================
 
 
-        // When user clicks on a table row
-        document.querySelectorAll('.cart-row').forEach(row => {
-            row.addEventListener('click', function() {
-                // Remove highlight from previously selected row
-                document.querySelectorAll('.cart-row').forEach(r => r.classList.remove('bg-blue-100'));
 
-                // Highlight the selected row
-                this.classList.add('bg-blue-100');
 
-                // Store selected ID
-                selectedRowId = this.dataset.id;
-                console.log('Selected item ID:', selectedRowId);
-            });
-        });
+
 
         // Listen for Delete key
     </script>
