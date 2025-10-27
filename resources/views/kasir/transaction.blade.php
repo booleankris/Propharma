@@ -1912,7 +1912,7 @@
                     previewdiscounttotal.value = formatRupiah(response.data.total_discount);
                     previewtransactiontotal.value = formatRupiah(response.data.total_transaction);
                     payment_total.value = formatRupiah(response.data.totalbought);
-
+                    totaltransaction = response.data.total_transaction;
                 })
                 .catch(err => console.error('Failed to delete item:', err));
         }
