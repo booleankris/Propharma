@@ -1589,7 +1589,7 @@
             } else {
                 const discountAmount = subtotal * val / 100;
                 final_price = subtotal - discountAmount;
-                discount = discountAmount; 
+                discount = discountAmount;
             }
 
             final_price = Math.ceil(final_price / 1000) * 1000;
@@ -1917,7 +1917,15 @@
                 editCartItem(id);
             });
         }
-
+        function renumberRows() {
+            const rows = document.querySelectorAll('#carts tr');
+            rows.forEach((row, index) => {
+                const numberCell = row.querySelector('td'); // Get The first recors
+                if (numberCell) {
+                    numberCell.textContent = index + 1;
+                }
+            });
+        }
         function deleteCartItem(id) {
             console.log('Deleting item:', id);
             axios.delete(`/transaction/cartItem/${id}`)
@@ -1925,9 +1933,11 @@
                     console.log('Deleted:', response.data);
                     const row = document.querySelector(`#itemincart${id}`);
                     if (row) row.remove();
+                    // Renumbering
+                    renumberRows();
                     selectedRowId = null;
 
-                    // UPDATE PREVIEW
+                    // Update Previews
                     cartTotalInput.value = formatRupiah(response.data.total_transaction);
                     previewdiscounttotal.value = formatRupiah(response.data.total_discount);
                     previewtransactiontotal.value = formatRupiah(response.data.total_transaction);
