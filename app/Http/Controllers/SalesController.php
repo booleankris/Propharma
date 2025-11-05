@@ -574,8 +574,8 @@ class SalesController extends Controller
 
     public function updateCart(Request $request)
     {
-        $cart = MedicineCart::where('medicine_id', $request->medicine_id)
-            ->where('transaction_id', $request->transaction_id)
+        $cart = MedicineCart::where('id', $request->id)
+            ->where('user_id', auth()->id())
             ->first();
 
         if (!$cart) {
@@ -589,20 +589,21 @@ class SalesController extends Controller
             'package'      => $request->package,
             'dosage_r'     => $request->dosage_r,
             'raw_total'    => $request->raw_total,
-            'total_price'  => $request->final_price,
-            'final_price'  => $request->total_price,
+            'total_price'  => $request->final_price,  
+            'final_price'  => $request->total_price, 
         ]);
 
-        $cart->load('medicine'); // eager-load medicine relation
+        $cart->load('medicine');
 
-        // Calculate new transaction total
-        $total_transaction = MedicineCart::where('transaction_id', $request->transaction_id)
+        $total_transaction = MedicineCart::where('transaction_id', $cart->transaction_id)
             ->where('user_id', auth()->id())
             ->sum('final_price');
-        $total_discount = MedicineCart::where('transaction_id', $request->transaction_id)
+
+        $total_discount = MedicineCart::where('transaction_id', $cart->transaction_id)
             ->where('user_id', auth()->id())
             ->sum('discount');
-        $totalbought = MedicineCart::where('transaction_id', $request->transaction_id)
+
+        $totalbought = MedicineCart::where('transaction_id', $cart->transaction_id)
             ->where('user_id', auth()->id())
             ->sum('raw_total');
 
@@ -614,6 +615,7 @@ class SalesController extends Controller
             'totalbought' => $totalbought,
         ]);
     }
+
 
     public function show($id)
     {

@@ -990,6 +990,7 @@
                 minimumFractionDigits: 0
             }).format(number);
         }
+
         function roundUpToNearestThousand(value) {
             // remove everything except digits and comma
             const num = parseInt(String(value).replace(/\D/g, ""), 10) || 0;
@@ -1575,7 +1576,8 @@
             pharmacy_price = price2 * val;
             final_price = subtotal;
             grossprice = subtotal;
-            console.log("count() => subtotal:", subtotal, "grossprice:", grossprice, "pharmacy_price price :", pharmacy_price);
+            console.log("count() => subtotal:", subtotal, "grossprice:", grossprice, "pharmacy_price price :",
+                pharmacy_price);
 
         }
 
@@ -1584,26 +1586,31 @@
                 final_price = subtotal - val;
                 discount = val;
             } else {
-                const d = subtotal * val / 100;
-                final_price = subtotal - d;
-                discount = d;
+                const discountAmount = subtotal * val / 100;
+                final_price = subtotal - discountAmount;
+                discount = discountAmount; 
             }
+
+            final_price = Math.ceil(final_price / 1000) * 1000;
             totalprice.value = formatRupiah(final_price);
         }
 
         function countSubtotalDiscount(val) {
+            let final_price;
+
             if (val > 100) {
                 final_price = totaltransaction - val;
                 subtotal_discount = val;
-                totaltransaction = totaltransaction - val;
             } else {
                 const d = totaltransaction * val / 100;
                 final_price = totaltransaction - d;
                 subtotal_discount = `${val}%`;
-                totaltransaction = totaltransaction - d;
             }
-            cartTotalInput.value = formatRupiah(final_price);
 
+            // Round the final_price up to the nearest 1000
+            final_price = Math.ceil(final_price / 1000) * 1000;
+
+            cartTotalInput.value = formatRupiah(final_price);
         }
 
         // ===============================
@@ -1628,6 +1635,7 @@
             raw_total, total_price, final_price, racikstatus) {
             if (edit_status == 1) {
                 axios.post("{{ route('transaction.updateCart') }}", {
+                        id: selectedRowId,
                         medicine_id,
                         transaction_id,
                         quantity,
@@ -1753,7 +1761,7 @@
 
                     }
                     console.log(item);
-                    
+
                     // UPDATE PREVIEW
                     cartTotalInput.value = formatRupiah(totaltransaction);
                     previewdiscounttotal.value = formatRupiah(total_discount);
@@ -2230,6 +2238,7 @@
         function onF3Key(e) {
             const isF3 = e.key === 'F3' || e.keyCode === 114;
             if (isF3) {
+                e.preventDefault();
                 if (transaction_type == 'RESEP TUNAI') {
                     parameters = {{ $ChangeFakturParameters }};
                     transaction_type = "UPDS";
