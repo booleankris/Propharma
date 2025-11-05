@@ -1566,6 +1566,7 @@
         // Perhitungan Harga & Diskon
         // ===============================
         function count(val) {
+            console.log('harga diskon adalah : ' + discount);
             if (discount == "") {
                 discount = 0;
             }
@@ -1606,7 +1607,7 @@
                 final_price = totaltransaction - d;
                 subtotal_discount = `${val}%`;
             }
-
+            totaltransaction = final_price;
             // Round the final_price up to the nearest 1000
             final_price = Math.ceil(final_price / 1000) * 1000;
 
@@ -1658,13 +1659,14 @@
                         totalbought = response.data.totalbought;
 
                         console.log("✅ Updated cart item:", item);
-                        // Reset Inputs
+                        // Reset Inputs and variables value
                         [stock, unit, quantity, price, name, totalprice].forEach(el => el.value = "");
                         discountInput.value = "";
+                        discount = 0;
+
                         resetInputs();
                         document.getElementById('productSearch').focus();
                         closeBox();
-
                         cartTotalInput.value = formatRupiah(totaltransaction);
                         previewdiscounttotal.value = formatRupiah(total_discount);
                         previewtransactiontotal.value = formatRupiah(totaltransaction);
@@ -1746,6 +1748,9 @@
                     price2 = formatRupiah(totaltransaction);
                     // Reset input fields
                     [stock, unit, quantity, price, name, totalprice].forEach(el => el.value = "");
+                    discount = 0;
+                    console.log("✅ Discount item:", discount);
+                    discountInput.value = "";
 
                     resetInputs();
 
@@ -1762,11 +1767,14 @@
                     }
                     console.log(item);
 
-                    // UPDATE PREVIEW
+                    // UPDATE PREVIEW 
                     cartTotalInput.value = formatRupiah(totaltransaction);
                     previewdiscounttotal.value = formatRupiah(total_discount);
                     previewtransactiontotal.value = formatRupiah(totaltransaction);
                     payment_total.value = formatRupiah(totalbought);
+
+                    // Reset Variables
+
 
                     document.getElementById('carts').insertAdjacentHTML('beforeend', `
                     <tr id="itemincart${item.id}" data-id="${item.id}" 
@@ -1796,6 +1804,8 @@
                     const newRow = document.getElementById(`itemincart${item.id}`); // ✅ safer
                     console.log('Newly inserted row:', newRow);
                     attachRowEvents(newRow);
+                    discount = 0;
+                    console.log('Reseting the discount variable', discount);
 
 
                 }).catch(error => {
@@ -1888,6 +1898,8 @@
                 pkg.value = pkg;
             }
             edit_status = 0;
+            discount = 0;
+
         }
 
         // edit cart
