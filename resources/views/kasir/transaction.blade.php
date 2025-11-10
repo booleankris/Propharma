@@ -977,7 +977,7 @@
         // Table
 
         let selectedRowId = null;
-
+        
 
         // ===============================
         // Helper Functions
@@ -1107,7 +1107,10 @@
                 dosageRInput.focus();
                 closeBox();
 
-            } else {
+            }else if(currenttransaction == 'KREDIT' && racikstatus == 1) {
+                dosageRInput.focus();
+                closeBox();
+            }else {
                 quantity.focus();
                 closeBox();
 
@@ -1607,7 +1610,6 @@
                 final_price = totaltransaction - d;
                 subtotal_discount = `${val}%`;
             }
-            totaltransaction = final_price;
             // Round the final_price up to the nearest 1000
             final_price = Math.ceil(final_price / 1000) * 1000;
 
@@ -1917,6 +1919,7 @@
                 editCartItem(id);
             });
         }
+
         function renumberRows() {
             const rows = document.querySelectorAll('#carts tr');
             rows.forEach((row, index) => {
@@ -1926,6 +1929,7 @@
                 }
             });
         }
+
         function deleteCartItem(id) {
             console.log('Deleting item:', id);
             axios.delete(`/transaction/cartItem/${id}`)
@@ -2186,7 +2190,7 @@
             let bayar = parseInt(raw) || 0;
             document.getElementById('pay').value = "Rp. " + bayar.toLocaleString("id-ID");
 
-            if (bayar < totaltransaction) {
+            if (bayar < totaltransaction - subtotal_discount) {
                 document.getElementById('trchange').value = "Duitnya Kurang";
                 resetButton();
             } else {
@@ -2220,6 +2224,7 @@
                     // Open modal
                     modal.classList.remove('hidden');
                     modal.classList.add('flex');
+                    inputpatient.focus();
                 } else {
                     // Close modal
                     modal.classList.add('hidden');
@@ -2429,6 +2434,7 @@
         document.getElementById('openModalPayment').addEventListener('click', () => {
             document.getElementById('paymentModal').classList.remove('hidden');
             document.getElementById('paymentModal').classList.add('flex');
+            inputpatient.focus();
         });
 
         document.getElementById('closeModal').addEventListener('click', () => {
@@ -2555,12 +2561,11 @@
             dosageRInput.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter') {
                     e.preventDefault();
-                    submit();
-                    packageInput.focus();
+                    quantity.focus();
 
                 } else if (e.key === 'Tab') {
                     e.preventDefault();
-                    document.getElementById('quantity').focus();
+                    document.getElementById('discount').focus();
                 }
             });
         }
@@ -2584,13 +2589,20 @@
                     icon: "question",
                     showCancelButton: true,
                     confirmButtonText: "Save",
-                    denyButtonText: `Don't save`
+                    cancelButtonText: "Batal",
+                    focusConfirm: true,
+                    focusCancel: false,
                 }).then((result) => {
-                    /* Read more about isConfirmed, isDenied below */
                     if (result.isConfirmed) {
-                        Swal.fire("Racikan Telah Diselesaikan!", "", "success");
-                        sendEmbalase(this.value);
-
+                        Swal.fire({
+                            title: "Racikan Telah Diselesaikan!",
+                            icon: "success",
+                            confirmButtonText: "OK",
+                            focusConfirm: true, // ✅ this makes OK auto-focused
+                            allowOutsideClick: false,
+                        }).then(() => {
+                            sendEmbalase(this.value);
+                        });
                     }
                 });
             }
@@ -2601,10 +2613,15 @@
                 submit();
             }
         });
+      
         payInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 pay(this.value);
+            }
+            else if (e.key === 'Tab') {
+                e.preventDefault();
+                discounsubtotal.focus();
             }
         });
 
