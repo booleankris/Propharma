@@ -2549,7 +2549,7 @@
         // Recipe Redirecting inputs
         if (packageInput) {
             packageInput.addEventListener('keydown', (e) => {
-                if (e.key === 'Tab') {
+                if (e.key === 'Enter') {
                     e.preventDefault();
                     document.getElementById('productSearch').focus();
                 }
