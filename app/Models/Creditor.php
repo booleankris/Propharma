@@ -5,23 +5,18 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class Doctors extends Model
+class Creditor extends Model
 {
     use HasFactory;
-    protected $table = 'doctors';
+    protected $table = 'creditors';
 
     protected $fillable = [
-        'pharmacy_id',
         'code',
         'name',
-        'specialist',
         'address',
         'city',
         'phone',
+        'email',
         'status',
     ];
-    public function pharmacies()
-    {
-        return $this->belongsTo(Pharmacies::class);
-    }
 }

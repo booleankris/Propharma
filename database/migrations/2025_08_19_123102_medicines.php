@@ -20,6 +20,11 @@ return new class extends Migration
             $table->foreignId('pharmacy_id')->constrained('pharmacies')->onDelete('cascade');
             $table->foreignId('medicine_category_id')->constrained('medicine_categories')->onDelete('cascade');
             $table->foreignId('composition_id')->constrained('compositions')->onDelete('cascade');
+            $table->foreignId('factory_id')->constrained('factories')->onDelete('cascade');
+            $table->string('preparations')->nullable();
+            $table->string('whole')->nullable();
+            $table->string('precursor')->nullable();
+            $table->string('receipt')->nullable();
             $table->string('name');
             $table->string('packaging')->nullable();
             $table->string('unit')->nullable();

@@ -540,7 +540,17 @@ table {
   border-color: inherit;
   /* 2 */
 }
+/* Make DataTable fully responsive within Tailwind card */
+.dataTables_wrapper {
+  overflow-x: auto;
+  width: 100%;
+}
 
+/* Prevent columns from breaking alignment */
+table.dataTable {
+  width: 100% !important;
+  border-collapse: collapse;
+}
 /*
 Forms
 =====

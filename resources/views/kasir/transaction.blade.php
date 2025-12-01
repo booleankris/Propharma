@@ -94,6 +94,10 @@
                             Tambah Transaksi
                         </button>
                     </form>
+                    <button type="button" onclick="back()" class="btn btn-pharma mt-2 !bg-[#cf2525] !shadow-[0_2px_6px_#cf2525] btn-lg btn-icon icon-right"
+                        tabindex="4">
+                        Kembali
+                    </button>
                 @endif
             </div>
 
@@ -844,7 +848,9 @@
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script>
         // WHEN PAGE LOADED
-
+        function back() {
+            window.location.href = "{{ route('home') }}";
+        }
         document.addEventListener('DOMContentLoaded', () => {
             // Attach events to all existing rows
             document.querySelectorAll('.cart-row').forEach(row => {
@@ -977,7 +983,7 @@
         // Table
 
         let selectedRowId = null;
-        
+
 
         // ===============================
         // Helper Functions
@@ -1107,10 +1113,10 @@
                 dosageRInput.focus();
                 closeBox();
 
-            }else if(currenttransaction == 'KREDIT' && racikstatus == 1) {
+            } else if (currenttransaction == 'KREDIT' && racikstatus == 1) {
                 dosageRInput.focus();
                 closeBox();
-            }else {
+            } else {
                 quantity.focus();
                 closeBox();
 
@@ -2613,13 +2619,12 @@
                 submit();
             }
         });
-      
+
         payInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 pay(this.value);
-            }
-            else if (e.key === 'Tab') {
+            } else if (e.key === 'Tab') {
                 e.preventDefault();
                 discounsubtotal.focus();
             }

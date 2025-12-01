@@ -13,11 +13,15 @@ return new class extends Migration
      */
     public function up()
     {
-        Schema::create('compositions', function (Blueprint $table) {
+        Schema::create('creditors', function (Blueprint $table) {
             $table->id();
-            $table->string('code');
+            $table->string('code')->default('0')->nullable();
             $table->string('name');
-            $table->integer('status')->default('0')->nullable();
+            $table->string('address');
+            $table->string('city');
+            $table->string('phone');
+            $table->string('email');
+            $table->integer('status')->default('0')->nullable(); 
             $table->timestamps();
         });
     }

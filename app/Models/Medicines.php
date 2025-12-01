@@ -11,10 +11,12 @@ class Medicines extends Model
     protected $table = 'medicines';
     protected $fillable = [
         'code',
-        'composition_id',
         'generic',
-        'medicine_category_id',
         'pharmacy_id',
+        'medicine_category_id',
+        'composition_id',
+        'factory_id',
+        'creditors_id',
         'name',
         'packaging',
         'unit',
@@ -26,5 +28,31 @@ class Medicines extends Model
         'psychotropic',
         'minimal_stock',
         'stock',
+        'status',
+        'preparations',
+        'whole',
+        'precursor',
+        'receipt',
+
     ];
+    public static function generateCode()
+    {
+        $last = self::orderBy('id', 'desc')->first();
+
+        if (!$last || !$last->code) {
+            return '054000000';
+        }
+
+        $prefix = substr($last->code, 0, 4);
+        $number = (int) substr($last->code, 4);
+
+        if ($number >= 99999) {
+            $prefix = str_pad(((int)$prefix) + 1, 4, '0', STR_PAD_LEFT);
+            $number = 0;
+        } else {
+            $number++;
+        }
+
+        return $prefix . str_pad($number, 5, '0', STR_PAD_LEFT);
+    }
 }

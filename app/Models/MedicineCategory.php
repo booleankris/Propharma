@@ -11,11 +11,8 @@ class MedicineCategory extends Model
     protected $table = 'medicine_categories';
 
     protected $fillable = [
-        'team_id',
+        'code',
         'name',
-        'type',
-        'age', 
-        'jersey',
-        'nik',
+        'status', 
     ];
 }

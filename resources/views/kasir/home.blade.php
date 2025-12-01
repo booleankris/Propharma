@@ -1,32 +1,60 @@
 @extends('layouts.app')
 @section('content')
+    <style>
+        .modal-show {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        .modal-hide {
+            opacity: 0;
+            transform: translate(-50%, -50%) scale(0.9);
+            pointer-events: none;
+        }
+
+        .modal-transition {
+            transition: all 0.25s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .animate-fadeIn {
+            animation: fadeIn 0.25s ease-out;
+        }
+    </style>
+
     {{-- Section Product Preview --}}
     <div class="mx-4 max-w-full grid grid-cols-12 gap-6">
         <!-- LEFT COLUMN -->
         <section class="col-span-12 lg:col-span-12 space-y-6">
             <!-- Header Card -->
-            <div class="dashboard-panel px-8 py-10">
-                <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                    <div class="flex items-end justify-between md:block">
-                        <p class="text-xl bolder font-nunito font-light tracking-wider">DASHBOARD KASIR</p>
-                        <p class="font-nunito text-[#8f9eaa] font-light">Hai, Selamat datang! Anda Telah Login Sebagai Kasir
-                        </p>
-                    </div>
-                    <div class="flex items-center justify-between gap-6 w-full md:w-auto">
-                        <!-- Date / Time -->
-                        <div class="text-right">
-                            <div class="text-sm md:text-base font-medium font-montserrat">Senin, 17 Agustus 2025</div>
-                            <div class="text-xs muted font-montserrat">10.20 WITA</div>
-                        </div>
-                    </div>
+            <section class="mb-6 flex items-center justify-between">
+                <div class="flex items-center justify-start"><span
+                        class="inline-flex justify-center items-center w-12 h-12 rounded-full bg-white text-[#008bff]  mr-3"><svg
+                            viewBox="0 0 24 24" width="24" height="24" class="inline-block">
+                            <path fill="currentColor"
+                                d="M3,14L3.5,14.07L8.07,9.5C7.89,8.85 8.06,8.11 8.59,7.59C9.37,6.8 10.63,6.8 11.41,7.59C11.94,8.11 12.11,8.85 11.93,9.5L14.5,12.07L15,12C15.18,12 15.35,12 15.5,12.07L19.07,8.5C19,8.35 19,8.18 19,8A2,2 0 0,1 21,6A2,2 0 0,1 23,8A2,2 0 0,1 21,10C20.82,10 20.65,10 20.5,9.93L16.93,13.5C17,13.65 17,13.82 17,14A2,2 0 0,1 15,16A2,2 0 0,1 13,14L13.07,13.5L10.5,10.93C10.18,11 9.82,11 9.5,10.93L4.93,15.5L5,16A2,2 0 0,1 3,18A2,2 0 0,1 1,16A2,2 0 0,1 3,14Z">
+                            </path>
+                        </svg></span>
+                    <h1 class="text-2xl font-montserrat font-black text-[#008bff] capitalize leading-tight">Dashboard Kasir
+                    </h1>
                 </div>
-            </div>
-            <div class="flex gap-4">
-                <!-- Resep Credit -->
-                <a href="{{ url('transaction/upds') }}">
-                    <button
-                        class="flex flex-col dashboard-item items-center justify-center w-[160px] h-[120px] bg-[#ffffff] rounded-2xl shadow-sm hover:bg-gray-50">
-                        <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" class="w-[45px]"
+            </section>
+            <div class="flex justify-center md:justify-start flex-wrap gap-4">
+                <a href="{{ url('transaction/upds') }}" class="contents">
+                    <div
+                        class="w-[45%] md:w-[250px] flex flex-col dashboard-item items-center justify-center p-[20px] bg-[#ffffff] rounded-2xl shadow-sm hover:bg-gray-50">
+                        <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" class="w-[75px]"
                             zoomAndPan="magnify" viewBox="0 0 810 1012.49997" preserveAspectRatio="xMidYMid meet"
                             version="1.2">
                             <defs>
@@ -166,13 +194,13 @@
                                     d="M 405 776.320312 L 333.863281 776.320312 C 318.140625 776.320312 305.410156 763.585938 305.410156 747.867188 L 305.410156 733.636719 L 433.453125 733.636719 L 433.453125 747.867188 C 433.453125 763.585938 420.722656 776.320312 405 776.320312 Z M 405 776.320312 " />
                             </g>
                         </svg>
-                        <span class="text-sm font-nunito font-medium">Penjualan</span>
-                    </button>
+                        <span class="text-[18px] font-poppins tracking-wide font-bold text-[#6196c0]">Penjualan</span>
+                    </div>
                 </a>
-                <!-- Resep Tunai -->
-                <button
-                    class="flex flex-col dashboard-item items-center justify-center w-[160px] h-[120px] bg-[#ffffff] rounded-2xl shadow-sm hover:bg-gray-50">
-                    <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" class="w-[45px]"
+                {{-- Report Data --}}
+                <div id="reportBtn" onclick="openModal('reportModal')"
+                    class="w-[45%] md:w-[250px] flex flex-col dashboard-item items-center justify-center p-[20px] bg-white rounded-2xl shadow-sm hover:bg-gray-50 cursor-pointer">
+                    <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" class="w-[75px]"
                         zoomAndPan="magnify" viewBox="0 0 810 1012.49997" preserveAspectRatio="xMidYMid meet"
                         version="1.2">
                         <defs>
@@ -191,13 +219,17 @@
                             </g>
                         </g>
                     </svg>
-                    <span class="text-sm font-nunito font-medium">Data Transaksi</span>
-                </button>
+                    <span class="text-[18px] font-poppins tracking-wide font-bold text-[#6196c0]">Report
+                        Data</span>
+                </div>
 
-                <!-- HV/OTC -->
-                <button
-                    class="flex flex-col dashboard-item items-center justify-center w-[160px] h-[120px] bg-[#ffffff] rounded-2xl shadow-sm hover:bg-gray-50">
-                    <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" class="w-[45px]"
+
+
+
+                <!-- Master Data -->
+                <div id="masterBtn" onclick="openModal('masterModal')"
+                    class="w-[45%] md:w-[250px] flex flex-col dashboard-item items-center justify-center p-[20px] bg-[#ffffff] rounded-2xl shadow-sm hover:bg-gray-50">
+                    <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" class="w-[75px]"
                         zoomAndPan="magnify" viewBox="0 0 810 1012.49997" preserveAspectRatio="xMidYMid meet"
                         version="1.2">
                         <g id="3e7b3fa54b">
@@ -231,64 +263,71 @@
                                 d="M 701.476562 456.769531 C 701.476562 458.007812 701.445312 459.246094 701.386719 460.484375 C 701.324219 461.71875 701.234375 462.957031 701.113281 464.1875 C 700.992188 465.421875 700.839844 466.652344 700.65625 467.878906 C 700.476562 469.101562 700.265625 470.324219 700.023438 471.539062 C 699.78125 472.753906 699.507812 473.964844 699.207031 475.164062 C 698.90625 476.367188 698.578125 477.5625 698.21875 478.746094 C 697.859375 479.933594 697.46875 481.109375 697.050781 482.277344 C 696.632812 483.441406 696.1875 484.597656 695.714844 485.742188 C 695.238281 486.886719 694.738281 488.019531 694.207031 489.140625 C 693.679688 490.261719 693.121094 491.367188 692.539062 492.460938 C 691.953125 493.554688 691.34375 494.632812 690.707031 495.695312 C 690.070312 496.757812 689.40625 497.804688 688.71875 498.832031 C 688.027344 499.863281 687.316406 500.878906 686.578125 501.871094 C 685.839844 502.867188 685.078125 503.84375 684.292969 504.800781 C 683.503906 505.761719 682.695312 506.699219 681.863281 507.617188 C 681.03125 508.535156 680.175781 509.433594 679.300781 510.308594 C 678.425781 511.183594 677.527344 512.039062 676.609375 512.871094 C 675.691406 513.703125 674.753906 514.511719 673.796875 515.296875 C 672.839844 516.085938 671.863281 516.847656 670.867188 517.585938 C 669.871094 518.324219 668.859375 519.035156 667.828125 519.722656 C 666.796875 520.414062 665.75 521.074219 664.6875 521.710938 C 663.625 522.351562 662.546875 522.960938 661.453125 523.542969 C 660.363281 524.128906 659.253906 524.683594 658.136719 525.214844 C 657.015625 525.746094 655.882812 526.246094 654.738281 526.722656 C 653.59375 527.195312 652.4375 527.640625 651.269531 528.058594 C 650.105469 528.476562 648.929688 528.863281 647.742188 529.226562 C 646.554688 529.585938 645.363281 529.914062 644.160156 530.214844 C 642.957031 530.515625 641.75 530.789062 640.535156 531.03125 C 639.320312 531.273438 638.097656 531.484375 636.875 531.664062 C 635.648438 531.847656 634.417969 532 633.183594 532.121094 C 631.953125 532.242188 630.714844 532.332031 629.480469 532.394531 C 628.242188 532.453125 627.003906 532.484375 625.765625 532.484375 C 624.523438 532.484375 623.285156 532.453125 622.046875 532.394531 C 620.8125 532.332031 619.574219 532.242188 618.34375 532.121094 C 617.109375 532 615.878906 531.847656 614.652344 531.664062 C 613.429688 531.484375 612.207031 531.273438 610.992188 531.03125 C 609.777344 530.789062 608.570312 530.515625 607.367188 530.214844 C 606.164062 529.914062 604.972656 529.585938 603.785156 529.226562 C 602.597656 528.863281 601.421875 528.476562 600.257812 528.058594 C 599.089844 527.640625 597.933594 527.195312 596.789062 526.722656 C 595.644531 526.246094 594.511719 525.746094 593.390625 525.214844 C 592.273438 524.683594 591.164062 524.128906 590.074219 523.542969 C 588.980469 522.960938 587.902344 522.351562 586.839844 521.710938 C 585.777344 521.074219 584.730469 520.414062 583.699219 519.722656 C 582.667969 519.035156 581.65625 518.324219 580.660156 517.585938 C 579.664062 516.847656 578.6875 516.085938 577.730469 515.296875 C 576.773438 514.511719 575.835938 513.703125 574.917969 512.871094 C 574 512.039062 573.101562 511.183594 572.226562 510.308594 C 571.351562 509.433594 570.496094 508.535156 569.664062 507.617188 C 568.832031 506.699219 568.023438 505.761719 567.234375 504.800781 C 566.449219 503.84375 565.6875 502.867188 564.949219 501.871094 C 564.210938 500.878906 563.5 499.863281 562.808594 498.832031 C 562.121094 497.804688 561.457031 496.757812 560.820312 495.695312 C 560.183594 494.632812 559.574219 493.554688 558.988281 492.460938 C 558.40625 491.367188 557.847656 490.261719 557.320312 489.140625 C 556.789062 488.019531 556.289062 486.886719 555.8125 485.742188 C 555.339844 484.597656 554.894531 483.441406 554.476562 482.277344 C 554.058594 481.109375 553.667969 479.933594 553.308594 478.746094 C 552.949219 477.5625 552.621094 476.367188 552.320312 475.164062 C 552.019531 473.964844 551.746094 472.753906 551.503906 471.539062 C 551.261719 470.324219 551.050781 469.101562 550.871094 467.878906 C 550.6875 466.652344 550.535156 465.421875 550.414062 464.1875 C 550.292969 462.957031 550.203125 461.71875 550.140625 460.484375 C 550.082031 459.246094 550.050781 458.007812 550.050781 456.769531 C 550.050781 455.527344 550.082031 454.289062 550.140625 453.050781 C 550.203125 451.816406 550.292969 450.578125 550.414062 449.347656 C 550.535156 448.113281 550.6875 446.882812 550.871094 445.65625 C 551.050781 444.433594 551.261719 443.210938 551.503906 441.996094 C 551.746094 440.78125 552.019531 439.570312 552.320312 438.371094 C 552.621094 437.167969 552.949219 435.972656 553.308594 434.789062 C 553.667969 433.601562 554.058594 432.425781 554.476562 431.257812 C 554.894531 430.09375 555.339844 428.9375 555.8125 427.792969 C 556.289062 426.648438 556.789062 425.515625 557.320312 424.394531 C 557.847656 423.273438 558.40625 422.167969 558.988281 421.074219 C 559.574219 419.980469 560.183594 418.902344 560.820312 417.839844 C 561.457031 416.777344 562.121094 415.730469 562.808594 414.703125 C 563.5 413.671875 564.210938 412.65625 564.949219 411.664062 C 565.6875 410.667969 566.449219 409.691406 567.234375 408.734375 C 568.023438 407.773438 568.832031 406.835938 569.664062 405.917969 C 570.496094 405 571.351562 404.101562 572.226562 403.226562 C 573.101562 402.351562 574 401.496094 574.917969 400.664062 C 575.835938 399.832031 576.773438 399.023438 577.730469 398.238281 C 578.6875 397.449219 579.664062 396.6875 580.660156 395.949219 C 581.65625 395.210938 582.667969 394.5 583.699219 393.8125 C 584.730469 393.121094 585.777344 392.460938 586.839844 391.824219 C 587.902344 391.183594 588.980469 390.574219 590.074219 389.992188 C 591.164062 389.40625 592.273438 388.847656 593.390625 388.320312 C 594.511719 387.789062 595.644531 387.289062 596.789062 386.8125 C 597.933594 386.339844 599.089844 385.894531 600.257812 385.476562 C 601.421875 385.058594 602.597656 384.671875 603.785156 384.308594 C 604.972656 383.949219 606.164062 383.621094 607.367188 383.320312 C 608.570312 383.019531 609.777344 382.746094 610.992188 382.503906 C 612.207031 382.261719 613.429688 382.050781 614.652344 381.871094 C 615.878906 381.6875 617.109375 381.535156 618.34375 381.414062 C 619.574219 381.292969 620.8125 381.203125 622.046875 381.140625 C 623.285156 381.082031 624.523438 381.050781 625.765625 381.050781 C 627.003906 381.050781 628.242188 381.082031 629.480469 381.140625 C 630.714844 381.203125 631.953125 381.292969 633.183594 381.414062 C 634.417969 381.535156 635.648438 381.6875 636.875 381.871094 C 638.097656 382.050781 639.320312 382.261719 640.535156 382.503906 C 641.75 382.746094 642.957031 383.019531 644.160156 383.320312 C 645.363281 383.621094 646.554688 383.949219 647.742188 384.308594 C 648.929688 384.671875 650.105469 385.058594 651.269531 385.476562 C 652.4375 385.894531 653.59375 386.339844 654.738281 386.8125 C 655.882812 387.289062 657.015625 387.789062 658.136719 388.320312 C 659.253906 388.847656 660.363281 389.40625 661.453125 389.992188 C 662.546875 390.574219 663.625 391.183594 664.6875 391.824219 C 665.75 392.460938 666.796875 393.121094 667.828125 393.8125 C 668.859375 394.5 669.871094 395.210938 670.867188 395.949219 C 671.863281 396.6875 672.839844 397.449219 673.796875 398.238281 C 674.753906 399.023438 675.691406 399.832031 676.609375 400.664062 C 677.527344 401.496094 678.425781 402.351562 679.300781 403.226562 C 680.175781 404.101562 681.03125 405 681.863281 405.917969 C 682.695312 406.835938 683.503906 407.773438 684.292969 408.734375 C 685.078125 409.691406 685.839844 410.667969 686.578125 411.664062 C 687.316406 412.65625 688.027344 413.671875 688.71875 414.699219 C 689.40625 415.730469 690.070312 416.777344 690.707031 417.839844 C 691.34375 418.902344 691.953125 419.980469 692.539062 421.074219 C 693.121094 422.167969 693.679688 423.273438 694.207031 424.394531 C 694.738281 425.515625 695.238281 426.648438 695.714844 427.792969 C 696.1875 428.9375 696.632812 430.09375 697.050781 431.257812 C 697.46875 432.425781 697.859375 433.601562 698.21875 434.789062 C 698.578125 435.972656 698.90625 437.167969 699.207031 438.371094 C 699.507812 439.570312 699.78125 440.78125 700.023438 441.996094 C 700.265625 443.210938 700.476562 444.433594 700.65625 445.65625 C 700.839844 446.882812 700.992188 448.113281 701.113281 449.347656 C 701.234375 450.578125 701.324219 451.816406 701.386719 453.050781 C 701.445312 454.289062 701.476562 455.527344 701.476562 456.769531 Z M 701.476562 456.769531 " />
                         </g>
                     </svg>
-                    <span class="text-sm font-nunito font-medium">Data Obat</span>
-                </button>
-
-                <!-- UPDS -->
-                <button
-                    class="flex flex-col dashboard-item items-center justify-center w-[150px] h-[120px] bg-[#ffffff] rounded-2xl shadow-sm hover:bg-gray-50">
-                    <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" class="w-[45px]"
-                        zoomAndPan="magnify" viewBox="0 0 810 1012.49997" preserveAspectRatio="xMidYMid meet"
-                        version="1.2">
-                        <defs>
-                            <clipPath id="866b726e4e">
-                                <path d="M 563 124.171875 L 675 124.171875 L 675 235 L 563 235 Z M 563 124.171875 " />
-                            </clipPath>
-                            <clipPath id="552f6b5a45">
-                                <path d="M 510 740 L 728 740 L 728 848.316406 L 510 848.316406 Z M 510 740 " />
-                            </clipPath>
-                        </defs>
-                        <g id="4aa8a03087">
-                            <path style=" stroke:none;fill-rule:nonzero;fill:#9ab0e0;fill-opacity:1;"
-                                d="M 246.144531 427.664062 C 246.144531 458.101562 221.476562 482.777344 191.039062 482.777344 C 160.605469 482.777344 135.9375 458.101562 135.9375 427.664062 C 135.9375 397.222656 160.605469 372.550781 191.039062 372.550781 C 221.476562 372.550781 246.144531 397.222656 246.144531 427.664062 " />
-                            <path style=" stroke:none;fill-rule:nonzero;fill:#192646;fill-opacity:1;"
-                                d="M 299.5 599.9375 C 299.132812 540.335938 250.742188 492.085938 191.039062 492.085938 C 131.335938 492.085938 82.9375 540.335938 82.5625 599.9375 L 299.5 599.9375 " />
-                            <g clip-rule="nonzero" clip-path="url(#866b726e4e)">
-                                <path style=" stroke:none;fill-rule:nonzero;fill:#9ab0e0;fill-opacity:1;"
-                                    d="M 674.136719 179.25 C 674.136719 209.691406 649.46875 234.363281 619.03125 234.363281 C 588.597656 234.363281 563.929688 209.691406 563.929688 179.25 C 563.929688 148.808594 588.597656 124.136719 619.03125 124.136719 C 649.46875 124.136719 674.136719 148.808594 674.136719 179.25 " />
-                            </g>
-                            <path style=" stroke:none;fill-rule:nonzero;fill:#f2ac34;fill-opacity:1;"
-                                d="M 727.527344 351.5625 C 727.125 291.921875 678.734375 243.707031 619.03125 243.707031 C 559.328125 243.707031 510.902344 291.921875 510.574219 351.5625 L 727.527344 351.5625 " />
-                            <path style=" stroke:none;fill-rule:nonzero;fill:#9ab0e0;fill-opacity:1;"
-                                d="M 674.136719 676.074219 C 674.136719 706.515625 649.46875 731.191406 619.03125 731.191406 C 588.597656 731.191406 563.929688 706.515625 563.929688 676.074219 C 563.929688 645.636719 588.597656 620.925781 619.03125 620.925781 C 649.46875 620.925781 674.136719 645.636719 674.136719 676.074219 " />
-                            <g clip-rule="nonzero" clip-path="url(#552f6b5a45)">
-                                <path style=" stroke:none;fill-rule:nonzero;fill:#d54050;fill-opacity:1;"
-                                    d="M 727.527344 848.351562 C 727.125 788.75 678.734375 740.496094 619.03125 740.496094 C 559.328125 740.496094 510.902344 788.75 510.574219 848.351562 L 727.527344 848.351562 " />
-                            </g>
-                            <path
-                                style="fill:none;stroke-width:30;stroke-linecap:round;stroke-linejoin:round;stroke:#f2ac34;stroke-opacity:1;stroke-miterlimit:10;"
-                                d="M 1598.699149 1650.598359 L 2036.398303 1300.3972 "
-                                transform="matrix(0.364932,0,0,-0.364991,-272.131472,1262.215458)" />
-                            <path
-                                style="fill:none;stroke-width:30;stroke-linecap:round;stroke-linejoin:round;stroke:#f2ac34;stroke-opacity:1;stroke-miterlimit:10;"
-                                d="M 1598.699149 2149.60451 L 2036.398303 2499.794968 "
-                                transform="matrix(0.364932,0,0,-0.364991,-272.131472,1262.215458)" />
-                            <path
-                                style="fill:none;stroke-width:30;stroke-linecap:round;stroke-linejoin:round;stroke:#f2ac34;stroke-opacity:1;stroke-miterlimit:10;"
-                                d="M 1995.701519 2525.202264 L 2053.203655 2516.501282 L 2044.501266 2445.202458 "
-                                transform="matrix(0.364932,0,0,-0.364991,-272.131472,1262.215458)" />
-                            <path
-                                style="fill:none;stroke-width:30;stroke-linecap:round;stroke-linejoin:round;stroke:#f2ac34;stroke-opacity:1;stroke-miterlimit:10;"
-                                d="M 1995.701519 1272.399943 L 2053.203655 1281.100925 L 2044.501266 1352.399749 "
-                                transform="matrix(0.364932,0,0,-0.364991,-272.131472,1262.215458)" />
-                        </g>
-                    </svg>
-                    <span class="text-sm font-nunito font-medium">Data Kreditur</span>
-                </button>
+                    <span class="text-[18px] font-poppins tracking-wide font-bold text-[#6196c0]">Master Data</span>
+                </div>
             </div>
         </section>
 
     </div>
+
+
+    {{-- Modal Submenu --}}
+
+    <div id="modalBackdrop" class="hidden fixed inset-0 bg-black bg-opacity-40 z-40"></div>
+
+    <div id="reportModal"
+        class="modal-hide modal-transition fixed top-1/2 left-1/2 
+       w-[90%] max-w-[400px] bg-white p-6 rounded-2xl shadow-lg z-50">
+
+        <h2 class="text-xl font-bold text-[#6196c0] mb-4">Report Data</h2>
+
+        <div class="flex flex-col space-y-3">
+            <button class="py-3 bg-[#6196c0] text-white rounded-xl">Summary Report</button>
+            <button class="py-3 bg-[#6196c0] text-white rounded-xl">Monthly Report</button>
+            <button class="py-3 bg-[#6196c0] text-white rounded-xl">Detailed Export</button>
+        </div>
+
+        <button class="closeModal mt-6 w-full py-2 bg-gray-300 hover:bg-gray-400 rounded-xl">
+            Close
+        </button>
+    </div>
+
+    <div id="masterModal"
+        class="modal-hide modal-transition fixed top-1/2 left-1/2 
+       w-[90%] max-w-[400px] bg-white p-6 rounded-2xl shadow-lg z-50">
+
+        <h2 class="text-xl font-bold text-[#6196c0] mb-4">Pilih Master Data</h2>
+
+        <div class="flex flex-col space-y-3">
+
+            <a href="{{ route('medicines.index') }}" class="py-3 bg-[#6196c0] text-center text-white rounded-xl">Master Obat</a>
+            <a href="{{ route('debtors.index') }}" class="py-3 bg-[#6196c0] text-center text-white rounded-xl">Master
+                Debitur</a>
+            <a href="{{ route('categories.index') }}" class="py-3 bg-[#6196c0] text-center text-white rounded-xl">Master
+                    Kategori Obat</a>
+            <a href="{{ route('creditors.index') }}" class="py-3 bg-[#6196c0] text-center text-white rounded-xl">Master
+                Kreditur</a>
+            <a href="{{ route('compositions.index') }}" class="py-3 bg-[#6196c0] text-center text-white rounded-xl">Master
+                Komposisi</a>
+            <a href="{{ route('doctors.index') }}" class="py-3 bg-[#6196c0] text-center text-white rounded-xl">Master
+                Dokter</a>
+            <a href="{{ route('patients.index') }}" class="py-3 bg-[#6196c0] text-center text-white rounded-xl">Master
+                Pasien</a>
+            <a href="{{ route('factories.index') }}" class="py-3 bg-[#6196c0] text-center text-white rounded-xl">Master
+                Pabrik</a>
+
+        </div>
+
+        <button class="closeModal mt-6 w-full py-2 bg-gray-300 hover:bg-gray-400 rounded-xl">
+            Close
+        </button>
+    </div>
+
+
+
+
+
+
     {{-- ------------------- Fixed Cart Card --------------------- --}}
     @if (request()->routeIs('sales*') != true)
         @if ($cart_total != '0')
@@ -328,185 +367,42 @@
         @endif
     @endif
 
-
     <script>
-        // --- Config ---
-        const endpoint = "{{ route('products.search') }}";
+        const backdrop = document.getElementById("modalBackdrop");
 
-        // --- Elements ---
-        const input = document.getElementById('productSearch');
-        const name = document.getElementById('name');
-        const stock = document.getElementById('stock');
-        const unit = document.getElementById('unit');
-        const quantity = document.getElementById('quantity');
-        const price = document.getElementById('price');
+        // MAKE FUNCTIONS GLOBAL
+        window.openModal = function(id) {
+            const modal = document.getElementById(id);
 
-
-        const box = document.getElementById('productResults');
-        const list = document.getElementById('productList');
-        const hidden = document.getElementById('selectedProductId');
-
-        let items = []; // current results
-        let activeIndex = -1;
-        let closeTimeout;
-
-        // Debounce helper
-        function debounce(fn, wait = 250) {
-            let t;
-            return (...args) => {
-                clearTimeout(t);
-                t = setTimeout(() => fn(...args), wait);
-            };
-        }
-
-        function openBox() {
-            box.classList.remove('hidden');
-        }
-
-        function closeBox() {
-            box.classList.add('hidden');
-            activeIndex = -1;
-            highlight();
-        }
-
-        function highlight() {
-            [...list.children].forEach((li, i) => {
-                li.classList.toggle('bg-gray-100', i === activeIndex);
-            });
-        }
-
-        function render(items) {
-            list.innerHTML = '';
-            if (!items.length) {
-                list.innerHTML = `<li class="px-4 py-3 text-sm text-gray-500">Tidak ada hasil</li>`;
+            if (!modal) {
+                console.error("Modal not found:", id);
                 return;
             }
-            for (const it of items) {
-                const li = document.createElement('li');
-                li.setAttribute('role', 'option');
-                li.className = 'cursor-pointer px-4 py-3 hover:bg-gray-100';
-                li.dataset.id = it.id;
 
-                li.innerHTML = `
-            <div class="flex items-start justify-between gap-2">
-              <div>
-                <div class="font-medium">${escapeHtml(it.name)}</div>
-                <div class="text-xs text-gray-500">
-                  Kode: ${escapeHtml(it.code)} • Stok: ${it.stock} • Tipe: ${escapeHtml(it.type || '-')}
-                </div>
-              </div>
-              <div class="text-sm font-semibold whitespace-nowrap">Rp ${it.formatted_price}</div>
-            </div>
-          `;
-
-                li.addEventListener('mousedown', (e) => {
-                    // mousedown so it fires before input loses focus
-                    selectItem(it);
-                    e.preventDefault();
-                });
-
-                list.appendChild(li);
-            }
+            modal.classList.remove("modal-hide");
+            modal.classList.add("modal-show");
+            backdrop.classList.remove("hidden");
         }
 
-        function escapeHtml(s) {
-            return String(s ?? '').replace(/[&<>"']/g, m => ({
-                '&': '&amp;',
-                '<': '&lt;',
-                '>': '&gt;',
-                '"': '&quot;',
-                "'": '&#39;'
-            } [m]));
-        }
-
-        // Fetch results
-        const doSearch = debounce(async (term) => {
-            if (!term.trim()) {
-                list.innerHTML = '';
-                closeBox();
-                return;
-            }
-            const url = `${endpoint}?q=${encodeURIComponent(term)}`;
-            const res = await fetch(url, {
-                headers: {
-                    'Accept': 'application/json'
-                }
+        window.closeModals = function() {
+            document.querySelectorAll(".modal-show").forEach(modal => {
+                modal.classList.remove("modal-show");
+                modal.classList.add("modal-hide");
             });
-            if (!res.ok) return;
-            items = await res.json();
-            render(items);
-            openBox();
-        }, 250);
-
-        // Input events
-        input.addEventListener('input', (e) => {
-            doSearch(e.target.value);
-        });
-
-        input.addEventListener('keydown', (e) => {
-            const max = items.length - 1;
-
-            if (e.key === 'ArrowDown') {
-                e.preventDefault();
-                if (max < 0) return;
-                activeIndex = Math.min(max, activeIndex + 1);
-                highlight();
-                ensureVisible();
-            } else if (e.key === 'ArrowUp') {
-                e.preventDefault();
-                if (max < 0) return;
-                activeIndex = Math.max(0, activeIndex - 1);
-                highlight();
-                ensureVisible();
-            } else if (e.key === 'Enter') {
-                if (activeIndex >= 0 && items[activeIndex]) {
-                    e.preventDefault();
-                    selectItem(items[activeIndex]);
-                }
-            } else if (e.key === 'Escape') {
-                closeBox();
-            }
-        });
-
-        function ensureVisible() {
-            const li = list.children[activeIndex];
-            if (!li) return;
-            const lTop = list.scrollTop;
-            const lBottom = lTop + list.clientHeight;
-            const liTop = li.offsetTop;
-            const liBottom = liTop + li.offsetHeight;
-            if (liTop < lTop) list.scrollTop = liTop;
-            else if (liBottom > lBottom) list.scrollTop = liBottom - list.clientHeight;
+            backdrop.classList.add("hidden");
         }
 
-        function selectItem(it) {
-            hidden.value = it.id;
-            input.value = ``;
-            stock.value = `${it.stock}`;
-            unit.value = `${it.unit}`;
-            name.value = `${it.name}`;
-            price.value = `${it.formatted_price}`;
-            quantity.focus();
-            quantity.select();
-            closeBox();
+        // Close buttons
+        document.querySelectorAll(".closeModal").forEach(btn => {
+            btn.addEventListener("click", window.closeModals);
+        });
 
-            // TODO: Integrate action after select (e.g., add to cart)
-            // example:
-            // addToCart(it.id);
-        }
-
-        // Close on outside click / blur
-        document.addEventListener('click', (e) => {
-            if (!box.contains(e.target) && e.target !== input) closeBox();
-        });
-        input.addEventListener('blur', () => {
-            closeTimeout = setTimeout(closeBox, 120);
-        });
-        input.addEventListener('focus', () => {
-            clearTimeout(closeTimeout);
-            if (list.children.length) openBox();
-        });
+        // Click backdrop to close
+        backdrop.addEventListener("click", window.closeModals);
     </script>
+
+
+
 
     {{-- ------------------- Fixed Cart Card --------------------- --}}
 @endsection

@@ -22,4 +22,8 @@ class Pharmacies extends Model
         'footnote2',
         'status',
     ];
+    public function doctors()
+    {
+        return $this->hasMany(Doctors::class);
+    }
 }

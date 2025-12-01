@@ -11,6 +11,8 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
     <title>Propharma | Dashboard</title>
+    @yield('style')
+
 </head>
 
 <body class="dashboard-body">
@@ -18,6 +20,7 @@
     <main class="my-[95px] pb-[80px]">
         @yield('content')
     </main>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
@@ -208,6 +211,8 @@
         //     imageInput.value = ""; // Clear file input
         // });
     </script>
+    @yield('scripts')
+
     @include('components.footer')
 
 </html>

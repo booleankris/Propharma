@@ -16,14 +16,24 @@ use App\Http\Controllers\Admin\MatchDayController;
 use App\Http\Controllers\Admin\MatchController;
 use App\Http\Controllers\Admin\ScanningController;
 use App\Http\Controllers\Admin\TicketController;
+use App\Http\Controllers\Master\CreditorsController;
+
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\LandingpageController;
 use App\Http\Controllers\SquadController;
 use App\Http\Controllers\Admin\TicketingController;
 use App\Http\Controllers\Admin\TicketingTransactionController;
 use App\Http\Controllers\AdminItemController;
+use App\Http\Controllers\CreditorController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ItemsController;
+use App\Http\Controllers\Master\CategoriesController;
+use App\Http\Controllers\Master\CompositionsController;
+use App\Http\Controllers\Master\DebtorsController;
+use App\Http\Controllers\Master\DoctorsController;
+use App\Http\Controllers\Master\FactoriesController;
+use App\Http\Controllers\Master\MedicineController;
+use App\Http\Controllers\master\PatientsController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\SalesController;
 use App\Http\Controllers\TransactionReportController;
@@ -92,7 +102,6 @@ Route::middleware(['auth', 'role:administrator'])->group(function () {
     Route::resource('scanning', ScanningController::class);
     Route::resource('report', TransactionReportController::class);
     Route::post('searchreport/', [TransactionReportController::class, 'searchreport'])->name('searchreport');
-
 });
 Route::middleware(['auth', 'role:Kasir'])->group(function () {
     Route::get('/home', [HomeController::class, 'index'])->name('home');
@@ -112,7 +121,7 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     // Initiate New Transaction
     Route::post('/createtransaction/', [SalesController::class, 'createTransaction'])->name('transaction.createnew');
     Route::post('/addtocart', [SalesController::class, 'addToCart'])
-    ->name('transaction.addToCart');
+        ->name('transaction.addToCart');
     Route::post('removecart', [SalesController::class, 'removeItem'])->name('transaction.removeItem');
 
     Route::get('/transaction/{slug}/', [SalesController::class, 'index'])->name('transaction');
@@ -121,11 +130,11 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     Route::get('/transaction/cartItem/{id}', [SalesController::class, 'getCartItem']);
     Route::get('/transaction/cartItem/{id}', [SalesController::class, 'getCartItem']);
     Route::post('/transaction/update-cart', [SalesController::class, 'updateCart'])
-    ->name('transaction.updateCart');
+        ->name('transaction.updateCart');
 
     Route::delete('/transaction/cartItem/{id}', [SalesController::class, 'deleteCartItem'])
-    ->name('transaction.cartItem.delete');
-    
+        ->name('transaction.cartItem.delete');
+
     // Route::post('addtocart', [SalesController::class, 'addToCart'])->name('sales.addToCart');
     Route::post('moreitem', [SalesController::class, 'moreItem'])->name('sales.moreItem');
     Route::post('lessitem', [SalesController::class, 'lessItem'])->name('sales.lessItem');
@@ -137,22 +146,40 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
 
     // ================================================================== Add Data =========================================================================
     Route::post('/addpatient', [SalesController::class, 'addPatient'])
-    ->name('transaction.addPatient');
+        ->name('transaction.addPatient');
     // ================================================================== Add Data =========================================================================
 
+    // Master
+    Route::resource('creditors', CreditorsController::class)->except(['show']);
+    Route::resource('debtors', DebtorsController::class)->except(['show']);
+    Route::resource('patients', PatientsController::class)->except(['show']);
+    Route::resource('doctors', DoctorsController::class)->except(['show']);
+    Route::resource('compositions', CompositionsController::class)->except(['show']);
+    Route::resource('factories', FactoriesController::class)->except(['show']);
+    Route::resource('categories', CategoriesController::class)->except(['show']);
+    Route::resource('medicines', MedicineController::class)->except(['show']);
+
+
+    Route::get('/compositions/select', [CompositionsController::class, 'select'])->name('composition.select');
+    Route::get('/factories/select', [FactoriesController::class, 'select'])->name('factories.select');
+    Route::get('/categories/select', [CategoriesController::class, 'select'])->name('categories.select');
+    Route::get('/creditors/select', [CreditorsController::class, 'select'])->name('creditors.select');
+    
 });
+
+
 Route::get('/products/search', [SalesController::class, 'search'])
-    ->middleware('auth') 
+    ->middleware('auth')
     ->name('products.search');
 
 Route::get('/debtors/search', [SalesController::class, 'searchDebtors'])
-    ->middleware('auth') 
+    ->middleware('auth')
     ->name('debtors.search');
 
 Route::get('/patients/search', [SalesController::class, 'searchPatients'])
-    ->middleware('auth') 
+    ->middleware('auth')
     ->name('patients.search');
 
-    Route::get('/doctors/search', [SalesController::class, 'searchDoctors'])
-    ->middleware('auth') 
+Route::get('/doctors/search', [SalesController::class, 'searchDoctors'])
+    ->middleware('auth')
     ->name('doctors.search');
