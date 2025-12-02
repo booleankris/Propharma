@@ -33,7 +33,7 @@ use App\Http\Controllers\Master\DebtorsController;
 use App\Http\Controllers\Master\DoctorsController;
 use App\Http\Controllers\Master\FactoriesController;
 use App\Http\Controllers\Master\MedicineController;
-use App\Http\Controllers\master\PatientsController;
+use App\Http\Controllers\Master\PatientsController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\SalesController;
 use App\Http\Controllers\TransactionReportController;
