@@ -79,8 +79,8 @@
                         medicineProgressBar.style.width = job.progress + "%";
                         medicineProgressText.textContent = job.progress + "%";
 
-                        // Completed
-                        if (job.status === "completed") {
+                        // Finished
+                        if (job.status === "finished") {
                             clearInterval(interval);
                             medicineProgressText.textContent = "Selesai!";
                             window.location.href = `/reports/export/medicines/download/${jobId}`;
