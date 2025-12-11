@@ -217,20 +217,51 @@ class SalesController extends Controller
 
     public function createTransaction(Request $request)
     {
-        $check_transaction = MedicineTransactions::where('pharmacy_id', Auth()->user()->pharmacy_id)->where('status', '0')->count();
-        $transactionCode = 'TRX-' . strtoupper(Str::random(8)) . '-' . time();
+        $check_transaction = MedicineTransactions::where('pharmacy_id', Auth()->user()->pharmacy_id)
+            ->where('status', '0')
+            ->count();
+
         if ($request->get('type') == 'resep') {
             $type = "RESEP TUNAI";
+            $code = "1";
         } else if ($request->get('type') == 'kredit') {
             $type = "RESEP KREDIT";
+            $code = "4";
         } else if ($request->get('type') == 'upds') {
             $type = "UPDS";
+            $code = "2";
         } else if ($request->get('type') == 'hv') {
             $type = "HV/OTC";
+            $code = "3";
         }
+
+        // Generate Transaction COdes
+        $year   = now()->format('y');
+        $month  = now()->format('m');
+        $prefix = $year . $month . strtoupper($code);
+
+        // find last transaction with same prefix
+        $last = MedicineTransactions::where('pharmacy_id', Auth()->user()->pharmacy_id)
+            ->where('transaction_code', 'like', $prefix . '%')
+            ->orderBy('transaction_code', 'desc')
+            ->first();
+
+        if ($last) {
+            $lastNumber = intval(substr($last->transaction_code, -4));
+            $nextNumber = $lastNumber + 1;
+        } else {
+            $nextNumber = 0;
+        }
+
+        $serial = str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+
+        $transactionCode = $prefix . $serial;
+        // =====================
+
         if ($check_transaction == 0) {
             try {
                 DB::beginTransaction();
+
                 $transaction = MedicineTransactions::create([
                     'pharmacy_id'       => Auth()->user()->pharmacy_id,
                     'debtor_id'         => NULL,
@@ -240,6 +271,7 @@ class SalesController extends Controller
                     'discount'          => NULL,
                     'status'            => 0,
                 ]);
+
                 DB::commit();
                 return redirect()->back()->with('message', "Berhasil Menyimpan! ");
             } catch (\Exception $e) {
@@ -387,6 +419,37 @@ class SalesController extends Controller
             'patient' => $patient
         ]);
     }
+    private function generateDoctorCode()
+    {
+        $last = Doctors::orderBy('id', 'desc')->first();
+
+        if (!$last || !$last->code) {
+            return 'DR0001';
+        }
+
+        $number = (int) substr($last->code, 2);
+        return 'DR' . str_pad($number + 1, 4, '0', STR_PAD_LEFT);
+    }
+    public function addDoctor(Request $request)
+    {
+        $code = $this->generateDoctorCode();
+
+        $doctor = Doctors::create([
+            'pharmacy_id' => "1",
+            'code'        => $code,
+            'name'        => $request->name,
+            'specialist'  => $request->specialist,
+            'address'     => $request->address,
+            'city'        => $request->city,
+            'phone'       => $request->phone,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'doctor'  => $doctor
+        ]);
+    }
+
     /**
      * Store a newly created resource in storage.
      *
@@ -589,8 +652,8 @@ class SalesController extends Controller
             'package'      => $request->package,
             'dosage_r'     => $request->dosage_r,
             'raw_total'    => $request->raw_total,
-            'total_price'  => $request->final_price,  
-            'final_price'  => $request->total_price, 
+            'total_price'  => $request->final_price,
+            'final_price'  => $request->total_price,
         ]);
 
         $cart->load('medicine');
@@ -666,7 +729,6 @@ class SalesController extends Controller
                 if (File::exists($oldImagePath)) {
                     File::delete($oldImagePath);
                 }
-
                 // Save new image
                 $image->move(public_path('uploads/items/'), $fileName);
 

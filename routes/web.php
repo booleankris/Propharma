@@ -35,6 +35,7 @@ use App\Http\Controllers\Master\FactoriesController;
 use App\Http\Controllers\Master\MedicineController;
 use App\Http\Controllers\Master\PatientsController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\ReportsController;
 use App\Http\Controllers\SalesController;
 use App\Http\Controllers\TransactionReportController;
 use App\Models\Item;
@@ -147,6 +148,8 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     // ================================================================== Add Data =========================================================================
     Route::post('/addpatient', [SalesController::class, 'addPatient'])
         ->name('transaction.addPatient');
+    Route::post('/adddoctor', [SalesController::class, 'addDoctor'])
+        ->name('transaction.addDoctor');
     // ================================================================== Add Data =========================================================================
 
     // Master
@@ -159,12 +162,40 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     Route::resource('categories', CategoriesController::class)->except(['show']);
     Route::resource('medicines', MedicineController::class)->except(['show']);
 
+    // Reports  
+    Route::get('/reports/transactions', [ReportsController::class, 'transactions'])->name('reports.transactions');
+    Route::get('/reports/medicines', [ReportsController::class, 'medicines'])->name('reports.medicines');
+    Route::get('/reports/doctors', [ReportsController::class, 'doctors'])->name('reports.doctors');
+    Route::get('/reports/patients', [ReportsController::class, 'patients'])->name('reports.patients');
+
+    // Patient Export
+    Route::post('/reports/export/patients', [ReportsController::class, 'exportPatients'])
+        ->name('reports.export.patients');
+
+    // Check Export Status
+    Route::get('/reports/export/status/{id}', [ReportsController::class, 'exportStatus'])
+        ->name('reports.export.status');
+
+    // Transaction Export
+    Route::post('/reports/export/transactions', [ReportsController::class, 'exportTransactions'])
+        ->name('reports.export.transactions');
+
+    Route::get('/reports/export/transactions/status/{id}', [ReportsController::class, 'transactionExportStatus'])
+        ->name('reports.export.transactions.status');
+
+    Route::get('/reports/export/transactions/download/{id}', [ReportsController::class, 'transactionExportDownload'])
+        ->name('reports.export.transactions.download');
+
+    // Medicine Export
+
+    Route::post('/reports/export/medicines', [ReportsController::class, 'exportMedicines']);
+    Route::get('/reports/export/medicines/status/{id}', [ReportsController::class, 'exportMedicinesStatus']);
+    Route::get('/reports/export/medicines/download/{id}', [ReportsController::class, 'exportMedicinesDownload']);
 
     Route::get('/compositions/select', [CompositionsController::class, 'select'])->name('composition.select');
     Route::get('/factories/select', [FactoriesController::class, 'select'])->name('factories.select');
     Route::get('/categories/select', [CategoriesController::class, 'select'])->name('categories.select');
     Route::get('/creditors/select', [CreditorsController::class, 'select'])->name('creditors.select');
-    
 });
 
 

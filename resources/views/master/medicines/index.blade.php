@@ -173,7 +173,7 @@
                                 <input id="net_price" name="net_price" type="number"
                                     class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px]">
                             </div>  --}}
-                            <div class="w-full">
+                            {{-- <div class="w-full">
                                 <label class="block text-[14px] font-semibold text-gray-800 mb-1">Harga HNA</label>
                                 <input id="raw_price" name="raw_price" type="text"
                                     class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px]"
@@ -192,7 +192,27 @@
                                 <input id="net_price" name="net_price" type="text"
                                     class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px]"
                                     placeholder="Rp 0">
+                            </div> --}}
+                            <div class="w-full">
+                                <label class="block text-[14px] font-semibold text-gray-800 mb-1">Harga HNA</label>
+                                <input id="raw_price" name="raw_price" type="text"
+                                    class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px]"
+                                    placeholder="Rp 0">
                             </div>
+
+                            <div class="w-full">
+                                <label class="block text-[14px] font-semibold text-gray-800 mb-1">Harga PPN 11%</label>
+                                <input id="pharmacy_net_price" name="pharmacy_net_price" type="text"
+                                    class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px]"
+                                    placeholder="Rp 0" readonly>
+                            </div>
+                            <div class="w-full">
+                                <label class="block text-[14px] font-semibold text-gray-800 mb-1">HJA/HET</label>
+                                <input id="net_price" name="net_price" type="text"
+                                    class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px]"
+                                    placeholder="Rp 0">
+                            </div>
+
                         </div>
 
                         <div class="flex gap-2">
@@ -300,16 +320,44 @@
             input.value = 'Rp ' + formatted;
         }
 
-        // Apply real-time formatting
-        ['raw_price', 'pharmacy_net_price', 'net_price'].forEach(id => {
-            document.getElementById(id).addEventListener('input', function() {
-                formatRupiah(this);
-            });
+        document.getElementById('raw_price').addEventListener('input', function() {
+            formatRupiah(this);
+            calculatePPN();
         });
 
+        document.getElementById('net_price').addEventListener('input', function() {
+            formatRupiah(this);
+        });
+        
         function cleanRupiah(value) {
             return value.replace(/[^0-9]/g, '');
         }
+
+        function formatRupiah(input) {
+            let value = cleanRupiah(input.value);
+
+            if (value === "") {
+                input.value = "";
+                return;
+            }
+
+            input.value = "Rp " + new Intl.NumberFormat("id-ID").format(value);
+        }
+
+        function calculatePPN() {
+            let rawValue = cleanRupiah(document.getElementById('raw_price').value);
+
+            if (rawValue === "" || isNaN(rawValue)) {
+                document.getElementById('pharmacy_net_price').value = "Rp 0";
+                return;
+            }
+
+            let total = Math.floor(rawValue * 1.11); // HNA + 11%
+
+            document.getElementById('pharmacy_net_price').value =
+                "Rp " + new Intl.NumberFormat("id-ID").format(total);
+        }
+
         $(document).ready(function() {
 
             // COMPOSITION SELECT2

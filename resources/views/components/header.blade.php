@@ -65,7 +65,7 @@
 
                 <div id="dropdownProfileMenu"
                     class="hidden absolute right-0 mt-2 w-40 bg-white border border-gray-200 rounded-lg shadow-lg">
-                    <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Menu Utama</a>
+                    <a href="{{ url('/home') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Menu Utama</a>
                     <a href="{{ url('transaction/upds') }}"
                         class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Penjualan</a>
                     <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Pembelian</a>
@@ -96,17 +96,27 @@
 
                 <div id="dropdownMasterMenu"
                     class="hidden absolute right-0 mt-2 w-40 bg-white border border-gray-200 rounded-lg shadow-lg">
-                    <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Master Obat</a>
-                    <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Master
-                        Distributor</a>
-                    <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Master Dokter</a>
-                    <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Master Debitur</a>
-
+                  
+                    <a href="{{ route('medicines.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Master
+                        Obat</a>
+                    <a href="{{ route('debtors.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Master
+                        Debitur</a>
+                    <a href="{{ route('categories.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Master
+                        Kategori Obat</a>
+                    <a href="{{ route('creditors.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Master
+                        Kreditur</a>
+                    <a href="{{ route('compositions.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Master
+                        Komposisi</a>
+                    <a href="{{ route('doctors.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Master
+                        Dokter</a>
+                    <a href="{{ route('patients.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Master
+                        Pasien</a>
+                    <a href="{{ route('factories.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Master
+                        Pabrik</a>
                 </div>
             </div>
 
-            <!-- DATA DROPDOWN -->
-            <div class="relative">
+            {{-- <div class="relative">
                 <button id="dropdownDataBtn" class="flex items-center gap-2 p-2 hover:bg-gray-100 rounded-md">
                     <svg class="w-5 h-5 text-gray-600" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24">
                         <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 4h3a1 1 0 0 1 1 1v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h3m0 3h6m-3 5h3m-6 0h.01M12 16h3m-6 0h.01M10 3v4h4V3h-4Z"/>
@@ -125,7 +135,7 @@
                     <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Data Pembelian</a>
                     <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Data Retur</a>
                 </div>
-            </div>
+            </div> --}}
         </div>
 
         <!-- Logout Form -->

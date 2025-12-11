@@ -28,11 +28,6 @@ class DashboardController extends Controller
         $items = Item::where('user_id', Auth::user()->id)->get();
         $cart_status = Item::with('cart_status')->where('user_id', Auth()->id())->get();
         $totaltransaction = TicketTransaction::where('user_id', Auth::user()->id)->count('id');
-   
-
-
-       
-
         return view('dashboard', compact('totalproduct', 'totaltransaction'));
     }
 }

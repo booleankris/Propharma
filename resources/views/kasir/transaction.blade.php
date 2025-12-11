@@ -22,7 +22,8 @@
                             </div>
                             <div class="text-sm md:text-base text-[#37719e] font-nunito !text-[12px] font-medium">
                                 @if ($check_transaction == 1)
-                                    {{ $transaction->transaction_code }}
+
+                                    <b>No. Transaksi :</b> {{ $transaction->transaction_code }}
                                 @endif
                             </div>
                         </div>
@@ -94,7 +95,8 @@
                             Tambah Transaksi
                         </button>
                     </form>
-                    <button type="button" onclick="back()" class="btn btn-pharma mt-2 !bg-[#cf2525] !shadow-[0_2px_6px_#cf2525] btn-lg btn-icon icon-right"
+                    <button type="button" onclick="back()"
+                        class="btn btn-pharma mt-2 !bg-[#cf2525] !shadow-[0_2px_6px_#cf2525] btn-lg btn-icon icon-right"
                         tabindex="4">
                         Kembali
                     </button>
@@ -697,6 +699,48 @@
             </form>
         </div>
     </div>
+
+    <!-- Doctor Modal -->
+    <div id="newDoctorModal" class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center hidden z-50">
+        <div id="newDoctorModalContent" class="bg-white p-6 rounded-lg shadow w-96">
+            <h2 class="text-lg font-bold mb-4">Tambah Dokter</h2>
+
+            <form id="newDoctorForm">
+                @csrf
+
+                <label class="block text-sm font-medium mb-1">Nama Dokter</label>
+                <input type="text" name="name" id="doctorName"
+                    class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                    required>
+
+                <label class="block text-sm font-medium mb-1">Spesialis</label>
+                <input type="text" name="specialist" id="doctorSpecialist"
+                    class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300">
+
+                <label class="block text-sm font-medium mb-1">Alamat</label>
+                <input type="text" name="address" id="doctorAddress"
+                    class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300">
+
+                <label class="block text-sm font-medium mb-1">Kota</label>
+                <input type="text" name="city" id="doctorCity"
+                    class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300">
+
+                <label class="block text-sm font-medium mb-1">Telepon</label>
+                <input type="text" name="phone" id="doctorPhone"
+                    class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300">
+
+                <div class="flex justify-end mt-4">
+                    <button type="button" id="closeNewDoctorBtn" class="px-4 py-2 bg-gray-300 rounded mr-2">
+                        Batal
+                    </button>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded">
+                        Tambah Dokter
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     @if ($check_transaction == 1)
         {{-- Modal Pembayaran --}}
         <div id="paymentModal" class="fixed inset-0 bg-black/50 hidden justify-center items-center z-40">
@@ -767,6 +811,22 @@
                                             <ul id="doctorList" role="listbox" class="max-h-80 overflow-auto py-2">
                                             </ul>
                                         </div>
+                                    </div>
+                                    <div class="adddebtors w-[120px] ml-[10px]">
+                                        <button type="button" id="openNewDoctorBtn"
+                                            class="rounded-[10px] border border-[#62b9ff] px-3 py-2 font-poppins font-bold text-[#62b9ff] flex items-center justify-center gap-2 transition">
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                                                class="w-6 h-6 text-[#62b9ff]">
+                                                <circle cx="15" cy="8" r="4" fill="currentColor" />
+                                                <path d="M15,14c-6.1,0-8,4-8,4v2h16v-2C23,18,21.1,14,15,14z"
+                                                    fill="currentColor" />
+                                                <line stroke="currentColor" stroke-miterlimit="10" stroke-width="2"
+                                                    x1="5" x2="5" y1="7" y2="15" />
+                                                <line stroke="currentColor" stroke-miterlimit="10" stroke-width="2"
+                                                    x1="9" x2="1" y1="11" y2="11" />
+                                            </svg>
+                                            Baru
+                                        </button>
                                     </div>
                                     <input type="hidden" id="selectedDoctorId" />
                                 </div>
@@ -871,6 +931,13 @@
         const openNewPatientBtn = document.getElementById('btnNewPatient');
         const closeNewPatientBtn = document.getElementById('closeNewPatientModal');
         const newPatientForm = document.getElementById('newPatientForm');
+
+        const openNewDoctorBtn = document.getElementById('openNewDoctorBtn');
+        const newDoctorModal = document.getElementById('newDoctorModal');
+        const newDoctorModalContent = document.getElementById('newDoctorModalContent');
+        const closeNewDoctorBtn = document.getElementById('closeNewDoctorBtn');
+        const newDoctorForm = document.getElementById('newDoctorForm');
+
 
 
         // Endpoints
@@ -2416,7 +2483,6 @@
                         newPatientForm.reset();
 
                         // Auto-fill patient field with new patient
-                        document.getElementById("patientname").value = response.data.patient.name;
                         inputpatient.value = response.data.patient.name;
                         document.getElementById("patient_id").value = response.data.patient.id;
 
@@ -2432,6 +2498,64 @@
                     alert("Terjadi kesalahan, coba lagi.");
                 });
         });
+
+        // Open modal
+        if (openNewDoctorBtn) {
+            openNewDoctorBtn.addEventListener('click', () => {
+                newDoctorModal.classList.remove('hidden');
+                document.getElementById('doctorName').focus();
+            });
+
+            // Close modal
+            closeNewDoctorBtn.addEventListener('click', () => {
+                newDoctorModal.classList.add('hidden');
+            });
+
+            // Close on outside click
+            newDoctorModal.addEventListener('click', (e) => {
+                if (!newDoctorModalContent.contains(e.target)) {
+                    newDoctorModal.classList.add('hidden');
+                }
+            });
+
+            // Submit Doctor Form
+            newDoctorForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+
+                let formData = new FormData(this);
+
+                axios.post("{{ route('transaction.addDoctor') }}", formData, {
+                        headers: {
+                            'X-CSRF-TOKEN': document.querySelector('meta[name=\"csrf-token\"]').content,
+                            'Content-Type': 'multipart/form-data'
+                        }
+                    })
+                    .then(response => {
+                        if (response.data.success) {
+
+                            alert("Dokter berhasil ditambahkan!");
+
+                            newDoctorModal.classList.add('hidden');
+                            newDoctorForm.reset();
+
+                            // Auto-fill doctor fields
+                            inputdoctor.value = response.data.doctor.name;
+                            document.getElementById("doctor_id").value = response.data.doctor.id;
+
+                            if (document.getElementById("selectedDoctorId")) {
+                                document.getElementById("selectedDoctorId").value = response.data.doctor.id;
+                            }
+
+                        } else {
+                            alert("Gagal menambahkan dokter.");
+                        }
+                    })
+                    .catch(error => {
+                        console.error(error);
+                        alert("Terjadi kesalahan, coba lagi.");
+                    });
+            });
+        }
 
 
         // ===============================

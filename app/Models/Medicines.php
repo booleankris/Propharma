@@ -35,6 +35,18 @@ class Medicines extends Model
         'receipt',
 
     ];
+    public function factory()
+    {
+        return $this->belongsTo(Factory::class, 'factory_id');
+    }
+    public function composition()
+    {
+        return $this->belongsTo(Composition::class, 'composition_id');
+    } 
+    public function category()
+    {
+        return $this->belongsTo(MedicineCategory::class, 'medicine_category_id');
+    } 
     public static function generateCode()
     {
         $last = self::orderBy('id', 'desc')->first();

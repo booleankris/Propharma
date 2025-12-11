@@ -282,9 +282,20 @@
         <h2 class="text-xl font-bold text-[#6196c0] mb-4">Report Data</h2>
 
         <div class="flex flex-col space-y-3">
-            <button class="py-3 bg-[#6196c0] text-white rounded-xl">Summary Report</button>
-            <button class="py-3 bg-[#6196c0] text-white rounded-xl">Monthly Report</button>
-            <button class="py-3 bg-[#6196c0] text-white rounded-xl">Detailed Export</button>
+            <a href="{{ route('reports.transactions') }}">
+                <div class="py-3 bg-[#6196c0] text-center text-white rounded-xl">Report Transaksi</div>
+            </a>
+            <a href="{{ route('reports.medicines') }}">
+                <div class="py-3 bg-[#6196c0] text-center text-white rounded-xl">Report Data Obat</div>
+            </a>
+
+            <a href="{{ route('reports.patients') }}">
+                <div class="py-3 bg-[#6196c0] text-center text-white rounded-xl">Report Data Pasien</div>
+            </a>
+
+            <a href="{{ route('reports.doctors') }}">
+                <div class="py-3 bg-[#6196c0] text-center text-white rounded-xl">Report Data Dokter</div>
+            </a>
         </div>
 
         <button class="closeModal mt-6 w-full py-2 bg-gray-300 hover:bg-gray-400 rounded-xl">
@@ -300,11 +311,12 @@
 
         <div class="flex flex-col space-y-3">
 
-            <a href="{{ route('medicines.index') }}" class="py-3 bg-[#6196c0] text-center text-white rounded-xl">Master Obat</a>
+            <a href="{{ route('medicines.index') }}" class="py-3 bg-[#6196c0] text-center text-white rounded-xl">Master
+                Obat</a>
             <a href="{{ route('debtors.index') }}" class="py-3 bg-[#6196c0] text-center text-white rounded-xl">Master
                 Debitur</a>
             <a href="{{ route('categories.index') }}" class="py-3 bg-[#6196c0] text-center text-white rounded-xl">Master
-                    Kategori Obat</a>
+                Kategori Obat</a>
             <a href="{{ route('creditors.index') }}" class="py-3 bg-[#6196c0] text-center text-white rounded-xl">Master
                 Kreditur</a>
             <a href="{{ route('compositions.index') }}" class="py-3 bg-[#6196c0] text-center text-white rounded-xl">Master
