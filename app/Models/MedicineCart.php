@@ -20,6 +20,7 @@ class MedicineCart extends Model
         'cart_type',
         'package',
         'dosage_r',
+        'item_price',
         'raw_total',
         'total_price',
         'final_price',
@@ -29,12 +30,14 @@ class MedicineCart extends Model
     ];
     public function medicine()
     {
-        return $this->belongsTo(Medicines::class);
+        return $this->belongsTo(Medicines::class, 'medicine_id');
     }
+
     public function transactions()
     {
         return $this->belongsTo(MedicineTransactions::class, 'transaction_id');
     }
+
     public function user()
     {
         return $this->belongsTo(User::class);

@@ -12,14 +12,17 @@ class TransactionParameter extends Model
     protected $table = "transaction_parameter";
 
     protected $fillable = [
-        'id',
         'debtor_id',
         'receipt',
-        'debtor_id',
-        'debtor_id',
-        'debtor_id',
-
+        'pdu',
+        'otc',
+        'credit',
+        'embalas',
+        'service',
+        'rounding',
+        'status'
     ];
+
 
     /**
      * Each parameter belongs to a debtor.

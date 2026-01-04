@@ -25,6 +25,7 @@ class Medicines extends Model
         'raw_price',
         'pharmacy_net_price',
         'net_price',
+        'het_price',
         'psychotropic',
         'minimal_stock',
         'stock',
@@ -46,6 +47,10 @@ class Medicines extends Model
     public function category()
     {
         return $this->belongsTo(MedicineCategory::class, 'medicine_category_id');
+    } 
+    public function creditor()
+    {
+        return $this->belongsTo(Creditor::class, 'creditors_id');
     } 
     public static function generateCode()
     {

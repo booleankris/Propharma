@@ -33,9 +33,11 @@ use App\Http\Controllers\Master\DebtorsController;
 use App\Http\Controllers\Master\DoctorsController;
 use App\Http\Controllers\Master\FactoriesController;
 use App\Http\Controllers\Master\MedicineController;
+use App\Http\Controllers\Master\ParametersController;
 use App\Http\Controllers\Master\PatientsController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ReportsController;
+use App\Http\Controllers\Sales\SalesDataController;
 use App\Http\Controllers\SalesController;
 use App\Http\Controllers\TransactionReportController;
 use App\Models\Item;
@@ -115,7 +117,6 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
 
     Route::resource('items', ItemsController::class);
     Route::resource('sales', SalesController::class);
-    Route::resource('transactions', TicketingTransactionController::class);
 
     // Route::get('/transaction', [SalesController::class, 'index'])->name('transaction');
 
@@ -132,6 +133,19 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     Route::get('/transaction/cartItem/{id}', [SalesController::class, 'getCartItem']);
     Route::post('/transaction/update-cart', [SalesController::class, 'updateCart'])
         ->name('transaction.updateCart');
+
+    // ------ Modal Data On Transaction (For Modal) -----
+
+
+    // Medicine Data 
+    Route::get('/transactions/getmedicinemaster', [SalesController::class, 'openMedicineMaster']);
+
+    // Transaction Data
+    Route::get('/transactions/gettransactiondata', [SalesController::class, 'openTransactionData']);
+    Route::get('/transactions/{id}/items', [SalesController::class, 'getTransactionItems'])->name('transactions.items');
+
+
+    // ------ Modal Data On Transaction (For Modal) -----
 
     Route::delete('/transaction/cartItem/{id}', [SalesController::class, 'deleteCartItem'])
         ->name('transaction.cartItem.delete');
@@ -150,6 +164,7 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
         ->name('transaction.addPatient');
     Route::post('/adddoctor', [SalesController::class, 'addDoctor'])
         ->name('transaction.addDoctor');
+
     // ================================================================== Add Data =========================================================================
 
     // Master
@@ -161,6 +176,17 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     Route::resource('factories', FactoriesController::class)->except(['show']);
     Route::resource('categories', CategoriesController::class)->except(['show']);
     Route::resource('medicines', MedicineController::class)->except(['show']);
+    Route::resource('parameters', ParametersController::class)->except(['show']);
+
+    // Sales Data
+    Route::get('/data/sales', [SalesDataController::class, 'index'])->name('salesdata.index');
+    Route::get('/retur', [SalesDataController::class, 'retur'])->name('salesdata.retur');
+    Route::post('/returitem', [SalesDataController::class, 'returItem'])->name('salesdata.returItem');
+
+    Route::get('/sales/transaction/{id}/items', [SalesDataController::class, 'transactionItems']);
+    Route::get('/salesdata/returdata', [SalesDataController::class, 'returdata'])->name('salesdata.returdata');
+    Route::get('/salesdata/getreturmedicine', [SalesDataController::class, 'getReturMedicines'])->name('salesdata.retur.medicines');
+
 
     // Reports  
     Route::get('/reports/transactions', [ReportsController::class, 'transactions'])->name('reports.transactions');

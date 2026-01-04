@@ -33,6 +33,7 @@ return new class extends Migration
             $table->string('raw_price')->default(0); 
             $table->string('pharmacy_net_price')->default(0);
             $table->string('net_price')->default(0);
+            $table->string('het_price')->default(0)->nullable();
             $table->string('psychotropic')->default(0);
             $table->integer('minimal_stock');
             $table->integer('stock')->default(0);

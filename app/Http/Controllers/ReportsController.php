@@ -64,7 +64,7 @@ class ReportsController extends Controller
         ]);
     }
 
-    // Transaction Export
+    // Transaction Export Function + Jobns
     public function exportTransactions(Request $request)
     {
         $start = $request->start ?? null;
@@ -97,7 +97,7 @@ class ReportsController extends Controller
                 : null
         ]);
     }
-
+    
     public function transactionExportDownload($id)
     {
         $job = ExportJob::findOrFail($id);

@@ -14,6 +14,7 @@ use App\Models\PaymentParameters;
 use App\Models\Sales;
 use App\Models\TicketPayment;
 use App\Models\TicketTransaction;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -29,6 +30,9 @@ class SalesController extends Controller
 
         if ($slug == "upds") {
             $parameters = PaymentParameters::where('id', 1)->first();
+            $parameterHV = $parameters->otc;
+            $parameterUP = $parameters->pdu;
+            $parameterRT = $parameters->receipt;
             $ChangeFakturParameters = $parameters->pdu;
             $ChangeFakturRounding = $parameters->rounding;
             $rounding = $parameters->rounding;
@@ -46,6 +50,9 @@ class SalesController extends Controller
             }
         } else if ($slug == "hv") {
             $parameters = PaymentParameters::where('id', 1)->first();
+            $parameterHV = $parameters->otc;
+            $parameterUP = $parameters->pdu;
+            $parameterRT = $parameters->receipt;
             $ChangeFakturParameters = $parameters->pdu;
             $ChangeFakturRounding = $parameters->rounding;
             $rounding = $parameters->rounding;
@@ -64,10 +71,13 @@ class SalesController extends Controller
             }
         } else if ($slug == "resep") {
             $parameters = PaymentParameters::where('id', 1)->first();
+            $parameterHV = $parameters->otc;
+            $parameterUP = $parameters->pdu;
+            $parameterRT = $parameters->receipt;
             $ChangeFakturParameters = $parameters->pdu;
             $ChangeFakturRounding = $parameters->rounding;
             $rounding = $parameters->rounding;
-            $parameters = $parameters->otc;
+            $parameters = $parameters->receipt;
             $type = "RESEP TUNAI";
 
 
@@ -117,7 +127,7 @@ class SalesController extends Controller
         // Get Item Inside Cart based on user id and cart item status
         $itemInCart = MedicineCart::with('medicine')->where('status', 0)->where('user_id', Auth()->user()->id)->get();
 
-        return view('kasir.transaction', compact('check_transaction', 'transaction', 'existingpackage', 'rawtotal', 'parameters', 'rounding', 'itemInCart', 'totaltransaction', 'discount_total', 'ChangeFakturParameters', 'ChangeFakturRounding'));
+        return view('kasir.transaction', compact('check_transaction', 'transaction', 'existingpackage', 'rawtotal', 'parameters', 'rounding', 'itemInCart', 'totaltransaction', 'discount_total', 'ChangeFakturParameters','parameterRT','parameterHV','parameterUP', 'ChangeFakturRounding'));
     }
 
     /**
@@ -343,6 +353,7 @@ class SalesController extends Controller
             'cart_type'      => $request->get('cart_type'),
             'package'      => $request->get('package'),
             'dosage_r'      => $request->get('dosage_r'),
+            'item_price'      => $request->get('price2'),
             'raw_total'    => $request->get('raw_total'),
             'total_price'    => $request->get('final_price'),
             'final_price'    => $request->get('total_price'),
@@ -541,7 +552,6 @@ class SalesController extends Controller
                 'doctor_id' => $request->get('doctor_id'),
                 'debtor_id' => $request->get('debtor_id'),
             ]);
-
             MedicineCart::where('transaction_id', $request->get('transaction_id'))
                 ->update(['status' => 1]);
 
@@ -777,5 +787,124 @@ class SalesController extends Controller
             DB::rollBack();
             return redirect()->back()->with('failed', 'Produk Gagal dihapus!');
         }
+    }
+
+    public function openMedicineMaster(Request $request)
+    {
+        $perPage = 30;
+
+        $query = Medicines::with(['composition', 'factory']);
+
+        if ($request->search) {
+            $search = $request->search;
+
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhereHas('composition', function ($q2) use ($search) {
+                        $q2->where('name', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('factory', function ($q3) use ($search) {
+                        $q3->where('name', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        return response()->json(
+            $query->orderBy('id', 'desc')->paginate($perPage)
+        );
+    }
+    public function openSearch(Request $request)
+    {
+        $perPage = 30;
+
+        $query = Medicines::with(['composition', 'factory']);
+
+        if ($request->search) {
+            $search = $request->search;
+
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhereHas('composition', function ($q2) use ($search) {
+                        $q2->where('name', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('factory', function ($q3) use ($search) {
+                        $q3->where('name', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        return response()->json(
+            $query->orderBy('id', 'desc')->paginate($perPage)
+        );
+    }
+
+
+    // Transaction Data
+    public function openTransactionData(Request $request)
+    {
+        $perPage = 30;
+
+        $query = MedicineCart::query()
+            ->where('status', 1)
+            ->selectRaw('
+            transaction_id,
+            MAX(created_at) as created_at,
+            SUM(final_price) as final_price
+        ')
+            ->groupBy('transaction_id')
+            ->with([
+                'transactions:id,transaction_code,patient_id,created_at',
+                'transactions.patients:id,name'
+            ]);
+
+        if ($request->search) {
+            $search = $request->search;
+
+            $query->where(function ($q) use ($search) {
+                $q->where('final_price', 'like', "%{$search}%")
+                    ->orWhereDate('created_at', $search)
+                    ->orWhereHas('transactions', function ($t) use ($search) {
+                        $t->where('transaction_code', 'like', "%{$search}%")
+                            ->orWhere('created_at', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('transactions.patients', function ($p) use ($search) {
+                        $p->where('name', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        $result = $query->orderByDesc('created_at')->paginate($perPage);
+        $result->getCollection()->transform(function ($row) {
+            return [
+                'transaction_id' => $row->transaction_id,
+                'code'           => $row->transactions?->transaction_code ?? '-',
+                'name'           => $row->transactions?->patients?->name ?? '-',
+                'date'           => Carbon::parse($row->created_at)->format('d-m-Y'),
+                'final_price'    => $row->final_price,
+            ];
+        });
+        return response()->json($result);
+    }
+    public function getTransactionItems($transactionId)
+    {
+        $items = MedicineCart::with([
+            'medicine:id,name',
+        ])
+            ->where('transaction_id', $transactionId)
+            ->where('status', 1)
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'medicine'       => $item->medicine?->name ?? '-',
+                    'quantity'       => $item->quantity,
+                    'discount'       => $item->discount,
+                    'total_price'    => $item->total_price,
+                    'total'          => $item->final_price,
+                ];
+            });
+
+        return response()->json([
+            'data' => $items
+        ]);
     }
 }

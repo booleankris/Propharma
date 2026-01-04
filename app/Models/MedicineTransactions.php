@@ -26,4 +26,8 @@ class MedicineTransactions extends Model
     {
         return $this->hasMany(MedicineCart::class);
     }
+    public function patients()
+    {
+        return $this->belongsTo(Patients::class, 'patient_id');
+    }
 }

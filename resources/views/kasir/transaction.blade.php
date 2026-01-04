@@ -22,7 +22,6 @@
                             </div>
                             <div class="text-sm md:text-base text-[#37719e] font-nunito !text-[12px] font-medium">
                                 @if ($check_transaction == 1)
-
                                     <b>No. Transaksi :</b> {{ $transaction->transaction_code }}
                                 @endif
                             </div>
@@ -331,9 +330,46 @@
                                     Ganti Faktor
                                 </div>
                             </div>
-
+                            <svg class="w-6 h-6 text-gray-800 dark:text-white" aria-hidden="true"
+                                xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none"
+                                viewBox="0 0 24 24">
+                                <path stroke="currentColor" stroke-linecap="round" stroke-width="2"
+                                    d="m21 21-3.5-3.5M17 10a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z" />
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+                <div class="card p-4 px-6 gap-3 flex flex-wrap items-center bg-white dashboard-panel">
+                    <div id="openMasterModal"
+                        class="flex flex-col py-1 items-center bg-[#0074ce] shadow-[0_0_11px_2px_#0074ce] cursor-pointer border-none px-[10px] rounded-md">
+                        <div class="py-[4px]">
+                            <svg class="w-5 h-5 text-gray-800 dark:text-white" aria-hidden="true"
+                                xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none"
+                                viewBox="0 0 24 24">
+                                <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+                                    stroke-width="2"
+                                    d="M19 6c0 1.657-3.134 3-7 3S5 7.657 5 6m14 0c0-1.657-3.134-3-7-3S5 4.343 5 6m14 0v6M5 6v6m0 0c0 1.657 3.134 3 7 3s7-1.343 7-3M5 12v6c0 1.657 3.134 3 7 3s7-1.343 7-3v-6" />
+                            </svg>
 
                         </div>
+                        <div class="px-1 font-semibold font-poppins text-[11px] text-white">
+                            Master
+                        </div>
+                    </div>
+                    <div id="openSearchModal"
+                        class="flex flex-col py-1 items-center bg-[#009688] shadow-[0_0_11px_2px_#009688] cursor-pointer border-none px-[10px] rounded-md">
+                        <div class="py-[4px]">
+                            <svg class="w-5 h-5 text-gray-800 dark:text-white" aria-hidden="true"
+                                xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none"
+                                viewBox="0 0 24 24">
+                                <path stroke="currentColor" stroke-linecap="round" stroke-width="2"
+                                    d="m21 21-3.5-3.5M17 10a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z" />
+                            </svg>
+                        </div>
+                        <div class="px-1 font-semibold font-poppins text-[11px] text-white">
+                            Cari
+                        </div>
+
                     </div>
                 </div>
             @endif
@@ -639,10 +675,10 @@
 
                 <div class="divider"></div>
 
-                <div id="paymentstotal" class="payment">
+                {{-- <div id="paymentstotal" class="payment">
                     <p id="paid">📧 info@example.com</p>
                     <p id="change">📞 +234XXXXXXXX</p>
-                </div>
+                </div> --}}
 
                 <div class="divider"></div>
 
@@ -903,29 +939,181 @@
         </div>
     @endif
 
+    <div id="masterModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-xl w-[90%] p-6 relative">
+
+            <div class="card w-full shadow-md rounded-2xl p-6 bg-white">
+                <div class="flex items-center mb-6">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-blue-600 mr-3 drop-shadow-md"
+                        fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" />
+                    </svg>
+                    <h2 class="text-2xl font-bold text-gray-800 drop-shadow-sm">
+                        Master Data
+                    </h2>
+                </div>
+
+                <div id="medicineScroll" class="overflow-y-auto overflow-x-auto p-3 max-h-[400px]">
+                    <input type="text" placeholder="Search medicine..." onkeyup="onSearch(this.value)"
+                        class="w-full border rounded-lg px-3 py-2 text-sm mb-2">
+
+                    <table class="w-full masterTable">
+                        <thead class="sticky top-0 bg-white z-10">
+                            <tr>
+                                <th>#</th>
+                                <th>Name</th>
+                                <th>Factory</th>
+                                <th>Composition</th>
+                                <th>Kemasan</th>
+                                <th>Harga</th>
+                                <th>Stok</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="masterTable"></tbody>
+                    </table>
+
+                    <div id="loader" class="text-center py-3 hidden">
+                        Loading...
+                    </div>
+                </div>
+            </div>
+
+            <button id="closeMasterModal" class="absolute top-3 right-3 text-gray-500 hover:text-red-500">
+                ✕
+            </button>
+        </div>
+    </div>
+
+
+    <div id="transactionModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-50">
+
+        <div class="bg-white rounded-xl w-[95%] p-6 relative">
+
+            <div class="card w-full shadow-md rounded-2xl p-6 bg-white">
+                <div class="flex items-center mb-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-blue-600 mr-3" fill="none"
+                        viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" />
+                    </svg>
+                    <h2 class="text-2xl font-bold text-gray-800">
+                        Transaksi
+                    </h2>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="border rounded-lg p-3">
+                        <input type="text" placeholder="Search transaction..."
+                            onkeyup="onTransactionSearch(this.value)"
+                            class="w-full border rounded px-3 py-2 text-sm mb-2">
+
+                        <div id="transactionScroll" class="overflow-y-auto max-h-[420px]">
+                            <table class="w-full transactionTable">
+                                <thead class="sticky top-0 bg-white">
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Date</th>
+                                        <th>Code</th>
+                                        <th>Nama Pasien</th>
+                                        <th>Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="transactionTable"></tbody>
+                            </table>
+
+                            <div id="transactionLoader" class="text-center py-3 hidden">
+                                Loading...
+                            </div>
+                        </div>
+                    </div>
+                    <div class="border rounded-lg p-3">
+                        <h3 class="font-semibold mb-2">
+                            Barang Dibeli
+                        </h3>
+
+                        <div id="itemScroll" class="overflow-y-auto max-h-[420px]">
+                            <table class="w-full transactionTable">
+                                <thead class="sticky top-0 bg-white">
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Nama Obat</th>
+                                        <th>Qty</th>
+                                        <th>Harga</th>
+                                        <th>Disc</th>
+                                        <th>Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="itemTable">
+                                    <tr>
+                                        <td colspan="5" class="text-center text-gray-400 py-6">
+                                            Select a transaction
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- CLOSE -->
+            <button id="closeTransactionModal" class="absolute top-3 right-3 text-gray-500 hover:text-red-500">
+                ✕
+            </button>
+        </div>
+    </div>
+
     {{-- ============================================================== Patient Invoice  ============================================================== --}}
 
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script>
         // WHEN PAGE LOADED
+        let page = 1;
+        let loading = false;
+        let lastPage = false;
+        let search = '';
+
         function back() {
             window.location.href = "{{ route('home') }}";
         }
         document.addEventListener('DOMContentLoaded', () => {
-            // Attach events to all existing rows
             document.querySelectorAll('.cart-row').forEach(row => {
                 attachRowEvents(row);
             });
+
+            loadData();
+
+            const scrollBox = document.getElementById('medicineScroll');
+
+            scrollBox.addEventListener('scroll', () => {
+                if (
+                    scrollBox.scrollTop + scrollBox.clientHeight >=
+                    scrollBox.scrollHeight - 50
+                ) {
+                    loadData();
+                }
+            });
+            const transactionScroll = document.getElementById('transactionScroll');
+            transactionScroll.addEventListener('scroll', () => {
+                if (
+                    transactionScroll.scrollTop + scroll.clientHeight >=
+                    transactionScroll.scrollHeight - 50
+                ) {
+                    loadTransactionData();
+                }
+            });
         });
-        // ===============================
-        // Konstanta & Variabel Global
-        // ===============================
+
+        // Global Variable
 
         const faktur = document.getElementById('faktur');
 
 
 
-        // Patien Modal Variable
+        // Modals JS
         const newPatientModal = document.getElementById('newPatientModal');
         const newPatientModalContent = document.getElementById('newPatientModalContent');
         const openNewPatientBtn = document.getElementById('btnNewPatient');
@@ -938,6 +1126,14 @@
         const closeNewDoctorBtn = document.getElementById('closeNewDoctorBtn');
         const newDoctorForm = document.getElementById('newDoctorForm');
 
+        const openMasterModal = document.getElementById('openMasterModal');
+        const openSearchModal = document.getElementById('openSearchModal');
+
+        const masterModal = document.getElementById('masterModal');
+        const transactionModal = document.getElementById('transactionModal');
+
+        const closeMasterModal = document.getElementById('closeMasterModal');
+        const closeTransactionModal = document.getElementById('closeTransactionModal');
 
 
         // Endpoints
@@ -948,6 +1144,7 @@
 
 
         const trx_id = {{ $transaction?->id ?? 'null' }};
+        console.log({{ $parameters }});
         var rounding = {{ $rounding }};
         var parameters = {{ $parameters }};
         var totaltransaction = {{ $totaltransaction }};
@@ -1009,6 +1206,8 @@
         var item_finalprice = "";
         let grossprice = "";
         var payInput = document.getElementById('pay');
+        var discounsubtotal = document.getElementById('discounsubtotal');
+
         var payment_total = document.getElementById('payment_total');
         var edit_status = 0;
         // var debtor_id = "";
@@ -1050,6 +1249,7 @@
         // Table
 
         let selectedRowId = null;
+        let selectedTransactionId = null;
 
 
         // ===============================
@@ -1082,6 +1282,10 @@
                 clearTimeout(t);
                 t = setTimeout(() => fn(...args), wait);
             };
+        }
+
+        function cleanRupiah(value) {
+            return value.replace(/\D/g, '') || 0;
         }
 
         function escapeHtml(s) {
@@ -1673,11 +1877,11 @@
         }
 
         function countSubtotalDiscount(val) {
-            let final_price;
 
             if (val > 100) {
                 final_price = totaltransaction - val;
                 subtotal_discount = val;
+
             } else {
                 const d = totaltransaction * val / 100;
                 final_price = totaltransaction - d;
@@ -1707,7 +1911,7 @@
 
         }
 
-        function addToCart(medicine_id, transaction_id, quantity, discount, embalase, cart_type, package, dosage_r,
+        function addToCart(medicine_id, transaction_id, quantity, discount, embalase, cart_type, package, dosage_r,price2,
             raw_total, total_price, final_price, racikstatus) {
             if (edit_status == 1) {
                 axios.post("{{ route('transaction.updateCart') }}", {
@@ -1720,6 +1924,7 @@
                         cart_type,
                         package,
                         dosage_r,
+                        price2,
                         raw_total,
                         total_price,
                         final_price,
@@ -1733,7 +1938,7 @@
                         total_discount = response.data.total_discount;
                         totalbought = response.data.totalbought;
 
-                        console.log("✅ Updated cart item:", item);
+                        console.log("Updated cart item:", item);
                         // Reset Inputs and variables value
                         [stock, unit, quantity, price, name, totalprice].forEach(el => el.value = "");
                         discountInput.value = "";
@@ -1808,6 +2013,7 @@
                     cart_type,
                     package,
                     dosage_r,
+                    price2,
                     raw_total,
                     total_price,
                     final_price,
@@ -1820,7 +2026,7 @@
                     totaltransaction += total_price;
                     totalbought = parseFloat(totalbought) + parseFloat(grossprice);
                     total_discount += parseFloat(discount);
-                    price2 = formatRupiah(totaltransaction);
+                    // price2 = formatRupiah(totaltransaction);
                     // Reset input fields
                     [stock, unit, quantity, price, name, totalprice].forEach(el => el.value = "");
                     discount = 0;
@@ -1908,6 +2114,7 @@
                     cart_type,
                     pkg,
                     dose,
+                    price2,
                     pharmacy_price,
                     true_price,
                     grossprice,
@@ -1922,6 +2129,7 @@
                     cart_type,
                     pkg,
                     dose,
+                    price2,
                     pharmacy_price,
                     true_price,
                     grossprice,
@@ -1965,6 +2173,7 @@
                     cart_type,
                     pkg,
                     dose,
+                    price2,
                     pharmacy_price,
                     true_price,
                     grossprice,
@@ -2112,7 +2321,7 @@
         // ===============================
         function checkoutItem() {
             const paid = document.getElementById('pay').value;
-            const changes = document.getElementById('change').value;
+            const changes = document.getElementById('trchange').value;
             if (transaction_type == 'RESEP TUNAI') {
                 const debtor_id = 0;
             } else if (transaction_type == 'UPDS' || transaction_type == 'HV/OTC') {
@@ -2179,7 +2388,15 @@
                             content.classList.add("scale-100");
                         });
                     } else {
+
                         document.getElementById("transaction_id").value = transaction_id;
+                        document.getElementById("paid").value =
+                            cleanRupiah(document.getElementById('pay').value);
+
+                        document.getElementById("changes").value =
+                            cleanRupiah(document.getElementById('trchange').value);
+                  
+
                         document.getElementById("checkoutForm").submit();
                     }
                 }).catch(error => {
@@ -2256,21 +2473,21 @@
 
         }
 
-        function pay() {
-            const paidInput = document.getElementById('paid');
-            const changesInput = document.getElementById('changes');
-            let raw = document.getElementById('pay').value.replace(/\D/g, "");
-            let bayar = parseInt(raw) || 0;
-            document.getElementById('pay').value = "Rp. " + bayar.toLocaleString("id-ID");
+        function pay(value) {
 
-            if (bayar < totaltransaction - subtotal_discount) {
-                document.getElementById('trchange').value = "Duitnya Kurang";
+            let raw = value.replace(/\D/g, "");
+            let bayar = parseInt(raw) || 0;
+            let price = totaltransaction - subtotal_discount;
+            value = "Rp. " + bayar.toLocaleString("id-ID");
+
+            if (bayar < price) {
+                document.getElementById('trchange').value = "Pembayaran Kurang";
                 resetButton();
+                final_price = "";
             } else {
-                if (totaltransaction > 0) activeButton();
-                paidInput.value = totaltransaction;
-                changesInput.value = bayar - totaltransaction;
-                document.getElementById('trchange').value = formatRupiah(bayar - totaltransaction);
+                activeButton()
+                final_price = bayar - price;
+                document.getElementById('trchange').value = formatRupiah(bayar - price);
             }
         }
 
@@ -2340,20 +2557,20 @@
             if (isF3) {
                 e.preventDefault();
                 if (transaction_type == 'RESEP TUNAI') {
-                    parameters = {{ $ChangeFakturParameters }};
+                    parameters = {{ $parameterUP }};
                     transaction_type = "UPDS";
                     faktur.innerHTML = `
                             <span
                             class="bg-green-100 text-green-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md dark:bg-green-900 dark:text-green-300">UPDS</span>
                     `;
                 } else if (transaction_type == "UPDS") {
-                    parameters = {{ $ChangeFakturParameters }};
+                    parameters = {{ $parameterHV }};
                     transaction_type = "HV/OTC";
                     faktur.innerHTML = `
                         <span class="bg-blue-100 text-blue-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md dark:bg-blue-900 dark:text-blue-300">HV/OTC</span>
                     `;
                 } else if (transaction_type == "HV/OTC") {
-                    parameters = {{ $ChangeFakturParameters }};
+                    parameters = {{ $parameterRT }};
                     transaction_type = "RESEP TUNAI";
                     faktur.innerHTML = `
                             <span class="bg-red-100 text-red-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md dark:bg-red-900 dark:text-red-300">Resep Tunai</span>
@@ -2377,6 +2594,7 @@
                 //     packageInput.classList.add('readonly');
                 //     dosageRInput.classList.add('readonly');
                 // }
+                console.log(parameters);
 
             }
         }
@@ -2444,9 +2662,8 @@
             if (list.children.length) openBox();
         });
 
-        // ===============================
-        // Patient Modal Control
-        // ===============================
+
+        // Modals
         openNewPatientBtn.addEventListener('click', () => {
             newPatientModal.classList.remove('hidden');
             document.getElementById('patientName').focus();
@@ -2558,9 +2775,7 @@
         }
 
 
-        // ===============================
-        // Modal Pembayaran
-        // ===============================
+        // Payment
         document.getElementById('openModalPayment').addEventListener('click', () => {
             document.getElementById('paymentModal').classList.remove('hidden');
             document.getElementById('paymentModal').classList.add('flex');
@@ -2579,9 +2794,230 @@
                 e.currentTarget.classList.remove('flex');
             }
         });
-        // ===============================
-        // Resep
-        // ===============================
+
+        // Modals & Search
+
+        closeMasterModal.addEventListener('click', () => {
+            masterModal.classList.add('hidden');
+            masterModal.classList.remove('flex');
+        });
+
+        // Close when clicking outside
+        masterModal.addEventListener('click', e => {
+            if (e.target === masterModal) {
+                masterModal.classList.add('hidden');
+                masterModal.classList.remove('flex');
+            }
+        });
+        openSearchModal.addEventListener('click', () => {
+            transactionModal.classList.remove('hidden');
+            transactionModal.classList.add('flex');
+            resetTransaction();
+            loadTransactionData();
+        });
+
+        function resetTransaction() {
+            page = 1;
+            lastPage = false;
+            document.getElementById('transactionTable').innerHTML = '';
+        }
+
+        openMasterModal.addEventListener('click', () => {
+            masterModal.classList.remove('hidden');
+            masterModal.classList.add('flex');
+        });
+        closeTransactionModal.addEventListener('click', () => {
+            transactionModal.classList.add('hidden');
+            transactionModal.classList.remove('flex');
+        });
+
+        [masterModal, transactionModal].forEach(modal => {
+            modal.addEventListener('click', e => {
+                if (e.target === modal) {
+                    modal.classList.add('hidden');
+                    modal.classList.remove('flex');
+                }
+            });
+        });
+
+        function loadData() {
+            if (loading || lastPage) return;
+
+            loading = true;
+            document.getElementById('loader').style.display = 'block';
+
+            axios.get('/transactions/getmedicinemaster', {
+                params: {
+                    page,
+                    search
+                }
+            }).then(res => {
+                const data = res.data.data;
+
+                if (data.length === 0) lastPage = true;
+
+                appendRows(data);
+                page++;
+
+                loading = false;
+                document.getElementById('loader').style.display = 'none';
+            });
+        }
+
+        function appendRows(rows) {
+            const tbody = document.getElementById('masterTable');
+
+            rows.forEach((item, index) => {
+                tbody.insertAdjacentHTML('beforeend', `
+            <tr>
+                <td>${tbody.rows.length + 1}</td>
+                <td>${item.name}</td>
+                <td>${item.factory?.name ?? '-'}</td>
+                <td>${item.composition?.name ?? '-'}</td>
+                <td>${item.packaging ?? '-'}</td>
+                <td>${formatRupiah(item.net_price)}</td>
+                <td>${item.stock ?? '-'}</td>
+                <td>
+                    ${item.status
+                        ? '<span style="color:green">Active</span>'
+                        : '<span style="color:red">Inactive</span>'}
+                </td>
+            </tr>
+        `);
+            });
+        }
+
+        // Transaction Data
+        function loadTransactionData() {
+            if (loading || lastPage) return;
+
+            loading = true;
+            document.getElementById('loader').classList.remove('hidden');
+
+            axios.get('/transactions/gettransactiondata', {
+                params: {
+                    page,
+                    search
+                }
+            }).then(res => {
+                const data = res.data.data ?? [];
+
+                if (!data.length) {
+                    lastPage = true;
+                } else {
+                    appendTransactionRows(data);
+                    page++;
+                }
+
+                loading = false;
+                document.getElementById('loader').classList.add('hidden');
+            });
+        }
+
+
+        function appendTransactionRows(rows) {
+            const tbody = document.getElementById('transactionTable');
+
+            rows.forEach(item => {
+                tbody.insertAdjacentHTML('beforeend', `
+            <tr
+                class="cursor-pointer hover:bg-blue-50"
+                onclick="selectTransaction(this, ${item.transaction_id})"
+            >
+                <td>${tbody.rows.length + 1}</td>
+                <td>${item.date}</td>
+                <td>${item.code}</td>
+                <td>${item.name}</td>
+                <td>${formatRupiah(item.final_price)}</td>
+            </tr>
+        `);
+            });
+        }
+
+        function selectTransaction(row, transactionId) {
+
+            /* Highlight selected row */
+            document.querySelectorAll('#transactionTable tr')
+                .forEach(tr => tr.classList.remove('bg-blue-100'));
+
+            row.classList.add('bg-blue-100');
+            selectedTransactionId = transactionId;
+
+            /* Show loading */
+            const tbody = document.getElementById('itemTable');
+            tbody.innerHTML = `
+            <tr>
+                <td colspan="5" class="text-center py-6">Loading...</td>
+            </tr>`;
+
+            axios.get(`/transactions/${transactionId}/items`)
+                .then(res => {
+                    renderTransactionItems(res.data.data);
+                });
+        }
+
+        function renderTransactionItems(items) {
+            const tbody = document.getElementById('itemTable');
+            tbody.innerHTML = '';
+
+            if (!items.length) {
+                tbody.innerHTML = `
+            <tr>
+                <td colspan="5" class="text-center py-6 text-gray-400">
+                    No items
+                </td>
+            </tr>
+        `;
+                return;
+            }
+
+            items.forEach((item, index) => {
+                tbody.insertAdjacentHTML('beforeend', `
+            <tr>
+                <td>${index + 1}</td>
+                <td>${item.medicine}</td>
+                <td>${item.quantity}</td>
+                <td>${formatRupiah(item.total_price)}</td>
+                <td>${formatRupiah(item.discount)}</td>
+                <td>${formatRupiah(item.total)}</td>
+            </tr>
+        `);
+            });
+        }
+
+
+        /* SCROLL LISTENER */
+        window.addEventListener('scroll', () => {
+            if (
+                window.innerHeight + window.scrollY >=
+                document.body.offsetHeight - 200
+            ) {
+                loadData();
+            }
+        });
+
+        let timer;
+        let searchTimer;
+
+        function onSearch(val) {
+            clearTimeout(timer);
+            timer = setTimeout(() => {
+                search = val;
+                page = 1;
+                lastPage = false;
+                document.getElementById('masterTable').innerHTML = '';
+                loadData();
+            }, 400);
+        }
+
+        function onTransactionSearch(value) {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(() => {
+                search = value;
+                resetTransaction();
+                loadTransactionData();
+            }, 400);
+        }
         if (checkbox) {
             checkbox.addEventListener('change', function() {
                 const packageInput = document.getElementById('package');
@@ -2743,11 +3179,20 @@
                 submit();
             }
         });
-
-        payInput.addEventListener('keydown', (e) => {
+        discounsubtotal.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
                 e.preventDefault();
-                pay(this.value);
+                payInput.focus();
+            }
+        })
+        payInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+
+                if (final_price >= 0 || final_price != "") {
+                    checkoutItem();
+                } else {
+                    alert('Mohon Isi Pembayaran');
+                }
             } else if (e.key === 'Tab') {
                 e.preventDefault();
                 discounsubtotal.focus();

@@ -19,4 +19,8 @@ class Patients extends Model
         'birth',
 
     ];
+    public function transactions()
+    {
+        return $this->hasMany(MedicineTransactions::class, 'patient_id');
+    }
 }

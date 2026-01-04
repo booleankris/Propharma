@@ -70,8 +70,8 @@
                             </div>
                             {{-- MEDICINE CATEGORY --}}
                             <div class="w-full">
-                                <label class="block text-[14px] font-semibold text-gray-800 mb-1">Medicine Category
-                                    ID</label>
+                                <label class="block text-[14px] font-semibold text-gray-800 mb-1">Golongan Obat
+                                </label>
                                 <select id="medicine_category_id" name="medicine_category_id"
                                     class="w-full rounded-lg border border-gray-300 px-4 py-10 text-[13px]">
                                 </select>
@@ -82,7 +82,7 @@
                         <div class="flex gap-2 items-center">
                             {{-- COMPOSITION --}}
                             <div class="w-full">
-                                <label class="block text-[14px] font-semibold text-gray-800 mb-1">Composition</label>
+                                <label class="block text-[14px] font-semibold text-gray-800 mb-1">Komposisi</label>
                                 <select id="composition_id" name="composition_id"
                                     class="select2 w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px]">
                                     <option value="">-- Select Composition --</option>
@@ -91,10 +91,10 @@
 
                             {{-- FACTORY --}}
                             <div class="w-full">
-                                <label class="block text-[14px] font-semibold text-gray-800 mb-1">Factory</label>
+                                <label class="block text-[14px] font-semibold text-gray-800 mb-1">Pabrik</label>
                                 <select id="factory_id" name="factory_id"
                                     class="select2 w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px]">
-                                    <option value="">-- Select Factory --</option>
+                                    <option value="">-- Pilih Pabrik --</option>
                                 </select>
                             </div>
 
@@ -104,26 +104,26 @@
                             <label class="flex items-center space-x-2">
                                 <input type="checkbox" id="generic_check" name="generic_check" value="1"
                                     class="w-4 h-4 text-blue-600 border-gray-300 rounded">
-                                <span class="text-sm">Generic</span>
+                                <span class="text-sm">Generik</span>
                             </label>
                         </div>
                         {{-- NAME --}}
                         <div class="w-full">
-                            <label class="block text-[14px] font-semibold text-gray-800 mb-1">Name</label>
+                            <label class="block text-[14px] font-semibold text-gray-800 mb-1">Nama Obat</label>
                             <input id="name" name="name" type="text"
                                 class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px]"
-                                placeholder="Enter medicine name">
+                                placeholder="Masukkan Nama Obat">
                         </div>
                         {{-- PHARMACY --}}
                         <div class="hidden">
-                            <label class="block text-[14px] font-semibold text-gray-800 mb-1">Pharmacy ID</label>
+                            <label class="block text-[14px] font-semibold text-gray-800 mb-1">Kreditur</label>
                             <input id="pharmacy_id" name="pharmacy_id" value="1" type="number"
                                 class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px]">
                         </div>
                         <div class="flex gap-2">
                             {{-- PACKAGING --}}
                             <div class="w-full">
-                                <label class="block text-[14px] font-semibold text-gray-800 mb-1">Packaging</label>
+                                <label class="block text-[14px] font-semibold text-gray-800 mb-1">Kemasan</label>
                                 <input id="packaging" name="packaging" type="text"
                                     class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px]">
                             </div>
@@ -194,21 +194,27 @@
                                     placeholder="Rp 0">
                             </div> --}}
                             <div class="w-full">
-                                <label class="block text-[14px] font-semibold text-gray-800 mb-1">Harga HNA</label>
+                                <label class="block text-[14px] font-semibold text-gray-800 mb-1">Harga Utuh</label>
                                 <input id="raw_price" name="raw_price" type="text"
                                     class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px]"
                                     placeholder="Rp 0">
                             </div>
 
                             <div class="w-full">
-                                <label class="block text-[14px] font-semibold text-gray-800 mb-1">Harga PPN 11%</label>
+                                <label class="block text-[14px] font-semibold text-gray-800 mb-1">Harga HNA</label>
                                 <input id="pharmacy_net_price" name="pharmacy_net_price" type="text"
                                     class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px]"
-                                    placeholder="Rp 0" readonly>
+                                    placeholder="Rp 0">
                             </div>
                             <div class="w-full">
-                                <label class="block text-[14px] font-semibold text-gray-800 mb-1">HJA/HET</label>
+                                <label class="block text-[14px] font-semibold text-gray-800 mb-1">Harga PPN 11%</label>
                                 <input id="net_price" name="net_price" type="text"
+                                    class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px]"
+                                    placeholder="Rp 0">
+                            </div>
+                            <div class="w-full">
+                                <label class="block text-[14px] font-semibold text-gray-800 mb-1">Harga HET</label>
+                                <input id="het_price" name="het_price" value="0" type="text"
                                     class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px]"
                                     placeholder="Rp 0">
                             </div>
@@ -223,14 +229,14 @@
                         </div>
                         <div class="flex gap-2">
                             <div class="w-full">
-                                <label class="block text-[14px] font-semibold text-gray-800 mb-1">Minimal Stock</label>
+                                <label class="block text-[14px] font-semibold text-gray-800 mb-1">Stok Minimal</label>
                                 <input id="minimal_stock" name="minimal_stock" type="number"
                                     class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px]">
                             </div>
 
                             {{-- STOCK --}}
                             <div class="w-full">
-                                <label class="block text-[14px] font-semibold text-gray-800 mb-1">Stock</label>
+                                <label class="block text-[14px] font-semibold text-gray-800 mb-1">Stok</label>
                                 <input id="stock" name="stock" type="number"
                                     class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px]">
                             </div>
@@ -311,6 +317,51 @@
     <script src="https://unpkg.com/sweetalert/dist/sweetalert.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
+
+    {{-- Form --}}
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const form = document.getElementById("medicineForm");
+            const creditorSelect = document.getElementById("creditors_id");
+
+            const focusableSelectors = `
+                input:not([type="hidden"]):not([disabled]),
+                select:not([disabled]),
+                textarea:not([disabled]),
+                button:not([disabled])
+            `;
+
+            const getFocusableElements = () =>
+                Array.from(form.querySelectorAll(focusableSelectors))
+                .filter(el => el.offsetParent !== null);
+
+            form.addEventListener("keydown", function(e) {
+                if (e.key !== "Enter") return;
+
+                if (e.target.tagName === "TEXTAREA") return;
+
+                e.preventDefault();
+
+                const focusables = getFocusableElements();
+                const index = focusables.indexOf(e.target);
+
+                if (index > -1 && index < focusables.length - 1) {
+                    const next = focusables[index + 1];
+
+                    if (next.classList.contains("select2")) {
+                        $(next).select2("open");
+                    } else {
+                        next.focus();
+                    }
+                }
+            });
+
+            $(creditorSelect).on("select2:select", function(e) {
+                handleSubmit();
+            });
+        });
+    </script>
+
     <script>
         function formatRupiah(input) {
             let value = input.value.replace(/[^0-9]/g, '');
@@ -322,13 +373,21 @@
 
         document.getElementById('raw_price').addEventListener('input', function() {
             formatRupiah(this);
+        });
+        document.getElementById('het_price').addEventListener('input', function() {
+            formatRupiah(this);
+        });
+
+        document.getElementById('pharmacy_net_price').addEventListener('input', function() {
+            formatRupiah(this);
             calculatePPN();
+
         });
 
         document.getElementById('net_price').addEventListener('input', function() {
             formatRupiah(this);
         });
-        
+
         function cleanRupiah(value) {
             return value.replace(/[^0-9]/g, '');
         }
@@ -345,16 +404,16 @@
         }
 
         function calculatePPN() {
-            let rawValue = cleanRupiah(document.getElementById('raw_price').value);
+            let rawValue = cleanRupiah(document.getElementById('pharmacy_net_price').value);
 
             if (rawValue === "" || isNaN(rawValue)) {
-                document.getElementById('pharmacy_net_price').value = "Rp 0";
+                document.getElementById('net_price').value = "Rp 0";
                 return;
             }
 
             let total = Math.floor(rawValue * 1.11); // HNA + 11%
 
-            document.getElementById('pharmacy_net_price').value =
+            document.getElementById('net_price').value =
                 "Rp " + new Intl.NumberFormat("id-ID").format(total);
         }
 
@@ -362,7 +421,7 @@
 
             // COMPOSITION SELECT2
             $('#composition_id').select2({
-                placeholder: 'Search composition...',
+                placeholder: 'Cari Komposisi...',
                 allowClear: true,
                 ajax: {
                     url: '{{ route('composition.select') }}',
@@ -410,7 +469,7 @@
             });
             // FACTORY SELECT2
             $('#factory_id').select2({
-                placeholder: 'Search factory...',
+                placeholder: 'Cari Pabrik...',
                 allowClear: true,
                 ajax: {
                     url: '{{ route('factories.select') }}',
@@ -491,20 +550,43 @@
             });
 
             $('#table-data tbody').on('click', 'tr', function() {
-                selectedData = tableData.row(this).data();
+                const selectedData = tableData.row(this).data();
                 if (!selectedData) return;
 
-                $('#table-data tbody tr').removeClass('bg-blue-100');
-                $(this).addClass('bg-blue-100');
-
-                // fill normal inputs
+                // normal inputs
                 Object.keys(selectedData).forEach(key => {
-                    if (document.getElementById(key)) {
-                        document.getElementById(key).value = selectedData[key];
+                    const el = document.getElementById(key);
+                    if (el && el.tagName !== 'SELECT') {
+                        el.value = selectedData[key];
                     }
                 });
+                console.log(selectedData);
 
-                // checkbox mapping (1 = checked, 0 = unchecked)
+                setSelect2AjaxValue(
+                    '#medicine_category_id',
+                    selectedData.medicine_category_id,
+                    selectedData.category_name
+                );
+
+                setSelect2AjaxValue(
+                    '#composition_id',
+                    selectedData.composition_id,
+                    selectedData.composition_name
+                );
+
+                setSelect2AjaxValue(
+                    '#factory_id',
+                    selectedData.factory_id,
+                    selectedData.factory_name
+                );
+
+                setSelect2AjaxValue(
+                    '#creditors_id',
+                    selectedData.creditors_id,
+                    selectedData.creditor_name
+                );
+
+                // checkboxes
                 $('#generic_check').prop('checked', selectedData.generic_check == 1);
                 $('#whole').prop('checked', selectedData.whole == 1);
                 $('#precursor').prop('checked', selectedData.precursor == 1);
@@ -514,6 +596,21 @@
 
                 $('#medicine_id').val(selectedData.id);
             });
+
+
+            function setSelect2AjaxValue(selector, id, text) {
+                const $select = $(selector);
+
+                if (!id) {
+                    $select.val(null).trigger('change');
+                    return;
+                }
+
+                const option = new Option(text, id, true, true);
+                $select.append(option).trigger('change');
+            }
+
+
 
             // BACK
             $('#back').click(function() {
@@ -590,6 +687,11 @@
                     form.reset();
                     $('#medicine_id').val('');
                     tableData.ajax.reload(null, false);
+
+                    $('#medicine_category_id').val(null).trigger('change');
+                    $('#composition_id').val(null).trigger('change');
+                    $('#factory_id').val(null).trigger('change');
+                    $('#creditors_id').val(null).trigger('change');
                 })
                 .catch(err => {
                     let msg = 'Failed to save.';

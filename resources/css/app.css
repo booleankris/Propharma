@@ -147,7 +147,7 @@ Use a better box model (opinionated).
 .btn-pos{
   box-shadow: 0 2px 6px #FFC107;
   border-color: #62b9ff;
-  background-color:#FFC107;
+  background-color:#f2ae00;
   color: #fff!important;
 }
 .btn-reset{
@@ -357,6 +357,26 @@ table, tr, td, th {
   background-color: #0000001a;
 }
 
+/* Table */
+
+
+.masterTable thead{
+  height: 40px;
+  background: #ffce3b;
+  top:-12px;
+}
+.masterTable tbody td{
+  padding: 5px;
+}
+
+.transactionTable thead{
+  height: 40px;
+  background: #ffce3b;
+  top:-12px;
+}
+.transactionTable tbody td{
+  padding: 5px;
+}
 *,
 *::before,
 *::after {

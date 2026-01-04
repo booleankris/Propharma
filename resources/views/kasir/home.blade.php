@@ -226,7 +226,7 @@
 
 
 
-                <!-- Master Data -->
+                {{-- Penjualan --}}
                 <div id="masterBtn" onclick="openModal('masterModal')"
                     class="w-[45%] md:w-[250px] flex flex-col dashboard-item items-center justify-center p-[20px] bg-[#ffffff] rounded-2xl shadow-sm hover:bg-gray-50">
                     <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" class="w-[75px]"
@@ -264,6 +264,52 @@
                         </g>
                     </svg>
                     <span class="text-[18px] font-poppins tracking-wide font-bold text-[#6196c0]">Master Data</span>
+                </div>
+
+                <div id="salesBtn" onclick="openModal('salesModal')"
+                    class="w-[45%] md:w-[250px] flex flex-col dashboard-item items-center justify-center p-[20px] bg-[#ffffff] rounded-2xl shadow-sm hover:bg-gray-50">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 115 115" class="w-[65px] h-[65px] my-3">
+
+                        <!-- GREEN SECTION -->
+                        <path class="fill-current text-emerald-500"
+                            d="M57.501 0v21.157a36.156 36.156 0 0 1 19.589 5.739L88.504 9.065A57.672 57.672 0 0 0 57.501 0z" />
+
+                        <path class="fill-current text-amber-700"
+                            d="M104.03 23.702A57.35 57.35 0 0 0 88.503 9.065L77.09 26.896c7.977 5.117 13.82 13.26 15.907 22.814l20.678-4.538a57.292 57.292 0 0 0-9.645-21.47z" />
+
+                        <!-- YELLOW SECTION -->
+                        <path class="fill-current text-yellow-200"
+                            d="M83.198 83.198C76.622 89.775 67.536 93.843 57.5 93.843V115a57.237 57.237 0 0 0 33.798-10.971 58 58 0 0 0 6.869-5.862L83.198 83.198z" />
+
+                        <path class="fill-current text-yellow-200"
+                            d="M57.5 93.842a36.164 36.164 0 0 1-19.589-5.738l-11.413 17.83A57.67 57.67 0 0 0 57.501 115L57.5 93.842z" />
+
+                        <!-- MINT SECTION -->
+                        <path class="fill-current text-emerald-300"
+                            d="M23.703 10.971a58 58 0 0 0-6.869 5.862C2.762 30.871-2.793 51.003 1.327 69.827a57.29 57.29 0 0 0 9.645 21.471 57.334 57.334 0 0 0 15.527 14.637l11.413-17.83C27.839 81.643 21.158 70.355 21.158 57.5c0-20.071 16.271-36.343 36.342-36.343h.001V0a57.23 57.23 0 0 0-33.798 10.971z" />
+
+                        <!-- ORANGE + RED -->
+                        <path class="fill-current text-amber-400"
+                            d="M87.475 78.046a36.605 36.605 0 0 1-4.276 5.152l14.969 14.969a57.087 57.087 0 0 0 6.767-8.154l-17.46-11.967z" />
+
+                        <path class="fill-current text-red-400"
+                            d="m113.675 45.173-20.678 4.538c.548 2.51.846 5.115.846 7.789 0 7.626-2.354 14.7-6.368 20.546l17.459 11.967c8.985-13.11 12.118-29.412 8.741-44.84z" />
+
+                        <!-- BAR CHART -->
+                        <path class="fill-current text-amber-700"
+                            d="M38.642 47.703h-.298a3.05 3.05 0 0 0-3.041 3.041v25.808a3.05 3.05 0 0 0 3.041 3.041h.298a3.05 3.05 0 0 0 3.041-3.041V50.744a3.05 3.05 0 0 0-3.041-3.041z" />
+
+                        <path class="fill-current text-amber-700"
+                            d="M50.87 57.367h-.298a3.05 3.05 0 0 0-3.041 3.041v16.145a3.05 3.05 0 0 0 3.041 3.041h.298a3.05 3.05 0 0 0 3.041-3.041V60.408a3.05 3.05 0 0 0-3.041-3.041z" />
+
+                        <path class="fill-current text-amber-700"
+                            d="M63.097 28.376H62.8a3.05 3.05 0 0 0-3.041 3.041v45.136a3.05 3.05 0 0 0 3.041 3.041h.298a3.05 3.05 0 0 0 3.041-3.041V31.417a3.05 3.05 0 0 0-3.042-3.041z" />
+
+                        <path class="fill-current text-amber-700"
+                            d="M75.325 38.039h-.298a3.05 3.05 0 0 0-3.041 3.041v35.472a3.05 3.05 0 0 0 3.041 3.041h.298a3.05 3.05 0 0 0 3.041-3.041V41.08a3.05 3.05 0 0 0-3.041-3.041z" />
+                    </svg>
+
+                    <span class="text-[18px] font-poppins tracking-wide font-bold text-[#6196c0]">Penjualan</span>
                 </div>
             </div>
         </section>
@@ -327,6 +373,8 @@
                 Pasien</a>
             <a href="{{ route('factories.index') }}" class="py-3 bg-[#6196c0] text-center text-white rounded-xl">Master
                 Pabrik</a>
+            <a href="{{ route('parameters.index') }}" class="py-3 bg-[#6196c0] text-center text-white rounded-xl">Master
+                Parameter</a>
 
         </div>
 
@@ -334,7 +382,25 @@
             Close
         </button>
     </div>
+    <div id="salesModal"
+        class="modal-hide modal-transition fixed top-1/2 left-1/2 
+       w-[90%] max-w-[400px] bg-white p-6 rounded-2xl shadow-lg z-50">
 
+        <h2 class="text-xl font-bold text-[#6196c0] mb-4">Pilih Master Data</h2>
+
+        <div class="flex flex-col space-y-3">
+
+            <a href="{{ route('salesdata.index') }}" class="py-3 bg-[#6196c0] text-center text-white rounded-xl">Data
+                Penjualan</a>
+            <a href="{{ route('salesdata.retur') }}" class="py-3 bg-[#6196c0] text-center text-white rounded-xl">Retur
+                Penjualan</a>
+
+        </div>
+
+        <button class="closeModal mt-6 w-full py-2 bg-gray-300 hover:bg-gray-400 rounded-xl">
+            Close
+        </button>
+    </div>
 
 
 
