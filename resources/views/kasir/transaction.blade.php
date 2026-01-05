@@ -963,8 +963,8 @@
                             <tr>
                                 <th>#</th>
                                 <th>Name</th>
-                                <th>Factory</th>
-                                <th>Composition</th>
+                                <th>Pabrik</th>
+                                <th>Komposisi</th>
                                 <th>Kemasan</th>
                                 <th>Harga</th>
                                 <th>Stok</th>
