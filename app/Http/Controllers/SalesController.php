@@ -95,6 +95,8 @@ class SalesController extends Controller
             $parameters = PaymentParameters::where('id', 1)->first();
             $ChangeFakturParameters = $parameters->pdu;
             $ChangeFakturRounding = $parameters->rounding;
+            $parameterHV = $parameters->otc;
+            $parameterUP = $parameters->pdu;
             $parameterRT = $parameters->receipt;
             $rounding = "0";
             $parameters = "0";
