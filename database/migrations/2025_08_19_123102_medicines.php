@@ -16,6 +16,7 @@ return new class extends Migration
         Schema::create('medicines', function (Blueprint $table) {
             $table->id();
             $table->string('code')->unique(); 
+            $table->string('barcode')->nullable();
             $table->string('generic')->nullable();
             $table->foreignId('pharmacy_id')->constrained('pharmacies')->onDelete('cascade');
             $table->foreignId('medicine_category_id')->constrained('medicine_categories')->onDelete('cascade');

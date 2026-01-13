@@ -94,6 +94,7 @@ class MedicineController extends Controller
 
         Medicines::create([
             'code'                   => $code,
+            'barcode'                => $request->barcode,
             'generic'                => $request->generic,
             'pharmacy_id'            => $request->pharmacy_id,
             'medicine_category_id'   => $request->medicine_category_id,
@@ -155,6 +156,7 @@ class MedicineController extends Controller
         $medicine = Medicines::findOrFail($id);
 
         $medicine->update([
+            'barcode'                => $request->barcode,
             'generic'                => $request->generic,
             'pharmacy_id'            => $request->pharmacy_id,
             'medicine_category_id'   => $request->medicine_category_id,

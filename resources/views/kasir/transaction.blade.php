@@ -1331,6 +1331,8 @@
 
         function render(items) {
             list.innerHTML = '';
+            activeIndex = -1;
+
             if (!items.length) {
                 list.innerHTML = `<li class="px-4 py-3 text-sm text-gray-500">Tidak ada hasil</li>`;
                 return;
@@ -1343,16 +1345,20 @@
                 li.dataset.id = it.id;
 
                 li.innerHTML = `
-                    <div class="flex items-start justify-between gap-2">
-                        <div>
-                            <div class="font-medium">${escapeHtml(it.name)}</div>
-                            <div class="text-xs text-gray-500">
-                                Kode: ${escapeHtml(it.code)} • Stok: ${it.stock} • Tipe: ${escapeHtml(it.type || '-')}
-                            </div>
-                        </div>
-                        <div class="text-sm font-semibold whitespace-nowrap">${formatRupiah(it.net_price)}</div>
+            <div class="flex items-start justify-between gap-2">
+                <div>
+                    <div class="font-medium">${escapeHtml(it.name)}</div>
+                    <div class="text-xs text-gray-500">
+                        Kode: ${escapeHtml(it.code)} • Stok: ${it.stock} • 
+                        Tipe: ${escapeHtml(it.type || '-')} • 
+                        Barcode: ${escapeHtml(it.barcode || '-')}
                     </div>
-                `;
+                </div>
+                <div class="text-sm font-semibold whitespace-nowrap">
+                    ${formatRupiah(it.net_price)}
+                </div>
+            </div>
+        `;
 
                 li.addEventListener('mousedown', (e) => {
                     selectItem(it);
@@ -1361,7 +1367,13 @@
 
                 list.appendChild(li);
             }
+
+            // ✅ AUTO HIGHLIGHT FIRST ITEM
+            activeIndex = 0;
+            highlight();
+            ensureVisible();
         }
+
 
         function selectItem(it) {
             hidden.value = it.id;
@@ -1911,7 +1923,7 @@
 
         }
 
-        function addToCart(medicine_id, transaction_id, quantity, discount, embalase, cart_type, package, dosage_r,price2,
+        function addToCart(medicine_id, transaction_id, quantity, discount, embalase, cart_type, package, dosage_r, price2,
             raw_total, total_price, final_price, racikstatus) {
             if (edit_status == 1) {
                 axios.post("{{ route('transaction.updateCart') }}", {
@@ -2395,7 +2407,7 @@
 
                         document.getElementById("changes").value =
                             cleanRupiah(document.getElementById('trchange').value);
-                  
+
 
                         document.getElementById("checkoutForm").submit();
                     }

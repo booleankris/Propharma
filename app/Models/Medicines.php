@@ -11,6 +11,7 @@ class Medicines extends Model
     protected $table = 'medicines';
     protected $fillable = [
         'code',
+        'barcode',
         'generic',
         'pharmacy_id',
         'medicine_category_id',

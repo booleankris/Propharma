@@ -127,7 +127,7 @@ class SalesController extends Controller
         // Get Item Inside Cart based on user id and cart item status
         $itemInCart = MedicineCart::with('medicine')->where('status', 0)->where('user_id', Auth()->user()->id)->get();
 
-        return view('kasir.transaction', compact('check_transaction', 'transaction', 'existingpackage', 'rawtotal', 'parameters', 'rounding', 'itemInCart', 'totaltransaction', 'discount_total', 'ChangeFakturParameters','parameterRT','parameterHV','parameterUP', 'ChangeFakturRounding'));
+        return view('kasir.transaction', compact('check_transaction', 'transaction', 'existingpackage', 'rawtotal', 'parameters', 'rounding', 'itemInCart', 'totaltransaction', 'discount_total', 'ChangeFakturParameters', 'parameterRT', 'parameterHV', 'parameterUP', 'ChangeFakturRounding'));
     }
 
     /**
@@ -164,10 +164,11 @@ class SalesController extends Controller
             ->when($q !== '', function ($builder) use ($q) {
                 $builder->where(function ($x) use ($q) {
                     $x->where('code', 'like', '%' . $q . '%')
-                        ->orWhere('name', 'like', '%' . $q . '%');
+                        ->orWhere('name', 'like', '%' . $q . '%')
+                        ->orWhere('barcode', 'like', '%' . $q . '%');
                 });
             })
-            ->select(['id', 'code', 'name', 'net_price', 'stock', 'unit', 'packaging', 'content', 'dosage'])
+            ->select(['id', 'code','barcode', 'name', 'net_price', 'stock', 'unit', 'packaging', 'content', 'dosage'])
             ->orderByRaw("CASE WHEN code LIKE ? THEN 0 ELSE 1 END, code ASC", [$q . '%'])
             ->limit(10)
             ->get();

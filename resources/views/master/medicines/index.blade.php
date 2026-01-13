@@ -108,11 +108,21 @@
                             </label>
                         </div>
                         {{-- NAME --}}
-                        <div class="w-full">
-                            <label class="block text-[14px] font-semibold text-gray-800 mb-1">Nama Obat</label>
-                            <input id="name" name="name" type="text"
-                                class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px]"
-                                placeholder="Masukkan Nama Obat">
+                        <div class="flex gap-2 w-full">
+
+                            <div class="w-full">
+                                <label class="block text-[14px] font-semibold text-gray-800 mb-1">Nama Obat</label>
+                                <input id="name" name="name" type="text"
+                                    class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px]"
+                                    placeholder="Masukkan Nama Obat">
+                            </div>
+                            <div class="w-full">
+                                <label class="block text-[14px] font-semibold text-gray-800 mb-1">Barcode</label>
+                                <input id="barcode" name="barcode" type="text"
+                                    class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px]"
+                                    placeholder="Masukkan Barcode Obat">
+                            </div>
+
                         </div>
                         {{-- PHARMACY --}}
                         <div class="hidden">
