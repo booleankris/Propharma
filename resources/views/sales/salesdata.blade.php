@@ -110,7 +110,6 @@
 
         $(function() {
 
-            // DATATABLE
             tableData = $('#table-data').DataTable({
                 responsive: true,
                 autoWidth: false,
@@ -120,7 +119,7 @@
                 columns: [{
                         data: 'DT_RowIndex',
                         orderable: false,
-                        searchable: true
+                        searchable: false
                     },
                     {
                         data: 'date'
@@ -134,8 +133,10 @@
                     {
                         data: 'final_price'
                     }
-                ],
+                ]
             });
+
+
 
             let itemsTable;
 
@@ -150,7 +151,7 @@
                     processing: true,
                     serverSide: true,
                     searchable: false,
-                    searching: false,   
+                    searching: false,
                     ajax: `/sales/transaction/${transactionId}/items`,
                     columns: [{
                             data: 'DT_RowIndex',

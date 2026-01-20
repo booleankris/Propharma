@@ -210,130 +210,134 @@
 
             </div> --}}
             <div style="position: relative; width: 100%;">
-                <div id="searchWrapper" style="position: relative; width: 100%;">
-                    <div class="flex py-2 gap-1">
-                        <div>
-                            <div class="py-1 text-[13px] font-bold">Tanggal Retur</div>
-                            <input type="text" id="returdate"
-                                class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
-                                placeholder="" value="{{ $now }}" readonly onkeyup="searchSalesData(this.value)"
-                                autocomplete="off">
+                <div id="searchWrapper" class="flex gap-5" style="position: relative; width: 100%;">
+                    <div class="w-11/12">
+                        <div class="flex py-2 gap-1">
+                            <div>
+                                <div class="py-1 text-[13px] font-bold">Tanggal Retur</div>
+                                <input type="text" id="returdate"
+                                    class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
+                                    placeholder="" value="{{ $now }}" readonly
+                                    onkeyup="searchSalesData(this.value)" autocomplete="off">
+                            </div>
+                            <div>
+                                <div class="py-1 text-[13px] font-bold" for="returnumber">Nomor Retur</div>
+                                <input type="text" id="returnumber"
+                                    class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
+                                    placeholder="" value="{{ $retur_code }}" readonly
+                                    onkeyup="searchSalesData(this.value)" autocomplete="off">
+                            </div>
                         </div>
-                        <div>
-                            <div class="py-1 text-[13px] font-bold" for="returnumber">Nomor Retur</div>
-                            <input type="text" id="returnumber"
-                                class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
-                                placeholder="" value="{{ $retur_code }}" readonly onkeyup="searchSalesData(this.value)"
-                                autocomplete="off">
-                        </div>
-                    </div>
 
-                    <input type="text" id="searchInput"
-                        class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
-                        placeholder="Search transaction..." oninput="searchSalesData(this.value)" autocomplete="off">
-                    <div id="searchDropdown" class="dropdown-table" style="display:none;">
-                        <table class="table table-sm table-bordered mb-0">
-                            <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th>Code</th>
-                                    <th>Name Pelanggan</th>
-                                    <th>Total</th>
-                                </tr>
-                            </thead>
-                        </table>
-                        <!-- scroll container -->
-                        <div id="tableScroll" style="max-height: 250px; overflow-y: auto;" onscroll="handleScroll()">
+                        <input type="text" id="searchInput"
+                            class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
+                            placeholder="Search transaction..." oninput="searchSalesData(this.value)" autocomplete="off">
+                        <div id="searchDropdown" class="dropdown-table" style="display:none;">
                             <table class="table table-sm table-bordered mb-0">
-                                <tbody id="searchResults"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                    <form method="post" action="{{ route('salesdata.returItem') }}" class="mt-3">
-                        @csrf
-                        <div class="flex py-2 w-full gap-1">
-                            <input id="medicine_id" type="hidden" name="medicine_id">
-                            <input id="cart_id" type="hidden" name="cart_id">
-                            <input id="transaction_id" type="hidden" name="transaction_id">
-                            <input id="old_qty" type="hidden" name="old_qty">
-
-                            <div>
-                                <div class="py-1 text-[13px] font-bold">Kode Obat</div>
-                                <input id="medicine_code" name="medicine_code" readonly value="" step="0.01"
-                                    class="rounded-lg w-full border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
-                                    placeholder="OTC">
-
-                            </div>
-                            <div class="w-[100%]">
-                                <div class="py-1 text-[13px] font-bold">Nama Obat</div>
-                                <input id="medicine_name" type="text" readonly
-                                    class="rounded-lg w-full border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
-                                    placeholder="Nama Obat">
-                            </div>
-                            <div>
-                                <div class="py-1 text-[13px] font-bold">Satuan</div>
-                                <input id="unit" type="text" readonly
-                                    class="rounded-lg w-full border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
-                                    placeholder="Satuan">
-                            </div>
-                            <div>
-                                <div class="py-1 text-[13px] font-bold">Hrg Satuan</div>
-                                <input id="item_price" type="text" readonly
-                                    class="rounded-lg  w-full border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
-                                    placeholder="Harga Satuan">
-                            </div>
-                        </div>
-
-                        <div class="flex py-2 w-full gap-1">
-                            <div>
-                                <div class="py-1 text-[13px] font-bold">QTY Retur</div>
-                                <input id="qty" type="number" name="qty_retur"
-                                    class="rounded-lg w-60 border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
-                                    placeholder="QTY Retur" oninput="calculateReturTotal()">
-
-                            </div>
-                            <div class="w-[90%]">
-                                <div class="py-1 text-[13px] font-bold">Harga Resep</div>
-                                <input id="price" type="number" readonly
-                                    class="rounded-lg  w-full border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
-                                    placeholder="Credit">
-                            </div>
-                            <div class="w-[90%]">
-                                <div class="py-1 text-[13px] font-bold">Jml Retur</div>
-                                <input id="total_retur" type="text" name="total_retur" readonly
-                                    class="rounded-lg  w-full border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
-                                    placeholder="Jumlah Retur">
-                            </div>
-                        </div>
-                        <div class="flex gap-2 mb-1">
-                            <div>
-                                <button type="submit" class="btn btn-pharma !bg-[#2196F3] btn-lg btn-icon icon-right"
-                                    tabindex="4">
-                                    Simpan
-                                </button>
-                            </div>
-                            <div>
-                                <button type="button" id="back"
-                                    class="btn btn-pharma !bg-[#b72929] !shadow-[0_2px_6px_#7e052e] btn-lg btn-icon icon-right"
-                                    tabindex="4">
-                                    Cancel
-                                </button>
-                            </div>
-                        </div>
-                    </form>
-                    <div class="card p-10 md:p-14 mt-2 bg-[#fff] shadow-sm">
-                        <div class="card-body">
-                            <table id="medicineTable" class="table table-hover align-middle w-100">
                                 <thead>
                                     <tr>
-                                        <th class="text-center">#</th>
-                                        <th class="text-center">Medicine</th>
-                                        <th class="text-center" class="text-end">Qty</th>
-                                        <th class="text-center" class="text-end">Price</th>
+                                        <th>#</th>
+                                        <th>Code</th>
+                                        <th>Name Pelanggan</th>
+                                        <th>Total</th>
                                     </tr>
                                 </thead>
-                                <tbody></tbody>
                             </table>
+                            <!-- scroll container -->
+                            <div id="tableScroll" style="max-height: 250px; overflow-y: auto;" onscroll="handleScroll()">
+                                <table class="table table-sm table-bordered mb-0">
+                                    <tbody id="searchResults"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <form method="post" action="{{ route('salesdata.returItem') }}" class="mt-3">
+                            @csrf
+                            <div class="flex py-2 w-full gap-1">
+                                <input id="medicine_id" type="hidden" name="medicine_id">
+                                <input id="cart_id" type="hidden" name="cart_id">
+                                <input id="transaction_id" type="hidden" name="transaction_id">
+                                <input id="old_qty" type="hidden" name="old_qty">
+
+                                <div>
+                                    <div class="py-1 text-[13px] font-bold">Kode Obat</div>
+                                    <input id="medicine_code" name="medicine_code" readonly value="" step="0.01"
+                                        class="rounded-lg w-full border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
+                                        placeholder="OTC">
+
+                                </div>
+                                <div class="w-[100%]">
+                                    <div class="py-1 text-[13px] font-bold">Nama Obat</div>
+                                    <input id="medicine_name" type="text" readonly
+                                        class="rounded-lg w-full border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
+                                        placeholder="Nama Obat">
+                                </div>
+                                <div>
+                                    <div class="py-1 text-[13px] font-bold">Satuan</div>
+                                    <input id="unit" type="text" readonly
+                                        class="rounded-lg w-full border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
+                                        placeholder="Satuan">
+                                </div>
+                                <div>
+                                    <div class="py-1 text-[13px] font-bold">Hrg Satuan</div>
+                                    <input id="item_price" type="text" readonly
+                                        class="rounded-lg  w-full border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
+                                        placeholder="Harga Satuan">
+                                </div>
+                            </div>
+
+                            <div class="flex py-2 w-full gap-1">
+                                <div>
+                                    <div class="py-1 text-[13px] font-bold">QTY Retur</div>
+                                    <input id="qty" type="number" name="qty_retur"
+                                        class="rounded-lg w-60 border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
+                                        placeholder="QTY Retur" oninput="calculateReturTotal()">
+
+                                </div>
+                                <div class="w-[90%]">
+                                    <div class="py-1 text-[13px] font-bold">Harga Resep</div>
+                                    <input id="price" type="number" readonly
+                                        class="rounded-lg  w-full border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
+                                        placeholder="Credit">
+                                </div>
+                                <div class="w-[90%]">
+                                    <div class="py-1 text-[13px] font-bold">Jml Retur</div>
+                                    <input id="total_retur" type="text" name="total_retur" readonly
+                                        class="rounded-lg  w-full border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
+                                        placeholder="Jumlah Retur">
+                                </div>
+                            </div>
+                            <div class="flex gap-2 mb-1">
+                                <div>
+                                    <button type="submit" class="btn btn-pharma !bg-[#2196F3] btn-lg btn-icon icon-right"
+                                        tabindex="4">
+                                        Simpan
+                                    </button>
+                                </div>
+                                <div>
+                                    <button type="button" id="back"
+                                        class="btn btn-pharma !bg-[#b72929] !shadow-[0_2px_6px_#7e052e] btn-lg btn-icon icon-right"
+                                        tabindex="4">
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="w-full">
+                        <div class="card p-10 md:p-14 mt-2 bg-[#fff] shadow-sm">
+                            <div class="card-body">
+                                <table id="medicineTable" class="table table-hover align-middle w-100">
+                                    <thead>
+                                        <tr>
+                                            <th class="text-center">#</th>
+                                            <th class="text-center">Medicine</th>
+                                            <th class="text-center" class="text-end">Qty</th>
+                                            <th class="text-center" class="text-end">Price</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>

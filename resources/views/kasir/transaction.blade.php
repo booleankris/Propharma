@@ -263,7 +263,7 @@
                                 <label class="text-[13px] font-poppins font-semibold">Discount</label>
 
                             </div>
-                            <input id="discount" name="discount" onkeyup="countDiscount(this.value)" type="text"
+                            <input id="discount" name="discount" onkeyup="countDiscount(this.value)" type="number"
                                 placeholder="Discount"
                                 class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300 text-[11px] font-poppins"
                                 autocomplete="off" />
@@ -614,7 +614,7 @@
     @endif --}}
     {{-- ============================================================== Modal Invoice  ============================================================== --}}
     <div id="invoiceModal"
-        class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 opacity-0 transition-opacity duration-300">
+        class="hidden z-[999999] fixed inset-0 bg-black/50 flex items-center justify-center opacity-0 transition-opacity duration-300">
         <div id="invoiceContent"
             class="bg-white rounded-lg shadow-lg w-96 p-6 transform scale-95 transition-transform duration-300">
             <div class="invoice-container" id="invoiceReceipt">
@@ -692,7 +692,8 @@
     {{-- ============================================================== Modal Invoice  ============================================================== --}}
 
     {{-- ============================================================== Patient Invoice  ============================================================== --}}
-    <div id="newPatientModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div id="newPatientModal"
+        class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[999999]">
         <div class="bg-white rounded-xl shadow-lg w-full max-w-lg p-6 relative" id="newPatientModalContent">
             <h3 class="text-lg font-semibold mb-4">Tambah Pasien Baru</h3>
             <form id="newPatientForm" method="POST" class="space-y-3">
@@ -737,7 +738,8 @@
     </div>
 
     <!-- Doctor Modal -->
-    <div id="newDoctorModal" class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center hidden z-50">
+    <div id="newDoctorModal"
+        class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center hidden z-[999999]">
         <div id="newDoctorModalContent" class="bg-white p-6 rounded-lg shadow w-96">
             <h2 class="text-lg font-bold mb-4">Tambah Dokter</h2>
 
@@ -779,7 +781,7 @@
 
     @if ($check_transaction == 1)
         {{-- Modal Pembayaran --}}
-        <div id="paymentModal" class="fixed inset-0 bg-black/50 hidden justify-center items-center z-40">
+        <div id="paymentModal" class="fixed inset-0 bg-black/50 hidden justify-center items-center z-[99999]">
             <!-- Modal content -->
             <div class="bg-white w-full max-w-3xl rounded-xl shadow-xl p-6 relative overflow-y-auto max-h-[90vh]">
 
@@ -837,8 +839,9 @@
                                 <label class="text-[13px] font-poppins font-semibold pb-1">Cari Dokter</label>
                                 <div class="flex items-center">
                                     <div class="searchdoctors w-full">
-                                        <input autofocus required id="doctorSearch" type="text"
-                                            placeholder="Ketik ID / Nama…"
+                                        <input autofocus required id="doctorSearch"
+                                            @if ($transaction->transaction_type == 'KREDIT') onclick="creditsubmit()" @endif
+                                            type="text" placeholder="Ketik ID / Nama…"
                                             class="w-full rounded-xl border my-1 border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
                                             autocomplete="off" />
                                         <!-- Dropdown -->
@@ -874,7 +877,7 @@
                 <div class="mr-2 w-[100%] mt-3 flex gap-2">
                     @if ($check_transaction == 1)
                         @if ($transaction->transaction_type == 'KREDIT')
-                            <div class="w-[40%]">
+                            <div class="w-[40%] hidden">
                                 <label class="text-[13px] font-poppins font-semibold pb-1">Embalase</label>
                                 <input id="embalase" tabindex="-1" readonly type="text" name="embalase"
                                     placeholder="Embalase"
@@ -883,41 +886,56 @@
                             </div>
                         @endif
                     @endif
-                    <div class="w-full gap-2 flex">
+                    @if ($check_transaction == 1)
+                        <div class="w-full gap-2 @if ($transaction->transaction_type == 'KREDIT') hidden @else flex @endif ">
+                            <div class="w-full">
+                                <label class="text-[13px] font-poppins font-semibold pb-1">Total</label>
+                                <input id="carttotal" tabindex="-1" readonly type="text" name="carttotal"
+                                    placeholder="Total obat"
+                                    class="w-full rounded-xl my-1 readonly border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                                    autocomplete="off" />
+                            </div>
+                            <div class="w-full">
+                                <label class="text-[13px] font-poppins font-semibold pb-1">Discount</label>
+                                <input @if ($transaction->transaction_type == 'KREDIT') value="0" @endif
+                                    onkeyup="countSubtotalDiscount(this.value)" id="discounsubtotal" tabindex="-1"
+                                    type="number" name="discounsubtotal" placeholder="Discount"
+                                    class="w-full rounded-xl my-1 border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                                    autocomplete="off" />
+                            </div>
+                        </div>
+                    @endif
+                </div>
+                @if ($check_transaction == 1)
+                    <div class="mr-2 flex gap-2 w-[100%] mt-3 @if ($transaction->transaction_type == 'KREDIT') hidden @else flex @endif">
                         <div class="w-full">
-                            <label class="text-[13px] font-poppins font-semibold pb-1">Total</label>
-                            <input id="carttotal" tabindex="-1" readonly type="text" name="carttotal"
-                                placeholder="Total obat"
-                                class="w-full rounded-xl my-1 readonly border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                            <label class="text-[13px] font-poppins font-semibold pb-1">Bayar</label>
+                            <input id="pay" onkeyup="pay(this.value)"
+                                @if ($transaction->transaction_type == 'KREDIT') value="0" @endif type="text" name="pay"
+                                placeholder="Bayar obat"
+                                class="w-full rounded-xl border my-1 border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
                                 autocomplete="off" />
                         </div>
                         <div class="w-full">
-                            <label class="text-[13px] font-poppins font-semibold pb-1">Discount</label>
-                            <input onkeyup="countSubtotalDiscount(this.value)" id="discounsubtotal" tabindex="-1"
-                                type="number" name="discounsubtotal" placeholder="Discount"
-                                class="w-full rounded-xl my-1 border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                            <label class="text-[13px] font-poppins font-semibold pb-1">Kembalian</label>
+                            <input id="trchange" tabindex="-1" @if ($transaction->transaction_type == 'KREDIT') value="0" @endif
+                                readonly type="text" name="change" placeholder="Bayar obat"
+                                class="w-full rounded-xl border my-1 readonly border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
                                 autocomplete="off" />
                         </div>
                     </div>
-                </div>
-
-                <div class="mr-2 flex gap-2 w-[100%] mt-3">
-                    <div class="w-full">
-                        <label class="text-[13px] font-poppins font-semibold pb-1">Bayar</label>
-                        <input id="pay" onkeyup="pay(this.value)" type="text" name="pay"
-                            placeholder="Bayar obat"
-                            class="w-full rounded-xl border my-1 border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                            autocomplete="off" />
-                    </div>
-                    <div class="w-full">
-                        <label class="text-[13px] font-poppins font-semibold pb-1">Kembalian</label>
-                        <input id="trchange" tabindex="-1" readonly type="text" name="change"
-                            placeholder="Bayar obat"
-                            class="w-full rounded-xl border my-1 readonly border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                            autocomplete="off" />
-                    </div>
-                </div>
-
+                @endif
+                @if ($check_transaction == 1)
+                    @if ($transaction->transaction_type == 'KREDIT')
+                        <div class="w-full">
+                            <label class="text-[13px] font-poppins font-semibold pb-1">Debitur</label>
+                            <input id="debtor_name" tabindex="-1" readonly type="text" name="change"
+                                placeholder="Nama Debitur"
+                                class="w-full rounded-xl border my-1 readonly border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                                autocomplete="off" />
+                        </div>
+                    @endif
+                @endif
                 <div class="mt-5">
                     <form id="checkoutForm" action="{{ route('transaction.checkout') }}" method="POST">
                         @csrf
@@ -929,10 +947,23 @@
                             name="doctor_id" id="doctor_id" />
                         <input type="hidden" required name="debtor_id" id="debtor_id" />
 
-                        <button type="button" id="checkout" disabled onclick="checkoutItem()"
-                            class="w-full mt-3 rounded-lg bg-gray-400 hover:bg-gray-500 text-white font-semibold py-4 transition">
-                            Selesaikan
-                        </button>
+                        @if ($check_transaction == 1)
+                            @if ($transaction->transaction_type == 'KREDIT')
+                                <button type="button" id="checkout" onclick="checkoutItem()"
+                                    class="w-full mt-3 rounded-lg bg-[#2196F3] hover:bg-gray-500 text-white font-semibold py-4 transition">
+                                    Simpan
+                                </button>
+                            @else
+                                <button type="button" @if ($transaction->transaction_type != 'KREDIT') disabled @endif id="checkout"
+                                    onclick="checkoutItem()"
+                                    class="w-full mt-3 rounded-lg bg-gray-400 hover:bg-gray-500 text-white font-semibold py-4 transition">
+                                    Selesaikan
+                                </button>
+                            @endif
+                        @endif
+
+
+
                     </form>
                 </div>
             </div>
@@ -1255,6 +1286,79 @@
         // ===============================
         // Helper Functions
         // ===============================
+
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const form = document.getElementById('newPatientForm');
+            const doctorFormEl = document.getElementById('newDoctorForm');
+
+            const inputs = Array.from(
+                form.querySelectorAll('input:not([type="hidden"]):not([disabled])')
+            );
+
+            inputs.forEach((input, index) => {
+                input.addEventListener('keydown', (e) => {
+                    if (e.key !== 'Enter') return;
+
+                    e.preventDefault();
+
+                    const next = inputs[index + 1];
+
+                    if (next) {
+                        next.focus();
+                    } else {
+                        form.requestSubmit(); // submit only on last input
+                    }
+                });
+            });
+            if (!doctorFormEl) return;
+
+            const doctorInputs = Array.from(
+                doctorFormEl.querySelectorAll('input:not([type="hidden"]):not([disabled])')
+            );
+
+            doctorInputs.forEach((doctorInput, doctorIndex) => {
+                doctorInput.addEventListener('keydown', (e) => {
+                    if (e.key !== 'Enter') return;
+
+                    e.preventDefault();
+
+                    const nextDoctorInput = doctorInputs[doctorIndex + 1];
+
+                    if (nextDoctorInput) {
+                        nextDoctorInput.focus();
+                    } else {
+                        doctorFormEl.requestSubmit(); // submit on last input
+                    }
+                });
+            });
+        });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const form = document.getElementById('newDoctorForm');
+            if (!form) return;
+
+            const inputs = Array.from(
+                form.querySelectorAll('input:not([type="hidden"]):not([disabled])')
+            );
+
+            inputs.forEach((input, index) => {
+                input.addEventListener('keydown', (e) => {
+                    if (e.key !== 'Enter') return;
+
+                    e.preventDefault();
+
+                    const nextInput = inputs[index + 1];
+
+                    if (nextInput) {
+                        nextInput.focus();
+                    } else {
+                        form.requestSubmit(); // submit on last input
+                    }
+                });
+            });
+        });
+
         function formatRupiah(value) {
             const number = Number(value) || 0;
             return new Intl.NumberFormat('id-ID', {
@@ -1262,6 +1366,36 @@
                 currency: 'IDR',
                 minimumFractionDigits: 0
             }).format(number);
+        }
+        document.addEventListener('input', function(e) {
+            if (e.target.matches('input[type="number"]')) {
+                if (e.target.value < 0) {
+                    e.target.value = Math.abs(e.target.value);
+                }
+            }
+        });
+        document.addEventListener('click', function(e) {
+            if (
+                !patientbox.contains(e.target)
+            ) {
+                closepatientBox();
+            }
+        });
+        patientbox.addEventListener('click', function(e) {
+            e.stopPropagation();
+        });
+
+        if (doctorbox) {
+            document.addEventListener('click', function(e) {
+                if (
+                    !doctorbox.contains(e.target)
+                ) {
+                    closedoctorBox();
+                }
+            });
+            doctorbox.addEventListener('click', function(e) {
+                e.stopPropagation();
+            });
         }
 
         function roundUpToNearestThousand(value) {
@@ -1387,7 +1521,13 @@
             }
             console.log("Harga : " + it.net_price + "Parameter : " + parameters + "Pembulatan : " + rounding);
             let raw = (+it.net_price * +parameters) + +rounding;
-            let rounded = Math.floor(raw / 1000) * 1000;
+
+            let rounded;
+            if (currenttransaction === 'KREDIT') {
+                rounded = Math.round(raw);
+            } else {
+                rounded = Math.floor(raw / 1000) * 1000;
+            }
             price.value = formatRupiah(rounded);
             console.log("harga Total : " + raw);
             price2 = rounded;
@@ -1706,8 +1846,6 @@
 
             if (currenttransaction == 'RESEP TUNAI') {
                 document.getElementById('pay').focus();
-            } else if (currenttransaction == 'KREDIT') {
-                document.getElementById('debtorSearch').focus();
             }
             document.getElementById('doctor_id').value = it.id;
             document.getElementById('doctorSearch').value = it.name;
@@ -1848,8 +1986,8 @@
                     discountInput.focus();
                 }
                 document.getElementById('debtorSearch').value = it.name;
+                document.getElementById('debtor_name').value = it.name;
                 document.getElementById('embalase').value = it.parameters[0].embalas;;
-
 
                 closedebtorBox();
             }
@@ -1877,16 +2015,16 @@
         function countDiscount(val) {
             if (val > 100) {
                 final_price = subtotal - val;
-                discount = val;
+                discount = Math.round(val / 1000) * 1000;
             } else {
                 const discountAmount = subtotal * val / 100;
                 final_price = subtotal - discountAmount;
-                discount = discountAmount;
+                discount = Math.round(discountAmount / 1000) * 1000;
             }
-
-            final_price = Math.ceil(final_price / 1000) * 1000;
+            final_price = Math.round(final_price / 1000) * 1000;
             totalprice.value = formatRupiah(final_price);
         }
+
 
         function countSubtotalDiscount(val) {
 
@@ -1899,7 +2037,7 @@
                 final_price = totaltransaction - d;
                 subtotal_discount = `${val}%`;
             }
-            // Round the final_price up to the nearest 1000
+
             final_price = Math.ceil(final_price / 1000) * 1000;
 
             cartTotalInput.value = formatRupiah(final_price);
@@ -2108,8 +2246,6 @@
 
 
         }
-
-
 
         function submit() {
 
@@ -2491,7 +2627,7 @@
             let bayar = parseInt(raw) || 0;
             let price = totaltransaction - subtotal_discount;
             value = "Rp. " + bayar.toLocaleString("id-ID");
-
+            payInput.value = value;
             if (bayar < price) {
                 document.getElementById('trchange').value = "Pembayaran Kurang";
                 resetButton();
@@ -2702,7 +2838,6 @@
             axios.post("{{ route('transaction.addPatient') }}", formData, {
                     headers: {
                         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                        'Content-Type': 'multipart/form-data'
                     }
                 })
                 .then(response => {
@@ -2799,7 +2934,6 @@
             document.getElementById('paymentModal').classList.remove('flex');
         });
 
-        // Optional: close when clicking outside modal
         document.getElementById('paymentModal').addEventListener('click', (e) => {
             if (e.target.id === 'paymentModal') {
                 e.currentTarget.classList.add('hidden');
@@ -2998,7 +3132,6 @@
         }
 
 
-        /* SCROLL LISTENER */
         window.addEventListener('scroll', () => {
             if (
                 window.innerHeight + window.scrollY >=
@@ -3176,10 +3309,11 @@
                             title: "Racikan Telah Diselesaikan!",
                             icon: "success",
                             confirmButtonText: "OK",
-                            focusConfirm: true, // ✅ this makes OK auto-focused
+                            focusConfirm: true,
                             allowOutsideClick: false,
                         }).then(() => {
                             sendEmbalase(this.value);
+                            document.getElementById('package').value = "";
                         });
                     }
                 });
@@ -3200,10 +3334,13 @@
         payInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
 
-                if (final_price >= 0 || final_price != "") {
-                    checkoutItem();
+                let price = totaltransaction - subtotal_discount;
+                let raw = payInput.value.replace(/\D/g, "");
+                let bayar = parseInt(raw) || 0;
+                if (price > bayar) {
+                    alert("Pembayaran Kurang");
                 } else {
-                    alert('Mohon Isi Pembayaran');
+                    checkoutItem();
                 }
             } else if (e.key === 'Tab') {
                 e.preventDefault();
@@ -3211,16 +3348,19 @@
             }
         });
 
-        // ===============================
-        // TABLE CONTROL
-        // ===============================
+        if (currenttransaction == "KREDIT") {
+            doctorSearch.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
 
 
+                    checkoutItem();
 
-
-
-
-        // Listen for Delete key
+                } else if (e.key === 'Tab') {
+                    e.preventDefault();
+                    discounsubtotal.focus();
+                }
+            });
+        }
     </script>
 
     {{-- ------------------- Fixed Cart Card --------------------- --}}

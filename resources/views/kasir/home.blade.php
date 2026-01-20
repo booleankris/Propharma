@@ -309,7 +309,7 @@
                             d="M75.325 38.039h-.298a3.05 3.05 0 0 0-3.041 3.041v35.472a3.05 3.05 0 0 0 3.041 3.041h.298a3.05 3.05 0 0 0 3.041-3.041V41.08a3.05 3.05 0 0 0-3.041-3.041z" />
                     </svg>
 
-                    <span class="text-[18px] font-poppins tracking-wide font-bold text-[#6196c0]">Penjualan</span>
+                    <span class="text-[18px] font-poppins tracking-wide font-bold text-[#6196c0]">Data Penjualan</span>
                 </div>
             </div>
         </section>

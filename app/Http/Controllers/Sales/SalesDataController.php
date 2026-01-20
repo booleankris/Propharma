@@ -19,6 +19,14 @@ class SalesDataController extends Controller
         if ($request->ajax()) {
 
             $search = trim($request->input('search.value'));
+            $parsedDate = null;
+
+            // Try parsing dd/mm/YYYY
+            try {
+                $parsedDate = Carbon::createFromFormat('d/m/Y', $search);
+            } catch (\Exception $e) {
+                $parsedDate = null;
+            }
 
             $query = MedicineCart::query()
                 ->with(['transactions.patients'])
@@ -31,51 +39,45 @@ class SalesDataController extends Controller
                 ->groupBy('transaction_id');
 
             if ($search) {
-                $query->havingRaw(
-                    "(
-                    DATE_FORMAT(MAX(created_at), '%d-%m-%Y') LIKE ?
-                    OR DATE_FORMAT(MAX(created_at), '%d/%m/%Y') LIKE ?
-                    OR DATE_FORMAT(MAX(created_at), '%Y') LIKE ?
-                    OR SUM(final_price) LIKE ?
-                )",
-                    [
-                        "%{$search}%",
-                        "%{$search}%",
-                        "%{$search}%",
-                        "%{$search}%"
-                    ]
-                )
-                    ->orWhereHas('transactions', function ($q) use ($search) {
-                        $q->where('transaction_code', 'like', "%{$search}%");
-                    })
-                    ->orWhereHas('transactions.patients', function ($q) use ($search) {
-                        $q->where('name', 'like', "%{$search}%");
+                $query->where(function ($q) use ($search, $parsedDate) {
+
+                    // ✅ Exact date search (31/12/2025)
+                    if ($parsedDate) {
+                        $q->whereDate('created_at', $parsedDate->format('Y-m-d'));
+                    }
+
+                    // ✅ Year search (2026)
+                    if (preg_match('/^\d{4}$/', $search)) {
+                        $q->orWhereYear('created_at', $search);
+                    }
+
+                    // ✅ Transaction code
+                    $q->orWhereHas('transactions', function ($t) use ($search) {
+                        $t->where('transaction_code', 'like', "%{$search}%");
                     });
+
+                    // ✅ Patient name
+                    $q->orWhereHas('transactions.patients', function ($p) use ($search) {
+                        $p->where('name', 'like', "%{$search}%");
+                    });
+                });
             }
 
             return DataTables::of($query)
                 ->addIndexColumn()
-                ->addColumn(
-                    'date',
-                    fn($row) =>
-                    \Carbon\Carbon::parse($row->created_at)->format('d/m/Y')
-                )
-                ->addColumn(
-                    'code',
-                    fn($row) =>
-                    $row->transactions?->transaction_code ?? '-'
-                )
-                ->addColumn(
-                    'name',
-                    fn($row) =>
-                    $row->transactions?->patients?->name ?? '-'
-                )
-                ->addColumn(
-                    'final_price',
-                    fn($row) =>
-                    'Rp ' . number_format($row->final_price, 0, ',', '.')
-                )
-                ->escapeColumns([])
+                ->addColumn('date', function ($row) {
+                    return Carbon::parse($row->created_at)->format('d/m/Y');
+                })
+                ->addColumn('code', function ($row) {
+                    return $row->transactions?->transaction_code ?? '-';
+                })
+                ->addColumn('name', function ($row) {
+                    return $row->transactions?->patients?->name ?? '-';
+                })
+                ->addColumn('final_price', function ($row) {
+                    return 'Rp ' . number_format($row->final_price, 0, ',', '.');
+                })
+                ->rawColumns(['final_price'])
                 ->make(true);
         }
 
@@ -193,28 +195,28 @@ class SalesDataController extends Controller
             ]);
 
 
-           
+
             // Get & UPdate Cart
             $cart = MedicineCart::findOrFail($request->cart_id);
-            if($request->old_qty - $request->qty_retur == 0){
+            if ($request->old_qty - $request->qty_retur == 0) {
                 $cart->delete();
                 $cart->update([
                     'final_price'   => $cart->final_price - $request->total_retur - $cart->discount,
                     'total_price'   => $cart->final_price - $request->total_retur,
                     'quantity'      => $request->old_qty - $request->qty_retur,
                 ]);
-            }else if($request->old_qty - $request->qty_retur > 0){
+            } else if ($request->old_qty - $request->qty_retur > 0) {
                 $cart->update([
                     'final_price'   => $cart->final_price - $request->total_retur - $cart->discount,
                     'total_price'   => $cart->final_price - $request->total_retur,
                     'quantity'      => $request->old_qty - $request->qty_retur,
                 ]);
-            }else{
+            } else {
                 return redirect()
-                ->back()
-                ->with('failed', 'Gagal menyimpan retur: ' . 'Qty tidak bisa dibawah 0');
+                    ->back()
+                    ->with('failed', 'Gagal menyimpan retur: ' . 'Qty tidak bisa dibawah 0');
             }
-           
+
 
             // Get & Update Transaction
             // $transaction = MedicineTransactions::findOrFail($request->transaction_id);

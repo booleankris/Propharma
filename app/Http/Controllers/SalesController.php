@@ -186,7 +186,9 @@ class SalesController extends Controller
             ->when($q !== '', function ($builder) use ($q) {
                 $builder->where(function ($x) use ($q) {
                     $x->where('code', 'like', '%' . $q . '%')
-                        ->orWhere('name', 'like', '%' . $q . '%');
+                        ->orWhere('name', 'like', '%' . $q . '%')                        
+                        ->orWhere('phone', 'like', '%' . $q . '%');
+
                 });
             })
             ->select(['id', 'code', 'name', 'address', 'city', 'phone', 'contact', 'email', 'status'])
@@ -204,7 +206,9 @@ class SalesController extends Controller
         $items = Patients::select(['id', 'code', 'name', 'address', 'city', 'phone', 'birth', 'status'])
             ->where(function ($query) use ($q) {
                 $query->where('code', 'like', "%{$q}%")
-                    ->orWhere('name', 'like', "%{$q}%");
+                    ->orWhere('name', 'like', "%{$q}%")
+                    ->orWhere('phone', 'like', '%' . $q . '%');
+
             })
             ->orderByRaw("CASE WHEN code LIKE ? THEN 0 ELSE 1 END, code ASC", [$q . '%'])
             ->limit(10)
