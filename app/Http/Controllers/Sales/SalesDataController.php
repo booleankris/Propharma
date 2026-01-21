@@ -21,7 +21,6 @@ class SalesDataController extends Controller
             $search = trim($request->input('search.value'));
             $parsedDate = null;
 
-            // Try parsing dd/mm/YYYY
             try {
                 $parsedDate = Carbon::createFromFormat('d/m/Y', $search);
             } catch (\Exception $e) {
@@ -41,22 +40,18 @@ class SalesDataController extends Controller
             if ($search) {
                 $query->where(function ($q) use ($search, $parsedDate) {
 
-                    // ✅ Exact date search (31/12/2025)
                     if ($parsedDate) {
                         $q->whereDate('created_at', $parsedDate->format('Y-m-d'));
                     }
 
-                    // ✅ Year search (2026)
                     if (preg_match('/^\d{4}$/', $search)) {
                         $q->orWhereYear('created_at', $search);
                     }
 
-                    // ✅ Transaction code
                     $q->orWhereHas('transactions', function ($t) use ($search) {
                         $t->where('transaction_code', 'like', "%{$search}%");
                     });
 
-                    // ✅ Patient name
                     $q->orWhereHas('transactions.patients', function ($p) use ($search) {
                         $p->where('name', 'like', "%{$search}%");
                     });

@@ -867,17 +867,30 @@ class SalesController extends Controller
 
         if ($request->search) {
             $search = $request->search;
+            $parsedDate = null;
 
-            $query->where(function ($q) use ($search) {
-                $q->where('final_price', 'like', "%{$search}%")
-                    ->orWhereDate('created_at', $search)
-                    ->orWhereHas('transactions', function ($t) use ($search) {
-                        $t->where('transaction_code', 'like', "%{$search}%")
-                            ->orWhere('created_at', 'like', "%{$search}%");
-                    })
-                    ->orWhereHas('transactions.patients', function ($p) use ($search) {
-                        $p->where('name', 'like', "%{$search}%");
-                    });
+            try {
+                $parsedDate = Carbon::createFromFormat('d/m/Y', $search);
+            } catch (\Exception $e) {
+                $parsedDate = null;
+            }
+            $query->where(function ($q) use ($search, $parsedDate) {
+
+                if ($parsedDate) {
+                    $q->whereDate('created_at', $parsedDate->format('Y-m-d'));
+                }
+
+                if (preg_match('/^\d{4}$/', $search)) {
+                    $q->orWhereYear('created_at', $search);
+                }
+
+                $q->orWhereHas('transactions', function ($t) use ($search) {
+                    $t->where('transaction_code', 'like', "%{$search}%");
+                });
+
+                $q->orWhereHas('transactions.patients', function ($p) use ($search) {
+                    $p->where('name', 'like', "%{$search}%");
+                });
             });
         }
 
@@ -888,6 +901,7 @@ class SalesController extends Controller
                 'code'           => $row->transactions?->transaction_code ?? '-',
                 'name'           => $row->transactions?->patients?->name ?? '-',
                 'date'           => Carbon::parse($row->created_at)->format('d-m-Y'),
+                'time'           => Carbon::parse($row->created_at)->format('H:i:s'),
                 'final_price'    => $row->final_price,
             ];
         });

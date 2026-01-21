@@ -684,7 +684,7 @@
 
                 <div class="button-row">
                     <button class="btn btn-gray" onclick="closeInvoice()">Tutup</button>
-                    <button class="btn btn-blue" onclick="printInvoice()">Cetak & Selesai</button>
+                    <button class="btn btn-blue" id="print" onclick="printInvoice()">Cetak & Selesai</button>
                 </div>
             </div>
         </div>
@@ -888,6 +888,15 @@
                     @endif
                     @if ($check_transaction == 1)
                         <div class="w-full gap-2 @if ($transaction->transaction_type == 'KREDIT') hidden @else flex @endif ">
+                            @if ($transaction->transaction_type != 'KREDIT')
+                                <div class="w-full">
+                                    <label class="text-[13px] font-poppins font-semibold pb-1">Sub Total</label>
+                                    <input id="subtotal" tabindex="-1" readonly type="text" name="subtotal"
+                                        placeholder="Subtotal obat"
+                                        class="w-full rounded-xl my-1 readonly border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                                        autocomplete="off" />
+                                </div>
+                            @endif
                             <div class="w-full">
                                 <label class="text-[13px] font-poppins font-semibold pb-1">Total</label>
                                 <input id="carttotal" tabindex="-1" readonly type="text" name="carttotal"
@@ -895,6 +904,7 @@
                                     class="w-full rounded-xl my-1 readonly border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
                                     autocomplete="off" />
                             </div>
+
                             <div class="w-full">
                                 <label class="text-[13px] font-poppins font-semibold pb-1">Discount</label>
                                 <input @if ($transaction->transaction_type == 'KREDIT') value="0" @endif
@@ -911,7 +921,7 @@
                         <div class="w-full">
                             <label class="text-[13px] font-poppins font-semibold pb-1">Bayar</label>
                             <input id="pay" onkeyup="pay(this.value)"
-                                @if ($transaction->transaction_type == 'KREDIT') value="0" @endif type="text" name="pay"
+                                @if ($transaction->transaction_type == 'KREDIT') value="0" @endif type="text" required name="pay"
                                 placeholder="Bayar obat"
                                 class="w-full rounded-xl border my-1 border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
                                 autocomplete="off" />
@@ -1045,7 +1055,8 @@
                                 <thead class="sticky top-0 bg-white">
                                     <tr>
                                         <th>#</th>
-                                        <th>Date</th>
+                                        <th>Tanggal</th>
+                                        <th>Jam</th>
                                         <th>Code</th>
                                         <th>Nama Pasien</th>
                                         <th>Total</th>
@@ -1231,6 +1242,7 @@
         var total_discount = {{ $discount_total }};
         var discount = "";
         var subtotal_discount = "";
+        var subtotalpreview = document.getElementById('subtotal');
         var total_item = "";
         var medicine_id = "";
         var price2 = "";
@@ -1268,7 +1280,7 @@
         cartTotalInput.value = formatRupiah(totaltransaction);
         payment_total.value = formatRupiah(totalbought);
 
-
+        subtotalpreview.value = formatRupiah(totaltransaction);
         previewdiscounttotal.value = formatRupiah(total_discount);
         previewtransactiontotal.value = formatRupiah(totaltransaction);
         if (packageInput) {
@@ -2098,6 +2110,7 @@
                         document.getElementById('productSearch').focus();
                         closeBox();
                         cartTotalInput.value = formatRupiah(totaltransaction);
+                        subtotalpreview.value = formatRupiah(totaltransaction);
                         previewdiscounttotal.value = formatRupiah(total_discount);
                         previewtransactiontotal.value = formatRupiah(totaltransaction);
                         payment_total.value = formatRupiah(totalbought);
@@ -2200,6 +2213,7 @@
 
                     // UPDATE PREVIEW 
                     cartTotalInput.value = formatRupiah(totaltransaction);
+                    subtotalpreview.value = formatRupiah(totaltransaction);
                     previewdiscounttotal.value = formatRupiah(total_discount);
                     previewtransactiontotal.value = formatRupiah(totaltransaction);
                     payment_total.value = formatRupiah(totalbought);
@@ -2371,8 +2385,9 @@
                     renumberRows();
                     selectedRowId = null;
 
-                    // Update Previews
+                    // Update Preview
                     cartTotalInput.value = formatRupiah(response.data.total_transaction);
+                    subtotalpreview.value = formatRupiah(response.data.total_transaction);
                     previewdiscounttotal.value = formatRupiah(response.data.total_discount);
                     previewtransactiontotal.value = formatRupiah(response.data.total_transaction);
                     payment_total.value = formatRupiah(response.data.totalbought);
@@ -2524,11 +2539,12 @@
                     <tr><td>Tunai</td><td></td><td>${paid}</td></tr>
                     <tr><td>Kembali</td><td></td><td>${changes}</td></tr>
                 `;
-
+                    const modal = document.getElementById("invoiceModal");
+                    const content = document.getElementById("invoiceContent");
+                    modal.classList.remove("hidden");
+                    document.getElementById('print').focus();
                     if (confirm("Apakah anda ingin mencetak struk?")) {
-                        const modal = document.getElementById("invoiceModal");
-                        const content = document.getElementById("invoiceContent");
-                        modal.classList.remove("hidden");
+
 
                         requestAnimationFrame(() => {
                             modal.classList.add("opacity-100");
@@ -3072,6 +3088,7 @@
             >
                 <td>${tbody.rows.length + 1}</td>
                 <td>${item.date}</td>
+                <td>${item.time}</td>
                 <td>${item.code}</td>
                 <td>${item.name}</td>
                 <td>${formatRupiah(item.final_price)}</td>
