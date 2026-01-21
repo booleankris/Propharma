@@ -65,6 +65,7 @@
                                 <tr>
                                     <th class="px-4 py-3">#</th>
                                     <th class="px-4 py-3">Tanggal</th>
+                                    <th class="px-4 py-3">Jam</th>
                                     <th class="px-4 py-3">Nomor</th>
                                     <th class="px-4 py-3">Nama Pelanggan/Pasien</th>
                                     <th class="px-4 py-3">Harga</th>
@@ -123,6 +124,9 @@
                     },
                     {
                         data: 'date'
+                    },
+                    {
+                        data: 'time'
                     },
                     {
                         data: 'code'

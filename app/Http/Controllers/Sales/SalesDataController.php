@@ -63,6 +63,9 @@ class SalesDataController extends Controller
                 ->addColumn('date', function ($row) {
                     return Carbon::parse($row->created_at)->format('d/m/Y');
                 })
+                ->addColumn('time', function ($row) {
+                    return Carbon::parse($row->created_at)->format('H:i:s');
+                })
                 ->addColumn('code', function ($row) {
                     return $row->transactions?->transaction_code ?? '-';
                 })
