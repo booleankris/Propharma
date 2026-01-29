@@ -8,7 +8,7 @@
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
     <style>
         .select2-container .select2-selection--single {
-            height: 42px !important;
+            height: 46px !important;
             /* match your Tailwind input height */
             padding: 7px 10px !important;
             display: flex !important;
@@ -21,6 +21,13 @@
 
         .select2-container--default .select2-selection--single .select2-selection__arrow {
             height: 42px !important;
+        }
+
+        .select2-selection__choice {
+            background: #e5e7eb !important;
+            border-radius: 6px !important;
+            padding: 4px 8px !important;
+            font-size: 13px;
         }
     </style>
 @endsection
@@ -57,7 +64,7 @@
                 </div>
 
                 <div class="bg-white p-6 rounded-2xl shadow-md w-full md:w-[60%] mx-auto">
-                    <form id="medicineForm" action="{{ route('medicines.store') }}" method="POST" class="space-y-3">
+                    <form id="medicineForm" action="{{ route('medicines.store') }}" method="POST" class="space-y-2  ">
                         @csrf
                         <input type="hidden" id="medicine_id" name="id">
 
@@ -79,7 +86,7 @@
                         </div>
 
                         {{-- COMPOSITION --}}
-                        <div class="flex gap-2 items-center">
+                        <div class="flex gap-1 items-center">
                             {{-- COMPOSITION --}}
                             <div class="w-full">
                                 <label class="block text-[14px] font-semibold text-gray-800 mb-1">Komposisi</label>
@@ -108,7 +115,7 @@
                             </label>
                         </div>
                         {{-- NAME --}}
-                        <div class="flex gap-2 w-full">
+                        <div class="flex gap-1 w-full">
 
                             <div class="w-full">
                                 <label class="block text-[14px] font-semibold text-gray-800 mb-1">Nama Obat</label>
@@ -130,23 +137,53 @@
                             <input id="pharmacy_id" name="pharmacy_id" value="1" type="number"
                                 class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px]">
                         </div>
-                        <div class="flex gap-2">
+                        <div class="flex gap-1">
                             {{-- PACKAGING --}}
                             <div class="w-full">
                                 <label class="block text-[14px] font-semibold text-gray-800 mb-1">Kemasan</label>
-                                <input id="packaging" name="packaging" type="text"
-                                    class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px]">
+                                <select id="packaging" name="packaging" required class="select2 w-full ...">
+                                    <option value="">-- Pilih Kemasan --</option>
+                                    <option value="UNIT">UNIT</option>
+                                    <option value="PACK">PACK</option>
+                                    <option value="PCS">PCS</option>
+                                    <option value="TUBE">TUBE</option>
+                                    <option value="VIAL">VIAL</option>
+                                    <option value="AMP">AMP</option>
+                                    <option value="KTK">KTK</option>
+                                    <option value="BKS">BKS</option>
+                                    <option value="BTL">BTL</option>
+                                    <option value="BOX">BOX</option>
+                                    <option value="TAB">TAB</option>
+
+
+                                </select>
+
                             </div>
                             {{-- Satuan --}}
                             <div class="w-full">
                                 <label class="block text-[14px] font-semibold text-gray-800 mb-1">Satuan</label>
-                                <input id="unit" name="unit" type="text"
-                                    class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px]">
+                                <select id="unit" name="unit" required class="select2 w-full ...">
+                                    <option value="UNIT">UNIT</option>
+                                    <option value="PACK">PACK</option>
+                                    <option value="PCS">PCS</option>
+                                    <option value="TUBE">TUBE</option>
+                                    <option value="VIAL">VIAL</option>
+                                    <option value="AMP">AMP</option>
+                                    <option value="KTK">KTK</option>
+                                    <option value="BKS">BKS</option>
+                                    <option value="BTL">BTL</option>
+                                    <option value="BOX">BOX</option>
+                                    <option value="TAB">TAB</option>
+                                    
+
+                                </select>
+                                
+
                             </div>
                             {{-- Isi --}}
                             <div class="w-full">
                                 <label class="block text-[14px] font-semibold text-gray-800 mb-1">Isi</label>
-                                <input id="content" name="content" type="text"
+                                <input id="content" name="content" type="number"
                                     class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px]">
                             </div>
                             {{-- DOSAGE --}}
@@ -156,56 +193,17 @@
                                     class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px]">
                             </div>
                         </div>
-                        <div class="flex gap-2">
+                        <div class="flex gap-1">
                             {{-- Sediaan --}}
                             <div class="w-full">
                                 <label class="block text-[14px] font-semibold text-gray-800 mb-1">Sediaan</label>
                                 <input id="preparations" name="preparations" type="text"
                                     class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px]">
                             </div>
-                            {{-- RAW PRICE
-                            <div class="w-full">
-                                <label class="block text-[14px] font-semibold text-gray-800 mb-1">Harga HNA</label>
-                                <input id="raw_price" name="raw_price" type="number"
-                                    class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px]">
-                            </div>
 
-                            {{-- PHARMACY NET PRICE --}}
-                            {{-- <div class="w-full">
-                                <label class="block text-[14px] font-semibold text-gray-800 mb-1">Harga PPN 11%</label>
-                                <input id="pharmacy_net_price" name="pharmacy_net_price" type="number"
-                                    class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px]">
-                            </div> --}}
-
-                            {{-- NET PRICE --}}
-                            {{-- <div class="w-full">
-                                <label class="block text-[14px] font-semibold text-gray-800 mb-1">HJA/HET</label>
-                                <input id="net_price" name="net_price" type="number"
-                                    class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px]">
-                            </div>  --}}
-                            {{-- <div class="w-full">
-                                <label class="block text-[14px] font-semibold text-gray-800 mb-1">Harga HNA</label>
-                                <input id="raw_price" name="raw_price" type="text"
-                                    class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px]"
-                                    placeholder="Rp 0">
-                            </div>
-
-                            <div class="w-full">
-                                <label class="block text-[14px] font-semibold text-gray-800 mb-1">Harga PPN 11%</label>
-                                <input id="pharmacy_net_price" name="pharmacy_net_price" type="text"
-                                    class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px]"
-                                    placeholder="Rp 0">
-                            </div>
-
-                            <div class="w-full">
-                                <label class="block text-[14px] font-semibold text-gray-800 mb-1">HJA/HET</label>
-                                <input id="net_price" name="net_price" type="text"
-                                    class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px]"
-                                    placeholder="Rp 0">
-                            </div> --}}
-                            <div class="w-full">
+                            <div class="w-full hidden">
                                 <label class="block text-[14px] font-semibold text-gray-800 mb-1">Harga Utuh</label>
-                                <input id="raw_price" name="raw_price" type="text"
+                                <input id="raw_price" value="0" name="raw_price" type="text"
                                     class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px]"
                                     placeholder="Rp 0">
                             </div>
@@ -218,7 +216,7 @@
                             </div>
                             <div class="w-full">
                                 <label class="block text-[14px] font-semibold text-gray-800 mb-1">Harga PPN 11%</label>
-                                <input id="net_price" name="net_price" type="text"
+                                <input id="net_price" name="net_price" readonly type="text"
                                     class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px]"
                                     placeholder="Rp 0">
                             </div>
@@ -231,13 +229,13 @@
 
                         </div>
 
-                        <div class="flex gap-2">
+                        <div class="flex gap-1">
 
 
                             {{-- MIN STOCK --}}
 
                         </div>
-                        <div class="flex gap-2">
+                        <div class="flex gap-1">
                             <div class="w-full">
                                 <label class="block text-[14px] font-semibold text-gray-800 mb-1">Stok Minimal</label>
                                 <input id="minimal_stock" name="minimal_stock" type="number"
@@ -251,49 +249,59 @@
                                     class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px]">
                             </div>
 
+                        </div>
+
+
+                        <div class="w-full space-y-1" id="creditorSelect">
+                            <label class="block text-[14px] font-semibold text-gray-800">Pilih Kreditur</label>
+                            <div id="pillContainer" class="flex flex-wrap gap-2"></div>
+
+                            <div class="relative">
+                                <input id="searchInput" type="text" name="creditors_id"
+                                    placeholder="Cari Kreditor...."
+                                    class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px]"
+                                    autocomplete="off">
+
+                                <ul id="dropdown"
+                                    class="absolute z-50 mt-1 w-full rounded-xl border bg-white shadow-lg max-h-60 overflow-y-auto hidden">
+                                </ul>
+                            </div>
+
+                            <input type="hidden" name="creditor_ids" id="creditor_ids">
+                        </div>
+                        <div class="flex gap-1">
                             <div class="w-full">
-                                <label class="block text-[14px] font-semibold text-gray-800 mb-1">Creditor</label>
-                                <select id="creditors_id" name="creditors_id"
+                                <label class="block text-[14px] font-semibold text-gray-800 mb-1">Etalase</label>
+                                <input id="etalase" name="etalase" type="text" placeholder="Etalase"
+                                    class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px]">
+                            </div>
+                            <div class="w-full">
+                                <label class="block text-[14px] font-semibold text-gray-800 mb-1">Lokasi</label>
+                                <input id="location" name="location" type="text" placeholder="Lokasi"
+                                    class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px]">
+                            </div>
+
+                            <div class="w-full">
+                                <label class="block text-[14px] font-semibold text-gray-800 mb-1">Pilih Tipe Pesanan
+                                </label>
+
+                                <select id="type" name="type" required
                                     class="select2 w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px]">
-                                    <option value="">-- Select Creditor --</option>
+                                    <option value="">-- Pilih Tipe --</option>
+                                    <option value="Narkotika">Narkotika</option>
+                                    <option value="Psikotropika">Psikotropika</option>
+                                    <option value="Reguler">Reguler</option>
+                                    <option value="Prekursor">Prekursor</option>
+                                    <option value="Obat Tertentu">Obat Tertentu</option>
+                                    <option value="Reguler">Reguler</option>
                                 </select>
                             </div>
                         </div>
-                        {{-- CHECKBOX GROUPS --}}
-                        <div class="flex gap-5">
-                            <label class="flex items-center space-x-2">
-                                <input type="checkbox" id="whole" name="whole" value="1"
-                                    class="w-4 h-4 text-blue-600 border-gray-300 rounded">
-                                <span class="text-sm">Utuh</span>
-                            </label>
 
-                            <label class="flex items-center space-x-2">
-                                <input type="checkbox" id="precursor" name="precursor" value="1"
-                                    class="w-4 h-4 text-blue-600 border-gray-300 rounded">
-                                <span class="text-sm">Precursor</span>
-                            </label>
 
-                            <label class="flex items-center space-x-2">
-                                <input type="checkbox" id="psychotropic" name="psychotropic" value="1"
-                                    class="w-4 h-4 text-blue-600 border-gray-300 rounded">
-                                <span class="text-sm">Psychotropic</span>
-                            </label>
-
-                            <label class="flex items-center space-x-2">
-                                <input type="checkbox" id="receipt" name="receipt" value="1"
-                                    class="w-4 h-4 text-blue-600 border-gray-300 rounded">
-                                <span class="text-sm">Receipt</span>
-                            </label>
-
-                            <label class="flex items-center space-x-2">
-                                <input type="checkbox" id="status" name="status" value="1" checked
-                                    class="w-4 h-4 text-blue-600 border-gray-300 rounded">
-                                <span class="text-sm">Active</span>
-                            </label>
-                        </div>
 
                         {{-- BUTTONS --}}
-                        <div class="flex justify-end gap-2 pt-3">
+                        <div class="flex justify-end gap-2">
                             <button type="button" id="submitForm"
                                 class="px-5 py-3 w-full bg-blue-500 hover:bg-blue-600 text-white rounded-lg shadow-lg">
                                 Submit
@@ -330,6 +338,17 @@
 
     {{-- Form --}}
     <script>
+        const creditors = @json($creditors);
+        const input = document.getElementById('searchInput');
+        const dropdown = document.getElementById('dropdown');
+        const pills = document.getElementById('pillContainer');
+        const hidden = document.getElementById('creditor_ids');
+        const etalase = document.getElementById('etalase');
+        const type = document.getElementById('type');
+        let selected = new Map();
+        let activeIndex = -1;
+        let filtered = [];
+
         document.addEventListener("DOMContentLoaded", function() {
             const form = document.getElementById("medicineForm");
             const creditorSelect = document.getElementById("creditors_id");
@@ -345,11 +364,21 @@
                 Array.from(form.querySelectorAll(focusableSelectors))
                 .filter(el => el.offsetParent !== null);
 
+            $('#type').on('select2:select', function() {
+                setTimeout(() => {
+                    handleSubmit();
+                }, 0);
+            });
+
             form.addEventListener("keydown", function(e) {
                 if (e.key !== "Enter") return;
 
                 if (e.target.tagName === "TEXTAREA") return;
-
+                if (e.target.id === "searchInput") {
+                    e.preventDefault();
+                    $("#creditors_id").select2("open");
+                    return;
+                }
                 e.preventDefault();
 
                 const focusables = getFocusableElements();
@@ -373,6 +402,15 @@
     </script>
 
     <script>
+        function reset() {
+            form.reset();
+            $('#medicine_category_id').val(null).trigger('change');
+            $('#composition_id').val(null).trigger('change');
+            $('#factory_id').val(null).trigger('change');
+            $('#creditors_id').val(null).trigger('change');
+            $('#type').val(null).trigger('change');
+        }
+
         function formatRupiah(input) {
             let value = input.value.replace(/[^0-9]/g, '');
             if (!value) return input.value = '';
@@ -391,6 +429,7 @@
         document.getElementById('pharmacy_net_price').addEventListener('input', function() {
             formatRupiah(this);
             calculatePPN();
+            document.getElementById('raw_price').value = this.value;
 
         });
 
@@ -501,29 +540,148 @@
                     cache: true
                 }
             });
-            // CREDITORS SELECT2
-            $('#creditors_id').select2({
-                placeholder: 'Search creditor...',
+            $('#packaging').select2({
+                placeholder: 'Cari Kemasan...',
                 allowClear: true,
-                ajax: {
-                    url: '{{ route('creditors.select') }}',
-                    dataType: 'json',
-                    delay: 250,
-                    data: function(params) {
-                        return {
-                            q: params.term
-                        };
-                    },
-                    processResults: function(data) {
-                        return {
-                            results: data.map(item => ({
-                                id: item.id,
-                                text: item.name
-                            }))
-                        };
-                    },
-                    cache: true
+            });
+            $('#unit').select2({
+                placeholder: 'Cari Satuan...',
+                allowClear: true,
+            });
+            $('#type').select2({
+                placeholder: 'Cari Tipe...',
+                allowClear: true,
+            });
+            // CREDITORS 
+            function renderDropdown(filter = '') {
+                dropdown.innerHTML = '';
+                activeIndex = -1;
+
+                filtered = creditors.filter(c =>
+                    c.name.toLowerCase().includes(filter.toLowerCase())
+                );
+
+                if (!filtered.length) {
+                    dropdown.innerHTML = `
+            <li class="px-4 py-2 text-sm text-gray-400">No results</li>
+        `;
+                    return;
                 }
+
+                filtered.forEach(c => {
+                    const isSelected = selected.has(c.id);
+
+                    const li = document.createElement('li');
+                    li.className = `
+            px-4 py-2 text-sm flex items-center justify-between
+            ${isSelected
+                ? 'text-gray-400 cursor-not-allowed'
+                : 'cursor-pointer hover:bg-blue-50'}
+        `;
+
+                    li.innerHTML = `
+            <span>${c.name}</span>
+            ${isSelected ? '<span class="text-blue-600">✔</span>' : ''}
+        `;
+
+                    if (!isSelected) {
+                        li.onclick = () => selectItem(c);
+                    }
+
+                    dropdown.appendChild(li);
+                });
+            }
+
+            function selectItem(item) {
+                selected.set(item.id, item);
+                input.value = '';
+                renderPills();
+                renderDropdown();
+                syncHidden();
+                input.focus();
+                dropdown.classList.add('hidden');
+            }
+
+            function removeItem(id) {
+                selected.delete(id);
+                renderPills();
+                renderDropdown(input.value);
+                syncHidden();
+            }
+
+            function renderPills() {
+                pills.innerHTML = '';
+
+                selected.forEach(item => {
+                    const pill = document.createElement('div');
+                    pill.className =
+                        'flex items-center gap-2 inline-flex items-center rounded-full border px-5 py-2 text-sm font-medium transition-all duration-200 ease-out hover:bg-[#064cba] peer-checked:bg-blue-600 bg-[#3b82f6] text-[#fff] peer-checked:text-white peer-checked:border-blue-600 peer-checked:scale-105 peer-checked:shadow-[0_4px_10px_rgba(37,99,235,0.4)]';
+
+                    pill.innerHTML = `
+            ${item.name}
+            <button class="text-[#fff] hover:text-blue-700">&times;</button>
+        `;
+
+                    pill.querySelector('button').onclick = () => removeItem(item.id);
+                    pills.appendChild(pill);
+                });
+            }
+
+            function syncHidden() {
+                hidden.value = [...selected.keys()].join(',');
+            }
+
+            // Keyboard navigation
+
+            input.addEventListener('keydown', e => {
+                if (!filtered.length) return;
+
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    activeIndex = (activeIndex + 1) % filtered.length;
+                }
+
+                if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    activeIndex =
+                        (activeIndex - 1 + filtered.length) % filtered.length;
+                }
+
+                if (e.key === 'Enter' && activeIndex >= 0) {
+                    e.preventDefault();
+                    selectItem(filtered[activeIndex]);
+                    input.focus();
+                }
+
+                [...dropdown.children].forEach((li, i) =>
+                    li.classList.toggle('bg-blue-100', i === activeIndex)
+                );
+            });
+
+            // Input handling
+            input.addEventListener('input', e => {
+                dropdown.classList.remove('hidden');
+                renderDropdown(e.target.value);
+            });
+
+            // Click outside
+            document.addEventListener('click', e => {
+                if (!document.getElementById('creditorSelect').contains(e.target)) {
+                    dropdown.classList.add('hidden');
+                }
+            });
+
+
+
+            // 
+            $('#medicine_category_id').on('select2:select', function() {
+                $('#composition_id').select2('open');
+            });
+            $('#composition_id').on('select2:select', function() {
+                $('#factory_id').select2('open');
+            });
+            $('#factory_id').on('select2:select', function() {
+                $('#name').focus();
             });
 
 
@@ -590,19 +748,25 @@
                     selectedData.factory_name
                 );
 
-                setSelect2AjaxValue(
-                    '#creditors_id',
-                    selectedData.creditors_id,
-                    selectedData.creditor_name
-                );
+                $('#type')
+                    .val(selectedData.type)
+                    .trigger('change');
+
+                $('#packaging')
+                    .val(selectedData.packaging)
+                    .trigger('change');
+
+                $('#unit')
+                    .val(selectedData.unit)
+                    .trigger('change');
 
                 // checkboxes
-                $('#generic_check').prop('checked', selectedData.generic_check == 1);
-                $('#whole').prop('checked', selectedData.whole == 1);
-                $('#precursor').prop('checked', selectedData.precursor == 1);
-                $('#psychotropic').prop('checked', selectedData.psychotropic == 1);
-                $('#receipt').prop('checked', selectedData.receipt == 1);
-                $('#status').prop('checked', selectedData.status == 1);
+                // $('#generic_check').prop('checked', selectedData.generic_check == 1);
+                // $('#whole').prop('checked', selectedData.whole == 1);
+                // $('#precursor').prop('checked', selectedData.precursor == 1);
+                // $('#psychotropic').prop('checked', selectedData.psychotropic == 1);
+                // $('#receipt').prop('checked', selectedData.receipt == 1);
+                // $('#status').prop('checked', selectedData.status == 1);
 
                 $('#medicine_id').val(selectedData.id);
             });
@@ -628,7 +792,7 @@
             });
             // CANCEL
             $('#cancelEdit').click(function() {
-                form.reset();
+                reset();
                 $('#medicine_id').val('');
                 $('#table-data tbody tr').removeClass('bg-blue-100');
             });
@@ -676,11 +840,11 @@
 
             // correct checkbox mapping
             formData.set("generic", document.getElementById('generic_check').checked ? 1 : 0);
-            formData.set("whole", document.getElementById('whole').checked ? 1 : 0);
-            formData.set("precursor", document.getElementById('precursor').checked ? 1 : 0);
-            formData.set("psychotropic", document.getElementById('psychotropic').checked ? 1 : 0);
-            formData.set("receipt", document.getElementById('receipt').checked ? 1 : 0);
-            formData.set("status", document.getElementById('status').checked ? 1 : 0);
+            // formData.set("whole", document.getElementById('whole').checked ? 1 : 0);
+            // formData.set("precursor", document.getElementById('precursor').checked ? 1 : 0);
+            // formData.set("psychotropic", document.getElementById('psychotropic').checked ? 1 : 0);
+            // formData.set("receipt", document.getElementById('receipt').checked ? 1 : 0);
+            // formData.set("status", document.getElementById('status').checked ? 1 : 0);
             formData.set('raw_price', cleanRupiah(document.getElementById('raw_price').value));
             formData.set('pharmacy_net_price', cleanRupiah(document.getElementById('pharmacy_net_price').value));
             formData.set('net_price', cleanRupiah(document.getElementById('net_price').value));
@@ -694,14 +858,16 @@
                         title: 'Success',
                         message: res.data.message
                     });
-                    form.reset();
+                    reset();
                     $('#medicine_id').val('');
                     tableData.ajax.reload(null, false);
-
                     $('#medicine_category_id').val(null).trigger('change');
                     $('#composition_id').val(null).trigger('change');
                     $('#factory_id').val(null).trigger('change');
                     $('#creditors_id').val(null).trigger('change');
+                    $('#type').val(null).trigger('change');
+
+
                 })
                 .catch(err => {
                     let msg = 'Failed to save.';

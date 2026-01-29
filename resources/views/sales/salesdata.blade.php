@@ -77,7 +77,7 @@
                 </div>
 
                 <div class="bg-white p-6 rounded-2xl shadow-md w-full md:w-[50%] mx-auto">
-                    <table id="items-table" class="table table-bordered w-full mt-4">
+                    <table id="items-table" class="table text-xs table-bordered w-full mt-4">
                         <thead>
                             <tr>
                                 <th>No</th>

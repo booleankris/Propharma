@@ -1242,7 +1242,9 @@
         var total_discount = {{ $discount_total }};
         var discount = "";
         var subtotal_discount = "";
-        var subtotalpreview = document.getElementById('subtotal');
+        const subtotalpreview = document.getElementById('subtotal');
+
+
         var total_item = "";
         var medicine_id = "";
         var price2 = "";
@@ -1279,8 +1281,9 @@
         // Set nilai awal
         cartTotalInput.value = formatRupiah(totaltransaction);
         payment_total.value = formatRupiah(totalbought);
-
-        subtotalpreview.value = formatRupiah(totaltransaction);
+        if (subtotalpreview) {
+            subtotalpreview.value = formatRupiah(totaltransaction);
+        }
         previewdiscounttotal.value = formatRupiah(total_discount);
         previewtransactiontotal.value = formatRupiah(totaltransaction);
         if (packageInput) {
@@ -2110,7 +2113,10 @@
                         document.getElementById('productSearch').focus();
                         closeBox();
                         cartTotalInput.value = formatRupiah(totaltransaction);
-                        subtotalpreview.value = formatRupiah(totaltransaction);
+                        if (subtotalpreview) {
+
+                            subtotalpreview.value = formatRupiah(totaltransaction);
+                        }
                         previewdiscounttotal.value = formatRupiah(total_discount);
                         previewtransactiontotal.value = formatRupiah(totaltransaction);
                         payment_total.value = formatRupiah(totalbought);
@@ -2213,8 +2219,12 @@
 
                     // UPDATE PREVIEW 
                     cartTotalInput.value = formatRupiah(totaltransaction);
-                    subtotalpreview.value = formatRupiah(totaltransaction);
+                    if (subtotalpreview) {
+                        subtotalpreview.value = formatRupiah(totaltransaction);
+                    }
+
                     previewdiscounttotal.value = formatRupiah(total_discount);
+
                     previewtransactiontotal.value = formatRupiah(totaltransaction);
                     payment_total.value = formatRupiah(totalbought);
 
@@ -2387,7 +2397,10 @@
 
                     // Update Preview
                     cartTotalInput.value = formatRupiah(response.data.total_transaction);
-                    subtotalpreview.value = formatRupiah(response.data.total_transaction);
+                    if (subtotalpreview) {
+
+                        subtotalpreview.value = formatRupiah(response.data.total_transaction);
+                    }
                     previewdiscounttotal.value = formatRupiah(response.data.total_discount);
                     previewtransactiontotal.value = formatRupiah(response.data.total_transaction);
                     payment_total.value = formatRupiah(response.data.totalbought);

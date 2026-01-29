@@ -35,7 +35,9 @@ class Medicines extends Model
         'whole',
         'precursor',
         'receipt',
-
+        'etalase',
+        'location',
+        'type'
     ];
     public function factory()
     {
@@ -53,6 +55,10 @@ class Medicines extends Model
     {
         return $this->belongsTo(Creditor::class, 'creditors_id');
     } 
+    public function transactions()
+    {
+        return $this->hasMany(MedicineCreditor::class);
+    }
     public static function generateCode()
     {
         $last = self::orderBy('id', 'desc')->first();

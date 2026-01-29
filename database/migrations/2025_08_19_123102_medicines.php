@@ -22,10 +22,7 @@ return new class extends Migration
             $table->foreignId('medicine_category_id')->constrained('medicine_categories')->onDelete('cascade');
             $table->foreignId('composition_id')->constrained('compositions')->onDelete('cascade');
             $table->foreignId('factory_id')->constrained('factories')->onDelete('cascade');
-            $table->string('preparations')->nullable();
-            $table->string('whole')->nullable();
-            $table->string('precursor')->nullable();
-            $table->string('receipt')->nullable();
+            $table->foreignId('creditors_id')->nullable()->constrained('creditors');
             $table->string('name');
             $table->string('packaging')->nullable();
             $table->string('unit')->nullable();
@@ -39,9 +36,16 @@ return new class extends Migration
             $table->integer('minimal_stock');
             $table->integer('stock')->default(0);
             $table->integer('status')->default('0')->nullable();
-
             $table->timestamps();
-        });
+            $table->string('preparations')->nullable();
+            $table->string('whole')->nullable();
+            $table->string('precursor')->nullable();
+            $table->string('receipt')->nullable();
+            $table->string('etalase')->default(0); 
+            $table->string('location')->default(0);
+            $table->string('type')->default(0); 
+           
+        }); 
     }
 
     /**

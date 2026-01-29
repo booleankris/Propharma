@@ -197,6 +197,76 @@
                         <span class="text-[18px] font-poppins tracking-wide font-bold text-[#6196c0]">Penjualan</span>
                     </div>
                 </a>
+                <div id="receivingBtn" onclick="openModal('receivingModal')"
+                    class="w-[45%] md:w-[250px] flex flex-col dashboard-item items-center justify-center p-[20px] bg-[#ffffff] rounded-2xl shadow-sm hover:bg-gray-50">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 468" class="w-[70px] my-3">
+                        <path class="text-green-500" fill="currentColor"
+                            d="M159.632 0h87.127c9.117 0 16.576 7.459 16.576 16.576v68.882H143.056V16.576C143.056 7.459 150.515 0 159.632 0z" />
+                        <path class="text-blue-500" fill="currentColor"
+                            d="M313.587 34.74c33.703 0 62.487 21.049 73.941 50.718H239.642c11.454-29.669 40.238-50.718 73.945-50.718z" />
+                        <path class="text-yellow-400" fill="currentColor"
+                            d="M407.338 10.942c44.42 0 81.311 32.196 88.626 74.528H318.712c7.319-42.323 44.211-74.528 88.626-74.528z" />
+                        <path class="text-red-500" fill="currentColor"
+                            d="M151.727 278.707l-47.29-171.245a16.321 16.321 0 01-.994-5.63c0-9.04 7.335-16.374 16.374-16.374h375.844c1.29.039 2.598.19 3.903.512 8.76 2.155 14.114 11.004 11.959 19.764l-42.37 171.42c-1.324 7.708-8.045 13.578-16.133 13.578H167.46c-7.16 0-13.734-4.741-15.733-11.975z" />
+                        <path class="text-gray-800" fill="currentColor"
+                            d="M224.685 387.66c22.097 0 40.013 17.911 40.013 40.013 0 22.097-17.916 40.012-40.013 40.012-22.101 0-40.016-17.915-40.016-40.012 0-22.102 17.915-40.013 40.016-40.013z
+                   M400.109 387.66c22.101 0 40.012 17.911 40.012 40.013 0 22.097-17.911 40.012-40.012 40.012-22.098 0-40.013-17.915-40.013-40.012 0-22.102 17.915-40.013 40.013-40.013z" />
+                        <path class="text-red-700" fill="currentColor"
+                            d="M225.838 158.688c-.419-6.329 4.369-11.808 10.698-12.227 6.329-.419 11.807 4.368 12.227 10.698l4.115 61.158c.42 6.329-4.368 11.808-10.697 12.227-6.329.42-11.807-4.368-12.227-10.697l-4.116-61.159z
+                   M301.103 157.923c0-6.352 5.157-11.508 11.509-11.508 6.353 0 11.509 5.156 11.509 11.508v61.159c0 6.353-5.156 11.509-11.509 11.509-6.352 0-11.509-5.156-11.509-11.509v-61.159z
+                   M376.462 157.159c.419-6.33 5.898-11.117 12.227-10.698 6.329.419 11.116 5.898 10.697 12.227l-4.116 61.159c-.419 6.329-5.898 11.117-12.227 10.697-6.329-.419-11.116-5.898-10.697-12.227l4.116-61.158z" />
+                        <path class="text-gray-700" fill="currentColor"
+                            d="M16.37 52.333C7.331 52.333 0 45.002 0 35.963c0-9.039 7.331-16.37 16.37-16.37h42.603c14.882.271 28.426 3.187 39.818 10.277 12.468 7.758 21.775 19.861 26.687 37.928l56.387 213.068c7.105 28.084 12.961 42.544 22.167 48.729 8.034 5.398 21.336 6.547 42.272 6.473h175.209c9.04 0 16.37 7.331 16.37 16.37 0 9.039-7.33 16.371-16.37 16.371H272.499c-27.615.074-45.895-1.91-60.875-11.974-17.356-11.657-26.5-31.463-35.703-67.916L95.522 76.446c-2.543-9.362-6.83-15.299-12.359-18.739-5.929-3.689-13.827-5.242-22.963-5.42H16.37z" />
+                    </svg>
+
+
+                    <span class="text-[18px] font-poppins tracking-wide font-bold text-[#6196c0]">Pembelian</span>
+                </div>
+                <div id="salesBtn" onclick="openModal('salesModal')"
+                    class="w-[45%] md:w-[250px] flex flex-col dashboard-item items-center justify-center p-[20px] bg-[#ffffff] rounded-2xl shadow-sm hover:bg-gray-50">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 115 115" class="w-[65px] h-[65px] my-3">
+
+                        <!-- GREEN SECTION -->
+                        <path class="fill-current text-emerald-500"
+                            d="M57.501 0v21.157a36.156 36.156 0 0 1 19.589 5.739L88.504 9.065A57.672 57.672 0 0 0 57.501 0z" />
+
+                        <path class="fill-current text-amber-700"
+                            d="M104.03 23.702A57.35 57.35 0 0 0 88.503 9.065L77.09 26.896c7.977 5.117 13.82 13.26 15.907 22.814l20.678-4.538a57.292 57.292 0 0 0-9.645-21.47z" />
+
+                        <!-- YELLOW SECTION -->
+                        <path class="fill-current text-yellow-200"
+                            d="M83.198 83.198C76.622 89.775 67.536 93.843 57.5 93.843V115a57.237 57.237 0 0 0 33.798-10.971 58 58 0 0 0 6.869-5.862L83.198 83.198z" />
+
+                        <path class="fill-current text-yellow-200"
+                            d="M57.5 93.842a36.164 36.164 0 0 1-19.589-5.738l-11.413 17.83A57.67 57.67 0 0 0 57.501 115L57.5 93.842z" />
+
+                        <!-- MINT SECTION -->
+                        <path class="fill-current text-emerald-300"
+                            d="M23.703 10.971a58 58 0 0 0-6.869 5.862C2.762 30.871-2.793 51.003 1.327 69.827a57.29 57.29 0 0 0 9.645 21.471 57.334 57.334 0 0 0 15.527 14.637l11.413-17.83C27.839 81.643 21.158 70.355 21.158 57.5c0-20.071 16.271-36.343 36.342-36.343h.001V0a57.23 57.23 0 0 0-33.798 10.971z" />
+
+                        <!-- ORANGE + RED -->
+                        <path class="fill-current text-amber-400"
+                            d="M87.475 78.046a36.605 36.605 0 0 1-4.276 5.152l14.969 14.969a57.087 57.087 0 0 0 6.767-8.154l-17.46-11.967z" />
+
+                        <path class="fill-current text-red-400"
+                            d="m113.675 45.173-20.678 4.538c.548 2.51.846 5.115.846 7.789 0 7.626-2.354 14.7-6.368 20.546l17.459 11.967c8.985-13.11 12.118-29.412 8.741-44.84z" />
+
+                        <!-- BAR CHART -->
+                        <path class="fill-current text-amber-700"
+                            d="M38.642 47.703h-.298a3.05 3.05 0 0 0-3.041 3.041v25.808a3.05 3.05 0 0 0 3.041 3.041h.298a3.05 3.05 0 0 0 3.041-3.041V50.744a3.05 3.05 0 0 0-3.041-3.041z" />
+
+                        <path class="fill-current text-amber-700"
+                            d="M50.87 57.367h-.298a3.05 3.05 0 0 0-3.041 3.041v16.145a3.05 3.05 0 0 0 3.041 3.041h.298a3.05 3.05 0 0 0 3.041-3.041V60.408a3.05 3.05 0 0 0-3.041-3.041z" />
+
+                        <path class="fill-current text-amber-700"
+                            d="M63.097 28.376H62.8a3.05 3.05 0 0 0-3.041 3.041v45.136a3.05 3.05 0 0 0 3.041 3.041h.298a3.05 3.05 0 0 0 3.041-3.041V31.417a3.05 3.05 0 0 0-3.042-3.041z" />
+
+                        <path class="fill-current text-amber-700"
+                            d="M75.325 38.039h-.298a3.05 3.05 0 0 0-3.041 3.041v35.472a3.05 3.05 0 0 0 3.041 3.041h.298a3.05 3.05 0 0 0 3.041-3.041V41.08a3.05 3.05 0 0 0-3.041-3.041z" />
+                    </svg>
+
+                    <span class="text-[18px] font-poppins tracking-wide font-bold text-[#6196c0]">Data Penjualan</span>
+                </div>
                 {{-- Report Data --}}
                 <div id="reportBtn" onclick="openModal('reportModal')"
                     class="w-[45%] md:w-[250px] flex flex-col dashboard-item items-center justify-center p-[20px] bg-white rounded-2xl shadow-sm hover:bg-gray-50 cursor-pointer">
@@ -266,51 +336,6 @@
                     <span class="text-[18px] font-poppins tracking-wide font-bold text-[#6196c0]">Master Data</span>
                 </div>
 
-                <div id="salesBtn" onclick="openModal('salesModal')"
-                    class="w-[45%] md:w-[250px] flex flex-col dashboard-item items-center justify-center p-[20px] bg-[#ffffff] rounded-2xl shadow-sm hover:bg-gray-50">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 115 115" class="w-[65px] h-[65px] my-3">
-
-                        <!-- GREEN SECTION -->
-                        <path class="fill-current text-emerald-500"
-                            d="M57.501 0v21.157a36.156 36.156 0 0 1 19.589 5.739L88.504 9.065A57.672 57.672 0 0 0 57.501 0z" />
-
-                        <path class="fill-current text-amber-700"
-                            d="M104.03 23.702A57.35 57.35 0 0 0 88.503 9.065L77.09 26.896c7.977 5.117 13.82 13.26 15.907 22.814l20.678-4.538a57.292 57.292 0 0 0-9.645-21.47z" />
-
-                        <!-- YELLOW SECTION -->
-                        <path class="fill-current text-yellow-200"
-                            d="M83.198 83.198C76.622 89.775 67.536 93.843 57.5 93.843V115a57.237 57.237 0 0 0 33.798-10.971 58 58 0 0 0 6.869-5.862L83.198 83.198z" />
-
-                        <path class="fill-current text-yellow-200"
-                            d="M57.5 93.842a36.164 36.164 0 0 1-19.589-5.738l-11.413 17.83A57.67 57.67 0 0 0 57.501 115L57.5 93.842z" />
-
-                        <!-- MINT SECTION -->
-                        <path class="fill-current text-emerald-300"
-                            d="M23.703 10.971a58 58 0 0 0-6.869 5.862C2.762 30.871-2.793 51.003 1.327 69.827a57.29 57.29 0 0 0 9.645 21.471 57.334 57.334 0 0 0 15.527 14.637l11.413-17.83C27.839 81.643 21.158 70.355 21.158 57.5c0-20.071 16.271-36.343 36.342-36.343h.001V0a57.23 57.23 0 0 0-33.798 10.971z" />
-
-                        <!-- ORANGE + RED -->
-                        <path class="fill-current text-amber-400"
-                            d="M87.475 78.046a36.605 36.605 0 0 1-4.276 5.152l14.969 14.969a57.087 57.087 0 0 0 6.767-8.154l-17.46-11.967z" />
-
-                        <path class="fill-current text-red-400"
-                            d="m113.675 45.173-20.678 4.538c.548 2.51.846 5.115.846 7.789 0 7.626-2.354 14.7-6.368 20.546l17.459 11.967c8.985-13.11 12.118-29.412 8.741-44.84z" />
-
-                        <!-- BAR CHART -->
-                        <path class="fill-current text-amber-700"
-                            d="M38.642 47.703h-.298a3.05 3.05 0 0 0-3.041 3.041v25.808a3.05 3.05 0 0 0 3.041 3.041h.298a3.05 3.05 0 0 0 3.041-3.041V50.744a3.05 3.05 0 0 0-3.041-3.041z" />
-
-                        <path class="fill-current text-amber-700"
-                            d="M50.87 57.367h-.298a3.05 3.05 0 0 0-3.041 3.041v16.145a3.05 3.05 0 0 0 3.041 3.041h.298a3.05 3.05 0 0 0 3.041-3.041V60.408a3.05 3.05 0 0 0-3.041-3.041z" />
-
-                        <path class="fill-current text-amber-700"
-                            d="M63.097 28.376H62.8a3.05 3.05 0 0 0-3.041 3.041v45.136a3.05 3.05 0 0 0 3.041 3.041h.298a3.05 3.05 0 0 0 3.041-3.041V31.417a3.05 3.05 0 0 0-3.042-3.041z" />
-
-                        <path class="fill-current text-amber-700"
-                            d="M75.325 38.039h-.298a3.05 3.05 0 0 0-3.041 3.041v35.472a3.05 3.05 0 0 0 3.041 3.041h.298a3.05 3.05 0 0 0 3.041-3.041V41.08a3.05 3.05 0 0 0-3.041-3.041z" />
-                    </svg>
-
-                    <span class="text-[18px] font-poppins tracking-wide font-bold text-[#6196c0]">Data Penjualan</span>
-                </div>
             </div>
         </section>
 
@@ -382,11 +407,25 @@
             Close
         </button>
     </div>
+    <div id="receivingModal" class="modal-hide modal-transition fixed top-1/2 left-1/2 
+    w-[90%] max-w-[400px] bg-white p-6 rounded-2xl shadow-lg z-50">
+        <h2 class="text-xl font-bold text-[#6196c0] mb-4">Pilih Pembelian</h2>
+
+        <div class="flex flex-col space-y-3">
+
+            <a href="{{ route('orders.create') }}" class="py-3 bg-[#6196c0] text-center text-white rounded-xl">Pemesanan Barang</a>
+            <a href="{{ route('receiving.create') }}" class="py-3 bg-[#6196c0] text-center text-white rounded-xl">Penerimaan Barang</a>
+        </div>
+
+        <button class="closeModal mt-6 w-full py-2 bg-gray-300 hover:bg-gray-400 rounded-xl">
+            Close
+        </button>
+    </div>
     <div id="salesModal"
         class="modal-hide modal-transition fixed top-1/2 left-1/2 
        w-[90%] max-w-[400px] bg-white p-6 rounded-2xl shadow-lg z-50">
 
-        <h2 class="text-xl font-bold text-[#6196c0] mb-4">Pilih Master Data</h2>
+        <h2 class="text-xl font-bold text-[#6196c0] mb-4">Pilih Penjualan</h2>
 
         <div class="flex flex-col space-y-3">
 

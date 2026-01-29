@@ -35,6 +35,8 @@ use App\Http\Controllers\Master\FactoriesController;
 use App\Http\Controllers\Master\MedicineController;
 use App\Http\Controllers\Master\ParametersController;
 use App\Http\Controllers\Master\PatientsController;
+use App\Http\Controllers\Orders\OrdersController;
+use App\Http\Controllers\Orders\ReceivingController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ReportsController;
 use App\Http\Controllers\Sales\SalesDataController;
@@ -187,7 +189,6 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     Route::get('/salesdata/returdata', [SalesDataController::class, 'returdata'])->name('salesdata.returdata');
     Route::get('/salesdata/getreturmedicine', [SalesDataController::class, 'getReturMedicines'])->name('salesdata.retur.medicines');
 
-
     // Reports  
     Route::get('/reports/transactions', [ReportsController::class, 'transactions'])->name('reports.transactions');
     Route::get('/reports/medicines', [ReportsController::class, 'medicines'])->name('reports.medicines');
@@ -213,10 +214,31 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
         ->name('reports.export.transactions.download');
 
     // Medicine Export
-
     Route::post('/reports/export/medicines', [ReportsController::class, 'exportMedicines']);
     Route::get('/reports/export/medicines/status/{id}', [ReportsController::class, 'exportMedicinesStatus']);
     Route::get('/reports/export/medicines/download/{id}', [ReportsController::class, 'exportMedicinesDownload']);
+
+    // Order
+    Route::get('/createorder', [OrdersController::class, 'createOrder'])->name('orders.create');
+    Route::get('/orders', [OrdersController::class, 'order'])->name('orders.order');
+    Route::post('/orders/additemorder', [OrdersController::class, 'addItemOrder'])->name('orders.addItemOrder');
+    Route::get('/orders/search', [OrdersController::class, 'searchMedicine'])->name('orders.searchmedicine');
+    Route::get('/orders/items', [OrdersController::class, 'orderItems'])
+    ->name('orders.orderitems');
+    Route::post('/orders/updateitems', [OrdersController::class, 'updateOrderItem'])
+    ->name('orders.updateOrderItem');
+    Route::post('/orders/deleteitems', [OrdersController::class, 'deleteOrderItem'])
+    ->name('orders.deleteOrderItem');
+    Route::post('/orders/completeorder', [OrdersController::class, 'completeOrder'])
+    ->name('orders.completeOrder');
+
+    // Receiving
+    Route::get('/receiving', [ReceivingController::class, 'index'])->name('receiving.index');
+    Route::get('/createreceiving', [ReceivingController::class, 'createReceiving'])->name('receiving.create');
+
+
+
+
 
     Route::get('/compositions/select', [CompositionsController::class, 'select'])->name('composition.select');
     Route::get('/factories/select', [FactoriesController::class, 'select'])->name('factories.select');

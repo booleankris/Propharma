@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Master;
 
 use App\Http\Controllers\Controller;
-
+use App\Models\Creditor;
 use App\Models\Medicine;
 use App\Models\Medicines;
 use Illuminate\Http\Request;
@@ -25,6 +25,7 @@ class MedicineController extends Controller
                 'creditor'
             ])
                 ->select('medicines.*')
+                ->where('status', 1)
                 ->orderBy('id', 'DESC');
 
             return DataTables::of($data)
@@ -53,9 +54,9 @@ class MedicineController extends Controller
                 ->rawColumns(['status_label'])
                 ->make(true);
         }
-
-
-        return view('master.medicines.index');
+        $creditors = Creditor::orderBy('name')
+            ->get(['id', 'name']);
+        return view('master.medicines.index',compact('creditors'));
     }
 
     /**
@@ -69,7 +70,6 @@ class MedicineController extends Controller
             'medicine_category_id'    => 'required|integer',
             'composition_id'          => 'required|integer',
             'factory_id'              => 'required|integer',
-            'creditors_id'            => 'required|integer',
             'name'                    => 'required|string|max:255',
             'packaging'               => 'nullable|string|max:255',
             'unit'                    => 'nullable|string|max:100',
@@ -86,6 +86,7 @@ class MedicineController extends Controller
             'whole'                   => 'nullable|boolean',
             'precursor'               => 'nullable|boolean',
             'receipt'                 => 'nullable|boolean',
+            'type'                    => 'required|string|max:255',
             'status'                  => 'nullable|boolean',
         ]);
 
@@ -100,7 +101,7 @@ class MedicineController extends Controller
             'medicine_category_id'   => $request->medicine_category_id,
             'composition_id'         => $request->composition_id,
             'factory_id'             => $request->factory_id,
-            'creditors_id'           => $request->creditors_id,
+            'creditors_id'           => NULL,
             'name'                   => $request->name,
             'packaging'              => $request->packaging,
             'unit'                   => $request->unit,
@@ -117,10 +118,13 @@ class MedicineController extends Controller
             'whole'                  => $request->whole ? 1 : 0,
             'precursor'              => $request->precursor ? 1 : 0,
             'receipt'                => $request->receipt ? 1 : 0,
-            'status'                 => $request->status ? 1 : 0,
+            'etalase'                => $request->input('etalase', null),
+            'location'               => $request->input('location', null),
+            'type'                   => $request->type,
+            'status'                 => 1,
         ]);
 
-        return response()->json(['message' => 'Medicine created successfully.']);
+        return response()->json(['message' => 'Obat Berhasil Ditambahkan']);
     }
 
     /**
@@ -133,7 +137,6 @@ class MedicineController extends Controller
             'pharmacy_id'             => 'required|integer',
             'medicine_category_id'    => 'required|integer',
             'composition_id'          => 'required|integer',
-            'creditors_id'            => 'required|integer',
             'name'                    => 'required|string|max:255',
             'packaging'               => 'nullable|string|max:255',
             'unit'                    => 'nullable|string|max:100',
@@ -150,6 +153,7 @@ class MedicineController extends Controller
             'whole'                   => 'nullable|boolean',
             'precursor'               => 'nullable|boolean',
             'receipt'                 => 'nullable|boolean',
+            'type'                    => 'required|string|max:255',
             'status'                  => 'nullable|boolean',
         ]);
 
@@ -162,7 +166,7 @@ class MedicineController extends Controller
             'medicine_category_id'   => $request->medicine_category_id,
             'composition_id'         => $request->composition_id,
             'factory_id'             => $request->factory_id,
-            'creditors_id'           => $request->creditors_id,
+            'creditors_id'           => NULL,
             'name'                   => $request->name,
             'packaging'              => $request->packaging,
             'unit'                   => $request->unit,
@@ -179,10 +183,12 @@ class MedicineController extends Controller
             'whole'                  => $request->whole ? 1 : 0,
             'precursor'              => $request->precursor ? 1 : 0,
             'receipt'                => $request->receipt ? 1 : 0,
-            'status'                 => $request->status ? 1 : 0,
+            'etalase'                => $request->input('etalase', null),
+            'location'               => $request->input('location', null),
+            'type'                   => $request->type,
+            'status'                 => 1,
         ]);
-
-        return response()->json(['message' => 'Medicine updated successfully.']);
+        return response()->json(['message' => 'Obat Berhasil Di-Update.']);
     }
 
     /**
@@ -192,10 +198,13 @@ class MedicineController extends Controller
     public function destroy($id)
     {
         $medicine = Medicines::findOrFail($id);
-        $medicine->delete();
+        
+        $medicine->update([
+            'status'=> 0,
+        ]);
 
         return response()->json([
-            'message' => 'Medicine deleted successfully.'
+            'message' => 'Obat Berhasil Dihapus'
         ]);
     }
 }
