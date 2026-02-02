@@ -171,7 +171,7 @@ class SalesController extends Controller
                         ->orWhere('barcode', 'like', '%' . $q . '%');
                 });
             })
-            ->select(['id', 'code','barcode', 'name', 'net_price', 'stock', 'unit', 'packaging', 'content', 'dosage'])
+            ->select(['id', 'code', 'barcode', 'name', 'net_price', 'stock', 'unit', 'packaging', 'content', 'dosage'])
             ->orderByRaw("CASE WHEN code LIKE ? THEN 0 ELSE 1 END, code ASC", [$q . '%'])
             ->limit(10)
             ->get();
@@ -186,9 +186,8 @@ class SalesController extends Controller
             ->when($q !== '', function ($builder) use ($q) {
                 $builder->where(function ($x) use ($q) {
                     $x->where('code', 'like', '%' . $q . '%')
-                        ->orWhere('name', 'like', '%' . $q . '%')                        
+                        ->orWhere('name', 'like', '%' . $q . '%')
                         ->orWhere('phone', 'like', '%' . $q . '%');
-
                 });
             })
             ->select(['id', 'code', 'name', 'address', 'city', 'phone', 'contact', 'email', 'status'])
@@ -208,7 +207,6 @@ class SalesController extends Controller
                 $query->where('code', 'like', "%{$q}%")
                     ->orWhere('name', 'like', "%{$q}%")
                     ->orWhere('phone', 'like', '%' . $q . '%');
-
             })
             ->orderByRaw("CASE WHEN code LIKE ? THEN 0 ELSE 1 END, code ASC", [$q . '%'])
             ->limit(10)
@@ -543,34 +541,39 @@ class SalesController extends Controller
     // Flow 5 : Checkout
     public function checkout(Request $request)
     {
-        // $transaction = MedicineTransactions::where('id', $request->get('transaction_id'))->first();
-        // $cart = MedicineCart::with('medicine')->where('transaction_id', $request->get('transaction_id'))->get();
-
-
         DB::beginTransaction();
         try {
-            $transaction = MedicineTransactions::findOrFail($request->get('transaction_id'));
+            $transaction = MedicineTransactions::findOrFail($request->transaction_id);
 
             $transaction->update([
                 'status' => 1,
-                'paid' => $request->get('paid'),
-                'subtotal' => $request->get('subtotal'),
-                'changes' => $request->get('changes'),
-                'patient_id' => $request->get('patient_id'),
-                'doctor_id' => $request->get('doctor_id'),
-                'debtor_id' => $request->get('debtor_id'),
+                'paid' => $request->paid,
+                'discount' => $request->discounsubtotal,
+                'subtotal' => $request->totaltransaction,
+                'changes' => $request->changes,
+                'patient_id' => $request->patient_id,
+                'doctor_id' => $request->doctor_id,
+                'debtor_id' => $request->debtor_id,
             ]);
-            MedicineCart::where('transaction_id', $request->get('transaction_id'))
+
+            MedicineCart::where('transaction_id', $request->transaction_id)
                 ->update(['status' => 1]);
 
             DB::commit();
 
-            return redirect()->back()->with('message', 'Berhasil menyimpan!');
+            return response()->json([
+                'success'   => true,
+                'print_url'=> route('sales.print', $transaction->id)
+            ]);
         } catch (\Exception $e) {
             DB::rollBack();
-            return redirect()->back()->with('message', 'Gagal menyimpan! ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
         }
     }
+
     public function getTransactionItem(Request $request)
     {
         $transaction = MedicineCart::with('medicine', 'transactions', 'user')->where('transaction_id', $request->get('transaction_id'))->first();

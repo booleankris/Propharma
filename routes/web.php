@@ -37,6 +37,7 @@ use App\Http\Controllers\Master\ParametersController;
 use App\Http\Controllers\Master\PatientsController;
 use App\Http\Controllers\Orders\OrdersController;
 use App\Http\Controllers\Orders\ReceivingController;
+use App\Http\Controllers\PrintController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ReportsController;
 use App\Http\Controllers\Sales\SalesDataController;
@@ -159,6 +160,7 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     Route::post('checkoutitem', [SalesController::class, 'checkoutItem'])->name('sales.checkout');
     Route::post('sendembalase', [SalesController::class, 'sendEmbalase'])->name('sales.sendembalase');
     Route::post('deleteTransaction', [SalesController::class, 'deleteTransaction'])->name('sales.deletetransaction');
+    Route::get('/print/receipt/{id}', [PrintController::class, 'receipt'])->name('sales.print');
 
 
     // ================================================================== Add Data =========================================================================

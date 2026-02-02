@@ -180,18 +180,6 @@ Use a better box model (opinionated).
   font-family: 'Poppins';
 }
 
-.transaction-item-active {
-  @apply bg-[#0074ce] !text-white;
-  border: none;
-  color: rgb(255 255 255 / var(--tw-text-opacity, 1)) !important;
-  box-shadow: 0px 0px 11px 2px #0097dd !important;
-
-}
-
-.transaction-item-active:hover {
-  @apply bg-[#ffffff] !text-[#0074ce];
-}
-
 .dashboard-panel {
   @apply bg-white rounded-[23px];
   border-radius: 20px;
