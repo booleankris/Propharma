@@ -75,7 +75,22 @@ class SalesDataController extends Controller
                 ->addColumn('final_price', function ($row) {
                     return 'Rp ' . number_format($row->final_price, 0, ',', '.');
                 })
-                ->rawColumns(['final_price'])
+                ->addColumn('print', function ($row) {
+                    return '
+                        <a href="' . url('print/receipt/' . $row->transactions->id) . '" target="_blank">
+                            <button class="group rounded-md shadow bg-blue-500 text-white cursor-pointer flex justify-between items-center overflow-hidden transition-all hover:glow">
+                                <div class="relative w-12 h-12 bg-white bg-opacity-20 flex justify-center items-center transition-all">
+                                    <svg class="w-4 h-4 transition-all group-hover:-translate-y-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
+                                    </svg>
+                                </div>
+                                <p class="px-5">Print</p>
+                            </button>
+                        </a>
+                    ';
+                })
+                ->rawColumns(['final_price', 'print'])
                 ->make(true);
         }
 

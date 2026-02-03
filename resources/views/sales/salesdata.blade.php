@@ -69,6 +69,8 @@
                                     <th class="px-4 py-3">Nomor</th>
                                     <th class="px-4 py-3">Nama Pelanggan/Pasien</th>
                                     <th class="px-4 py-3">Harga</th>
+                                    <th class="px-4 py-3">Print</th>
+
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-100"></tbody>
@@ -134,9 +136,13 @@
                     {
                         data: 'name'
                     },
+                    
                     {
                         data: 'final_price'
-                    }
+                    },
+                    {
+                        data: 'print'
+                    },
                 ]
             });
 
