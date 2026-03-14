@@ -70,6 +70,14 @@ class Medicines extends Model
     {
         return $this->hasMany(MedicineCreditor::class);
     }
+    public function etalases()
+    {
+        return $this->belongsTo(Etalases::class, 'etalase');
+    }
+    public function locations()
+    {
+        return $this->belongsTo(Locations::class, 'location');
+    }
     public function items_log()
     {
         return $this->hasMany(ItemsLog::class, 'medicine_id');

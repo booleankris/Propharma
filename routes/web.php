@@ -26,12 +26,13 @@ use App\Http\Controllers\Admin\TicketingTransactionController;
 use App\Http\Controllers\AdminItemController;
 use App\Http\Controllers\CreditorController;
 use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\ItemsController;
 use App\Http\Controllers\Master\CategoriesController;
 use App\Http\Controllers\Master\CompositionsController;
 use App\Http\Controllers\Master\DebtorsController;
 use App\Http\Controllers\Master\DoctorsController;
 use App\Http\Controllers\Master\FactoriesController;
+use App\Http\Controllers\Master\ItemsController;
+use App\Http\Controllers\Master\LocationsController;
 use App\Http\Controllers\Master\MedicineController;
 use App\Http\Controllers\Master\ParametersController;
 use App\Http\Controllers\Master\PatientsController;
@@ -122,7 +123,6 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
         Route::put('profile/edit', [HomeController::class, 'updateProfile'])->name('profile-update');
     });
 
-    Route::resource('items', ItemsController::class);
     Route::resource('sales', SalesController::class);
 
     // Route::get('/transaction', [SalesController::class, 'index'])->name('transaction');
@@ -185,6 +185,8 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     Route::resource('categories', CategoriesController::class)->except(['show']);
     Route::resource('medicines', MedicineController::class)->except(['show']);
     Route::resource('parameters', ParametersController::class)->except(['show']);
+    Route::resource('items', ItemsController::class)->except(['show']);
+    Route::resource('locations', LocationsController::class)->except(['show']);
 
 
     // Master Addition
@@ -305,6 +307,9 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     Route::get('/factories/select', [FactoriesController::class, 'select'])->name('factories.select');
     Route::get('/categories/select', [CategoriesController::class, 'select'])->name('categories.select');
     Route::get('/creditors/select', [CreditorsController::class, 'select'])->name('creditors.select');
+    Route::get('locations/select', [LocationsController::class, 'select'])->name('locations.select');
+    Route::get('/items/select', [ItemsController::class, 'select'])->name('items.select');
+
 });
 
 

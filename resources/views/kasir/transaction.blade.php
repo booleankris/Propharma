@@ -509,7 +509,8 @@
                             <div class="mr-2 flex items-center justify-end">
 
                                 <div class="w-[40%] text-right">
-                                    <label class="text-[13px] font-poppins font-semibold text-right pr-2">Jumlah</label>
+                                    <label
+                                        class="text-[13px] font-poppins font-semibold text-right pr-2">Jumlah</label>
 
                                 </div>
                                 <div class="w-[100%]">
@@ -582,7 +583,7 @@
 
                                     @endphp
                                     <tr id="itemincart{{ $cart->id }}" data-id="{{ $cart->id }}"
-                                        class="cart-row @if($cart->recipe_status != null) bg-[#eefff8] @endif border-b hover:bg-blue-50 transition text-[10px] cursor-pointer">
+                                        class="cart-row @if ($cart->recipe_status != null) bg-[#eefff8] @endif border-b hover:bg-blue-50 transition text-[10px] cursor-pointer">
                                         <td class="px-1 py-1 text-center text-gray-600">{{ $index + 1 }}</td>
                                         <td colspan="7"
                                             class="text-[10px] leading-normal px-1 py-1 font-semibold text-gray-800">
@@ -606,7 +607,6 @@
                                         <td class="px-1 py-1 text-center font-semibold text-blue-600">
                                             {{ $cart->cart_type }}
                                         </td>
-
                                     </tr>
                                 @endforeach
                             </tbody>
@@ -1354,7 +1354,7 @@
     // Total Transaksi Input
     payment_total.value = formatRupiah(totalbought);
 
-    
+
     if (subtotalpreview) {
         subtotalpreview.value = formatRupiah(totaltransaction);
     }
@@ -1555,6 +1555,7 @@
     }
 
     function render(items) {
+        console.log(items);
         list.innerHTML = '';
         activeIndex = -1;
 
@@ -1574,13 +1575,13 @@
                 <div>
                     <div class="font-medium">${escapeHtml(it.name)}</div>
                     <div class="text-xs text-gray-500">
-                        Kode: ${escapeHtml(it.code)}  <br> • 
-                        Etalase: ${escapeHtml(it.etalase || '-')} <br> • 
-                        Lokasi : ${escapeHtml(it.location || '-')} <br> • 
+                        Kode: ${escapeHtml(it.code)} <br> • 
+                        Etalase: ${escapeHtml(it.etalases?.name || '-')} <br> • 
+                        Lokasi: ${escapeHtml(it.locations?.name || '-')} <br> • 
                         Barcode: ${escapeHtml(it.barcode || '-')} <br> 
-                        <span class='font-poppins text-[14px] py-2'>Stock : ${escapeHtml(it.stock || '-')} <br> • 
-
-
+                        <span class="font-poppins text-[14px] py-2">
+                            Stock: ${escapeHtml(it.stock || '-')}
+                        </span>
                     </div>
                 </div>
                 <div class="text-sm font-semibold whitespace-nowrap">
@@ -1597,7 +1598,7 @@
             list.appendChild(li);
         }
 
-        // AUTO HIGHLIGHT FIRST ITEM
+        // Auto-highlight first item
         activeIndex = 0;
         highlight();
         ensureVisible();
@@ -2321,7 +2322,7 @@
 
 
 
-                if(racikstatus == 1){
+                if (racikstatus == 1) {
                     recipe_row = "bg-[#eefff8]";
                 }
 

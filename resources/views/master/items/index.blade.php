@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Compositions')
+@section('title', 'Etalase')
 
 @section('style')
     <!-- CSS Libraries -->
@@ -26,7 +26,7 @@
                                     fill="#688af8"></path>
                             </g>
                         </svg>
-                        <h2 class="text-2xl font-bold text-gray-800 drop-shadow-sm">Data Compositions</h2>
+                        <h2 class="text-2xl font-bold text-gray-800 drop-shadow-sm">Data Etalase</h2>
                     </div>
 
                     <div class="overflow-x-auto p-3">
@@ -35,7 +35,6 @@
                                 <tr>
                                     <th class="px-4 py-3">#</th>
                                     <th class="px-4 py-3">Name</th>
-                                    <th class="px-4 py-3">Aksi</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-100"></tbody>
@@ -44,9 +43,9 @@
                 </div>
 
                 <div class="bg-white p-6 rounded-2xl shadow-md w-full md:w-[35%] mx-auto">
-                    <form id="compositionForm" action="{{ route('compositions.store') }}" method="POST" class="space-y-3">
+                    <form id="compositionForm" action="{{ route('items.store') }}" method="POST" class="space-y-3">
                         @csrf
-                        <input type="hidden" id="composition_id" name="id">
+                        <input type="hidden" id="items_id" name="id">
 
                         <div>
                             <label class="block text-[14px] font-semibold text-gray-800 mb-1">Code</label>
@@ -120,7 +119,7 @@
                 autoWidth: false,
                 processing: true,
                 serverSide: true,
-                ajax: '{{ route('compositions.index') }}',
+                ajax: '{{ route('items.index') }}',
                 columns: [{
                         data: 'DT_RowIndex',
                         orderable: false,
@@ -129,9 +128,7 @@
                     {
                         data: 'name'
                     },
-                    {
-                        data: 'action'
-                    },
+
                 ],
             });
 
@@ -143,7 +140,7 @@
                 $('#table-data tbody tr').removeClass('bg-blue-100');
                 $(this).addClass('bg-blue-100');
 
-                $('#composition_id').val(selectedData.id);
+                $('#items_id').val(selectedData.id);
                 $('#code').val(selectedData.code);
                 $('#name').val(selectedData.name);
             });
@@ -154,24 +151,24 @@
             // CANCEL
             $('#cancelEdit').click(function() {
                 form.reset();
-                $('#composition_id').val('');
+                $('#items_id').val('');
                 $('#table-data tbody tr').removeClass('bg-blue-100');
             });
 
             // DELETE
             $('#deleteData').click(function() {
-                const id = $('#composition_id').val();
+                const id = $('#items_id').val();
 
                 if (!id) {
                     return iziToast.warning({
                         title: 'Warning',
-                        message: 'Select a composition to delete.'
+                        message: 'Pilih Etalase Yang Ingin Dihapus.'
                     });
                 }
 
                 swal({
                     title: 'Delete?',
-                    text: 'This composition will be removed permanently.',
+                    text: 'Hapus Etalase ini>',
                     icon: 'warning',
                     buttons: true,
                     dangerMode: true,
@@ -179,12 +176,11 @@
                     if (!yes) return;
 
                     $.ajax({
-                        url: '/compositions/' + id,
+                        url: '/items/' + id,
                         type: 'DELETE',
-                        data: {
-                            _token: '{{ csrf_token() }}'
-                        },
                         headers: {
+                            'X-CSRF-TOKEN': document.querySelector(
+                                'meta[name="csrf-token"]').content,
                             'X-Requested-With': 'XMLHttpRequest'
                         },
                         success: function(res) {
@@ -226,9 +222,9 @@
 
         function handleSubmit() {
             const formData = new FormData(form);
-            const id = document.getElementById('composition_id').value;
+            const id = document.getElementById('items_id').value;
 
-            const url = id ? `/compositions/${id}` : form.action;
+            const url = id ? `/items/${id}` : form.action;
             if (id) formData.append('_method', 'PUT');
 
             axios({
@@ -243,11 +239,16 @@
                 .then(res => {
                     iziToast.success({
                         title: 'Success',
-                        message: res.data.message
+                        message: res.data.message,
+                        position: 'topRight',
+                        timeout: 3000,
+                        progressBar: true,
+                        transitionIn: 'fadeInDown',
+                        transitionOut: 'fadeOutUp'
                     });
 
                     form.reset();
-                    $('#composition_id').val('');
+                    $('#items_id').val('');
                     tableData.ajax.reload(null, false);
                 })
                 .catch(err => {

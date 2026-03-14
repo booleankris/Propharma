@@ -194,6 +194,7 @@ class SalesController extends Controller
         $q = trim($request->get('q', ''));
 
         $items = Medicines::query()
+            ->with('etalases', 'locations')
             ->when($q !== '', function ($builder) use ($q) {
                 $builder->where(function ($x) use ($q) {
                     $x->where('code', 'like', '%' . $q . '%')

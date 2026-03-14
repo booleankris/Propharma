@@ -23,7 +23,10 @@ class MedicineController extends Controller
                 'composition',
                 'category',
                 'factory',
-                'creditor'
+                'creditor',
+                'etalases',
+                'locations',
+
             ])
                 ->select('medicines.*')
                 ->where('status', 1)
@@ -32,7 +35,6 @@ class MedicineController extends Controller
             return DataTables::of($data)
                 ->addIndexColumn()
 
-                // FLATTEN RELATION FIELDS
                 ->addColumn('composition_name', function ($row) {
                     return $row->composition?->name;
                 })
@@ -41,6 +43,12 @@ class MedicineController extends Controller
                 })
                 ->addColumn('factory_name', function ($row) {
                     return $row->factory?->name;
+                })
+                ->addColumn('location_name', function ($row) {
+                    return $row->locations?->name;
+                })
+                ->addColumn('etalase_name', function ($row) {
+                    return $row->etalases?->name;
                 })
                 ->addColumn('creditor_name', function ($row) {
                     return $row->creditor?->name;

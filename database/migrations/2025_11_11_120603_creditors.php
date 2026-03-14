@@ -15,7 +15,7 @@ return new class extends Migration
     {
         Schema::create('creditors', function (Blueprint $table) {
             $table->id();
-            $table->string('code')->default('0')->nullable();
+            $table->string('code')->unique();
             $table->string('name');
             $table->string('address');
             $table->string('city')->nullable();

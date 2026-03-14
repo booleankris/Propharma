@@ -68,8 +68,7 @@
                     <a href="{{ url('/home') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Menu Utama</a>
                     <a href="{{ url('transaction/upds') }}"
                         class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Penjualan</a>
-                    <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Pembelian</a>
-                    <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Akun</a>
+                    <a href="{{ route('receiving.index') }}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Pembelian</a>
 
                     <a href="{{ route('logout') }}"
                         onclick="event.preventDefault(); document.getElementById('logout-form').submit();"

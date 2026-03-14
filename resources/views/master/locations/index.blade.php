@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Compositions')
+@section('title', 'Lokasi')
 
 @section('style')
     <!-- CSS Libraries -->
@@ -26,7 +26,7 @@
                                     fill="#688af8"></path>
                             </g>
                         </svg>
-                        <h2 class="text-2xl font-bold text-gray-800 drop-shadow-sm">Data Compositions</h2>
+                        <h2 class="text-2xl font-bold text-gray-800 drop-shadow-sm">Data Lokasi</h2>
                     </div>
 
                     <div class="overflow-x-auto p-3">
@@ -35,7 +35,6 @@
                                 <tr>
                                     <th class="px-4 py-3">#</th>
                                     <th class="px-4 py-3">Name</th>
-                                    <th class="px-4 py-3">Aksi</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-100"></tbody>
@@ -44,15 +43,11 @@
                 </div>
 
                 <div class="bg-white p-6 rounded-2xl shadow-md w-full md:w-[35%] mx-auto">
-                    <form id="compositionForm" action="{{ route('compositions.store') }}" method="POST" class="space-y-3">
+                    <form id="locationForm" action="{{ route('locations.store') }}" method="POST" class="space-y-3">
                         @csrf
-                        <input type="hidden" id="composition_id" name="id">
+                        <input type="hidden" id="location_id" name="id">
 
-                        <div>
-                            <label class="block text-[14px] font-semibold text-gray-800 mb-1">Code</label>
-                            <input id="code" name="code" readonly
-                                class="w-full rounded-lg border border-gray-300 bg-gray-100 px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200">
-                        </div>
+
 
                         <div>
                             <label class="block text-[14px] font-semibold text-gray-800 mb-1">Name</label>
@@ -60,7 +55,6 @@
                                 class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
                                 placeholder="Enter name">
                         </div>
-
 
                         {{-- Buttons --}}
                         <div class="flex justify-start gap-2 pt-3 flex-wrap">
@@ -75,14 +69,12 @@
                                     class="px-5 py-3 w-full bg-yellow-400 hover:bg-yellow-500 text-white rounded-lg shadow-lg hover:shadow-yellow-300/70 transition-all duration-300">
                                     Cancel
                                 </button>
-
                             </div>
                             <div>
                                 <button type="button" id="deleteData"
                                     class="px-5 py-3 w-full bg-red-500 hover:bg-red-600 text-white rounded-lg shadow-lg hover:shadow-red-400/70 transition-all duration-300">
                                     Delete
                                 </button>
-
                             </div>
                             <div>
                                 <button type="button" id="back"
@@ -110,7 +102,7 @@
 
     <script>
         let tableData, selectedData = null;
-        const form = document.getElementById('compositionForm');
+        const form = document.getElementById('locationForm');
 
         $(function() {
 
@@ -120,7 +112,7 @@
                 autoWidth: false,
                 processing: true,
                 serverSide: true,
-                ajax: '{{ route('compositions.index') }}',
+                ajax: '{{ route('locations.index') }}',
                 columns: [{
                         data: 'DT_RowIndex',
                         orderable: false,
@@ -128,10 +120,7 @@
                     },
                     {
                         data: 'name'
-                    },
-                    {
-                        data: 'action'
-                    },
+                    }
                 ],
             });
 
@@ -143,35 +132,37 @@
                 $('#table-data tbody tr').removeClass('bg-blue-100');
                 $(this).addClass('bg-blue-100');
 
-                $('#composition_id').val(selectedData.id);
+                $('#location_id').val(selectedData.id);
                 $('#code').val(selectedData.code);
                 $('#name').val(selectedData.name);
             });
+
             // BACK
             $('#back').click(function() {
                 window.location.href = "{{ route('home') }}";
             });
+
             // CANCEL
             $('#cancelEdit').click(function() {
                 form.reset();
-                $('#composition_id').val('');
+                $('#location_id').val('');
                 $('#table-data tbody tr').removeClass('bg-blue-100');
             });
 
             // DELETE
             $('#deleteData').click(function() {
-                const id = $('#composition_id').val();
+                const id = $('#location_id').val();
 
                 if (!id) {
                     return iziToast.warning({
                         title: 'Warning',
-                        message: 'Select a composition to delete.'
+                        message: 'Pilih Lokasi Yang Ingin Dihapus.'
                     });
                 }
 
                 swal({
                     title: 'Delete?',
-                    text: 'This composition will be removed permanently.',
+                    text: 'Hapus Lokasi ini?',
                     icon: 'warning',
                     buttons: true,
                     dangerMode: true,
@@ -179,12 +170,11 @@
                     if (!yes) return;
 
                     $.ajax({
-                        url: '/compositions/' + id,
+                        url: '/locations/' + id,
                         type: 'DELETE',
-                        data: {
-                            _token: '{{ csrf_token() }}'
-                        },
                         headers: {
+                            'X-CSRF-TOKEN': document.querySelector(
+                                'meta[name="csrf-token"]').content,
                             'X-Requested-With': 'XMLHttpRequest'
                         },
                         success: function(res) {
@@ -210,25 +200,19 @@
             input.addEventListener('keydown', e => {
                 if (e.key === 'Enter') {
                     e.preventDefault();
-
-                    switch (input.id) {
-                        case 'name':
-                            handleSubmit();
-                            break;
-                    }
+                    handleSubmit();
                 }
             });
         });
-
 
         // SUBMIT FORM
         document.getElementById('submitForm').addEventListener('click', handleSubmit);
 
         function handleSubmit() {
             const formData = new FormData(form);
-            const id = document.getElementById('composition_id').value;
+            const id = document.getElementById('location_id').value;
 
-            const url = id ? `/compositions/${id}` : form.action;
+            const url = id ? `/locations/${id}` : form.action;
             if (id) formData.append('_method', 'PUT');
 
             axios({
@@ -243,11 +227,16 @@
                 .then(res => {
                     iziToast.success({
                         title: 'Success',
-                        message: res.data.message
+                        message: res.data.message,
+                        position: 'topRight',
+                        timeout: 3000,
+                        progressBar: true,
+                        transitionIn: 'fadeInDown',
+                        transitionOut: 'fadeOutUp'
                     });
 
                     form.reset();
-                    $('#composition_id').val('');
+                    $('#location_id').val('');
                     tableData.ajax.reload(null, false);
                 })
                 .catch(err => {
@@ -262,6 +251,4 @@
                 });
         }
     </script>
-
-
 @endsection
