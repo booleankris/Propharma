@@ -120,23 +120,31 @@
                         </div>
 
                         {{-- BUTTONS --}}
-                        <div class="flex gap-2 pt-4">
-                            <button type="button" id="submitForm"
-                                class="w-full bg-blue-500 hover:bg-blue-600 text-white rounded-lg py-2">
-                                Submit
-                            </button>
-                            <button type="button" id="cancelEdit"
-                                class="w-full bg-yellow-400 hover:bg-yellow-500 text-white rounded-lg py-2">
-                                Cancel
-                            </button>
-                            <button type="button" id="deleteData"
-                                class="w-full bg-red-500 hover:bg-red-600 text-white rounded-lg py-2">
-                                Delete
-                            </button>
-                            <button type="button" id="backBtn"
-                                class="w-full bg-orange-500 hover:bg-orange-600 text-white rounded-lg py-2">
-                                Back
-                            </button>
+                        <div class="flex flex-wrap pt-4">
+                            <div>
+                                <button type="button" id="submitForm"
+                                    class="w-full bg-blue-500 hover:bg-blue-600 text-white rounded-lg py-2">
+                                    Submit
+                                </button>
+                            </div>
+                            <div>
+                                <button type="button" id="cancelEdit"
+                                    class="w-full bg-yellow-400 hover:bg-yellow-500 text-white rounded-lg py-2">
+                                    Cancel
+                                </button>
+                            </div>
+                            <div>
+                                <button type="button" id="deleteData"
+                                    class="w-full bg-red-500 hover:bg-red-600 text-white rounded-lg py-2">
+                                    Delete
+                                </button>
+                            </div>
+                            <div>
+                                <button type="button" id="backBtn"
+                                    class="w-full bg-orange-500 hover:bg-orange-600 text-white rounded-lg py-2">
+                                    Back
+                                </button>
+                            </div>
                         </div>
                     </form>
                 </div>

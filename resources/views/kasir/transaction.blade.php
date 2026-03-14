@@ -73,7 +73,7 @@
     <section class="col-span-12 lg:col-span-5 space-y-3">
         <!-- Header Card -->
         <div
-            class="card py-6 px-6 @if ($check_transaction == 1) @if ($transaction->transaction_type == 'UPDS') !bg-[#4CAF50] @elseif($transaction->transaction_type == 'HV/OTC') !bg-[#0e88ea] @else !bg-[#9a1c1c] @endif
+            class="card py-6 px-6 @if ($check_transaction == 1) @if ($transaction->transaction_type == 'UPDS') !bg-[#4CAF50] @elseif($transaction->transaction_type == 'HV/OTC') !bg-[#0e88ea] @elseif($transaction->transaction_type == 'KREDIT') !bg-[#9a851c] @else !bg-[#9a1c1c] @endif
 @else
 !bg-[#6d8497] @endif dashboard-panel">
             <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -509,8 +509,7 @@
                             <div class="mr-2 flex items-center justify-end">
 
                                 <div class="w-[40%] text-right">
-                                    <label class="text-[13px] font-poppins font-semibold text-right pr-2">Total
-                                        Biaya</label>
+                                    <label class="text-[13px] font-poppins font-semibold text-right pr-2">Jumlah</label>
 
                                 </div>
                                 <div class="w-[100%]">
@@ -555,7 +554,7 @@
                 </div>
                 <h2 class="text-xl font-semibold mb-3 mt-2">Barang Dibeli</h2>
                 <div
-                    class="mt-4 rounded-2xl @if ($transaction->transaction_type == 'UPDS') bg-[#eff8ef] @elseif($transaction->transaction_type == 'HV/OTC') bg-[#e8f5ff] @else bg-[#ffeaea] @endif h-[40vh] overflow-y-scroll md:h-[53vh]">
+                    class="mt-4 rounded-2xl @if ($transaction->transaction_type == 'UPDS') bg-[#eff8ef] @elseif($transaction->transaction_type == 'HV/OTC') bg-[#e8f5ff] @elseif($transaction->transaction_type == 'KREDIT') bg-[#f8f4e3] @else bg-[#ffeaea] @endif h-[40vh] overflow-y-scroll md:h-[53vh]">
                     <div class="flex flex-col justify-between">
                         <table class="min-w-full text-sm text-left font-poppins text-gray-700">
                             <thead class="text-gray-600 uppercase text-xs border-b border-[#d6d6d6]">
@@ -583,7 +582,7 @@
 
                                     @endphp
                                     <tr id="itemincart{{ $cart->id }}" data-id="{{ $cart->id }}"
-                                        class="cart-row border-b hover:bg-blue-50 transition text-[10px] cursor-pointer">
+                                        class="cart-row @if($cart->recipe_status != null) bg-[#eefff8] @endif border-b hover:bg-blue-50 transition text-[10px] cursor-pointer">
                                         <td class="px-1 py-1 text-center text-gray-600">{{ $index + 1 }}</td>
                                         <td colspan="7"
                                             class="text-[10px] leading-normal px-1 py-1 font-semibold text-gray-800">
@@ -1328,7 +1327,7 @@
     // var patient_id = "";
     // var doctor_id = "";
 
-    let totalbought = {{ $rawtotal }};
+    let totalbought = {{ $rawtotal->raw_total + $rawtotal->embalase }};
     var subtotal = "";
     var final_price = "";
     let items = [];
@@ -1347,13 +1346,21 @@
     var previewtransactiontotal = document.getElementById('price2');
 
 
-    // Set nilai awal
+    // Set Initial Value
+
+    // Total Beli Input
     cartTotalInput.value = formatRupiah(totaltransaction);
+
+    // Total Transaksi Input
     payment_total.value = formatRupiah(totalbought);
+
+    
     if (subtotalpreview) {
         subtotalpreview.value = formatRupiah(totaltransaction);
     }
+    // Total Discount Input
     previewdiscounttotal.value = formatRupiah(total_discount);
+
     previewtransactiontotal.value = formatRupiah(totaltransaction);
     if (packageInput) {
         document.getElementById('package').value = existingpackage;
@@ -1567,9 +1574,13 @@
                 <div>
                     <div class="font-medium">${escapeHtml(it.name)}</div>
                     <div class="text-xs text-gray-500">
-                        Kode: ${escapeHtml(it.code)} • Stok: ${it.stock} • 
-                        Tipe: ${escapeHtml(it.type || '-')} • 
-                        Barcode: ${escapeHtml(it.barcode || '-')}
+                        Kode: ${escapeHtml(it.code)}  <br> • 
+                        Etalase: ${escapeHtml(it.etalase || '-')} <br> • 
+                        Lokasi : ${escapeHtml(it.location || '-')} <br> • 
+                        Barcode: ${escapeHtml(it.barcode || '-')} <br> 
+                        <span class='font-poppins text-[14px] py-2'>Stock : ${escapeHtml(it.stock || '-')} <br> • 
+
+
                     </div>
                 </div>
                 <div class="text-sm font-semibold whitespace-nowrap">
@@ -1586,7 +1597,7 @@
             list.appendChild(li);
         }
 
-        // ✅ AUTO HIGHLIGHT FIRST ITEM
+        // AUTO HIGHLIGHT FIRST ITEM
         activeIndex = 0;
         highlight();
         ensureVisible();
@@ -1597,6 +1608,8 @@
         hidden.value = it.id;
         medicine_id = it.id;
         input.value = '';
+        quantity.value = '';
+        totalprice.value = '';
         stock.value = it.stock;
         unit.value = it.unit;
         name.value = it.name;
@@ -1604,7 +1617,16 @@
             dosage.value = it.dosage;
         }
         console.log("Harga : " + it.net_price + "Parameter : " + parameters + "Pembulatan : " + rounding);
-        let raw = (+it.net_price * +parameters) + +rounding;
+
+
+        let raw;
+        console.log(it);
+
+        if (it.het_price != 0) {
+            raw = it.het_price;
+        } else {
+            raw = (+it.net_price * +parameters) + +rounding;
+        }
 
         let rounded;
         if (currenttransaction === 'KREDIT') {
@@ -2116,8 +2138,7 @@
         let final_price = 0;
         if (val > 100) {
             discount = val;
-        }
-        else {
+        } else {
             discount = totaltransaction * val / 100;
         }
         discount = Math.ceil(discount / 1000) * 1000;
@@ -2239,7 +2260,7 @@
                     attachRowEvents(document.getElementById(`itemincart${item.id}`));
                 })
                 .catch(error => {
-                    console.error("❌ Error updating cart:", error.response ? error.response.data : error.message);
+                    console.error("Error updating cart:", error.response ? error.response.data : error.message);
                 });
         } else {
             axios.post("{{ route('transaction.addToCart') }}", {
@@ -2260,6 +2281,7 @@
 
             }).then(response => {
                 const item = response.data;
+                let recipe_row = "";
 
                 totaltransaction += total_price;
                 totalbought = parseFloat(totalbought) + parseFloat(grossprice);
@@ -2268,7 +2290,7 @@
                 // Reset input fields
                 [stock, unit, quantity, price, name, totalprice].forEach(el => el.value = "");
                 discount = 0;
-                console.log("✅ Discount item:", discount);
+                console.log("Discount item:", discount);
                 discountInput.value = "";
 
                 resetInputs();
@@ -2297,12 +2319,15 @@
                 previewtransactiontotal.value = formatRupiah(totaltransaction);
                 payment_total.value = formatRupiah(totalbought);
 
-                // Reset Variables
 
+
+                if(racikstatus == 1){
+                    recipe_row = "bg-[#eefff8]";
+                }
 
                 document.getElementById('carts').insertAdjacentHTML('beforeend', `
                     <tr id="itemincart${item.id}" data-id="${item.id}" 
-                        class="cart-row border-b hover:bg-blue-50 transition text-[10px] cursor-pointer">
+                        class="cart-row border-b ${recipe_row} hover:bg-blue-50 transition text-[10px] cursor-pointer">
                         <td class="px-1 py-1 text-center text-gray-600">
                             ${document.querySelectorAll('#carts tr').length + 1}
                         </td>
@@ -2325,7 +2350,7 @@
                     </tr>
                 `);
 
-                const newRow = document.getElementById(`itemincart${item.id}`); // ✅ safer
+                const newRow = document.getElementById(`itemincart${item.id}`); // safer
                 console.log('Newly inserted row:', newRow);
                 attachRowEvents(newRow);
                 discount = 0;
@@ -2333,7 +2358,7 @@
 
 
             }).catch(error => {
-                console.error("❌ Error adding to cart:", error.response ? error.response.data : error.message);
+                console.error("Error adding to cart:", error.response ? error.response.data : error.message);
             });
         }
 
@@ -2474,6 +2499,7 @@
                 previewtransactiontotal.value = formatRupiah(response.data.total_transaction);
                 payment_total.value = formatRupiah(response.data.totalbought);
                 totaltransaction = response.data.total_transaction;
+                totalbought = response.data.totalbought;
             })
             .catch(err => console.error('Failed to delete item:', err));
     }
@@ -2668,7 +2694,7 @@
 
                 }
             }).catch(error => {
-                console.error("❌ Error getting cart:", error.response ? error.response.data : error.message);
+                console.error("Error getting cart:", error.response ? error.response.data : error.message);
             });
         }
 
@@ -2872,7 +2898,7 @@
         if (isF4) {
             e.preventDefault();
             if (checkbox) {
-                checkbox.checked = !checkbox.checked; // ✅ toggle
+                checkbox.checked = !checkbox.checked; // toggle
                 checkbox.dispatchEvent(new Event('change')); // optional: trigger change event
             }
             // if (checkbox.checked) {
@@ -3370,7 +3396,7 @@
             console.log('After:', roundUpToNearestThousand(totaltransaction));
 
             previewtransactiontotal.value = formatRupiah(totaltransaction);
-
+            payment_total.value = formatRupiah(totaltransaction);
 
 
         }).catch(error => {

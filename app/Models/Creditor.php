@@ -16,7 +16,13 @@ class Creditor extends Model
         'address',
         'city',
         'phone',
-        'email',
+        'fax',
+        'ppn_type',
+        'numbers',
+        'bank_type',
+        'bank_number',
+        'bank_name',
+        'npwp',
         'status',
     ];
 }

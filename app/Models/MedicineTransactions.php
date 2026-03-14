@@ -24,7 +24,7 @@ class MedicineTransactions extends Model
     ];
     public function transactions()
     {
-        return $this->hasMany(MedicineCart::class);
+        return $this->hasMany(MedicineCart::class, 'transaction_id');
     }
     public function patients()
     {

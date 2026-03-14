@@ -21,7 +21,7 @@ class CreditorsController extends Controller
     public function index(Request $request)
     {
         if ($request->ajax()) {
-            $creditors = Creditor::select('id', 'code', 'name', 'address', 'city', 'phone', 'email', 'status', 'created_at');
+            $creditors = Creditor::select('id', 'code', 'name', 'address', 'city', 'phone', 'fax', 'bank_type','numbers', 'ppn_type', 'bank_name', 'bank_number', 'npwp' ,'status', 'created_at');
 
             if (!$request->has('order')) {
                 $creditors = $creditors->orderBy('created_at', 'ASC');
@@ -64,43 +64,48 @@ class CreditorsController extends Controller
 
     private function generateCreditorCode()
     {
-        $last = Creditor::orderBy('id', 'desc')->first();
+        $maxId = Creditor::max('id');
 
-        if (!$last || !$last->code) {
-            return 'CR0001';
-        }
-
-        // Extract number part from code (e.g., CR0007 → 7)
-        $number = (int) substr($last->code, 2);
-        $nextNumber = $number + 1;
-
-        return 'CR' . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+        $nextNumber = $maxId ? $maxId + 1 : 1;
+        
+        return 'KR' . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
     }
     public function store(Request $request)
     {
         $nextCode = $this->generateCreditorCode();
 
         $this->validate($request, [
-            'name'    => 'required|string|max:255',
-            'address' => 'nullable|string|max:255',
-            'city'    => 'nullable|string|max:100',
-            'phone'   => 'nullable|string|max:50',
-            'contact' => 'nullable|string|max:100',
-            'email'   => 'nullable|email|max:255',
-        ]);
+            'name'        => 'required|string|max:255',
+            'address'     => 'nullable|string|max:255',
+            'city'        => 'nullable|string|max:100',
+            'phone'       => 'nullable|string|max:50',
+            'contact'     => 'nullable|string|max:100',
+            'fax'         => 'nullable|string|max:255',
+            'ppn_type'    => 'nullable|string|max:255',
+            'numbers'     => 'nullable|string|max:255',
+            'bank_type'   => 'nullable|string|max:255',
+            'bank_number' => 'nullable|string|max:255',
+            'bank_name'   => 'nullable|string|max:255',
+            'npwp'        => 'nullable|string|max:255',
 
+        ]);
         $creditor = Creditor::create([
             'code'    => $nextCode,
             'name'    => $request->name,
             'address' => $request->address,
             'city'    => $request->city,
             'phone'   => $request->phone,
-            'contact' => $request->contact,
-            'email'   => $request->email,
-            'status'  => $request->status ?? 0,
+            'contact'     => $request->contact,
+            'fax'         => $request->fax ?? null,
+            'ppn_type'    => $request->ppn_type ?? null,
+            'numbers'     => $request->numbers ?? null,
+            'bank_type'   => $request->bank_type ?? null,
+            'bank_number' => $request->bank_number ?? null,
+            'bank_name'   => $request->bank_name ?? null,
+            'npwp'        => $request->npwp ?? null,
+            'status'      => $request->status ?? 0,
         ]);
 
-        // ✅ Always return JSON when it's an AJAX request
         if ($request->ajax()) {
             return response()->json([
                 'success' => true,
@@ -130,12 +135,18 @@ class CreditorsController extends Controller
     public function update(Request $request, Creditor $creditor)
     {
         $validated = $request->validate([
-            'name'    => 'required|string|max:255',
-            'address' => 'nullable|string|max:255',
-            'city'    => 'nullable|string|max:100',
-            'phone'   => 'nullable|string|max:50',
-            'contact' => 'nullable|string|max:100',
-            'email'   => 'nullable|email|max:255',
+            'name'        => 'required|string|max:255',
+            'address'     => 'nullable|string|max:255',
+            'city'        => 'nullable|string|max:100',
+            'phone'       => 'nullable|string|max:50',
+            'contact'     => 'nullable|string|max:100',
+            'fax'         => 'nullable|string|max:255',
+            'ppn_type'    => 'nullable|string|max:255',
+            'numbers'     => 'nullable|string|max:255',
+            'bank_type'   => 'nullable|string|max:255',
+            'bank_number' => 'nullable|string|max:255',
+            'bank_name'   => 'nullable|string|max:255',
+            'npwp'        => 'nullable|string|max:255',
         ]);
 
         $creditor->update([
@@ -144,7 +155,13 @@ class CreditorsController extends Controller
             'city'    => $validated['city'] ?? null,
             'phone'   => $validated['phone'] ?? null,
             'contact' => $validated['contact'] ?? null,
-            'email'   => $validated['email'] ?? null,
+            'fax'         => $validated['fax'] ?? null,
+            'ppn_type'    => $validated['ppn_type'] ?? null,
+            'numbers'     => $validated['numbers'] ?? null,
+            'bank_type'   => $validated['bank_type'] ?? null,
+            'bank_number' => $validated['bank_number'] ?? null,
+            'bank_name'   => $validated['bank_name'] ?? null,
+            'npwp'        => $validated['npwp'] ?? null,
             'status'  => $request->status ?? 0,
         ]);
 
@@ -176,6 +193,6 @@ class CreditorsController extends Controller
         $creditor = Creditor::findOrFail($id);
         $creditor->delete();
 
-        return response()->json(['status' => true, 'message' => 'Creditor successfully deleted!']);
+        return response()->json(['status' => true, 'message' => 'Berhasil Menghapus Kreditur!']);
     }
 }

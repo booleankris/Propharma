@@ -46,18 +46,33 @@ class Medicines extends Model
     public function composition()
     {
         return $this->belongsTo(Composition::class, 'composition_id');
-    } 
+    }
     public function category()
     {
         return $this->belongsTo(MedicineCategory::class, 'medicine_category_id');
-    } 
+    }
     public function creditor()
     {
         return $this->belongsTo(Creditor::class, 'creditors_id');
-    } 
+    }
+    public function creditors()
+    {
+        return $this->belongsToMany(
+            Creditor::class,
+            'medicine_creditors',
+            'medicine_id',
+            'creditor_code',
+            'id',
+            'code'
+        );
+    }
     public function transactions()
     {
         return $this->hasMany(MedicineCreditor::class);
+    }
+    public function items_log()
+    {
+        return $this->hasMany(ItemsLog::class, 'medicine_id');
     }
     public static function generateCode()
     {

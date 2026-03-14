@@ -37,40 +37,57 @@
     <hr>
 
     Bukti Pembayaran<br>
-    {{ $transactionCart->first()->updated_at->format('d/m/Y H:i:s') }}<br>
+    {{ $transaction->updated_at->format('d/m/Y H:i:s') }}<br>
 
     <br>
-    Nama : {{ $transactionCart->first()->transactions->patients->name }}<br>
-    Alamat : {{ $transactionCart->first()->transactions->patients->address }}<br>
+    Nama : {{ $transaction->patients->name }}<br>
+    Alamat : {{ $transaction->patients->address }}<br>
     <hr>
 
-    @foreach ($transactionCart as $item)
-        {{ $item->medicine->name }}<br>
-        {{ $item->quantity }} x {{ number_format($item->item_price) }}
-        <span style="float:right">
-            {{ number_format($item->raw_total) }}
-        </span>
-        <br>
+    @foreach ($transactionCart as $key => $items)
+        @if ($key != 'single')
+            <table style="width: 100%">
+                <tr>
+                    <td style="text-align: left;font-size:12px"><strong>Racikan {{ $key }}</strong></td>
+                    <td style="text-align: left;font-size:12px"> 
+                        <span style="float:right">
+                            {{ number_format($items->sum('final_price')) }}
+                        </span>
+                    </td>
+
+                </tr>
+            </table>
+            <br>
+        @else
+            @foreach ($items as $item)
+                {{ $item->medicine->name }}<br>
+                {{ $item->quantity }} x {{ number_format($item->item_price) }}
+                <span style="float:right">
+                    {{ number_format($item->raw_total) }}
+                </span>
+                <br>
+            @endforeach
+        @endif
     @endforeach
 
     <hr>
 
-    Sub Total
+    Jumlah
     <span style="float:right;">{{ number_format($totalRawTotal) }}</span><br>
 
     Discount
     <span style="float:right;">-{{ number_format($totaldiscount) }}</span><br>
 
     <strong>
-        Jumlah
+        Total Beli
         <span style="float:right;">{{ number_format($payment) }}</span>
     </strong><br>
 
     Bayar
-    <span style="float:right;">{{ number_format($transactionCart->first()->transactions->paid) }}</span><br>
+    <span style="float:right;">{{ number_format($transaction->paid) }}</span><br>
 
     Kembalian
-    <span style="float:right;">{{ number_format($transactionCart->first()->transactions->changes) }}</span>
+    <span style="float:right;">{{ number_format($transaction->changes) }}</span>
 
     <hr>
 

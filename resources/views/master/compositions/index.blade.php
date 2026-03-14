@@ -56,25 +56,35 @@
                                 placeholder="Enter name">
                         </div>
 
-                      
+
                         {{-- Buttons --}}
-                        <div class="flex justify-end gap-2 pt-3">
-                            <button type="button" id="submitForm"
-                                class="px-5 py-3 w-full bg-blue-500 hover:bg-blue-600 text-white rounded-lg shadow-lg hover:shadow-blue-400/70 transition-all duration-300">
-                                Submit
-                            </button>
-                            <button type="button" id="cancelEdit"
-                                class="px-5 py-3 w-full bg-yellow-400 hover:bg-yellow-500 text-white rounded-lg shadow-lg hover:shadow-yellow-300/70 transition-all duration-300">
-                                Cancel
-                            </button>
-                            <button type="button" id="deleteData"
-                                class="px-5 py-3 w-full bg-red-500 hover:bg-red-600 text-white rounded-lg shadow-lg hover:shadow-red-400/70 transition-all duration-300">
-                                Delete
-                            </button>
-                            <button type="button" id="back"
-                                class="px-5 py-3 w-full bg-[#FF9800] hover:bg-[#FF9232] text-white rounded-lg shadow-lg hover:shadow-red-400/70 transition-all duration-300">
-                                Kembali
-                            </button>
+                        <div class="flex justify-start gap-2 pt-3 flex-wrap">
+                            <div>
+                                <button type="button" id="submitForm"
+                                    class="px-5 py-3 w-full bg-blue-500 hover:bg-blue-600 text-white rounded-lg shadow-lg hover:shadow-blue-400/70 transition-all duration-300">
+                                    Submit
+                                </button>
+                            </div>
+                            <div>
+                                <button type="button" id="cancelEdit"
+                                    class="px-5 py-3 w-full bg-yellow-400 hover:bg-yellow-500 text-white rounded-lg shadow-lg hover:shadow-yellow-300/70 transition-all duration-300">
+                                    Cancel
+                                </button>
+
+                            </div>
+                            <div>
+                                <button type="button" id="deleteData"
+                                    class="px-5 py-3 w-full bg-red-500 hover:bg-red-600 text-white rounded-lg shadow-lg hover:shadow-red-400/70 transition-all duration-300">
+                                    Delete
+                                </button>
+
+                            </div>
+                            <div>
+                                <button type="button" id="back"
+                                    class="px-5 py-3 w-full bg-[#FF9800] hover:bg-[#FF9232] text-white rounded-lg shadow-lg hover:shadow-red-400/70 transition-all duration-300">
+                                    Kembali
+                                </button>
+                            </div>
                         </div>
 
                     </form>

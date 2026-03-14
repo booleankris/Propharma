@@ -39,12 +39,16 @@ use App\Http\Controllers\Orders\OrdersController;
 use App\Http\Controllers\Orders\ReceivingController;
 use App\Http\Controllers\PrintController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\RejectController;
 use App\Http\Controllers\ReportsController;
+use App\Http\Controllers\ReturController;
 use App\Http\Controllers\Sales\SalesDataController;
 use App\Http\Controllers\SalesController;
+use App\Http\Controllers\SuppliesController;
 use App\Http\Controllers\TransactionReportController;
 use App\Models\Item;
 use App\Models\TicketTransaction;
+use PhpOffice\PhpSpreadsheet\Calculation\Statistical\Averages\Mean;
 
 Route::get('/', function () {
     return view('auth.login');
@@ -182,14 +186,46 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     Route::resource('medicines', MedicineController::class)->except(['show']);
     Route::resource('parameters', ParametersController::class)->except(['show']);
 
+
+    // Master Addition
+    Route::get('/medicines/{id}/edit-data', [MedicineController::class, 'editCreditor']);
+
+
     // Sales Data
     Route::get('/data/sales', [SalesDataController::class, 'index'])->name('salesdata.index');
-    Route::get('/retur', [SalesDataController::class, 'retur'])->name('salesdata.retur');
-    Route::post('/returitem', [SalesDataController::class, 'returItem'])->name('salesdata.returItem');
-
     Route::get('/sales/transaction/{id}/items', [SalesDataController::class, 'transactionItems']);
-    Route::get('/salesdata/returdata', [SalesDataController::class, 'returdata'])->name('salesdata.returdata');
-    Route::get('/salesdata/getreturmedicine', [SalesDataController::class, 'getReturMedicines'])->name('salesdata.retur.medicines');
+  
+
+    // Sales Reject
+    Route::get('/reject', [RejectController::class, 'reject'])->name('sales.reject');
+    Route::get('/getreject', [RejectController::class, 'getReject'])->name('sales.getreject');
+    Route::get('reject/searchmedicine', [RejectController::class, 'searchMedicine'])->name('sales.searchmedicine');
+    Route::post('reject/additemreject', [RejectController::class, 'addItemReject'])->name('sales.addItemReject');
+    Route::post('/postrejecttion', [RejectController::class, 'postRejection'])->name('sales.rejection');
+
+    // Sales Retur
+    Route::get('/retur', [ReturController::class, 'retur'])->name('returdata.retur');
+    Route::post('/returitem', [ReturController::class, 'returItem'])->name('returdata.returItem');
+    Route::get('/salesdata/returdata', [ReturController::class, 'returdata'])->name('returdata.returdata');
+    Route::get('/salesdata/getreturmedicine', [ReturController::class, 'getReturMedicines'])->name('returdata.medicines');
+
+    // Orders Retur
+    Route::get('/returorder', [ReturController::class, 'returOrders'])->name('returdata.returorders');
+    Route::post('/returorderitem', [ReturController::class, 'returOrderItems'])->name('returdata.returorderitems');
+    Route::get('/salesdata/returorderdata', [ReturController::class, 'returOrderdata'])->name('returdata.returorderdata');
+    Route::get('/salesdata/getreturordermedicine', [ReturController::class, 'getReturOrderMedicines'])->name('returdata.ordermedicines');
+
+    // Supplies
+    Route::get('/supplies', [SuppliesController::class, 'supplies'])->name('supplies.index');
+    Route::get('/getsupplies', [SuppliesController::class, 'getSupplies'])->name('supplies.getSupplies');
+    Route::get('/stock-data', [SuppliesController::class, 'stockData'])->name('supplies.stockData');
+    Route::get('/getstockdata', [SuppliesController::class, 'getStockData'])->name('supplies.getstockData');
+    Route::get('/stockopname', [SuppliesController::class, 'stockOpname'])->name('supplies.stockOpname');
+    Route::get('/getmedicines', [SuppliesController::class, 'getMedicines'])->name('supplies.medicines');
+    Route::get('/medicineStockLog', [SuppliesController::class, 'medicineStockLog'])->name('supplies.medicineStockLog');
+    Route::post('/saveopname', [SuppliesController::class, 'Opname'])->name('supplies.opname');
+    Route::get('/export-stock', [SuppliesController::class, 'printStockData'])->name('supplies.printstockdata');
+    Route::get('/export-stockopname', [SuppliesController::class, 'printStockOpname'])->name('supplies.printstockopname');
 
     // Reports  
     Route::get('/reports/transactions', [ReportsController::class, 'transactions'])->name('reports.transactions');
@@ -226,19 +262,42 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     Route::post('/orders/additemorder', [OrdersController::class, 'addItemOrder'])->name('orders.addItemOrder');
     Route::get('/orders/search', [OrdersController::class, 'searchMedicine'])->name('orders.searchmedicine');
     Route::get('/orders/items', [OrdersController::class, 'orderItems'])
-    ->name('orders.orderitems');
+        ->name('orders.orderitems');
     Route::post('/orders/updateitems', [OrdersController::class, 'updateOrderItem'])
-    ->name('orders.updateOrderItem');
+        ->name('orders.updateOrderItem');
     Route::post('/orders/deleteitems', [OrdersController::class, 'deleteOrderItem'])
-    ->name('orders.deleteOrderItem');
+        ->name('orders.deleteOrderItem');
     Route::post('/orders/completeorder', [OrdersController::class, 'completeOrder'])
-    ->name('orders.completeOrder');
+        ->name('orders.completeOrder');
+    Route::get('/orders/{id}/creditors', [OrdersController::class, 'getCreditors']);
+    Route::get('/orders/{order}/printspb', [OrdersController::class, 'printSPB'])
+        ->name('orders.print');
+    Route::get('/orders/printorder/{id}', [OrdersController::class, 'printOrder'])->name('orders.printorder');
+    Route::get('/orders/print-preview/{order_id}', [OrdersController::class, 'printPreview']);
+
+
 
     // Receiving
     Route::get('/receiving', [ReceivingController::class, 'index'])->name('receiving.index');
+    Route::get('/receive/{id}', [ReceivingController::class, 'receive'])->name('receiving.receive');
+
     Route::get('/createreceiving', [ReceivingController::class, 'createReceiving'])->name('receiving.create');
+    Route::get('/searchbpba', [ReceivingController::class, 'searchBPBA'])->name('receiving.searchbpba');
+    Route::get('/receiving/getorderitems/items', [ReceivingController::class, 'getOrderItems'])->name('receiving.getorderitems');
+    Route::post('/receiving/addreceivingitem', [ReceivingController::class, 'addReceivingItem'])->name('receiving.addreceivingitem');
+    Route::get('/receiving/print/{id}', [ReceivingController::class, 'printReceiving']);
+    Route::get('/invoice/print/{id}', [ReceivingController::class, 'printInvoice']);
 
+    Route::post('/receiving/completeorder', [ReceivingController::class, 'completeOrder'])
+        ->name('receiving.completeOrder');
+    Route::get('/receiving/orderlist', [ReceivingController::class, 'orderList'])->name('receiving.orderlist');
+    Route::get('/searchreceivingdetails', [ReceivingController::class, 'searchReceivingDetails'])->name('receiving.searchreceivingdetails');
+    Route::get('/receiving/history', [ReceivingController::class, 'history'])->name('receiving.history');
+    Route::get('/receiving/gethistory', [ReceivingController::class, 'gethistory'])->name('receiving.gethistory');
+    Route::get('/receiving/orderhistory', [ReceivingController::class, 'orderhistory'])->name('receiving.orderhistory');
+    Route::get('/receiving/getorderhistory', [ReceivingController::class, 'getorderhistory'])->name('receiving.getorderhistory');
 
+    Route::get('/receiving/orders', [ReceivingController::class, 'orders'])->name('receiving.orders');
 
 
 

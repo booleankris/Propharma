@@ -2,21 +2,27 @@
 
 namespace App\Http\Controllers\Orders;
 
+use App\Exports\Orders\OrdersExport;
 use App\Http\Controllers\Controller;
 use App\Models\MedicineCart;
 use App\Models\Medicines;
 use App\Models\Order;
 use App\Models\OrderItems;
+use App\Models\Receiving;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use DataTables;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Maatwebsite\Excel\Facades\Excel;
 
 class OrdersController extends Controller
 {
 
     public function OrderItems(Request $request)
     {
+        $creditorId = $request->creditor_id;
+
         $query = OrderItems::select([
             'order_items.id as order_item_id',
             'order_items.order_id',
@@ -25,26 +31,44 @@ class OrdersController extends Controller
             'order_items.price',
             'order_items.total',
             'order_items.pack',
-            'order_items.creditor_id',
-        ])->with([
-            'medicines.factory',
-            'medicines.creditor',
-            'orders'
-        ])->whereHas('orders', function ($q) {
-            $q->where('status', 0);
-        });
+            'order_items.creditor_code',
+        ])
+            ->with([
+                'medicines.factory',
+                'medicines.creditors',
+                'medicines.creditor',
+                'orders',
+                'creditors'
+            ])
+            ->whereHas('orders', function ($q) {
+                $q->where('status', 0);
+            })
+
+            ->when($creditorId, function ($q) use ($creditorId) {
+                $q->where('creditor_code', $creditorId);
+            });
 
         return DataTables::of($query)
-         
-            ->addColumn('item_total', function ($data) {
-                $total = "Rp. " . number_format($data->total);
-                return $total;
-            })
-            ->addColumn('item_price', function ($data) {
-                $price = "Rp. " . number_format($data->price);
-                return $price;
-            })
-            ->escapeColumns(['preview, action'])
+
+            ->addColumn(
+                'item_total',
+                fn($data) =>
+                "Rp. " . number_format($data->total)
+            )
+
+            ->addColumn(
+                'item_price',
+                fn($data) =>
+                "Rp. " . number_format($data->price)
+            )
+
+            ->addColumn(
+                'creditors',
+                fn($data) =>
+                $data->creditors->name ?? 'Belum Dipilih'
+            )
+
+            ->escapeColumns([])
             ->make(true);
     }
     public function createOrder(Request $request)
@@ -58,12 +82,14 @@ class OrdersController extends Controller
             $last = Order::where('pharmacy_id', Auth()->user()->pharmacy_id)
                 ->where('status', '0')
                 ->first();
-            $total = OrderItems::where('order_id', $last->id)->where('status', '0')->sum('total');
+            $d_price = OrderItems::where('order_id', $last->id)->where('status', '0')->sum('total') ?? '';
+            $d_ppn = $d_price * 0.11 ?? '';
+            $d_total = $d_price + $d_ppn ?? '';
             $order_id = $last->id;
             $order_code = $last->code;
             $now = $last->date;
 
-            return view('orders.order', compact('order_code', 'now', 'order_id', 'total'));
+            return view('orders.order', compact('order_code', 'now', 'd_price', 'd_ppn', 'd_total', 'order_id'));
         } else {
             // Generate Order COde
             $year   = now()->format('y');
@@ -107,32 +133,94 @@ class OrdersController extends Controller
         // if ($check_transaction == 0) {
         // }
     }
+    public function orderList(Request $request)
+    {
+        $orderCode = $request->order_id;
+        \Illuminate\Support\Facades\Log::info('ORDER CODE', [$request->order_id]);
+
+        if (!$orderCode) {
+            return DataTables::of(collect())->make(true);
+        }
+
+        $items = OrderItems::query()
+            ->with(['medicines', 'receiving_items'])
+            ->withSum('receivingItems as qty_received', 'qty_received')
+            ->whereHas('orders', function ($q) use ($orderCode) {
+                $q->where('code', $orderCode);
+            });
+
+        return DataTables::of($items)
+            ->addIndexColumn()
+
+            ->addColumn('qty_received', function ($row) {
+                return $row->qty_received ?? 0;
+            })
+
+            ->addColumn('qty_remaining', function ($row) {
+                return max(0, $row->quantity - ($row->qty_received ?? 0));
+            })
+
+            ->addColumn(
+                'price',
+                fn($row) =>
+                'Rp ' . number_format($row->price, 0, ',', '.')
+            )
+            ->addColumn(
+                'price_ppn',
+                fn($row) =>
+
+                'Rp ' . number_format(floor($row->price * 1.11), 0, ',', '.')
+            )
+            ->addColumn(
+                'total',
+                fn($row) =>
+                'Rp ' . number_format($row->total, 0, ',', '.')
+            )
+
+            ->make(true);
+    }
+    public function printOrder($id)
+    {
+        $order = Order::where('id', $id)->first();
+        return Excel::download(
+            new OrdersExport($id),
+            $order->code . '.xlsx'
+        );
+    }
     public function addItemOrder(Request $request)
     {
         $validated = $request->validate([
-            'order_id'    => 'required',
-            'medicine_id' => 'required',
-            'creditor_id' => 'nullable',
-            'pack'        => 'required',
-            'price'       => 'required',
-            'quantity'    => 'required',
-            'total'       => 'required',
+            'order_id'      => 'required',
+            'medicine_id'   => 'required',
+            'creditor_code' => 'nullable',
+            'pack'          => 'required',
+            'price'         => 'required',
+            'quantity'      => 'required',
+            'total'         => 'required',
         ]);
 
         $item = OrderItems::create([
-            'order_id'    => $validated['order_id'],
-            'medicine_id' => $validated['medicine_id'],
-            'creditor_id' => $validated['creditor_id'],
-            'pack'        => $validated['pack'],
-            'price'       => $validated['price'],
-            'quantity'    => $validated['quantity'],
-            'total'       => $validated['total'],
-            'status'      => 0,
+            'order_id'      => $validated['order_id'],
+            'medicine_id'   => $validated['medicine_id'],
+            'creditor_code' => $validated['creditor_code'] ?? null,
+            'pack'          => $validated['pack'],
+            'price'         => $validated['price'],
+            'quantity'      => $validated['quantity'],
+            'total'         => $validated['total'],
+            'status'        => 0,
         ]);
 
+        $price_total = OrderItems::where('order_id', $item->order_id)->where('status', '0')->sum('total') ?? '';
+
+        $ppn = $price_total * 0.11;
         return response()->json([
             'success' => true,
-            'item' => $item
+            'item' => $item,
+            'summary' => [
+                'price_item' => $price_total,
+                'price_ppn' => $ppn,
+                'price_total' => $price_total + $ppn
+            ]
         ]);
     }
     public function updateOrderItem(Request $request)
@@ -144,19 +232,28 @@ class OrdersController extends Controller
             'quantity'    => 'required|',
             'total'       => 'required|',
         ]);
-    
+
         $item = OrderItems::findOrFail($request->order_id);
         $item->update([
             'medicine_id' => $request->medicine_id,
+            'creditor_code' => $request->creditor_code,
             'pack'        => $request->pack,
             'price'       => $request->price,
             'quantity' => $request->quantity,
             'total' => $request->total,
         ]);
 
+        $price_total = OrderItems::where('order_id', $item->order_id)->where('status', '0')->sum('total') ?? '';
+
+        $ppn = $price_total * 0.11;
         return response()->json([
             'success' => true,
-            'message' => 'Item updated successfully'
+            'item' => $item,
+            'summary' => [
+                'price_item' => $price_total,
+                'price_ppn' => $ppn,
+                'price_total' => $price_total + $ppn
+            ]
         ]);
     }
     public function deleteOrderItem(Request $request)
@@ -168,15 +265,26 @@ class OrdersController extends Controller
         $item = OrderItems::findOrFail($request->id);
         $item->delete();
 
+        $price_total = OrderItems::where('order_id', $item->order_id)->where('status', '0')->sum('total') ?? '';
+
+        $ppn = $price_total * 0.11;
         return response()->json([
             'success' => true,
-            'message' => 'Item deleted successfully'
+            'item' => $item,
+            'message' => 'Item deleted successfully',
+            'summary' => [
+                'price_item' => $price_total,
+                'price_ppn' => $ppn,
+                'price_total' => $price_total + $ppn
+            ]
         ]);
     }
     public function searchMedicine(Request $request)
     {
         $search = $request->search;
-        $data = Medicines::query()
+        $orderid = $request->orderid;
+        $filterExist = OrderItems::where('order_id', $orderid)->pluck('medicine_id');
+        $data = Medicines::whereNotIn('id', $filterExist)
             ->with([
                 'composition',
                 'category',
@@ -230,21 +338,102 @@ class OrdersController extends Controller
     {
         $now = Carbon::now()->format('d/m/Y');
         $order_code = $this->generateOrderCode();
+
         return view('orders.order', compact('order_code', 'now'));
     }
-    public function completeOrder(Request $request) {
+    public function completeOrder(Request $request)
+    {
         $request->validate([
             'order_id' => 'required',
         ]);
-    
+
         $item = Order::findOrFail($request->order_id);
         $item->update([
             'status' => 1,
         ]);
+        $now = Carbon::now()->format('d/m/Y');
+        $year   = now()->format('y');
+        $month  = now()->format('m');
+        $prefix = $year . $month . 'RE';
+        $last = Receiving::where('pharmacy_id', Auth()->user()->pharmacy_id)
+            ->where('code', 'like', $prefix . '%')
+            ->orderBy('code', 'desc')
+            ->first();
+
+        if ($last) {
+            $lastNumber = intval(substr($last->code, -4));
+            $nextNumber = $lastNumber + 1;
+        } else {
+            $nextNumber = 0;
+        }
+
+        $serial = str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+
+        $receiving_code = $prefix . $serial;
+        try {
+            DB::beginTransaction();
+
+            $transaction = Receiving::create([
+                'order_id'          => $request->order_id,
+                'creditors_id'      => NULL,
+                'pharmacy_id'       => Auth()->user()->pharmacy_id,
+                'code'              => $receiving_code,
+                'date'              => $now,
+                'status'            => 0,
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'status' => 'success', 
+                'message' => 'Pemesanan Berhasil!',
+                'redirect' => route('receiving.index')
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return redirect()->back()->with([
+                'status' => 'error',
+                'message' => "Gagal Menyimpan! " . $e->getMessage()
+            ]);
+        }
+    }
+    public function getCreditors($id)
+    {
+        $medicine = Medicines::with('creditors')->findOrFail($id);
 
         return response()->json([
-            'success' => true,
-            'message' => 'Order Completed'
+            'medicine' => $medicine,
+            'creditors' => $medicine->creditors->map(function ($c) {
+                return [
+                    'id' => $c->id,
+                    'name' => $c->name,
+                    'code' => $c->code,
+                ];
+            })
         ]);
+    }
+    public function printSPB($orderId)
+    {
+        $date = Carbon::now()->translatedFormat('d F Y');
+        $order = Order::with(['order_items.medicines', 'order_items.creditors', 'order_items.medicines.factory', 'order_items.medicines.category'])
+            ->findOrFail($orderId);
+        $grouped = $order->order_items->groupBy(function ($item) {
+            return $item->medicines->type ?? "Kosong";
+        })->map(function ($perCreditor) {
+            return $perCreditor->groupBy('creditor_code') ?? "Kosong";
+        });
+        $pdf = Pdf::loadView('orders.printSPB', compact('order', 'date', 'grouped'))
+            ->setPaper('A4', 'portrait');
+
+        return $pdf->stream("ORDER-{$order->code}.pdf");
+    }
+    public function printPreview($order_id)
+    {
+        $order = Order::with(['order_items.medicines', 'order_items.medicines.factory'])
+            ->findOrFail($order_id);
+        $grouped = $order->order_items->groupBy('creditor_code');
+
+
+        return view('orders.printSPB', compact('grouped'));
     }
 }

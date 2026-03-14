@@ -69,7 +69,7 @@
                                     <th class="px-4 py-3">Nomor</th>
                                     <th class="px-4 py-3">Nama Pelanggan/Pasien</th>
                                     <th class="px-4 py-3">Harga</th>
-                                    <th class="px-4 py-3">Print</th>
+                                    <th class="px-4 py-3">Cetak</th>
 
                                 </tr>
                             </thead>

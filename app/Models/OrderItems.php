@@ -13,7 +13,7 @@ class OrderItems extends Model
     protected $fillable = [
         'order_id',
         'medicine_id',
-        'creditor_id',
+        'creditor_code',
         'pack',
         'price',
         'quantity',
@@ -28,5 +28,17 @@ class OrderItems extends Model
     public function orders()
     {
         return $this->belongsTo(Order::class, 'order_id');
+    }
+    public function receivingItems()
+    {
+        return $this->hasMany(ReceivingItems::class, 'order_items_id');
+    }
+    public function receiving_items()
+    {
+        return $this->hasOne(ReceivingItems::class, 'order_items_id');
+    }
+    public function creditors()
+    {
+        return $this->belongsTo(Creditor::class, 'creditor_code', 'code');
     }
 }

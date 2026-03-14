@@ -167,54 +167,14 @@
 @section('content')
     <section class="section px-4">
         <div class="section-body">
-            {{-- <div class="flex flex-col lg:flex-row gap-4">
 
-                <div class="card w-full md:w-[65%] shadow-md rounded-2xl p-6 bg-white">
-                    <div class="flex items-center mb-6">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-blue-600 mr-3 drop-shadow-md"
-                            fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" />
-                        </svg>
-                        <h2 class="text-2xl font-bold text-gray-800 drop-shadow-sm">Retur Penjualan</h2>
-                    </div>
-
-                    <div class="overflow-x-auto p-3">
-                        <table id="table-data" class="min-w-full text-sm text-left text-gray-600">
-                            <thead class="bg-gray-100 text-gray-700 uppercase text-xs">
-                                <tr>
-                                    <th class="px-4 py-3">#</th>
-                                    <th class="px-4 py-3">Tanggal</th>
-                                    <th class="px-4 py-3">Nomor</th>
-                                    <th class="px-4 py-3">Nama Pelanggan/Pasien</th>
-                                    <th class="px-4 py-3">Harga</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-100"></tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <div class="bg-white p-6 rounded-2xl shadow-md w-full md:w-[50%] mx-auto">
-                    <table id="items-table" class="table table-bordered w-full mt-4">
-                        <thead>
-                            <tr>
-                                <th>No</th>
-                                <th>Medicine</th>
-                                <th>Qty</th>
-                                <th>Harga</th>
-                                <th>Disc</th>
-                                <th>Total</th>
-                            </tr>
-                        </thead>
-                    </table>
-
-                </div>
-
-            </div> --}}
             <div class="relative w-full p-[24px] bg-[#ffffff] rounded-[22px]">
                 <div id="searchWrapper" class="flex gap-5" style="position: relative; width: 100%;">
                     <div class="w-11/12">
+                        <div class="flex items-end justify-between md:block">
+                            <h1 class="text-2xl font-semibold tracking-tight font-poppins text-[#1c1c1c]">Pemesanan
+                            </h1>
+                        </div>
                         <div class="flex py-2 gap-1">
                             <div>
                                 <div class="py-1 text-[13px] font-bold">Tanggal Order</div>
@@ -267,7 +227,7 @@
                                     <div class="py-1 text-[13px] font-bold">Kode Obat</div>
                                     <input id="medicine_code" readonly
                                         class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
-                                        placeholder="OTC">
+                                        placeholder="Kode Obat">
                                 </div>
 
                                 <div class="flex-1 min-w-[200px]">
@@ -299,7 +259,7 @@
                                     <div class="py-1 text-[13px] font-bold">QTY BPBA</div>
                                     <input id="qty" type="number" name="qty"
                                         class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
-                                        placeholder="QTY Retur" oninput="counttotal()">
+                                        placeholder="QTY Retur" onkeyup="counttotal()">
                                 </div>
                                 <div class="w-full sm:w-40">
                                     <div class="py-1 text-[13px] font-bold">Isi Obat</div>
@@ -321,19 +281,36 @@
                                         class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
                                         placeholder="Jumlah">
                                 </div>
-                                <div class="flex gap-3 mt-4">
-                                    <button onclick="addItem()" type="button" class="btn btn-pharma !bg-[#2196F3] btn-lg">
-                                        Simpan
-                                    </button>
 
-                                    <button onclick="resetInputs()" type="button" id="back"
-                                        class="btn btn-pharma !bg-[#b72929] btn-lg">
-                                        Cancel
-                                    </button>
+                            </div>
+                            <div>
+
+                                <div class="flex items-center gap-3 mt-4">
+                                    <div class="flex-1 min-w-[200px]">
+                                        <div class="py-1 text-[13px] font-bold">Kreditur</div>
+                                        <select id="creditor" name="creditor_id"
+                                            class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
+                                            placeholder="Jumlah">
+                                            <option value="" required>--Pilih Kreditur--</option>
+                                        </select>
+                                    </div>
+                                    <div class="flex gap-2 items-center flex-wrap">
+                                        <div>
+                                            <button onclick="submit_data()" type="button"
+                                                class="btn btn-pharma !bg-[#2196F3] btn-lg">
+                                                Tambahkan
+                                            </button>
+                                        </div>
+                                        <div>
+                                            <button id="back" type="button" id="back"
+                                                class="btn btn-pharma !bg-[#b72929] btn-lg">
+                                                Kembali
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </form>
-
                     </div>
                 </div>
             </div>
@@ -341,13 +318,16 @@
                 <div class="flex items-center gap-3">
                     <button onclick="completeOrder()"
                         class="inline-flex items-center gap-2 rounded-lg btn-pharma !bg-blue-600 !shadow-[0_2px_6px_#2563eb] px-6 py-4 text-sm font-xl text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            class="w-5 h-5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                            <polyline points="17 21 17 13 7 13 7 21" />
+                            <polyline points="7 3 7 8 15 8" />
                         </svg>
-                        Buat Baru
+                        Simpan
                     </button>
 
-                    <button
+                    <button onclick="printOrder()" id='printorder'
                         class="inline-flex items-center gap-2 rounded-lg btn-pharma !bg-gray-700 !shadow-[0_2px_6px_#374151] px-6 py-4 text-sm font-xl text-white hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2">
                         <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round"
@@ -356,22 +336,14 @@
                         Cetak
                     </button>
 
-                    <button
-                        class="inline-flex items-center gap-2 rounded-lg  btn-pharma !bg-emerald-600 !shadow-[0_2px_6px_#079669] px-6 py-4 text-sm font-xl text-white hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                            <rect x="2" y="5" width="20" height="14" rx="2" ry="2" />
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M2 10h20" />
-                        </svg>
-                        Kreditur
-                    </button>
-
-                    <button
+                    <button onclick="printSPB()"
                         class="inline-flex items-center gap-2 rounded-lg  btn-pharma !bg-purple-600 !shadow-[0_2px_6px_#9333ea] px-6 py-4 text-sm font-xl text-white hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2">
                         <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M7 3h10v18l-2-1-2 1-2-1-2 1-2-1V3z" />
                         </svg>
                         SPB
                     </button>
+
                 </div>
 
                 <table id="orderItemsTable" class="w-full">
@@ -379,14 +351,39 @@
                         <tr>
                             <th>Nama Obat</th>
                             <th>Pabrik</th>
+                            <th>Kreditur Dipilih</th>
                             <th>Satuan</th>
                             <th>Harga</th>
                             <th>Qty</th>
+                            <th>Sisa</th>
                             <th>Total</th>
                         </tr>
                     </thead>
-                    <tbody></tbody>
+                    <tbody class="text-[11px]"></tbody>
                 </table>
+                <div class="flex justify-end w-full shadow-[0_0_20px_rgba(0,0,0,0.2)] bg-white fixed left-0 bottom-0">
+                    <div class="p-4 rounded-t-2xl gap-2 flex">
+                        <div class="flex items-center">
+                            <p class="font-bold pr-2 font-poppins">HARGA HNA</p>
+                            <input id="d_price" readonly
+                                class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
+                                placeholder="Input">
+                        </div>
+                        <div class="flex items-center">
+                            <p class="font-bold pr-2 font-poppins">PPN</p>
+                            <input id="d_ppn" readonly
+                                class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
+                                placeholder="Input">
+                        </div>
+                        <div class="flex items-center">
+                            <p class="font-bold pr-2 font-poppins">TOTAL</p>
+
+                            <input id="d_total" readonly
+                                class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
+                                placeholder="Input">
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </section>
@@ -419,14 +416,27 @@
         let itempack = '0';
         var itemcreditor = '';
 
-        let totalprice = {{ $total }};
 
         var pack = document.getElementById('pack');
         let orderItemsTable;
         let selectedRowData = null;
         let selectedRowIndex = null;
+        let d_price = {{ $d_price }};
+        let d_ppn = {{ $d_ppn }};
+        let d_total = {{ $d_total }};
 
+        // Setting Initial Transaction Value
+        $('#d_price').val(formatRupiah(d_price));
+        $('#d_ppn').val(formatRupiah(d_ppn));
+        $('#d_total').val(formatRupiah(d_total));
+
+
+        $('#back').click(function() {
+            window.location.href = "{{ route('receiving.index') }}";
+        });
+        // Datatable
         document.addEventListener('DOMContentLoaded', function() {
+
             orderItemsTable = $('#orderItemsTable').DataTable({
                 processing: true,
                 serverSide: true,
@@ -447,6 +457,10 @@
 
                     },
                     {
+                        data: 'creditors',
+                        name: 'creditors'
+                    },
+                    {
                         data: 'medicines.unit',
                         name: 'medicines.unit'
                     },
@@ -459,6 +473,10 @@
                         name: 'quantity'
                     },
                     {
+                        data: 'medicines.stock',
+                        name: 'medicines.stock'
+                    },
+                    {
                         data: 'item_total',
                         name: 'item_total'
                     },
@@ -468,6 +486,8 @@
                 info: false,
             });
         });
+
+        // Table click
         $('#orderItemsTable').on('click', 'tbody tr', function() {
             $('#orderItemsTable tbody tr').removeClass('selected');
             $(this).addClass('selected');
@@ -492,34 +512,70 @@
             document.getElementById('qty').value = data.quantity;
             document.getElementById('medicine_code').value = data.medicines.code;
             document.getElementById('total_price').value = formatRupiah(data.total);
+            console.log(data.creditor_code);
+            axios.get(`/orders/${data.medicine_id}/creditors`)
+                .then(res => {
+                    let creditors = res.data.creditors;
+                    console.log(creditors);
+                    let select = $("#creditor");
+                    select.empty();
+
+                    creditors.forEach(c => {
+                        select.append(new Option(c.name, c.code));
+                    });
+                    select.val(data.creditor_code).trigger("change");
+
+                    select.trigger("change");
+                })
+                .catch(err => console.log(err));
             if (data.pack == "1") {
                 pack.checked = true;
             }
-            console.log(data);
-            // IMPORTANT: store for update
+            console.log(data.creditor_code);
+
             itemcode = data.medicine_id;
             itemprice = data.medicines.raw_price;
             itemqty = data.quantity;
             itemcontent = data.medicines.content;
+            itemtotal = data.total;
             totalprice = data.total;
             document.getElementById('qty').focus();
         });
+
         document.getElementById('qty').addEventListener('keydown', function(e) {
             if (e.key !== 'Enter') return;
             e.preventDefault();
-
+            document.getElementById('creditor').focus();
+        });
+        document.getElementById('creditor').addEventListener('keydown', function(e) {
+            if (e.key !== 'Enter') return;
+            e.preventDefault();
             if (selectedRowData) {
                 updateItem();
             } else {
-                addItem(); // your existing function
+                addItem();
             }
         });
+
+        function empyCreditorOption() {
+            let select = $("#creditor");
+            select.empty();
+        }
+
+        function submit_data() {
+            if (selectedRowData) {
+                updateItem();
+            } else {
+                addItem();
+            }
+        }
 
         function updateItem() {
             const qty = parseInt(document.getElementById('qty').value);
             const total = qty * itemprice;
             axios.post("{{ route('orders.updateOrderItem') }}", {
                 order_id: selectedRowData.order_item_id,
+                creditor_code: document.getElementById('creditor')?.value ?? null,
                 medicine_id: selectedRowData.medicines.id,
                 pack: itempack,
                 price: itemprice,
@@ -537,9 +593,22 @@
                     resetInputs();
                     selectedRowData = null;
                     selectedRowIndex = null;
+                    let item = res.data.summary;
+                    orderItemsTable.ajax.reload(null, false);
+                    console.log(item.price);
+
+                    d_price = item.price_item;
+                    d_ppn = item.price_ppn
+                    d_total = item.price_total;
+
+                    $('#d_price').val(formatRupiah(d_price));
+                    $('#d_ppn').val(formatRupiah(d_ppn));
+                    $('#d_total').val(formatRupiah(d_total));
                 }
             }).catch(err => {
                 console.error(err);
+                console.log(err.response.data);
+
                 alert('Update failed');
             });
         }
@@ -553,7 +622,6 @@
             if (!isDeleteKey) return;
             if (!selectedRowData) return;
 
-            // prevent deleting while typing
             const tag = document.activeElement.tagName;
             if (tag === 'INPUT' || tag === 'TEXTAREA') return;
 
@@ -576,6 +644,17 @@
                     orderItemsTable.ajax.reload(null, false);
                     selectedRowData = null;
                     selectedRowIndex = null;
+                    let item = res.data.summary;
+                    orderItemsTable.ajax.reload(null, false);
+                    console.log(item.price);
+
+                    d_price = item.price_item;
+                    d_ppn = item.price_ppn
+                    d_total = item.price_total;
+
+                    $('#d_price').val(formatRupiah(d_price));
+                    $('#d_ppn').val(formatRupiah(d_ppn));
+                    $('#d_total').val(formatRupiah(d_total));
                 }
             }).catch(err => {
                 console.error(err);
@@ -618,7 +697,7 @@
 
             loading = true;
 
-            fetch(`{{ route('orders.searchmedicine') }}?search=${keyword}&page=${page}`)
+            fetch(`{{ route('orders.searchmedicine') }}?search=${keyword}&page=${page}&orderid=${orderid}`)
                 .then(res => res.json())
                 .then(res => {
                     const tbody = document.getElementById('searchResults');
@@ -740,8 +819,25 @@
 
             document.getElementById('searchDropdown').style.display = 'none';
             document.getElementById('searchInput').value = "";
-            document.getElementById('qty')?.focus();
+            document.getElementById('creditor').value = "";
 
+            document.getElementById('qty')?.focus();
+            axios.get(`/orders/${item.id}/creditors`)
+                .then(res => {
+                    let creditors = res.data.creditors;
+                    console.log(creditors);
+
+                    let select = $("#creditor");
+                    select.empty();
+
+                    creditors.forEach(c => {
+                        select.append(new Option(c.name, c.code));
+                    });
+                    select.val(data.creditor_code).trigger("change");
+
+                    select.trigger("change");
+                })
+                .catch(err => console.log(err));
         }
 
         // Update
@@ -818,19 +914,21 @@
             itemcreditor = null;
             selectedRowData = null;
             document.getElementById('searchInput').focus();
+            empyCreditorOption();
+
         }
 
         function addItem() {
             const payload = {
                 order_id: orderid,
                 medicine_id: itemcode,
-                creditor_id: itemcreditor ?? null,
+                creditor_code: document.getElementById('creditor').value ?? null,
                 pack: itempack,
                 price: itemprice,
                 quantity: itemqty,
                 total: itemtotal,
             };
-
+            console.log(payload);
             axios.post("{{ route('orders.addItemOrder') }}", payload, {
                     headers: {
                         'X-CSRF-TOKEN': document
@@ -840,14 +938,27 @@
                 })
                 .then(res => {
                     if (res.data.success) {
+                        let item = res.data.summary;
                         orderItemsTable.ajax.reload(null, false);
+                        console.log(item.price);
+
+                        d_price = item.price_item;
+                        d_ppn = item.price_ppn
+                        d_total = item.price_total;
+
+                        $('#d_price').val(formatRupiah(d_price));
+                        $('#d_ppn').val(formatRupiah(d_ppn));
+                        $('#d_total').val(formatRupiah(d_total));
+
                         resetInputs();
+                        empyCreditorOption();
 
                     }
                 })
                 .catch(err => {
                     console.error(err);
-                    alert('Error adding item');
+                    empyCreditorOption();
+                    alert('Isi Form Dengan Benar!');
                 });
         }
 
@@ -862,18 +973,64 @@
                         .content
                 }
             }).then(res => {
-                if (res.data.success) {
-                    orderItemsTable.ajax.reload(null, false);
+                const data = res.data;
+
+                // SweetAlert
+                Swal.fire({
+                    icon: data.status, // success or error
+                    title: data.status === 'success' ? 'Berhasil' : 'Gagal',
+                    text: data.message,
+                    confirmButtonText: 'OK'
+                }).then(() => {
+                    if (data.redirect) {
+                        window.location.href = data.redirect; // redirect after OK
+                    } else {
+                        // optional fallback: reload table
+                        orderItemsTable.ajax.reload(null, false);
+                    }
+
+                    // reset inputs only if needed
                     resetInputs();
                     selectedRowData = null;
                     selectedRowIndex = null;
-                    location.reload();
+                });
 
-                }
             }).catch(err => {
                 console.error(err);
-                alert('Update failed');
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Gagal',
+                    text: 'Terjadi kesalahan sistem!'
+                });
             });
+        }
+
+        function printSPB() {
+            window.open(`/orders/${orderid}/printspb`, "_blank");
+        }
+
+        function printOrder() {
+
+            const btn = document.getElementById('printorder');
+            if (btn.disabled) return;
+
+            btn.disabled = true;
+
+            Swal.fire({
+                title: 'Processing...',
+                text: 'Sedang menyiapkan file',
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                    window.location.href = `/orders/printorder/${orderid}`;
+                }
+            });
+
+            setTimeout(() => {
+                Swal.close();
+                btn.disabled = false;
+            }, 4000);
         }
     </script>
 

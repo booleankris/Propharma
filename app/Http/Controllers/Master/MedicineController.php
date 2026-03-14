@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Master;
 use App\Http\Controllers\Controller;
 use App\Models\Creditor;
 use App\Models\Medicine;
+use App\Models\MedicineCreditor;
 use App\Models\Medicines;
 use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
@@ -55,8 +56,8 @@ class MedicineController extends Controller
                 ->make(true);
         }
         $creditors = Creditor::orderBy('name')
-            ->get(['id', 'name']);
-        return view('master.medicines.index',compact('creditors'));
+            ->get(['id', 'code', 'name']);
+        return view('master.medicines.index', compact('creditors'));
     }
 
     /**
@@ -90,10 +91,8 @@ class MedicineController extends Controller
             'status'                  => 'nullable|boolean',
         ]);
 
-        // Auto-generate code
         $code = Medicines::generateCode();
-
-        Medicines::create([
+        $insert = Medicines::create([
             'code'                   => $code,
             'barcode'                => $request->barcode,
             'generic'                => $request->generic,
@@ -123,6 +122,13 @@ class MedicineController extends Controller
             'type'                   => $request->type,
             'status'                 => 1,
         ]);
+        $creditors_id = explode(',', $request->get('creditor_ids'));
+        foreach ($creditors_id as $id) {
+            MedicineCreditor::create([
+                'medicine_id' => $insert->id,
+                'creditor_code' => $id,
+            ]);
+        }
 
         return response()->json(['message' => 'Obat Berhasil Ditambahkan']);
     }
@@ -188,6 +194,15 @@ class MedicineController extends Controller
             'type'                   => $request->type,
             'status'                 => 1,
         ]);
+        $medicineCreditor = Medicines::findOrFail($id);
+
+        $medicineCreditor->update($request->except('creditor_ids'));
+
+        // creditor_ids is "BP001,CS001"
+        $codes = explode(',', $request->creditor_ids);
+
+        // replace pivot rows
+        $medicineCreditor->creditors()->sync($codes);
         return response()->json(['message' => 'Obat Berhasil Di-Update.']);
     }
 
@@ -198,13 +213,34 @@ class MedicineController extends Controller
     public function destroy($id)
     {
         $medicine = Medicines::findOrFail($id);
-        
+
         $medicine->update([
-            'status'=> 0,
+            'status' => 0,
         ]);
 
         return response()->json([
             'message' => 'Obat Berhasil Dihapus'
         ]);
     }
+
+    public function editCreditor($id)
+    {
+        $medicine = Medicines::with('creditors')->findOrFail($id);
+
+        return response()->json([
+            'medicine' => $medicine,
+            'creditors' => $medicine->creditors->map(function ($c) {
+                return [
+                    'id' => $c->id,
+                    'name' => $c->name,
+                    'code' => $c->code,
+                ];
+            })
+        ]);
+    }
+    // public function updateCreditor($id, Request $request)
+    // {
+    //     dd($request->all() . $id);
+
+    // }
 }

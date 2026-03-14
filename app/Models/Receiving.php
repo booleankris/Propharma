@@ -8,13 +8,31 @@ use Illuminate\Database\Eloquent\Model;
 class Receiving extends Model
 {
     use HasFactory;
-    protected $table = 'receiving';
 
+    protected $table = 'receiving';
     protected $fillable = [
         'pharmacy_id',
-        'user_id',
         'code',
         'date',
         'status',
     ];
+    public function receiving_details()
+    {
+        return $this->hasMany(ReceivingDetails::class, 'receiving_id');
+    }
+    public function receivings()
+    {
+        return $this->belongsTo(ReceivingDetails::class);
+    }
+    public function receiving_items()
+    {
+        return $this->hasManyThrough(
+            ReceivingItems::class,
+            ReceivingDetails::class,
+            'receiving_id',        // FK on receiving_details
+            'receiving_details_id', // FK on receiving_items
+            'id',                  // PK on receiving
+            'id'                   // PK on receiving_details
+        );
+    }
 }

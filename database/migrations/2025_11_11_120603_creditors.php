@@ -18,9 +18,15 @@ return new class extends Migration
             $table->string('code')->default('0')->nullable();
             $table->string('name');
             $table->string('address');
-            $table->string('city');
-            $table->string('phone');
-            $table->string('email');
+            $table->string('city')->nullable();
+            $table->string('phone')->nullable();
+            $table->string('fax')->nullable();
+            $table->string('ppn_type')->nullable();
+            $table->string('numbers');
+            $table->string('bank_type');
+            $table->string('bank_number');
+            $table->string('bank_name');
+            $table->string('npwp');
             $table->integer('status')->default('0')->nullable(); 
             $table->timestamps();
         });

@@ -6,6 +6,7 @@ use App\Models\Debtors;
 use App\Models\Doctors;
 use App\Models\Item;
 use App\Models\ItemCart;
+use App\Models\ItemsLog;
 use App\Models\MedicineCart;
 use App\Models\Medicines;
 use App\Models\MedicineTransactions;
@@ -116,8 +117,17 @@ class SalesController extends Controller
 
         // Checking Transaction Status
         $transaction = MedicineTransactions::where('pharmacy_id', Auth()->user()->pharmacy_id)->where('status', '0')->first();
-        $totaltransaction =  MedicineCart::where('user_id', Auth()->user()->id)->where('status', '0')->sum('final_price');
-        $rawtotal =  MedicineCart::where('user_id', Auth()->user()->id)->where('status', '0')->sum('raw_total');
+
+        // Total Beli
+        $totaltransaction =  MedicineCart::where('user_id', Auth()->user()->id)
+            ->where('status', '0')->sum('final_price');
+
+        // Jumlah
+        $rawtotal =  MedicineCart::where('user_id', Auth()->user()->id)
+            ->where('status', '0')
+            ->selectRaw('SUM(raw_total) as raw_total, SUM(embalase) as embalase')->first();
+
+
 
         $existingpackage = MedicineCart::where('user_id', auth()->id())
             ->where('status', '0')
@@ -132,7 +142,27 @@ class SalesController extends Controller
 
         return view('kasir.transaction', compact('check_transaction', 'transaction', 'existingpackage', 'rawtotal', 'parameters', 'rounding', 'itemInCart', 'totaltransaction', 'discount_total', 'ChangeFakturParameters', 'parameterRT', 'parameterHV', 'parameterUP', 'ChangeFakturRounding'));
     }
+    function generateItemsLogCode()
+    {
+        $now = Carbon::now();
 
+        $year  = $now->format('y');
+        $month = $now->format('m');
+        $prefix = "{$year}{$month}LOG-";
+
+        $lastCode = ItemsLog::where('code', 'like', "{$prefix}%")
+            ->orderBy('code', 'desc')
+            ->value('code');
+
+        if ($lastCode) {
+            $lastNumber = (int) substr($lastCode, -4);
+            $nextNumber = $lastNumber + 1;
+        } else {
+            $nextNumber = 1;
+        }
+
+        return $prefix . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+    }
     /**
      * Show the form for creating a new resource.
      *
@@ -171,7 +201,7 @@ class SalesController extends Controller
                         ->orWhere('barcode', 'like', '%' . $q . '%');
                 });
             })
-            ->select(['id', 'code', 'barcode', 'name', 'net_price', 'stock', 'unit', 'packaging', 'content', 'dosage'])
+            ->select(['id', 'code', 'barcode', 'name', 'het_price', 'location', 'etalase', 'net_price', 'stock', 'unit', 'packaging', 'content', 'dosage'])
             ->orderByRaw("CASE WHEN code LIKE ? THEN 0 ELSE 1 END, code ASC", [$q . '%'])
             ->limit(10)
             ->get();
@@ -404,13 +434,15 @@ class SalesController extends Controller
             ->sum('discount');
         $totalbought = MedicineCart::where('transaction_id', $cart->transaction_id)
             ->where('user_id', auth()->id())
-            ->sum('total_price');
+            ->selectRaw('SUM(raw_total) as raw_total, SUM(embalase) as embalase')->first();
+
+        $total_raw = $totalbought->raw_total + $totalbought->embalase;
         return response()->json([
             'success' => true,
             'item' => $cart,
             'total_transaction' => $total_transaction,
             'total_discount' => $total_discount,
-            'totalbought' => $totalbought,
+            'totalbought' => $total_raw,
         ]);
     }
     public function addPatient(Request $request)
@@ -559,11 +591,44 @@ class SalesController extends Controller
             MedicineCart::where('transaction_id', $request->transaction_id)
                 ->update(['status' => 1]);
 
+
+            // Create Sales Log 
+            // log = 1
+            // type = UM
+
+            $transaction = MedicineTransactions::with('transactions')->findOrFail($request->transaction_id);
+            $now = Carbon::now()->format('Y-m-d');
+
+            $totalfinalprice = $transaction->transactions->sum('final_price');
+
+            foreach ($transaction->transactions as $cart) {
+                $medicine = Medicines::findOrFail($cart->medicine_id);
+                $qty_before = $medicine->stock;
+                // Reduce stock
+                $medicine->stock -= $cart->quantity;
+                $medicine->save();
+
+                // Log the transaction
+                ItemsLog::create([
+                    'transaction_code' => $transaction->transaction_code,
+                    'code'             => $this->generateItemsLogCode(),
+                    'type'             => "UM",
+                    'medicine_id'      => $cart->medicine_id,
+                    'qty'              => $cart->quantity,
+                    'qty_before'       => $qty_before,
+                    'qty_after'        => $medicine->stock,
+                    'total'            => $cart->final_price,
+                    'date'             => $now,
+                    'status'           => 1,
+                ]);
+            }
+
+
             DB::commit();
 
             return response()->json([
                 'success'   => true,
-                'print_url'=> route('sales.print', $transaction->id)
+                'print_url' => route('sales.print', $transaction->id)
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -687,16 +752,20 @@ class SalesController extends Controller
             ->where('user_id', auth()->id())
             ->sum('discount');
 
+
         $totalbought = MedicineCart::where('transaction_id', $cart->transaction_id)
             ->where('user_id', auth()->id())
-            ->sum('raw_total');
+            ->selectRaw('SUM(raw_total) as raw_total, SUM(embalase) as embalase')->first();
+
+        $total_raw = $totalbought->raw_total + $totalbought->embalase;
+
 
         return response()->json([
             'success' => true,
             'item' => $cart,
             'total_transaction' => $total_transaction,
             'total_discount' => $total_discount,
-            'totalbought' => $totalbought,
+            'totalbought' => $total_raw,
         ]);
     }
 

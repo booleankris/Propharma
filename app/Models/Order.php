@@ -17,4 +17,12 @@ class Order extends Model
         'date',
         'status',
     ];
+    public function order_items()
+    {
+        return $this->hasMany(OrderItems::class);
+    }
+    public function receiving()
+    {
+        return $this->hasMany(Receiving::class);
+    }
 }

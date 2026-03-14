@@ -77,6 +77,7 @@ class SalesDataController extends Controller
                 })
                 ->addColumn('print', function ($row) {
                     return '
+                    <div class="flex gap-2">
                         <a href="' . url('print/receipt/' . $row->transactions->id) . '" target="_blank">
                             <button class="group rounded-md shadow bg-blue-500 text-white cursor-pointer flex justify-between items-center overflow-hidden transition-all hover:glow">
                                 <div class="relative w-12 h-12 bg-white bg-opacity-20 flex justify-center items-center transition-all">
@@ -85,172 +86,29 @@ class SalesDataController extends Controller
                                             d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
                                     </svg>
                                 </div>
-                                <p class="px-5">Print</p>
+                                <p class="px-5">Struk</p>
                             </button>
                         </a>
+                        <a href="' . url('print/payment-receipt/' . $row->transactions->id) . '" target="_blank">
+                            <button style="background:#bd9c33" class="group rounded-md shadow text-white cursor-pointer flex justify-between items-center overflow-hidden transition-all hover:glow">
+                                <div class="relative w-10 h-12 bg-white bg-opacity-20 flex justify-center items-center transition-all">
+                                    <svg class="w-4 h-4 transition-all group-hover:-translate-y-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
+                                    </svg>
+                                </div>
+                                <p class="px-3">Kwitansi</p>
+                            </button>
+                        </a>
+                    </div>
                     ';
                 })
+              
                 ->rawColumns(['final_price', 'print'])
                 ->make(true);
         }
 
         return view('sales.salesdata');
-    }
-
-    public function returdata(Request $request)
-    {
-        $search = $request->search;
-
-        $data = MedicineCart::query()
-            ->with(['transactions.patients'])
-            ->whereHas('transactions', function ($q) use ($search) {
-                $q->where('transaction_code', 'LIKE', "%{$search}%")
-                    ->orWhereHas('patients', function ($q2) use ($search) {
-                        $q2->where('name', 'LIKE', "%{$search}%");
-                    });
-            })
-            ->select('transaction_id')
-            ->selectRaw('SUM(final_price) as final_price')
-            ->groupBy('transaction_id')
-            ->orderByDesc('transaction_id')
-            ->paginate(10);
-
-        // format response for frontend
-        $data->getCollection()->transform(function ($item) {
-            return [
-                'transaction_code' => $item->transactions->transaction_code,
-                'name'             => $item->transactions->patients->name,
-                'final_price'      => $item->final_price,
-            ];
-        });
-
-        return response()->json($data);
-    }
-    public function getReturMedicines(Request $request)
-    {
-        $transactionCode = $request->transaction_code;
-
-        $transactionCart = MedicineCart::with([
-            'medicine',
-            'transactions'
-        ])
-            ->whereHas('transactions', function ($q) use ($transactionCode) {
-                $q->where('transaction_code', $transactionCode);
-            })
-            ->get();
-
-
-        $transactionCart->map(function ($item) {
-            return [
-                'medicine_id'   => $item->medicine_id,
-                'name'          => $item->medicine->name,
-                'quantity'      => $item->quantity,
-                'final_price'   => $item->final_price,
-            ];
-        });
-
-
-        return response()->json($transactionCart);
-    }
-
-
-
-    function generateReturCode()
-    {
-        $now = Carbon::now();
-
-        $year  = $now->format('y'); // 25
-        $month = $now->format('m'); // 11
-        $prefix = "{$year}{$month}R";
-
-        // Get last code for this month
-        $lastCode = Retur::where('code', 'like', "{$prefix}%")
-            ->orderBy('code', 'desc')
-            ->value('code');
-
-        if ($lastCode) {
-            $lastNumber = (int) substr($lastCode, -4);
-            $nextNumber = $lastNumber + 1;
-        } else {
-            $nextNumber = 1;
-        }
-
-        return $prefix . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
-    }
-    public function retur()
-    {
-        $now = Carbon::now()->format('d/m/Y');
-        $retur_code = $this->generateReturCode();
-        return view('sales.salesretur', compact('retur_code', 'now'));
-    }
-    public function returItem(Request $request)
-    {
-        $request->validate([
-            'transaction_id' => 'required|integer',
-            'medicine_id'    => 'required|integer',
-            'qty_retur'      => 'required|numeric|min:1',
-            'total_retur'    => 'required',
-            'old_qty'        => 'required',
-
-        ]);
-
-        DB::beginTransaction();
-
-        try {
-
-            $retur = Retur::create([
-                'code'           => $this->generateReturCode(),
-                'transaction_id' => $request->transaction_id,
-                'medicine_id'    => $request->medicine_id,
-                'qty_retur'      => $request->qty_retur,
-                'total_retur'    => $request->total_retur,
-                'status'         => 1,
-            ]);
-
-
-
-            // Get & UPdate Cart
-            $cart = MedicineCart::findOrFail($request->cart_id);
-            if ($request->old_qty - $request->qty_retur == 0) {
-                $cart->delete();
-                $cart->update([
-                    'final_price'   => $cart->final_price - $request->total_retur - $cart->discount,
-                    'total_price'   => $cart->final_price - $request->total_retur,
-                    'quantity'      => $request->old_qty - $request->qty_retur,
-                ]);
-            } else if ($request->old_qty - $request->qty_retur > 0) {
-                $cart->update([
-                    'final_price'   => $cart->final_price - $request->total_retur - $cart->discount,
-                    'total_price'   => $cart->final_price - $request->total_retur,
-                    'quantity'      => $request->old_qty - $request->qty_retur,
-                ]);
-            } else {
-                return redirect()
-                    ->back()
-                    ->with('failed', 'Gagal menyimpan retur: ' . 'Qty tidak bisa dibawah 0');
-            }
-
-
-            // Get & Update Transaction
-            // $transaction = MedicineTransactions::findOrFail($request->transaction_id);
-            // $transaction->update([
-            //     'status'        => 2,
-            //     'total_retur'   => $request->total_retur,
-            //     'updated_at'    => now(),
-            // ]);
-            DB::commit();
-
-            return redirect()
-                ->back()
-                ->with('success', 'Retur berhasil disimpan');
-        } catch (\Throwable $e) {
-
-            DB::rollBack();
-
-            return redirect()
-                ->back()
-                ->with('error', 'Gagal menyimpan retur: ' . $e->getMessage());
-        }
     }
     public function transactionItems($transactionId)
     {
