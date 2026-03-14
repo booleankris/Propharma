@@ -200,7 +200,7 @@ class SuppliesController extends Controller
     // Data Stok
     public function stockData()
     {
-        return view('supply.StockData');
+        return view('supply.stockData');
     }
     public function getStockData(Request $request)
     {
