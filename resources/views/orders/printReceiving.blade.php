@@ -176,9 +176,6 @@
                             {{ number_format($totaldiscount, 0, ',', '.') }}
                         </th>
                     </tr>
-
-            
-
                     <tr>
                         <th colspan="7" class="text-right">TOTAL</th>
                         <th class="text-right">

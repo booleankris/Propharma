@@ -9,6 +9,7 @@ use App\Models\ItemCart;
 use App\Models\ItemsLog;
 use App\Models\MedicineCart;
 use App\Models\Medicines;
+use App\Models\ReceivingItems;
 use App\Models\MedicineTransactions;
 use App\Models\Patients;
 use App\Models\PaymentParameters;
@@ -605,9 +606,21 @@ class SalesController extends Controller
             foreach ($transaction->transactions as $cart) {
                 $medicine = Medicines::findOrFail($cart->medicine_id);
                 $qty_before = $medicine->stock;
+                $medicine_id = $medicine->id;
+                $getReceivingItems = ReceivingItems::with('order_items.medicines')
+                    ->whereHas('order_items.medicines', function ($q) use ($medicine_id) {
+                        $q->where('id', $medicine_id);
+                    })->orderBy('expired_date','asc')->first();
+                if($getReceivingItems){
+                    $getReceivingItems->qty -= $cart->quantity;
+                    $getReceivingItems->save();
+                }
+
                 // Reduce stock
                 $medicine->stock -= $cart->quantity;
                 $medicine->save();
+
+                // Find 
 
                 // Log the transaction
                 ItemsLog::create([

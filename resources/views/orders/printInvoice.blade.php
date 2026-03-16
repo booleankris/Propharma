@@ -105,8 +105,7 @@
                     <th>Satuan</th>
                     <th>Harga</th>
                     <th>Discount</th>
-                    <th>Lokasi</th>
-                    <th>Etalase</th>
+                    <th>Extra Discount</th>
                     <th>Jumlah</th>
                 </tr>
             </thead>
@@ -142,15 +141,9 @@
                         <td class="text-center">
                             {{ $item->discount ?? 0 }}
                         </td>
-
                         <td class="text-center">
-                            {{ $item->location }}
+                            {{ $item->extra_discount ?? 0 }}
                         </td>
-
-                        <td class="text-center">
-                            {{ $item->etalase }}
-                        </td>
-
                         <td class="text-right">
                             {{ number_format($subtotal, 0, ',', '.') }}
                         </td>
@@ -165,23 +158,29 @@
                 @endphp
 
                 <tr>
-                    <th colspan="8" class="text-right">TOTAL</th>
+                    <th colspan="7" class="text-right">TOTAL</th>
                     <th class="text-right">
                         {{ number_format($grandTotal, 0, ',', '.') }}
                     </th>
                 </tr>
 
                 <tr>
-                    <th colspan="8" class="text-right">TOTAL PPN (11%)</th>
+                    <th colspan="7" class="text-right">TOTAL PPN (11%)</th>
                     <th class="text-right">
                         {{ number_format($ppn, 0, ',', '.') }}
                     </th>
                 </tr>
 
                 <tr>
-                    <th colspan="8" class="text-right">TOTAL + PPN</th>
+                    <th colspan="7" class="text-right">TOTAL DISKON</th>
                     <th class="text-right">
-                        {{ number_format($grandTotalWithPpn, 0, ',', '.') }}
+                        {{ number_format($totaldiscount, 0, ',', '.') }}
+                    </th>
+                </tr>
+                <tr>
+                    <th colspan="7" class="text-right">TOTAL</th>
+                    <th class="text-right">
+                        {{ number_format($grandTotal + $ppn - $totaldiscount, 0, ',', '.') }}
                     </th>
                 </tr>
             </tfoot>

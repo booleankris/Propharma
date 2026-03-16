@@ -7,6 +7,7 @@ use App\Exports\Stocks\StockDataExport;
 use App\Models\ItemsLog;
 use App\Models\MedicineCart;
 use App\Models\Medicines;
+use App\Models\ReceivingItems;
 use Carbon\Carbon;
 use DataTables;
 use Form;
@@ -684,6 +685,52 @@ class SuppliesController extends Controller
                 'success' => false,
                 'message' => 'Terjadi kesalahan: ' . $e->getMessage()
             ], 500);
+        }
+    }
+    // Stock Detail
+    public function stockDetail()
+    {
+        return view('supply.stockDetail');
+    }
+    public function getStockDetail(Request $request)
+    {
+        if ($request->ajax()) {
+
+            $stockdetail = ReceivingItems::join('order_items', 'order_items.id', '=', 'receiving_items.order_items_id')
+                ->join('medicines', 'medicines.id', '=', 'order_items.medicine_id')
+                ->select(
+                    'receiving_items.id', // untuk DT_RowIndex
+                    'medicines.code as code',
+                    'medicines.name as name',
+                    'receiving_items.batch as batch',
+                    'receiving_items.qty as qty',
+                    'receiving_items.expired_date as expired_date'
+                )
+                ->orderBy('medicines.name')
+                ->orderBy('receiving_items.expired_date')
+                ->orderBy('receiving_items.batch');
+
+            if ($request->filled('searchMedicine')) {
+                $stockdetail->where(function ($q) use ($request) {
+                    $q->where('medicines.name', 'like', "%{$request->searchMedicine}%")
+                        ->orWhere('medicines.code', 'like', "%{$request->searchMedicine}%");
+                });
+            }
+
+            if ($request->filled('start_date')) {
+                $stockdetail->whereDate('receiving_items.date', '>=', $request->start_date);
+            }
+
+            if ($request->filled('end_date')) {
+                $stockdetail->whereDate('receiving_items.date', '<=', $request->end_date);
+            }
+
+            return DataTables::of($stockdetail)
+                ->addIndexColumn()
+                ->editColumn('expired_date', function ($row) {
+                    return Carbon::parse($row->expired_date)->format('d F Y'); // 11 January 2026
+                })
+                ->make(true);
         }
     }
 }

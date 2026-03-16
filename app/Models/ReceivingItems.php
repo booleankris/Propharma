@@ -13,6 +13,7 @@ class ReceivingItems extends Model
         'receiving_details_id',
         'order_items_id',
         'qty_received',
+        'qty',
         'discount',
         'extra_discount',
         'expired_date',
@@ -31,5 +32,14 @@ class ReceivingItems extends Model
     public function order_items()
     {
         return $this->belongsTo(OrderItems::class, 'order_items_id');
+    }
+
+    public function etalases()
+    {
+        return $this->belongsTo(Etalases::class, 'etalase');
+    }
+    public function locations()
+    {
+        return $this->belongsTo(Locations::class, 'location');
     }
 }

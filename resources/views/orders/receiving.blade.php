@@ -349,7 +349,7 @@
                                 </select>
                             </div>
                         </div>
-                        <form method="post" action="{{ route('orders.addItemOrder') }}">
+                        <form method="post" id="checkout_detail" action="{{ route('orders.addItemOrder') }}">
                             @csrf
 
                             <div class="flex flex-wrap gap-3 py-2 w-full">
@@ -366,21 +366,21 @@
                                 </div>
                                 <div class="w-full sm:w-40">
                                     <div class="py-1 text-[13px] font-bold">Kode Obat</div>
-                                    <input id="medicine_code" readonly
+                                    <input id="medicine_code" type="text" readonly
                                         class="w-full rounded-lg border bg-[#eaeaea] border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
                                         placeholder="Kode Obat">
                                 </div>
 
                                 <div class="flex-1 min-w-[200px]">
                                     <div class="py-1 text-[13px] font-bold">Nama Obat</div>
-                                    <input id="medicine_name" readonly
+                                    <input id="medicine_name" type="text" readonly
                                         class="w-full rounded-lg border bg-[#eaeaea] border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
                                         placeholder="Nama Obat">
                                 </div>
 
                                 <div class="w-full sm:w-32">
                                     <div class="py-1 text-[13px] font-bold">Satuan</div>
-                                    <input id="unit" readonly
+                                    <input id="unit" type="text" readonly
                                         class="w-full rounded-lg border bg-[#eaeaea] border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
                                         placeholder="Satuan">
                                 </div>
@@ -410,67 +410,75 @@
                                 </div>
                                 <div class="w-full sm:w-40">
                                     <div class="py-1 text-[13px] font-bold">Isi Obat</div>
-                                    <input id="content" readonly
+                                    <input id="content" type="text" readonly
                                         class="w-full rounded-lg border bg-[#eaeaea] border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
                                         placeholder="Isi Obat">
                                 </div>
 
                                 <div class="w-full sm:w-40">
                                     <div class="py-1 text-[13px] font-bold">Hrg HNA</div>
-                                    <input id="item_price" readonly
+                                    <input id="item_price" type="text" readonly
                                         class="w-full rounded-lg border bg-[#eaeaea] border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
                                         placeholder="Harga Satuan">
                                 </div>
 
                                 <div class="w-full sm:w-40">
                                     <div class="py-1 text-[13px] font-bold">Batch</div>
-                                    <input id="batch" name="batch"
+                                    <input id="batch" name="batch" type="text"
                                         class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
                                         placeholder="Batch">
                                 </div>
 
                                 <div class="w-full sm:w-40">
                                     <div class="py-1 text-[13px] font-bold">Diskon</div>
-                                    <input id="discount"
+                                    <input id="discount" type="text"
                                         class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
                                         placeholder="Diskon">
                                 </div>
                                 <div class="w-full sm:w-40">
                                     <div class="py-1 text-[13px] font-bold">Ekstra Diskon</div>
-                                    <input id="extra_discount" required value="0"
+                                    <input id="extra_discount" type="text" required value="0"
                                         class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
                                         placeholder="Extra Diskon">
                                 </div>
-                                <div class="w-full sm:w-40">
-                                    <div class="py-1 text-[13px] font-bold">Exp Date</div>
-                                    <input id="expired_date" type="date" name="expired_date"
-                                        class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
-                                        placeholder="Tanggal Faktur">
-                                </div>
-                                <div class="flex-1 min-w-[200px]">
-                                    <div class="py-1 text-[13px] font-bold">Jumlah</div>
-                                    <input id="total_price" readonly name="total_price"
-                                        class="w-full rounded-lg border bg-[#eaeaea] border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
-                                        placeholder="Jumlah">
-                                </div>
-                                <div class="w-full sm:w-40">
-                                    <div class="py-1 text-[13px] font-bold">Etalase</div>
-                                    <input id="etalase" name="etalase"
-                                        class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
-                                        placeholder="Etalase">
-                                </div>
+                                <div class="flex flex-wrap w-full gap-3">
+                                    <div class="w-[10%]">
+                                        <div class="py-1 text-[13px] font-bold">Exp Date</div>
+                                        <input id="expired_date" type="date" name="expired_date"
+                                            class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
+                                            placeholder="Tanggal Faktur">
+                                    </div>
+                                    <div class="flex-1 w-[40%] min-w-[200px]">
+                                        <div class="py-1 text-[13px] font-bold">Jumlah</div>
+                                        <input id="total_price" type="text" readonly name="total_price"
+                                            class="w-full rounded-lg border bg-[#eaeaea] border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
+                                            placeholder="Jumlah">
+                                    </div>
+                                    <div class="w-[20%]">
+                                        <div class="py-1 text-[13px] font-bold">Etalase</div>
+                                        <select id="items" name="etalase" required
+                                            class="select2 w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px]">
+                                            <option value="">-- Pilih Etalase --</option>
 
-                                <div class="w-full sm:w-40">
-                                    <div class="py-1 text-[13px] font-bold">Lokasi</div>
-                                    <input id="location" name="location"
-                                        class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
-                                        placeholder="Lokasi">
-                                </div>
-                                <div class="w-full sm:w-40">
-                                    <div class="py-1 text-[13px] font-bold">Status Barang</div>
-                                    <input id="status" name="status"
-                                        class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
-                                        placeholder="Status Barang">
+                                        </select>
+                                    </div>
+
+                                    <div class="w-[20%]">
+                                        <div class="py-1 text-[13px] font-bold">Lokasi</div>
+                                        <select name="location"
+                                            class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px"
+                                            id="location">
+                                            <option value="">-- Pilih Lokasi --</option>
+
+                                        </select>
+                                    </div>
+
+                                    <div class="w-[20%]">
+                                        <div class="py-1 text-[13px] font-bold">Status Barang</div>
+                                        <input id="status" name="status" type="text"
+                                            class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
+                                            placeholder="Status Barang">
+                                    </div>
                                 </div>
 
 
@@ -522,6 +530,7 @@
                             <th>Harga PPN</th>
                             <th>Diskon</th>
                             <th>Extra Diskon</th>
+                            <th>Lokasi</th>
                             <th>Total</th>
                             <th>Status Barang</th>
 
@@ -604,7 +613,7 @@
         const discount = document.getElementById('discount');
         const itemlocation = document.getElementById('location');
         const itemstatus = document.getElementById('status');
-        const etalase = document.getElementById('etalase');
+        const etalase = document.getElementById('items');
         const batch = document.getElementById('batch');
         const extra_discount = document.getElementById('extra_discount');
         const invoice_payment = document.getElementById('invoice_payment');
@@ -621,6 +630,58 @@
         let selectedRowData = null;
         let selectedRowIndex = null;
 
+        // Functions
+        function resetInputs() {
+
+            $('#searchWrapper')
+                .find('input:not([type="hidden"]):not([readonly]):not([disabled])')
+                .val('');
+
+            $('#searchWrapper')
+                .find('textarea:not([readonly]):not([disabled])')
+                .val('');
+
+            $('#searchWrapper')
+                .find('select')
+                .val('')
+                .trigger('change');
+
+            $('#searchWrapper')
+                .find('input[type="checkbox"]')
+                .prop('checked', false);
+            $('#checkout_detail')
+                .find('input[type="text"]')
+                .val('')
+                .trigger('change');
+            $('#total_price').val('');
+            $('#qty_received').val('');
+
+            $('#items').val(null).trigger('change');
+            $('#location').val(null).trigger('change');
+            $('#invoice_due').val('');
+            itemcode = null;
+            itemprice = null;
+            itemqty = null;
+            itemcontent = null;
+            document.getElementById('creditor').focus();
+
+        }
+
+        function setSelect2AjaxValue(selector, id, text) {
+            const $select = $(selector);
+
+            if (!id) {
+                $select.val(null).trigger("change");
+                return;
+            }
+
+            if ($select.find("option[value='" + id + "']").length) {
+                $select.val(id).trigger("change");
+            } else {
+                const option = new Option(text, id, true, true);
+                $select.append(option).trigger("change");
+            }
+        }
         document.addEventListener('DOMContentLoaded', function() {
 
             // SELECT2
@@ -628,7 +689,44 @@
                 placeholder: 'Pilih Pembayaran...',
                 allowClear: true,
             });
-
+            $("#location").select2({
+                placeholder: "Cari Lokasi...",
+                allowClear: true,
+                ajax: {
+                    url: "{{ route('locations.select') }}",
+                    dataType: "json",
+                    delay: 250,
+                    data: params => ({
+                        q: params.term
+                    }),
+                    processResults: data => ({
+                        results: data.map(item => ({
+                            id: item.id,
+                            text: item.name
+                        }))
+                    }),
+                    cache: true
+                }
+            });
+            $("#items").select2({
+                placeholder: "Cari Lokasi...",
+                allowClear: true,
+                ajax: {
+                    url: "{{ route('items.select') }}",
+                    dataType: "json",
+                    delay: 250,
+                    data: params => ({
+                        q: params.term
+                    }),
+                    processResults: data => ({
+                        results: data.map(item => ({
+                            id: item.id,
+                            text: item.name
+                        }))
+                    }),
+                    cache: true
+                }
+            });
             // DATATABLE INIT
             orderItemsTable = $('#orderItemsTable').DataTable({
                 processing: true,
@@ -662,6 +760,10 @@
                     {
                         data: 'receiving_items.extra_discount'
                     },
+                    {
+                        data: 'receiving_items.locations.name'
+                    },
+
                     {
                         data: 'total'
                     },
@@ -709,17 +811,14 @@
             order_items_id = selectedRowData.id;
             order_id = selectedRowData.order_id;
 
-            console.log('ROW SELECTED:', selectedRowData);
         });
 
         $('#orderItemsTable tbody').on('dblclick', 'tr', function() {
 
             const data = orderItemsTable.row(this).data();
             if (!data) return;
-
-            selectedRowIndex = orderItemsTable.row(this).index();
-            selectedRowData = data;
-            console.log(selectedRowData);
+            console.log(data.receiving_items?.locations?.name);
+            console.log(data.receiving_items?.etalases?.name);
             document.getElementById('medicine_name').value = data.medicines.name ?? '';
             document.getElementById('unit').value = data.medicines.unit ?? '';
             document.getElementById('content').value = data.medicines.content ?? '';
@@ -730,15 +829,23 @@
             document.getElementById('qty_received').focus();
             document.getElementById('qty_received').value = data.qty_received ?? '';
             document.getElementById('batch').value = data.receiving_items?.batch ?? '';
-            document.getElementById('location').value = data.receiving_items?.location ?? '';
-            document.getElementById('etalase').value = data.receiving_items?.etalase ?? '';
+
             document.getElementById('discount').value = data.receiving_items?.discount ?? '';
             document.getElementById('extra_discount').value = data.receiving_items?.extra_discount ?? '';
             document.getElementById('status').value = data.receiving_items?.status ?? '';
             document.getElementById('expired_date').value = data.receiving_items?.expired_date ?? '';
             document.getElementById('receiving_items_id').value = data.receiving_items?.id ?? '';
             document.getElementById('receiving_details_id').value = data.receiving_items?.id ?? '';
-
+            setSelect2AjaxValue(
+                "#location",
+                data.receiving_items?.locations?.id,
+                data.receiving_items?.locations?.name
+            );
+            setSelect2AjaxValue(
+                "#items",
+                data.receiving_items?.etalases?.id,
+                data.receiving_items?.etalases?.name
+            );
             if (data.pack == "1") {
                 pack.checked = true;
             }
@@ -772,10 +879,8 @@
                         }
                     })
                     .then(function(response) {
-                        console.log(response.data);
                         invoice_number.value = response.data.invoice_number || '';
                         invoice_times.value = response.data.invoice_times || '';
-                        console.log(invoice_payment.value);
                         $('#invoice_payment')
                             .val(response.data.invoice_payment || '')
                             .trigger('change');
@@ -1009,12 +1114,10 @@
         function selectRow(row) {
             const item = JSON.parse(row.dataset.item);
             document.getElementById('invoice_number').focus();
-            console.log(item.items);
             ordersid = item.code;
             loadItems(ordersid);
         }
 
-        console.log(ordersid);
         // Update
         function updateActiveRow(rows) {
             rows.forEach(r => r.classList.remove('active'));
@@ -1056,12 +1159,10 @@
                 itemtotal = qty * itemcontent * itemprice;
                 total_transaction = itemtotal;
                 document.getElementById('total_price').value = formatRupiah(itemtotal);
-                console.log(total_transaction);
             } else {
                 itemtotal = qty * itemprice;
                 total_transaction = itemtotal;
                 document.getElementById('total_price').value = formatRupiah(itemtotal);
-                console.log(total_transaction);
 
             }
         }
@@ -1074,42 +1175,17 @@
                 itemtotal = qty * itemcontent * itemprice;
                 total_transaction = itemtotal;
                 document.getElementById('total_price').value = formatRupiah(itemtotal);
-                console.log(total_transaction);
 
 
             } else {
                 itemtotal = qty * itemprice;
                 total_transaction = itemtotal;
                 document.getElementById('total_price').value = formatRupiah(itemtotal);
-                console.log(total_transaction);
 
             }
         }
 
-        function resetInputs() {
-            document.getElementById('medicine_code').value = '';
-            document.getElementById('medicine_name').value = '';
-            document.getElementById('unit').value = '';
-            document.getElementById('qty').value = '';
-            document.getElementById('content').value = '';
-            document.getElementById('item_price').value = '';
-            document.getElementById('total_price').value = '';
-            const isActive = document.getElementById('is_active');
-            pack.checked = false;
 
-            if (isActive && isActive.checked) {
-                isActive.checked = false;
-            }
-
-            // reset JS
-            itemcode = '';
-            itemprice = '';
-            itemqty = '';
-            itemtotal = '';
-            itemcreditor = null;
-            selectedRowData = null;
-            document.getElementById('searchInput').focus();
-        }
 
         function addItem() {
 
@@ -1169,6 +1245,7 @@
                         document.getElementById("searchInput").readOnly = true;
                         resetInputs();
 
+
                     }
                 })
                 .catch(err => {
@@ -1189,6 +1266,7 @@
                         position: 'topRight'
                     });
                 });
+            resetInputs();
         }
 
         function completeOrder() {

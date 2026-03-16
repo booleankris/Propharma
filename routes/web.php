@@ -228,6 +228,10 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     Route::post('/saveopname', [SuppliesController::class, 'Opname'])->name('supplies.opname');
     Route::get('/export-stock', [SuppliesController::class, 'printStockData'])->name('supplies.printstockdata');
     Route::get('/export-stockopname', [SuppliesController::class, 'printStockOpname'])->name('supplies.printstockopname');
+    // Stock Detail
+    Route::get('/stock-detail', [SuppliesController::class, 'stockDetail'])->name('supplies.stockDetail');
+    Route::get('/getstockdetail', [SuppliesController::class, 'getStockDetail'])->name('supplies.getStockDetail');
+
 
     // Reports  
     Route::get('/reports/transactions', [ReportsController::class, 'transactions'])->name('reports.transactions');

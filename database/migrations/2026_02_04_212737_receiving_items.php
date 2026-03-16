@@ -18,6 +18,7 @@ return new class extends Migration
             $table->foreignId('receiving_details_id')->nullable()->constrained('receiving_details')->onDelete('no action');
             $table->foreignId('order_items_id')->nullable()->constrained('order_items')->onDelete('no action');
             $table->string('qty_received')->nullable();
+            $table->string('qty')->nullable();
             $table->string('discount')->nullable();
             $table->string('extra_discount')->nullable();
             $table->string('expired_date')->nullable();

@@ -152,7 +152,7 @@ class ReceivingController extends Controller
             return DataTables::of(collect())->make(true);
         }
         $items = OrderItems::query()
-            ->with(['medicines', 'receiving_items', 'receiving_items.receiving_details'])
+            ->with(['medicines', 'receiving_items', 'receiving_items.locations', 'receiving_items.etalases', 'receiving_items.receiving_details'])
             ->withSum('receivingItems as qty_received', 'qty_received')
             ->whereHas('orders', function ($q) use ($ordersid) {
                 $q->where('id', $ordersid);
@@ -557,14 +557,15 @@ class ReceivingController extends Controller
             $receiving_code = $transaction->code;
             $order_id = $getOrder->id;
             $order_code = $getOrder->code;
-            $d_price = ReceivingItems::with('receiving_details')
-                ->whereHas('receiving_details', function ($q) use ($receiving_id) {
-                    $q->where('receiving_id', $receiving_id);
+            $getOrderItems = OrderItems::where('order_id', $order_id)->first();
+            $getOrderId = $getOrderItems->id;
+            $d_price = ReceivingItems::with('order_items')
+                ->whereHas('order_items', function ($q) use ($getOrderId) {
+                    $q->where('id', $getOrderId);
                 })
                 ->sum('total') ?? '0';
             $d_ppn = $d_price * 0.11 ?? '0';
             $d_total = $d_price + $d_ppn ?? '0';
-
             return view('orders.receiving', compact('order_id', 'd_price', 'd_ppn', 'd_total', 'order_code', 'creditorOption', 'receiving_code', 'transaction', 'now', 'receiving_id'));
         } else {
             $year   = now()->format('y');
@@ -652,6 +653,7 @@ class ReceivingController extends Controller
                 ],
                 [
                     'qty_received'   => $request->qty_received,
+                    'qty'            => $request->qty_received,
                     'discount'       => $request->discount,
                     'extra_discount' => $request->extra_discount,
                     'expired_date'   => $request->expired_date,
@@ -667,10 +669,11 @@ class ReceivingController extends Controller
 
             $receiving = Receiving::findOrFail($request->receiving_id);
             $receiving_id = $request->receiving_id;
+            $getOrderId = $request->order_items_id;
 
-            $price_total = ReceivingItems::with('receiving_details')
-                ->whereHas('receiving_details', function ($q) use ($receiving_id) {
-                    $q->where('receiving_id', $receiving_id);
+            $price_total =  ReceivingItems::with('order_items')
+                ->whereHas('order_items', function ($q) use ($getOrderId) {
+                    $q->where('id', $getOrderId);
                 })
                 ->sum('total') ?? '0';
             $ppn = $price_total * 0.11;
@@ -768,7 +771,23 @@ class ReceivingController extends Controller
             'receiving_items.order_items.medicines',
             'creditor'
         ])->findOrFail($id);
-        return view('Orders.printInvoice', compact('invoice'));
+        $totalDiscount = 0;
+        $extraDiscount = 0;
+        $subtotal = 0;
+       
+        $totalDiscount = $invoice->receiving_items->sum('discount');
+        $extraDiscount = $invoice->receiving_items->sum('extra_discount');
+        $subtotal = $invoice->receiving_items->sum('total');
+
+        $totaldiscount = $totalDiscount + $extraDiscount;
+        $totalwithdiscount = $subtotal;
+        $total_receiving = $subtotal - $totaldiscount;
+
+        return view('Orders.printInvoice',  compact(
+            'totaldiscount',
+            'totalwithdiscount',
+            'total_receiving',
+            'invoice'));
     }
     public function completeOrder(Request $request)
     {
@@ -817,9 +836,6 @@ class ReceivingController extends Controller
                     'status'           => 2,
                 ]);
             }
-
-
-
             $order->update([
                 'status' => 2,
             ]);
