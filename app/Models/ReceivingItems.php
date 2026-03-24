@@ -22,6 +22,7 @@ class ReceivingItems extends Model
         'etalase',
         'total',
         'status',
+        'batches_id',
     ];
 
     public function receiving_details()
@@ -41,5 +42,9 @@ class ReceivingItems extends Model
     public function locations()
     {
         return $this->belongsTo(Locations::class, 'location');
+    }
+    public function batches()
+    {
+        return $this->belongsTo(Batches::class, 'batches_id');
     }
 }

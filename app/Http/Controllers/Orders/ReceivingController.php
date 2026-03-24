@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Orders;
 
 use App\Http\Controllers\Controller;
+use App\Models\Batches;
 use App\Models\Creditor;
 use App\Models\ItemsLog;
 use App\Models\Medicines;
@@ -652,6 +653,7 @@ class ReceivingController extends Controller
                     'order_items_id'       => $request->order_items_id,
                 ],
                 [
+                    'batches_id'     => $request->id,
                     'qty_received'   => $request->qty_received,
                     'qty'            => $request->qty_received,
                     'discount'       => $request->discount,
@@ -774,7 +776,7 @@ class ReceivingController extends Controller
         $totalDiscount = 0;
         $extraDiscount = 0;
         $subtotal = 0;
-       
+
         $totalDiscount = $invoice->receiving_items->sum('discount');
         $extraDiscount = $invoice->receiving_items->sum('extra_discount');
         $subtotal = $invoice->receiving_items->sum('total');
@@ -787,7 +789,8 @@ class ReceivingController extends Controller
             'totaldiscount',
             'totalwithdiscount',
             'total_receiving',
-            'invoice'));
+            'invoice'
+        ));
     }
     public function completeOrder(Request $request)
     {
@@ -809,7 +812,6 @@ class ReceivingController extends Controller
 
             $now = Carbon::now()->format('Y-m-d');
 
-
             // Create Order Log 
             // orders = 2
             // type = OR
@@ -819,7 +821,25 @@ class ReceivingController extends Controller
                 $medicine = Medicines::findOrFail($item->order_items->medicine_id);
                 $qty_before = $medicine->stock;
 
+                // Check Batch
+
+                $batch = Batches::firstOrCreate(
+                    [
+                        'medicine_id' =>  $item->order_items->medicine_id,
+                        'name'         => $item->batch,
+                        'expired_date' => $item->expired_date,
+                    ],
+                    [
+                        'stock'  => $item->qty_received,
+                        'status' => 0,
+                    ]
+                );
+                $test = $item->update([
+                    'batches_id' => $batch->id,
+                ]);
+
                 // Increase stock
+                $batch->increment('stock', $item->qty_received);
                 $medicine->stock += $item->qty_received;
                 $medicine->save();
 
@@ -834,6 +854,7 @@ class ReceivingController extends Controller
                     'total'            => $item->order_items->total ?? 0,
                     'date'             => $now,
                     'status'           => 2,
+                    'batches_id'       => $batch->id,
                 ]);
             }
             $order->update([

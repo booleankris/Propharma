@@ -2,7 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\Log;
 use App\Models\Debtors;
+use App\Models\Batches;
 use App\Models\Doctors;
 use App\Models\Item;
 use App\Models\ItemCart;
@@ -575,58 +578,93 @@ class SalesController extends Controller
     // Flow 5 : Checkout
     public function checkout(Request $request)
     {
+        $validated = $request->validate([
+            'transaction_id'   => 'required|integer|exists:medicine_transactions,id',
+            'paid'             => 'required|numeric|min:0',
+            'discounsubtotal' => 'nullable|numeric|min:0',
+            'totaltransaction' => 'required|numeric|min:0',
+            'changes'          => 'required|numeric|min:0',
+            'patient_id'       => 'nullable|integer|exists:patients,id',
+            'doctor_id'        => 'nullable|integer|exists:doctors,id',
+            'debtor_id'        => 'nullable|integer|exists:debtors,id',
+        ]);
+
         DB::beginTransaction();
         try {
-            $transaction = MedicineTransactions::findOrFail($request->transaction_id);
+            // Idempotency
+            $transaction = MedicineTransactions::findOrFail($validated['transaction_id']);
+
+            if ($transaction->status === 1) {
+                DB::rollBack();
+                return response()->json([
+                    'success'   => true,
+                    'print_url' => route('sales.print', $transaction->id),
+                ]);
+            }
 
             $transaction->update([
-                'status' => 1,
-                'paid' => $request->paid,
-                'discount' => $request->discounsubtotal,
-                'subtotal' => $request->totaltransaction,
-                'changes' => $request->changes,
-                'patient_id' => $request->patient_id,
-                'doctor_id' => $request->doctor_id,
-                'debtor_id' => $request->debtor_id,
+                'status'    => 1,
+                'paid'      => $validated['paid'],
+                'discount'  => $validated['discounsubtotal'],
+                'subtotal'  => $validated['totaltransaction'],
+                'changes'   => $validated['changes'],
+                'patient_id' => $validated['patient_id'],
+                'doctor_id'  => $validated['doctor_id'],
+                'debtor_id'  => $validated['debtor_id'],
             ]);
 
-            MedicineCart::where('transaction_id', $request->transaction_id)
+            MedicineCart::where('transaction_id', $validated['transaction_id'])
                 ->update(['status' => 1]);
 
 
-            // Create Sales Log 
-            // log = 1
-            // type = UM
+            $txWithItems = MedicineTransactions::with('transactions.medicine')
+                ->findOrFail($validated['transaction_id']);
 
-            $transaction = MedicineTransactions::with('transactions')->findOrFail($request->transaction_id);
             $now = Carbon::now()->format('Y-m-d');
 
-            $totalfinalprice = $transaction->transactions->sum('final_price');
-
-            foreach ($transaction->transactions as $cart) {
-                $medicine = Medicines::findOrFail($cart->medicine_id);
-                $qty_before = $medicine->stock;
+            foreach ($txWithItems->transactions as $cart) {
+                $medicine    = $cart->medicine;
+                $qty_before  = $medicine->stock;
                 $medicine_id = $medicine->id;
-                $getReceivingItems = ReceivingItems::with('order_items.medicines')
-                    ->whereHas('order_items.medicines', function ($q) use ($medicine_id) {
-                        $q->where('id', $medicine_id);
-                    })->orderBy('expired_date','asc')->first();
-                if($getReceivingItems){
-                    $getReceivingItems->qty -= $cart->quantity;
-                    $getReceivingItems->save();
+                $qty_bought  = $cart->quantity;
+
+                // Verify before touching the batch
+                if ($medicine->stock < $qty_bought) {
+                    throw new \Exception("Stok tidak mencukupi untuk obat: {$medicine->name}.");
                 }
 
-                // Reduce stock
+                while ($qty_bought > 0) {
+              
+                    $batches = Batches::where('medicine_id', $medicine_id)->where('stock', '>', 0)
+                        ->orderBy('expired_date', 'asc')
+                        ->lockForUpdate() 
+                        ->first();
+
+                    if (!$batches) {
+                        throw new \Exception("Batch stok tidak ditemukan untuk obat: {$medicine->name}.");
+                    }
+
+                    if ($batches->stock >= $qty_bought) {
+                        $batches->stock -= $qty_bought;
+                        $batches->save();
+                        $qty_bought = 0;
+                    } else {
+                        $qty_bought -= $batches->stock;
+                        $batches->stock = 0;
+                        $batches->save();
+                    }
+                }
+
+                // Reduce medicine total stock
                 $medicine->stock -= $cart->quantity;
                 $medicine->save();
 
-                // Find 
-
-                // Log the transaction
+                // Log The Stock
+                // Sales status = 1 
                 ItemsLog::create([
-                    'transaction_code' => $transaction->transaction_code,
+                    'transaction_code' => $txWithItems->transaction_code,
                     'code'             => $this->generateItemsLogCode(),
-                    'type'             => "UM",
+                    'type'             => 'UM',
                     'medicine_id'      => $cart->medicine_id,
                     'qty'              => $cart->quantity,
                     'qty_before'       => $qty_before,
@@ -634,21 +672,35 @@ class SalesController extends Controller
                     'total'            => $cart->final_price,
                     'date'             => $now,
                     'status'           => 1,
+                    'batches_id'       => $batches->id,
+
                 ]);
             }
-
 
             DB::commit();
 
             return response()->json([
                 'success'   => true,
-                'print_url' => route('sales.print', $transaction->id)
+                'print_url' => route('sales.print', $transaction->id),
             ]);
-        } catch (\Exception $e) {
+        } catch (ModelNotFoundException $e) {
+            // 7. Specific catch for 404 — don't leak internal model names
             DB::rollBack();
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => 'Transaksi tidak ditemukan.',
+            ], 404);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Checkout failed', [
+                'transaction_id' => $request->transaction_id,
+                'error'          => $e->getMessage(),
+                'trace'          => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
             ], 500);
         }
     }

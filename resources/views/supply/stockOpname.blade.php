@@ -230,6 +230,18 @@
                                 </div>
                             </div>
 
+                            <div class="grid grid-cols-2 gap-3 mb-5">
+                                <div>
+                                    <label class="block text-[12px] font-medium text-gray-500 mb-1">Batch</label>
+                                    <input id="batch" name="batch" type="text" placeholder="No. batch"
+                                        class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200">
+                                </div>
+                                <div>
+                                    <label class="block text-[12px] font-medium text-gray-500 mb-1">Exp date</label>
+                                    <input id="expired_date" type="date" name="expired_date"
+                                        class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200">
+                                </div>
+                            </div>
                             <div class="py-1 flex gap-2">
                                 <button id="save_opname"
                                     class="inline-flex font-poppins items-center gap-2 rounded-lg btn-pharma !bg-blue-600 !shadow-[0_2px_6px_#2563eb] px-6 py-4 text-sm font-xl text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
@@ -459,6 +471,9 @@
             let medicineId = $('#medicine_id').val();
             let stockPhysic = parseInt($('#stock_physic').val()) || 0;
             let stockSystem = parseInt($('#medicine_stock').val()) || 0;
+            let expiredDate = $('#expired_date').val();
+            let batch = $('#batch').val();
+
             let discrepancy = stockPhysic - stockSystem;
 
             if (!medicineId) {
@@ -478,6 +493,8 @@
                     medicine_id: medicineId,
                     stock_physic: stockPhysic,
                     stock_system: stockSystem,
+                    expired_date: expiredDate,
+                    batch: batch,
                     stock_discrepancy: discrepancy
                 },
                 success: function(response) {

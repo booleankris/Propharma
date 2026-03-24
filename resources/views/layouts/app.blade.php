@@ -17,7 +17,9 @@
 
 <body class="dashboard-body">
     @include('components.header')
-    <main class="my-[95px] pb-[80px]">
+    @include('components.sidebar-client')
+
+    <main class="my-[10px] pb-[80px]">
         @yield('content')
     </main>
 

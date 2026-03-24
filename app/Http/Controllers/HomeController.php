@@ -45,16 +45,19 @@ class HomeController extends Controller
 
         // Dashboard 
         $total_sales = MedicineTransactions::where('status', 1)->sum('subtotal');
+        $qty_sales = MedicineTransactions::where('status', 1)->count('id');
+
         $total_orders = OrderItems::whereHas('orders', function ($query) {
             $query->where('status', 2);
         })->sum('total');
+       
         $total_reject = Reject::sum('total');
 
         $total_sales_rp = formatRupiah($total_sales);
         $total_orders_rp = formatRupiah($total_orders);
         $total_reject_rp = formatRupiah($total_reject);
 
-        return view('kasir.home', compact('totalproduct', 'totaltransaction', 'items', 'cart_status', 'cart_total', 'cart_subtotal', 'total_sales_rp', 'total_orders_rp', 'total_reject_rp'));
+        return view('kasir.home', compact('totalproduct', 'totaltransaction', 'qty_sales' ,'items', 'cart_status', 'cart_total', 'cart_subtotal', 'total_sales_rp', 'total_orders_rp', 'total_reject_rp'));
     }
     public function profile($edit = null)
     {

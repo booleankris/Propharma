@@ -1,0 +1,404 @@
+/* ======================== Stat Card ======================== */
+.stat-card {
+    border-radius: 14px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 118px;
+}
+
+.stat-card-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 14px;
+}
+
+.stat-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.stat-badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 20px;
+    white-space: nowrap;
+}
+
+.stat-value {
+    font-size: 23px;
+    font-weight: 600;
+    letter-spacing: -0.025em;
+    margin-bottom: 2px;
+}
+
+.stat-label {
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.stat-blue {
+    background: #d2e9ff;
+    box-shadow: 0px 1px 11px 4px #bcdcfa;
+}
+
+.stat-blue .stat-icon {
+    background: #B5D4F4;
+}
+
+.stat-blue .stat-badge {
+    background: #B5D4F4;
+    color: #0C447C;
+}
+
+.stat-blue .stat-value {
+    color: #0C447C;
+}
+
+.stat-blue .stat-label {
+    color: #185FA5;
+}
+
+.stat-green {
+    box-shadow: 0px 1px 11px 4px #d6e6c2;
+    background: #EAF3DE;
+}
+
+.stat-green .stat-icon {
+    background: #C0DD97;
+}
+
+.stat-green .stat-badge {
+    background: #C0DD97;
+    color: #27500A;
+}
+
+.stat-green .stat-value {
+    color: #27500A;
+}
+
+.stat-green .stat-label {
+    color: #3B6D11;
+}
+
+.stat-amber {
+    background: #FAEEDA;
+    box-shadow: 0px 1px 11px 4px #ffe5b9;
+}
+
+.stat-amber .stat-icon {
+    background: #FAC775;
+}
+
+.stat-amber .stat-badge {
+    background: #FAC775;
+    color: #633806;
+}
+
+.stat-amber .stat-value {
+    color: #633806;
+}
+
+.stat-amber .stat-label {
+    color: #854F0B;
+}
+
+.stat-purple {
+    background: #EEEDFE;
+    box-shadow: 0px 1px 11px 4px #dbd9ff;
+}
+
+.stat-purple .stat-icon {
+    background: #CECBF6;
+}
+
+.stat-purple .stat-badge {
+    background: #CECBF6;
+    color: #3C3489;
+}
+
+.stat-purple .stat-value {
+    color: #3C3489;
+}
+
+.stat-purple .stat-label {
+    color: #534AB7;
+}
+
+/* ======================== Menu ======================== */
+.menu-tile {
+    border-radius: 14px;
+    padding: 18px 10px 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: transform 0.2s cubic-bezier(.34, 1.4, .64, 1),
+        filter 0.2s ease;
+}
+
+.menu-tile:hover {
+    transform: translateY(-5px);
+    filter: brightness(1.06);
+}
+
+.menu-tile-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.22);
+    transition: transform 0.22s cubic-bezier(.34, 1.56, .64, 1),
+        box-shadow 0.22s ease;
+}
+
+.menu-tile:hover .menu-tile-icon {
+    transform: scale(1.18) rotate(-6deg);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.22);
+}
+
+.menu-tile-label {
+    font-size: 12px;
+    font-weight: 600;
+    text-align: center;
+    line-height: 1.35;
+    color: white;
+    transition: opacity 0.18s;
+}
+
+.menu-tile:hover .menu-tile-label {
+    opacity: 0.8;
+}
+
+.tile-blue {
+    background: #378ADD;
+}
+
+.tile-green {
+    background: #3B8C2A;
+}
+
+.tile-amber {
+    background: #B87010;
+}
+
+.tile-purple {
+    background: #6B5DD3;
+}
+
+.tile-red {
+    background: #D03C3C;
+}
+
+.tile-teal {
+    background: #0F8C6A;
+}
+
+.tile-coral {
+    background: #C04E22;
+}
+
+.pos-eyebrow {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #9ca3af;
+    margin-bottom: 12px;
+}
+
+/* ── Card ───────────────────────────────────── */
+.trx-card {
+    border-radius: 18px;
+    padding: 24px 28px 22px;
+}
+
+.trx-card.type-upds {
+    background: #3B8C2A;
+}
+
+.trx-card.type-hv {
+    background: #378ADD;
+}
+
+.trx-card.type-kredit {
+    background: #B87010;
+}
+
+.trx-card.type-resep {
+    background: #D03C3C;
+}
+
+.trx-card.type-idle {
+    background: #5f6d7a;
+}
+
+/* ── Header ─────────────────────────────────── */
+.trx-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 18px;
+}
+
+.trx-title {
+    font-size: 26px;
+    font-weight: 600;
+    color: white;
+    letter-spacing: -0.02em;
+    margin: 0 0 6px;
+    font-family: 'DM Sans', sans-serif;
+}
+
+.trx-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255, 255, 255, 0.18);
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 12px;
+    color: white;
+    font-weight: 600;
+}
+
+.trx-datetime {
+    text-align: right;
+}
+
+.trx-date {
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.9);
+    font-weight: 500;
+}
+
+.trx-time {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.65);
+    margin-top: 2px;
+}
+
+/* ── Divider ─────────────────────────────────── */
+.trx-divider {
+    height: 0.5px;
+    background: rgba(255, 255, 255, 0.2);
+    margin: 0 0 18px;
+}
+
+/* ── Type Chips ──────────────────────────────── */
+.trx-chips {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+}
+
+.trx-chip {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    width: 82px;
+    height: 62px;
+    border-radius: 14px;
+    border: 1.5px solid rgba(255, 255, 255, 0.35);
+    background: rgba(255, 255, 255, 0.12);
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.18s, border-color 0.18s, transform 0.15s;
+}
+
+.trx-chip:hover {
+    background: rgba(255, 255, 255, 0.22);
+    border-color: rgba(255, 255, 255, 0.6);
+    transform: translateY(-2px);
+}
+
+.trx-chip.active {
+    background: rgba(255, 255, 255, 0.95);
+    border-color: transparent;
+}
+
+.trx-chip svg {
+    width: 18px;
+    height: 18px;
+    stroke: rgba(255, 255, 255, 0.9);
+    flex-shrink: 0;
+}
+
+.trx-chip.active svg {
+    stroke: #185FA5;
+}
+
+.trx-chip-lbl {
+    font-size: 10px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.9);
+    text-align: center;
+    line-height: 1.2;
+}
+
+.trx-chip.active .trx-chip-lbl {
+    color: #185FA5;
+}
+
+/* ── Action Buttons ──────────────────────────── */
+.trx-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.trx-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    padding: 12px 22px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    border: none;
+    letter-spacing: 0.01em;
+    transition: filter 0.15s;
+    font-family: 'DM Sans', sans-serif;
+}
+
+.trx-btn:hover {
+    filter: brightness(1.1);
+}
+
+.trx-btn:active {
+    filter: brightness(0.92);
+}
+
+.trx-btn svg {
+    width: 16px;
+    height: 16px;
+    stroke: white;
+    stroke-width: 2.8;
+    flex-shrink: 0;
+}
+
+.trx-btn-add {
+    background: #22c55e;
+    color: white;
+}
+
+.trx-btn-back {
+    background: #f43f5e;
+    color: white;
+}

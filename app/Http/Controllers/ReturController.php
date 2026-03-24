@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Batches;
 use App\Models\History;
 use App\Models\ItemsLog;
 use App\Models\MedicineCart;
@@ -188,16 +189,42 @@ class ReturController extends Controller
         DB::beginTransaction();
 
         try {
-
             $findcode = MedicineTransactions::findOrFail($request->transaction_id);
             $now = Carbon::now()->format('Y-m-d');
 
 
-            $medicine = Medicines::findOrFail($request->medicine_id);
+            $medicine = Medicines::where('id', $request->medicine_id)
+                ->lockForUpdate()
+                ->firstOrFail();
             $qty_before = $medicine->stock;
 
 
 
+            // $batches = Batches::where('medicine_id', $request->medicine_id)
+            //     ->where('expired_at', $request->expired_date)
+            //     ->where('name', $request->batch)
+            //     ->first();
+            // if ($batches) {
+            //     $batches->increment('stock', $request->qty_rsetur);
+            // }
+
+            $batch = Batches::where('medicine_id', $request->medicine_id)
+                ->where('name', $request->batch)
+                ->where('expired_date', $request->expired_date)
+                ->lockForUpdate()
+                ->first();
+
+            if (!$batch) {
+                $batch = Batches::create([
+                    'medicine_id'  => $request->medicine_id,
+                    'name'         => $request->batch,
+                    'expired_date' => $request->expired_date,
+                    'stock'        => 0,
+                    'status'       => 0,
+                ]);
+            }
+
+            $batch->increment('stock', $request->qty_retur);
 
             // Create Retur (Retur Sales = 3)
             $itemsLog = ItemsLog::create([
@@ -211,6 +238,7 @@ class ReturController extends Controller
                 'total'            => $request->total_retur,
                 'date'             => $now,
                 'status'           => 3,
+                'batches_id'       => $batch->id
             ]);
 
             // Create New Retur Transaction
@@ -233,8 +261,7 @@ class ReturController extends Controller
 
 
             // Get & Increase stock
-            $cart = Medicines::findOrFail($request->medicine_id);
-            $cart->increment('stock', $request->qty_retur);
+            $medicine->increment('stock', $request->qty_retur);
 
 
             // if ($request->old_qty - $request->qty_retur == 0) {
@@ -372,10 +399,40 @@ class ReturController extends Controller
             // Create Retur Log (Retur Orders = 4)
             $findcode = Receiving::findOrFail($request->transaction_id);
             $now = Carbon::now()->format('Y-m-d');
-            
 
-            $medicine = Medicines::findOrFail($request->medicine_id);
+
+            $medicine = Medicines::where('id', $request->medicine_id)
+                ->lockForUpdate()
+                ->firstOrFail();
             $qty_before = $medicine->stock;
+
+
+
+            // $batches = Batches::where('medicine_id', $request->medicine_id)
+            //     ->where('expired_at', $request->expired_date)
+            //     ->where('name', $request->batch)
+            //     ->first();
+            // if ($batches) {
+            //     $batches->increment('stock', $request->qty_rsetur);
+            // }
+
+            $batch = Batches::where('medicine_id', $request->medicine_id)
+                ->where('name', $request->batch)
+                ->where('expired_date', $request->expired_date)
+                ->lockForUpdate()
+                ->first();
+
+            if (!$batch) {
+                $batch = Batches::create([
+                    'medicine_id'  => $request->medicine_id,
+                    'name'         => $request->batch,
+                    'expired_date' => $request->expired_date,
+                    'stock'        => 0,
+                    'status'       => 0,
+                ]);
+            }
+
+            $batch->decrement('stock', $request->qty_retur);
 
             $itemsLog = ItemsLog::create([
                 'transaction_code' => $findcode->code,
@@ -388,6 +445,7 @@ class ReturController extends Controller
                 'total'            => $request->total_retur,
                 'date'             => $now,
                 'status'           => 4,
+                'batches_id'       => $batch->id
             ]);
 
             // Create New Retur Transaction

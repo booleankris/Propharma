@@ -13,21 +13,12 @@ return new class extends Migration
      */
     public function up()
     {
-        Schema::create('items_log', function (Blueprint $table) {
+        Schema::create('batches', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('batches_id')
-                ->nullable() 
-                ->constrained('batches')
-                ->onDelete('no action');
-            $table->string('transaction_code');
-            $table->string('code');
-            $table->string('type');
             $table->foreignId('medicine_id')->constrained('medicines')->onDelete('no action');
-            $table->string('qty');
-            $table->string('qty_before');
-            $table->string('qty_after');
-            $table->string('total');
-            $table->string('date');
+            $table->string('name');
+            $table->string('expired_date')->nullable();
+            $table->string('stock')->nullable();
             $table->integer('status')->default('0')->nullable();
             $table->timestamps();
         });

@@ -5,25 +5,17 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class ItemsLog extends Model
+class Batches extends Model
 {
     use HasFactory;
-    protected $casts = [
-        'date' => 'datetime', 
-    ];
-    protected $table = 'items_log';
+    protected $table = 'batches';
+
     protected $fillable = [
-        'transaction_code',
-        'code',
-        'type',
         'medicine_id',
-        'batches_id',
-        'qty',
-        'qty_before',
-        'qty_after',
-        'total',
-        'date',
-        'status'
+        'name',
+        'expired_date',
+        'stock',
+        'status',
     ];
     public function medicines()
     {

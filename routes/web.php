@@ -196,7 +196,7 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     // Sales Data
     Route::get('/data/sales', [SalesDataController::class, 'index'])->name('salesdata.index');
     Route::get('/sales/transaction/{id}/items', [SalesDataController::class, 'transactionItems']);
-  
+
 
     // Sales Reject
     Route::get('/reject', [RejectController::class, 'reject'])->name('sales.reject');
@@ -220,8 +220,11 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     // Supplies
     Route::get('/supplies', [SuppliesController::class, 'supplies'])->name('supplies.index');
     Route::get('/getsupplies', [SuppliesController::class, 'getSupplies'])->name('supplies.getSupplies');
-    Route::get('/stock-data', [SuppliesController::class, 'stockData'])->name('supplies.stockData');
-    Route::get('/getstockdata', [SuppliesController::class, 'getStockData'])->name('supplies.getstockData');
+    // Stock Data
+    Route::get('/stock-data',        [SuppliesController::class, 'stockData'])->name('supplies.stockData');
+    Route::get('/stock-data/get',    [SuppliesController::class, 'getStockData'])->name('supplies.getStockData');
+    Route::get('/stock-data/export', [SuppliesController::class, 'exportStock'])->name('supplies.exportStockData');
+    
     Route::get('/stockopname', [SuppliesController::class, 'stockOpname'])->name('supplies.stockOpname');
     Route::get('/getmedicines', [SuppliesController::class, 'getMedicines'])->name('supplies.medicines');
     Route::get('/medicineStockLog', [SuppliesController::class, 'medicineStockLog'])->name('supplies.medicineStockLog');
@@ -313,7 +316,6 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     Route::get('/creditors/select', [CreditorsController::class, 'select'])->name('creditors.select');
     Route::get('locations/select', [LocationsController::class, 'select'])->name('locations.select');
     Route::get('/items/select', [ItemsController::class, 'select'])->name('items.select');
-
 });
 
 

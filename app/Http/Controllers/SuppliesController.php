@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Exports\Stocks\PrintStockOpnameExport;
 use App\Exports\Stocks\StockDataExport;
+use App\Models\Batches;
 use App\Models\ItemsLog;
 use App\Models\MedicineCart;
 use App\Models\Medicines;
@@ -649,12 +650,28 @@ class SuppliesController extends Controller
         try {
             DB::transaction(function () use ($request) {
                 $medicine = Medicines::findOrFail($request->medicine_id);
+                $batch = Batches::where('medicine_id', $medicine->id)
+                    ->where('name', $request->batch)
+                    ->where('expired_date', $request->expired_date)
+                    ->lockForUpdate()
+                    ->first();
 
+                if (!$batch) {
+                    $batch = Batches::create([
+                        'medicine_id'  => $request->medicine_id,
+                        'name'         => $request->batch,
+                        'expired_date' => $request->expired_date,
+                        'stock'        => 0,
+                        'status'       => 0,
+                    ]);
+                }
                 $status = '';
                 if ($request->stock_discrepancy < 0) {
                     $status = 6;
+                    $batch->decrement('stock', $request->stock_discrepancy);
                 } else if ($request->stock_discrepancy >= 0) {
                     $status = 5;
+                    $batch->increment('stock', $request->stock_discrepancy);
                 }
 
                 ItemsLog::create([
@@ -694,43 +711,76 @@ class SuppliesController extends Controller
     }
     public function getStockDetail(Request $request)
     {
-        if ($request->ajax()) {
+        $query = ReceivingItems::with(['batches.medicines', 'locations', 'etalases'])
+            ->whereHas('batches')
+            ->select('receiving_items.*');
 
-            $stockdetail = ReceivingItems::join('order_items', 'order_items.id', '=', 'receiving_items.order_items_id')
-                ->join('medicines', 'medicines.id', '=', 'order_items.medicine_id')
-                ->select(
-                    'receiving_items.id', // untuk DT_RowIndex
-                    'medicines.code as code',
-                    'medicines.name as name',
-                    'receiving_items.batch as batch',
-                    'receiving_items.qty as qty',
-                    'receiving_items.expired_date as expired_date'
-                )
-                ->orderBy('medicines.name')
-                ->orderBy('receiving_items.expired_date')
-                ->orderBy('receiving_items.batch');
-
-            if ($request->filled('searchMedicine')) {
-                $stockdetail->where(function ($q) use ($request) {
-                    $q->where('medicines.name', 'like', "%{$request->searchMedicine}%")
-                        ->orWhere('medicines.code', 'like', "%{$request->searchMedicine}%");
-                });
-            }
-
-            if ($request->filled('start_date')) {
-                $stockdetail->whereDate('receiving_items.date', '>=', $request->start_date);
-            }
-
-            if ($request->filled('end_date')) {
-                $stockdetail->whereDate('receiving_items.date', '<=', $request->end_date);
-            }
-
-            return DataTables::of($stockdetail)
-                ->addIndexColumn()
-                ->editColumn('expired_date', function ($row) {
-                    return Carbon::parse($row->expired_date)->format('d F Y'); // 11 January 2026
-                })
-                ->make(true);
+        if ($request->search) {
+            $search = $request->search;
+            $query->whereHas('batches.medicines', function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('code', 'like', "%{$search}%");
+            });
         }
+
+        if ($request->start_date && $request->end_date) {
+            $query->whereBetween('receiving_items.expired_date', [
+                $request->start_date,
+                $request->end_date
+            ]);
+        }
+
+        $data = $query->get()->map(function ($item, $index) {
+            return [
+                'DT_RowIndex' => $index + 1,
+                'medicine_code' => $item->batches->medicines->code ?? '-',
+                'medicine_name' => $item->batches->medicines->name ?? '-',
+                'batch_name'    => $item->batches->name ?? '-',
+                'stock'         => $item->batches->stock ?? 0,
+                'expired_date'  => $item->expired_date ?? '-',
+                'location'      => $item->locations->name ?? '-',
+                'etalase'       => $item->etalases->name ?? '-',
+            ];
+        });
+
+        return response()->json(['data' => $data]);
+        // if ($request->ajax()) {
+
+        //     $stockdetail = ReceivingItems::join('order_items', 'order_items.id', '=', 'receiving_items.order_items_id')
+        //         ->join('medicines', 'medicines.id', '=', 'order_items.medicine_id')
+        //         ->select(
+        //             'receiving_items.id', // untuk DT_RowIndex
+        //             'medicines.code as code',
+        //             'medicines.name as name',
+        //             'receiving_items.batch as batch',
+        //             'receiving_items.qty as qty',
+        //             'receiving_items.expired_date as expired_date'
+        //         )
+        //         ->orderBy('medicines.name')
+        //         ->orderBy('receiving_items.expired_date')
+        //         ->orderBy('receiving_items.batch');
+
+        //     if ($request->filled('searchMedicine')) {
+        //         $stockdetail->where(function ($q) use ($request) {
+        //             $q->where('medicines.name', 'like', "%{$request->searchMedicine}%")
+        //                 ->orWhere('medicines.code', 'like', "%{$request->searchMedicine}%");
+        //         });
+        //     }
+
+        //     if ($request->filled('start_date')) {
+        //         $stockdetail->whereDate('receiving_items.date', '>=', $request->start_date);
+        //     }
+
+        //     if ($request->filled('end_date')) {
+        //         $stockdetail->whereDate('receiving_items.date', '<=', $request->end_date);
+        //     }
+
+        //     return DataTables::of($stockdetail)
+        //         ->addIndexColumn()
+        //         ->editColumn('expired_date', function ($row) {
+        //             return Carbon::parse($row->expired_date)->format('d F Y'); // 11 January 2026
+        //         })
+        //         ->make(true);
+        // }
     }
 }

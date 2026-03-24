@@ -226,7 +226,7 @@
                 processing: true,
                 serverSide: true,
                 ajax: {
-                    url: "{{ route('supplies.getstockData') }}",
+                    url: "{{ route('supplies.getStockData') }}",
                     data: function(d) {
                         d.searchMedicine = searchMedicine;
                         d.start_date = startDate;

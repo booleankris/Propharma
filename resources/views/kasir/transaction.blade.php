@@ -1,6 +1,8 @@
 @extends('layouts.app')
 @section('content')
 @section('style')
+    <link rel="stylesheet" href="{{ asset('css/dashboard.css') }}">
+
     <style>
         .transaction-item {
             color: #fff;
@@ -72,105 +74,119 @@
     <!-- LEFT COLUMN -->
     <section class="col-span-12 lg:col-span-5 space-y-3">
         <!-- Header Card -->
-        <div
-            class="card py-6 px-6 @if ($check_transaction == 1) @if ($transaction->transaction_type == 'UPDS') !bg-[#4CAF50] @elseif($transaction->transaction_type == 'HV/OTC') !bg-[#0e88ea] @elseif($transaction->transaction_type == 'KREDIT') !bg-[#9a851c] @else !bg-[#9a1c1c] @endif
-@else
-!bg-[#6d8497] @endif dashboard-panel">
-            <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <div class="flex items-end justify-between md:block">
-                    <h1 class="text-4xl font-semibold tracking-tight font-poppins text-[#ffffff]">Transaksi</h1>
+        @php
+            $typeClass = 'type-idle';
+            if ($check_transaction == 1) {
+                $typeClass = match ($transaction->transaction_type) {
+                    'UPDS' => 'type-upds',
+                    'HV/OTC' => 'type-hv',
+                    'KREDIT' => 'type-kredit',
+                    default => 'type-resep',
+                };
+            }
+        @endphp
+        <div class="trx-card {{ $typeClass }} dashboard-panel">
 
+            {{-- Header --}}
+            <div class="trx-header">
+                <div>
+                    <h1 class="trx-title">Transaksi</h1>
+                    @if ($check_transaction == 1)
+                        <div class="trx-badge">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="2" y="5" width="20" height="14" rx="2" />
+                                <line x1="2" y1="10" x2="22" y2="10" />
+                            </svg>
+                            {{ $transaction->transaction_code }}
+                        </div>
+                    @endif
                 </div>
-                <div class="flex items-center justify-between gap-6 w-full md:w-auto">
-                    <!-- Date / Time -->
-                    <div class="text-right">
-                        <div class="text-sm md:text-base text-[#fff] font-poppins font-medium">
-                            {{ now()->translatedFormat('l, d F Y') }}
-                        </div>
-                        <div class="text-xs text-[#fff] font-poppins">
-                            {{ now()->format('H.i') }} WITA
-                        </div>
-                        <div class="text-sm md:text-base text-[#ffe500] font-nunito !text-[12px] font-medium">
-                            @if ($check_transaction == 1)
-                                <b>No. Transaksi :</b> {{ $transaction->transaction_code }}
-                            @endif
-                        </div>
-                    </div>
+                <div class="trx-datetime">
+                    <div class="trx-date">{{ now()->translatedFormat('l, d F Y') }}</div>
+                    <div class="trx-time">{{ now()->format('H.i') }} WITA</div>
                 </div>
+            </div>
+
+            <div class="trx-divider"></div>
+
+            {{-- Transaction Type Chips --}}
+            <div class="trx-chips">
+
+                {{-- Resep Credit --}}
+                <a href="{{ url('transaction/kredit') }}"
+                    class="trx-chip {{ request()->is('transaction/kredit') ? 'active' : '' }}">
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <rect x="2" y="5" width="20" height="14" rx="2" />
+                        <line x1="2" y1="10" x2="22" y2="10" />
+                    </svg>
+                    <span class="trx-chip-lbl">Resep Credit</span>
+                </a>
+
+                {{-- Resep Tunai --}}
+                <a href="{{ url('transaction/resep') }}"
+                    class="trx-chip {{ request()->is('transaction/resep') ? 'active' : '' }}">
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
+                        <rect x="9" y="3" width="6" height="4" rx="1" />
+                    </svg>
+                    <span class="trx-chip-lbl">Resep Tunai</span>
+                </a>
+
+                {{-- HV/OTC --}}
+                <a href="{{ url('transaction/hv') }}"
+                    class="trx-chip {{ request()->is('transaction/hv') ? 'active' : '' }}">
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path
+                            d="M19.428 15.428a2 2 0 0 0-1.022-.547l-2.387-.477a6 6 0 0 0-3.86.517l-.318.158a6 6 0 0 1-3.86.517L6.05 15.21a2 2 0 0 0-1.806.547M8 4h8l-1 1v5.172a2 2 0 0 0 .586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 0 0 9 10.172V5L8 4z" />
+                    </svg>
+                    <span class="trx-chip-lbl">HV/OTC</span>
+                </a>
+
+                {{-- UPDS --}}
+                <a href="{{ url('transaction/upds') }}"
+                    class="trx-chip {{ request()->is('transaction/upds') ? 'active' : '' }}">
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
+                        <line x1="3" y1="6" x2="21" y2="6" />
+                        <path d="M16 10a4 4 0 0 1-8 0" />
+                    </svg>
+                    <span class="trx-chip-lbl">UPDS</span>
+                </a>
 
             </div>
 
-
-            <!-- Transaction Type Chips -->
-            <div class="flex flex-wrap justify-start gap-4 pt-3">
-                <!-- Resep Credit -->
-                <a href="{{ url('transaction/kredit') }}">
-                    <button
-                        class="flex flex-col items-center justify-center w-[90px] h-[60px] transaction-item  {{ request()->is('transaction/kredit') ? 'transaction-item-active shadow-none' : '' }}  border-[#fff] border rounded-2xl shadow-sm">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mb-2 text-[#fff] svg-item" fill="none"
-                            viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M2.25 6.75h19.5v10.5H2.25zM2.25 9.75h19.5" />
-                        </svg>
-                        <span class="text-[10px] font-semibold font-poppins">Resep Credit</span>
-                    </button>
-                </a>
-
-                <!-- Resep Tunai -->
-                <a href="{{ url('transaction/resep') }}">
-                    <button
-                        class="flex flex-col items-center justify-center w-[90px] h-[60px] transaction-item {{ request()->is('transaction/resep') ? 'transaction-item-active shadow-none' : '' }} border-[#fff] border rounded-2xl shadow-sm">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mb-2 text-[#fff] svg-item" fill="none"
-                            viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M2.25 6.75h19.5v10.5H2.25zM2.25 9.75h19.5" />
-                        </svg>
-                        <span class="text-[10px] font-semibold font-poppins">Resep Tunai</span>
-                    </button>
-                </a>
-
-                <!-- HV/OTC -->
-                <a href="{{ url('transaction/hv') }}">
-                    <button
-                        class="flex flex-col items-center justify-center w-[90px] h-[60px] transaction-item border-[#fff] {{ request()->is('transaction/hv') ? 'transaction-item-active shadow-none' : '' }} border rounded-2xl shadow-sm">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mb-2 text-[#fff] svg-item" fill="none"
-                            viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M2.25 6.75h19.5v10.5H2.25zM2.25 9.75h19.5" />
-                        </svg>
-                        <span class="text-[10px] font-semibold font-poppins">HV/OTC</span>
-                    </button>
-                </a>
-
-                <!-- UPDS -->
-                <a href="{{ url('transaction/upds') }}">
-                    <button
-                        class="flex flex-col items-center justify-center w-[90px] h-[60px] transaction-item border-[#fff] {{ request()->is('transaction/upds') ? 'transaction-item-active shadow-none' : '' }} border rounded-2xl shadow-sm">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 mb-2 text-[#fff] svg-item" fill="none"
-                            viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M2.25 6.75h19.5v10.5H2.25zM2.25 9.75h19.5" />
-                        </svg>
-                        <span class="text-[10px] font-semibold font-poppins">UPDS</span>
-                    </button>
-                </a>
-            </div>
+            {{-- Action Buttons (hanya tampil jika belum ada transaksi aktif) --}}
             @if ($check_transaction == 0)
-                <form method="post" action="{{ route('transaction.createnew') }}" class="mt-3">
+                <form method="post" action="{{ route('transaction.createnew') }}">
                     @csrf
-                    <input type="hidden" value="{{ request()->segment(2) }}" name="type" id="type">
-                    <button type="submit" class="btn btn-pharma !bg-[#2196F3] btn-lg btn-icon icon-right"
-                        tabindex="4">
-                        Tambah Transaksi
-                    </button>
+                    <input type="hidden" value="{{ request()->segment(2) }}" name="type">
+                    <div class="trx-actions">
+                        <button type="submit" class="trx-btn trx-btn-add" tabindex="4">
+                            <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="9" />
+                                <line x1="12" y1="8" x2="12" y2="16" />
+                                <line x1="8" y1="12" x2="16" y2="12" />
+                            </svg>
+                            Tambah Transaksi
+                        </button>
+                        <button type="button" onclick="back()" class="trx-btn trx-btn-back" tabindex="5">
+                            <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="9 14 4 9 9 4" />
+                                <path d="M20 20v-7a4 4 0 0 0-4-4H4" />
+                            </svg>
+                            Kembali
+                        </button>
+                    </div>
                 </form>
-                <button type="button" onclick="back()"
-                    class="btn btn-pharma mt-3 !bg-[#cf2525] !shadow-[0_2px_6px_#cf2525] btn-lg btn-icon icon-right"
-                    tabindex="4">
-                    Kembali
-                </button>
             @endif
+
         </div>
+
 
         @if ($check_transaction == 1)
             <div class="card p-6  flex flex-wrap items-center bg-white dashboard-panel">
@@ -448,7 +464,7 @@
     @if ($check_transaction == 1)
         <!-- RIGHT COLUMN -->
         <aside class="col-span-12 lg:col-span-7  dashboard-panel">
-            <div class="card px-6 bg-white">
+            <div class="card px-6 bg-white mt-5">
                 <div class="w-full flex">
                     <div class="w-1/2 flex">
                         <div class="mr-2">
@@ -621,13 +637,11 @@
                     <br>
                 </div>
             </div>
-            <div class="button-container flex gap-2 mt-3 mx-auto w-[95%]">
+            {{-- <div class="button-container flex gap-2 mt-3 mb-4 mx-auto w-[95%]">
                 <div class="w-[50%]">
                     <form method="POST" action="{{ route('sales.deletetransaction') }}">
                         @csrf
-                        <input type="hidden" name="trxtype"
-                            value="{{ $transaction?->transaction_type ?? 'null' }}">
-                        <input type="hidden" name="trxid" value="{{ $transaction?->id ?? 'null' }}">
+                        
                         <button type="submit" id="deletebtn"
                             class="py-[15px] mt-2 w-full font-poppins bg-[#e95050] text-white shadow-[0_0_11px_2px_#e95050] border-none px-[16px] rounded-md transition">
                             Batal
@@ -639,6 +653,51 @@
                     Pembayaran
                 </button>
 
+            </div> --}}
+            <div class="flex gap-2 mt-3 mb-4 mx-auto w-[95%]">
+
+                {{-- Cancel button with confirmation --}}
+                <div class="w-1/2">
+                    <form method="POST" action="{{ route('sales.deletetransaction') }}">
+                        @csrf
+                        <input type="hidden" name="trxtype"
+                            value="{{ $transaction?->transaction_type ?? 'null' }}">
+                        <input type="hidden" name="trxid" value="{{ $transaction?->id ?? 'null' }}">
+                        <button type="submit" id="deletebtn"
+                            class="flex items-center justify-center gap-2 py-[14px] mt-2 w-full
+                               font-poppins text-[15px] font-medium bg-[#e95050] text-white
+                               border-none px-[16px] rounded-md
+                               transition-all duration-150
+                               hover:bg-[#d43e3e] active:scale-[0.97]
+                               disabled:opacity-55 disabled:cursor-not-allowed">
+                            <svg class="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round">
+                                <line x1="4" y1="4" x2="12" y2="12" />
+                                <line x1="12" y1="4" x2="4" y2="12" />
+                            </svg>
+                            Batal
+                        </button>
+                    </form>
+                </div>
+
+                {{-- Payment button --}}
+                <div class="w-1/2">
+                    <button id="openModalPayment" type="button"
+                        class="flex items-center justify-center gap-2 py-[14px] mt-2 w-full
+                               font-poppins text-[15px] font-medium bg-[#0074ce] text-white
+                               border-none px-[16px] rounded-md
+                               transition-all duration-150
+                               hover:bg-[#005fab] active:scale-[0.97]
+                               disabled:opacity-55 disabled:cursor-not-allowed">
+                        <svg class="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+                            stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="1" y="4" width="14" height="9" rx="2" />
+                            <path d="M1 7h14" />
+                            <path d="M4 11h3" />
+                        </svg>
+                        Pembayaran
+                    </button>
+                </div>
             </div>
     @endif
 </div>
