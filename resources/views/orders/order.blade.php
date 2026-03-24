@@ -259,7 +259,7 @@
                                     <div class="py-1 text-[13px] font-bold">QTY BPBA</div>
                                     <input id="qty" type="number" name="qty"
                                         class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
-                                        placeholder="QTY Retur" onkeyup="counttotal()">
+                                        placeholder="QTY BPBA" onkeyup="counttotal()">
                                 </div>
                                 <div class="w-full sm:w-40">
                                     <div class="py-1 text-[13px] font-bold">Isi Obat</div>
