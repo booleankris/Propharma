@@ -170,6 +170,7 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     Route::post('sendembalase', [SalesController::class, 'sendEmbalase'])->name('sales.sendembalase');
     Route::post('deleteTransaction', [SalesController::class, 'deleteTransaction'])->name('sales.deletetransaction');
     Route::get('/print/receipt/{id}', [PrintController::class, 'receipt'])->name('sales.print');
+    Route::get('/print/fullreceipt/{id}', [PrintController::class, 'fullReceipt'])->name('salesrecipe.print');
 
 
     // ================================================================== Add Data =========================================================================

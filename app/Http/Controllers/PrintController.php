@@ -21,7 +21,7 @@ class PrintController extends Controller
             return $recipe->recipe_number ?? 'single';
         });
 
-        $transaction = MedicineTransactions::with('patients')->find($id);
+        $transaction = MedicineTransactions::with(['patients','doctors'])->find($id);
 
         $totalEmbalase = $items->sum('embalase');
         $totalPrice = $items->sum('final_price');
@@ -35,6 +35,42 @@ class PrintController extends Controller
         $payment = $totalRawTotal - $totaldiscount;
 
         return view('kasir.receipt', compact(
+            'payment',
+            'transaction',
+            'transactionCart',
+            'totalRawTotal',
+            'totalPrice',
+            'totalFinalPrice',
+            'totaldiscount',
+            'subtotaldiscount'
+        ));
+    }
+    public function fullReceipt($id)
+    {
+        $items = MedicineCart::with(['medicine', 'transactions'])
+            ->whereHas('transactions', function ($q) use ($id) {
+                $q->where('id', $id);
+            })
+            ->get();
+
+        $transactionCart = $items->groupBy(function ($recipe) {
+            return $recipe->recipe_number ?? 'single';
+        });
+
+        $transaction = MedicineTransactions::with(['patients','doctors'])->find($id);
+
+        $totalEmbalase = $items->sum('embalase');
+        $totalPrice = $items->sum('final_price');
+        $totalRawTotal = $items->sum('raw_total') + $totalEmbalase;
+        $totalFinalPrice = $items->sum('final_price');
+        $discount = $items->sum('discount');
+
+        $subtotaldiscount = $transaction->discount ?? 0;
+        $totaldiscount = ceil(($discount + $subtotaldiscount) / 1000) * 1000;
+
+        $payment = $totalRawTotal - $totaldiscount;
+
+        return view('kasir.allreceipt', compact(
             'payment',
             'transaction',
             'transactionCart',

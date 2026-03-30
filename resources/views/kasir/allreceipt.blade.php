@@ -26,6 +26,7 @@
         border-top: 1px dashed #000;
     }
 </style>
+
 <div class="struk">
     <div class="text-center">
         <strong>APOTEK SAHABAT</strong><br>
@@ -40,48 +41,30 @@
     {{ $transaction->updated_at->format('d/m/Y H:i:s') }}<br>
 
     <br>
-    Nama : {{ $transaction->patients->name }}<br>
-    Alamat : {{ $transaction->patients->address }}<br>
+    Nama : {{ $transaction->patients->name ?? '-' }}<br>
+    Alamat : {{ $transaction->patients->address ?? '-' }}<br>
     <hr>
-    Nama Dokter : {{ $transaction->doctors->name }}<br>
+    Nama Dokter : {{ $transaction->doctors->name ?? '-' }}<br>
     <hr>
 
-    @foreach ($transactionCart as $key => $items)
-        @if ($key != 'single')
-            <table style="width: 100%">
-                <tr>
-                    <td style="text-align: left;font-size:12px"><strong>Racikan {{ $key }}</strong></td>
-                    <td style="text-align: left;font-size:12px">
-                        <span style="float:right">
-                            {{ number_format($items->sum('final_price')) }}
-                        </span>
-                    </td>
-
-                </tr>
-            </table>
-            <br>
-        @else
-            @foreach ($items as $item)
-                {{ $item->medicine->name }}<br>
-                {{ $item->quantity }} x {{ number_format($item->item_price) }}
-                <span style="float:right">
-                    {{ number_format($item->raw_total) }}
-                </span>
-                <br>
-            @endforeach
-        @endif
+    @foreach ($transactionCart as $groupKey => $items)
+        @foreach ($items as $item)
+            {{ $item->medicine->name }}<br>
+            {{ $item->quantity }} x {{ number_format($item->item_price) }}
+            <span style="float:right">{{ number_format($item->raw_total) }}</span><br>
+        @endforeach
     @endforeach
 
     <hr>
 
-    Jumlah
+    Sub Total
     <span style="float:right;">{{ number_format($totalRawTotal) }}</span><br>
 
     Discount
     <span style="float:right;">-{{ number_format($totaldiscount) }}</span><br>
 
     <strong>
-        Total Beli
+        Jumlah
         <span style="float:right;">{{ number_format($payment) }}</span>
     </strong><br>
 
@@ -104,6 +87,8 @@
 <script>
     window.onload = () => {
         window.print();
-        window.onafterprint = () => window.close();
+        window.onafterprint = () => {
+            window.location.href = "{{ route('transaction', 'resep') }}";
+        }
     }
 </script>

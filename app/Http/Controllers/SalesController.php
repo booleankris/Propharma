@@ -804,8 +804,9 @@ class SalesController extends Controller
             DB::commit();
 
             return response()->json([
-                'success'   => true,
-                'print_url' => route('sales.print', $transaction->id),
+                'success'        => true,
+                'print_url'      => route('sales.print', $transaction->id),
+                'print_resep_url' => route('salesrecipe.print', $transaction->id),
             ]);
         } catch (ModelNotFoundException $e) {
             // 7. Specific catch for 404 — don't leak internal model names

@@ -105,7 +105,7 @@
             <div class="trx-divider"></div>
             {{-- Transaction Type Chips --}}
             <div class="trx-chips">
-                
+
                 {{-- Resep Credit --}}
                 <a href="{{ url('transaction/kredit/' . ($trx_id != 0 ? $trx_id : 0)) }}"
                     class="trx-chip @if ($type == 'kredit') active @endif">
@@ -1158,6 +1158,45 @@
             </div>
         </div>
     </div>
+    {{-- Print Confirmation Modal --}}
+    <div id="printConfirmModal" class="hidden fixed inset-0 z-[999999] items-center justify-center bg-black/40">
+        <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4">
+            <h3 class="text-[15px] font-semibold text-gray-800 mb-1">Cetak Struk?</h3>
+            <p class="text-[13px] text-gray-400 mb-5">Pilih jenis struk yang ingin dicetak.</p>
+
+            {{-- RESEP TUNAI buttons --}}
+            <div id="btnGroupResep" class="hidden flex-col gap-2">
+                <button id="btnStrukPelanggan"
+                    class="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-[13px] font-semibold transition-colors">
+                    Struk Pelanggan
+                </button>
+                <button id="btnStrukPelangganResep"
+                    class="w-full py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-[13px] font-semibold transition-colors">
+                    Struk Pelanggan &amp; Resep
+                </button>
+                <button id="btnCancelResep"
+                    class="w-full py-2.5 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 text-[13px] font-semibold transition-colors">
+                    Batal
+                </button>
+            </div>
+
+            {{-- Default buttons --}}
+            <div id="btnGroupDefault" class="hidden flex-col gap-2">
+                <button id="btnPrint"
+                    class="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-[13px] font-semibold transition-colors">
+                    Cetak Struk
+                </button>
+                <button id="btnSkipPrint"
+                    class="w-full py-2.5 rounded-xl bg-gray-800 hover:bg-gray-900 text-white text-[13px] font-semibold transition-colors">
+                    Tanpa Struk
+                </button>
+                <button id="btnCancel"
+                    class="w-full py-2.5 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 text-[13px] font-semibold transition-colors">
+                    Batal
+                </button>
+            </div>
+        </div>
+    </div>
 @endif
 
 <div id="masterModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-50">
@@ -1290,38 +1329,8 @@
 
 {{-- ============================================================== Patient Invoice  ============================================================== --}}
 {{-- Print Confirmation --}}
-{{-- Print Confirmation Modal --}}
-<div id="printConfirmModal" class="hidden fixed inset-0 z-[999999] flex items-center justify-center bg-black/40 backdrop-blur-sm">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6">
-        <div class="flex items-center gap-3 mb-4">
-            <div class="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center">
-                <svg class="w-5 h-5 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
-                    <rect x="6" y="14" width="12" height="8"/>
-                </svg>
-            </div>
-            <div>
-                <p class="text-[14px] font-semibold text-gray-800">Cetak Struk?</p>
-                <p class="text-[12px] text-gray-400">Transaksi berhasil disimpan</p>
-            </div>
-        </div>
 
-        <div class="flex gap-2 mt-5">
-            <button id="btnPrint"
-                class="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg bg-[#2196F3] hover:bg-[#1976D2] text-white text-[13px] font-medium transition-colors">
-                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
-                    <rect x="6" y="14" width="12" height="8"/>
-                </svg>
-                Ya, Cetak
-            </button>
-            <button id="btnSkipPrint"
-                class="flex-1 px-4 py-2.5 rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-600 text-[13px] font-medium transition-colors">
-                Lewati
-            </button>
-        </div>
-    </div>
-</div>
+
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 <script>
     // WHEN PAGE LOADED
@@ -2146,7 +2155,8 @@
     function selectDoctor(it) {
 
         if (currenttransaction == 'RESEP TUNAI') {
-            document.getElementById('pay').focus();
+            document.getElementById('payment_type').focus();
+            document.getElementById('payment_type').checked = true;
         }
         document.getElementById('doctor_id').value = it.id;
         document.getElementById('doctorSearch').value = it.name;
@@ -2781,114 +2791,178 @@
     function checkoutItem() {
         const paid = document.getElementById('pay').value;
         const changes = document.getElementById('trchange').value;
-        if (transaction_type == 'RESEP TUNAI') {
-            const debtor_id = 0;
-        } else if (transaction_type == 'UPDS' || transaction_type == 'HV/OTC') {
-            const debtor_id = 0;
-            const doctor_id = 0;
+
+        let doctor_id = null;
+        let debtor_id = null;
+
+        if (transaction_type === 'RESEP TUNAI') {
+            doctor_id = document.getElementById('doctor_id').value || null;
+            debtor_id = null;
+
+        } else if (transaction_type === 'UPDS' || transaction_type === 'HV/OTC') {
+            doctor_id = null;
+            debtor_id = null;
+
         } else {
-            const debtor_id = document.getElementById('debtor_id').value;
-            const doctor_id = document.getElementById('doctor_id').value;
+            doctor_id = document.getElementById('doctor_id').value || null;
+            debtor_id = document.getElementById('debtor_id').value || null;
         }
-        const patient_id = document.getElementById('patient_id').value;
 
-        if (doctor_id == "") {
-            alert("Silahkan Pilih Dokter Dulu")
-        } else if (debtor_id == "") {
-            alert("Silahkan Pilih Debitur DUlu")
+        const patient_id = document.getElementById('patient_id').value || null;
 
-        } else if (patient_id == "") {
-            alert("Silahkan Pilih Pasien")
-
-        } else {
-            axios.post("{{ route('transaction.getTransactionItem') }}", {
-                transaction_id,
-                paid,
-                subtotal,
-                doctor_id,
-                debtor_id,
-                patient_id,
-                changes
-            }).then(response => {
-                var transaction_items = response.data.itemTransaction;
-                var transaction = response.data.transaction;
-
-                document.getElementById('receipt').textContent = transaction.transactions.transaction_code;
-                document.getElementById('type').textContent = transaction.transactions.transaction_type;
-                document.getElementById('cashier').textContent = transaction.user.name;
-                document.getElementById('customer').textContent = "Client";
-                document.getElementById('invoiceItems').innerHTML = "";
-                document.getElementById('invoiceTotal').innerHTML = "";
-
-                transaction_items.forEach(item => {
-                    document.getElementById('invoiceItems').innerHTML += `
-                            <tr>
-                                <td>${item.medicine.name}</td>
-                                <td>${item.quantity}</td>
-                                <td>${formatRupiah(item.total_price)}</td>
-                            </tr>
-                        `;
-                });
-
-                document.getElementById('invoiceTotal').innerHTML += `
-                        <tr><td>Total</td><td></td><td>${formatRupiah(totaltransaction)}</td></tr>
-                        <tr><td>Tunai</td><td></td><td>${paid}</td></tr>
-                        <tr><td>Kembali</td><td></td><td>${changes}</td></tr>
-                    `;
-                const modal = document.getElementById("invoiceModal");
-                const content = document.getElementById("invoiceContent");
-                modal.classList.remove("hidden");
-                if (confirm("Apakah anda ingin mencetak struk?")) {
-                    document.getElementById("paid").value = cleanRupiah(document.getElementById('pay').value);
-                    document.getElementById("changes").value = cleanRupiah(document.getElementById('trchange')
-                        .value);
-                    const paid = document.getElementById('paid').value;
-                    const changes = document.getElementById('changes').value;
-                    const discounsubtotal = document.getElementById('discounsubtotal').value;
-                    const patient_id = document.getElementById('patient_id').value;
-                    const doctor_id = document.getElementById('doctor_id').value;
-                    const debtor_id = document.getElementById('debtor_id').value;
-                    const print_receipt = document.getElementById('print_receipt').value;
-                    axios.post("{{ route('transaction.checkout') }}", {
-                        transaction_id,
-                        paid,
-                        discounsubtotal,
-                        totaltransaction,
-                        changes,
-                        doctor_id,
-                        debtor_id,
-                        patient_id,
-                        print_receipt: 1,
-                        paymentType,
-                        user_id,
-                        shift_logs_id,
-                    }).then(res => {
-                        if (res.data.success) {
-                            window.open(res.data.print_url, '_blank');
-                            setTimeout(() => {
-                                window.location.reload();
-
-                            }, 300);
-                        }
-                    }).catch(err => {
-                        console.error(err);
-                        alert("Gagal menyimpan transaksi");
-                    });
-                } else {
-
-                    document.getElementById("transaction_id").value = transaction_id;
-                    document.getElementById("paid").value =
-                        cleanRupiah(document.getElementById('pay').value);
-
-                    document.getElementById("changes").value =
-                        cleanRupiah(document.getElementById('trchange').value);
-
-                }
-            }).catch(error => {
-                console.error("Error getting cart:", error.response ? error.response.data : error.message);
+        // ── Validation ────────────────────────────────────────────────────────
+        if (transaction_type === 'RESEP TUNAI' && !doctor_id) {
+            iziToast.warning({
+                title: 'Peringatan',
+                message: 'Silahkan Pilih Dokter Dulu',
+                position: 'topRight'
             });
+            return;
+        }
+        if ((transaction_type === 'RESEP KREDIT' || transaction_type === 'RESEP ASURANSI') && !debtor_id) {
+            iziToast.warning({
+                title: 'Peringatan',
+                message: 'Silahkan Pilih Debitur Dulu',
+                position: 'topRight'
+            });
+            return;
+        }
+        if (!patient_id) {
+            iziToast.warning({
+                title: 'Peringatan',
+                message: 'Silahkan Pilih Pasien',
+                position: 'topRight'
+            });
+            return;
         }
 
+        // ── Step 1: Get transaction items ─────────────────────────────────────
+        axios.post("{{ route('transaction.getTransactionItem') }}", {
+            transaction_id,
+            paid,
+            subtotal,
+            doctor_id,
+            debtor_id,
+            patient_id,
+            changes
+        }).then(response => {
+            const transaction_items = response.data.itemTransaction;
+            const transaction = response.data.transaction;
+
+            // ── Fill invoice ──────────────────────────────────────────────────
+            document.getElementById('receipt').textContent = transaction.transactions.transaction_code;
+            document.getElementById('type').textContent = transaction.transactions.transaction_type;
+            document.getElementById('cashier').textContent = transaction.user.name;
+            document.getElementById('customer').textContent = "Client";
+
+            document.getElementById('invoiceItems').innerHTML = "";
+            transaction_items.forEach(item => {
+                document.getElementById('invoiceItems').innerHTML += `
+                <tr>
+                    <td>${item.medicine.name}</td>
+                    <td>${item.quantity}</td>
+                    <td>${formatRupiah(item.total_price)}</td>
+                </tr>
+            `;
+            });
+
+            document.getElementById('invoiceTotal').innerHTML = `
+            <tr><td>Total</td><td></td><td>${formatRupiah(totaltransaction)}</td></tr>
+            <tr><td>Tunai</td><td></td><td>${paid}</td></tr>
+            <tr><td>Kembali</td><td></td><td>${changes}</td></tr>
+        `;
+
+            // ── Show invoice modal ────────────────────────────────────────────
+            document.getElementById('invoiceModal').classList.remove('hidden');
+
+            // ── Show print confirm modal ──────────────────────────────────────
+            const printModal = document.getElementById('printConfirmModal');
+            const btnGroupResep = document.getElementById('btnGroupResep');
+            const btnGroupDefault = document.getElementById('btnGroupDefault');
+
+            printModal.classList.remove('hidden');
+            printModal.classList.add('flex');
+
+            if (transaction_type === 'RESEP TUNAI') {
+                btnGroupResep.classList.remove('hidden');
+                btnGroupResep.classList.add('flex');
+                btnGroupDefault.classList.add('hidden');
+                btnGroupDefault.classList.remove('flex');
+            } else {
+                btnGroupDefault.classList.remove('hidden');
+                btnGroupDefault.classList.add('flex');
+                btnGroupResep.classList.add('hidden');
+                btnGroupResep.classList.remove('flex');
+            }
+
+            // ── Helpers ───────────────────────────────────────────────────────
+            function closeModal() {
+                printModal.classList.add('hidden');
+                printModal.classList.remove('flex');
+            }
+
+            // ── Step 2: Checkout ──────────────────────────────────────────────
+            function doCheckout(printMode) {
+                closeModal();
+
+                const cleanPaid = cleanRupiah(document.getElementById('pay').value);
+                const cleanChanges = cleanRupiah(document.getElementById('trchange').value);
+                const discounsubtotal = document.getElementById('discounsubtotal').value;
+
+                document.getElementById('paid').value = cleanPaid;
+                document.getElementById('changes').value = cleanChanges;
+                document.getElementById('transaction_id').value = transaction_id;
+
+                axios.post("{{ route('transaction.checkout') }}", {
+                    transaction_id,
+                    paid: cleanPaid,
+                    discounsubtotal,
+                    totaltransaction,
+                    changes: cleanChanges,
+                    doctor_id,
+                    debtor_id,
+                    patient_id,
+                    print_receipt: printMode !== 'none' ? 1 : 0,
+                    paymentType,
+                    user_id,
+                    shift_logs_id,
+                }).then(res => {
+                    if (res.data.success) {
+                        if (printMode === 'pelanggan') {
+                            window.open(res.data.print_url, '_blank');
+
+                        } else if (printMode === 'pelanggan_resep') {
+                            window.open(res.data.print_url, '_blank');
+                            window.location.href = res.data.print_resep_url;
+                        }
+                        setTimeout(() => window.location.reload(), 300);
+                    }
+                }).catch(err => {
+                    console.error(err);
+                    iziToast.error({
+                        title: 'Gagal',
+                        message: 'Gagal menyimpan transaksi',
+                        position: 'topRight'
+                    });
+                });
+            }
+
+            // ── Button handlers ───────────────────────────────────────────────
+            document.getElementById('btnPrint').onclick = () => doCheckout('pelanggan');
+            document.getElementById('btnSkipPrint').onclick = () => doCheckout('none');
+            document.getElementById('btnCancel').onclick = () => closeModal();
+            document.getElementById('btnStrukPelanggan').onclick = () => doCheckout('pelanggan');
+            document.getElementById('btnStrukPelangganResep').onclick = () => doCheckout('pelanggan_resep');
+            document.getElementById('btnCancelResep').onclick = () => closeModal();
+
+        }).catch(error => {
+            console.error("Error:", error.response ? error.response.data : error.message);
+            iziToast.error({
+                title: 'Gagal',
+                message: 'Gagal memuat transaksi',
+                position: 'topRight'
+            });
+        });
     }
 
     function closeInvoice() {
@@ -3665,7 +3739,8 @@
     discounsubtotal.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
             e.preventDefault();
-            payInput.focus();
+            document.getElementById('payment_type').focus();
+            document.getElementById('payment_type').checked = true;
         }
     })
     payInput.addEventListener('keydown', (e) => {
