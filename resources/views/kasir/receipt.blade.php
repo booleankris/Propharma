@@ -42,6 +42,8 @@
     <br>
     Nama : {{ $transaction->patients->name }}<br>
     Alamat : {{ $transaction->patients->address }}<br>
+    No.Telp : {{ $transaction->patients->phone }}<br>
+
     <hr>
     Nama Dokter : {{ $transaction->doctors->name }}<br>
     <hr>
