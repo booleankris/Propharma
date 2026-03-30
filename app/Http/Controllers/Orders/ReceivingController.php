@@ -534,6 +534,8 @@ class ReceivingController extends Controller
     public function receive($id)
     {
         $now = Carbon::now()->format('d/m/Y');
+        $datenow = Carbon::now()->format('Y-m-d');
+
         $transaction = Receiving::where('pharmacy_id', Auth()->user()->pharmacy_id)
             ->where('status', 0)->first();
         $check_order = OrderItems::with('orders')->whereHas('orders', function ($q) use ($id) {
@@ -567,7 +569,7 @@ class ReceivingController extends Controller
                 ->sum('total') ?? '0';
             $d_ppn = $d_price * 0.11 ?? '0';
             $d_total = $d_price + $d_ppn ?? '0';
-            return view('orders.receiving', compact('order_id', 'd_price', 'd_ppn', 'd_total', 'order_code', 'creditorOption', 'receiving_code', 'transaction', 'now', 'receiving_id'));
+            return view('orders.receiving', compact('order_id', 'd_price', 'd_ppn', 'd_total', 'order_code', 'creditorOption', 'receiving_code', 'transaction', 'now', 'datenow', 'receiving_id'));
         } else {
             $year   = now()->format('y');
             $month  = now()->format('m');
@@ -617,8 +619,7 @@ class ReceivingController extends Controller
             'extra_discount'   => 'required',
             'expired_date'     => 'required',
             'batch'            => 'required',
-            'location'         => 'required',
-            'etalase'          => 'required',
+           
             'status'           => 'required',
             'invoice_date'     => 'required',
             'invoice_due'      => 'required',
@@ -660,8 +661,8 @@ class ReceivingController extends Controller
                     'extra_discount' => $request->extra_discount,
                     'expired_date'   => $request->expired_date,
                     'batch'          => $request->batch,
-                    'location'       => $request->location,
-                    'etalase'        => $request->etalase,
+                    'location'       => NULL,
+                    'etalase'        => NULL,
                     'total'          => $request->total,
                     'status'         => $request->status,
                 ]
@@ -797,92 +798,148 @@ class ReceivingController extends Controller
         $request->validate([
             'receivingid' => 'required',
             'orderid'     => 'required',
-
         ]);
 
         try {
             DB::beginTransaction();
 
-            $receiving = Receiving::with('receiving_details.receiving_items.order_items.medicines')->findOrFail($request->receivingid);
+            $receiving = Receiving::with([
+                'receiving_details.receiving_items.order_items'
+            ])->findOrFail($request->receivingid);
+
             $order = Order::findOrFail($request->orderid);
 
             $receivingItems = $receiving->receiving_details
                 ->pluck('receiving_items')
                 ->flatten();
 
-            $now = Carbon::now()->format('Y-m-d');
+            if ($receivingItems->isEmpty()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Tidak ada item untuk diproses',
+                ], 422);
+            }
 
-            // Create Order Log 
-            // orders = 2
-            // type = OR
+            $now         = Carbon::now()->format('Y-m-d');
+            $pharmacyId  = auth()->user()->pharmacy_id;
 
-            // Loop through each order item
+            // ───────────────────── 1. Pre-fetch all medicines in one query ─────────────────────
+            $medicineIds = $receivingItems->pluck('order_items.medicine_id')->unique()->values();
+            $medicines   = Medicines::whereIn('id', $medicineIds)->get()->keyBy('id');
+
+            // ───────────────────── 2. Pre-fetch all matching batches in one query ─────────────────────
+            $existingBatches = Batches::where('pharmacy_id', $pharmacyId)
+                ->where(function ($q) use ($receivingItems) {
+                    foreach ($receivingItems as $item) {
+                        $q->orWhere(
+                            fn($q2) => $q2
+                                ->where('medicine_id',  $item->order_items->medicine_id)
+                                ->where('name',         $item->batch)
+                                ->where('expired_date', $item->expired_date)
+                        );
+                    }
+                })
+                ->get()
+                ->keyBy(fn($b) => "{$b->medicine_id}|{$b->name}|{$b->expired_date}");
+
+            // ───────────────────── 3. Loop — zero DB calls per iteration ─────────────────────
+            $itemsLogInserts      = [];
+            $batchIncrements      = [];  // batch_id   => qty
+            $medicineIncrements   = [];  // medicine_id => qty
+            $receivingItemUpdates = [];  // item_id     => batch_id
+            $newBatches           = [];  // track newly created batch keys
+
             foreach ($receivingItems as $item) {
-                $medicine = Medicines::findOrFail($item->order_items->medicine_id);
-                $qty_before = $medicine->stock;
+                $medicineId = $item->order_items->medicine_id;
+                $medicine   = $medicines->get($medicineId);
 
-                // Check Batch
+                if (!$medicine) {
+                    throw new \Exception("Medicine ID {$medicineId} not found.");
+                }
 
-                $batch = Batches::firstOrCreate(
-                    [
-                        'medicine_id' =>  $item->order_items->medicine_id,
+                $batchKey = "{$medicineId}|{$item->batch}|{$item->expired_date}";
+
+                if (!isset($existingBatches[$batchKey])) {
+                    $batch = Batches::create([
+                        'medicine_id'  => $medicineId,
                         'name'         => $item->batch,
                         'expired_date' => $item->expired_date,
-                    ],
-                    [
-                        'stock'  => $item->qty_received,
-                        'status' => 0,
-                    ]
-                );
-                $test = $item->update([
-                    'batches_id' => $batch->id,
-                ]);
+                        'status'       => 0,
+                        'pharmacy_id'  => $pharmacyId,
+                        'stock'        => 0,
+                    ]);
+                    $existingBatches[$batchKey] = $batch;
+                }
 
-                // Increase stock
-                $batch->increment('stock', $item->qty_received);
+                $batch    = $existingBatches[$batchKey];
+                $qtyBefore = $medicine->stock;
                 $medicine->stock += $item->qty_received;
-                $medicine->save();
 
-                ItemsLog::create([
+                $batchIncrements[$batch->id]     = ($batchIncrements[$batch->id]     ?? 0) + $item->qty_received;
+                $medicineIncrements[$medicineId] = ($medicineIncrements[$medicineId] ?? 0) + $item->qty_received;
+                $receivingItemUpdates[$item->id] = $batch->id;
+
+                $itemsLogInserts[] = [
                     'transaction_code' => $receiving->code,
                     'code'             => $this->generateItemsLogCode(),
-                    'type'             => "OR",
-                    'medicine_id'      => $item->order_items->medicine_id,
+                    'type'             => 'OR',
+                    'medicine_id'      => $medicineId,
                     'qty'              => $item->qty_received,
-                    'qty_before'       => $qty_before,
+                    'qty_before'       => $qtyBefore,
                     'qty_after'        => $medicine->stock,
                     'total'            => $item->order_items->total ?? 0,
                     'date'             => $now,
                     'status'           => 2,
                     'batches_id'       => $batch->id,
-                ]);
+                    'created_at'       => now(),
+                    'updated_at'       => now(),
+                ];
             }
-            $order->update([
-                'status' => 2,
-            ]);
 
-            $receiving->update([
-                'status' => 1,
-            ]);
+            // ─────────────────── 4. Bulk writes ─────────────────────
+
+            foreach ($batchIncrements as $batchId => $qty) {
+                Batches::where('id', $batchId)->increment('stock', $qty);
+            }
+
+            foreach ($medicineIncrements as $medicineId => $qty) {
+                Medicines::where('id', $medicineId)->increment('stock', $qty);
+            }
+
+            collect($receivingItemUpdates)
+                ->chunk(500)
+                ->each(function ($chunk) {
+                    foreach ($chunk as $itemId => $batchId) {
+                        ReceivingItems::where('id', $itemId)->update(['batches_id' => $batchId]);
+                    }
+                });
+
+            collect($itemsLogInserts)
+                ->chunk(500)
+                ->each(fn($chunk) => ItemsLog::insert($chunk->values()->all()));
+
+            // ───────────────────── 5. Finalize order & receiving ─────────────────────
+            $order->update(['status' => 2]);
+            $receiving->update(['status' => 1]);
 
             DB::commit();
 
             return response()->json([
                 'success' => true,
-                'message' => 'Received'
+                'message' => 'Received',
             ]);
         } catch (\Throwable $e) {
-
             DB::rollBack();
 
             \Log::error('Error complete receiving', [
                 'message' => $e->getMessage(),
-                'line' => $e->getLine()
+                'line'    => $e->getLine(),
+                'trace'   => $e->getTraceAsString(),
             ]);
 
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal menyelesaikan receiving'
+                'message' => 'Gagal menyelesaikan receiving',
             ], 500);
         }
     }

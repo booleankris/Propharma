@@ -8,6 +8,7 @@ use App\Models\Batches;
 use App\Models\ItemsLog;
 use App\Models\MedicineCart;
 use App\Models\Medicines;
+use App\Models\MedicineTransfers;
 use App\Models\ReceivingItems;
 use Carbon\Carbon;
 use DataTables;
@@ -99,6 +100,11 @@ class SuppliesController extends Controller
                                         <b'>" . $row->qty . "</b>
                                     </div>";
                         }
+                    } else if ($row->status == 7) {
+                        return "<div style='color:#248787;font-weight:bold;'>
+                        <span></span>
+                        <b'> -" . $row->qty . "</b>
+                    </div>";
                     }
                 })
                 ->addColumn('qty_before', function ($row) {
@@ -191,6 +197,19 @@ class SuppliesController extends Controller
                         font-family: Poppins;
                         border-radius: 25px;'>
                         Stock Opname
+                        </div";
+                    } else if ($row->status == 7) {
+                        return "<div style='
+                        text-align: center;
+                        font-weight: bold;
+                        text-transform: uppercase;
+                        background-color: #aeffeaad;
+                        color: #238787;
+                        padding: 7px 6px;
+                        font-size: 10px;
+                        font-family: Poppins;
+                        border-radius: 25px;'>
+                        Mutasi Stok
                         </div";
                     }
                 })
@@ -711,10 +730,19 @@ class SuppliesController extends Controller
     }
     public function getStockDetail(Request $request)
     {
-        $query = ReceivingItems::with(['batches.medicines', 'locations', 'etalases'])
-            ->whereHas('batches')
-            ->select('receiving_items.*');
 
+        $query = MedicineTransfers::with([
+            'batches.medicines',
+            'batches.pharmacy',
+            'etalases'
+        ])
+            ->whereHas('batches', function ($q) {
+                $q->where('pharmacy_id', auth()->user()->pharmacy_id);
+            })
+            ->select('medicine_transfers.*');
+        if ($request->status !== null && $request->status !== '') {
+            $query->where('status', $request->status);
+        }
         if ($request->search) {
             $search = $request->search;
             $query->whereHas('batches.medicines', function ($q) use ($search) {
@@ -723,64 +751,22 @@ class SuppliesController extends Controller
             });
         }
 
-        if ($request->start_date && $request->end_date) {
-            $query->whereBetween('receiving_items.expired_date', [
-                $request->start_date,
-                $request->end_date
-            ]);
-        }
-
         $data = $query->get()->map(function ($item, $index) {
+            $batch = $item->batches;
+
             return [
-                'DT_RowIndex' => $index + 1,
-                'medicine_code' => $item->batches->medicines->code ?? '-',
-                'medicine_name' => $item->batches->medicines->name ?? '-',
-                'batch_name'    => $item->batches->name ?? '-',
-                'stock'         => $item->batches->stock ?? 0,
-                'expired_date'  => $item->expired_date ?? '-',
-                'location'      => $item->locations->name ?? '-',
-                'etalase'       => $item->etalases->name ?? '-',
+                'DT_RowIndex'    => $index + 1,
+                'medicine_name'  => $batch->medicines->name ?? '-',
+                'batch_name'     => $batch->name ?? '-',
+                'stock'          => $item->stock ?? 0,
+                'expired_date'   => $batch->expired_date ?? '-',
+                'etalase'        => $item->etalases->name ?? '-',
+                'pharmacy'       => $batch->pharmacy->name ?? '-',
+                'status'         => $item->status,
+                'code'           => $item->code ?? '-',
             ];
         });
 
         return response()->json(['data' => $data]);
-        // if ($request->ajax()) {
-
-        //     $stockdetail = ReceivingItems::join('order_items', 'order_items.id', '=', 'receiving_items.order_items_id')
-        //         ->join('medicines', 'medicines.id', '=', 'order_items.medicine_id')
-        //         ->select(
-        //             'receiving_items.id', // untuk DT_RowIndex
-        //             'medicines.code as code',
-        //             'medicines.name as name',
-        //             'receiving_items.batch as batch',
-        //             'receiving_items.qty as qty',
-        //             'receiving_items.expired_date as expired_date'
-        //         )
-        //         ->orderBy('medicines.name')
-        //         ->orderBy('receiving_items.expired_date')
-        //         ->orderBy('receiving_items.batch');
-
-        //     if ($request->filled('searchMedicine')) {
-        //         $stockdetail->where(function ($q) use ($request) {
-        //             $q->where('medicines.name', 'like', "%{$request->searchMedicine}%")
-        //                 ->orWhere('medicines.code', 'like', "%{$request->searchMedicine}%");
-        //         });
-        //     }
-
-        //     if ($request->filled('start_date')) {
-        //         $stockdetail->whereDate('receiving_items.date', '>=', $request->start_date);
-        //     }
-
-        //     if ($request->filled('end_date')) {
-        //         $stockdetail->whereDate('receiving_items.date', '<=', $request->end_date);
-        //     }
-
-        //     return DataTables::of($stockdetail)
-        //         ->addIndexColumn()
-        //         ->editColumn('expired_date', function ($row) {
-        //             return Carbon::parse($row->expired_date)->format('d F Y'); // 11 January 2026
-        //         })
-        //         ->make(true);
-        // }
     }
 }

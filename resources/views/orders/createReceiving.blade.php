@@ -546,7 +546,7 @@
         let selectedRowIndex = null;
 
         document.addEventListener('DOMContentLoaded', function() {
-
+       
             // SELECT2
             $('#factor_payment').select2({
                 placeholder: 'Pilih Pembayaran...',
@@ -1000,12 +1000,78 @@
         }
 
         function addItem() {
+            const requiredFields = [{
+                    el: receiving_items_id,
+                    name: "Receiving Items ID"
+                },
+                {
+                    el: qty_received,
+                    name: "QTY Diterima"
+                },
+                {
+                    el: batch,
+                    name: "Batch"
+                },
+                {
+                    el: expired_date,
+                    name: "Exp Date"
+                },
+                {
+                    el: itemlocation,
+                    name: "Lokasi"
+                },
+                {
+                    el: etalase,
+                    name: "Etalase"
+                },
+                {
+                    el: factor_payment,
+                    name: "Jenis Bayar"
+                },
+                {
+                    el: factor_number,
+                    name: "Nomor Faktur"
+                },
+                {
+                    el: factor_date,
+                    name: "Tanggal Faktur"
+                },
+                {
+                    el: factor_times,
+                    name: "Waktu Kredit (Hari)"
+                },
+                {
+                    el: factor_due,
+                    name: "Jatuh Tempo"
+                },
+                {
+                    el: factor_ppn,
+                    name: "Jenis PPN"
+                }
+            ];
 
-            // alert(itemlocation.value);
-            // alert(discount.value);
-            // alert(batch.value);
-            // alert(itemlocation.value);
-            // alert(qty_received.value);
+            let isValid = true;
+
+            document.querySelectorAll(".error-msg").forEach(e => e.remove());
+
+            requiredFields.forEach(field => {
+                const input = field.el;
+                if (!input.value || input.value.trim() === "") {
+                    isValid = false;
+
+                    const error = document.createElement("span");
+                    error.classList.add("error-msg");
+                    error.style.color = "red";
+                    error.style.fontSize = "12px";
+                    error.innerText = `${field.name} wajib diisi`;
+
+                    input.parentNode.appendChild(error);
+                }
+            });
+
+            if (!isValid) {
+                return;
+            }
 
             const payload = {
                 receiving_items_id: receiving_items_id.value,
@@ -1029,23 +1095,19 @@
 
             axios.post("{{ route('receiving.addreceivingitem') }}", payload, {
                     headers: {
-                        'X-CSRF-TOKEN': document
-                            .querySelector('meta[name="csrf-token"]')
-                            .content
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
                     }
                 })
                 .then(res => {
                     if (res.data.success) {
                         iziToast.success({
                             title: 'Berhasil',
-                            message: res.message ??
-                                'Item Berhasil di-Update!',
+                            message: res.message ?? 'Item Berhasil di-Update!',
                             position: 'topRight'
                         });
                         orderItemsTable.ajax.reload(null, false);
                         document.getElementById("searchInput").readOnly = true;
                         resetInputs();
-
                     }
                 })
                 .catch(err => {

@@ -13,13 +13,9 @@ return new class extends Migration
      */
     public function up()
     {
-        Schema::create('batches', function (Blueprint $table) {
+        Schema::create('ppn', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('medicine_id')->constrained('medicines')->onDelete('no action');
-            $table->foreignId('pharmacy_id')->constrained('pharmacies')->onDelete('no action');
             $table->string('name');
-            $table->string('expired_date')->nullable();
-            $table->string('stock')->nullable();
             $table->integer('status')->default('0')->nullable();
             $table->timestamps();
         });

@@ -12,6 +12,7 @@ class Batches extends Model
 
     protected $fillable = [
         'medicine_id',
+        'pharmacy_id',
         'name',
         'expired_date',
         'stock',
@@ -19,6 +20,18 @@ class Batches extends Model
     ];
     public function medicines()
     {
-        return $this->belongsTo(Medicines::class, 'medicine_id');
+        return $this->belongsTo(Medicines::class, 'medicine_id', 'id');
+    }
+    public function medicine_transfers()
+    {
+        return $this->hasMany(MedicineTransfers::class, 'batches_id', 'id'); // add foreign key explicitly
+    }
+    public function receivingItems()
+    {
+        return $this->hasMany(ReceivingItems::class, 'batches_id', 'id');
+    }
+    public function pharmacy()
+    {
+        return $this->belongsTo(Pharmacies::class, 'pharmacy_id', 'id');
     }
 }

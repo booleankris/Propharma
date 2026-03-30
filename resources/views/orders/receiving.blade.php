@@ -318,7 +318,7 @@
                             <div class="w-full sm:w-40">
                                 <div class="py-1 text-[13px] font-bold">Tanggal Faktur</div>
                                 <input id="invoice_date" type="date" name="invoice_date"
-                                    value="{{ $transaction->date ? \Carbon\Carbon::createFromFormat('d/m/Y', $transaction->date)->format('Y-m-d') : '' }}"
+                                    value="{{ $transaction->invoice_date ? \Carbon\Carbon::createFromFormat('d/m/Y', $transaction->invoice_date)->format('Y-m-d') : \Carbon\Carbon::now()->format('Y-m-d') }}"
                                     class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
                                     placeholder="Tanggal Faktur">
                             </div>
@@ -431,30 +431,37 @@
 
                                 <div class="w-full sm:w-40">
                                     <div class="py-1 text-[13px] font-bold">Diskon</div>
-                                    <input id="discount" type="text"
+                                    <input id="discount" type="number"
                                         class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
                                         placeholder="Diskon">
                                 </div>
                                 <div class="w-full sm:w-40">
                                     <div class="py-1 text-[13px] font-bold">Ekstra Diskon</div>
-                                    <input id="extra_discount" type="text" required value="0"
+                                    <input id="extra_discount" type="number" required value="0"
                                         class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
                                         placeholder="Extra Diskon">
                                 </div>
+                                <div class="w-[10%]">
+                                    <div class="py-1 text-[13px] font-bold">Exp Date</div>
+                                    <input id="expired_date" type="date" name="expired_date"
+                                        class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
+                                        placeholder="Tanggal Faktur">
+                                </div>
+                                <div class="flex-1 w-[40%] min-w-[200px]">
+                                    <div class="py-1 text-[13px] font-bold">Jumlah</div>
+                                    <input id="total_price" type="text" readonly name="total_price"
+                                        class="w-full rounded-lg border bg-[#eaeaea] border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
+                                        placeholder="Jumlah">
+                                </div>
+                                <div class="w-[20%]">
+                                    <div class="py-1 text-[13px] font-bold">Status Barang</div>
+                                    <input id="status" name="status" type="text"
+                                        class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
+                                        placeholder="Status Barang">
+                                </div>
                                 <div class="flex flex-wrap w-full gap-3">
-                                    <div class="w-[10%]">
-                                        <div class="py-1 text-[13px] font-bold">Exp Date</div>
-                                        <input id="expired_date" type="date" name="expired_date"
-                                            class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
-                                            placeholder="Tanggal Faktur">
-                                    </div>
-                                    <div class="flex-1 w-[40%] min-w-[200px]">
-                                        <div class="py-1 text-[13px] font-bold">Jumlah</div>
-                                        <input id="total_price" type="text" readonly name="total_price"
-                                            class="w-full rounded-lg border bg-[#eaeaea] border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
-                                            placeholder="Jumlah">
-                                    </div>
-                                    <div class="w-[20%]">
+
+                                    <div class="w-[20%] hidden">
                                         <div class="py-1 text-[13px] font-bold">Etalase</div>
                                         <select id="items" name="etalase" required
                                             class="select2 w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px]">
@@ -463,7 +470,7 @@
                                         </select>
                                     </div>
 
-                                    <div class="w-[20%]">
+                                    <div class="w-[20%] hidden">
                                         <div class="py-1 text-[13px] font-bold">Lokasi</div>
                                         <select name="location"
                                             class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px"
@@ -473,12 +480,7 @@
                                         </select>
                                     </div>
 
-                                    <div class="w-[20%]">
-                                        <div class="py-1 text-[13px] font-bold">Status Barang</div>
-                                        <input id="status" name="status" type="text"
-                                            class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
-                                            placeholder="Status Barang">
-                                    </div>
+
                                 </div>
 
 
@@ -624,6 +626,41 @@
         const invoice_ppn = document.getElementById('invoice_ppn');
         const receiving_items_id = document.getElementById('receiving_items_id');
         const receiving_details_id = document.getElementById('receiving_details_id');
+        let date_now = "{{ \Carbon\Carbon::now()->format('Y-m-d') }}";
+
+        const itemPriceInput = document.getElementById('item_price');
+        const discountInput = document.getElementById('discount');
+        const extraDiscountInput = document.getElementById('extra_discount');
+
+        function handleDiscount(inputElement) {
+            const basePrice = parseFloat(total_transaction.value) || 0;
+            let value = parseFloat(inputElement.value.replace(',', '.')) || 0;
+
+            let realDiscount = 0;
+            let percentage = 0;
+
+            if (value > 100) {
+                realDiscount = value;
+                percentage = basePrice > 0 ? Math.round((value / basePrice) * 100) : 0;
+
+            } else {
+                percentage = value;
+                realDiscount = Math.round((basePrice * value) / 100);
+                document.getElementById('total_price').value = data.total
+            }
+
+            console.log(`Input: ${value}, Real Discount: ${realDiscount}, Percentage: ${percentage}%`);
+
+            return {
+                realDiscount,
+                percentage
+            };
+        }
+
+        // Event listeners
+        discountInput.addEventListener('input', () => handleDiscount(discountInput));
+        extraDiscountInput.addEventListener('input', () => handleDiscount(extraDiscountInput));
+
 
         var pack = document.getElementById('pack');
         let orderItemsTable;
@@ -683,8 +720,16 @@
             }
         }
         document.addEventListener('DOMContentLoaded', function() {
+            const factorDateInput = document.getElementById('invoice_date');
+            // if (factorDateInput && !factorDateInput.value) {
+            //     const today = new Date();
+            //     const year = today.getFullYear();
+            //     const month = String(today.getMonth() + 1).padStart(2, '0'); // Months are 0-indexed
+            //     const day = String(today.getDate()).padStart(2, '0');
+            //     console.log(day);
+            //     factorDateInput.value = `${year}-${month}-${day}`;
+            // }
 
-            // SELECT2
             $('#invoice_payment').select2({
                 placeholder: 'Pilih Pembayaran...',
                 allowClear: true,
@@ -870,7 +915,6 @@
 
 
             let creditor = $(this).val();
-
             if (creditor) {
                 axios.get('/searchreceivingdetails', {
                         params: {
@@ -884,9 +928,9 @@
                         $('#invoice_payment')
                             .val(response.data.invoice_payment || '')
                             .trigger('change');
-                        invoice_date.value = response.data.invoice_date || '';
                         invoice_due.value = response.data.invoice_due || '';
                         invoice_ppn.value = response.data.invoice_ppn || '';
+                        invoice_date.value = response.data.invoice_date || datenow;
 
                         // invoice_number.value = response.data.invoice_number || '';
 
@@ -1189,12 +1233,6 @@
 
         function addItem() {
 
-            // alert(itemlocation.value);
-            // alert(discount.value);
-            // alert(batch.value);
-            // alert(itemlocation.value);
-            // alert(qty_received.value);
-
             const payload = {
                 creditor_code: creditor.value,
                 receiving_items_id: receiving_items_id.value,
@@ -1220,32 +1258,27 @@
 
             axios.post("{{ route('receiving.addreceivingitem') }}", payload, {
                     headers: {
-                        'X-CSRF-TOKEN': document
-                            .querySelector('meta[name="csrf-token"]')
-                            .content
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
                     }
                 })
                 .then(res => {
                     if (res.data.success) {
                         iziToast.success({
                             title: 'Berhasil',
-                            message: res.message ??
-                                'Item Berhasil di-Update!',
+                            message: res.message ?? 'Item Berhasil di-Update!',
                             position: 'topRight'
                         });
-                        let item = res.data.summary;
-                        d_price = item.price_item;
-                        d_ppn = item.price_ppn
-                        d_total = item.price_total;
 
-                        $('#d_price').val(formatRupiah(d_price));
-                        $('#d_ppn').val(formatRupiah(d_ppn));
-                        $('#d_total').val(formatRupiah(d_total));
+                        let item = res.data.summary;
+                        $('#d_price').val(formatRupiah(item.price_item));
+                        $('#d_ppn').val(formatRupiah(item.price_ppn));
+                        $('#d_total').val(formatRupiah(item.price_total));
+
                         orderItemsTable.ajax.reload(null, false);
                         document.getElementById("searchInput").readOnly = true;
+
+                        // Reset hanya jika sukses
                         resetInputs();
-
-
                     }
                 })
                 .catch(err => {
@@ -1265,8 +1298,9 @@
                         message: message,
                         position: 'topRight'
                     });
+
+                    // Jangan reset input jika gagal
                 });
-            resetInputs();
         }
 
         function completeOrder() {
@@ -1371,6 +1405,13 @@
             setTimeout(() => $("#invoice_number").focus(), 100);
         });
 
+        $("#items").on("select2:select", () => {
+            setTimeout(() => $("#location").focus(), 100);
+        });
+
+        $("#location").on("select2:select", () => {
+            setTimeout(() => $("#status").focus(), 100);
+        });
         discount.addEventListener('keydown', function(e) {
             if (e.key == 'Enter') {
                 etalase.focus();
@@ -1423,7 +1464,7 @@
         });
         expired_date.addEventListener('keydown', function(e) {
             if (e.key == 'Enter') {
-                etalase.focus();
+                itemstatus.focus();
             }
         });
         etalase.addEventListener('keydown', function(e) {

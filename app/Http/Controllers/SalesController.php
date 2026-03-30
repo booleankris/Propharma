@@ -19,6 +19,8 @@ use App\Models\PaymentParameters;
 use App\Models\Sales;
 use App\Models\TicketPayment;
 use App\Models\TicketTransaction;
+use App\Models\MedicineTransfers;
+
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -30,121 +32,163 @@ use Illuminate\Support\Facades\URL;
 
 class SalesController extends Controller
 {
-    public function index($slug)
+    public function index($type, $id = null)
     {
+        $pharmacy_id = Auth::user()->pharmacy_id;
+        $user_id     = Auth::user()->id;
 
-        if ($slug == "upds") {
-            $parameters = PaymentParameters::where('id', 1)->first();
-            $parameterHV = $parameters->otc;
-            $parameterUP = $parameters->pdu;
-            $parameterRT = $parameters->receipt;
-            $ChangeFakturParameters = $parameters->pdu;
-            $ChangeFakturRounding = $parameters->rounding;
-            $rounding = $parameters->rounding;
-            $parameters = $parameters->pdu;
-            $type = "UPDS";
-            // Clear Cart If Different Payment Type
-            $transaction = MedicineTransactions::where('pharmacy_id', Auth()->user()->pharmacy_id)->where('status', '0')->first();
-            if ($transaction) {
-                if ($transaction->transaction_type != "UPDS") {
-                    $transaction->update([
-                        'transaction_type' => $type
-                    ]);
-                    $clearTransaction = MedicineCart::where('transaction_id', $transaction->id)->delete();
-                }
-            }
-        } else if ($slug == "hv") {
-            $parameters = PaymentParameters::where('id', 1)->first();
-            $parameterHV = $parameters->otc;
-            $parameterUP = $parameters->pdu;
-            $parameterRT = $parameters->receipt;
-            $ChangeFakturParameters = $parameters->pdu;
-            $ChangeFakturRounding = $parameters->rounding;
-            $rounding = $parameters->rounding;
-            $parameters = $parameters->otc;
-            $type = "HV/OTC";
+        // ── 1. Resolve display-type → DB-type + parameter key ──────────────────
+        $typeMap = [
+            'resep'  => ['db' => 'RESEP TUNAI', 'param_key' => 'receipt', 'code' => '1'],
+            'kredit' => ['db' => 'KREDIT',      'param_key' => null,      'code' => '4'],
+            'upds'   => ['db' => 'UPDS',        'param_key' => 'pdu',     'code' => '2'],
+            'hv'     => ['db' => 'HV/OTC',      'param_key' => 'otc',     'code' => '3'],
+        ];
 
-            // Clear Cart If Different Payment Type
-            $transaction = MedicineTransactions::where('pharmacy_id', Auth()->user()->pharmacy_id)->where('status', '0')->first();
-            if ($transaction) {
-                if ($transaction->transaction_type != $type) {
-                    $transaction->update([
-                        'transaction_type' => $type
-                    ]);
-                    $clearTransaction = MedicineCart::where('transaction_id', $transaction->id)->delete();
-                }
-            }
-        } else if ($slug == "resep") {
-            $parameters = PaymentParameters::where('id', 1)->first();
-            $parameterHV = $parameters->otc;
-            $parameterUP = $parameters->pdu;
-            $parameterRT = $parameters->receipt;
-            $ChangeFakturParameters = $parameters->pdu;
-            $ChangeFakturRounding = $parameters->rounding;
-            $rounding = $parameters->rounding;
-            $parameters = $parameters->receipt;
-            $type = "RESEP TUNAI";
+        abort_if(!array_key_exists($type, $typeMap), 404, 'Invalid transaction type.');
 
+        $meta      = $typeMap[$type];
+        $dbType    = $meta['db'];
+        $paramKey  = $meta['param_key'];
 
-            // Clear Cart If Different Payment Type
-            $transaction = MedicineTransactions::where('pharmacy_id', Auth()->user()->pharmacy_id)->where('status', '0')->first();
-            if ($transaction) {
-                if ($transaction->transaction_type != $type) {
-                    $transaction->update([
-                        'transaction_type' => $type
-                    ]);
-                    $clearTransaction = MedicineCart::where('transaction_id', $transaction->id)->delete();
-                }
+        // ── 2. Load payment parameters once ─────────────────────────────────────
+        $paymentParams        = PaymentParameters::findOrFail(1);
+        $parameterHV          = $paymentParams->otc;
+        $parameterUP          = $paymentParams->pdu;
+        $parameterRT          = $paymentParams->receipt;
+        $ChangeFakturParameters = $paymentParams->pdu;
+        $ChangeFakturRounding = $paymentParams->rounding;
+        $rounding             = $dbType === 'KREDIT' ? '0' : $paymentParams->rounding;
+        $parameters           = $dbType === 'KREDIT' ? '0' : $paymentParams->{$paramKey};
+
+        // ── 3. Resolve which transaction to use ──────────────────────────────────
+        if ($id !== null) {
+            // Tab already has a specific transaction — load it, guard status
+            $transaction = MedicineTransactions::where('pharmacy_id', $pharmacy_id)
+                ->where('id', $id)
+                ->where('status', 0)          // ← FIX: block finished transactions
+                ->first();
+
+            if (!$transaction) {
+                // Transaction finished or doesn't belong to this pharmacy
+                // Fall back to opening a fresh transaction of the requested type
+                return redirect()->route('transaction', ['type' => $type])
+                    ->with('message', 'Transaksi sudah selesai atau tidak ditemukan. Transaksi baru dibuka.');
             }
-        } else if ($slug == "kredit") {
-            $parameters = PaymentParameters::where('id', 1)->first();
-            $ChangeFakturParameters = $parameters->pdu;
-            $ChangeFakturRounding = $parameters->rounding;
-            $parameterHV = $parameters->otc;
-            $parameterUP = $parameters->pdu;
-            $parameterRT = $parameters->receipt;
-            $rounding = "0";
-            $parameters = "0";
-            $type = "KREDIT";
-            // Clear Cart If Different Payment Type
-            $transaction = MedicineTransactions::where('pharmacy_id', Auth()->user()->pharmacy_id)->where('status', '0')->first();
+
+            $trx_id = $transaction->id;
+        } else {
+            // No ID supplied — look for ANY pending transaction for this pharmacy
+            $transaction = MedicineTransactions::where('pharmacy_id', $pharmacy_id)
+                ->where('status', 0)
+                ->latest()
+                ->first();
+
             if ($transaction) {
-                if ($transaction->transaction_type != $type) {
-                    $transaction->update([
-                        'transaction_type' => $type
-                    ]);
-                    $clearTransaction = MedicineCart::where('transaction_id', $transaction->id)->delete();
-                }
+                // Resume existing pending transaction; redirect WITH id so each
+                // tab gets a stable URL it can bookmark / re-open
+                return redirect()->route('transaction', [
+                    'type' => $this->dbTypeToRouteType($transaction->transaction_type),
+                    'id'   => $transaction->id,
+                ]);
             }
+
+            // No pending transaction at all — create a new one
+            try {
+                DB::beginTransaction();
+
+                $transaction = MedicineTransactions::create([
+                    'pharmacy_id'      => $pharmacy_id,
+                    'debtor_id'        => null,
+                    'transaction_type' => $dbType,
+                    'transaction_code' => $this->generateTransactionCode($meta['code']),
+                    'subtotal'         => null,
+                    'discount'         => null,
+                    'status'           => 0,
+                ]);
+
+                DB::commit();
+            } catch (\Exception $e) {
+                DB::rollBack();
+                return redirect()->back()->with('message', 'Gagal membuat transaksi: ' . $e->getMessage());
+            }
+
+            // Redirect WITH the new id so the URL is stable for this tab
+            return redirect()->route('transaction', [
+                'type' => $type,
+                'id'   => $transaction->id,
+            ]);
         }
 
+        // ── 4. Handle type switch on an existing transaction ────────────────────
+        // If the user navigates to a different type on the same transaction,
+        // update the type and clear the cart (prices differ per type).
+        if ($transaction->transaction_type !== $dbType) {
+            $transaction->update(['transaction_type' => $dbType]);
+            MedicineCart::where('transaction_id', $transaction->id)->delete();
+        }
 
-        // Checking Transaction Status
-        $transaction = MedicineTransactions::where('pharmacy_id', Auth()->user()->pharmacy_id)->where('status', '0')->first();
+        $trx_id = $transaction->id;
 
-        // Total Beli
-        $totaltransaction =  MedicineCart::where('user_id', Auth()->user()->id)
-            ->where('status', '0')->sum('final_price');
+        // ── 5. Collect view data ─────────────────────────────────────────────────
+        $totaltransaction = MedicineCart::where('user_id', $user_id)
+            ->where('transaction_id', $trx_id)
+            ->sum('final_price');
 
-        // Jumlah
-        $rawtotal =  MedicineCart::where('user_id', Auth()->user()->id)
-            ->where('status', '0')
-            ->selectRaw('SUM(raw_total) as raw_total, SUM(embalase) as embalase')->first();
+        $rawtotal = MedicineCart::where('user_id', $user_id)
+            ->where('transaction_id', $trx_id)
+            ->selectRaw('SUM(raw_total) as raw_total, SUM(embalase) as embalase')
+            ->first();
 
-
-
-        $existingpackage = MedicineCart::where('user_id', auth()->id())
-            ->where('status', '0')
+        $existingpackage = MedicineCart::where('user_id', $user_id)
+            ->where('transaction_id', $trx_id)
             ->where('recipe_status', '0')
             ->whereNotNull('package')
             ->first();
-        $discount_total =  MedicineCart::where('user_id', Auth()->user()->id)->where('status', '0')->sum('discount');
-        $check_transaction = MedicineTransactions::where('pharmacy_id', Auth()->user()->pharmacy_id)->where('status', '0')->count();
 
-        // Get Item Inside Cart based on user id and cart item status
-        $itemInCart = MedicineCart::with('medicine')->where('status', 0)->where('user_id', Auth()->user()->id)->get();
+        $discount_total = MedicineCart::where('user_id', $user_id)
+            ->where('status', '0')
+            ->sum('discount');
 
-        return view('kasir.transaction', compact('check_transaction', 'transaction', 'existingpackage', 'rawtotal', 'parameters', 'rounding', 'itemInCart', 'totaltransaction', 'discount_total', 'ChangeFakturParameters', 'parameterRT', 'parameterHV', 'parameterUP', 'ChangeFakturRounding'));
+        $check_transaction = MedicineTransactions::where('pharmacy_id', $pharmacy_id)
+            ->where('status', 0)
+            ->count();
+
+        $itemInCart = MedicineCart::with('medicine')
+            ->where('transaction_id', $trx_id)
+            ->where('user_id', $user_id)
+            ->get();
+
+        return view('kasir.transaction', compact(
+            'check_transaction',
+            'type',
+            'trx_id',
+            'transaction',
+            'existingpackage',
+            'rawtotal',
+            'parameters',
+            'rounding',
+            'itemInCart',
+            'totaltransaction',
+            'discount_total',
+            'ChangeFakturParameters',
+            'parameterRT',
+            'parameterHV',
+            'parameterUP',
+            'ChangeFakturRounding'
+        ));
+    }
+
+    // ── Helper: map DB type string back to route slug ───────────────────────────
+    private function dbTypeToRouteType(string $dbType): string
+    {
+        return match ($dbType) {
+            'RESEP TUNAI' => 'resep',
+            'KREDIT'      => 'kredit',
+            'UPDS'        => 'upds',
+            'HV/OTC'      => 'hv',
+            default       => 'resep',
+        };
     }
     function generateItemsLogCode()
     {
@@ -198,7 +242,11 @@ class SalesController extends Controller
         $q = trim($request->get('q', ''));
 
         $items = Medicines::query()
-            ->with('etalases', 'locations')
+            ->with([
+                'etalases',
+                'locations',
+                'batches.medicine_transfers'  // eager load nested
+            ])
             ->when($q !== '', function ($builder) use ($q) {
                 $builder->where(function ($x) use ($q) {
                     $x->where('code', 'like', '%' . $q . '%')
@@ -206,10 +254,34 @@ class SalesController extends Controller
                         ->orWhere('barcode', 'like', '%' . $q . '%');
                 });
             })
-            ->select(['id', 'code', 'barcode', 'name', 'het_price', 'location', 'etalase', 'net_price', 'stock', 'unit', 'packaging', 'content', 'dosage'])
+            ->select([
+                'id',
+                'code',
+                'barcode',
+                'raw_price',
+                'name',
+                'het_price',
+                'location',
+                'etalase',
+                'net_price',
+                'stock',
+                'unit',
+                'packaging',
+                'content',
+                'dosage'
+            ])
             ->orderByRaw("CASE WHEN code LIKE ? THEN 0 ELSE 1 END, code ASC", [$q . '%'])
-            ->limit(10)
+            ->limit(40)
             ->get();
+
+        $items->transform(function ($medicine) {
+            $medicine->storage_stock = $medicine->batches->sum('stock');
+            $medicine->counter_stock = $medicine->batches
+                ->flatMap->medicine_transfers
+                ->where('status', 1)
+                ->sum('stock');
+            return $medicine;
+        });
 
         return response()->json($items);
     }
@@ -231,6 +303,31 @@ class SalesController extends Controller
             ->get();
 
         return response()->json($items);
+    }
+    public function generateTransactionCode($code)
+    {
+        $pharmacyId = auth()->user()->pharmacy_id;
+
+        $year   = now()->format('y');
+        $month  = now()->format('m');
+        $prefix = $year . $month . strtoupper($code);
+
+        $last = MedicineTransactions::where('pharmacy_id', Auth()->user()->pharmacy_id)
+            ->where('transaction_code', 'like', $prefix . '%')
+            ->orderBy('transaction_code', 'desc')
+            ->first();
+
+        if ($last) {
+            $lastNumber = intval(substr($last->transaction_code, -4));
+            $nextNumber = $lastNumber + 1;
+        } else {
+            $nextNumber = 0;
+        }
+
+        $serial = str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+
+        $transactionCode = $prefix . $serial;
+        return $transactionCode;
     }
 
     public function searchPatients(Request $request)
@@ -268,21 +365,18 @@ class SalesController extends Controller
 
     public function createTransaction(Request $request)
     {
-        $check_transaction = MedicineTransactions::where('pharmacy_id', Auth()->user()->pharmacy_id)
-            ->where('status', '0')
-            ->count();
 
         if ($request->get('type') == 'resep') {
-            $type = "RESEP TUNAI";
+            $typenew = "RESEP TUNAI";
             $code = "1";
         } else if ($request->get('type') == 'kredit') {
-            $type = "RESEP KREDIT";
+            $typenew = "RESEP KREDIT";
             $code = "4";
         } else if ($request->get('type') == 'upds') {
-            $type = "UPDS";
+            $typenew = "UPDS";
             $code = "2";
         } else if ($request->get('type') == 'hv') {
-            $type = "HV/OTC";
+            $typenew = "HV/OTC";
             $code = "3";
         }
 
@@ -309,26 +403,27 @@ class SalesController extends Controller
         $transactionCode = $prefix . $serial;
         // =====================
 
-        if ($check_transaction == 0) {
-            try {
-                DB::beginTransaction();
+        try {
+            DB::beginTransaction();
 
-                $transaction = MedicineTransactions::create([
-                    'pharmacy_id'       => Auth()->user()->pharmacy_id,
-                    'debtor_id'         => NULL,
-                    'transaction_type'  => $type,
-                    'transaction_code'  => $transactionCode,
-                    'subtotal'          => NULL,
-                    'discount'          => NULL,
-                    'status'            => 0,
-                ]);
+            $transaction = MedicineTransactions::create([
+                'pharmacy_id'       => Auth()->user()->pharmacy_id,
+                'debtor_id'         => NULL,
+                'transaction_type'  => $typenew,
+                'transaction_code'  => $transactionCode,
+                'subtotal'          => NULL,
+                'discount'          => NULL,
+                'status'            => 0,
+            ]);
 
-                DB::commit();
-                return redirect()->back()->with('message', "Berhasil Menyimpan! ");
-            } catch (\Exception $e) {
-                DB::rollBack();
-                return redirect()->back()->with('message', "Gagal Menyimpan! " . $e->getMessage());
-            }
+            DB::commit();
+            return redirect()->route('transaction', [
+                'type' => $request->get('type'),
+                'id' => $transaction->id
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return redirect()->back()->with('message', "Gagal Menyimpan! " . $e->getMessage());
         }
     }
     public function deleteTransaction(Request $request)
@@ -346,7 +441,13 @@ class SalesController extends Controller
             } else if ($request->get('trxtype') == "KREDIT") {
                 $url = 'kredit';
             }
-            return redirect()->route('transaction', $url);
+            $transaction = MedicineTransactions::where('pharmacy_id', Auth()->user()->pharmacy_id)->where('status', 0)->latest()->first();
+
+            if ($transaction) {
+                return redirect()->route('home');
+            } else {
+                return redirect()->route('home');
+            }
         }
     }
 
@@ -579,7 +680,7 @@ class SalesController extends Controller
     public function checkout(Request $request)
     {
         $validated = $request->validate([
-            'transaction_id'   => 'required|integer|exists:medicine_transactions,id',
+            'transaction_id'   => 'required|integer|',
             'paid'             => 'required|numeric|min:0',
             'discounsubtotal' => 'nullable|numeric|min:0',
             'totaltransaction' => 'required|numeric|min:0',
@@ -587,6 +688,10 @@ class SalesController extends Controller
             'patient_id'       => 'nullable|integer|exists:patients,id',
             'doctor_id'        => 'nullable|integer|exists:doctors,id',
             'debtor_id'        => 'nullable|integer|exists:debtors,id',
+            'paymentType'      => 'nullable|string',
+            'user_id'          => 'nullable|integer|exists:users,id',
+            'shift_logs_id'    => 'nullable|integer|exists:shift_logs,id',
+
         ]);
 
         DB::beginTransaction();
@@ -601,16 +706,19 @@ class SalesController extends Controller
                     'print_url' => route('sales.print', $transaction->id),
                 ]);
             }
-
             $transaction->update([
-                'status'    => 1,
-                'paid'      => $validated['paid'],
-                'discount'  => $validated['discounsubtotal'],
-                'subtotal'  => $validated['totaltransaction'],
-                'changes'   => $validated['changes'],
-                'patient_id' => $validated['patient_id'],
-                'doctor_id'  => $validated['doctor_id'],
-                'debtor_id'  => $validated['debtor_id'],
+                'status'           => 1,
+                'paid'             => $validated['paid'],
+                'discount'         => $validated['discounsubtotal'],
+                'subtotal'         => $validated['totaltransaction'],
+                'changes'          => $validated['changes'],
+                'patient_id'       => $validated['patient_id'],
+                'doctor_id'        => $validated['doctor_id'],
+                'debtor_id'        => $validated['debtor_id'],
+                'payment_method'   => $validated['paymentType'],
+                'user_id'          => $validated['user_id'],
+                'shift_logs_id'    => $validated['shift_logs_id'],
+
             ]);
 
             MedicineCart::where('transaction_id', $validated['transaction_id'])
@@ -627,33 +735,49 @@ class SalesController extends Controller
                 $qty_before  = $medicine->stock;
                 $medicine_id = $medicine->id;
                 $qty_bought  = $cart->quantity;
-
-                // Verify before touching the batch
-                if ($medicine->stock < $qty_bought) {
-                    throw new \Exception("Stok tidak mencukupi untuk obat: {$medicine->name}.");
-                }
-
+                \Log::info('Sale debug', [
+                    'medicine_id' => $medicine_id,
+                    'medicine_name' => $medicine->name,
+                    'qty_bought' => $qty_bought,
+                ]);
                 while ($qty_bought > 0) {
-              
-                    $batches = Batches::where('medicine_id', $medicine_id)->where('stock', '>', 0)
-                        ->orderBy('expired_date', 'asc')
-                        ->lockForUpdate() 
+                    $transfer = MedicineTransfers::join('batches', 'medicine_transfers.batches_id', '=', 'batches.id')
+                        ->where('batches.medicine_id', $medicine_id)
+                        ->where('medicine_transfers.stock', '>', 0)
+                        ->orderBy('batches.expired_date', 'asc')
+                        ->lockForUpdate()
+                        ->select('medicine_transfers.*')
                         ->first();
 
-                    if (!$batches) {
-                        throw new \Exception("Batch stok tidak ditemukan untuk obat: {$medicine->name}.");
+                    if (!$transfer) {
+                        $transfer = MedicineTransfers::join('batches', 'medicine_transfers.batches_id', '=', 'batches.id')
+                            ->where('batches.medicine_id', $medicine_id)
+                            ->orderBy('batches.expired_date', 'desc')
+                            ->lockForUpdate()
+                            ->select('medicine_transfers.*')
+                            ->first();
+
+                        if (!$transfer) {
+                            throw new \Exception("Stok counter tidak ditemukan untuk obat: {$medicine->name}.");
+                        }
+
+                        $transfer->stock -= $qty_bought;
+                        $transfer->save();
+                        $qty_bought = 0;
+                        break;
                     }
 
-                    if ($batches->stock >= $qty_bought) {
-                        $batches->stock -= $qty_bought;
-                        $batches->save();
+                    if ($transfer->stock >= $qty_bought) {
+                        $transfer->stock -= $qty_bought;
+                        $transfer->save();
                         $qty_bought = 0;
                     } else {
-                        $qty_bought -= $batches->stock;
-                        $batches->stock = 0;
-                        $batches->save();
+                        $qty_bought -= $transfer->stock;
+                        $transfer->stock = 0;
+                        $transfer->save();
                     }
                 }
+
 
                 // Reduce medicine total stock
                 $medicine->stock -= $cart->quantity;
@@ -672,7 +796,7 @@ class SalesController extends Controller
                     'total'            => $cart->final_price,
                     'date'             => $now,
                     'status'           => 1,
-                    'batches_id'       => $batches->id,
+                    'batches_id'       => $transfer->id,
 
                 ]);
             }

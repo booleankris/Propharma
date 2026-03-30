@@ -192,7 +192,7 @@
                             </div>
                         </div>
 
-                        <input type="text" id="searchInput"
+                        <input type="text" autofocus id="searchInput"
                             class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
                             placeholder="Cari Obat..." oninput="searchMedicineData(this.value)" autocomplete="off">
                         <div id="searchDropdown" class="dropdown-table" style="display:none;">

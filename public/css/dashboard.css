@@ -402,3 +402,127 @@
     background: #f43f5e;
     color: white;
 }
+
+/* Transaction Type On Sales (Transaction) */
+.transaction-item {
+    color: #fff;
+}
+
+.transaction-item:hover .svg-item {
+    color: #1e7221 !important;
+}
+
+.transaction-item:hover {
+    background: #fff;
+    color: #1e7221 !important;
+}
+
+.payment-option input[type="radio"]:checked+.payment-card.qris-card {
+    border-color: #8b5cf6;
+    background: #f5f3ff;
+}
+
+.payment-option input[type="radio"]:checked+.payment-card.qris-card svg,
+.payment-option input[type="radio"]:checked+.payment-card.debit-card svg,
+.payment-option input[type="radio"]:checked+.payment-card.cash-card svg
+{
+    color: #fff;
+}
+
+.payment-option input[type="radio"]:checked+.payment-card.qris-card .payment-icon {
+    background: #8b5cf6;
+}
+
+.payment-option input[type="radio"]:checked+.payment-card.qris-card .payment-label {
+    color: #6d28d9;
+    font-weight: 600;
+}
+
+.payment-option input[type="radio"]:checked+.payment-card.debit-card {
+    border-color: #3b82f6;
+    background: #eff6ff;
+}
+
+
+
+.payment-option input[type="radio"]:checked+.payment-card.debit-card .payment-icon {
+    background: #3b82f6;
+}
+
+.payment-option input[type="radio"]:checked+.payment-card.debit-card .payment-label {
+    color: #1d4ed8;
+    font-weight: 600;
+}
+
+.payment-option input[type="radio"]:checked+.payment-card.cash-card {
+    border-color: #10b981;
+    background: #ecfdf5;
+}
+
+.payment-option input[type="radio"]:checked+.payment-card.cash-card .payment-icon {
+    background: #10b981;
+}
+
+.payment-option input[type="radio"]:checked+.payment-card.cash-card .payment-label {
+    color: #047857;
+    font-weight: 600;
+}
+
+.payment-card {
+    transition: all 0.15s ease;
+}
+
+.payment-card:active {
+    transform: scale(0.97);
+}
+
+.payment-card.qris-card {
+    border-color: #ede9fe;
+    background: #faf9ff;
+}
+
+.payment-card.debit-card {
+    border-color: #dbeafe;
+    background: #f8fbff;
+}
+
+.payment-card.cash-card {
+    border-color: #d1fae5;
+    background: #f6fffe;
+}
+
+.payment-card.qris-card .payment-icon {
+    background: #ede9fe;
+}
+
+.payment-card.debit-card .payment-icon {
+    background: #dbeafe;
+}
+
+.payment-card.cash-card .payment-icon {
+    background: #d1fae5;
+}
+
+.payment-card.qris-card .payment-icon svg {
+    color: #8b5cf6;
+}
+
+.payment-card.debit-card .payment-icon svg {
+    color: #3b82f6;
+}
+
+.payment-card.cash-card .payment-icon svg {
+    color: #10b981;
+}
+
+.payment-card.qris-card .payment-label {
+    color: #7c3aed;
+}
+
+.payment-card.debit-card .payment-label {
+    color: #2563eb;
+}
+
+.payment-card.cash-card .payment-label {
+    color: #059669;
+}

@@ -133,6 +133,20 @@
         .text-end {
             text-align: right !important;
         }
+
+        /* Focus ring for enter-nav inputs */
+        .nav-input:focus {
+            outline: none;
+            ring: 2px solid #3b82f6;
+            border-color: #3b82f6 !important;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15) !important;
+        }
+
+        /* Submit button loading state */
+        #submitBtn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
     </style>
 @endsection
 
@@ -154,7 +168,7 @@
                         </div>
                         <div>
                             <label class="block text-[12px] font-medium text-gray-500 mb-1">Nomor retur</label>
-                            <input type="text" value="{{ $retur_code }}" readonly
+                            <input type="text" id="retur_code_display" value="{{ $retur_code }}" readonly
                                 class="w-full rounded-lg border border-gray-200 bg-gray-50 text-gray-500 px-3 py-2 text-[13px] focus:outline-none">
                         </div>
                     </div>
@@ -168,10 +182,8 @@
                                 <circle cx="6.5" cy="6.5" r="4.5" />
                                 <line x1="10.5" y1="10.5" x2="14" y2="14" />
                             </svg>
-                            <input type="text" id="searchInput"
-                                placeholder="Cari kode / nama pelanggan..."
-                                oninput="searchSalesData(this.value)"
-                                autocomplete="off"
+                            <input type="text" id="searchInput" placeholder="Cari kode / nama pelanggan..."
+                                oninput="searchSalesData(this.value)" autocomplete="off"
                                 class="w-full rounded-lg border border-gray-200 bg-white pl-9 pr-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400">
 
                             {{-- Dropdown --}}
@@ -200,95 +212,92 @@
                     {{-- Detail Obat --}}
                     <p class="text-[11px] font-medium text-gray-400 uppercase tracking-widest mb-3">Detail Obat</p>
 
-                    <form method="POST" action="{{ route('returdata.returItem') }}">
-                        @csrf
-                        <input id="medicine_id"    type="hidden" name="medicine_id">
-                        <input id="cart_id"        type="hidden" name="cart_id">
-                        <input id="transaction_id" type="hidden" name="transaction_id">
-                        <input id="old_qty"        type="hidden" name="old_qty">
+                    {{-- Hidden fields --}}
+                    <input id="medicine_id" type="hidden">
+                    <input id="cart_id" type="hidden">
+                    <input id="transaction_id" type="hidden">
+                    <input id="old_qty" type="hidden">
 
-                        <div class="grid grid-cols-2 gap-3 mb-3">
-                            <div>
-                                <label class="block text-[12px] font-medium text-gray-500 mb-1">Kode obat</label>
-                                <input id="medicine_code" name="medicine_code" type="text" readonly placeholder="OTC"
-                                    class="w-full rounded-lg border border-gray-200 bg-gray-50 text-gray-500 px-3 py-2 text-[13px] focus:outline-none">
-                            </div>
-                            <div>
-                                <label class="block text-[12px] font-medium text-gray-500 mb-1">Satuan</label>
-                                <input id="unit" type="text" readonly placeholder="—"
-                                    class="w-full rounded-lg border border-gray-200 bg-gray-50 text-gray-500 px-3 py-2 text-[13px] focus:outline-none">
-                            </div>
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="block text-[12px] font-medium text-gray-500 mb-1">Nama obat</label>
-                            <input id="medicine_name" type="text" readonly placeholder="—"
+                    <div class="grid grid-cols-2 gap-3 mb-3">
+                        <div>
+                            <label class="block text-[12px] font-medium text-gray-500 mb-1">Kode obat</label>
+                            <input id="medicine_code" type="text" readonly placeholder="OTC"
                                 class="w-full rounded-lg border border-gray-200 bg-gray-50 text-gray-500 px-3 py-2 text-[13px] focus:outline-none">
                         </div>
-
-                        <div class="mb-3">
-                            <label class="block text-[12px] font-medium text-gray-500 mb-1">Harga satuan</label>
-                            <input id="item_price" type="text" readonly placeholder="Rp 0"
+                        <div>
+                            <label class="block text-[12px] font-medium text-gray-500 mb-1">Satuan</label>
+                            <input id="unit" type="text" readonly placeholder="—"
                                 class="w-full rounded-lg border border-gray-200 bg-gray-50 text-gray-500 px-3 py-2 text-[13px] focus:outline-none">
                         </div>
+                    </div>
 
-                        <hr class="border-gray-100 my-5">
+                    <div class="mb-3">
+                        <label class="block text-[12px] font-medium text-gray-500 mb-1">Nama obat</label>
+                        <input id="medicine_name" type="text" readonly placeholder="—"
+                            class="w-full rounded-lg border border-gray-200 bg-gray-50 text-gray-500 px-3 py-2 text-[13px] focus:outline-none">
+                    </div>
 
-                        {{-- Rincian Retur --}}
-                        <p class="text-[11px] font-medium text-gray-400 uppercase tracking-widest mb-3">Rincian Retur</p>
+                    <div class="mb-3">
+                        <label class="block text-[12px] font-medium text-gray-500 mb-1">Harga satuan</label>
+                        <input id="item_price" type="text" readonly placeholder="Rp 0"
+                            class="w-full rounded-lg border border-gray-200 bg-gray-50 text-gray-500 px-3 py-2 text-[13px] focus:outline-none">
+                    </div>
 
-                        <div class="grid grid-cols-3 gap-3 mb-3">
-                            <div>
-                                <label class="block text-[12px] font-medium text-gray-500 mb-1">Qty retur</label>
-                                <input id="qty" type="number" name="qty_retur" placeholder="0"
-                                    oninput="calculateReturTotal()"
-                                    class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400">
-                            </div>
-                            <div>
-                                <label class="block text-[12px] font-medium text-gray-500 mb-1">Harga resep</label>
-                                <input id="price" type="text" readonly placeholder="Rp 0"
-                                    class="w-full rounded-lg border border-gray-200 bg-gray-50 text-gray-500 px-3 py-2 text-[13px] focus:outline-none">
-                            </div>
-                            <div>
-                                <label class="block text-[12px] font-medium text-gray-500 mb-1">Jumlah retur</label>
-                                <input id="total_retur" type="text" name="total_retur" readonly placeholder="Rp 0"
-                                    class="w-full rounded-lg border border-gray-200 bg-gray-50 text-gray-500 px-3 py-2 text-[13px] focus:outline-none">
-                            </div>
+                    <hr class="border-gray-100 my-5">
+
+                    {{-- Rincian Retur --}}
+                    <p class="text-[11px] font-medium text-gray-400 uppercase tracking-widest mb-3">Rincian Retur</p>
+
+                    <div class="grid grid-cols-3 gap-3 mb-3">
+                        <div>
+                            <label class="block text-[12px] font-medium text-gray-500 mb-1">Qty retur</label>
+                            {{-- Change data-nav-enter on qty from "batch" to "batch_select" --}}
+                            <input id="qty" type="number" placeholder="0" data-nav-enter="batch_select"
+                                oninput="calculateReturTotal()"
+                                class="nav-input w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400">
                         </div>
-
-                        <div class="grid grid-cols-2 gap-3 mb-5">
-                            <div>
-                                <label class="block text-[12px] font-medium text-gray-500 mb-1">Batch</label>
-                                <input id="batch" name="batch" type="text" placeholder="No. batch"
-                                    class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400">
-                            </div>
-                            <div>
-                                <label class="block text-[12px] font-medium text-gray-500 mb-1">Exp date</label>
-                                <input id="expired_date" type="date" name="expired_date"
-                                    class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400">
-                            </div>
+                        <div>
+                            <label class="block text-[12px] font-medium text-gray-500 mb-1">Harga resep</label>
+                            <input id="price" type="text" readonly placeholder="Rp 0"
+                                class="w-full rounded-lg border border-gray-200 bg-gray-50 text-gray-500 px-3 py-2 text-[13px] focus:outline-none">
                         </div>
-
-                        <div class="flex gap-2">
-                            <button type="submit"
-                                class="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#2196F3] hover:bg-[#1976D2] text-white text-[13px] font-medium transition-colors duration-150">
-                                <svg class="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor"
-                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <polyline points="2 9 6 13 14 4" />
-                                </svg>
-                                Simpan
-                            </button>
-                            <button type="button" id="back"
-                                class="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#e95050] hover:bg-[#d43e3e] text-white text-[13px] font-medium transition-colors duration-150">
-                                <svg class="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor"
-                                    stroke-width="2" stroke-linecap="round">
-                                    <line x1="4" y1="4" x2="12" y2="12" />
-                                    <line x1="12" y1="4" x2="4" y2="12" />
-                                </svg>
-                                Batal
-                            </button>
+                        <div>
+                            <label class="block text-[12px] font-medium text-gray-500 mb-1">Jumlah retur</label>
+                            <input id="total_retur" type="text" readonly placeholder="Rp 0"
+                                class="w-full rounded-lg border border-gray-200 bg-gray-50 text-gray-500 px-3 py-2 text-[13px] focus:outline-none">
                         </div>
-                    </form>
+                    </div>
+
+                    <div class="mb-5">
+                        <label class="block text-[12px] font-medium text-gray-500 mb-1">Batch & Expired Date</label>
+                        <select id="batch_select" data-nav-enter="submit"
+                            class="nav-input w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400">
+                            <option value="">— Pilih batch —</option>
+                        </select>
+                        <input id="batch" type="hidden">
+                        <input id="expired_date" type="hidden">
+                        <input id="transfer_id" type="hidden">
+                    </div>
+
+                    <div class="flex gap-2">
+                        <button type="button" id="submitBtn" onclick="submitRetur()"
+                            class="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#2196F3] hover:bg-[#1976D2] text-white text-[13px] font-medium transition-colors duration-150">
+                            <svg class="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="2 9 6 13 14 4" />
+                            </svg>
+                            Simpan
+                        </button>
+                        <button type="button" id="back"
+                            class="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#e95050] hover:bg-[#d43e3e] text-white text-[13px] font-medium transition-colors duration-150">
+                            <svg class="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round">
+                                <line x1="4" y1="4" x2="12" y2="12" />
+                                <line x1="12" y1="4" x2="4" y2="12" />
+                            </svg>
+                            Batal
+                        </button>
+                    </div>
                 </div>
 
                 {{-- RIGHT: Item Table --}}
@@ -296,7 +305,8 @@
                     <div class="flex items-center justify-between mb-4">
                         <p class="text-[11px] font-medium text-gray-400 uppercase tracking-widest">Item retur</p>
                         <span id="itemCount"
-                            class="text-[11px] font-medium bg-blue-50 text-blue-700 px-2.5 py-0.5 rounded-full">0 item</span>
+                            class="text-[11px] font-medium bg-blue-50 text-blue-700 px-2.5 py-0.5 rounded-full">0
+                            item</span>
                     </div>
                     <table id="medicineTable" class="w-full text-[13px] border-collapse">
                         <thead>
@@ -353,7 +363,6 @@
         // ─── Fetch ────────────────────────────────────────────────────────────────────
         function fetchData() {
             if (loading || !hasMore) return;
-
             loading = true;
 
             fetch(`{{ route('returdata.returdata') }}?search=${keyword}&page=${page}`)
@@ -362,7 +371,8 @@
                     const tbody = document.getElementById('searchResults');
 
                     if (page === 1 && res.data.length === 0) {
-                        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:16px; color:#9ca3af;">Tidak ada data ditemukan</td></tr>`;
+                        tbody.innerHTML =
+                            `<tr><td colspan="4" style="text-align:center; padding:16px; color:#9ca3af;">Tidak ada data ditemukan</td></tr>`;
                         hasMore = false;
                         showDropdown();
                         return;
@@ -383,7 +393,9 @@
                     page++;
                     showDropdown();
                 })
-                .finally(() => { loading = false; });
+                .finally(() => {
+                    loading = false;
+                });
         }
 
         // ─── Dropdown helpers ─────────────────────────────────────────────────────────
@@ -406,7 +418,9 @@
             rows.forEach(r => r.classList.remove('active'));
             if (activeIndex >= 0) {
                 rows[activeIndex].classList.add('active');
-                rows[activeIndex].scrollIntoView({ block: 'nearest' });
+                rows[activeIndex].scrollIntoView({
+                    block: 'nearest'
+                });
             }
         }
 
@@ -420,20 +434,174 @@
 
         // ─── Calculate retur total ────────────────────────────────────────────────────
         function calculateReturTotal() {
-            const oldQty    = parseFloat(document.getElementById('old_qty').value) || 0;
-            const returQty  = parseFloat(document.getElementById('qty').value) || 0;
+            const oldQty = parseFloat(document.getElementById('old_qty').value) || 0;
+            const returQty = parseFloat(document.getElementById('qty').value) || 0;
             const itemPrice = parseFloat(
                 (document.getElementById('item_price').value || '0').replace(/[^\d.-]/g, '')
             ) || 0;
             document.getElementById('total_retur').value = ((oldQty - returQty) * itemPrice).toFixed(0);
         }
 
+        // ─── Enter key navigation ─────────────────────────────────────────────────────
+        function initEnterNavigation() {
+            document.querySelectorAll('input.nav-input').forEach(input => {
+                input.addEventListener('keydown', function(e) {
+                    if (e.key !== 'Enter') return;
+                    e.preventDefault();
+                    const nextTarget = this.getAttribute('data-nav-enter');
+                    if (!nextTarget) return;
+                    if (nextTarget === 'submit') {
+                        document.getElementById('submitBtn').click();
+                    } else {
+                        const nextEl = document.getElementById(nextTarget);
+                        if (nextEl) nextEl.focus();
+                    }
+                });
+            });
+            document.querySelectorAll('select.nav-input').forEach(select => {
+                select.addEventListener('keydown', function(e) {
+                    if (e.key !== 'Enter') return;
+                    e.preventDefault();
+                    const nextTarget = this.getAttribute('data-nav-enter');
+                    if (!nextTarget) return;
+                    if (nextTarget === 'submit') {
+                        document.getElementById('submitBtn').click();
+                    } else {
+                        const nextEl = document.getElementById(nextTarget);
+                        if (nextEl) nextEl.focus();
+                    }
+                });
+            });
+        }
+
+        // ─── Reset form ───────────────────────────────────────────────────────────────
+        function resetReturForm() {
+            $('#medicine_id').val('');
+            $('#cart_id').val('');
+            $('#transaction_id').val('');
+            $('#old_qty').val('');
+            $('#medicine_code').val('');
+            $('#medicine_name').val('');
+            $('#unit').val('');
+            $('#item_price').val('');
+            $('#price').val('');
+            $('#qty').val('');
+            $('#total_retur').val('');
+            $('#batch').val('');
+            $('#expired_date').val('');
+
+            // Remove active row highlight from table
+            $('#medicineTable tbody tr').removeClass('active');
+        }
+
+        // ─── AJAX Submit ──────────────────────────────────────────────────────────────
+        function submitRetur() {
+            const medicine_id = $('#medicine_id').val();
+            const cart_id = $('#cart_id').val();
+            const transaction_id = $('#transaction_id').val();
+            const qty_retur = $('#qty').val();
+            const total_retur = $('#total_retur').val();
+            const transfer_id = $('#transfer_id').val();
+            const medicine_code = $('#medicine_code').val();
+            const old_qty = $('#old_qty').val();
+
+            // Basic validation
+            if (!medicine_id || !cart_id) {
+                iziToast.warning({
+                    title: 'Peringatan',
+                    message: 'Pilih obat terlebih dahulu dari tabel.',
+                    position: 'topRight'
+                });
+                return;
+            }
+
+            if (!qty_retur || qty_retur <= 0) {
+                iziToast.warning({
+                    title: 'Peringatan',
+                    message: 'Qty retur harus diisi.',
+                    position: 'topRight'
+                });
+                $('#qty').focus();
+                return;
+            }
+
+            if (!transfer_id) {
+                iziToast.warning({
+                    title: 'Peringatan',
+                    message: 'Pilih batch terlebih dahulu.',
+                    position: 'topRight'
+                });
+                $('#batch_select').focus();
+                return;
+            }
+
+            const btn = document.getElementById('submitBtn');
+            btn.disabled = true;
+            btn.innerHTML = `
+                <svg class="w-3.5 h-3.5 animate-spin" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="8" cy="8" r="6" stroke-dasharray="28" stroke-dashoffset="10"/>
+                </svg>
+                Menyimpan...
+            `;
+
+            axios.post('{{ route('returdata.returItem') }}', {
+                    medicine_id,
+                    cart_id,
+                    transaction_id,
+                    qty_retur,
+                    total_retur,
+                    transfer_id, 
+                    medicine_code,
+                    old_qty,
+                    _token: '{{ csrf_token() }}'
+                })
+                .then(response => {
+                    iziToast.success({
+                        title: 'Berhasil',
+                        message: `Retur obat berhasil disimpan.`,
+                        position: 'topRight'
+                    });
+
+                    // Update retur code display if returned from server
+                    if (response.data.retur_code) {
+                        $('#retur_code_display').val(response.data.retur_code);
+                    }
+
+                    // Reset form but keep transaction selected so user can retur next item
+                    resetReturForm();
+
+                    // Reload medicine table to reflect updated data
+                    medicineTable?.ajax.reload(null, false);
+                })
+                .catch(error => {
+                    const message = error.response?.data?.message || 'Terjadi kesalahan. Coba lagi.';
+                    iziToast.error({
+                        title: 'Gagal',
+                        message,
+                        position: 'topRight'
+                    });
+                })
+                .finally(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = `
+                    <svg class="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="2 9 6 13 14 4" />
+                    </svg>
+                    Simpan
+                `;
+                });
+        }
+
         // ─── DOM-dependent code ───────────────────────────────────────────────────────
-        $(document).ready(function () {
+        $(document).ready(function() {
+
+            // Init Enter key navigation
+            initEnterNavigation();
 
             // Keyboard nav on search input
-            document.getElementById('searchInput').addEventListener('keydown', function (e) {
-                const rows     = document.querySelectorAll('#searchResults tr');
+            document.getElementById('searchInput').addEventListener('keydown', function(e) {
+                const rows = document.querySelectorAll('#searchResults tr');
                 const dropdown = document.getElementById('searchDropdown');
 
                 if (dropdown.style.display === 'none' || !rows.length) return;
@@ -453,7 +621,7 @@
             });
 
             // Hover highlight
-            document.getElementById('searchResults').addEventListener('mouseover', function (e) {
+            document.getElementById('searchResults').addEventListener('mouseover', function(e) {
                 const row = e.target.closest('tr');
                 if (!row) return;
                 const rows = [...this.children];
@@ -463,7 +631,7 @@
             });
 
             // Click to select
-            document.getElementById('searchResults').addEventListener('click', function (e) {
+            document.getElementById('searchResults').addEventListener('click', function(e) {
                 const row = e.target.closest('tr');
                 if (row) {
                     selectRow(row);
@@ -472,9 +640,9 @@
             });
 
             // Close on outside click
-            document.addEventListener('click', function (e) {
+            document.addEventListener('click', function(e) {
                 const searchInput = document.getElementById('searchInput');
-                const dropdown    = document.getElementById('searchDropdown');
+                const dropdown = document.getElementById('searchDropdown');
                 if (!searchInput.contains(e.target) && !dropdown.contains(e.target)) {
                     hideDropdown();
                 }
@@ -485,28 +653,40 @@
 
             // DataTable
             medicineTable = $('#medicineTable').DataTable({
-                processing:   true,
-                paging:       true,
-                searching:    true,
-                ordering:     false,
-                info:         true,
+                processing: true,
+                paging: true,
+                searching: true,
+                ordering: false,
+                info: true,
                 lengthChange: true,
-                autoWidth:    false,
+                autoWidth: false,
 
                 ajax: {
-                    url:     '{{ route('returdata.medicines') }}',
-                    data:    d => { d.transaction_code = selectedTransactionCode; },
+                    url: '{{ route('returdata.medicines') }}',
+                    data: d => {
+                        d.transaction_code = selectedTransactionCode;
+                    },
                     dataSrc: ''
                 },
 
-                columns: [
-                    { data: null,             render: (d, t, r, m) => m.row + 1 },
-                    { data: 'medicine.name' },
-                    { data: 'quantity',    className: 'text-end' },
-                    { data: 'final_price', className: 'text-end' },
+                columns: [{
+                        data: null,
+                        render: (d, t, r, m) => m.row + 1
+                    },
+                    {
+                        data: 'medicine.name'
+                    },
+                    {
+                        data: 'quantity',
+                        className: 'text-end'
+                    },
+                    {
+                        data: 'final_price',
+                        className: 'text-end'
+                    },
                 ],
 
-                drawCallback: function () {
+                drawCallback: function() {
                     const count = this.api().rows().count();
                     document.getElementById('itemCount').textContent = count + ' item';
                 }
@@ -522,10 +702,13 @@
                 $('#item_price').val(data.item_price);
                 $('#old_qty').val(data.quantity);
                 $('#cart_id').val(data.id);
+
+                // Load batches
+                loadBatches(data.medicine.id);
                 $('#qty').trigger('focus');
             }
 
-            $('#medicineTable tbody').on('click', 'tr', function () {
+            $('#medicineTable tbody').on('click', 'tr', function() {
                 const data = medicineTable.row(this).data();
                 if (!data) return;
                 $('#medicineTable tbody tr').removeClass('active');
@@ -533,5 +716,58 @@
                 loadMedicineForRetur(data);
             });
         });
+
+
+
+        function loadBatches(medicine_id) {
+            const select = document.getElementById('batch_select');
+            select.innerHTML = '<option value="">Memuat batch...</option>';
+
+            fetch(`{{ route('returdata.batches') }}?medicine_id=${medicine_id}`)
+                .then(res => res.json())
+                .then(data => {
+                    select.innerHTML = '<option value="">— Pilih batch —</option>';
+
+                    if (!data.length) {
+                        select.innerHTML = '<option value="">Tidak ada batch tersedia</option>';
+                        return;
+                    }
+
+                    data.forEach((item, index) => {
+                        const option = document.createElement('option');
+                        option.value = item.transfer_id;
+                        option.textContent =
+                            `${item.batch_name} — Exp: ${item.expired_date} (Stok: ${item.counter_stock})`;
+                        option.dataset.batchName = item.batch_name;
+                        option.dataset.expiredDate = item.expired_date;
+                        option.dataset.transferId = item.transfer_id;
+                        select.appendChild(option);
+                    });
+
+                    // Auto-select first (FEFO — already ordered by earliest expiry)
+                    select.selectedIndex = 1;
+                    syncBatchFields();
+                });
+        }
+
+        // Sync hidden fields whenever select changes
+        function syncBatchFields() {
+            const select = document.getElementById('batch_select');
+            const opt = select.options[select.selectedIndex];
+
+            if (!opt || !opt.value) {
+                $('#batch').val('');
+                $('#expired_date').val('');
+                $('#transfer_id').val('');
+                return;
+            }
+
+            $('#batch').val(opt.dataset.batchName);
+            $('#expired_date').val(opt.dataset.expiredDate);
+            $('#transfer_id').val(opt.dataset.transferId);
+        }
+
+        // Attach change listener
+        document.getElementById('batch_select').addEventListener('change', syncBatchFields);
     </script>
 @endsection

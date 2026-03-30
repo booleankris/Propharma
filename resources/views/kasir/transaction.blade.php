@@ -2,22 +2,7 @@
 @section('content')
 @section('style')
     <link rel="stylesheet" href="{{ asset('css/dashboard.css') }}">
-
-    <style>
-        .transaction-item {
-            color: #fff;
-        }
-
-        .transaction-item:hover .svg-item {
-            color: #1e7221 !important;
-        }
-
-        .transaction-item:hover {
-            background: #fff;
-            color: #1e7221 !important;
-        }
-    </style>
-    @if ($check_transaction == 1)
+    @if ($check_transaction != 0)
         @if ($transaction->transaction_type == 'HV/OTC')
             <style>
                 .transaction-item-active {
@@ -76,7 +61,7 @@
         <!-- Header Card -->
         @php
             $typeClass = 'type-idle';
-            if ($check_transaction == 1) {
+            if ($check_transaction != 0) {
                 $typeClass = match ($transaction->transaction_type) {
                     'UPDS' => 'type-upds',
                     'HV/OTC' => 'type-hv',
@@ -91,7 +76,7 @@
             <div class="trx-header">
                 <div>
                     <h1 class="trx-title">Transaksi</h1>
-                    @if ($check_transaction == 1)
+                    @if ($check_transaction != 0)
                         <div class="trx-badge">
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                 stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -102,20 +87,28 @@
                         </div>
                     @endif
                 </div>
+                @php
+                    $shift = currentShift();
+                    $activeshift = activeShift();
+                @endphp
+
                 <div class="trx-datetime">
                     <div class="trx-date">{{ now()->translatedFormat('l, d F Y') }}</div>
                     <div class="trx-time">{{ now()->format('H.i') }} WITA</div>
+                    <div class="trx-badge mt-2">
+                        {{ 'Shift : ' . $shift->name }}
+                    </div>
                 </div>
+
             </div>
 
             <div class="trx-divider"></div>
-
             {{-- Transaction Type Chips --}}
             <div class="trx-chips">
-
+                
                 {{-- Resep Credit --}}
-                <a href="{{ url('transaction/kredit') }}"
-                    class="trx-chip {{ request()->is('transaction/kredit') ? 'active' : '' }}">
+                <a href="{{ url('transaction/kredit/' . ($trx_id != 0 ? $trx_id : 0)) }}"
+                    class="trx-chip @if ($type == 'kredit') active @endif">
                     <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"
                         stroke-linejoin="round">
                         <rect x="2" y="5" width="20" height="14" rx="2" />
@@ -125,8 +118,8 @@
                 </a>
 
                 {{-- Resep Tunai --}}
-                <a href="{{ url('transaction/resep') }}"
-                    class="trx-chip {{ request()->is('transaction/resep') ? 'active' : '' }}">
+                <a href="{{ url('transaction/resep/' . ($trx_id != 0 ? $trx_id : 0)) }}"
+                    class="trx-chip  @if ($type == 'resep') active @endif">
                     <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"
                         stroke-linejoin="round">
                         <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
@@ -136,8 +129,8 @@
                 </a>
 
                 {{-- HV/OTC --}}
-                <a href="{{ url('transaction/hv') }}"
-                    class="trx-chip {{ request()->is('transaction/hv') ? 'active' : '' }}">
+                <a href="{{ url('transaction/hv/' . ($trx_id != 0 ? $trx_id : 0)) }}"
+                    class="trx-chip @if ($type == 'hv') active @endif">
                     <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"
                         stroke-linejoin="round">
                         <path
@@ -147,8 +140,8 @@
                 </a>
 
                 {{-- UPDS --}}
-                <a href="{{ url('transaction/upds') }}"
-                    class="trx-chip {{ request()->is('transaction/upds') ? 'active' : '' }}">
+                <a href="{{ url('transaction/upds/' . ($trx_id != 0 ? $trx_id : 0)) }}"
+                    class="trx-chip @if ($type == 'upds') active @endif">
                     <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"
                         stroke-linejoin="round">
                         <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
@@ -160,35 +153,29 @@
 
             </div>
 
-            {{-- Action Buttons (hanya tampil jika belum ada transaksi aktif) --}}
-            @if ($check_transaction == 0)
-                <form method="post" action="{{ route('transaction.createnew') }}">
-                    @csrf
-                    <input type="hidden" value="{{ request()->segment(2) }}" name="type">
-                    <div class="trx-actions">
-                        <button type="submit" class="trx-btn trx-btn-add" tabindex="4">
-                            <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                                <circle cx="12" cy="12" r="9" />
-                                <line x1="12" y1="8" x2="12" y2="16" />
-                                <line x1="8" y1="12" x2="16" y2="12" />
-                            </svg>
-                            Tambah Transaksi
-                        </button>
-                        <button type="button" onclick="back()" class="trx-btn trx-btn-back" tabindex="5">
-                            <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                                <polyline points="9 14 4 9 9 4" />
-                                <path d="M20 20v-7a4 4 0 0 0-4-4H4" />
-                            </svg>
-                            Kembali
-                        </button>
-                    </div>
-                </form>
-            @endif
-
+            <form method="post" action="{{ route('transaction.createnew') }}" target="_blank">
+                @csrf
+                <input type="hidden" value="{{ request()->segment(2) }}" name="type">
+                <div class="trx-actions">
+                    <button type="submit" class="trx-btn trx-btn-add" tabindex="4">
+                        <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="9" />
+                            <line x1="12" y1="8" x2="12" y2="16" />
+                            <line x1="8" y1="12" x2="16" y2="12" />
+                        </svg>
+                        Tambah Transaksi
+                    </button>
+                    <button type="button" onclick="back()" class="trx-btn trx-btn-back" tabindex="5">
+                        <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="9 14 4 9 9 4" />
+                            <path d="M20 20v-7a4 4 0 0 0-4-4H4" />
+                        </svg>
+                        Kembali
+                    </button>
+                </div>
+            </form>
         </div>
-
-
-        @if ($check_transaction == 1)
+        @if ($check_transaction != 0)
             <div class="card p-6  flex flex-wrap items-center bg-white dashboard-panel">
 
 
@@ -334,8 +321,9 @@
                             <label class="text-[13px] font-poppins font-semibold">Qty</label>
 
                         </div>
-                        <input id="quantity" required name="quantity" onkeyup="count(this.value)" type="number"
-                            placeholder="QTY"
+                        <input id="quantity" required name="quantity"
+                            oninput="this.value = this.value.replace(/[^0-9]/g, '')" step="1"
+                            onkeyup="count(this.value)" type="number" placeholder="QTY"
                             class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300 text-[11px] font-poppins"
                             autocomplete="off" />
                     </div>
@@ -375,7 +363,7 @@
                 </div>
             </div>
         @endif
-        @if ($check_transaction == 1)
+        @if ($check_transaction != 0)
             <div class="card p-4 px-6  flex flex-wrap items-center bg-white dashboard-panel">
 
 
@@ -461,7 +449,7 @@
         @endif
     </section>
 
-    @if ($check_transaction == 1)
+    @if ($check_transaction != 0)
         <!-- RIGHT COLUMN -->
         <aside class="col-span-12 lg:col-span-7  dashboard-panel">
             <div class="card px-6 bg-white mt-5">
@@ -472,7 +460,7 @@
                                 <label class="text-[13px] font-poppins font-semibold">Faktur</label>
 
                             </div>
-                            @if ($check_transaction == 1)
+                            @if ($check_transaction != 0)
                                 @if ($transaction->transaction_type == 'KREDIT')
                                     <div id="faktur" class="py-2">
                                         <span
@@ -498,7 +486,7 @@
                                 @endif
                             @endif
                         </div>
-                        @if ($check_transaction == 1)
+                        @if ($check_transaction != 0)
                             <div class="mr-2 w-[20%] @if ($transaction->transaction_type != 'RESEP TUNAI' && $transaction->transaction_type != 'KREDIT') hidden @endif">
                                 <div class="w-full my-1">
                                     <label class="text-[13px] font-poppins font-semibold">Racik?</label>
@@ -908,7 +896,7 @@
     </div>
 </div>
 
-@if ($check_transaction == 1)
+@if ($check_transaction != 0)
     {{-- Modal Pembayaran --}}
     <div id="paymentModal" class="fixed inset-0 bg-black/50 hidden justify-center items-center z-[99999]">
         <!-- Modal content -->
@@ -926,7 +914,7 @@
                     <h1 class="text-4xl font-semibold tracking-tight">Pembayaran</h1>
 
                 </div>
-                @if ($check_transaction == 1)
+                @if ($check_transaction != 0)
                     <div class="w-full">
                         <label class="text-[13px] font-poppins font-semibold">Cari Pasien</label>
 
@@ -1004,7 +992,7 @@
             </div>
 
             <div class="mr-2 w-[100%] mt-3 flex gap-2">
-                @if ($check_transaction == 1)
+                @if ($check_transaction != 0)
                     @if ($transaction->transaction_type == 'KREDIT')
                         <div class="w-[40%] hidden">
                             <label class="text-[13px] font-poppins font-semibold pb-1">Embalase</label>
@@ -1015,7 +1003,7 @@
                         </div>
                     @endif
                 @endif
-                @if ($check_transaction == 1)
+                @if ($check_transaction != 0)
                     <div class="w-full gap-2 @if ($transaction->transaction_type == 'KREDIT') hidden @else flex @endif ">
                         @if ($transaction->transaction_type != 'KREDIT')
                             <div class="w-full">
@@ -1045,13 +1033,89 @@
                     </div>
                 @endif
             </div>
-            @if ($check_transaction == 1)
-                <div class="mr-2 flex gap-2 w-[100%] mt-3 @if ($transaction->transaction_type == 'KREDIT') hidden @else flex @endif">
+            @if ($transaction->transaction_type != 'KREDIT')
+                <div class="mb-5">
+                    <label class="block text-[12px] font-medium text-gray-500 mb-3">Metode Pembayaran</label>
+
+                    <div class="flex gap-2" id="paymentTypeGroup">
+                        {{-- Cash --}}
+                        <label class="payment-option flex-1 cursor-pointer">
+                            <input type="radio" id="payment_type" name="payment_type" onclick="getPaymentType()"
+                                value="CASH" class="sr-only">
+                            <div
+                                class="payment-card cash-card flex flex-col items-center gap-2 py-3 px-2 rounded-xl border text-center">
+                                <div class="payment-icon w-9 h-9 rounded-lg flex items-center justify-center">
+                                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                        <rect x="2" y="6" width="20" height="12" rx="2" />
+                                        <circle cx="12" cy="12" r="3" />
+                                        <path d="M6 12h.01M18 12h.01" />
+                                    </svg>
+                                </div>
+                                <span class="payment-label text-[12px] font-medium">Cash</span>
+                            </div>
+                        </label>
+                        {{-- QRIS --}}
+                        <label class="payment-option flex-1 cursor-pointer">
+                            <input type="radio" name="payment_type" onclick="getPaymentType()" value="QRIS"
+                                class="sr-only" required>
+                            <div
+                                class="payment-card qris-card flex flex-col items-center gap-2 py-3 px-2 rounded-xl border text-center">
+                                <div class="payment-icon w-9 h-9 rounded-lg flex items-center justify-center">
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+                                        xmlns="http://www.w3.org/2000/svg">
+                                        <path
+                                            d="M6.5 6.5H6.51M17.5 6.5H17.51M6.5 17.5H6.51M13 13H13.01M17.5 17.5H17.51M17 21H21V17M14 16.5V21M21 14H16.5M15.6 10H19.4C19.9601 10 20.2401 10 20.454 9.89101C20.6422 9.79513 20.7951 9.64215 20.891 9.45399C21 9.24008 21 8.96005 21 8.4V4.6C21 4.03995 21 3.75992 20.891 3.54601C20.7951 3.35785 20.6422 3.20487 20.454 3.10899C20.2401 3 19.9601 3 19.4 3H15.6C15.0399 3 14.7599 3 14.546 3.10899C14.3578 3.20487 14.2049 3.35785 14.109 3.54601C14 3.75992 14 4.03995 14 4.6V8.4C14 8.96005 14 9.24008 14.109 9.45399C14.2049 9.64215 14.3578 9.79513 14.546 9.89101C14.7599 10 15.0399 10 15.6 10ZM4.6 10H8.4C8.96005 10 9.24008 10 9.45399 9.89101C9.64215 9.79513 9.79513 9.64215 9.89101 9.45399C10 9.24008 10 8.96005 10 8.4V4.6C10 4.03995 10 3.75992 9.89101 3.54601C9.79513 3.35785 9.64215 3.20487 9.45399 3.10899C9.24008 3 8.96005 3 8.4 3H4.6C4.03995 3 3.75992 3 3.54601 3.10899C3.35785 3.20487 3.20487 3.35785 3.10899 3.54601C3 3.75992 3 4.03995 3 4.6V8.4C3 8.96005 3 9.24008 3.10899 9.45399C3.20487 9.64215 3.35785 9.79513 3.54601 9.89101C3.75992 10 4.03995 10 4.6 10ZM4.6 21H8.4C8.96005 21 9.24008 21 9.45399 20.891C9.64215 20.7951 9.79513 20.6422 9.89101 20.454C10 20.2401 10 19.9601 10 19.4V15.6C10 15.0399 10 14.7599 9.89101 14.546C9.79513 14.3578 9.64215 14.2049 9.45399 14.109C9.24008 14 8.96005 14 8.4 14H4.6C4.03995 14 3.75992 14 3.54601 14.109C3.35785 14.2049 3.20487 14.3578 3.10899 14.546C3 14.7599 3 15.0399 3 15.6V19.4C3 19.9601 3 20.2401 3.10899 20.454C3.20487 20.6422 3.35785 20.7951 3.54601 20.891C3.75992 21 4.03995 21 4.6 21Z"
+                                            stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                            stroke-linejoin="round" />
+                                    </svg>
+                                </div>
+                                <span class="payment-label text-[12px] font-medium">QRIS</span>
+                            </div>
+                        </label>
+
+                        {{-- Debit --}}
+                        <label class="payment-option flex-1 cursor-pointer">
+                            <input type="radio" name="payment_type" onclick="getPaymentType()" value="DEBIT"
+                                class="sr-only">
+                            <div
+                                class="payment-card debit-card flex flex-col items-center gap-2 py-3 px-2 rounded-xl border text-center">
+                                <div class="payment-icon w-9 h-9 rounded-lg flex items-center justify-center">
+                                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                        <rect x="1" y="4" width="22" height="16" rx="2" />
+                                        <path d="M1 10h22" />
+                                        <path d="M4 15h3M10 15h2" />
+                                    </svg>
+                                </div>
+                                <span class="payment-label text-[12px] font-medium">Debit</span>
+                            </div>
+                        </label>
+
+
+                    </div>
+                </div>
+            @endif
+
+            @if ($check_transaction != 0)
+                @if ($transaction->transaction_type == 'KREDIT')
+                    <div class="w-full">
+                        <label class="text-[13px] font-poppins font-semibold pb-1">Debitur</label>
+                        <input id="debtor_name" tabindex="-1" readonly type="text" name="change"
+                            placeholder="Nama Debitur"
+                            class="w-full rounded-xl border my-1 readonly border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                            autocomplete="off" />
+                    </div>
+                @endif
+            @endif
+            @if ($check_transaction != 0)
+                <div
+                    class="mr-2 flex gap-2 w-[100%] mt-3 @if ($transaction->transaction_type == 'KREDIT') hidden @else flex @endif">
                     <div class="w-full">
                         <label class="text-[13px] font-poppins font-semibold pb-1">Bayar</label>
                         <input id="pay" onkeyup="pay(this.value)"
-                            @if ($transaction->transaction_type == 'KREDIT') value="0" @endif type="text" required name="pay"
-                            placeholder="Bayar obat"
+                            @if ($transaction->transaction_type == 'KREDIT') value="0" @endif type="text" required
+                            name="pay" placeholder="Bayar obat"
                             class="w-full rounded-xl border my-1 border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
                             autocomplete="off" />
                     </div>
@@ -1063,17 +1127,6 @@
                             autocomplete="off" />
                     </div>
                 </div>
-            @endif
-            @if ($check_transaction == 1)
-                @if ($transaction->transaction_type == 'KREDIT')
-                    <div class="w-full">
-                        <label class="text-[13px] font-poppins font-semibold pb-1">Debitur</label>
-                        <input id="debtor_name" tabindex="-1" readonly type="text" name="change"
-                            placeholder="Nama Debitur"
-                            class="w-full rounded-xl border my-1 readonly border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                            autocomplete="off" />
-                    </div>
-                @endif
             @endif
             <div class="mt-5">
                 <form id="checkoutForm">
@@ -1087,7 +1140,7 @@
                         name="doctor_id" id="doctor_id" />
                     <input type="hidden" required name="debtor_id" id="debtor_id" />
 
-                    @if ($check_transaction == 1)
+                    @if ($check_transaction != 0)
                         @if ($transaction->transaction_type == 'KREDIT')
                             <button type="button" id="checkout" onclick="checkoutItem()"
                                 class="w-full mt-3 rounded-lg bg-[#2196F3] hover:bg-gray-500 text-white font-semibold py-4 transition">
@@ -1236,7 +1289,39 @@
 </div>
 
 {{-- ============================================================== Patient Invoice  ============================================================== --}}
+{{-- Print Confirmation --}}
+{{-- Print Confirmation Modal --}}
+<div id="printConfirmModal" class="hidden fixed inset-0 z-[999999] flex items-center justify-center bg-black/40 backdrop-blur-sm">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6">
+        <div class="flex items-center gap-3 mb-4">
+            <div class="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center">
+                <svg class="w-5 h-5 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+                    <rect x="6" y="14" width="12" height="8"/>
+                </svg>
+            </div>
+            <div>
+                <p class="text-[14px] font-semibold text-gray-800">Cetak Struk?</p>
+                <p class="text-[12px] text-gray-400">Transaksi berhasil disimpan</p>
+            </div>
+        </div>
 
+        <div class="flex gap-2 mt-5">
+            <button id="btnPrint"
+                class="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg bg-[#2196F3] hover:bg-[#1976D2] text-white text-[13px] font-medium transition-colors">
+                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+                    <rect x="6" y="14" width="12" height="8"/>
+                </svg>
+                Ya, Cetak
+            </button>
+            <button id="btnSkipPrint"
+                class="flex-1 px-4 py-2.5 rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-600 text-[13px] font-medium transition-colors">
+                Lewati
+            </button>
+        </div>
+    </div>
+</div>
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 <script>
     // WHEN PAGE LOADED
@@ -1312,7 +1397,7 @@
     const endpointDoctor = "{{ route('doctors.search') }}";
 
 
-    const trx_id = {{ $transaction?->id ?? 'null' }};
+    const trx_id = {{ $trx_id ?? 'null' }};
     console.log({{ $parameters }});
     var rounding = {{ $rounding }};
     var parameters = {{ $parameters }};
@@ -1344,6 +1429,8 @@
 
 
     // Patient
+    const user_id = {{ auth()->user()->id }};
+    const shift_logs_id = {{ $activeshift->id }}
     const inputpatient = document.getElementById('patientSearch');
     const patientname = document.getElementById('patientname');
     const patientbox = document.getElementById('patientResults');
@@ -1369,8 +1456,9 @@
     var total_discount = {{ $discount_total }};
     var discount = "";
     var subtotal_discount = "";
-    const subtotalpreview = document.getElementById('subtotal');
+    var paymentType = "";
 
+    const subtotalpreview = document.getElementById('subtotal');
 
     var total_item = "";
     var medicine_id = "";
@@ -1612,7 +1700,7 @@
         if (liTop < lTop) list.scrollTop = liTop;
         else if (liBottom > lBottom) list.scrollTop = liBottom - list.clientHeight;
     }
-
+    // Searchbar / Search Medicine
     function render(items) {
         console.log(items);
         list.innerHTML = '';
@@ -1624,30 +1712,59 @@
         }
 
         for (const it of items) {
+            console.log(items);
             const li = document.createElement('li');
             li.setAttribute('role', 'option');
             li.className = 'cursor-pointer px-4 py-3 hover:bg-gray-100';
             li.dataset.id = it.id;
 
             li.innerHTML = `
-            <div class="flex items-start justify-between gap-2">
-                <div>
-                    <div class="font-medium">${escapeHtml(it.name)}</div>
-                    <div class="text-xs text-gray-500">
-                        Kode: ${escapeHtml(it.code)} <br> • 
-                        Etalase: ${escapeHtml(it.etalases?.name || '-')} <br> • 
-                        Lokasi: ${escapeHtml(it.locations?.name || '-')} <br> • 
-                        Barcode: ${escapeHtml(it.barcode || '-')} <br> 
-                        <span class="font-poppins text-[14px] py-2">
-                            Stock: ${escapeHtml(it.stock || '-')}
-                        </span>
+                <div class="flex items-start justify-between gap-3 p-1">
+
+                <div class="flex flex-col gap-1 min-w-0">
+                    <div class="font-semibold text-sm text-gray-800">${escapeHtml(it.name)}</div>
+                    <div class="font-mono text-[11px] text-blue-400 bg-blue-50 px-2 py-0.5 rounded-md w-fit">${escapeHtml(it.code)}</div>
+
+                    <div class="grid grid-cols-2 gap-x-4 gap-y-1 mt-1">
+                    <div>
+                        <div class="text-[10px] uppercase tracking-wide text-gray-400">Etalase</div>
+                        <div class="text-xs text-gray-700">${escapeHtml(it.etalases?.name || '—')}</div>
+                    </div>
+                    <div>
+                        <div class="text-[10px] uppercase tracking-wide text-gray-400">Lokasi</div>
+                        <div class="text-xs text-gray-700">${escapeHtml(it.locations?.name || '—')}</div>
+                    </div>
+                    <div>
+                        <div class="text-[10px] uppercase tracking-wide text-gray-400">Barcode</div>
+                        <div class="text-xs text-gray-700 font-mono">${escapeHtml(it.barcode || '—')}</div>
+                    </div>
+                    </div>
+
+                    <div class="flex gap-2 flex-wrap mt-1">
+                    <div class="flex items-center gap-1 bg-emerald-50 border border-emerald-200 rounded-md px-2 py-1">
+                        <span class="text-[10px] text-emerald-500 font-medium">Stok</span>
+                        <span class="text-xs font-bold text-emerald-700">${escapeHtml(String(it.stock || '—'))}</span>
+                    </div>
+                    <div class="flex items-center gap-1 bg-violet-50 border border-violet-200 rounded-md px-2 py-1">
+                        <span class="text-[10px] text-violet-500 font-medium">Gudang</span>
+                        <span class="text-xs font-bold text-violet-700">${escapeHtml(String(it.storage_stock || '—'))}</span>
+                    </div>
+                    <div class="flex items-center gap-1 bg-amber-50 border border-amber-200 rounded-md px-2 py-1">
+                        <span class="text-[10px] text-amber-500 font-medium">Pelayanan</span>
+                        <span class="text-xs font-bold text-amber-700">${escapeHtml(String(it.counter_stock || '—'))}</span>
+                    </div>
                     </div>
                 </div>
-                <div class="text-sm font-semibold whitespace-nowrap">
-                    ${formatRupiah(it.net_price)}
+
+                <div class="flex flex-col items-end flex-shrink-0">
+                    <div class="text-sm font-bold text-gray-800 whitespace-nowrap">${formatRupiah(it.raw_price)}</div>
+                    ${it.het_price && Number(it.het_price)
+                    ? `<div class="text-xs font-semibold text-red-500 bg-red-50 border border-red-200 rounded px-1.5 py-0.5 mt-1 whitespace-nowrap">HET: ${formatRupiah(it.het_price)}</div>`
+                    : ''}
                 </div>
-            </div>
-        `;
+
+                </div>
+                `;
 
             li.addEventListener('mousedown', (e) => {
                 selectItem(it);
@@ -1685,24 +1802,24 @@
         if (it.het_price != 0) {
             raw = it.het_price;
         } else {
-            raw = (+it.net_price * +parameters) + +rounding;
+            raw = (+it.net_price * +parameters);
         }
 
-        let rounded;
-        if (currenttransaction === 'KREDIT') {
-            rounded = Math.round(raw);
-        } else {
-            rounded = Math.floor(raw / 1000) * 1000;
-        }
-        price.value = formatRupiah(rounded);
+        // let rounded;
+        // if (currenttransaction === 'KREDIT') {
+        //     rounded = Math.round(raw);
+        // } else {
+        //     rounded = Math.floor(raw / 1000) * 1000;
+        // }
+        price.value = formatRupiah(raw);
         console.log("harga Total : " + raw);
-        price2 = rounded;
-        item_finalprice = rounded;
-        if (currenttransaction == 'RESEP TUNAI' && racikstatus == 1) {
+        price2 = raw;
+        item_finalprice = raw;
+        if (currenttransaction == 'RESEP TUNAI' && racikstatus != 0) {
             dosageRInput.focus();
             closeBox();
 
-        } else if (currenttransaction == 'KREDIT' && racikstatus == 1) {
+        } else if (currenttransaction == 'KREDIT' && racikstatus != 0) {
             dosageRInput.focus();
             closeBox();
         } else {
@@ -1711,9 +1828,7 @@
 
         }
     }
-    // ===============================
     // Search (Debounced)
-    // ===============================
     const doSearch = debounce(async (term) => {
         if (!term.trim()) {
             list.innerHTML = '';
@@ -1758,9 +1873,32 @@
     });
 
 
-    // ===============================
-    // Pencarian Pasien
-    // ===============================
+    // ================ Pilih Tipe Pembayaran =========================
+
+    function getPaymentType() {
+        const selected = document.querySelector('input[name="payment_type"]:checked');
+        paymentType = selected.value;
+        console.log('Payment type:', paymentType);
+        return selected ? selected.value : null;
+
+    }
+    const paymentRadios = document.querySelectorAll('input[name="payment_type"]');
+    const nextInput = document.getElementById('pay');
+
+    paymentRadios.forEach(radio => {
+        radio.addEventListener('keydown', function(event) {
+            if (event.key === 'Enter') {
+                paymentType = radio.value;
+                event.preventDefault();
+                nextInput.focus();
+                console.log('Payment type:', radio.value);
+
+            }
+        });
+    });
+
+
+    // ================ Pencarian Pasien =========================
 
     function openpatientBox() {
         patientbox.classList.remove('hidden');
@@ -1829,9 +1967,7 @@
         }
     }
 
-    // ===============================
-    // Search (Debounced)
-    // ===============================
+
     const dopatientSearch = debounce(async (term) => {
         if (!term.trim()) {
             patientlist.innerHTML = '';
@@ -1882,16 +2018,17 @@
         if (currenttransaction == 'RESEP TUNAI' || currenttransaction == 'KREDIT') {
             document.getElementById('doctorSearch').focus();
         } else {
-            document.getElementById('pay').focus();
+            document.getElementById('payment_type').focus();
+            document.getElementById('payment_type').checked = true;
+
+
         }
         document.getElementById('patientSearch').value = it.name;
         closepatientBox();
     }
 
 
-    // ===============================
-    // Pencarian Dokter
-    // ===============================
+    // ==================== Pencarian Dokter ====================
 
     function opendoctorBox() {
         doctorbox.classList.remove('hidden');
@@ -1960,9 +2097,7 @@
         }
     }
 
-    // ===============================
-    // Search (Debounced)
-    // ===============================
+
     const dodoctorSearch = debounce(async (term) => {
         if (!term.trim()) {
             doctorlist.innerHTML = '';
@@ -2021,9 +2156,7 @@
     }
 
 
-    // ===============================
     // Pencarian Debitur
-    // ===============================
 
     if (debtorbox) {
         function opendebtorBox() {
@@ -2090,9 +2223,6 @@
             }
         }
 
-        // ===============================
-        // Search (Debounced)
-        // ===============================
         const dodebtorSearch = debounce(async (term) => {
             if (!term.trim()) {
                 debtorlist.innerHTML = '';
@@ -2158,17 +2288,18 @@
             closedebtorBox();
         }
     }
-    // ===============================
+
     // Perhitungan Harga & Diskon
-    // ===============================
     function count(val) {
+        val = Math.floor(Number(val) || 0);
         console.log('harga diskon adalah : ' + discount);
         if (discount == "") {
             discount = 0;
         }
         console.log('harganya itu adalah : ' + price2);
         total_item = val;
-        subtotal = price2 * val - discount;
+        roundedtotal = price2 * val - discount;
+        subtotal = Math.ceil(roundedtotal / 1000) * 1000;
         totalprice.value = formatRupiah(subtotal);
         pharmacy_price = price2 * val;
         final_price = subtotal;
@@ -2228,7 +2359,7 @@
 
     function addToCart(medicine_id, transaction_id, quantity, discount, embalase, cart_type, package, dosage_r, price2,
         raw_total, total_price, final_price, racikstatus) {
-        if (edit_status == 1) {
+        if (edit_status != 0) {
             axios.post("{{ route('transaction.updateCart') }}", {
                     id: selectedRowId,
                     medicine_id,
@@ -2381,7 +2512,7 @@
 
 
 
-                if (racikstatus == 1) {
+                if (racikstatus != 0) {
                     recipe_row = "bg-[#eefff8]";
                 }
 
@@ -2427,7 +2558,7 @@
 
     function submit() {
 
-        if (edit_status == 1) {
+        if (edit_status != 0) {
             true_price = final_price + jasa;
             const pkg = document.getElementById('package')?.value || '';
             const dose = document.getElementById('dosage_r')?.value || '';
@@ -2587,7 +2718,7 @@
 
     function editCartItem(id) {
 
-        axios.get(`/transaction/cartItem/${id}`)
+        axios.get(`/getcart/cartItem/${id}`)
             .then(response => {
                 edit_status = 1;
                 const item = response.data;
@@ -2645,11 +2776,8 @@
             .catch(err => console.error('Failed to load item data:', err));
     }
 
+    // ======================== Checkout & Invoice ========================
 
-
-    // ===============================
-    // Checkout & Invoice
-    // ===============================
     function checkoutItem() {
         const paid = document.getElementById('pay').value;
         const changes = document.getElementById('trchange').value;
@@ -2694,19 +2822,19 @@
 
                 transaction_items.forEach(item => {
                     document.getElementById('invoiceItems').innerHTML += `
-                        <tr>
-                            <td>${item.medicine.name}</td>
-                            <td>${item.quantity}</td>
-                            <td>${formatRupiah(item.total_price)}</td>
-                        </tr>
-                    `;
+                            <tr>
+                                <td>${item.medicine.name}</td>
+                                <td>${item.quantity}</td>
+                                <td>${formatRupiah(item.total_price)}</td>
+                            </tr>
+                        `;
                 });
 
                 document.getElementById('invoiceTotal').innerHTML += `
-                    <tr><td>Total</td><td></td><td>${formatRupiah(totaltransaction)}</td></tr>
-                    <tr><td>Tunai</td><td></td><td>${paid}</td></tr>
-                    <tr><td>Kembali</td><td></td><td>${changes}</td></tr>
-                `;
+                        <tr><td>Total</td><td></td><td>${formatRupiah(totaltransaction)}</td></tr>
+                        <tr><td>Tunai</td><td></td><td>${paid}</td></tr>
+                        <tr><td>Kembali</td><td></td><td>${changes}</td></tr>
+                    `;
                 const modal = document.getElementById("invoiceModal");
                 const content = document.getElementById("invoiceContent");
                 modal.classList.remove("hidden");
@@ -2730,7 +2858,10 @@
                         doctor_id,
                         debtor_id,
                         patient_id,
-                        print_receipt: 1
+                        print_receipt: 1,
+                        paymentType,
+                        user_id,
+                        shift_logs_id,
                     }).then(res => {
                         if (res.data.success) {
                             window.open(res.data.print_url, '_blank');
@@ -2806,9 +2937,8 @@
         document.body.removeChild(iframe);
     }
 
-    // ===============================
-    // Payment & Button State
-    // ===============================
+    // ======================== Pembayaran & Tombol ========================
+
     function activeButton() {
         const btn = document.getElementById("checkout");
         btn.disabled = false;

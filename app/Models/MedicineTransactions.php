@@ -21,6 +21,10 @@ class MedicineTransactions extends Model
         'subtotal',
         'discount',
         'status',
+        'user_id',
+        'payment_method',
+        'shift_logs_id',
+
     ];
     public function transactions()
     {

@@ -24,6 +24,7 @@ use App\Http\Controllers\SquadController;
 use App\Http\Controllers\Admin\TicketingController;
 use App\Http\Controllers\Admin\TicketingTransactionController;
 use App\Http\Controllers\AdminItemController;
+use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\CreditorController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Master\CategoriesController;
@@ -47,13 +48,12 @@ use App\Http\Controllers\Sales\SalesDataController;
 use App\Http\Controllers\SalesController;
 use App\Http\Controllers\SuppliesController;
 use App\Http\Controllers\TransactionReportController;
+use App\Http\Controllers\TransfersController;
 use App\Models\Item;
 use App\Models\TicketTransaction;
 use PhpOffice\PhpSpreadsheet\Calculation\Statistical\Averages\Mean;
 
-Route::get('/', function () {
-    return view('auth.login');
-});
+
 Route::get('/teamregistration', [LandingpageController::class, 'index'])->name('teamregistration');
 Route::post('/teamregister', [LandingpageController::class, 'teamRegister'])->name('teamregister');
 Route::get('/teamregistersuccess', [LandingpageController::class, 'teamRegisterSuccess'])->name('teamregister.success');
@@ -77,11 +77,17 @@ Route::post('/buyticket/{id}', [LandingpageController::class, 'buyTicket'])->nam
 Route::get('/checkticket/{code}', [LandingpageController::class, 'checkTicket'])->name('check.ticket');
 
 
+
+// Redirect root to login
+Route::get('/', function () {
+    return redirect()->route('login');
+});
+
+// Auth routes (login only)
 Auth::routes([
     'register' => false,
     'verify' => false,
 ]);
-
 
 Route::middleware(['auth', 'role:administrator'])->group(function () {
 
@@ -133,12 +139,11 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
         ->name('transaction.addToCart');
     Route::post('removecart', [SalesController::class, 'removeItem'])->name('transaction.removeItem');
 
-    Route::get('/transaction/{slug}/', [SalesController::class, 'index'])->name('transaction');
+    Route::get('/transaction/{type}/{id?}', [SalesController::class, 'index'])->name('transaction');
     Route::post('/transaction/checkout', [SalesController::class, 'checkout'])->name('transaction.checkout');
     Route::post('/gettransaction/', [SalesController::class, 'getTransactionItem'])->name('transaction.getTransactionItem');
-    Route::get('/transaction/cartItem/{id}', [SalesController::class, 'getCartItem']);
-    Route::get('/transaction/cartItem/{id}', [SalesController::class, 'getCartItem']);
-    Route::post('/transaction/update-cart', [SalesController::class, 'updateCart'])
+    Route::get('/getcart/cartItem/{id}', [SalesController::class, 'getCartItem']);
+    Route::post('/getcart/update-cart', [SalesController::class, 'updateCart'])
         ->name('transaction.updateCart');
 
     // ------ Modal Data On Transaction (For Modal) -----
@@ -210,6 +215,7 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     Route::post('/returitem', [ReturController::class, 'returItem'])->name('returdata.returItem');
     Route::get('/salesdata/returdata', [ReturController::class, 'returdata'])->name('returdata.returdata');
     Route::get('/salesdata/getreturmedicine', [ReturController::class, 'getReturMedicines'])->name('returdata.medicines');
+    Route::get('retur/batches', [ReturController::class, 'getBatchesByMedicine'])->name('returdata.batches');
 
     // Orders Retur
     Route::get('/returorder', [ReturController::class, 'returOrders'])->name('returdata.returorders');
@@ -224,7 +230,7 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     Route::get('/stock-data',        [SuppliesController::class, 'stockData'])->name('supplies.stockData');
     Route::get('/stock-data/get',    [SuppliesController::class, 'getStockData'])->name('supplies.getStockData');
     Route::get('/stock-data/export', [SuppliesController::class, 'exportStock'])->name('supplies.exportStockData');
-    
+
     Route::get('/stockopname', [SuppliesController::class, 'stockOpname'])->name('supplies.stockOpname');
     Route::get('/getmedicines', [SuppliesController::class, 'getMedicines'])->name('supplies.medicines');
     Route::get('/medicineStockLog', [SuppliesController::class, 'medicineStockLog'])->name('supplies.medicineStockLog');
@@ -235,6 +241,16 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     Route::get('/stock-detail', [SuppliesController::class, 'stockDetail'])->name('supplies.stockDetail');
     Route::get('/getstockdetail', [SuppliesController::class, 'getStockDetail'])->name('supplies.getStockDetail');
 
+    // Transfers
+    Route::get('/transfers/create', [TransfersController::class, 'transfersCreate'])->name('transfers.create');
+    Route::post('/transfer', [TransfersController::class, 'transfer'])->name('transfer');
+    Route::get('/search/getbatches', [TransfersController::class, 'searchBatches'])->name('search.getbatches');
+    Route::get('/etalases',        [TransfersController::class, 'index'])->name('etalases.index');
+    Route::post('/etalases',       [TransfersController::class, 'store'])->name('etalases.store');
+    Route::put('/etalases/{etalase}', [TransfersController::class, 'update']);
+    Route::get('/transfers/incoming', [TransfersController::class, 'incomingTransfers'])->name('transfers.incoming');
+    Route::post('/transfers/{transfer}/accept', [TransfersController::class, 'acceptTransfer'])->name('transfers.accept');
+    Route::post('/transfers/{transfer}/deny', [TransfersController::class, 'denyTransfer'])->name('transfers.deny');
 
     // Reports  
     Route::get('/reports/transactions', [ReportsController::class, 'transactions'])->name('reports.transactions');

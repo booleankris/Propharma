@@ -7,6 +7,7 @@ use App\Models\History;
 use App\Models\ItemsLog;
 use App\Models\MedicineCart;
 use App\Models\Medicines;
+use App\Models\MedicineTransfers;
 use App\Models\MedicineTransactions;
 use App\Models\Receiving;
 use App\Models\ReceivingItems;
@@ -208,23 +209,10 @@ class ReturController extends Controller
             //     $batches->increment('stock', $request->qty_rsetur);
             // }
 
-            $batch = Batches::where('medicine_id', $request->medicine_id)
-                ->where('name', $request->batch)
-                ->where('expired_date', $request->expired_date)
-                ->lockForUpdate()
-                ->first();
+            $transfer = MedicineTransfers::findOrFail($request->transfer_id);
+            $transfer->stock += $request->qty_retur; // add back to counter stock
+            $transfer->save();
 
-            if (!$batch) {
-                $batch = Batches::create([
-                    'medicine_id'  => $request->medicine_id,
-                    'name'         => $request->batch,
-                    'expired_date' => $request->expired_date,
-                    'stock'        => 0,
-                    'status'       => 0,
-                ]);
-            }
-
-            $batch->increment('stock', $request->qty_retur);
 
             // Create Retur (Retur Sales = 3)
             $itemsLog = ItemsLog::create([
@@ -238,7 +226,7 @@ class ReturController extends Controller
                 'total'            => $request->total_retur,
                 'date'             => $now,
                 'status'           => 3,
-                'batches_id'       => $batch->id
+                'batches_id'       => $transfer->batches_id
             ]);
 
             // Create New Retur Transaction
@@ -289,11 +277,14 @@ class ReturController extends Controller
             //     'total_retur'   => $request->total_retur,
             //     'updated_at'    => now(),
             // ]);
+            
             DB::commit();
 
-            return redirect()
-                ->back()
-                ->with('success', 'Retur berhasil disimpan');
+            return response()->json([
+                'success'    => true,
+                'message'    => 'Retur berhasil disimpan.',
+                'retur_code' => $this->generateReturCode(), // next retur code
+            ]);
         } catch (\Throwable $e) {
 
             DB::rollBack();
@@ -302,6 +293,24 @@ class ReturController extends Controller
                 ->back()
                 ->with('error', 'Gagal menyimpan retur: ' . $e->getMessage());
         }
+    }
+    public function getBatchesByMedicine(Request $request)
+    {
+        $medicine_id = $request->medicine_id;
+
+        $transfers = MedicineTransfers::join('batches', 'medicine_transfers.batches_id', '=', 'batches.id')
+            ->where('batches.medicine_id', $medicine_id)
+            ->orderBy('batches.expired_date', 'asc') // FEFO
+            ->select(
+                'medicine_transfers.id as transfer_id',
+                'medicine_transfers.stock as counter_stock',
+                'batches.id as batch_id',
+                'batches.name as batch_name',
+                'batches.expired_date',
+            )
+            ->get();
+
+        return response()->json($transfers);
     }
 
 
@@ -387,15 +396,6 @@ class ReturController extends Controller
 
         try {
 
-            // $retur = Retur::create([
-            //     'code'           => $this->generateReturCode(),
-            //     'transaction_id' => $request->transaction_id,
-            //     'medicine_id'    => $request->medicine_id,
-            //     'qty_retur'      => $request->qty_retur,
-            //     'total_retur'    => $request->total_retur,
-            //     'status'         => 2,
-            // ]);
-
             // Create Retur Log (Retur Orders = 4)
             $findcode = Receiving::findOrFail($request->transaction_id);
             $now = Carbon::now()->format('Y-m-d');
@@ -405,17 +405,6 @@ class ReturController extends Controller
                 ->lockForUpdate()
                 ->firstOrFail();
             $qty_before = $medicine->stock;
-
-
-
-            // $batches = Batches::where('medicine_id', $request->medicine_id)
-            //     ->where('expired_at', $request->expired_date)
-            //     ->where('name', $request->batch)
-            //     ->first();
-            // if ($batches) {
-            //     $batches->increment('stock', $request->qty_rsetur);
-            // }
-
             $batch = Batches::where('medicine_id', $request->medicine_id)
                 ->where('name', $request->batch)
                 ->where('expired_date', $request->expired_date)
@@ -447,26 +436,6 @@ class ReturController extends Controller
                 'status'           => 4,
                 'batches_id'       => $batch->id
             ]);
-
-            // Create New Retur Transaction
-            // $getTransactiondata = MedicineTransactions::findOrFail($request->transaction_id);
-            // $transaction = MedicineTransactions::create([
-            //     'pharmacy_id'           => $getTransactiondata->pharmacy_id,
-            //     "debtor_id"             => $getTransactiondata->debtor_id,
-            //     "doctor_id"             => $getTransactiondata->doctor_id,
-            //     "patient_id"            => $getTransactiondata->patient_id,
-            //     "transaction_type"      => "RETUR BELI",
-            //     "transaction_code"      => "RT",
-            //     "paid"                  => $getTransactiondata->paid,
-            //     "changes"               => $getTransactiondata->changes,
-            //     "subtotal"              => $getTransactiondata->subtotal,
-            //     "discount"              => $getTransactiondata->discount,
-            //     "status"                => $getTransactiondata->status,
-            //     "created_at"            => $getTransactiondata->created_at,
-            //     "updated_at"            => $getTransactiondata->updated_at,
-            // ]);
-
-
             // Get & Update Cart
             $medicine = Medicines::findOrFail($request->medicine_id);
 
@@ -477,33 +446,6 @@ class ReturController extends Controller
             }
 
             $medicine->decrement('stock', $request->qty_retur);
-
-
-            // if ($request->old_qty - $request->qty_retur == 0) {
-            //     $cart->delete();
-            //     $cart->update([
-            //         'final_price'   => $cart->final_price - $request->total_retur - $cart->discount,
-            //         'total_price'   => $cart->final_price - $request->total_retur,
-            //         'quantity'      => $request->old_qty - $request->qty_retur,
-            //     ]);
-            // } else if ($request->old_qty - $request->qty_retur > 0) {
-            //     $cart->update([
-            //         'final_price'   => $cart->final_price - $request->total_retur - $cart->discount,
-            //         'total_price'   => $cart->final_price - $request->total_retur,
-            //         'quantity'      => $request->old_qty - $request->qty_retur,
-            //     ]);
-            // } else {
-
-            // }
-
-
-            // Get & Update Transaction
-            // $transaction = MedicineTransactions::findOrFail($request->transaction_id);
-            // $transaction->update([
-            //     'status'        => 2,
-            //     'total_retur'   => $request->total_retur,
-            //     'updated_at'    => now(),
-            // ]);
             DB::commit();
 
             return redirect()

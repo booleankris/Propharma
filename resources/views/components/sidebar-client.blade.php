@@ -30,26 +30,19 @@
         animation: fadeIn 0.25s ease-out;
     }
 
-    main {
-        margin-left: 240px;
-        min-height: 100vh;
-        display: flex;
-        flex-direction: column;
-
-    }
-
+    /* ── Sidebar ── */
     .sidebar {
         width: 240px;
         min-height: 100vh;
         background: #0f2744;
         display: flex;
         flex-direction: column;
-        padding: 0;
         position: fixed;
         left: 0;
         top: 0;
         bottom: 0;
-        z-index: 10;
+        z-index: 100;
+        transition: transform 0.3s ease;
     }
 
     .sidebar-brand {
@@ -69,7 +62,7 @@
 
     .brand-name {
         font-size: 20px;
-        color: #ffffff;
+        color: #fff;
         letter-spacing: 0.02em;
     }
 
@@ -87,6 +80,7 @@
         display: flex;
         flex-direction: column;
         gap: 2px;
+        overflow-y: auto;
     }
 
     .nav-section-title {
@@ -155,43 +149,40 @@
         flex-shrink: 0;
     }
 
+    /* ── Topbar ── */
+    main {
+        margin-left: 240px;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+    }
 
-    /* NAVBAR & TOPBAR */
     .navbar-positions {
         margin-left: 240px;
-
     }
 
     .topbar {
-        background: #ffffff;
+        background: #fff;
         border-bottom: 1px solid #e2e8f0;
         padding: 0 32px;
         height: 64px;
         display: flex;
         align-items: center;
-        justify-content: space-between;
         position: sticky;
         top: 0;
-        z-index: 5;
-    }
-
-    .topbar-title {
-        font-size: 22px;
-        font-weight: 800;
-        color: #0f2744;
-        letter-spacing: 0.01em;
-    }
-
-    .topbar-right {
-        display: flex;
-        align-items: center;
-        gap: 12px;
+        z-index: 50;
     }
 
     .topbar-date {
         font-size: 13px;
         color: #64748b;
         font-weight: 500;
+    }
+
+    .topbar-right {
+        display: flex;
+        align-items: center;
+        gap: 12px;
     }
 
     .topbar-btn {
@@ -214,16 +205,30 @@
         color: #374151;
     }
 
-    /* NOTIFICATION */
-
-    .notif-hidden {
+    /* Hamburger — hidden on desktop */
+    .hamburger-btn {
         display: none;
+        width: 38px;
+        height: 38px;
+        border-radius: 10px;
+        border: 1.5px solid #e2e8f0;
+        background: transparent;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        color: #64748b;
     }
 
-    .expiry-hidden {
+    /* Sidebar overlay (mobile) */
+    .sidebar-overlay {
         display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.45);
+        z-index: 99;
     }
 
+    /* ── Notification panel ── */
     .notif-overlay {
         position: absolute;
         top: 68px;
@@ -233,7 +238,7 @@
         background: white;
         border-radius: 16px;
         border: 1px solid #e2e8f0;
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.10);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, .10);
         overflow: hidden;
     }
 
@@ -257,7 +262,6 @@
         cursor: pointer;
         color: #94a3b8;
         font-size: 18px;
-        line-height: 1;
     }
 
     .notif-list {
@@ -330,6 +334,19 @@
         margin-bottom: 4px;
     }
 
+    .notif-meta {
+        font-size: 11px;
+        color: #94a3b8;
+        margin-top: 3px;
+    }
+
+    .notif-empty {
+        padding: 32px;
+        text-align: center;
+        color: #94a3b8;
+        font-size: 13px;
+    }
+
     .notif-badge {
         display: inline-flex;
         align-items: center;
@@ -372,12 +389,6 @@
         color: #7c3aed;
     }
 
-    .notif-meta {
-        font-size: 11px;
-        color: #94a3b8;
-        margin-top: 3px;
-    }
-
     .notif-qty {
         font-size: 13px;
         font-weight: 700;
@@ -398,17 +409,81 @@
         color: #7c3aed;
     }
 
-    .notif-empty {
-        padding: 32px;
-        text-align: center;
-        color: #94a3b8;
-        font-size: 13px;
+    /* ── Mobile ── */
+    @media (max-width: 768px) {
+        .sidebar {
+            transform: translateX(-100%);
+        }
+
+        .sidebar.open {
+            transform: translateX(0);
+        }
+
+        .sidebar-overlay.open {
+            display: block;
+        }
+
+        main {
+            margin-left: 0;
+        }
+
+        .navbar-positions {
+            margin-left: 0;
+        }
+
+        .hamburger-btn {
+            display: flex;
+        }
+
+        .topbar {
+            padding: 0 16px;
+        }
+
+        .topbar-date {
+            display: none;
+        }
+
+        .notif-overlay {
+            position: fixed;
+            top: 68px;
+            right: 8px;
+            left: 8px;
+            width: auto;
+        }
+
+        /* Bottom-sheet modals on mobile */
+        .modal-hide,
+        .modal-show {
+            top: auto !important;
+            left: 0 !important;
+            right: 0 !important;
+            bottom: 0 !important;
+            transform: none !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            border-radius: 24px 24px 0 0 !important;
+            max-height: 85vh;
+            overflow-y: auto;
+        }
+
+        .modal-hide {
+            transform: translateY(100%) !important;
+            opacity: 0;
+        }
+
+        .modal-show {
+            transform: translateY(0) !important;
+            opacity: 1;
+        }
     }
 </style>
 
-<div class="sidebar">
+{{-- Sidebar overlay (mobile tap to close) --}}
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+<div class="sidebar" id="sidebar">
     <div class="sidebar-brand">
-        <div style="display:flex; align-items:center; gap:12px; margin-bottom: 4px;">
+        <div style="display:flex; align-items:center; gap:12px; margin-bottom:4px;">
             <div class="brand-logo">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2"
                     stroke-linecap="round" stroke-linejoin="round">
@@ -425,7 +500,6 @@
     </div>
 
     <div class="sidebar-nav">
-
         <div class="nav-section-title">Menu Utama</div>
 
         <a href="{{ url('dashboard') }}" class="nav-item {{ request()->is('dashboard') ? 'active' : '' }}">
@@ -469,13 +543,25 @@
             </svg>
             Persediaan
         </a>
+        <a width="16" height="16" onclick="openModal('transfersModal')"
+            class="nav-item {{ request()->is('inventory*') ? 'active' : '' }}">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                class="icon icon-tabler icons-tabler-outline icon-tabler-transfer">
+                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                <path d="M20 10h-16l5.5 -6" />
+                <path d="M4 14h16l-5.5 6" />
+            </svg>
+            Mutasi
+        </a>
+
 
         <div class="nav-section-title">Laporan</div>
 
         <a onclick="openModal('salesModal')" class="nav-item {{ request()->is('sales*') ? 'active' : '' }}"
             style="cursor:pointer;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                stroke-linecap="round" stroke-linejoin="round">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <line x1="12" y1="20" x2="12" y2="10" />
                 <line x1="18" y1="20" x2="18" y2="4" />
                 <line x1="6" y1="20" x2="6" y2="16" />
@@ -519,7 +605,6 @@
             Master Data
         </a>
 
-
         <div class="nav-section-title">Akun</div>
 
         <a href="{{ url('profile') }}" class="nav-item {{ request()->is('profile*') ? 'active' : '' }}">
@@ -546,7 +631,6 @@
         <form id="logout-form" action="{{ route('logout') }}" method="POST" style="display:none;">
             @csrf
         </form>
-
     </div>
 
     <div class="sidebar-footer">
@@ -560,27 +644,31 @@
     </div>
 </div>
 
-{{-- Navbar & Topbar --}}
+{{-- Topbar --}}
 <div class="navbar-positions">
-    <div class="topbar">
-        <div>
-            {{-- <div class="topbar-title font-poppins">Apotek Sahabat</div> --}}
-        </div>
+    <div class="topbar justify-between md:justify-end">
+        <button class="hamburger-btn" onclick="toggleSidebar()" aria-label="Toggle menu">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round">
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <line x1="3" y1="12" x2="21" y2="12" />
+                <line x1="3" y1="18" x2="21" y2="18" />
+            </svg>
+        </button>
+
         <div class="topbar-right">
             <div class="topbar-date">{{ \Carbon\Carbon::now()->locale('id')->isoFormat('dddd, D MMMM YYYY') }}</div>
-            <button class="topbar-btn" onclick="toggleModal('notif-modal')">
+            <button class="topbar-btn" onclick="toggleModal('notif-modal')" aria-label="Notifikasi stok">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
                     <path d="M13.73 21a2 2 0 0 1-3.46 0" />
                 </svg>
             </button>
-            <button class="topbar-btn" onclick="toggleModal('expiry-modal')">
+            <button class="topbar-btn" onclick="toggleModal('expiry-modal')" aria-label="Obat kedaluwarsa">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
-                    stroke="currentColor" class="w-6 h-6 text-gray-400">
-                    <!-- Circular arrow (history) -->
+                    stroke="currentColor" width="16" height="16">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M3 12a9 9 0 1 0 3-6.708M3 4v5h5" />
-                    <!-- Clock hands -->
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 7v5l3 3" />
                 </svg>
             </button>
@@ -588,18 +676,16 @@
     </div>
 </div>
 
-
-{{-- Modals --}}
+{{-- Modal backdrop --}}
 <div id="modalBackdrop" class="hidden fixed inset-0 bg-black bg-opacity-40 z-40"></div>
 
+{{-- Report Modal --}}
 <div id="reportModal"
     class="modal-hide modal-transition fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
     w-[92%] max-w-[480px] bg-white rounded-3xl shadow-2xl z-50 overflow-hidden">
-
     <div class="relative bg-gradient-to-br from-[#4a90d9] via-[#6196c0] to-[#3a7bd5] px-6 pt-6 pb-8">
         <div class="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2"></div>
         <div class="absolute bottom-0 left-4 w-16 h-16 bg-white/10 rounded-full translate-y-1/2"></div>
-
         <div class="relative flex items-center justify-between">
             <div>
                 <p class="text-blue-100 text-xs font-medium tracking-widest uppercase mb-1">Manajemen Sistem</p>
@@ -614,14 +700,13 @@
             </div>
         </div>
     </div>
-    <div class="px-5 py-8 max-h-[60vh] overflow-y-auto scrollbar-thin">
+    <div class="px-5 py-6 max-h-[60vh] overflow-y-auto">
         <div class="grid grid-cols-2 gap-3">
             <a href="{{ route('reports.transactions') }}"
-                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-violet-50 hover:bg-violet-500 border border-violet-100 hover:border-violet-500 transition-all duration-200 hover:shadow-lg hover:shadow-violet-200 hover:-translate-y-0.5">
+                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-violet-50 hover:bg-violet-500 border border-violet-100 hover:border-violet-500 transition-all duration-200 hover:-translate-y-0.5">
                 <div
-                    class="w-9 h-9 rounded-xl bg-violet-100 group-hover:bg-violet-400 flex items-center justify-center transition-colors duration-200 flex-shrink-0">
-                    <svg xmlns="http://www.w3.org/2000/svg"
-                        class="w-5 h-5 text-violet-500 group-hover:text-white transition-colors" fill="none"
+                    class="w-9 h-9 rounded-xl bg-violet-100 group-hover:bg-violet-400 flex items-center justify-center flex-shrink-0 transition-colors">
+                    <svg class="w-5 h-5 text-violet-500 group-hover:text-white transition-colors" fill="none"
                         viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round"
                             d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
@@ -630,67 +715,51 @@
                 <span class="text-sm font-semibold text-violet-700 group-hover:text-white transition-colors">Report
                     Transaksi</span>
             </a>
-
             <a href="{{ route('reports.patients') }}"
-                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-pink-50 hover:bg-pink-500 border border-pink-100 hover:border-pink-500 transition-all duration-200 hover:shadow-lg hover:shadow-pink-200 hover:-translate-y-0.5">
+                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-pink-50 hover:bg-pink-500 border border-pink-100 hover:border-pink-500 transition-all duration-200 hover:-translate-y-0.5">
                 <div
-                    class="w-9 h-9 rounded-xl bg-pink-100 group-hover:bg-pink-400 flex items-center justify-center transition-colors duration-200 flex-shrink-0">
-                    <svg xmlns="http://www.w3.org/2000/svg"
-                        class="w-5 h-5 text-pink-500 group-hover:text-white transition-colors" fill="none"
+                    class="w-9 h-9 rounded-xl bg-pink-100 group-hover:bg-pink-400 flex items-center justify-center flex-shrink-0 transition-colors">
+                    <svg class="w-5 h-5 text-pink-500 group-hover:text-white transition-colors" fill="none"
                         viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round"
                             d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                         <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                     </svg>
                 </div>
-                <span class="text-sm font-semibold text-pink-700 group-hover:text-white transition-colors">Report Data
+                <span class="text-sm font-semibold text-pink-700 group-hover:text-white transition-colors">Report
                     Pasien</span>
             </a>
-            <a href="{{ route('reports.patients') }}"
-                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-emerald-50 hover:bg-emerald-500 border border-emerald-100 hover:border-emerald-500 transition-all duration-200 hover:shadow-lg hover:shadow-emerald-200 hover:-translate-y-0.5">
-                <div
-                    class="w-9 h-9 rounded-xl bg-emerald-100 group-hover:bg-emerald-400 flex items-center justify-center transition-colors duration-200 flex-shrink-0">
-                    <svg xmlns="http://www.w3.org/2000/svg"
-                        class="w-5 h-5 text-emerald-500 group-hover:text-white transition-colors" fill="none"
-                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                </div>
-                <span class="text-sm font-semibold text-emerald-700 group-hover:text-white transition-colors">Report
-                    Data Pasien</span>
-            </a>
             <a href="{{ route('reports.doctors') }}"
-                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-orange-50 hover:bg-orange-500 border border-orange-100 hover:border-orange-500 transition-all duration-200 hover:shadow-lg hover:shadow-orange-200 hover:-translate-y-0.5">
+                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-orange-50 hover:bg-orange-500 border border-orange-100 hover:border-orange-500 transition-all duration-200 hover:-translate-y-0.5">
                 <div
-                    class="w-9 h-9 rounded-xl bg-orange-100 group-hover:bg-orange-400 flex items-center justify-center transition-colors duration-200 flex-shrink-0">
-                    <svg xmlns="http://www.w3.org/2000/svg"
-                        class="w-5 h-5 text-orange-500 group-hover:text-white transition-colors" fill="none"
+                    class="w-9 h-9 rounded-xl bg-orange-100 group-hover:bg-orange-400 flex items-center justify-center flex-shrink-0 transition-colors">
+                    <svg class="w-5 h-5 text-orange-500 group-hover:text-white transition-colors" fill="none"
                         viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round"
                             d="M3 7h2l2 9h10l2-9h2M3 7l1-4h16l1 4M9 16v2m6-2v2" />
                     </svg>
                 </div>
-                <span class="text-sm font-semibold text-orange-700 group-hover:text-white transition-colors">
-                    Report Data Dokter
-                </span>
+                <span class="text-sm font-semibold text-orange-700 group-hover:text-white transition-colors">Report
+                    Dokter</span>
             </a>
         </div>
-
-        <button class="closeModal mt-6 w-full py-2 bg-gray-300 hover:bg-gray-400 rounded-xl">
-            Close
+        <button
+            class="closeModal mt-5 w-full py-2.5 flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-600 font-semibold rounded-2xl transition-all">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+            Tutup
         </button>
     </div>
 </div>
+
+{{-- Master Modal --}}
 <div id="masterModal"
     class="modal-hide modal-transition fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
     w-[92%] max-w-[480px] bg-white rounded-3xl shadow-2xl z-50 overflow-hidden">
-
     <div class="relative bg-gradient-to-br from-[#4a90d9] via-[#6196c0] to-[#3a7bd5] px-6 pt-6 pb-8">
-        <div class="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2">
-        </div>
+        <div class="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2"></div>
         <div class="absolute bottom-0 left-4 w-16 h-16 bg-white/10 rounded-full translate-y-1/2"></div>
-
         <div class="relative flex items-center justify-between">
             <div>
                 <p class="text-blue-100 text-xs font-medium tracking-widest uppercase mb-1">Manajemen Sistem</p>
@@ -705,33 +774,26 @@
             </div>
         </div>
     </div>
-
-    <div class="px-5 py-5 max-h-[60vh] overflow-y-auto scrollbar-thin">
+    <div class="px-5 py-5 max-h-[60vh] overflow-y-auto">
         <div class="grid grid-cols-2 gap-3">
-
-            {{-- Master Obat --}}
             <a href="{{ route('medicines.index') }}"
-                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-blue-50 hover:bg-blue-500 border border-blue-100 hover:border-blue-500 transition-all duration-200 hover:shadow-lg hover:shadow-blue-200 hover:-translate-y-0.5">
+                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-blue-50   hover:bg-blue-500   border border-blue-100   hover:border-blue-500   transition-all duration-200 hover:-translate-y-0.5">
                 <div
-                    class="w-9 h-9 rounded-xl bg-blue-100 group-hover:bg-blue-400 flex items-center justify-center transition-colors duration-200 flex-shrink-0">
-                    <svg xmlns="http://www.w3.org/2000/svg"
-                        class="w-5 h-5 text-blue-500 group-hover:text-white transition-colors" fill="none"
+                    class="w-9 h-9 rounded-xl bg-blue-100   group-hover:bg-blue-400   flex items-center justify-center flex-shrink-0 transition-colors">
+                    <svg class="w-5 h-5 text-blue-500   group-hover:text-white transition-colors" fill="none"
                         viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round"
                             d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
                     </svg>
                 </div>
-                <span class="text-sm font-semibold text-blue-700 group-hover:text-white transition-colors">Master
+                <span class="text-sm font-semibold text-blue-700   group-hover:text-white transition-colors">Master
                     Obat</span>
             </a>
-
-            {{-- Master Debitur --}}
             <a href="{{ route('debtors.index') }}"
-                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-emerald-50 hover:bg-emerald-500 border border-emerald-100 hover:border-emerald-500 transition-all duration-200 hover:shadow-lg hover:shadow-emerald-200 hover:-translate-y-0.5">
+                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-emerald-50 hover:bg-emerald-500 border border-emerald-100 hover:border-emerald-500 transition-all duration-200 hover:-translate-y-0.5">
                 <div
-                    class="w-9 h-9 rounded-xl bg-emerald-100 group-hover:bg-emerald-400 flex items-center justify-center transition-colors duration-200 flex-shrink-0">
-                    <svg xmlns="http://www.w3.org/2000/svg"
-                        class="w-5 h-5 text-emerald-500 group-hover:text-white transition-colors" fill="none"
+                    class="w-9 h-9 rounded-xl bg-emerald-100 group-hover:bg-emerald-400 flex items-center justify-center flex-shrink-0 transition-colors">
+                    <svg class="w-5 h-5 text-emerald-500 group-hover:text-white transition-colors" fill="none"
                         viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round"
                             d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -740,143 +802,116 @@
                 <span class="text-sm font-semibold text-emerald-700 group-hover:text-white transition-colors">Master
                     Debitur</span>
             </a>
-
-            {{-- Master Kategori Obat --}}
             <a href="{{ route('categories.index') }}"
-                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-violet-50 hover:bg-violet-500 border border-violet-100 hover:border-violet-500 transition-all duration-200 hover:shadow-lg hover:shadow-violet-200 hover:-translate-y-0.5">
+                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-violet-50  hover:bg-violet-500  border border-violet-100  hover:border-violet-500  transition-all duration-200 hover:-translate-y-0.5">
                 <div
-                    class="w-9 h-9 rounded-xl bg-violet-100 group-hover:bg-violet-400 flex items-center justify-center transition-colors duration-200 flex-shrink-0">
-                    <svg xmlns="http://www.w3.org/2000/svg"
-                        class="w-5 h-5 text-violet-500 group-hover:text-white transition-colors" fill="none"
+                    class="w-9 h-9 rounded-xl bg-violet-100  group-hover:bg-violet-400  flex items-center justify-center flex-shrink-0 transition-colors">
+                    <svg class="w-5 h-5 text-violet-500  group-hover:text-white transition-colors" fill="none"
                         viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round"
                             d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
                     </svg>
                 </div>
-                <span class="text-sm font-semibold text-violet-700 group-hover:text-white transition-colors">Kategori
+                <span class="text-sm font-semibold text-violet-700  group-hover:text-white transition-colors">Kategori
                     Obat</span>
             </a>
-
-            {{-- Master Kreditur --}}
             <a href="{{ route('creditors.index') }}"
-                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-amber-50 hover:bg-amber-500 border border-amber-100 hover:border-amber-500 transition-all duration-200 hover:shadow-lg hover:shadow-amber-200 hover:-translate-y-0.5">
+                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-amber-50  hover:bg-amber-500  border border-amber-100  hover:border-amber-500  transition-all duration-200 hover:-translate-y-0.5">
                 <div
-                    class="w-9 h-9 rounded-xl bg-amber-100 group-hover:bg-amber-400 flex items-center justify-center transition-colors duration-200 flex-shrink-0">
-                    <svg xmlns="http://www.w3.org/2000/svg"
-                        class="w-5 h-5 text-amber-500 group-hover:text-white transition-colors" fill="none"
+                    class="w-9 h-9 rounded-xl bg-amber-100  group-hover:bg-amber-400  flex items-center justify-center flex-shrink-0 transition-colors">
+                    <svg class="w-5 h-5 text-amber-500  group-hover:text-white transition-colors" fill="none"
                         viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round"
                             d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                     </svg>
                 </div>
-                <span class="text-sm font-semibold text-amber-700 group-hover:text-white transition-colors">Master
+                <span class="text-sm font-semibold text-amber-700  group-hover:text-white transition-colors">Master
                     Kreditur</span>
             </a>
-
-            {{-- Master Komposisi --}}
             <a href="{{ route('compositions.index') }}"
-                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-cyan-50 hover:bg-cyan-500 border border-cyan-100 hover:border-cyan-500 transition-all duration-200 hover:shadow-lg hover:shadow-cyan-200 hover:-translate-y-0.5">
+                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-cyan-50   hover:bg-cyan-500   border border-cyan-100   hover:border-cyan-500   transition-all duration-200 hover:-translate-y-0.5">
                 <div
-                    class="w-9 h-9 rounded-xl bg-cyan-100 group-hover:bg-cyan-400 flex items-center justify-center transition-colors duration-200 flex-shrink-0">
-                    <svg xmlns="http://www.w3.org/2000/svg"
-                        class="w-5 h-5 text-cyan-500 group-hover:text-white transition-colors" fill="none"
+                    class="w-9 h-9 rounded-xl bg-cyan-100   group-hover:bg-cyan-400   flex items-center justify-center flex-shrink-0 transition-colors">
+                    <svg class="w-5 h-5 text-cyan-500   group-hover:text-white transition-colors" fill="none"
                         viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round"
                             d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                     </svg>
                 </div>
-                <span class="text-sm font-semibold text-cyan-700 group-hover:text-white transition-colors">Master
+                <span class="text-sm font-semibold text-cyan-700   group-hover:text-white transition-colors">Master
                     Komposisi</span>
             </a>
-
-            {{-- Master Dokter --}}
             <a href="{{ route('doctors.index') }}"
-                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-rose-50 hover:bg-rose-500 border border-rose-100 hover:border-rose-500 transition-all duration-200 hover:shadow-lg hover:shadow-rose-200 hover:-translate-y-0.5">
+                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-rose-50   hover:bg-rose-500   border border-rose-100   hover:border-rose-500   transition-all duration-200 hover:-translate-y-0.5">
                 <div
-                    class="w-9 h-9 rounded-xl bg-rose-100 group-hover:bg-rose-400 flex items-center justify-center transition-colors duration-200 flex-shrink-0">
-                    <svg xmlns="http://www.w3.org/2000/svg"
-                        class="w-5 h-5 text-rose-500 group-hover:text-white transition-colors" fill="none"
+                    class="w-9 h-9 rounded-xl bg-rose-100   group-hover:bg-rose-400   flex items-center justify-center flex-shrink-0 transition-colors">
+                    <svg class="w-5 h-5 text-rose-500   group-hover:text-white transition-colors" fill="none"
                         viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round"
                             d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                 </div>
-                <span class="text-sm font-semibold text-rose-700 group-hover:text-white transition-colors">Master
+                <span class="text-sm font-semibold text-rose-700   group-hover:text-white transition-colors">Master
                     Dokter</span>
             </a>
-
-            {{-- Master Pasien --}}
             <a href="{{ route('patients.index') }}"
-                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-teal-50 hover:bg-teal-500 border border-teal-100 hover:border-teal-500 transition-all duration-200 hover:shadow-lg hover:shadow-teal-200 hover:-translate-y-0.5">
+                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-teal-50   hover:bg-teal-500   border border-teal-100   hover:border-teal-500   transition-all duration-200 hover:-translate-y-0.5">
                 <div
-                    class="w-9 h-9 rounded-xl bg-teal-100 group-hover:bg-teal-400 flex items-center justify-center transition-colors duration-200 flex-shrink-0">
-                    <svg xmlns="http://www.w3.org/2000/svg"
-                        class="w-5 h-5 text-teal-500 group-hover:text-white transition-colors" fill="none"
+                    class="w-9 h-9 rounded-xl bg-teal-100   group-hover:bg-teal-400   flex items-center justify-center flex-shrink-0 transition-colors">
+                    <svg class="w-5 h-5 text-teal-500   group-hover:text-white transition-colors" fill="none"
                         viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round"
                             d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                     </svg>
                 </div>
-                <span class="text-sm font-semibold text-teal-700 group-hover:text-white transition-colors">Master
+                <span class="text-sm font-semibold text-teal-700   group-hover:text-white transition-colors">Master
                     Pasien</span>
             </a>
-
-            {{-- Master Pabrik --}}
             <a href="{{ route('factories.index') }}"
-                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-orange-50 hover:bg-orange-500 border border-orange-100 hover:border-orange-500 transition-all duration-200 hover:shadow-lg hover:shadow-orange-200 hover:-translate-y-0.5">
+                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-orange-50  hover:bg-orange-500  border border-orange-100  hover:border-orange-500  transition-all duration-200 hover:-translate-y-0.5">
                 <div
-                    class="w-9 h-9 rounded-xl bg-orange-100 group-hover:bg-orange-400 flex items-center justify-center transition-colors duration-200 flex-shrink-0">
-                    <svg xmlns="http://www.w3.org/2000/svg"
-                        class="w-5 h-5 text-orange-500 group-hover:text-white transition-colors" fill="none"
+                    class="w-9 h-9 rounded-xl bg-orange-100  group-hover:bg-orange-400  flex items-center justify-center flex-shrink-0 transition-colors">
+                    <svg class="w-5 h-5 text-orange-500  group-hover:text-white transition-colors" fill="none"
                         viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round"
                             d="M3 7h2l2 9h10l2-9h2M3 7l1-4h16l1 4M9 16v2m6-2v2" />
                     </svg>
                 </div>
-                <span class="text-sm font-semibold text-orange-700 group-hover:text-white transition-colors">Master
+                <span class="text-sm font-semibold text-orange-700  group-hover:text-white transition-colors">Master
                     Pabrik</span>
             </a>
-
-            {{-- Master Parameter --}}
             <a href="{{ route('parameters.index') }}"
-                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-indigo-50 hover:bg-indigo-500 border border-indigo-100 hover:border-indigo-500 transition-all duration-200 hover:shadow-lg hover:shadow-indigo-200 hover:-translate-y-0.5">
+                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-indigo-50  hover:bg-indigo-500  border border-indigo-100  hover:border-indigo-500  transition-all duration-200 hover:-translate-y-0.5">
                 <div
-                    class="w-9 h-9 rounded-xl bg-indigo-100 group-hover:bg-indigo-400 flex items-center justify-center transition-colors duration-200 flex-shrink-0">
-                    <svg xmlns="http://www.w3.org/2000/svg"
-                        class="w-5 h-5 text-indigo-500 group-hover:text-white transition-colors" fill="none"
+                    class="w-9 h-9 rounded-xl bg-indigo-100  group-hover:bg-indigo-400  flex items-center justify-center flex-shrink-0 transition-colors">
+                    <svg class="w-5 h-5 text-indigo-500  group-hover:text-white transition-colors" fill="none"
                         viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round"
                             d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
                     </svg>
                 </div>
-                <span class="text-sm font-semibold text-indigo-700 group-hover:text-white transition-colors">Master
+                <span class="text-sm font-semibold text-indigo-700  group-hover:text-white transition-colors">Master
                     Parameter</span>
             </a>
-
-            {{-- Master Lokasi --}}
             <a href="{{ route('locations.index') }}"
-                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-pink-50 hover:bg-pink-500 border border-pink-100 hover:border-pink-500 transition-all duration-200 hover:shadow-lg hover:shadow-pink-200 hover:-translate-y-0.5">
+                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-pink-50   hover:bg-pink-500   border border-pink-100   hover:border-pink-500   transition-all duration-200 hover:-translate-y-0.5">
                 <div
-                    class="w-9 h-9 rounded-xl bg-pink-100 group-hover:bg-pink-400 flex items-center justify-center transition-colors duration-200 flex-shrink-0">
-                    <svg xmlns="http://www.w3.org/2000/svg"
-                        class="w-5 h-5 text-pink-500 group-hover:text-white transition-colors" fill="none"
+                    class="w-9 h-9 rounded-xl bg-pink-100   group-hover:bg-pink-400   flex items-center justify-center flex-shrink-0 transition-colors">
+                    <svg class="w-5 h-5 text-pink-500   group-hover:text-white transition-colors" fill="none"
                         viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round"
                             d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                         <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                     </svg>
                 </div>
-                <span class="text-sm font-semibold text-pink-700 group-hover:text-white transition-colors">Master
+                <span class="text-sm font-semibold text-pink-700   group-hover:text-white transition-colors">Master
                     Lokasi</span>
             </a>
-
-            {{-- Master Etalase --}}
             <a href="{{ route('items.index') }}"
-                class="group col-span-2 flex items-center gap-3 p-3.5 rounded-2xl bg-lime-50 hover:bg-lime-500 border border-lime-100 hover:border-lime-500 transition-all duration-200 hover:shadow-lg hover:shadow-lime-200 hover:-translate-y-0.5">
+                class="group col-span-2 flex items-center gap-3 p-3.5 rounded-2xl bg-lime-50 hover:bg-lime-500 border border-lime-100 hover:border-lime-500 transition-all duration-200 hover:-translate-y-0.5">
                 <div
-                    class="w-9 h-9 rounded-xl bg-lime-100 group-hover:bg-lime-400 flex items-center justify-center transition-colors duration-200 flex-shrink-0">
-                    <svg xmlns="http://www.w3.org/2000/svg"
-                        class="w-5 h-5 text-lime-600 group-hover:text-white transition-colors" fill="none"
+                    class="w-9 h-9 rounded-xl bg-lime-100 group-hover:bg-lime-400 flex items-center justify-center flex-shrink-0 transition-colors">
+                    <svg class="w-5 h-5 text-lime-600 group-hover:text-white transition-colors" fill="none"
                         viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round"
                             d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
@@ -885,105 +920,227 @@
                 <span class="text-sm font-semibold text-lime-700 group-hover:text-white transition-colors">Master
                     Etalase</span>
             </a>
-
         </div>
-    </div>
-
-    {{-- Footer --}}
-    <div class="px-5 pb-5 pt-2">
         <button
-            class="closeModal w-full py-2.5 flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-800 font-semibold rounded-2xl transition-all duration-200">
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24"
-                stroke="currentColor" stroke-width="2.5">
+            class="closeModal mt-5 w-full py-2.5 flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-600 font-semibold rounded-2xl transition-all">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
             Tutup
         </button>
     </div>
 </div>
+
+{{-- Persediaan Modal --}}
 <div id="logModal"
-    class="modal-hide modal-transition fixed top-1/2 left-1/2 
-       w-[90%] max-w-[400px] bg-white p-6 rounded-2xl shadow-lg z-50">
-
-    <h2 class="text-xl font-bold text-[#6196c0] mb-4">Persediaan</h2>
-
-    <div class="flex flex-col space-y-3">
-
-        <a href="{{ route('supplies.index') }}"
-            class="py-3 bg-[#6196c0] text-center text-white rounded-xl font-poppins">Kartu Stok</a>
-        <a href="{{ route('supplies.stockDetail') }}"
-            class="py-3 bg-[#6196c0] text-center text-white rounded-xl font-poppins">Detail Stok</a>
-        <a href="{{ route('supplies.stockData') }}"
-            class="py-3 bg-[#6196c0] text-center text-white rounded-xl font-poppins">Data Stok</a>
-        <a href="{{ route('supplies.stockOpname') }}"
-            class="py-3 bg-[#6196c0] text-center text-white rounded-xl font-poppins">Stok Opname</a>
-
+    class="modal-hide modal-transition fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
+    w-[90%] max-w-[400px] bg-white rounded-3xl shadow-2xl z-50 overflow-hidden">
+    <div class="relative bg-gradient-to-br from-[#4a90d9] via-[#6196c0] to-[#3a7bd5] px-6 pt-6 pb-8">
+        <div class="relative flex items-center justify-between">
+            <div>
+                <p class="text-blue-100 text-xs font-medium tracking-widest uppercase mb-1">Manajemen Sistem</p>
+                <h2 class="text-2xl font-bold text-white">Persediaan</h2>
+            </div>
+        </div>
     </div>
-
-    <button class="closeModal mt-6 w-full py-2 bg-gray-300 hover:bg-gray-400 rounded-xl">
-        Close
-    </button>
-</div>
-<div id="receivingModal"
-    class="modal-hide modal-transition fixed top-1/2 left-1/2 
-    w-[90%] max-w-[400px] bg-white p-6 rounded-2xl shadow-lg z-50">
-    <h2 class="text-xl font-bold text-[#6196c0] mb-4">Pilih Pembelian</h2>
-
-    <div class="flex flex-col space-y-3">
-
-        <a href="{{ route('receiving.index') }}"
-            class="py-3 bg-[#6196c0] text-center text-white rounded-xl font-poppins">Pemesanan dan Penerimaan
-            Barang</a>
-        <a href="{{ route('receiving.history') }}"
-            class="py-3 bg-[#6196c0] text-center text-white rounded-xl font-poppins">History Harga Beli</a>
-        <a href="{{ route('receiving.orderhistory') }}"
-            class="py-3 bg-[#6196c0] text-center text-white rounded-xl font-poppins">Data Pembelian</a>
-        <a href="{{ route('returdata.returorders') }}"
-            class="py-3 bg-[#6196c0] text-center text-white rounded-xl font-poppins">Retur Pembelian</a>
-
-    </div>
-
-    <button class="closeModal mt-6 w-full py-2 bg-gray-300 hover:bg-gray-400 rounded-xl">
-        Close
-    </button>
-</div>
-<div id="salesModal"
-    class="modal-hide modal-transition fixed top-1/2 left-1/2 
-       w-[90%] max-w-[400px] bg-white p-6 rounded-2xl shadow-lg z-50">
-
-    <h2 class="text-xl font-bold text-[#6196c0] mb-4">Pilih Penjualan</h2>
-
-    <div class="flex flex-col space-y-3">
-
-        <a href="{{ route('salesdata.index') }}"
-            class="py-3 bg-[#6196c0] text-center text-white rounded-xl font-poppins">Data
-            Penjualan</a>
-        <a href="{{ route('returdata.retur') }}"
-            class="py-3 bg-[#6196c0] text-center text-white rounded-xl font-poppins">Retur
-            Penjualan</a>
-        <a href="{{ route('sales.reject') }}"
-            class="py-3 bg-[#6196c0] text-center text-white rounded-xl font-poppins">Penolakan</a>
-
-    </div>
-
-    <button class="closeModal mt-6 w-full py-2 bg-gray-300 hover:bg-gray-400 rounded-xl">
-        Close
-    </button>
-</div>
-<div id="notif-modal" class="notif-overlay hidden">
-    <!-- HEADER -->
-    <div class="notif-header">
-        <span class="notif-title">Notifikasi Stok</span>
-        <button class="notif-close" onclick="document.getElementById('notif-modal').classList.add('hidden')">
-            ×
+    <div class="px-5 py-5">
+        <div class="flex flex-col gap-2">
+            <a href="{{ route('supplies.index') }}"
+                class="py-3 px-4 bg-[#6196c0] hover:bg-[#4a7aaa] text-center text-white rounded-xl font-medium transition-colors">Kartu
+                Stok</a>
+            <a href="{{ route('supplies.stockDetail') }}"
+                class="py-3 px-4 bg-[#6196c0] hover:bg-[#4a7aaa] text-center text-white rounded-xl font-medium transition-colors">Detail
+                Stok</a>
+            <a href="{{ route('supplies.stockData') }}"
+                class="py-3 px-4 bg-[#6196c0] hover:bg-[#4a7aaa] text-center text-white rounded-xl font-medium transition-colors">Data
+                Stok</a>
+            <a href="{{ route('supplies.stockOpname') }}"
+                class="py-3 px-4 bg-[#6196c0] hover:bg-[#4a7aaa] text-center text-white rounded-xl font-medium transition-colors">Stok
+                Opname</a>
+        </div>
+        <button
+            class="closeModal mt-5 w-full py-2.5 flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-600 font-semibold rounded-2xl transition-all">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+            Tutup
         </button>
     </div>
+</div>
 
-    <!-- LIST -->
+{{-- Pembelian Modal --}}
+<div id="receivingModal"
+    class="modal-hide modal-transition fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
+    w-[90%] max-w-[400px] bg-white rounded-3xl shadow-2xl z-50 overflow-hidden">
+    <div class="relative bg-gradient-to-br from-[#4a90d9] via-[#6196c0] to-[#3a7bd5] px-6 pt-6 pb-8">
+        <div class="relative flex items-center justify-between">
+            <div>
+                <p class="text-blue-100 text-xs font-medium tracking-widest uppercase mb-1">Manajemen Sistem</p>
+                <h2 class="text-2xl font-bold text-white">Pembelian</h2>
+            </div>
+        </div>
+    </div>
+    <div class="px-5 py-5">
+        <div class="flex flex-col gap-2">
+            <a href="{{ route('receiving.index') }}"
+                class="py-3 px-4 bg-[#6196c0] hover:bg-[#4a7aaa] text-center text-white rounded-xl font-medium transition-colors">Pemesanan
+                dan Penerimaan Barang</a>
+            <a href="{{ route('receiving.history') }}"
+                class="py-3 px-4 bg-[#6196c0] hover:bg-[#4a7aaa] text-center text-white rounded-xl font-medium transition-colors">History
+                Harga Beli</a>
+            <a href="{{ route('receiving.orderhistory') }}"
+                class="py-3 px-4 bg-[#6196c0] hover:bg-[#4a7aaa] text-center text-white rounded-xl font-medium transition-colors">Data
+                Pembelian</a>
+            <a href="{{ route('returdata.returorders') }}"
+                class="py-3 px-4 bg-[#6196c0] hover:bg-[#4a7aaa] text-center text-white rounded-xl font-medium transition-colors">Retur
+                Pembelian</a>
+        </div>
+        <button
+            class="closeModal mt-5 w-full py-2.5 flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-600 font-semibold rounded-2xl transition-all">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+            Tutup
+        </button>
+    </div>
+</div>
+
+{{-- Penjualan Modal --}}
+<div id="salesModal"
+    class="modal-hide modal-transition fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
+    w-[90%] max-w-[400px] bg-white rounded-3xl shadow-2xl z-50 overflow-hidden">
+    <div class="relative bg-gradient-to-br from-[#4a90d9] via-[#6196c0] to-[#3a7bd5] px-6 pt-6 pb-8">
+        <div class="relative flex items-center justify-between">
+            <div>
+                <p class="text-blue-100 text-xs font-medium tracking-widest uppercase mb-1">Manajemen Sistem</p>
+                <h2 class="text-2xl font-bold text-white">Penjualan</h2>
+            </div>
+        </div>
+    </div>
+    <div class="px-5 py-5">
+        <div class="flex flex-col gap-2">
+            <a href="{{ route('salesdata.index') }}"
+                class="py-3 px-4 bg-[#6196c0] hover:bg-[#4a7aaa] text-center text-white rounded-xl font-medium transition-colors">Data
+                Penjualan</a>
+            <a href="{{ route('returdata.retur') }}"
+                class="py-3 px-4 bg-[#6196c0] hover:bg-[#4a7aaa] text-center text-white rounded-xl font-medium transition-colors">Retur
+                Penjualan</a>
+            <a href="{{ route('sales.reject') }}"
+                class="py-3 px-4 bg-[#6196c0] hover:bg-[#4a7aaa] text-center text-white rounded-xl font-medium transition-colors">Penolakan</a>
+        </div>
+        <button
+            class="closeModal mt-5 w-full py-2.5 flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-600 font-semibold rounded-2xl transition-all">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+            Tutup
+        </button>
+    </div>
+</div>
+
+<div id="salesModal"
+    class="modal-hide modal-transition fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
+    w-[90%] max-w-[400px] bg-white rounded-3xl shadow-2xl z-50 overflow-hidden">
+    <div class="relative bg-gradient-to-br from-[#4a90d9] via-[#6196c0] to-[#3a7bd5] px-6 pt-6 pb-8">
+        <div class="relative flex items-center justify-between">
+            <div>
+                <p class="text-blue-100 text-xs font-medium tracking-widest uppercase mb-1">Manajemen Sistem</p>
+                <h2 class="text-2xl font-bold text-white">Penjualan</h2>
+            </div>
+        </div>
+    </div>
+    <div class="px-5 py-5">
+        <div class="flex flex-col gap-2">
+            <a href="{{ route('salesdata.index') }}"
+                class="py-3 px-4 bg-[#6196c0] hover:bg-[#4a7aaa] text-center text-white rounded-xl font-medium transition-colors">Data
+                Penjualan</a>
+            <a href="{{ route('returdata.retur') }}"
+                class="py-3 px-4 bg-[#6196c0] hover:bg-[#4a7aaa] text-center text-white rounded-xl font-medium transition-colors">Retur
+                Penjualan</a>
+            <a href="{{ route('sales.reject') }}"
+                class="py-3 px-4 bg-[#6196c0] hover:bg-[#4a7aaa] text-center text-white rounded-xl font-medium transition-colors">Penolakan</a>
+        </div>
+        <button
+            class="closeModal mt-5 w-full py-2.5 flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-600 font-semibold rounded-2xl transition-all">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+            Tutup
+        </button>
+    </div>
+</div>
+
+<div id="transfersModal"
+    class="modal-hide modal-transition fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
+    w-[92%] max-w-[480px] bg-white rounded-3xl shadow-2xl z-50 overflow-hidden">
+    <div class="relative bg-gradient-to-br from-[#4a90d9] via-[#6196c0] to-[#3a7bd5] px-6 pt-6 pb-8">
+        <div class="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2"></div>
+        <div class="absolute bottom-0 left-4 w-16 h-16 bg-white/10 rounded-full translate-y-1/2"></div>
+        <div class="relative flex items-center justify-between">
+            <div>
+                <p class="text-blue-100 text-xs font-medium tracking-widest uppercase mb-1">Manajemen Sistem</p>
+                <h2 class="text-2xl font-bold text-white">Mutasi Stok</h2>
+            </div>
+            <div class="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-white" fill="none"
+                    viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                </svg>
+            </div>
+        </div>
+    </div>
+    <div class="px-5 py-6 max-h-[60vh] overflow-y-auto">
+        <div class="grid grid-cols-2 gap-3">
+            <a href="{{ route('transfers.create') }}"
+                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-violet-50 hover:bg-violet-500 border border-violet-100 hover:border-violet-500 transition-all duration-200 hover:-translate-y-0.5">
+                <div
+                    class="w-9 h-9 rounded-xl bg-violet-100 group-hover:bg-violet-400 flex items-center justify-center flex-shrink-0 transition-colors">
+                    <svg class="w-5 h-5 text-violet-500 group-hover:text-white transition-colors" fill="none"
+                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
+                    </svg>
+                </div>
+                <span class="text-sm font-semibold text-violet-700 group-hover:text-white transition-colors">Mutasi
+                    Stok</span>
+            </a>
+
+            <a href="{{ route('transfers.incoming') }}"
+                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-orange-50 hover:bg-orange-500 border border-orange-100 hover:border-orange-500 transition-all duration-200 hover:-translate-y-0.5">
+                <div
+                    class="w-9 h-9 rounded-xl bg-orange-100 group-hover:bg-orange-400 flex items-center justify-center flex-shrink-0 transition-colors">
+                    <svg class="w-5 h-5 text-orange-500 group-hover:text-white transition-colors" fill="none"
+                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M3 7h2l2 9h10l2-9h2M3 7l1-4h16l1 4M9 16v2m6-2v2" />
+                    </svg>
+                </div>
+                <span class="text-sm font-semibold text-orange-700 group-hover:text-white transition-colors">Riwayat
+                    Mutasi
+                </span>
+            </a>
+        </div>
+        <button
+            class="closeModal mt-5 w-full py-2.5 flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-600 font-semibold rounded-2xl transition-all">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+            Tutup
+        </button>
+    </div>
+</div>
+
+{{-- Notif Modal --}}
+<div id="notif-modal" class="notif-overlay hidden">
+    <div class="notif-header">
+        <span class="notif-title">Notifikasi Stok</span>
+        <button class="notif-close"
+            onclick="document.getElementById('notif-modal').classList.add('hidden')">×</button>
+    </div>
     <div class="notif-list">
         @php
             $logs = \App\Models\ItemsLog::with('medicines')->orderBy('created_at', 'desc')->take(30)->get();
-
             $typeMap = [
                 1 => ['label' => 'Penjualan', 'icon' => '↓', 'sign' => '-', 'class' => 'qty-out', 'color' => 1],
                 2 => ['label' => 'Pembelian', 'icon' => '↑', 'sign' => '+', 'class' => 'qty-in', 'color' => 2],
@@ -1008,8 +1165,7 @@
 
         @forelse ($logs as $log)
             @php
-                $s = $log->status;
-                $info = $typeMap[$s] ?? [
+                $info = $typeMap[$log->status] ?? [
                     'label' => 'Lainnya',
                     'icon' => '•',
                     'sign' => '',
@@ -1017,63 +1173,36 @@
                     'color' => 0,
                 ];
             @endphp
-
             <div class="notif-item">
-                <!-- ICON -->
-                <div class="notif-dot dot-{{ $info['color'] }}">
-                    {{ $info['icon'] }}
-                </div>
-
-                <!-- INFO -->
+                <div class="notif-dot dot-{{ $info['color'] }}">{{ $info['icon'] }}</div>
                 <div style="flex:1; min-width:0;">
-                    <div class="notif-name">
-                        {{ $log->medicines->name ?? '-' }}
-                    </div>
-
+                    <div class="notif-name">{{ $log->medicines->name ?? '-' }}</div>
                     <div style="display:flex; align-items:center; gap:6px; margin-bottom:2px;">
-                        <span class="notif-badge badge-{{ $info['color'] }}">
-                            {{ $info['label'] }}
-                        </span>
+                        <span class="notif-badge badge-{{ $info['color'] }}">{{ $info['label'] }}</span>
                     </div>
-
-                    <div class="notif-meta">
-                        {{ \Carbon\Carbon::parse($log->created_at)->format('d M Y H:i') }}
-                    </div>
+                    <div class="notif-meta">{{ \Carbon\Carbon::parse($log->created_at)->format('d M Y H:i') }}</div>
                 </div>
-
-                <!-- QTY -->
-                <div class="notif-qty {{ $info['class'] }}">
-                    {{ $info['sign'] }} {{ $log->qty }}
-                </div>
+                <div class="notif-qty {{ $info['class'] }}">{{ $info['sign'] }} {{ $log->qty }}</div>
             </div>
-
         @empty
-            <div class="notif-empty">
-                Belum ada aktivitas stok
-            </div>
+            <div class="notif-empty">Belum ada aktivitas stok</div>
         @endforelse
     </div>
 </div>
 
+{{-- Expiry Modal --}}
 <div id="expiry-modal" class="notif-overlay hidden">
     <div class="notif-header">
         <span class="notif-title">Obat Kedaluwarsa</span>
-        <button class="notif-close" onclick="document.getElementById('expiry-modal').classList.add('hidden')">
-            ×
-        </button>
+        <button class="notif-close"
+            onclick="document.getElementById('expiry-modal').classList.add('hidden')">×</button>
     </div>
-
     <div class="notif-list">
         @php
             use Carbon\Carbon;
-
             $today = Carbon::today();
-
             $expiredBatches = \App\Models\Batches::with('medicines')
-                ->whereBetween('expired_date', [
-                    $today->copy()->startOfYear(), // awal tahun
-                    $today->copy()->endOfYear(), // akhir tahun
-                ])
+                ->whereBetween('expired_date', [$today->copy()->startOfYear(), $today->copy()->endOfYear()])
                 ->orderBy('expired_date', 'asc')
                 ->get();
         @endphp
@@ -1082,7 +1211,6 @@
             @php
                 $expDate = Carbon::parse($batch->expired_date);
                 $diffDays = $today->diffInDays($expDate, false);
-
                 if ($diffDays < 0) {
                     $status = 1;
                     $label = 'Kedaluwarsa';
@@ -1095,24 +1223,15 @@
                     $qtyClass = 'qty-neutral';
                 }
             @endphp
-
             <div class="notif-item">
-                <div class="notif-dot dot-{{ $status }}">
-                    {{ $icon }}
-                </div>
+                <div class="notif-dot dot-{{ $status }}">{{ $icon }}</div>
                 <div style="flex:1; min-width:0;">
-                    <div class="notif-name">
-                        {{ $batch->medicines->name ?? $batch->name }}
-                    </div>
-                    <div class="text-[10px] batch-name">
-                       Batch : {{ $batch->name }}
+                    <div class="notif-name">{{ $batch->medicines->name ?? $batch->name }}</div>
+                    <div class="text-[10px]" style="color:#94a3b8; margin-bottom:3px;">Batch: {{ $batch->name }}
                     </div>
                     <div style="display:flex; align-items:center; gap:6px; margin-bottom:2px;">
-                        <span class="notif-badge badge-{{ $status }}">
-                            {{ $label }}
-                        </span>
+                        <span class="notif-badge badge-{{ $status }}">{{ $label }}</span>
                     </div>
-
                     <div class="notif-meta">
                         Exp: {{ $expDate->format('d M Y') }}
                         @if ($diffDays >= 0)
@@ -1122,72 +1241,70 @@
                         @endif
                     </div>
                 </div>
-
-                <div class="notif-qty {{ $qtyClass }}">
-                    {{ $batch->stock }}
-                </div>
+                <div class="notif-qty {{ $qtyClass }}">{{ $batch->stock }}</div>
             </div>
-
         @empty
-            <div class="notif-empty">
-                Tidak ada obat kedaluwarsa / mendekati
-            </div>
+            <div class="notif-empty">Tidak ada obat kedaluwarsa / mendekati</div>
         @endforelse
     </div>
 </div>
 
 <script>
-    const backdrop = document.getElementById("modalBackdrop");
+    // ─── Sidebar (mobile) ─────────────────────────────────────────────────────────
+    function toggleSidebar() {
+        document.getElementById('sidebar').classList.toggle('open');
+        document.getElementById('sidebarOverlay').classList.toggle('open');
+    }
+
+    function closeSidebar() {
+        document.getElementById('sidebar').classList.remove('open');
+        document.getElementById('sidebarOverlay').classList.remove('open');
+    }
+
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.addEventListener('click', () => {
+            if (window.innerWidth <= 768) closeSidebar();
+        });
+    });
+
+    const backdrop = document.getElementById('modalBackdrop');
 
     window.openModal = function(id) {
         const modal = document.getElementById(id);
-
-        if (!modal) {
-            console.error("Modal not found:", id);
-            return;
-        }
-
-        modal.classList.remove("modal-hide");
-        modal.classList.add("modal-show");
-        backdrop.classList.remove("hidden");
-    }
+        if (!modal) return;
+        modal.classList.remove('modal-hide');
+        modal.classList.add('modal-show');
+        backdrop.classList.remove('hidden');
+    };
 
     window.closeModals = function() {
-        document.querySelectorAll(".modal-show").forEach(modal => {
-            modal.classList.remove("modal-show");
-            modal.classList.add("modal-hide");
+        document.querySelectorAll('.modal-show').forEach(modal => {
+            modal.classList.remove('modal-show');
+            modal.classList.add('modal-hide');
         });
-        backdrop.classList.add("hidden");
-    }
+        backdrop.classList.add('hidden');
+    };
 
-    document.querySelectorAll(".closeModal").forEach(btn => {
-        btn.addEventListener("click", window.closeModals);
+    document.querySelectorAll('.closeModal').forEach(btn => {
+        btn.addEventListener('click', window.closeModals);
     });
 
-    backdrop.addEventListener("click", window.closeModals);
+    backdrop.addEventListener('click', window.closeModals);
 
     function toggleModal(id) {
         const target = document.getElementById(id);
         if (!target) return;
-        document.querySelectorAll('#notif-modal, #expiry-modal').forEach(modal => {
-            if (modal.id !== id) {
-                modal.classList.add('hidden');
-            }
+        document.querySelectorAll('#notif-modal, #expiry-modal').forEach(m => {
+            if (m.id !== id) m.classList.add('hidden');
         });
-
         target.classList.toggle('hidden');
     }
-    document.addEventListener('click', function(e) {
-        const modals = ['notif-modal', 'expiry-modal'];
 
-        modals.forEach(id => {
+    document.addEventListener('click', function(e) {
+        ['notif-modal', 'expiry-modal'].forEach(id => {
             const modal = document.getElementById(id);
             if (!modal) return;
-
-            const isInside = e.target.closest(`#${id} > *`);
-            const isButton = e.target.closest(`[onclick*="${id}"]`);
-
-            if (!isInside && !isButton) {
+            if (!e.target.closest(`#${id}`) && !e.target.closest(`[onclick*="${id}"]`)) {
                 modal.classList.add('hidden');
             }
         });
