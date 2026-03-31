@@ -56,4 +56,8 @@ class User extends Authenticatable
     {
         return $this->hasMany(Item::class, 'user_id');
     }
+    public function pharmacy()
+    {
+        return $this->belongsTo(Pharmacies::class);
+    }
 }

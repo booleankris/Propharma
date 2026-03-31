@@ -232,12 +232,16 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     Route::get('/stock-data/get',    [SuppliesController::class, 'getStockData'])->name('supplies.getStockData');
     Route::get('/stock-data/export', [SuppliesController::class, 'exportStock'])->name('supplies.exportStockData');
 
+    // Stock Opname
     Route::get('/stockopname', [SuppliesController::class, 'stockOpname'])->name('supplies.stockOpname');
     Route::get('/getmedicines', [SuppliesController::class, 'getMedicines'])->name('supplies.medicines');
     Route::get('/medicineStockLog', [SuppliesController::class, 'medicineStockLog'])->name('supplies.medicineStockLog');
     Route::post('/saveopname', [SuppliesController::class, 'Opname'])->name('supplies.opname');
     Route::get('/export-stock', [SuppliesController::class, 'printStockData'])->name('supplies.printstockdata');
     Route::get('/export-stockopname', [SuppliesController::class, 'printStockOpname'])->name('supplies.printstockopname');
+    Route::get('supplies/batches', [SuppliesController::class, 'getBatchesByMedicine'])->name('supplies.batches');
+
+
     // Stock Detail
     Route::get('/stock-detail', [SuppliesController::class, 'stockDetail'])->name('supplies.stockDetail');
     Route::get('/getstockdetail', [SuppliesController::class, 'getStockDetail'])->name('supplies.getStockDetail');

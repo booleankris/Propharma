@@ -1,282 +1,493 @@
 @extends('layouts.app')
 
-@section('title', 'Sales Data')
+@section('title', 'Stock Opname')
 
 @section('style')
-    <!-- CSS Libraries -->
     <link rel="stylesheet" href="{{ asset('templates/library/datatables/media/css/jquery.dataTables.min.css') }}">
     <link rel="stylesheet" href="{{ asset('templates/library/izitoast/dist/css/iziToast.min.css') }}">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 
     <style>
+        /* ── Base ── */
+        * {
+            box-sizing: border-box;
+        }
+
+        /* ── DataTable overrides ── */
         table.dataTable thead th,
         table.dataTable thead td {
-            padding: 9px 18px !important;
-            background: #ffffff !important;
-            border-bottom: 1px solid #111 !important;
+            padding: 10px 14px !important;
+            background: #f8fafc !important;
+            border-bottom: 2px solid #e2e8f0 !important;
+            font-size: 11px !important;
+            font-weight: 700 !important;
+            text-transform: uppercase !important;
+            letter-spacing: .05em !important;
+            color: #64748b !important;
+        }
+
+        table.dataTable tbody td {
+            padding: 10px 14px !important;
+            font-size: 13px !important;
+            vertical-align: middle !important;
+            border-bottom: 1px solid #f1f5f9 !important;
+        }
+
+        table.dataTable tbody tr:hover {
+            background: #f8fafc !important;
         }
 
         .dataTables_wrapper .top {
-            font-family: "Poppins";
             display: flex !important;
             justify-content: space-between !important;
             align-items: center !important;
-            margin-bottom: 12px !important;
-        }
-
-        .dataTables_filter {
-            display: block !important;
-        }
-
-        .dataTables_filter label {
-            font-weight: 600 !important;
+            margin-bottom: 10px !important;
+            gap: 8px !important;
         }
 
         .dataTables_filter input {
-            width: 260px !important;
             padding: 6px 10px !important;
-            border-radius: 6px !important;
-            border: 1px solid #d1d5db !important;
+            border-radius: 8px !important;
+            border: 1px solid #e2e8f0 !important;
+            font-size: 13px !important;
             outline: none !important;
+            transition: border .15s;
         }
 
-        .dataTables_length {
-            padding: 15px 0px;
-            display: block !important;
+        .dataTables_filter input:focus {
+            border-color: #3b82f6 !important;
         }
 
         .dataTables_length select {
-            padding: 4px 23px !important;
-            border-radius: 6px !important;
-            border: 1px solid #d1d5db !important;
-        }
-
-
-        #medicineTable thead th {
-            background-color: #f8fafc !important;
-            font-weight: 600 !important;
+            padding: 4px 8px !important;
+            border-radius: 8px !important;
+            border: 1px solid #e2e8f0 !important;
             font-size: 13px !important;
-            text-transform: uppercase !important;
-            border-bottom: 2px solid #e5e7eb !important;
-        }
-
-        .panel {
-            height: 40vh;
-            overflow: scroll;
-            padding: 12px;
-            background: #f6f9ff;
-            border-radius: 20px;
-        }
-
-        #medicineTable tbody td {
-            padding: 12px 10px !important;
-            font-size: 14px !important;
-            vertical-align: middle !important;
-        }
-
-        #medicineTable tbody tr:hover {
-            background-color: #f1f5f9 !important;
-        }
-
-        #orderItemsTable tr.selected {
-            background-color: #e0f2fe !important;
         }
 
         .dataTables_paginate .paginate_button {
-            padding: 6px 12px !important;
+            padding: 5px 10px !important;
             border-radius: 6px !important;
-            background: #f3f3f3;
-            margin: 0 4px;
+            margin: 0 2px !important;
+            font-size: 12px !important;
+            background: #f1f5f9 !important;
+            border: none !important;
         }
 
         .dataTables_wrapper .dataTables_paginate .paginate_button.current {
-            background: #2563eb;
+            background: #2563eb !important;
             color: #fff !important;
-            border: 1px solid #2563eb;
-            margin: 0 4px;
+            border: none !important;
         }
 
         .dataTables_wrapper .dataTables_paginate .paginate_button.disabled {
-            cursor: default !important;
-            color: #666 !important;
-            border: 1px solid transparent !important;
+            opacity: .4 !important;
             background: transparent !important;
-            box-shadow: none !important;
         }
 
         .paginate_button.previous {
-            background: #ffd7d7 !important;
+            background: #fee2e2 !important;
         }
 
         .paginate_button.next {
-            background: #c4ffcf !important;
-            font-family: 'Poppins';
-            font-size: 14px;
+            background: #dcfce7 !important;
+        }
+
+        /* ── Log panel ── */
+        .log-panel {
+            height: 38vh;
+            overflow-y: auto;
+            background: #f8fafc;
+            border-radius: 14px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .log-panel::-webkit-scrollbar {
+            width: 5px;
+        }
+
+        .log-panel::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .log-panel::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 99px;
+        }
+
+        /* ── Stat cards ── */
+        .stat-card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+            padding: 10px 18px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            min-width: 80px;
+            transition: box-shadow .15s;
+        }
+
+        .stat-card:hover {
+            box-shadow: 0 4px 12px rgba(37, 99, 235, .1);
+        }
+
+        .stat-card .val {
+            font-size: 22px;
+            font-weight: 800;
+            color: #2563eb;
+            line-height: 1;
+        }
+
+        .stat-card .lbl {
+            font-size: 11px;
+            color: #94a3b8;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        /* ── Form inputs ── */
+        .field-label {
+            display: block;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .05em;
+            color: #64748b;
+            margin-bottom: 5px;
+        }
+
+        .field-input {
+            width: 100%;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 9px 12px;
+            font-size: 13px;
+            background: #fff;
+            transition: border .15s, box-shadow .15s;
+            outline: none;
+        }
+
+        .field-input:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, .12);
+        }
+
+        .field-input[readonly] {
+            background: #f8fafc;
+            color: #94a3b8;
+            cursor: default;
+        }
+
+        .field-input.border-red-500 {
+            border-color: #ef4444 !important;
+            color: #dc2626 !important;
+        }
+
+        /* ── Medicine table row ── */
+        #medicines_data tbody tr {
+            cursor: pointer;
+            transition: background .1s;
+        }
+
+        #medicines_data tbody tr:hover {
+            background: #eff6ff !important;
+        }
+
+        #medicines_data tbody tr.active {
+            background: #dbeafe !important;
+        }
+
+        #orderItemsTable tbody tr.table-primary {
+            background: #dbeafe !important;
+        }
+
+        /* ── Buttons ── */
+        .btn-primary {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 10px 20px;
+            background: #2563eb;
+            color: #fff;
+            font-size: 13px;
+            font-weight: 600;
+            border-radius: 10px;
+            border: none;
+            cursor: pointer;
+            transition: background .15s, box-shadow .15s;
+            box-shadow: 0 2px 8px rgba(37, 99, 235, .25);
+        }
+
+        .btn-primary:hover {
+            background: #1d4ed8;
+            box-shadow: 0 4px 14px rgba(37, 99, 235, .35);
+        }
+
+        .btn-danger {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 10px 20px;
+            background: #dc2626;
+            color: #fff;
+            font-size: 13px;
+            font-weight: 600;
+            border-radius: 10px;
+            border: none;
+            cursor: pointer;
+            transition: background .15s;
+        }
+
+        .btn-danger:hover {
+            background: #b91c1c;
+        }
+
+        .btn-export {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            background: #16a34a;
+            color: #fff;
+            font-size: 13px;
+            font-weight: 600;
+            border-radius: 10px;
+            border: none;
+            cursor: pointer;
+            transition: background .15s;
+            text-decoration: none;
+        }
+
+        .btn-export:hover {
+            background: #15803d;
+            color: #fff;
+        }
+
+        /* ── Section label ── */
+        .section-label {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .07em;
+            color: #94a3b8;
+            margin-bottom: 10px;
+        }
+
+        /* ── Layout ── */
+        .opname-grid {
+            display: grid;
+            grid-template-columns: 380px 1fr;
+            gap: 20px;
+            align-items: start;
+        }
+
+        @media (max-width: 1024px) {
+            .opname-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card-panel {
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 16px;
+            padding: 20px;
+        }
+
+        /* ── Nav input highlight ── */
+        .nav-input:focus {
+            border-color: #3b82f6 !important;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, .15) !important;
+        }
+
+        /* ── Discrepancy badge ── */
+        #discrepancy_badge {
+            display: none;
+            font-size: 12px;
+            font-weight: 700;
+            padding: 3px 10px;
+            border-radius: 99px;
+            margin-top: 6px;
         }
     </style>
 @endsection
 
 @section('content')
-    <section class="section px-4">
+    <section class="section px-4 pb-8">
         <div class="section-body">
-            <div class="">
 
-                <div class="card  shadow-md rounded-2xl p-6 bg-white">
-                    <div class="flex items-center mb-6">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-blue-600 mr-3 drop-shadow-md"
-                            fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" />
+            {{-- Page header --}}
+            <div class="flex items-center justify-between mb-5">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center shadow-md">
+                        <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                            stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                         </svg>
-                        <h2 class="text-2xl font-bold text-gray-800 drop-shadow-sm">Stock Opname</h2>
-
                     </div>
-                    <div class="flex gap-10">
-
-                        <div>
-                            <div class="flex py-2 gap-1">
-
-                                <div>
-                                    <div class="py-1 text-[13px] font-bold">Tanggal</div>
-
-                                    <input type="text" id="dateRange" placeholder="Pilih rentang tanggal..."
-                                        class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
-                                        autocomplete="off">
-                                </div>
-                                <div class="w-full">
-                                    {{-- Fill this after too after selecting --}}
-                                    <div class="py-1 text-[13px] font-bold">Nama Obat</div>
-
-                                    <input type="text" readonly id="medicine_name" placeholder="Nama Obat..."
-                                        class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
-                                        autocomplete="off">
-                                </div>
-                            </div>
-                            <p class="font-poppins pb-1 font-medium">
-                                Pilih Obat
-                            </p>
-                            <div>
-                                <table id="medicines_data" class="min-w-full text-sm text-left text-gray-600">
-                                    <thead class="bg-gray-100 text-gray-700 uppercase text-xs">
-                                        <tr>
-                                            <th class="px-4 py-3">#</th>
-                                            <th class="px-4 py-3">Nama</th>
-                                            <th class="px-4 py-3">Satuan</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="divide-y divide-gray-100"></tbody>
-                                </table>
-                            </div>
-                        </div>
-                        <div>
-                            <div class="panel">
-                                <input type="hidden" id="medicine_id">
-                                <input type="hidden" id="medicine_stock">
-
-                                <div class="overflow-x-auto p-3">
-                                    <table id="orderItemsTable" class="min-w-full text-sm text-left text-gray-600">
-                                        <thead class="bg-gray-100 text-gray-700 uppercase text-xs">
-                                            <tr>
-                                                <th class="px-4 py-3">#</th>
-                                                <th class="px-4 py-3">Tanggal</th>
-                                                <th class="px-4 py-3">Kode Transaksi</th>
-                                                <th class="px-4 py-3">Tipe</th>
-                                                <th class="px-4 py-3">Saldo Awal</th>
-                                                <th class="px-4 py-3">Qty</th>
-                                                <th class="px-4 py-3">Jumlah</th>
-                                                <th class="px-4 py-3">Saldo Sekarang</th>
-                                                <th class="px-4 py-3">Keterangan</th>
-
-                                            </tr>
-                                        </thead>
-                                        <tbody class="divide-y divide-gray-100"></tbody>
-                                    </table>
-                                </div>
-                            </div>
-                            <div class="mt-3 flex items-center space-x-6">
-                                <div>
-                                    <p class="text-2xl font-bold text-[#2563eb]" id="qty_awal">-</p>
-                                    <p class="text-sm font-poppins text-gray-400">QTY Awal</p>
-                                </div>
-                                <div class="h-12 w-px bg-gray-700"></div>
-                                <div>
-                                    <p class="text-2xl font-bold text-[#2563eb]" id="qty_beli">-</p>
-                                    <p class="text-sm font-poppins text-gray-400">QTY Beli</p>
-                                </div>
-                                <div class="h-12 w-px bg-gray-700"></div>
-                                <div>
-                                    <p class="text-2xl font-bold text-[#2563eb]" id="qty_jual">-</p>
-                                    <p class="text-sm font-poppins text-gray-400">QTY Jual</p>
-                                </div>
-                                <div class="h-12 w-px bg-gray-700"></div>
-                                <div>
-                                    <p class="text-2xl font-bold text-[#2563eb]" id="qty_akhir">-</p>
-                                    <p class="text-sm font-poppins text-gray-400">QTY Akhir</p>
-                                </div>
-                            </div>
-                            <div class="flex py-2 gap-1">
-                                <div class="w-full">
-                                    <div class="py-1 text-[13px] font-bold">Stok Fisik</div>
-                                    <input type="number" required onkeyup="countDiscrepancy()" id="stock_physic"
-                                        placeholder="Stok Fisik..."
-                                        class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
-                                        autocomplete="off">
-                                </div>
-                                <div class="w-full">
-                                    <div class="py-1 text-[13px] font-bold">Selisih Stok</div>
-                                    <input type="text" required readonly id="stock_discrepancy" placeholder="Selisih...."
-                                        class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
-                                        autocomplete="off">
-                                </div>
-                            </div>
-
-                            <div class="grid grid-cols-2 gap-3 mb-5">
-                                <div>
-                                    <label class="block text-[12px] font-medium text-gray-500 mb-1">Batch</label>
-                                    <input id="batch" name="batch" type="text" placeholder="No. batch"
-                                        class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200">
-                                </div>
-                                <div>
-                                    <label class="block text-[12px] font-medium text-gray-500 mb-1">Exp date</label>
-                                    <input id="expired_date" type="date" name="expired_date"
-                                        class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200">
-                                </div>
-                            </div>
-                            <div class="py-1 flex gap-2">
-                                <button id="save_opname"
-                                    class="inline-flex font-poppins items-center gap-2 rounded-lg btn-pharma !bg-blue-600 !shadow-[0_2px_6px_#2563eb] px-6 py-4 text-sm font-xl text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-                                        stroke="currentColor" class="w-5 h-5" stroke-width="2" stroke-linecap="round"
-                                        stroke-linejoin="round">
-                                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-                                        <polyline points="17 21 17 13 7 13 7 21"></polyline>
-                                        <polyline points="7 3 7 8 15 8"></polyline>
-                                    </svg>
-                                    Simpan
-                                </button>
-                                <button id="back"
-                                    class="inline-flex !text-[#fff] font-poppins items-center gap-2 rounded-lg !bg-[#b20b0b] !shadow-[0_2px_6px_#b20b0b] px-6 py-4 text-sm font-xl hover:bg-[#b20b0b !important] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
-                                    Kembali
-                                </button>
-                                <a href="{{ route('supplies.printstockopname') }}" target="_blank">
-                                    <button style="background:#41bd33"
-                                        class="group rounded-md shadow text-white cursor-pointer flex justify-between items-center overflow-hidden transition-all hover:glow">
-                                        <div
-                                            class="relative px-6 py-5 bg-white bg-opacity-20 flex justify-center items-center transition-all">
-                                            <svg class="w-4 h-4 transition-all group-hover:-translate-y-1" fill="none"
-                                                stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                    d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
-                                            </svg>
-                                        </div>
-                                        <p class="px-3">Export Excel</p>
-                                    </button>
-                                </a>
-                            </div>
-                        </div>
+                    <div>
+                        <h1 class="text-xl font-bold text-gray-800 leading-tight">Stock Opname</h1>
+                        <p class="text-[12px] text-gray-400">Rekonsiliasi stok fisik vs sistem</p>
                     </div>
                 </div>
             </div>
+
+            <div class="opname-grid">
+
+                {{-- LEFT: Medicine selector --}}
+                <div class="card-panel">
+                    <p class="section-label">Pilih Obat</p>
+
+                    {{-- Filters --}}
+                    <div class="grid grid-cols-1 gap-3 mb-4">
+                        <div>
+                            <label class="field-label">Rentang Tanggal</label>
+                            <input type="text" id="dateRange" placeholder="Pilih rentang tanggal..." class="field-input"
+                                autocomplete="off">
+                        </div>
+                        <div>
+                            <label class="field-label">Obat Dipilih</label>
+                            <input type="text" readonly id="medicine_name" placeholder="Klik 2x pada tabel..."
+                                class="field-input" autocomplete="off">
+                        </div>
+                    </div>
+
+                    {{-- Medicine datatable --}}
+                    <table id="medicines_data" class="w-full text-sm text-left text-gray-600">
+                        <thead class="bg-gray-100 text-gray-700 uppercase text-xs">
+                            <tr>
+                                <th class="px-3 py-2">#</th>
+                                <th class="px-3 py-2">Nama</th>
+                                <th class="px-3 py-2">Satuan</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                    <p class="text-[11px] text-gray-400 mt-2">* Double-click baris untuk memilih obat</p>
+                </div>
+
+                {{-- RIGHT: Log + Opname form --}}
+                <div class="flex flex-col gap-4">
+
+                    {{-- Hidden fields --}}
+                    <input type="hidden" id="medicine_id">
+                    <input type="hidden" id="medicine_stock">
+                    <input type="hidden" id="batches_id">
+                    <input type="hidden" id="expired_date">
+
+                    {{-- Stock log panel --}}
+                    <div class="card-panel">
+                        <p class="section-label">Riwayat Stok</p>
+                        <div class="log-panel">
+                            <table id="orderItemsTable" class="w-full text-sm text-left text-gray-600">
+                                <thead>
+                                    <tr>
+                                        <th class="px-3 py-2">#</th>
+                                        <th class="px-3 py-2">Tanggal</th>
+                                        <th class="px-3 py-2">Kode</th>
+                                        <th class="px-3 py-2">Tipe</th>
+                                        <th class="px-3 py-2">Saldo Awal</th>
+                                        <th class="px-3 py-2">Qty</th>
+                                        <th class="px-3 py-2">Jumlah</th>
+                                        <th class="px-3 py-2">Saldo Kini</th>
+                                        <th class="px-3 py-2">Ket.</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+
+                        {{-- Stat cards --}}
+                        <div class="flex flex-wrap gap-3 mt-4">
+                            <div class="stat-card">
+                                <span class="val" id="qty_awal">—</span>
+                                <span class="lbl">QTY Awal</span>
+                            </div>
+                            <div class="stat-card">
+                                <span class="val" id="qty_beli">—</span>
+                                <span class="lbl">QTY Beli</span>
+                            </div>
+                            <div class="stat-card">
+                                <span class="val" id="qty_jual">—</span>
+                                <span class="lbl">QTY Jual</span>
+                            </div>
+                            <div class="stat-card">
+                                <span class="val" id="qty_akhir">—</span>
+                                <span class="lbl">QTY Akhir</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- Opname form --}}
+                    <div class="card-panel">
+                        <p class="section-label">Input Opname</p>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+                            <div>
+                                <label class="field-label">Stok Fisik (Gudang)</label>
+                                <input type="number" id="stock_physic" data-nav-enter="counter_stock_physic"
+                                    onkeyup="countDiscrepancy()" placeholder="Stok gudang fisik..."
+                                    class="nav-input field-input" autocomplete="off">
+                            </div>
+                            <div>
+                                <label class="field-label">Stok Fisik (Counter)</label>
+                                <input type="number" id="counter_stock_physic" data-nav-enter="batch_select"
+                                    placeholder="Stok counter fisik..." class="nav-input field-input" autocomplete="off">
+                            </div>
+                            <div>
+                                <label class="field-label">Selisih Stok (Gudang)</label>
+                                <input type="text" readonly id="stock_discrepancy" placeholder="—"
+                                    class="field-input">
+                                <span id="discrepancy_badge"></span>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="field-label">
+                                Batch
+                                <span class="normal-case font-normal text-gray-400 ml-1">(opsional — default: expired
+                                    terdekat)</span>
+                            </label>
+                            <select id="batch_select" data-nav-enter="submit" class="nav-input field-input">
+                                <option value="">— Otomatis (FEFO) —</option>
+                            </select>
+                        </div>
+
+                        <div class="flex flex-wrap gap-2">
+                            <button id="save_opname" class="btn-primary">
+                                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z" />
+                                    <polyline points="17 21 17 13 7 13 7 21" />
+                                    <polyline points="7 3 7 8 15 8" />
+                                </svg>
+                                Simpan
+                            </button>
+                            <button id="back" class="btn-danger">
+                                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                                </svg>
+                                Kembali
+                            </button>
+                            <a href="{{ route('supplies.printstockopname') }}" target="_blank" class="btn-export">
+                                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                </svg>
+                                Export Excel
+                            </a>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
         </div>
     </section>
 @endsection
@@ -287,42 +498,238 @@
     <script src="{{ asset('templates/js/page/modules-datatables.js') }}"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="{{ asset('templates/library/izitoast/dist/js/iziToast.min.js') }}"></script>
-    <script src="https://unpkg.com/sweetalert/dist/sweetalert.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
     <script>
-        let total_stock = '';
-        let orderItemsTable;
-        let startDate = '';
-        let endDate = '';
-        var searchMedicine = '';
-        let tableData, selectedData = null;
-        const form = document.getElementById('patientForm');
+        /* ── State ─────────────────────────────────────────────────────── */
+        let total_stock = 0; // current system stock (from selected batch / log)
+        let orderItemsTable, medicineData;
+        let startDate = '',
+            endDate = '',
+            searchMedicine = '';
 
+        /* ── Enter-key navigation ──────────────────────────────────────── */
+        // Map: elementId → nextElementId  (or 'submit')
+        const NAV_MAP = {
+            'stock_physic': 'counter_stock_physic',
+            'counter_stock_physic': 'batch_select',
+            'batch_select': 'submit',
+        };
+
+        function initEnterNavigation() {
+            Object.entries(NAV_MAP).forEach(([id, nextId]) => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                el.addEventListener('keydown', function(e) {
+                    if (e.key !== 'Enter') return;
+                    e.preventDefault();
+                    if (nextId === 'submit') {
+                        SaveOpname();
+                    } else {
+                        document.getElementById(nextId)?.focus();
+                    }
+                });
+            });
+        }
+
+        /* ── Load batches into <select> ────────────────────────────────── */
+        function loadBatches(medicine_id) {
+            const select = document.getElementById('batch_select');
+            select.innerHTML = '<option value="">Memuat batch…</option>';
+
+            fetch(`{{ route('supplies.batches') }}?medicine_id=${medicine_id}`)
+                .then(res => res.json())
+                .then(batches => {
+                    select.innerHTML = '<option value="">— Otomatis (FEFO) —</option>';
+
+                    let totalBatchStock = 0; // ← accumulate here
+
+                    batches.forEach(b => {
+                        const opt = document.createElement('option');
+                        opt.value = b.id;
+                        opt.textContent = `${b.name} — Exp: ${b.expired_date} (Stok: ${b.stock})`;
+                        opt.dataset.stock = b.stock;
+                        select.appendChild(opt);
+                        totalBatchStock += parseInt(b.stock || 0); // ← sum all batches
+                    });
+
+                    // ← Update qty_akhir with real total storage stock
+                    $('#qty_akhir').text(totalBatchStock);
+                    $('#medicine_stock').val(totalBatchStock);
+                    total_stock = totalBatchStock;
+
+                    updateTotalStockFromSelect();
+                })
+                .catch(() => {
+                    select.innerHTML = '<option value="">— Gagal memuat batch —</option>';
+                });
+        }
+
+        /* ── Sync total_stock when batch selection changes ─────────────── */
+        function updateTotalStockFromSelect() {
+            const select = document.getElementById('batch_select');
+            const selectedOpt = select.options[select.selectedIndex];
+
+            if (selectedOpt && selectedOpt.value !== '') {
+                // User picked a specific batch → use that batch's stock
+                total_stock = parseInt(selectedOpt.dataset.stock) || 0;
+            } else {
+                // "Otomatis (FEFO)" → use first real option's stock
+                const firstBatch = select.options[1]; // index 0 is the placeholder
+                total_stock = firstBatch ? (parseInt(firstBatch.dataset.stock) || 0) : 0;
+            }
+
+            $('#medicine_stock').val(total_stock);
+            // Recalculate discrepancy if physic is already filled
+            if ($('#stock_physic').val() !== '') countDiscrepancy();
+        }
+
+        document.getElementById('batch_select')
+            ?.addEventListener('change', updateTotalStockFromSelect);
+
+        /* ── Discrepancy indicator ─────────────────────────────────────── */
+        function countDiscrepancy() {
+            const val = $('#stock_physic').val();
+            const input = document.getElementById('stock_discrepancy');
+            const badge = document.getElementById('discrepancy_badge');
+
+            if (val === '') {
+                input.value = '';
+                input.classList.remove('border-red-500', 'text-red-600');
+                badge.style.display = 'none';
+                return;
+            }
+
+            const stockPhysic = parseInt(val) || 0;
+            const discrepancy = stockPhysic - total_stock;
+            input.value = discrepancy;
+
+            if (discrepancy !== 0) {
+                input.classList.add('border-red-500', 'text-red-600');
+                if (discrepancy > 0) {
+                    badge.textContent = `+${discrepancy} Lebih`;
+                    badge.style.cssText =
+                        'display:inline-block;background:#dcfce7;color:#16a34a;font-size:12px;font-weight:700;padding:3px 10px;border-radius:99px;margin-top:6px;';
+                } else {
+                    badge.textContent = `${discrepancy} Kurang`;
+                    badge.style.cssText =
+                        'display:inline-block;background:#fee2e2;color:#dc2626;font-size:12px;font-weight:700;padding:3px 10px;border-radius:99px;margin-top:6px;';
+                }
+            } else {
+                input.classList.remove('border-red-500', 'text-red-600');
+                badge.style.display = 'none';
+            }
+        }
+
+        /* ── Save opname ───────────────────────────────────────────────── */
+        function SaveOpname() {
+            const medicineId = $('#medicine_id').val();
+            const stockPhysic = $('#stock_physic').val();
+            const counterStockPhysic = $('#counter_stock_physic').val();
+            const batchesId = $('#batch_select').val(); // '' = let backend use FEFO
+
+            if (!medicineId) {
+                iziToast.warning({
+                    title: 'Peringatan',
+                    message: 'Pilih obat terlebih dahulu!',
+                    position: 'topRight'
+                });
+                return;
+            }
+            if (stockPhysic === '') {
+                iziToast.warning({
+                    title: 'Peringatan',
+                    message: 'Isi stok fisik gudang terlebih dahulu!',
+                    position: 'topRight'
+                });
+                document.getElementById('stock_physic').focus();
+                return;
+            }
+
+            const btn = document.getElementById('save_opname');
+            btn.disabled = true;
+            btn.innerHTML =
+                `<svg class="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" stroke-dasharray="40" stroke-dashoffset="15"/></svg> Menyimpan…`;
+
+            $.ajax({
+                url: "{{ route('supplies.opname') }}",
+                type: 'POST',
+                data: {
+                    _token: "{{ csrf_token() }}",
+                    medicine_id: medicineId,
+                    stock_physic: stockPhysic,
+                    counter_stock_physic: counterStockPhysic,
+                    batches_id: batchesId, // empty string → backend picks FEFO
+                },
+                success: function(response) {
+                    iziToast.success({
+                        title: 'Berhasil',
+                        message: response.message || 'Stok berhasil disimpan!',
+                        position: 'topRight'
+                    });
+
+                    // Update total_stock from server response
+                    total_stock = response.qty_after ?? total_stock;
+                    $('#medicine_stock').val(total_stock);
+
+                    // Reset input fields (keep medicine & batch list intact)
+                    $('#stock_physic, #counter_stock_physic, #stock_discrepancy').val('');
+                    $('#batch_select').prop('selectedIndex', 0);
+                    document.getElementById('discrepancy_badge').style.display = 'none';
+                    document.getElementById('stock_discrepancy').classList.remove('border-red-500',
+                        'text-red-600');
+
+                    // Reload stock log
+                    orderItemsTable.ajax.reload(null, false);
+
+                    // Reload batches to reflect updated stock numbers
+                    loadBatches(medicineId);
+
+                    document.getElementById('stock_physic').focus();
+                },
+                error: function(xhr) {
+                    const msg = xhr.responseJSON?.message || 'Terjadi kesalahan!';
+                    iziToast.error({
+                        title: 'Gagal',
+                        message: msg,
+                        position: 'topRight'
+                    });
+                },
+                complete: function() {
+                    btn.disabled = false;
+                    btn.innerHTML =
+                        `<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Simpan`;
+                }
+            });
+        }
+
+        /* ── DOM ready ─────────────────────────────────────────────────── */
         document.addEventListener('DOMContentLoaded', function() {
+            initEnterNavigation();
+
+            // Date range picker
             flatpickr("#dateRange", {
                 mode: "range",
                 dateFormat: "Y-m-d",
-                onClose: function(selectedDates, dateStr) {
-
+                onClose: function(selectedDates) {
                     if (selectedDates.length === 2) {
                         startDate = flatpickr.formatDate(selectedDates[0], "Y-m-d");
                         endDate = flatpickr.formatDate(selectedDates[1], "Y-m-d");
                     } else {
-                        startDate = '';
-                        endDate = '';
+                        startDate = endDate = '';
                     }
-
                     orderItemsTable.ajax.reload();
                 }
             });
+
+            // Stock log DataTable
             orderItemsTable = $('#orderItemsTable').DataTable({
                 processing: true,
                 serverSide: true,
                 deferLoading: 0,
                 ajax: {
                     url: "{{ route('supplies.medicineStockLog') }}",
-                    data: function(d) {
+                    data: d => {
                         d.searchMedicine = searchMedicine;
                         d.start_date = startDate;
                         d.end_date = endDate;
@@ -330,8 +737,7 @@
                 },
                 columns: [{
                         data: 'DT_RowIndex',
-                        orderable: false,
-                        searchable: true
+                        orderable: false
                     },
                     {
                         data: 'date'
@@ -356,194 +762,75 @@
                     },
                     {
                         data: 'status'
-                    }
+                    },
                 ],
                 paging: true,
                 searching: false,
                 info: false,
                 language: {
                     emptyTable: "Silakan pilih obat terlebih dahulu"
-                }
+                },
             });
 
-
-            medicineData = $("#medicines_data").DataTable({
+            // Medicine DataTable
+            medicineData = $('#medicines_data').DataTable({
                 responsive: true,
                 serverSide: true,
                 ajax: "{{ route('supplies.medicines') }}",
                 columns: [{
-                        data: "DT_RowIndex",
+                        data: 'DT_RowIndex',
                         orderable: false,
                         searchable: false
                     },
                     {
-                        data: "name"
+                        data: 'name'
                     },
                     {
-                        data: "unit"
-                    }
+                        data: 'unit'
+                    },
                 ],
                 initComplete: function() {
                     $('#medicines_data_filter input').focus();
                 }
             });
 
+            // Double-click a medicine row to select it
             $('#medicines_data tbody').on('dblclick', 'tr', function() {
-                let medicine = medicineData.row(this).data();
+                const medicine = medicineData.row(this).data();
                 if (!medicine) return;
 
+                $('#medicines_data tbody tr').removeClass('active');
+                $(this).addClass('active');
+
                 $('#medicine_name').val(medicine.name);
+                $('#medicine_id').val(medicine.id);
                 searchMedicine = medicine.name;
 
+                // Load batches (FEFO first)
+                loadBatches(medicine.id);
+
+                // Load stock log for this medicine
                 orderItemsTable.ajax.reload(function() {
-                    let rows = orderItemsTable.rows().nodes();
-                    $(rows).removeClass('table-primary');
-
-                    let rowFound = false;
+                    // Update stat cards from the last row (most recent state)
                     orderItemsTable.rows().every(function() {
-                        let rowData = this.data();
-                        if (rowData.name === searchMedicine) {
-                            $(this.node()).addClass('table-primary');
-
-                            // Set QTY
-                            $('#qty_awal').text(rowData.stock_start || 0);
-                            $('#qty_beli').text(rowData.total_orders || 0);
-                            $('#qty_jual').text(rowData.total_sales || 0);
-                            $('#qty_akhir').text(rowData.medicines.stock || 0);
-                            console.log(rowData);
-                            $('#medicine_stock').val(rowData.supply);
-                            $('#medicine_id').val(medicine.id);
-
-                            rowFound = true;
-                            total_stock = rowData.medicines.stock;
-
+                        const row = this.data();
+                        if (row.name === searchMedicine) {
+                            total_stock = row.qty_after_number || 0;
+                            $('#medicine_stock').val(total_stock);
+                            $('#qty_awal').text(row.stock_start?.qty_before ?? 0);
+                            $('#qty_beli').text(row.total_orders ?? 0);
+                            $('#qty_jual').text(row.total_sales ?? 0);
+                            $('#qty_akhir').text(total_stock);
                             return false;
                         }
                     });
 
-                    if (!rowFound) {
-                        $('#medicine_stock').val('');
-                    }
+                    document.getElementById('stock_physic').focus();
                 });
             });
 
-
-            window.searchMedicines = function(medicine) {
-                searchMedicine = medicine || '';
-                orderItemsTable.ajax.reload(function() {
-                    let rowFound = false;
-                    orderItemsTable.rows().every(function() {
-                        let rowData = this.data();
-                        if (rowData.name === searchMedicine) {
-                            $(this.node()).addClass('table-primary');
-                            $('#medicine_name').val(rowData.name);
-                            $('#medicine_stock').val(rowData.supply);
-                            rowFound = true;
-                            return false;
-                        }
-                    });
-
-                    if (!rowFound) {
-                        $('#medicine_name').val('');
-                        $('#medicine_stock').val('');
-                    }
-                });
-            };
-
-        });
-
-        function countDiscrepancy() {
-            let stockPhysic = parseInt($('#stock_physic').val() || 0);
-            let stockSystem = total_stock || 0;
-            let discrepancy = stockPhysic - stockSystem;
-            $('#stock_discrepancy').val(discrepancy);
-            if (discrepancy !== 0) {
-                discrepancyInput.classList.add('border-red-500', 'text-red-600');
-            } else {
-                discrepancyInput.classList.remove('border-red-500', 'text-red-600');
-            }
-            if (stockPhysic == "") {
-                $('#stock_discrepancy').val("");
-            }
-        }
-
-        function SaveOpname() {
-            let medicineId = $('#medicine_id').val();
-            let stockPhysic = parseInt($('#stock_physic').val()) || 0;
-            let stockSystem = parseInt($('#medicine_stock').val()) || 0;
-            let expiredDate = $('#expired_date').val();
-            let batch = $('#batch').val();
-
-            let discrepancy = stockPhysic - stockSystem;
-
-            if (!medicineId) {
-                iziToast.warning({
-                    title: 'Peringatan',
-                    message: 'Pilih obat terlebih dahulu!',
-                    position: 'topRight'
-                });
-                return;
-            }
-
-            $.ajax({
-                url: "{{ route('supplies.opname') }}",
-                type: 'POST',
-                data: {
-                    _token: "{{ csrf_token() }}",
-                    medicine_id: medicineId,
-                    stock_physic: stockPhysic,
-                    stock_system: stockSystem,
-                    expired_date: expiredDate,
-                    batch: batch,
-                    stock_discrepancy: discrepancy
-                },
-                success: function(response) {
-                    iziToast.success({
-                        title: 'Berhasil',
-                        message: 'Stok berhasil disimpan!',
-                        position: 'topRight'
-                    });
-
-                    // Reset form
-                    $('#stock_physic, #stock_discrepancy, #medicine_name, #medicine_stock, #medicine_id').val(
-                        '');
-
-                    // Reload table
-                    orderItemsTable.ajax.reload(function() {
-                        // Optional: refresh QTY summary cards again after save
-                        let rows = orderItemsTable.rows().data().toArray();
-                        let stockData = rows.find(row => row.name === searchMedicine);
-
-                        if (stockData) {
-                            $('#qty_awal').text(stockData.qty_before_number || 0);
-                            $('#qty_beli').text(stockData.total_orders || 0);
-                            $('#qty_jual').text(stockData.total_sales || 0);
-                            $('#qty_akhir').text(stockData.supply || 0);
-                        }
-                    });
-                },
-                error: function(xhr) {
-                    iziToast.error({
-                        title: 'Gagal',
-                        message: 'Terjadi kesalahan saat menyimpan stok!',
-                        position: 'topRight'
-                    });
-                    console.error(xhr.responseText);
-                }
-            });
-        }
-        $('#save_opname').click(SaveOpname);
-        $('#stock_physic').keydown(function(e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                SaveOpname();
-
-            }
-        });
-        // BACK BUTTON 
-        $('#back').click(function() {
-            window.location.href = "{{ route('home') }}";
+            $('#save_opname').on('click', SaveOpname);
+            $('#back').on('click', () => window.location.href = "{{ route('home') }}");
         });
     </script>
-
 @endsection

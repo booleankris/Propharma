@@ -10,6 +10,7 @@ use App\Models\MedicineCart;
 use App\Models\Medicines;
 use App\Models\MedicineTransfers;
 use App\Models\ReceivingItems;
+use App\Models\StockOpname;
 use Carbon\Carbon;
 use DataTables;
 use Form;
@@ -636,6 +637,14 @@ class SuppliesController extends Controller
                 ->make(true);
         }
     }
+    public function getBatchesByMedicine(Request $request)
+    {
+        $batches = Batches::where('medicine_id', $request->medicine_id)
+            ->orderBy('expired_date', 'asc') // FEFO
+            ->get(['id', 'name', 'expired_date', 'stock']);
+
+        return response()->json($batches);
+    }
     public function generateOpnameCode()
     {
         $now = Carbon::now();
@@ -688,70 +697,155 @@ class SuppliesController extends Controller
         $now = Carbon::now()->format('dmY');
         return Excel::download(new PrintStockOpnameExport($request), 'stock_opname-' . $now . '.xlsx');
     }
-    public function Opname(Request $request)
+    // public function Opname(Request $request)
+    // {
+    //     $request->validate([
+    //         'medicine_id'       => 'required|exists:medicines,id',
+    //         'stock_physic'      => 'nullable|integer',  
+    //         'stock_system'      => 'nullable|integer',
+    //         'stock_discrepancy' => 'required|integer',
+    //     ]);
+
+    //     try {
+    //         DB::transaction(function () use ($request) {
+    //             $medicine = Medicines::findOrFail($request->medicine_id);
+
+    //             // ── 1. Correct batches (storage) ──────────────────────────────
+    //             if ($request->filled('batches_id')) {
+    //                 $batch = Batches::findOrFail($request->batches_id);
+    //             } else {
+    //                 // FEFO — earliest expiry first
+    //                 $batch = Batches::where('medicine_id', $medicine->id)
+    //                     ->orderBy('expired_date', 'asc')
+    //                     ->lockForUpdate()
+    //                     ->first();
+    //             }
+
+    //             if ($batch) {
+    //                 // Set directly to physical count instead of increment/decrement
+    //                 $batch->stock = $request->stock_physic;
+    //                 $batch->save();
+    //             }
+
+    //             // ── 2. Correct medicine_transfers (counter) ───────────────────
+    //             // If client selects a specific transfer, correct that one
+    //             // Otherwise correct the latest transfer for this medicine
+    //             if ($request->filled('transfer_id')) {
+    //                 $transfer = MedicineTransfers::findOrFail($request->transfer_id);
+    //                 $transfer->stock = $request->counter_stock_physic;
+    //                 $transfer->save();
+    //             }
+
+    //             // ── 3. Log the correction ─────────────────────────────────────
+    //             $discrepancy = $request->stock_discrepancy;
+    //             $status = $discrepancy < 0 ? 6 : 5;
+
+    //             ItemsLog::create([
+    //                 'transaction_code' => $this->generateOpnameCode(),
+    //                 'code'             => $this->generateItemsLogCode(),
+    //                 'type'             => 'SO',
+    //                 'medicine_id'      => $medicine->id,
+    //                 'batches_id'       => $batch?->id,
+    //                 'qty'              => abs($discrepancy),
+    //                 'qty_before'       => $request->stock_system,
+    //                 'qty_after'        => $request->stock_physic,
+    //                 'total'            => '-',
+    //                 'date'             => now(),
+    //                 'status'           => $status,
+    //             ]);
+
+    //             // ── 4. Update medicine master stock ───────────────────────────
+    //             $medicine->update(['stock' => $request->stock_physic]);
+    //         });
+
+    //         return response()->json(['success' => true, 'message' => 'Stok berhasil dikoreksi!']);
+    //     } catch (\Exception $e) {
+    //         return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+    //     }
+    // }
+    public function batches(Request $request)
+    {
+        $batches = Batches::where('medicine_id', $request->medicine_id)
+            ->where('pharmacy_id', auth()->user()->pharmacy_id) // scope to current pharmacy
+            ->orderBy('expired_date', 'asc')                    // FEFO
+            ->get(['id', 'name', 'expired_date', 'stock']);
+
+        return response()->json($batches);
+    }
+
+    public function opname(Request $request)
     {
         $request->validate([
-            'medicine_id'       => 'required|exists:medicines,id',
-            'stock_physic'      => 'required|integer|min:0',
-            'stock_system'      => 'required|integer|min:0',
-            'stock_discrepancy' => 'required|integer',
+            'medicine_id'          => 'required|exists:medicines,id',
+            'stock_physic'         => 'required|integer',
+            'counter_stock_physic' => 'nullable|integer',
+            'batches_id'           => 'nullable|exists:batches,id',
         ]);
 
+        DB::beginTransaction();
+
         try {
-            DB::transaction(function () use ($request) {
-                $medicine = Medicines::findOrFail($request->medicine_id);
-                $batch = Batches::where('medicine_id', $medicine->id)
-                    ->where('name', $request->batch)
-                    ->where('expired_date', $request->expired_date)
-                    ->lockForUpdate()
-                    ->first();
+            // 1. Resolve which batch to use (provided or FEFO default)
+            if ($request->filled('batches_id')) {
+                $batch = Batches::lockForUpdate()->findOrFail($request->batches_id);
+            } else {
+                $batch = Batches::lockForUpdate()
+                    ->where('medicine_id', $request->medicine_id)
+                    ->where('pharmacy_id', auth()->user()->pharmacy_id)
+                    ->orderBy('expired_date', 'asc')
+                    ->firstOrFail();
+            }
 
-                if (!$batch) {
-                    $batch = Batches::create([
-                        'medicine_id'  => $request->medicine_id,
-                        'name'         => $request->batch,
-                        'expired_date' => $request->expired_date,
-                        'stock'        => 0,
-                        'status'       => 0,
-                    ]);
-                }
-                $status = '';
-                if ($request->stock_discrepancy < 0) {
-                    $status = 6;
-                    $batch->decrement('stock', $request->stock_discrepancy);
-                } else if ($request->stock_discrepancy >= 0) {
-                    $status = 5;
-                    $batch->increment('stock', $request->stock_discrepancy);
-                }
+            $stockBefore  = (int) $batch->stock;
+            $stockPhysic  = (int) $request->stock_physic;
+            $discrepancy  = $stockPhysic - $stockBefore;
 
-                ItemsLog::create([
-                    'transaction_code'  => $this->generateOpnameCode(),
-                    'code'              => $this->generateItemsLogCode(),
-                    'type'              => "SO",
-                    'medicine_id'       => $medicine->id,
-                    'qty'               => abs($request->stock_discrepancy),
-                    'qty_before'        => $request->stock_system,
-                    'qty_after'         => $request->stock_physic,
-                    'total'             => "-",
-                    'date'              => now(),
-                    'status'            => $status
-                ]);
+            // status 5 = surplus or equal, status 6 = deficit
+            $status = $discrepancy >= 0 ? 5 : 6;
 
-                // Update medicine stock
-                $medicine->update([
-                    'stock' => $request->stock_physic
-                ]);
-            });
+            // 2. Update batch stock to the physical count
+            $batch->stock = $stockPhysic;
+            $batch->save();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Stok berhasil disimpan!'
+            // 3. Write to items_log
+            // Generate a transaction code — adjust the format to your convention
+            StockOpname::create([
+                'users_id'          => auth()->id(),
+                'batches_id'        => $batch->id,
+                'stock_physical'    => $stockPhysic,
+                'stock_discrepancy' => $discrepancy,          // signed: positive = surplus, negative = deficit
+                'stock_total'       => $stockPhysic,          // final stock after correction
+                'date'              => now()->toDateString(),
+                'status'            => $status,               // 5 = surplus/sama, 6 = defisit
             ]);
-        } catch (\Exception $e) {
+
+            ItemsLog::create([
+                'batches_id'       => $batch->id,
+                'transaction_code' => $this->generateOpnameCode(),
+                'code'             => $this->generateItemsLogCode(),
+                'type'             => "SO",
+                'medicine_id'      => $request->medicine_id,
+                'qty'              => abs($discrepancy),
+                'qty_before'       => $stockBefore,
+                'qty_after'        => $stockPhysic,
+                'total'            => $discrepancy,
+                'date'             => now()->toDateString(),
+                'status'           => $status,
+            ]);
+
+            DB::commit();
+
             return response()->json([
-                'success' => false,
-                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
-            ], 500);
+                'message'      => 'Stock opname berhasil disimpan.',
+                'batch'        => $batch->fresh(),
+                'qty_before'   => $stockBefore,
+                'qty_after'    => $stockPhysic,
+                'discrepancy'  => $discrepancy,
+                'status'       => $status,
+            ]);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json(['message' => $e->getMessage()], 422);
         }
     }
     // Stock Detail

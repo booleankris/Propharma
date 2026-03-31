@@ -24,7 +24,7 @@ class Batches extends Model
     }
     public function medicine_transfers()
     {
-        return $this->hasMany(MedicineTransfers::class, 'batches_id', 'id'); // add foreign key explicitly
+        return $this->hasMany(MedicineTransfers::class, 'batches_id', 'id'); 
     }
     public function receivingItems()
     {
