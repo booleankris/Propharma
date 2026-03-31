@@ -803,9 +803,21 @@ class SuppliesController extends Controller
             // status 5 = surplus or equal, status 6 = deficit
             $status = $discrepancy >= 0 ? 5 : 6;
 
-            // 2. Update batch stock to the physical count
+            // 2. Update batch stock to the physical count (Storage And COunter)
             $batch->stock = $stockPhysic;
             $batch->save();
+
+            if ($request->filled('counter_stock_physic')) {
+                $counterPhysic = (int) $request->counter_stock_physic;
+            
+                $transfer = MedicineTransfers::where('batches_id', $batch->id)->first();
+            
+                if ($transfer) {
+                    $transfer->stock = $counterPhysic;
+                    $transfer->save();
+                }
+                // If no transfer record exists for this batch, skip silently
+            }
 
             // 3. Write to items_log
             // Generate a transaction code — adjust the format to your convention
