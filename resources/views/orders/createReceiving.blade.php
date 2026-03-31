@@ -248,6 +248,7 @@
                                     class="select2 w-full rounded-lg border border-gray-300 px-12 py-2.5 text-[13px]">
                                     <option value="KREDIT">Kredit</option>
                                     <option value="TUNAI">Tunai</option>
+                                    <option value="KONSINYASI">Konsinyasi</option>
                                 </select>
                             </div>
                             <div>

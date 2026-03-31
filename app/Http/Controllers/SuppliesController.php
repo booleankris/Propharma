@@ -382,6 +382,19 @@ class SuppliesController extends Controller
                         border-radius: 25px;'>
                         Stock Opname
                         </div";
+                    } else if ($row->status == 7) {
+                        return "<div style='
+                        text-align: center;
+                        font-weight: bold;
+                        text-transform: uppercase;
+                        background-color: #aeffeaad;
+                        color: #238787;
+                        padding: 7px 6px;
+                        font-size: 10px;
+                        font-family: Poppins;
+                        border-radius: 25px;'>
+                        Mutasi Stok
+                        </div";
                     }
                 })
                 ->rawColumns(['status'])
@@ -503,6 +516,11 @@ class SuppliesController extends Controller
                                         <b'>" . $row->qty . "</b>
                                     </div>";
                         }
+                    } else if ($row->status == 7) {
+                        return "   <div style='color:#d34163;font-weight:bold;'>
+                        <span>-</span>
+                        <b'>" . $row->qty . "</b>
+                    </div>";
                     }
                 })
                 ->addColumn('qty_before', function ($row) {
@@ -598,6 +616,19 @@ class SuppliesController extends Controller
                         font-family: Poppins;
                         border-radius: 25px;'>
                         Stock Opname
+                        </div";
+                    } else if ($row->status == 7) {
+                        return "<div style='
+                        text-align: center;
+                        font-weight: bold;
+                        text-transform: uppercase;
+                        background-color: #aeffeaad;
+                        color: #238787;
+                        padding: 7px 6px;
+                        font-size: 10px;
+                        font-family: Poppins;
+                        border-radius: 25px;'>
+                        Mutasi Stok
                         </div";
                     }
                 })
