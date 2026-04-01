@@ -1,7 +1,7 @@
 @extends('layouts.app')
 @section('content')
 @section('style')
-    <link rel="stylesheet" href="{{ asset('css/dashboard.css') }}">
+<link rel="stylesheet" href="{{ asset('css/dashboard.css') }}?time={{ time() }}">
     <link rel="stylesheet" href="{{ asset('templates/library/izitoast/dist/css/iziToast.min.css') }}">
 
     @if ($check_transaction != 0)
