@@ -682,13 +682,14 @@ class SalesController extends Controller
         $validated = $request->validate([
             'transaction_id'   => 'required|integer|',
             'paid'             => 'required|numeric|min:0',
-            'discounsubtotal' => 'nullable|numeric|min:0',
+            'discounsubtotal'  => 'nullable|numeric|min:0',
             'totaltransaction' => 'required|numeric|min:0',
             'changes'          => 'required|numeric|min:0',
             'patient_id'       => 'nullable|integer|exists:patients,id',
             'doctor_id'        => 'nullable|integer|exists:doctors,id',
             'debtor_id'        => 'nullable|integer|exists:debtors,id',
             'paymentType'      => 'nullable|string',
+            'bank_name'        => 'nullable|string',
             'user_id'          => 'nullable|integer|exists:users,id',
             'shift_logs_id'    => 'nullable|integer|exists:shift_logs,id',
 
@@ -707,17 +708,18 @@ class SalesController extends Controller
                 ]);
             }
             $transaction->update([
-                'status'           => 1,
-                'paid'             => $validated['paid'],
-                'discount'         => $validated['discounsubtotal'],
-                'subtotal'         => $validated['totaltransaction'],
-                'changes'          => $validated['changes'],
-                'patient_id'       => $validated['patient_id'],
-                'doctor_id'        => $validated['doctor_id'],
-                'debtor_id'        => $validated['debtor_id'],
-                'payment_method'   => $validated['paymentType'],
-                'user_id'          => $validated['user_id'],
-                'shift_logs_id'    => $validated['shift_logs_id'],
+                'status'               => 1,
+                'paid'                 => $validated['paid'],
+                'discount'             => $validated['discounsubtotal'],
+                'subtotal'             => $validated['totaltransaction'],
+                'changes'              => $validated['changes'],
+                'patient_id'           => $validated['patient_id'],
+                'doctor_id'            => $validated['doctor_id'],
+                'debtor_id'            => $validated['debtor_id'],
+                'payment_method'       => $validated['paymentType'],
+                'transfer_bank_name'   => $validated['bank_name'],
+                'user_id'              => $validated['user_id'],
+                'shift_logs_id'        => $validated['shift_logs_id'],
 
             ]);
 

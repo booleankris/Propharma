@@ -44,10 +44,12 @@
     Alamat : {{ $transaction->patients->address }}<br>
     No.Telp : {{ $transaction->patients->phone }}<br>
 
-    <hr>
-    Nama Dokter : {{ $transaction->doctors->name }}<br>
-    <hr>
-
+    @if($transaction->transaction_type == "RESEP TUNAI" || $transaction->transaction_type == "KREDIT")
+        <hr>
+        Nama Dokter : {{ $transaction->doctors->name }}
+        <hr>
+    @endif
+    <br>
     @foreach ($transactionCart as $key => $items)
         @if ($key != 'single')
             <table style="width: 100%">

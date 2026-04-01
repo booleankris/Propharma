@@ -24,6 +24,7 @@ class MedicineTransactions extends Model
         'user_id',
         'payment_method',
         'shift_logs_id',
+        'transfer_bank_name',
 
     ];
     public function transactions()

@@ -424,9 +424,9 @@
 
 .payment-option input[type="radio"]:checked+.payment-card.qris-card svg,
 .payment-option input[type="radio"]:checked+.payment-card.debit-card svg,
-.payment-option input[type="radio"]:checked+.payment-card.cash-card svg
-{
-    color: #fff;
+.payment-option input[type="radio"]:checked+.payment-card.cash-card svg {
+
+    color: #fff!important;
 }
 
 .payment-option input[type="radio"]:checked+.payment-card.qris-card .payment-icon {
@@ -442,7 +442,6 @@
     border-color: #3b82f6;
     background: #eff6ff;
 }
-
 
 
 .payment-option input[type="radio"]:checked+.payment-card.debit-card .payment-icon {
@@ -468,6 +467,15 @@
     font-weight: 600;
 }
 
+.payment-option input[type="radio"]:checked+.payment-card.transfer-card {
+    border-color: #d0ca82;
+    background: #fffdec;
+}
+
+.payment-option input[type="radio"]:checked+.payment-card.transfer-card .payment-icon {
+    background: #f7eb3c;
+}
+
 .payment-card {
     transition: all 0.15s ease;
 }
@@ -491,6 +499,11 @@
     background: #f6fffe;
 }
 
+.payment-card.transfer-card {
+    border-color: #ebe8c4;
+    background: #fffdec;
+}
+
 .payment-card.qris-card .payment-icon {
     background: #ede9fe;
 }
@@ -499,9 +512,19 @@
     background: #dbeafe;
 }
 
+.payment-card.transfer-card .payment-icon {
+    background: #fdf5d3;
+}
+
+
 .payment-card.cash-card .payment-icon {
     background: #d1fae5;
 }
+
+.payment-card.transfer-card .payment-icon svg {
+    color: #bf9c00;
+}
+
 
 .payment-card.qris-card .payment-icon svg {
     color: #8b5cf6;
@@ -521,6 +544,10 @@
 
 .payment-card.debit-card .payment-label {
     color: #2563eb;
+}
+
+.payment-card.transfer-card .payment-label {
+    color: #bf9c00;
 }
 
 .payment-card.cash-card .payment-label {

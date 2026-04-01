@@ -2,6 +2,8 @@
 @section('content')
 @section('style')
     <link rel="stylesheet" href="{{ asset('css/dashboard.css') }}">
+    <link rel="stylesheet" href="{{ asset('templates/library/izitoast/dist/css/iziToast.min.css') }}">
+
     @if ($check_transaction != 0)
         @if ($transaction->transaction_type == 'HV/OTC')
             <style>
@@ -1055,6 +1057,7 @@
                                 <span class="payment-label text-[12px] font-medium">Cash</span>
                             </div>
                         </label>
+
                         {{-- QRIS --}}
                         <label class="payment-option flex-1 cursor-pointer">
                             <input type="radio" name="payment_type" onclick="getPaymentType()" value="QRIS"
@@ -1065,7 +1068,7 @@
                                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
                                         xmlns="http://www.w3.org/2000/svg">
                                         <path
-                                            d="M6.5 6.5H6.51M17.5 6.5H17.51M6.5 17.5H6.51M13 13H13.01M17.5 17.5H17.51M17 21H21V17M14 16.5V21M21 14H16.5M15.6 10H19.4C19.9601 10 20.2401 10 20.454 9.89101C20.6422 9.79513 20.7951 9.64215 20.891 9.45399C21 9.24008 21 8.96005 21 8.4V4.6C21 4.03995 21 3.75992 20.891 3.54601C20.7951 3.35785 20.6422 3.20487 20.454 3.10899C20.2401 3 19.9601 3 19.4 3H15.6C15.0399 3 14.7599 3 14.546 3.10899C14.3578 3.20487 14.2049 3.35785 14.109 3.54601C14 3.75992 14 4.03995 14 4.6V8.4C14 8.96005 14 9.24008 14.109 9.45399C14.2049 9.64215 14.3578 9.79513 14.546 9.89101C14.7599 10 15.0399 10 15.6 10ZM4.6 10H8.4C8.96005 10 9.24008 10 9.45399 9.89101C9.64215 9.79513 9.79513 9.64215 9.89101 9.45399C10 9.24008 10 8.96005 10 8.4V4.6C10 4.03995 10 3.75992 9.89101 3.54601C9.79513 3.35785 9.64215 3.20487 9.45399 3.10899C9.24008 3 8.96005 3 8.4 3H4.6C4.03995 3 3.75992 3 3.54601 3.10899C3.35785 3.20487 3.20487 3.35785 3.10899 3.54601C3 3.75992 3 4.03995 3 4.6V8.4C3 8.96005 3 9.24008 3.10899 9.45399C3.20487 9.64215 3.35785 9.79513 3.54601 9.89101C3.75992 10 4.03995 10 4.6 10ZM4.6 21H8.4C8.96005 21 9.24008 21 9.45399 20.891C9.64215 20.7951 9.79513 20.6422 9.89101 20.454C10 20.2401 10 19.9601 10 19.4V15.6C10 15.0399 10 14.7599 9.89101 14.546C9.79513 14.3578 9.64215 14.2049 9.45399 14.109C9.24008 14 8.96005 14 8.4 14H4.6C4.03995 14 3.75992 14 3.54601 14.109C3.35785 14.2049 3.20487 14.3578 3.10899 14.546C3 14.7599 3 15.0399 3 15.6V19.4C3 19.9601 3 20.2401 3.10899 20.454C3.20487 20.6422 3.35785 20.7951 3.54601 20.891C3.75992 21 4.03995 21 4.6 21Z"
+                                            d="M6.5 6.5H6.51M17.5 6.5H17.51M6.5 17.5H6.51M13 13H13.01M17.5 17.5H17.51M17 21H21V17M14 16.5V21M21 14H16.5M15.6 10H19.4C19.9601 10 20.2401 10 20.454 9.89101C20.6422 9.79513 20.7951 9.64215 20.891 9.45399C21 9.24008 21 8.96005 21 8.4V4.6C21 4.03995 21 3.75992 20.891 3.54601C20.7951 3.35785 20.6422 3.20487 20.454 3.10899C20.2401 3 19.9601 3 14.546 3.10899C14.3578 3.20487 14.2049 3.35785 14.109 3.54601C14 3.75992 14 4.03995 14 4.6V8.4C14 8.96005 14 9.24008 14.109 9.45399C14.2049 9.64215 14.3578 9.79513 14.546 9.89101C14.7599 10 15.0399 10 15.6 10ZM4.6 10H8.4C8.96005 10 9.24008 10 9.45399 9.89101C9.64215 9.79513 9.79513 9.64215 9.89101 9.45399C10 9.24008 10 8.96005 10 8.4V4.6C10 4.03995 10 3.75992 9.89101 3.54601C9.79513 3.35785 9.64215 3.20487 9.45399 3.10899C9.24008 3 8.96005 3 8.4 3H4.6C4.03995 3 3.75992 3 3.54601 3.10899C3.35785 3.20487 3.20487 3.35785 3.10899 3.54601C3 3.75992 3 4.03995 3 4.6V8.4C3 8.96005 3 9.24008 3.10899 9.45399C3.20487 9.64215 3.35785 9.79513 3.54601 9.89101C3.75992 10 4.03995 10 4.6 10ZM4.6 21H8.4C8.96005 21 9.24008 21 9.45399 20.891C9.64215 20.7951 9.79513 20.6422 9.89101 20.454C10 20.2401 10 19.9601 10 19.4V15.6C10 15.0399 10 14.7599 9.89101 14.546C9.79513 14.3578 9.64215 14.2049 9.45399 14.109C9.24008 14 8.96005 14 8.4 14H4.6C4.03995 14 3.75992 14 3.54601 14.109C3.35785 14.2049 3.20487 14.3578 3.10899 14.546C3 14.7599 3 15.0399 3 15.6V19.4C3 19.9601 3 20.2401 3.10899 20.454C3.20487 20.6422 3.35785 20.7951 3.54601 20.891C3.75992 21 4.03995 21 4.6 21Z"
                                             stroke="currentColor" stroke-width="2" stroke-linecap="round"
                                             stroke-linejoin="round" />
                                     </svg>
@@ -1092,7 +1095,32 @@
                             </div>
                         </label>
 
+                        {{-- Transfer --}}
+                        <label class="payment-option flex-1 cursor-pointer">
+                            <input type="radio" name="payment_type" onclick="getPaymentType()" value="TRANSFER"
+                                class="sr-only">
+                            <div
+                                class="payment-card transfer-card flex flex-col items-center gap-2 py-3 px-2 rounded-xl border text-center">
+                                <div class="payment-icon w-9 h-9 rounded-lg flex items-center justify-center">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                                        stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+                                        stroke-linejoin="round">
+                                        <path d="M4 17h16M4 17l4-4M4 17l4 4" />
+                                        <path d="M20 7H4M20 7l-4-4M20 7l-4 4" />
+                                    </svg>
+                                </div>
+                                <span class="payment-label text-[12px] font-medium">Transfer</span>
+                            </div>
+                        </label>
+                    </div>
 
+                    {{-- Bank name input — only visible when Transfer is selected --}}
+                    <div id="bankNameWrapper" class="hidden mt-3">
+                        <label class="block text-[12px] font-medium text-gray-500 mb-1">Nama bank</label>
+                        <input type="text" id="bank_name" name="bank_name"
+                            placeholder="Contoh: BCA, Mandiri, BNI..." autocomplete="off"
+                            class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-[13px]
+                                   focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400">
                     </div>
                 </div>
             @endif
@@ -1160,41 +1188,155 @@
     </div>
     {{-- Print Confirmation Modal --}}
     <div id="printConfirmModal" class="hidden fixed inset-0 z-[999999] items-center justify-center bg-black/40">
-        <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4">
-            <h3 class="text-[15px] font-semibold text-gray-800 mb-1">Cetak Struk?</h3>
-            <p class="text-[13px] text-gray-400 mb-5">Pilih jenis struk yang ingin dicetak.</p>
+        <div class="bg-white rounded-2xl p-6 w-full max-w-sm mx-4" style="border: 0.5px solid rgba(0,0,0,0.08);">
+
+            {{-- Icon --}}
+            <div class="w-10 h-10 rounded-xl flex items-center justify-center mb-4" style="background: #EFF6FF;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2196F3"
+                    stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="6 9 6 2 18 2 18 9" />
+                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                    <rect x="6" y="14" width="12" height="8" />
+                </svg>
+            </div>
+
+            <h3 class="text-[15px] font-medium text-gray-800 mb-1">Cetak struk?</h3>
+            <p class="text-[12px] text-gray-400 mb-4">
+                Gunakan
+                <kbd
+                    class="inline-flex items-center px-1 py-0.5 rounded text-[11px] border border-gray-200 bg-gray-50 text-gray-500 font-mono">↑</kbd>
+                <kbd
+                    class="inline-flex items-center px-1 py-0.5 rounded text-[11px] border border-gray-200 bg-gray-50 text-gray-500 font-mono">↓</kbd>
+                untuk navigasi,
+                <kbd
+                    class="inline-flex items-center px-1 py-0.5 rounded text-[11px] border border-gray-200 bg-gray-50 text-gray-500 font-mono">↵</kbd>
+                untuk pilih.
+            </p>
 
             {{-- RESEP TUNAI buttons --}}
             <div id="btnGroupResep" class="hidden flex-col gap-2">
-                <button id="btnStrukPelanggan"
-                    class="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-[13px] font-semibold transition-colors">
-                    Struk Pelanggan
+
+                <button id="btnStrukPelanggan" data-modal-btn data-mode="pelanggan"
+                    class="modal-print-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 text-left transition-colors">
+                    <div
+                        class="modal-btn-icon w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 text-gray-500 flex-shrink-0 transition-colors">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="6 9 6 2 18 2 18 9" />
+                            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                            <rect x="6" y="14" width="12" height="8" />
+                        </svg>
+                    </div>
+                    <div class="flex-1">
+                        <span class="block text-[13px] font-medium text-gray-700 modal-btn-label">Struk
+                            pelanggan</span>
+                        <span class="block text-[11px] text-gray-400">Print struk pembayaran saja</span>
+                    </div>
+                    <span
+                        class="modal-btn-enter text-[11px] text-gray-300 opacity-0 transition-opacity font-mono">↵</span>
                 </button>
-                <button id="btnStrukPelangganResep"
-                    class="w-full py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-[13px] font-semibold transition-colors">
-                    Struk Pelanggan &amp; Resep
+
+                <button id="btnStrukPelangganResep" data-modal-btn data-mode="pelanggan_resep"
+                    class="modal-print-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 text-left transition-colors">
+                    <div
+                        class="modal-btn-icon w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 text-gray-500 flex-shrink-0 transition-colors">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                            <polyline points="14 2 14 8 20 8" />
+                            <line x1="16" y1="13" x2="8" y2="13" />
+                            <line x1="16" y1="17" x2="8" y2="17" />
+                        </svg>
+                    </div>
+                    <div class="flex-1">
+                        <span class="block text-[13px] font-medium text-gray-700 modal-btn-label">Struk + resep</span>
+                        <span class="block text-[11px] text-gray-400">Print struk dan lembar resep</span>
+                    </div>
+                    <span
+                        class="modal-btn-enter text-[11px] text-gray-300 opacity-0 transition-opacity font-mono">↵</span>
                 </button>
-                <button id="btnCancelResep"
-                    class="w-full py-2.5 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 text-[13px] font-semibold transition-colors">
-                    Batal
+
+                <div class="h-px bg-gray-100 my-1"></div>
+
+                <button id="btnCancelResep" data-modal-btn data-mode="cancel"
+                    class="modal-print-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 text-left transition-colors">
+                    <div
+                        class="modal-btn-icon w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 text-gray-500 flex-shrink-0 transition-colors">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M19 12H5M5 12l7-7M5 12l7 7" />
+                        </svg>
+                    </div>
+                    <div class="flex-1">
+                        <span class="block text-[13px] font-medium text-gray-700 modal-btn-label">Batal</span>
+                        <span class="block text-[11px] text-gray-400">Kembali ke transaksi</span>
+                    </div>
+                    <span
+                        class="modal-btn-enter text-[11px] text-gray-300 opacity-0 transition-opacity font-mono">↵</span>
                 </button>
             </div>
 
             {{-- Default buttons --}}
             <div id="btnGroupDefault" class="hidden flex-col gap-2">
-                <button id="btnPrint"
-                    class="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-[13px] font-semibold transition-colors">
-                    Cetak Struk
+
+                <button id="btnPrint" data-modal-btn data-mode="pelanggan"
+                    class="modal-print-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 text-left transition-colors">
+                    <div
+                        class="modal-btn-icon w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 text-gray-500 flex-shrink-0 transition-colors">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="6 9 6 2 18 2 18 9" />
+                            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                            <rect x="6" y="14" width="12" height="8" />
+                        </svg>
+                    </div>
+                    <div class="flex-1">
+                        <span class="block text-[13px] font-medium text-gray-700 modal-btn-label">Cetak struk</span>
+                        <span class="block text-[11px] text-gray-400">Print struk untuk pelanggan</span>
+                    </div>
+                    <span
+                        class="modal-btn-enter text-[11px] text-gray-300 opacity-0 transition-opacity font-mono">↵</span>
                 </button>
-                <button id="btnSkipPrint"
-                    class="w-full py-2.5 rounded-xl bg-gray-800 hover:bg-gray-900 text-white text-[13px] font-semibold transition-colors">
-                    Tanpa Struk
+
+                <button id="btnSkipPrint" data-modal-btn data-mode="none"
+                    class="modal-print-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 text-left transition-colors">
+                    <div
+                        class="modal-btn-icon w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 text-gray-500 flex-shrink-0 transition-colors">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="18" y1="6" x2="6" y2="18" />
+                            <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                    </div>
+                    <div class="flex-1">
+                        <span class="block text-[13px] font-medium text-gray-700 modal-btn-label">Tanpa struk</span>
+                        <span class="block text-[11px] text-gray-400">Selesaikan tanpa mencetak</span>
+                    </div>
+                    <span
+                        class="modal-btn-enter text-[11px] text-gray-300 opacity-0 transition-opacity font-mono">↵</span>
                 </button>
-                <button id="btnCancel"
-                    class="w-full py-2.5 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 text-[13px] font-semibold transition-colors">
-                    Batal
+
+                <div class="h-px bg-gray-100 my-1"></div>
+
+                <button id="btnCancel" data-modal-btn data-mode="cancel"
+                    class="modal-print-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 text-left transition-colors">
+                    <div
+                        class="modal-btn-icon w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 text-gray-500 flex-shrink-0 transition-colors">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+                            stroke-linejoin="round">
+                            <path d="M19 12H5M5 12l7-7M5 12l7 7" />
+                        </svg>
+                    </div>
+                    <div class="flex-1">
+                        <span class="block text-[13px] font-medium text-gray-700 modal-btn-label">Batal</span>
+                        <span class="block text-[11px] text-gray-400">Kembali ke transaksi</span>
+                    </div>
+                    <span
+                        class="modal-btn-enter text-[11px] text-gray-300 opacity-0 transition-opacity font-mono">↵</span>
                 </button>
             </div>
+
         </div>
     </div>
 @endif
@@ -1327,11 +1469,12 @@
     </div>
 </div>
 
-{{-- ============================================================== Patient Invoice  ============================================================== --}}
 {{-- Print Confirmation --}}
 
 
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script src="{{ asset('templates/library/izitoast/dist/js/iziToast.min.js') }}"></script>
+
 <script>
     // WHEN PAGE LOADED
     let page = 1;
@@ -1460,6 +1603,12 @@
     const dosageRInput = document.getElementById('dosage_r');
     const packageInput = document.getElementById('package');
 
+    // Print Modal
+    const printModal = document.getElementById('printConfirmModal');
+    const btnGroupResep = document.getElementById('btnGroupResep');
+    const btnGroupDefault = document.getElementById('btnGroupDefault');
+
+
     // Variabel Transaksi & Cart
     var transaction_id = trx_id;
     var total_discount = {{ $discount_total }};
@@ -1475,6 +1624,7 @@
     var item_finalprice = "";
     let grossprice = "";
     var payInput = document.getElementById('pay');
+    var bank_name_input = document.getElementById('bank_name');
     var discounsubtotal = document.getElementById('discounsubtotal');
 
     var payment_total = document.getElementById('payment_total');
@@ -1678,6 +1828,127 @@
             "'": '&#39;'
         } [m]));
     }
+    // 
+
+    // Print Modal JS
+    const CheckoutModal = (() => {
+        const modal = document.getElementById('printConfirmModal');
+        const btnGroupDefault = document.getElementById('btnGroupDefault');
+        const btnGroupResep = document.getElementById('btnGroupResep');
+
+        let activeButtons = [];
+        let focusedIndex = 0;
+
+        // ── Focus helpers ─────────────────────────────────────────────────────────
+        function applyFocus(index) {
+            // Clear all
+            activeButtons.forEach(btn => {
+                btn.classList.remove('bg-blue-50', 'border-blue-200');
+                btn.querySelector('.modal-btn-icon').classList.remove('bg-blue-100', 'text-blue-600');
+                btn.querySelector('.modal-btn-icon').classList.add('bg-gray-100', 'text-gray-500');
+                btn.querySelector('.modal-btn-label').classList.remove('text-blue-700');
+                btn.querySelector('.modal-btn-label').classList.add('text-gray-700');
+                btn.querySelector('.modal-btn-enter').classList.add('opacity-0');
+                btn.querySelector('.modal-btn-enter').classList.remove('opacity-100');
+            });
+
+            // Apply to focused
+            focusedIndex = (index + activeButtons.length) % activeButtons.length;
+            const btn = activeButtons[focusedIndex];
+            btn.classList.add('bg-blue-50', 'border-blue-200');
+            btn.querySelector('.modal-btn-icon').classList.remove('bg-gray-100', 'text-gray-500');
+            btn.querySelector('.modal-btn-icon').classList.add('bg-blue-100', 'text-blue-600');
+            btn.querySelector('.modal-btn-label').classList.remove('text-gray-700');
+            btn.querySelector('.modal-btn-label').classList.add('text-blue-700');
+            btn.querySelector('.modal-btn-enter').classList.remove('opacity-0');
+            btn.querySelector('.modal-btn-enter').classList.add('opacity-100');
+            btn.focus({
+                preventScroll: true
+            });
+        }
+
+        // ── Keyboard handler ──────────────────────────────────────────────────────
+        function onKeyDown(e) {
+            if (!activeButtons.length) return;
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                applyFocus(focusedIndex + 1);
+            }
+            if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                applyFocus(focusedIndex - 1);
+            }
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                activeButtons[focusedIndex].click();
+            }
+            if (e.key === 'Escape') {
+                close();
+            }
+        }
+
+        // ── Open ──────────────────────────────────────────────────────────────────
+        function open(transactionType) {
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+
+            if (transactionType === 'RESEP TUNAI') {
+                btnGroupResep.classList.remove('hidden');
+                btnGroupResep.classList.add('flex');
+                btnGroupDefault.classList.add('hidden');
+                btnGroupDefault.classList.remove('flex');
+                activeButtons = Array.from(btnGroupResep.querySelectorAll('[data-modal-btn]'));
+            } else {
+                btnGroupDefault.classList.remove('hidden');
+                btnGroupDefault.classList.add('flex');
+                btnGroupResep.classList.add('hidden');
+                btnGroupResep.classList.remove('flex');
+                activeButtons = Array.from(btnGroupDefault.querySelectorAll('[data-modal-btn]'));
+            }
+
+            focusedIndex = 0;
+            applyFocus(0);
+            document.addEventListener('keydown', onKeyDown);
+        }
+
+        // ── Close ─────────────────────────────────────────────────────────────────
+        function close() {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            // Reset all button styles
+            document.querySelectorAll('[data-modal-btn]').forEach(btn => {
+                btn.classList.remove('bg-blue-50', 'border-blue-200');
+                btn.querySelector('.modal-btn-icon').classList.remove('bg-blue-100', 'text-blue-600');
+                btn.querySelector('.modal-btn-icon').classList.add('bg-gray-100', 'text-gray-500');
+                btn.querySelector('.modal-btn-label').classList.remove('text-blue-700');
+                btn.querySelector('.modal-btn-label').classList.add('text-gray-700');
+                btn.querySelector('.modal-btn-enter').classList.add('opacity-0');
+                btn.querySelector('.modal-btn-enter').classList.remove('opacity-100');
+            });
+            activeButtons = [];
+            document.removeEventListener('keydown', onKeyDown);
+            document.getElementById('pay').focus();
+        }
+
+        // ── Bind button handlers (called each checkout to capture fresh closure) ──
+        function bindButtons(handlers) {
+            document.getElementById('btnPrint').onclick = handlers.onBtnPrint;
+            document.getElementById('btnSkipPrint').onclick = handlers.onBtnSkipPrint;
+            document.getElementById('btnCancel').onclick = handlers.onBtnCancel;
+            document.getElementById('btnStrukPelanggan').onclick = handlers.onBtnStrukPelanggan;
+            document.getElementById('btnStrukPelangganResep').onclick = handlers.onBtnStrukPelangganResep;
+            document.getElementById('btnCancelResep').onclick = handlers.onBtnCancelResep;
+        }
+
+        return {
+            open,
+            close,
+            bindButtons
+        };
+    })();
+
+
+
 
     // ===============================
     // Autocomplete Box Control
@@ -1881,32 +2152,6 @@
         }
     });
 
-
-    // ================ Pilih Tipe Pembayaran =========================
-
-    function getPaymentType() {
-        const selected = document.querySelector('input[name="payment_type"]:checked');
-        paymentType = selected.value;
-        console.log('Payment type:', paymentType);
-        return selected ? selected.value : null;
-
-    }
-    const paymentRadios = document.querySelectorAll('input[name="payment_type"]');
-    const nextInput = document.getElementById('pay');
-
-    paymentRadios.forEach(radio => {
-        radio.addEventListener('keydown', function(event) {
-            if (event.key === 'Enter') {
-                paymentType = radio.value;
-                event.preventDefault();
-                nextInput.focus();
-                console.log('Payment type:', radio.value);
-
-            }
-        });
-    });
-
-
     // ================ Pencarian Pasien =========================
 
     function openpatientBox() {
@@ -2018,6 +2263,62 @@
                 selectPatient(items[activeIndex]);
             } else if (e.key === 'Escape') {
                 closepatientBox();
+            }
+        });
+    }
+    if (bank_name_input) {
+        // ================ Pilih Tipe Pembayaran =========================
+
+        function getPaymentType() {
+            const selected = document.querySelector('input[name="payment_type"]:checked');
+            paymentType = selected ? selected.value : null;
+
+            // Show / hide bank name field
+            const bankWrapper = document.getElementById('bankNameWrapper');
+            const bankInput = document.getElementById('bank_name');
+
+            if (paymentType === 'TRANSFER') {
+                bankWrapper.classList.remove('hidden');
+                // Small delay so the element is visible before focusing
+                setTimeout(() => bankInput.focus(), 50);
+            } else {
+                bankWrapper.classList.add('hidden');
+                bankInput.value = '';
+            }
+
+            console.log('Payment type:', paymentType);
+            return paymentType;
+        }
+
+        const paymentRadios = document.querySelectorAll('input[name="payment_type"]');
+        const nextInput = document.getElementById('pay');
+
+        paymentRadios.forEach(radio => {
+            radio.addEventListener('keydown', function(event) {
+                if (event.key !== 'Enter') return;
+                event.preventDefault();
+
+                paymentType = radio.value;
+                console.log('Payment type:', radio.value);
+
+                // If Transfer is selected via Enter, focus the bank name field instead of pay
+                if (radio.value === 'TRANSFER') {
+                    const bankWrapper = document.getElementById('bankNameWrapper');
+                    const bankInput = document.getElementById('bank_name');
+                    bankWrapper.classList.remove('hidden');
+                    setTimeout(() => bankInput.focus(), 50);
+                } else {
+                    document.getElementById('bankNameWrapper').classList.add('hidden');
+                    document.getElementById('bank_name').value = '';
+                    nextInput.focus();
+                }
+            });
+        });
+
+        bank_name_input.addEventListener('keydown', function(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                nextInput.focus();
             }
         });
     }
@@ -2872,42 +3173,25 @@
             <tr><td>Kembali</td><td></td><td>${changes}</td></tr>
         `;
 
-            // ── Show invoice modal ────────────────────────────────────────────
-            document.getElementById('invoiceModal').classList.remove('hidden');
 
-            // ── Show print confirm modal ──────────────────────────────────────
-            const printModal = document.getElementById('printConfirmModal');
-            const btnGroupResep = document.getElementById('btnGroupResep');
-            const btnGroupDefault = document.getElementById('btnGroupDefault');
+            CheckoutModal.bindButtons({
+                onBtnPrint: () => doCheckout('pelanggan'),
+                onBtnSkipPrint: () => doCheckout('none'),
+                onBtnCancel: () => CheckoutModal.close(),
+                onBtnStrukPelanggan: () => doCheckout('pelanggan'),
+                onBtnStrukPelangganResep: () => doCheckout('pelanggan_resep'),
+                onBtnCancelResep: () => CheckoutModal.close(),
+            });
 
-            printModal.classList.remove('hidden');
-            printModal.classList.add('flex');
+            CheckoutModal.open(transaction_type);
 
-            if (transaction_type === 'RESEP TUNAI') {
-                btnGroupResep.classList.remove('hidden');
-                btnGroupResep.classList.add('flex');
-                btnGroupDefault.classList.add('hidden');
-                btnGroupDefault.classList.remove('flex');
-            } else {
-                btnGroupDefault.classList.remove('hidden');
-                btnGroupDefault.classList.add('flex');
-                btnGroupResep.classList.add('hidden');
-                btnGroupResep.classList.remove('flex');
-            }
-
-            // ── Helpers ───────────────────────────────────────────────────────
-            function closeModal() {
-                printModal.classList.add('hidden');
-                printModal.classList.remove('flex');
-            }
-
-            // ── Step 2: Checkout ──────────────────────────────────────────────
             function doCheckout(printMode) {
-                closeModal();
+                CheckoutModal.close();
 
                 const cleanPaid = cleanRupiah(document.getElementById('pay').value);
                 const cleanChanges = cleanRupiah(document.getElementById('trchange').value);
                 const discounsubtotal = document.getElementById('discounsubtotal').value;
+                const bank_name = bank_name_input ? bank_name_input.value || null : null;;
 
                 document.getElementById('paid').value = cleanPaid;
                 document.getElementById('changes').value = cleanChanges;
@@ -2924,6 +3208,7 @@
                     patient_id,
                     print_receipt: printMode !== 'none' ? 1 : 0,
                     paymentType,
+                    bank_name,
                     user_id,
                     shift_logs_id,
                 }).then(res => {
@@ -2946,14 +3231,6 @@
                     });
                 });
             }
-
-            // ── Button handlers ───────────────────────────────────────────────
-            document.getElementById('btnPrint').onclick = () => doCheckout('pelanggan');
-            document.getElementById('btnSkipPrint').onclick = () => doCheckout('none');
-            document.getElementById('btnCancel').onclick = () => closeModal();
-            document.getElementById('btnStrukPelanggan').onclick = () => doCheckout('pelanggan');
-            document.getElementById('btnStrukPelangganResep').onclick = () => doCheckout('pelanggan_resep');
-            document.getElementById('btnCancelResep').onclick = () => closeModal();
 
         }).catch(error => {
             console.error("Error:", error.response ? error.response.data : error.message);
@@ -3010,6 +3287,7 @@
         document.getElementById("checkoutForm").submit();
         document.body.removeChild(iframe);
     }
+
 
     // ======================== Pembayaran & Tombol ========================
 
