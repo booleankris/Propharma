@@ -37,7 +37,7 @@ class SalesController extends Controller
         $pharmacy_id = Auth::user()->pharmacy_id;
         $user_id     = Auth::user()->id;
 
-        // ── 1. Resolve display-type → DB-type + parameter key ──────────────────
+        // 1. Resolve display-type → DB-type + parameter key 
         $typeMap = [
             'resep'  => ['db' => 'RESEP TUNAI', 'param_key' => 'receipt', 'code' => '1'],
             'kredit' => ['db' => 'KREDIT',      'param_key' => null,      'code' => '4'],
@@ -51,7 +51,7 @@ class SalesController extends Controller
         $dbType    = $meta['db'];
         $paramKey  = $meta['param_key'];
 
-        // ── 2. Load payment parameters once ─────────────────────────────────────
+        // 2. Load payment parameters once
         $paymentParams        = PaymentParameters::findOrFail(1);
         $parameterHV          = $paymentParams->otc;
         $parameterUP          = $paymentParams->pdu;
@@ -61,12 +61,12 @@ class SalesController extends Controller
         $rounding             = $dbType === 'KREDIT' ? '0' : $paymentParams->rounding;
         $parameters           = $dbType === 'KREDIT' ? '0' : $paymentParams->{$paramKey};
 
-        // ── 3. Resolve which transaction to use ──────────────────────────────────
+        // 3. Resolve which transaction to use
         if ($id !== null) {
-            // Tab already has a specific transaction — load it, guard status
+            // Tab already has a specific transaction, load it, guard status
             $transaction = MedicineTransactions::where('pharmacy_id', $pharmacy_id)
                 ->where('id', $id)
-                ->where('status', 0)          // ← FIX: block finished transactions
+                ->where('status', 0)
                 ->first();
 
             if (!$transaction) {
@@ -120,17 +120,20 @@ class SalesController extends Controller
             ]);
         }
 
-        // ── 4. Handle type switch on an existing transaction ────────────────────
+        // 4. Handle type switch on an existing transaction ────────────────────
         // If the user navigates to a different type on the same transaction,
         // update the type and clear the cart (prices differ per type).
+
         if ($transaction->transaction_type !== $dbType) {
-            $transaction->update(['transaction_type' => $dbType]);
+            $new_type = $meta['code'];
+            $new_code = $this->regenerateTransactionCode($new_type, $transaction->transaction_code);
+            $transaction->update(['transaction_type' => $dbType, 'transaction_code' => $new_code]);
             MedicineCart::where('transaction_id', $transaction->id)->delete();
         }
 
         $trx_id = $transaction->id;
 
-        // ── 5. Collect view data ─────────────────────────────────────────────────
+        // 5. Collect view data───────────────
         $totaltransaction = MedicineCart::where('user_id', $user_id)
             ->where('transaction_id', $trx_id)
             ->sum('final_price');
@@ -179,7 +182,7 @@ class SalesController extends Controller
         ));
     }
 
-    // ── Helper: map DB type string back to route slug ───────────────────────────
+    // Helper: map DB type string back to route slug ───────────────────────────
     private function dbTypeToRouteType(string $dbType): string
     {
         return match ($dbType) {
@@ -327,6 +330,14 @@ class SalesController extends Controller
         $serial = str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
 
         $transactionCode = $prefix . $serial;
+        return $transactionCode;
+    }
+    public function regenerateTransactionCode($type, $code)
+    {
+        $transactionCode = $code;
+        $newDigit = $type;
+
+        $transactionCode[4] = $newDigit;
         return $transactionCode;
     }
 
