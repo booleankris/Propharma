@@ -836,7 +836,7 @@ class SalesController extends Controller
                     'total'            => $cart->final_price,
                     'date'             => $now,
                     'status'           => 1,
-                    'batches_id'       => $transfer->id,
+                    'batches_id'       => $transfer->batches_id,
 
                 ]);
             }

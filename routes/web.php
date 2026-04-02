@@ -189,7 +189,13 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     Route::resource('compositions', CompositionsController::class)->except(['show']);
     Route::resource('factories', FactoriesController::class)->except(['show']);
     Route::resource('categories', CategoriesController::class)->except(['show']);
-    Route::resource('medicines', MedicineController::class)->except(['show']);
+    Route::prefix('medicines')->name('medicines.')->group(function () {
+        Route::get('/',                     [MedicineController::class, 'index'])->name('index');
+        Route::post('/',                    [MedicineController::class, 'store'])->name('store');
+        Route::put('/{id}',                 [MedicineController::class, 'update'])->name('update');
+        Route::delete('/{id}',              [MedicineController::class, 'destroy'])->name('destroy');
+        Route::get('/{id}/edit-creditor',   [MedicineController::class, 'editCreditor'])->name('editCreditor');
+    });
     Route::resource('parameters', ParametersController::class)->except(['show']);
     Route::resource('items', ItemsController::class)->except(['show']);
     Route::resource('locations', LocationsController::class)->except(['show']);

@@ -20,6 +20,7 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class SuppliesController extends Controller
 {
+    // Stok Pelayanan
     public function supplies(Request $request)
     {
         return view('supply.history');
@@ -220,6 +221,7 @@ class SuppliesController extends Controller
         }
     }
 
+    // Stok Gudang
     public function storageSupplies(Request $request)
     {
         return view('supply.storageStockData');
@@ -229,7 +231,7 @@ class SuppliesController extends Controller
     {
         if ($request->ajax()) {
             $items = ItemsLog::with('medicines')
-                ->whereIn('status', [5, 6, 7]);
+                ->whereIn('status', [2, 5, 6, 7]);
 
             if ($request->filled('searchMedicine')) {
                 $items->whereHas('medicines', function ($q) use ($request) {
@@ -249,11 +251,17 @@ class SuppliesController extends Controller
             return DataTables::eloquent($items)
                 ->addIndexColumn()
                 ->addColumn('date',             fn($r) => $r->date)
-                ->addColumn('transaction_code', fn($r) => $r->transaction_code)
                 ->addColumn('code',             fn($r) => $r->code)
                 ->addColumn('type',             fn($r) => $r->type)
                 ->addColumn('name',             fn($r) => $r->medicines->name)
                 ->addColumn('stock', function ($row) {
+
+                    // status 2 — Pembelian ( Stok masuk gudang)
+                    if ($row->status == 2) {
+                        $sign  = $row->qty > 0 ? '+' : '';
+                        $color = $row->qty >= 0 ? '#854F0B' : '#A32D2D';
+                        return "<div style='color:{$color};font-weight:600;'>{$sign}{$row->qty}</div>";
+                    }
                     // status 5 — Stock Opname
                     if ($row->status == 5) {
                         $sign  = $row->qty > 0 ? '+' : '';
@@ -277,6 +285,7 @@ class SuppliesController extends Controller
                 ->addColumn('supply', fn($r) => $r->medicines->stock)
                 ->addColumn('status', function ($row) {
                     $map = [
+                        2 => ['label' => 'Pembelian', 'bg' => '#caffc5', 'color' => '#457b00'],
                         5 => ['label' => 'Stock Opname', 'bg' => '#FAEEDA', 'color' => '#633806'],
                         6 => ['label' => 'Adjustment',   'bg' => '#E6F1FB', 'color' => '#0C447C'],
                         7 => ['label' => 'Mutasi Stok',  'bg' => '#E1F5EE', 'color' => '#085041'],
