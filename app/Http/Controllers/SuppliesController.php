@@ -27,7 +27,8 @@ class SuppliesController extends Controller
     public function getSupplies(Request $request)
     {
         if ($request->ajax()) {
-            $items = ItemsLog::with(['medicines']);
+            $items = ItemsLog::with('medicines')
+                ->whereNotIn('status', [5, 6, 7]);
             if ($request->filled('searchMedicine')) {
                 $items->whereHas('medicines', function ($q) use ($request) {
                     $q->where('name', 'like', "%{$request->searchMedicine}%")
@@ -213,6 +214,82 @@ class SuppliesController extends Controller
                         Mutasi Stok
                         </div";
                     }
+                })
+                ->rawColumns(['status', 'stock', 'qty_before', 'qty_after'])
+                ->make(true);
+        }
+    }
+
+    public function storageSupplies(Request $request)
+    {
+        return view('supply.storageStockData');
+    }
+
+    public function getStorageSupplies(Request $request)
+    {
+        if ($request->ajax()) {
+            $items = ItemsLog::with('medicines')
+                ->whereIn('status', [5, 6, 7]);
+
+            if ($request->filled('searchMedicine')) {
+                $items->whereHas('medicines', function ($q) use ($request) {
+                    $q->where('name', 'like', "%{$request->searchMedicine}%")
+                        ->orWhere('code', 'like', "%{$request->searchMedicine}%");
+                });
+            }
+
+            if ($request->filled('start_date')) {
+                $items->whereDate('date', '>=', $request->start_date);
+            }
+
+            if ($request->filled('end_date')) {
+                $items->whereDate('date', '<=', $request->end_date);
+            }
+
+            return DataTables::eloquent($items)
+                ->addIndexColumn()
+                ->addColumn('date',             fn($r) => $r->date)
+                ->addColumn('transaction_code', fn($r) => $r->transaction_code)
+                ->addColumn('code',             fn($r) => $r->code)
+                ->addColumn('type',             fn($r) => $r->type)
+                ->addColumn('name',             fn($r) => $r->medicines->name)
+                ->addColumn('stock', function ($row) {
+                    // status 5 — Stock Opname
+                    if ($row->status == 5) {
+                        $sign  = $row->qty > 0 ? '+' : '';
+                        $color = $row->qty >= 0 ? '#854F0B' : '#A32D2D';
+                        return "<div style='color:{$color};font-weight:600;'>{$sign}{$row->qty}</div>";
+                    }
+                    // status 6 — fallback (was missing entirely)
+                    if ($row->status == 6) {
+                        return "<div style='color:#185FA5;font-weight:600;'>{$row->qty}</div>";
+                    }
+                    // status 7 — Mutasi Stok
+                    if ($row->status == 7) {
+                        return "<div style='color:#0F6E56;font-weight:600;'>-{$row->qty}</div>";
+                    }
+                })
+                ->addColumn('qty_before', fn($r) => "<b>{$r->qty_before}</b>")
+                ->addColumn('qty_after',  fn($r) => "<b>{$r->qty_after}</b>")
+                // Fixed: these two were both returning qty_after
+                ->addColumn('qty_before_number', fn($r) => $r->qty_before)
+                ->addColumn('qty_after_number',  fn($r) => $r->qty_after)
+                ->addColumn('supply', fn($r) => $r->medicines->stock)
+                ->addColumn('status', function ($row) {
+                    $map = [
+                        5 => ['label' => 'Stock Opname', 'bg' => '#FAEEDA', 'color' => '#633806'],
+                        6 => ['label' => 'Adjustment',   'bg' => '#E6F1FB', 'color' => '#0C447C'],
+                        7 => ['label' => 'Mutasi Stok',  'bg' => '#E1F5EE', 'color' => '#085041'],
+                    ];
+                    $s = $map[$row->status] ?? ['label' => '—', 'bg' => '#F1EFE8', 'color' => '#5F5E5A'];
+                    return "
+                    <div style='
+                        text-align:center;font-weight:500;text-transform:uppercase;
+                        background:{$s['bg']};color:{$s['color']};
+                        padding:4px 10px;font-size:11px;font-family:inherit;
+                        border-radius:20px;letter-spacing:0.04em;'>
+                        {$s['label']}
+                    </div>";
                 })
                 ->rawColumns(['status', 'stock', 'qty_before', 'qty_after'])
                 ->make(true);
@@ -809,9 +886,9 @@ class SuppliesController extends Controller
 
             if ($request->filled('counter_stock_physic')) {
                 $counterPhysic = (int) $request->counter_stock_physic;
-            
+
                 $transfer = MedicineTransfers::where('batches_id', $batch->id)->first();
-            
+
                 if ($transfer) {
                     $transfer->stock = $counterPhysic;
                     $transfer->save();
@@ -844,6 +921,8 @@ class SuppliesController extends Controller
                 'date'             => now()->toDateString(),
                 'status'           => $status,
             ]);
+
+
 
             DB::commit();
 

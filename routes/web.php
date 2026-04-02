@@ -246,6 +246,11 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     Route::get('/stock-detail', [SuppliesController::class, 'stockDetail'])->name('supplies.stockDetail');
     Route::get('/getstockdetail', [SuppliesController::class, 'getStockDetail'])->name('supplies.getStockDetail');
 
+    // Stock Detail
+    Route::get('/stock-storage', [SuppliesController::class, 'storageSupplies'])->name('supplies.storage');
+    Route::get('/getstockstorage', [SuppliesController::class, 'getStorageSupplies'])->name('supplies.getStorageSupplies');
+
+
     // Transfers
     Route::get('/transfers/create', [TransfersController::class, 'transfersCreate'])->name('transfers.create');
     Route::post('/transfer', [TransfersController::class, 'transfer'])->name('transfer');

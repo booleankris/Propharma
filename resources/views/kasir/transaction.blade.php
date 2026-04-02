@@ -2023,7 +2023,7 @@
                     <div class="flex gap-2 flex-wrap mt-1">
                     <div class="flex items-center gap-1 bg-emerald-50 border border-emerald-200 rounded-md px-2 py-1">
                         <span class="text-[10px] text-emerald-500 font-medium">Stok</span>
-                        <span class="text-xs font-bold text-emerald-700">${escapeHtml(String(it.stock || '—'))}</span>
+                        <span class="text-xs font-bold text-emerald-700">${escapeHtml(String(it.storage_stock + it.counter_stock   || '—'))}</span>
                     </div>
                     <div class="flex items-center gap-1 bg-violet-50 border border-violet-200 rounded-md px-2 py-1">
                         <span class="text-[10px] text-violet-500 font-medium">Gudang</span>

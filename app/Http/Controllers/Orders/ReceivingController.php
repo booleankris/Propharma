@@ -256,7 +256,7 @@ class ReceivingController extends Controller
             ->addColumn(
                 'total',
                 fn($row) =>
-                'Rp ' . number_format($row->total * 1.11, 0, ',', '.')
+                'Rp ' . number_format($row->order_items->price * 1.11, 0, ',', '.')
             )
             ->make(true);
     }

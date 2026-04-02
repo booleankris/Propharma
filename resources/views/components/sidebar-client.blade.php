@@ -949,8 +949,11 @@
                 class="py-3 px-4 bg-[#6196c0] hover:bg-[#4a7aaa] text-center text-white rounded-xl font-medium transition-colors">Kartu
                 Stok</a>
             <a href="{{ route('supplies.stockDetail') }}"
-                class="py-3 px-4 bg-[#6196c0] hover:bg-[#4a7aaa] text-center text-white rounded-xl font-medium transition-colors">Detail
-                Stok</a>
+                class="py-3 px-4 bg-[#6196c0] hover:bg-[#4a7aaa] text-center text-white rounded-xl font-medium transition-colors">Data
+                Stok Pelayanan</a>
+            <a href="{{ route('supplies.storage') }}"
+                class="py-3 px-4 bg-[#6196c0] hover:bg-[#4a7aaa] text-center text-white rounded-xl font-medium transition-colors">Data
+                Stok Gudang</a>
             <a href="{{ route('supplies.stockData') }}"
                 class="py-3 px-4 bg-[#6196c0] hover:bg-[#4a7aaa] text-center text-white rounded-xl font-medium transition-colors">Data
                 Stok</a>
@@ -1140,7 +1143,11 @@
     </div>
     <div class="notif-list">
         @php
-            $logs = \App\Models\ItemsLog::with('medicines')->orderBy('created_at', 'desc')->take(30)->get();
+            $logs = \App\Models\ItemsLog::with('medicines')
+                ->where('status', '!=', 7)
+                ->orderBy('created_at', 'desc')
+                ->take(30)
+                ->get();
             $typeMap = [
                 1 => ['label' => 'Penjualan', 'icon' => '↓', 'sign' => '-', 'class' => 'qty-out', 'color' => 1],
                 2 => ['label' => 'Pembelian', 'icon' => '↑', 'sign' => '+', 'class' => 'qty-in', 'color' => 2],

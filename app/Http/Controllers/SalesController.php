@@ -240,54 +240,81 @@ class SalesController extends Controller
     // Flow 1 Create Transaction
 
     // Flow 2 Search Item
+
     public function search(Request $request)
     {
         $q = trim($request->get('q', ''));
 
         $items = Medicines::query()
-            ->with([
-                'etalases',
-                'locations',
-                'batches.medicine_transfers'  // eager load nested
-            ])
-            ->when($q !== '', function ($builder) use ($q) {
-                $builder->where(function ($x) use ($q) {
-                    $x->where('code', 'like', '%' . $q . '%')
-                        ->orWhere('name', 'like', '%' . $q . '%')
-                        ->orWhere('barcode', 'like', '%' . $q . '%');
-                });
-            })
             ->select([
                 'id',
                 'code',
                 'barcode',
-                'raw_price',
                 'name',
+                'raw_price',
                 'het_price',
+                'net_price',
                 'location',
                 'etalase',
-                'net_price',
                 'stock',
                 'unit',
                 'packaging',
                 'content',
-                'dosage'
+                'dosage',
+                DB::raw('(SELECT COALESCE(SUM(stock), 0) FROM batches WHERE medicine_id = medicines.id) as storage_stock'),
+                DB::raw('(SELECT COALESCE(SUM(mt.stock), 0) FROM medicine_transfers mt JOIN batches b ON b.id = mt.batches_id WHERE b.medicine_id = medicines.id AND mt.status = 1) as counter_stock'),
             ])
+            ->with(['etalases', 'locations'])
+            ->when($q !== '', function ($builder) use ($q) {
+                $builder->where(function ($x) use ($q) {  // grouped — keeps OR inside parentheses
+                    $x->where('code',      'like', $q . '%')
+                        ->orWhere('barcode', 'like', $q . '%')
+                        ->orWhere('name',    'like', '%' . $q . '%');
+                });
+            })
             ->orderByRaw("CASE WHEN code LIKE ? THEN 0 ELSE 1 END, code ASC", [$q . '%'])
             ->limit(40)
             ->get();
 
-        $items->transform(function ($medicine) {
-            $medicine->storage_stock = $medicine->batches->sum('stock');
-            $medicine->counter_stock = $medicine->batches
-                ->flatMap->medicine_transfers
-                ->where('status', 1)
-                ->sum('stock');
-            return $medicine;
-        });
-
         return response()->json($items);
     }
+    // public function search(Request $request)
+    // {
+    //     $q = trim($request->get('q', ''));
+
+    //     $items = Medicines::query()
+    //         ->select([
+    //             'id',
+    //             'code',
+    //             'barcode',
+    //             'name',
+    //             'raw_price',
+    //             'het_price',
+    //             'net_price',
+    //             'location',
+    //             'etalase',
+    //             'stock',
+    //             'unit',
+    //             'packaging',
+    //             'content',
+    //             'dosage',
+    //             DB::raw('(SELECT COALESCE(SUM(stock), 0) FROM batches WHERE medicine_id = medicines.id) as storage_stock'),
+    //             DB::raw('(SELECT COALESCE(SUM(mt.stock), 0) FROM medicine_transfers mt JOIN batches b ON b.id = mt.batches_id WHERE b.medicine_id = medicines.id AND mt.status = 1) as counter_stock'),
+    //         ])
+    //         ->with(['etalases', 'locations'])
+    //         ->when(
+    //             $q !== '',
+    //             fn($query) =>
+    //             $query->where('code',      'like', $q . '%')
+    //                 ->orWhere('barcode', 'like', $q . '%')
+    //                 ->orWhere('name',    'like', '%' . $q . '%')
+    //         )
+    //         ->orderByRaw("CASE WHEN code LIKE ? THEN 0 ELSE 1 END, code ASC", [$q . '%'])
+    //         ->limit(40)
+    //         ->get();
+
+    //     return response()->json($items);
+    // }
     public function searchDebtors(Request $request)
     {
         $q = trim($request->get('q', ''));
