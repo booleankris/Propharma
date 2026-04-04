@@ -953,9 +953,9 @@ class SuppliesController extends Controller
     {
         return view('supply.stockDetail');
     }
+
     public function getStockDetail(Request $request)
     {
-
         $query = MedicineTransfers::with([
             'batches.medicines',
             'batches.pharmacy',
@@ -965,33 +965,61 @@ class SuppliesController extends Controller
                 $q->where('pharmacy_id', auth()->user()->pharmacy_id);
             })
             ->select('medicine_transfers.*');
-        if ($request->status !== null && $request->status !== '') {
-            $query->where('status', $request->status);
-        }
-        if ($request->search) {
-            $search = $request->search;
-            $query->whereHas('batches.medicines', function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('code', 'like', "%{$search}%");
-            });
-        }
 
-        $data = $query->get()->map(function ($item, $index) {
-            $batch = $item->batches;
+        return DataTables::of($query)
 
-            return [
-                'DT_RowIndex'    => $index + 1,
-                'medicine_name'  => $batch->medicines->name ?? '-',
-                'batch_name'     => $batch->name ?? '-',
-                'stock'          => $item->stock ?? 0,
-                'expired_date'   => $batch->expired_date ?? '-',
-                'etalase'        => $item->etalases->name ?? '-',
-                'pharmacy'       => $batch->pharmacy->name ?? '-',
-                'status'         => $item->status,
-                'code'           => $item->code ?? '-',
-            ];
-        });
+        ->addIndexColumn()
 
-        return response()->json(['data' => $data]);
+        ->filter(function ($query) use ($request) {
+
+            // Filter status
+            if ($request->status !== null && $request->status !== '') {
+                $query->where('status', $request->status);
+            }
+
+            // Filter search
+            if ($request->search) {
+                $search = $request->search;
+
+                $query->whereHas('batches.medicines', function ($q) use ($search) {
+                    $q->where(function ($q2) use ($search) {
+                        $q2->where('name', 'like', "%{$search}%")
+                            ->orWhere('code', 'like', "%{$search}%");
+                    });
+                });
+            }
+        })
+
+        ->addColumn('medicine_name', function ($item) {
+            return optional($item->batches->medicines)->name ?? '-';
+        })
+
+        ->addColumn('batch_name', function ($item) {
+            return $item->batches->name ?? '-';
+        })
+
+        ->addColumn('expired_date', function ($item) {
+            return $item->batches->expired_date ?? '-';
+        })
+
+        ->addColumn('etalase', function ($item) {
+            return optional($item->etalases)->name ?? '-';
+        })
+
+        ->addColumn('pharmacy', function ($item) {
+            return optional($item->batches->pharmacy)->name ?? '-';
+        })
+
+        ->editColumn('stock', function ($item) {
+            return $item->stock ?? 0;
+        })
+
+        ->editColumn('status', function ($item) {
+            return (int) $item->status;
+        })
+
+        ->rawColumns([]) 
+
+        ->make(true);
     }
 }

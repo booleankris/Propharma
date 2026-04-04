@@ -3,9 +3,8 @@
 @section('title', 'Data Transfer Obat')
 
 @section('style')
-    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+    <link rel="stylesheet" href="{{ asset('templates/library/datatables/media/css/jquery.dataTables.min.css') }}">
     <link rel="stylesheet" href="{{ asset('templates/library/izitoast/dist/css/iziToast.min.css') }}">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 
     <style>
         .dataTables_wrapper .top {
@@ -208,129 +207,127 @@
         </div>
     </section>
 @endsection
+
 @section('scripts')
     <script src="{{ asset('templates/library/datatables/media/js/jquery.dataTables.min.js') }}"></script>
-    <script src="{{ asset('templates/library/jquery-ui-dist/jquery-ui.min.js') }}"></script>
     <script src="{{ asset('templates/js/page/modules-datatables.js') }}"></script>
-    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="{{ asset('templates/library/izitoast/dist/js/iziToast.min.js') }}"></script>
-    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-    <script>
-        let table;
 
-        $(document).ready(function() {
-            table = $('#transferTable').DataTable({
+    <script>
+        let transferTable;
+
+        function stockBadge(qty) {
+            qty = parseInt(qty) || 0;
+            if (qty <= 0) return `<span class="badge-stock empty">${qty}</span>`;
+            if (qty <= 10) return `<span class="badge-stock low">${qty}</span>`;
+            return `<span class="badge-stock ok">${qty}</span>`;
+        }
+
+        function statusBadge(status) {
+            const map = {
+                0: ['pending', 'Pending'],
+                1: ['accepted', 'Diterima'],
+                2: ['denied', 'Ditolak'],
+            };
+
+            const [cls, label] = map[parseInt(status)] ?? ['pending', 'Pending'];
+            return `<span class="badge-status ${cls}">${label}</span>`;
+        }
+
+        function filterTable() {
+            if (transferTable) {
+                transferTable.ajax.reload(null, false);
+            }
+        }
+
+        function resetFilters() {
+            document.getElementById('searchInput').value = '';
+            document.getElementById('statusFilter').value = '';
+
+            filterTable();
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            transferTable = $('#transferTable').DataTable({
                 processing: true,
-                serverSide: false,
+                serverSide: true, // ✅ IMPORTANT
+
                 ajax: {
-                    url: '/getstockdetail',
-                    type: 'GET',
+                    url: '{{ route('supplies.getStockDetail') }}',
                     data: function(d) {
-                        d.search = $('#searchInput').val();
+                        d.search = $('#searchInput').val().trim();
                         d.status = $('#statusFilter').val();
-                    },
-                    dataSrc: 'data',
-                    error: function() {
-                        console.error('Gagal mengambil data');
                     }
                 },
+
                 columns: [{
                         data: 'DT_RowIndex',
-                        title: '#',
                         orderable: false,
-                        searchable: false
+                        searchable: false,
+                        width: '40px'
                     },
                     {
-                        data: 'code',
-                        title: 'Kode Transfer'
+                        data: 'code'
                     },
                     {
                         data: 'medicine_name',
-                        title: 'Nama Obat'
+                        orderable: false
                     },
                     {
                         data: 'batch_name',
-                        title: 'Batch'
+                        orderable: false
                     },
                     {
                         data: 'stock',
-                        title: 'Stok'
+                        render: (d) => stockBadge(d),
+                        className: 'text-center'
                     },
                     {
                         data: 'expired_date',
-                        title: 'Expired'
+                        orderable: false
                     },
                     {
                         data: 'etalase',
-                        title: 'Etalase'
+                        orderable: false
                     },
                     {
                         data: 'pharmacy',
-                        title: 'Apotek'
+                        orderable: false
                     },
                     {
                         data: 'status',
-                        title: 'Status',
-                        render: function(val) {
-                            const map = {
-                                0: {
-                                    label: 'Pending',
-                                    cls: 'bg-yellow-50 text-yellow-700 border border-yellow-200'
-                                },
-                                1: {
-                                    label: 'Diterima',
-                                    cls: 'bg-green-50 text-green-700 border border-green-200'
-                                },
-                                2: {
-                                    label: 'Ditolak',
-                                    cls: 'bg-red-50 text-red-700 border border-red-200'
-                                },
-                            };
-                            const s = map[val] ?? {
-                                label: '-',
-                                cls: 'bg-gray-100 text-gray-500'
-                            };
-                            return `<span class="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-medium ${s.cls}">${s.label}</span>`;
-                        }
+                        render: (d) => statusBadge(d),
+                        className: 'text-center'
                     },
                 ],
+
+                order: [
+                    [1, 'desc']
+                ], // safer
+
+                searching: false,
+                lengthChange: true,
+                autoWidth: false,
+
                 language: {
                     processing: 'Memuat data...',
-                    search: 'Cari:',
-                    lengthMenu: 'Tampilkan _MENU_ data',
+                    zeroRecords: 'Tidak ada data ditemukan',
                     info: 'Menampilkan _START_ - _END_ dari _TOTAL_ data',
                     infoEmpty: 'Tidak ada data',
-                    infoFiltered: '(difilter dari _MAX_ total data)',
-                    zeroRecords: 'Tidak ada data ditemukan',
-                    emptyTable: 'Tidak ada data tersedia',
                     paginate: {
-                        first: 'Pertama',
-                        last: 'Terakhir',
-                        next: 'Selanjutnya',
-                        previous: 'Sebelumnya',
-                    },
-                },
-                dom: '<"flex items-center justify-between mb-3"lp>t<"flex items-center justify-between mt-3"ip>',
-                pageLength: 10,
-                order: [],
+                        previous: '&#8592;',
+                        next: '&#8594;'
+                    }
+                }
             });
 
-            // Hook custom filters to reload DataTable
-            let debounceTimer;
             $('#searchInput').on('input', function() {
-                clearTimeout(debounceTimer);
-                debounceTimer = setTimeout(() => table.ajax.reload(), 300);
+                transferTable.ajax.reload(null, false);
             });
 
             $('#statusFilter').on('change', function() {
-                table.ajax.reload();
+                transferTable.ajax.reload(null, false);
             });
         });
-
-        function resetFilters() {
-            $('#searchInput').val('');
-            $('#statusFilter').val('');
-            table.ajax.reload();
-        }
     </script>
 @endsection
