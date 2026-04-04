@@ -207,118 +207,125 @@
         </div>
     </section>
 @endsection
-
 @section('scripts')
-    <script src="{{ asset('templates/library/datatables/media/js/jquery.dataTables.min.js') }}"></script>
-    <script src="{{ asset('templates/js/page/modules-datatables.js') }}"></script>
-    <script src="{{ asset('templates/library/izitoast/dist/js/iziToast.min.js') }}"></script>
-
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
     <script>
-        let transferTable;
-        let searchValue = '';
-        let statusValue = '';
+        let table;
 
-        function stockBadge(qty) {
-            qty = parseInt(qty) || 0;
-            if (qty <= 0) return `<span class="badge-stock empty">${qty}</span>`;
-            if (qty <= 10) return `<span class="badge-stock low">${qty}</span>`;
-            return `<span class="badge-stock ok">${qty}</span>`;
-        }
-
-        function statusBadge(status) {
-            const map = {
-                0: ['pending', 'Pending'],
-                1: ['accepted', 'Diterima'],
-                2: ['denied', 'Ditolak'],
-            };
-            const [cls, label] = map[status] ?? ['pending', 'Pending'];
-            return `<span class="badge-status ${cls}">${label}</span>`;
-        }
-
-        function filterTable() {
-            searchValue = document.getElementById('searchInput').value.trim();
-            statusValue = document.getElementById('statusFilter').value;
-            transferTable.ajax.reload();
-        }
-
-        function resetFilters() {
-            searchValue = '';
-            statusValue = '';
-            document.getElementById('searchInput').value = '';
-            document.getElementById('statusFilter').value = '';
-            transferTable.ajax.reload();
-        }
-
-        document.addEventListener('DOMContentLoaded', function() {
-            transferTable = $('#transferTable').DataTable({
+        $(document).ready(function() {
+            table = $('#transferTable').DataTable({
                 processing: true,
                 serverSide: false,
                 ajax: {
-                    url: '{{ route('supplies.getStockDetail') }}',
+                    url: '/getstockdetail',
                     type: 'GET',
-                    xhrFields: {
-                        withCredentials: true
-                    },
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'Accept': 'application/json'
-                    },
                     data: function(d) {
-                        d.search = searchValue;
-                        d.status = statusValue;
+                        d.search = $('#searchInput').val();
+                        d.status = $('#statusFilter').val();
                     },
-                    dataSrc: function(json) {
-                        console.log("RESPONSE:", json);
-                        return json.data;
-                    },
-                    error: function(xhr) {
-                        console.log("ERROR:", xhr.responseText);
+                    dataSrc: 'data',
+                    error: function() {
+                        console.error('Gagal mengambil data');
                     }
                 },
                 columns: [{
                         data: 'DT_RowIndex',
+                        title: '#',
                         orderable: false,
-                        searchable: false,
-                        width: '40px'
+                        searchable: false
                     },
                     {
-                        data: 'code'
+                        data: 'code',
+                        title: 'Kode Transfer'
                     },
                     {
-                        data: 'medicine_name'
+                        data: 'medicine_name',
+                        title: 'Nama Obat'
                     },
                     {
-                        data: 'batch_name'
+                        data: 'batch_name',
+                        title: 'Batch'
                     },
                     {
                         data: 'stock',
-                        render: (d) => stockBadge(d),
-                        className: 'text-center'
+                        title: 'Stok'
                     },
                     {
-                        data: 'expired_date'
+                        data: 'expired_date',
+                        title: 'Expired'
                     },
                     {
-                        data: 'etalase'
+                        data: 'etalase',
+                        title: 'Etalase'
                     },
                     {
-                        data: 'pharmacy'
+                        data: 'pharmacy',
+                        title: 'Apotek'
                     },
                     {
                         data: 'status',
-                        render: (d) => statusBadge(d),
-                        className: 'text-center'
+                        title: 'Status',
+                        render: function(val) {
+                            const map = {
+                                0: {
+                                    label: 'Pending',
+                                    cls: 'bg-yellow-50 text-yellow-700 border border-yellow-200'
+                                },
+                                1: {
+                                    label: 'Diterima',
+                                    cls: 'bg-green-50 text-green-700 border border-green-200'
+                                },
+                                2: {
+                                    label: 'Ditolak',
+                                    cls: 'bg-red-50 text-red-700 border border-red-200'
+                                },
+                            };
+                            const s = map[val] ?? {
+                                label: '-',
+                                cls: 'bg-gray-100 text-gray-500'
+                            };
+                            return `<span class="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-medium ${s.cls}">${s.label}</span>`;
+                        }
                     },
                 ],
-                order: [
-                    [2, 'asc']
-                ],
-                paging: true,
-                searching: false,
-                info: true,
-                lengthChange: true,
-                autoWidth: false
+                language: {
+                    processing: 'Memuat data...',
+                    search: 'Cari:',
+                    lengthMenu: 'Tampilkan _MENU_ data',
+                    info: 'Menampilkan _START_ - _END_ dari _TOTAL_ data',
+                    infoEmpty: 'Tidak ada data',
+                    infoFiltered: '(difilter dari _MAX_ total data)',
+                    zeroRecords: 'Tidak ada data ditemukan',
+                    emptyTable: 'Tidak ada data tersedia',
+                    paginate: {
+                        first: 'Pertama',
+                        last: 'Terakhir',
+                        next: 'Selanjutnya',
+                        previous: 'Sebelumnya',
+                    },
+                },
+                dom: '<"flex items-center justify-between mb-3"lp>t<"flex items-center justify-between mt-3"ip>',
+                pageLength: 10,
+                order: [],
+            });
+
+            // Hook custom filters to reload DataTable
+            let debounceTimer;
+            $('#searchInput').on('input', function() {
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(() => table.ajax.reload(), 300);
+            });
+
+            $('#statusFilter').on('change', function() {
+                table.ajax.reload();
             });
         });
+
+        function resetFilters() {
+            $('#searchInput').val('');
+            $('#statusFilter').val('');
+            table.ajax.reload();
+        }
     </script>
 @endsection
