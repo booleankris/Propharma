@@ -74,15 +74,51 @@
             border: 1px solid transparent !important;
         }
 
-        .badge-stock { display: inline-block; padding: 2px 10px; border-radius: 99px; font-size: 12px; font-weight: 500; }
-        .badge-stock.ok    { background: #dcfce7; color: #15803d; }
-        .badge-stock.low   { background: #fef9c3; color: #854d0e; }
-        .badge-stock.empty { background: #fee2e2; color: #b91c1c; }
+        .badge-stock {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 99px;
+            font-size: 12px;
+            font-weight: 500;
+        }
 
-        .badge-status { display: inline-block; padding: 2px 10px; border-radius: 99px; font-size: 12px; font-weight: 500; }
-        .badge-status.pending  { background: #fef9c3; color: #854d0e; }
-        .badge-status.accepted { background: #dcfce7; color: #15803d; }
-        .badge-status.denied   { background: #fee2e2; color: #b91c1c; }
+        .badge-stock.ok {
+            background: #dcfce7;
+            color: #15803d;
+        }
+
+        .badge-stock.low {
+            background: #fef9c3;
+            color: #854d0e;
+        }
+
+        .badge-stock.empty {
+            background: #fee2e2;
+            color: #b91c1c;
+        }
+
+        .badge-status {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 99px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .badge-status.pending {
+            background: #fef9c3;
+            color: #854d0e;
+        }
+
+        .badge-status.accepted {
+            background: #dcfce7;
+            color: #15803d;
+        }
+
+        .badge-status.denied {
+            background: #fee2e2;
+            color: #b91c1c;
+        }
     </style>
 @endsection
 
@@ -95,9 +131,9 @@
                 <div class="flex items-center justify-between mb-6">
                     <div class="flex items-center gap-3">
                         <div class="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center">
-                            <svg class="w-5 h-5 text-blue-600" viewBox="0 0 24 24" fill="none"
-                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M5 12h14M12 5l7 7-7 7"/>
+                            <svg class="w-5 h-5 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M5 12h14M12 5l7 7-7 7" />
                             </svg>
                         </div>
                         <div>
@@ -114,8 +150,8 @@
                         <div class="relative">
                             <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none"
                                 viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
-                                <circle cx="6.5" cy="6.5" r="4.5"/>
-                                <line x1="10.5" y1="10.5" x2="14" y2="14"/>
+                                <circle cx="6.5" cy="6.5" r="4.5" />
+                                <line x1="10.5" y1="10.5" x2="14" y2="14" />
                             </svg>
                             <input type="text" id="searchInput" placeholder="Kode atau nama obat..."
                                 oninput="filterTable(this.value)"
@@ -140,7 +176,7 @@
                             class="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 text-[13px] transition-colors duration-150">
                             <svg class="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor"
                                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M1 4h14M4 4V2h8v2M3 4l1 10h8l1-10"/>
+                                <path d="M1 4h14M4 4V2h8v2M3 4l1 10h8l1-10" />
                             </svg>
                             Reset
                         </button>
@@ -184,16 +220,16 @@
 
         function stockBadge(qty) {
             qty = parseInt(qty) || 0;
-            if (qty <= 0)  return `<span class="badge-stock empty">${qty}</span>`;
+            if (qty <= 0) return `<span class="badge-stock empty">${qty}</span>`;
             if (qty <= 10) return `<span class="badge-stock low">${qty}</span>`;
             return `<span class="badge-stock ok">${qty}</span>`;
         }
 
         function statusBadge(status) {
             const map = {
-                0: ['pending',  'Pending'],
+                0: ['pending', 'Pending'],
                 1: ['accepted', 'Diterima'],
-                2: ['denied',   'Ditolak'],
+                2: ['denied', 'Ditolak'],
             };
             const [cls, label] = map[status] ?? ['pending', 'Pending'];
             return `<span class="badge-status ${cls}">${label}</span>`;
@@ -213,42 +249,75 @@
             transferTable.ajax.reload();
         }
 
-        document.addEventListener('DOMContentLoaded', function () {
+        document.addEventListener('DOMContentLoaded', function() {
             transferTable = $('#transferTable').DataTable({
                 processing: true,
                 serverSide: false,
                 ajax: {
                     url: '{{ route('supplies.getStockDetail') }}',
-                    data: function (d) {
+                    type: 'GET',
+                    xhrFields: {
+                        withCredentials: true
+                    },
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    },
+                    data: function(d) {
                         d.search = searchValue;
                         d.status = statusValue;
                     },
-                    dataSrc: 'data'
+                    dataSrc: function(json) {
+                        console.log("RESPONSE:", json);
+                        return json.data;
+                    },
+                    error: function(xhr) {
+                        console.log("ERROR:", xhr.responseText);
+                    }
                 },
-                columns: [
-                    { data: 'DT_RowIndex',   orderable: false, searchable: false, width: '40px' },
-                    { data: 'code' },
-                    { data: 'medicine_name' },
-                    { data: 'batch_name' },
-                    { data: 'stock',        render: (d) => stockBadge(d),  className: 'text-center' },
-                    { data: 'expired_date' },
-                    { data: 'etalase' },
-                    { data: 'pharmacy' },
-                    { data: 'status',       render: (d) => statusBadge(d), className: 'text-center' },
+                columns: [{
+                        data: 'DT_RowIndex',
+                        orderable: false,
+                        searchable: false,
+                        width: '40px'
+                    },
+                    {
+                        data: 'code'
+                    },
+                    {
+                        data: 'medicine_name'
+                    },
+                    {
+                        data: 'batch_name'
+                    },
+                    {
+                        data: 'stock',
+                        render: (d) => stockBadge(d),
+                        className: 'text-center'
+                    },
+                    {
+                        data: 'expired_date'
+                    },
+                    {
+                        data: 'etalase'
+                    },
+                    {
+                        data: 'pharmacy'
+                    },
+                    {
+                        data: 'status',
+                        render: (d) => statusBadge(d),
+                        className: 'text-center'
+                    },
                 ],
-                order: [[2, 'asc']],
+                order: [
+                    [2, 'asc']
+                ],
                 paging: true,
                 searching: false,
                 info: true,
                 lengthChange: true,
-                autoWidth: false,
-                language: {
-                    processing:  'Memuat data...',
-                    zeroRecords: 'Tidak ada data ditemukan',
-                    info:        'Menampilkan _START_ - _END_ dari _TOTAL_ data',
-                    infoEmpty:   'Tidak ada data',
-                    paginate: { previous: '&#8592;', next: '&#8594;' }
-                }
+                autoWidth: false
             });
         });
     </script>
