@@ -3,8 +3,9 @@
 @section('title', 'Data Transfer Obat')
 
 @section('style')
-    <link rel="stylesheet" href="{{ asset('templates/library/datatables/media/css/jquery.dataTables.min.css') }}">
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
     <link rel="stylesheet" href="{{ asset('templates/library/izitoast/dist/css/iziToast.min.css') }}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 
     <style>
         .dataTables_wrapper .top {
@@ -208,7 +209,12 @@
     </section>
 @endsection
 @section('scripts')
-    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+    <script src="{{ asset('templates/library/datatables/media/js/jquery.dataTables.min.js') }}"></script>
+    <script src="{{ asset('templates/library/jquery-ui-dist/jquery-ui.min.js') }}"></script>
+    <script src="{{ asset('templates/js/page/modules-datatables.js') }}"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="{{ asset('templates/library/izitoast/dist/js/iziToast.min.js') }}"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script>
         let table;
 
