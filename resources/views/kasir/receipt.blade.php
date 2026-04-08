@@ -170,7 +170,7 @@
         <hr>
         Nama Dokter : {{ $transaction->doctors->name ?? '-' }}
         <hr>
-
+        <br>
         {{-- ITEM --}}
         @foreach ($transactionCart as $items)
             <table class="table-struk">
