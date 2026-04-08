@@ -107,23 +107,23 @@
                     </td>
                 </tr>
             </table>
+        @else
+            <table class="table-struk">
+                @foreach ($items as $item)
+                    <tr>
+                        <td class="col-name">
+                            {{ $item->medicine->name }}
+                        </td>
+                        <td class="col-qty">
+                            {{ $item->quantity }}
+                        </td>
+                        <td class="col-total">
+                            {{ number_format($item->raw_total) }}
+                        </td>
+                    </tr>
+                @endforeach
+            </table>
         @endif
-
-        <table class="table-struk">
-            @foreach ($items as $item)
-                <tr>
-                    <td class="col-name">
-                        {{ $item->medicine->name }}
-                    </td>
-                    <td class="col-qty">
-                        {{ $item->quantity }}
-                    </td>
-                    <td class="col-total">
-                        {{ number_format($item->raw_total) }}
-                    </td>
-                </tr>
-            @endforeach
-        </table>
     @endforeach
 
     <hr>
@@ -178,6 +178,7 @@
                     <tr>
                         <td class="col-name">
                             {{ $item->medicine->name }}
+                            <hr>
                         </td>
                         <td class="col-qty">
                             {{ $item->quantity }}
@@ -190,8 +191,7 @@
             </table>
         @endforeach
 
-        <hr>
-
+        <br>
         Sub Total <span style="float:right">{{ number_format($totalRawTotal) }}</span><br>
         Discount <span style="float:right">-{{ number_format($totaldiscount) }}</span><br>
         <strong>Jumlah <span style="float:right">{{ number_format($payment) }}</span></strong><br>
