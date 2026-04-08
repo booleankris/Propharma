@@ -229,6 +229,7 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     Route::post('/returorderitem', [ReturController::class, 'returOrderItems'])->name('returdata.returorderitems');
     Route::get('/salesdata/returorderdata', [ReturController::class, 'returOrderdata'])->name('returdata.returorderdata');
     Route::get('/salesdata/getreturordermedicine', [ReturController::class, 'getReturOrderMedicines'])->name('returdata.ordermedicines');
+    Route::get('salesdata/getbatchesbyorderedmedicine', [ReturController::class, 'getBatchesByOrderedMedicine'])->name('returdata.getBatchesByOrderedMedicine');
 
     // Supplies
     Route::get('/supplies', [SuppliesController::class, 'supplies'])->name('supplies.index');

@@ -12,37 +12,25 @@ class PrintController extends Controller
     public function receipt($id)
     {
         $items = MedicineCart::with(['medicine', 'transactions'])
-            ->whereHas('transactions', function ($q) use ($id) {
-                $q->where('id', $id);
-            })
+            ->whereHas('transactions', fn($q) => $q->where('id', $id))
             ->get();
 
-        $transactionCart = $items->groupBy(function ($recipe) {
-            return $recipe->recipe_number ?? 'single';
-        });
+        $transactionCart = $items->groupBy(fn($recipe) => $recipe->recipe_number ?? 'single');
+        $transaction     = MedicineTransactions::with(['patients', 'doctors'])->findOrFail($id);
 
-        $transaction = MedicineTransactions::with(['patients','doctors'])->find($id);
-
-        $totalEmbalase = $items->sum('embalase');
-        $totalPrice = $items->sum('final_price');
-        $totalRawTotal = $items->sum('raw_total') + $totalEmbalase;
-        $totalFinalPrice = $items->sum('final_price');
-        $discount = $items->sum('discount');
-
+        $totalEmbalase   = $items->sum('embalase');
+        $totalRawTotal   = $items->sum('raw_total') + $totalEmbalase;
+        $discount        = $items->sum('discount');
         $subtotaldiscount = $transaction->discount ?? 0;
-        $totaldiscount = ceil(($discount + $subtotaldiscount) / 1000) * 1000;
-
-        $payment = $totalRawTotal - $totaldiscount;
+        $totaldiscount   = ceil(($discount + $subtotaldiscount) / 1000) * 1000;
+        $payment         = $totalRawTotal - $totaldiscount;
 
         return view('kasir.receipt', compact(
             'payment',
             'transaction',
             'transactionCart',
             'totalRawTotal',
-            'totalPrice',
-            'totalFinalPrice',
-            'totaldiscount',
-            'subtotaldiscount'
+            'totaldiscount'
         ));
     }
     public function fullReceipt($id)
@@ -57,7 +45,7 @@ class PrintController extends Controller
             return $recipe->recipe_number ?? 'single';
         });
 
-        $transaction = MedicineTransactions::with(['patients','doctors'])->find($id);
+        $transaction = MedicineTransactions::with(['patients', 'doctors'])->find($id);
 
         $totalEmbalase = $items->sum('embalase');
         $totalPrice = $items->sum('final_price');

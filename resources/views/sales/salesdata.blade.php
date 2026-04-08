@@ -1,96 +1,164 @@
 @extends('layouts.app')
 
-@section('title', 'Sales Data')
+@section('title', 'Data Penjualan')
 
 @section('style')
-    <!-- CSS Libraries -->
     <link rel="stylesheet" href="{{ asset('templates/library/datatables/media/css/jquery.dataTables.min.css') }}">
     <link rel="stylesheet" href="{{ asset('templates/library/izitoast/dist/css/iziToast.min.css') }}">
     <style>
-        /* Container */
-        .dataTables_filter {
-            display: block;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 16px;
+        /* ── DataTables overrides ── */
+        .dataTables_wrapper .dataTables_filter        { float: none !important; margin-bottom: 12px; }
+        .dataTables_wrapper .dataTables_filter label  { font-size: 13px; color: #6b7280; }
+        .dataTables_wrapper .dataTables_filter input  {
+            margin-left: 8px; padding: 6px 10px; font-size: 12px;
+            border-radius: 8px; border: 0.5px solid #d1d5db; outline: none; width: 200px;
+        }
+        .dataTables_wrapper .dataTables_filter input:focus {
+            border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,.12);
+        }
+        .dataTables_wrapper .dataTables_info,
+        .dataTables_wrapper .dataTables_length label  { font-size: 12px; color: #9ca3af; }
+        .dataTables_wrapper .dataTables_length select {
+            font-size: 12px; padding: 4px 6px;
+            border-radius: 6px; border: 0.5px solid #d1d5db;
+        }
+        .dataTables_wrapper .dataTables_paginate .paginate_button {
+            font-size: 12px !important; padding: 4px 9px !important;
+            border-radius: 6px !important; border: none !important;
+        }
+        .dataTables_wrapper .dataTables_paginate .paginate_button.current {
+            background: #E6F1FB !important; color: #185FA5 !important; border: none !important;
         }
 
-        /* Label */
-        .dataTables_filter label {
-            font-size: 14px;
-            font-weight: 600;
-            color: #374151;
+        /* ── Tables ── */
+        #table-data thead th,
+        #items-table thead th {
+            font-size: 11px !important; font-weight: 500 !important;
+            text-transform: uppercase !important; color: #9ca3af !important;
+            padding: 8px 10px !important; background: #fff !important;
+            border-bottom: 0.5px solid #e5e7eb !important;
+            white-space: nowrap;
+        }
+        #table-data tbody td,
+        #items-table tbody td {
+            font-size: 12px !important; padding: 9px 10px !important;
+            vertical-align: middle !important; color: #111827;
+            border-bottom: 0.5px solid #f3f4f6 !important;
+        }
+        #table-data tbody tr,
+        #items-table tbody tr { cursor: pointer; transition: background .1s; }
+        #table-data tbody tr:hover  { background: #f8fafc !important; }
+        #table-data tbody tr.active { background: #E6F1FB !important; }
+        .col-mono  { font-family: ui-monospace, monospace; font-size: 11px !important; color: #6b7280 !important; }
+        .col-price { text-align: right !important; font-weight: 500 !important; }
+        .col-right { text-align: right !important; }
+        .col-muted { text-align: right !important; color: #9ca3af !important; }
+
+        /* ── Print button ── */
+        .btn-print {
+            display: inline-flex; align-items: center; gap: 4px;
+            font-size: 11px; padding: 3px 8px; border-radius: 6px;
+            border: 0.5px solid #bfdbfe; background: #eff6ff;
+            color: #1d4ed8; cursor: pointer; white-space: nowrap;
+            transition: background .12s; line-height: 1.4;
+        }
+        .btn-print:hover { background: #dbeafe; }
+
+        /* ── Qty badge ── */
+        .qty-badge {
+            display: inline-block; font-size: 11px; padding: 1px 7px;
+            border-radius: 20px; background: #f3f4f6; color: #374151; font-weight: 500;
         }
 
-        /* Input */
-        .dataTables_filter input {
-            margin-left: 8px;
-            padding: 8px 12px;
-            width: 40%;
-            font-size: 13px;
-            border-radius: 8px;
-            border: 1px solid #d1d5db;
-            outline: none;
+        /* ── Total row ── */
+        .total-row {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 10px 10px 0; margin-top: 8px;
+            border-top: 0.5px solid #e5e7eb;
         }
+        .total-row span:first-child { font-size: 12px; color: #6b7280; }
+        .total-row span:last-child  { font-size: 14px; font-weight: 500; color: #111827; }
 
-        .dataTables_wrapper .dataTables_filter {
-            float: none !important;
-        }
-
-        .dataTables_filter input:focus {
-            border-color: #2563eb;
-            box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
-        }
+        /* ── Empty state ── */
+        .empty-state { text-align: center; padding: 2.5rem 1rem; color: #d1d5db; font-size: 12px; }
+        .empty-state svg { width: 28px; height: 28px; margin: 0 auto 8px; display: block; }
     </style>
 @endsection
 
 @section('content')
     <section class="section px-4">
         <div class="section-body">
-            <div class="flex flex-col lg:flex-row gap-4">
+            <div class="grid grid-cols-1 lg:grid-cols-5 gap-4">
 
-                <div class="card w-full md:w-[65%] shadow-md rounded-2xl p-6 bg-white">
-                    <div class="flex items-center mb-6">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-blue-600 mr-3 drop-shadow-md"
-                            fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" />
-                        </svg>
-                        <h2 class="text-2xl font-bold text-gray-800 drop-shadow-sm">Data Penjualan</h2>
+                {{-- ─── LEFT: Sales Table (3/5) ─────────────────────────────────── --}}
+                <div class="lg:col-span-3 bg-white border border-gray-100 rounded-xl p-5">
+
+                    <div class="flex items-center justify-between mb-4">
+                        <h1 class="text-[14px] font-medium text-gray-800">Data penjualan</h1>
+                        <a href="{{ route('home') }}"
+                            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200
+                                   text-[12px] text-gray-500 hover:bg-gray-50 transition-colors">
+                            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+                                <path d="M10 12L6 8l4-4"/>
+                            </svg>
+                            Kembali
+                        </a>
                     </div>
 
-                    <div class="overflow-x-auto p-3">
-                        <table id="table-data" class="min-w-full text-sm text-left text-gray-600">
-                            <thead class="bg-gray-100 text-gray-700 uppercase text-xs">
+                    <div class="overflow-x-auto">
+                        <table id="table-data" class="w-full">
+                            <thead>
                                 <tr>
-                                    <th class="px-4 py-3">#</th>
-                                    <th class="px-4 py-3">Tanggal</th>
-                                    <th class="px-4 py-3">Jam</th>
-                                    <th class="px-4 py-3">Nomor</th>
-                                    <th class="px-4 py-3">Nama Pelanggan/Pasien</th>
-                                    <th class="px-4 py-3">Harga</th>
-                                    <th class="px-4 py-3">Cetak</th>
-
+                                    <th>#</th>
+                                    <th>Tanggal</th>
+                                    <th>Jam</th>
+                                    <th>Nomor</th>
+                                    <th>Pasien</th>
+                                    <th class="col-right">Harga</th>
+                                    <th></th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-gray-100"></tbody>
+                            <tbody></tbody>
                         </table>
                     </div>
                 </div>
 
-                <div class="bg-white p-6 rounded-2xl shadow-md w-full md:w-[50%] mx-auto">
-                    <table id="items-table" class="table text-xs table-bordered w-full mt-4">
-                        <thead>
-                            <tr>
-                                <th>No</th>
-                                <th>Medicine</th>
-                                <th>Qty</th>
-                                <th>Harga</th>
-                                <th>Disc</th>
-                                <th>Total</th>
-                            </tr>
-                        </thead>
-                    </table>
+                {{-- ─── RIGHT: Transaction Detail (2/5) ────────────────────────── --}}
+                <div class="lg:col-span-2 bg-white border border-gray-100 rounded-xl p-5">
+
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-[14px] font-medium text-gray-800">Detail transaksi</h2>
+                        <span id="detail-code" class="text-[11px] font-mono text-gray-400">—</span>
+                    </div>
+
+                    <div id="detail-empty" class="empty-state">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4">
+                            <path d="M9 12h6M9 16h6M7 2H5a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8l-6-6z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                        </svg>
+                        Pilih transaksi untuk melihat detail
+                    </div>
+
+                    <div id="detail-wrap" class="hidden">
+                        <div class="overflow-x-auto">
+                            <table id="items-table" class="w-full">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Obat</th>
+                                        <th class="col-right">Qty</th>
+                                        <th class="col-right">Disc</th>
+                                        <th class="col-right">Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                        <div class="total-row">
+                            <span>Total</span>
+                            <span id="detail-total">—</span>
+                        </div>
+                    </div>
 
                 </div>
 
@@ -105,179 +173,80 @@
     <script src="{{ asset('templates/js/page/modules-datatables.js') }}"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="{{ asset('templates/library/izitoast/dist/js/iziToast.min.js') }}"></script>
-    <script src="https://unpkg.com/sweetalert/dist/sweetalert.min.js"></script>
 
     <script>
-        let tableData, selectedData = null;
-        const form = document.getElementById('patientForm');
+        let tableData  = null;
+        let itemsTable = null;
 
-        $(function() {
+        $(function () {
 
+            // ── Main sales table ──────────────────────────────────────────────
             tableData = $('#table-data').DataTable({
-                responsive: true,
-                autoWidth: false,
-                processing: true,
-                serverSide: true,
-                ajax: '{{ route('salesdata.index') }}',
-                columns: [{
-                        data: 'DT_RowIndex',
-                        orderable: false,
-                        searchable: false
-                    },
+                responsive:  true,
+                autoWidth:   false,
+                processing:  true,
+                serverSide:  true,
+                ajax:        '{{ route('salesdata.index') }}',
+                language:    { search: '', searchPlaceholder: 'Cari nomor, nama pasien...' },
+                columns: [
+                    { data: 'DT_RowIndex', orderable: false, searchable: false, className: 'col-mono' },
+                    { data: 'date' },
+                    { data: 'time', className: 'col-mono' },
+                    { data: 'code', className: 'col-mono' },
+                    { data: 'name' },
+                    { data: 'final_price', className: 'col-price' },
                     {
-                        data: 'date'
+                        data: null, orderable: false, searchable: false,
+                        render: (d) =>
+                            `<button class="btn-print" onclick="event.stopPropagation(); window.open('/print/receipt/${d.transactions.id}','_blank')">
+                                <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
+                                    <polyline points="4 6 4 1 12 1 12 6"/>
+                                    <path d="M4 12H3a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1"/>
+                                    <rect x="4" y="10" width="8" height="5"/>
+                                </svg>Cetak</button>`
                     },
-                    {
-                        data: 'time'
-                    },
-                    {
-                        data: 'code'
-                    },
-                    {
-                        data: 'name'
-                    },
-                    
-                    {
-                        data: 'final_price'
-                    },
-                    {
-                        data: 'print'
-                    },
-                ]
+                ],
             });
 
-
-
-            let itemsTable;
-
-            function loadItems(transactionId) {
-
-                if (itemsTable) {
-                    itemsTable.destroy();
-                    $('#items-table tbody').empty();
-                }
-
-                itemsTable = $('#items-table').DataTable({
-                    processing: true,
-                    serverSide: true,
-                    searchable: false,
-                    searching: false,
-                    ajax: `/sales/transaction/${transactionId}/items`,
-                    columns: [{
-                            data: 'DT_RowIndex',
-                            orderable: false
-                        },
-                        {
-                            data: 'medicine'
-                        },
-                        {
-                            data: 'quantity'
-                        },
-                        {
-                            data: 'price'
-                        },
-                        {
-                            data: 'discount'
-                        },
-                        {
-                            data: 'total'
-                        }
-                    ]
-                });
-            }
-
-            $('#table-data tbody').on('click', 'tr', function() {
-
+            // ── Row click → load items ────────────────────────────────────────
+            $('#table-data tbody').on('click', 'tr', function () {
                 const data = tableData.row(this).data();
                 if (!data) return;
 
-                const transactionId = data.transaction_id;
+                $('#table-data tbody tr').removeClass('active');
+                $(this).addClass('active');
 
-                // highlight selected row
-                $('#table-data tbody tr').removeClass('bg-blue-100');
-                $(this).addClass('bg-blue-100');
-
-                loadItems(transactionId);
-            });
-
-
-
-
-            // BACK BUTTON 
-            $('#back').click(function() {
-                window.location.href = "{{ route('home') }}";
-            });
-            $('#back').click(function() {
-                form.reset();
-                $('#patient_id').val('');
-                $('#table-data tbody tr').removeClass('bg-blue-100');
-            });
-
-        });
-
-
-        // ENTER NAVIGATION
-        const inputs = ['name', 'address', 'phone', 'city', 'birth']
-            .map(id => document.getElementById(id));
-
-        inputs.forEach((input, index) => {
-            input.addEventListener('keydown', e => {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    if (index < inputs.length - 1) inputs[index + 1].focus();
-                    else handleSubmit();
-                }
+                document.getElementById('detail-code').textContent = data.code;
+                loadItems(data.transaction_id, data.final_price);
             });
         });
 
+        // ── Load items table ──────────────────────────────────────────────────
+        function loadItems(transactionId, totalPrice) {
+            if (itemsTable) { itemsTable.destroy(); $('#items-table tbody').empty(); }
 
-        // SUBMIT
-        document.getElementById('submitForm').addEventListener('click', handleSubmit);
+            document.getElementById('detail-empty').classList.add('hidden');
+            document.getElementById('detail-wrap').classList.remove('hidden');
+            document.getElementById('detail-total').textContent = totalPrice ?? '—';
 
-        function handleSubmit() {
-            const formData = new FormData(form);
-            const id = document.getElementById('patient_id').value;
-
-            const url = id ?
-                `/patients/${id}` :
-                form.action;
-
-            if (id) formData.append('_method', 'PUT');
-
-            axios({
-                    method: 'POST',
-                    url: url,
-                    data: formData,
-                    headers: {
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-                        'X-Requested-With': 'XMLHttpRequest',
+            itemsTable = $('#items-table').DataTable({
+                processing:  true,
+                serverSide:  true,
+                searching:   false,
+                paging:      false,
+                info:        false,
+                ajax: `/sales/transaction/${transactionId}/items`,
+                columns: [
+                    { data: 'DT_RowIndex', orderable: false, className: 'col-mono' },
+                    { data: 'medicine' },
+                    {
+                        data: 'quantity', className: 'col-right',
+                        render: val => `<span class="qty-badge">${val}</span>`
                     },
-                })
-                .then(res => {
-                    iziToast.success({
-                        title: 'Success',
-                        message: res.data.message || 'Patient saved.'
-                    });
-
-                    form.reset();
-                    $('#patient_id').val('');
-                    tableData.ajax.reload(null, false);
-                })
-                .catch(err => {
-                    let msg = 'Failed to save.';
-
-                    if (err.response?.status === 422) {
-                        msg = Object.values(err.response.data.errors)
-                            .flat()
-                            .join('<br>');
-                    }
-
-                    iziToast.error({
-                        title: 'Error',
-                        message: msg
-                    });
-                });
+                    { data: 'discount', className: 'col-muted', render: val => val ? val : '—' },
+                    { data: 'total',    className: 'col-price' },
+                ],
+            });
         }
     </script>
-
 @endsection

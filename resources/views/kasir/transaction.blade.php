@@ -1,7 +1,7 @@
 @extends('layouts.app')
 @section('content')
 @section('style')
-<link rel="stylesheet" href="{{ asset('css/dashboard.css') }}?time={{ time() }}">
+    <link rel="stylesheet" href="{{ asset('css/dashboard.css') }}?time={{ time() }}">
     <link rel="stylesheet" href="{{ asset('templates/library/izitoast/dist/css/iziToast.min.css') }}">
 
     @if ($check_transaction != 0)
@@ -1184,6 +1184,18 @@
                     @endif
                 </form>
             </div>
+            <div id="checkoutLoading"
+                class="hidden fixed inset-0 z-[9999999] flex items-center justify-center bg-black/40 backdrop-blur-sm">
+                <div class="bg-white rounded-2xl p-6 flex flex-col items-center gap-3 shadow-xl">
+                    <svg class="animate-spin h-8 w-8 text-[#2196F3]" xmlns="http://www.w3.org/2000/svg"
+                        fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                            stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+                    </svg>
+                    <span class="text-[13px] text-gray-500 font-medium">Memproses...</span>
+                </div>
+            </div>
         </div>
     </div>
     {{-- Print Confirmation Modal --}}
@@ -1829,6 +1841,17 @@
         } [m]));
     }
     // 
+
+    // checkout loading 
+    function showCheckoutLoading() {
+        document.getElementById('checkoutLoading').classList.remove('hidden');
+        document.getElementById('checkoutLoading').classList.add('flex');
+    }
+
+    function hideCheckoutLoading() {
+        document.getElementById('checkoutLoading').classList.add('hidden');
+        document.getElementById('checkoutLoading').classList.remove('flex');
+    }
 
     // Print Modal JS
     const CheckoutModal = (() => {
@@ -3136,7 +3159,7 @@
             });
             return;
         }
-
+        showCheckoutLoading();
         // ── Step 1: Get transaction items ─────────────────────────────────────
         axios.post("{{ route('transaction.getTransactionItem') }}", {
             transaction_id,
@@ -3183,6 +3206,8 @@
                 onBtnCancelResep: () => CheckoutModal.close(),
             });
 
+            hideCheckoutLoading(); 
+
             CheckoutModal.open(transaction_type);
 
             function doCheckout(printMode) {
@@ -3223,6 +3248,7 @@
                         setTimeout(() => window.location.reload(), 300);
                     }
                 }).catch(err => {
+                    hideCheckoutLoading();
                     console.error(err);
                     iziToast.error({
                         title: 'Gagal',
@@ -3233,6 +3259,7 @@
             }
 
         }).catch(error => {
+            hideCheckoutLoading();
             console.error("Error:", error.response ? error.response.data : error.message);
             iziToast.error({
                 title: 'Gagal',

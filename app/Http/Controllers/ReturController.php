@@ -277,7 +277,7 @@ class ReturController extends Controller
             //     'total_retur'   => $request->total_retur,
             //     'updated_at'    => now(),
             // ]);
-            
+
             DB::commit();
 
             return response()->json([
@@ -319,32 +319,60 @@ class ReturController extends Controller
 
     // Retur Order
 
+    public function getBatchesByOrderedMedicine(Request $request)
+    {
+        $request->validate([
+            'medicine_id' => 'required|integer|exists:medicines,id',
+        ]);
+
+        // Return batches ordered by created_at DESC so the latest batch appears first.
+        // We only return batches with stock > 0 so the user can only retur what exists.
+        $batches = Batches::where('medicine_id', $request->medicine_id)
+            ->where('stock', '>', 0)
+            ->orderBy('created_at', 'desc')
+            ->get(['id', 'name', 'expired_date', 'stock']);
+
+        return response()->json($batches);
+    }
+
+    // ─── 2. Get medicines for a receiving transaction ─────────────────────────────
+    // (Fixes the broken ->map() that was discarding results and not returning batches)
     public function getReturOrderMedicines(Request $request)
     {
         $transactionCode = $request->transaction_code;
 
         $transactionCart = ReceivingItems::with([
             'receiving_details.receiving',
-            'order_items.medicines'
+            'order_items.medicines',
         ])
             ->whereHas('receiving_details.receiving', function ($q) use ($transactionCode) {
                 $q->where('code', $transactionCode);
             })
             ->get();
 
-        $transactionCart->map(function ($item) {
+        // map() result was previously discarded — fixed here
+        $result = $transactionCart->map(function ($item) {
+            $medicine = $item->order_items->medicines ?? null;
+            $receiving = $item->receiving_details->receiving ?? null;
+
             return [
-                'medicine_id'   => $item->order_items->medicines->id,
-                'name'          => $item->order_items->medicines->name,
-                'quantity'      => $item->order_items->medicines->quantity,
-                'final_price'   => $item->order_items->medicines->final_price,
+                'id'             => $item->id,
+                'medicine_id'    => $medicine?->id,
+                'code'           => $medicine?->code,
+                'name'           => $medicine?->name,
+                'unit'           => $medicine?->unit,
+                'content'        => $medicine?->content,
+                'raw_price'      => $medicine?->raw_price,
+                'qty_received'   => $item->qty_received,
+                'total'          => $item->total,
+                'receiving_id'   => $receiving?->id,
             ];
         });
 
-
-        return response()->json($transactionCart);
+        return response()->json($result);
     }
 
+    // ─── 3. Search receiving transactions for retur ───────────────────────────────
     public function returOrderdata(Request $request)
     {
         $search = $request->search;
@@ -353,11 +381,12 @@ class ReturController extends Controller
             ->with(['receiving_details.receiving_items.order_items.medicines'])
             ->where(function ($q) use ($search) {
                 $q->where('code', 'LIKE', "%{$search}%")
-                    ->orwhereHas(
+                    ->orWhereHas(
                         'receiving_details',
                         fn($q_invoice) =>
                         $q_invoice->where('invoice_number', 'LIKE', "%{$search}%")
-                    )->orwhereHas(
+                    )
+                    ->orWhereHas(
                         'receiving_details.receiving_items.order_items.medicines',
                         fn($q_med) =>
                         $q_med->where('name', 'LIKE', "%{$search}%")
@@ -366,12 +395,11 @@ class ReturController extends Controller
             ->where('status', 1)
             ->paginate(10);
 
-
         $data->getCollection()->transform(function ($item) {
-
             $finalPrice = $item->receiving_details
                 ->flatMap(fn($detail) => $detail->receiving_items)
                 ->sum('total');
+
             return [
                 'transaction_code' => $item->code,
                 'name'             => optional($item->receiving_details->first())->invoice_number,
@@ -381,83 +409,85 @@ class ReturController extends Controller
 
         return response()->json($data);
     }
+
+    // ─── 4. Save retur item (AJAX-ready, returns JSON, fixes stock-check order) ───
     public function returOrderItems(Request $request)
     {
         $request->validate([
             'transaction_id' => 'required|integer',
             'medicine_id'    => 'required|integer',
+            'batch_id'       => 'required|integer|exists:batches,id',
             'qty_retur'      => 'required|numeric|min:1',
-            'total_retur'    => 'required',
-            'old_qty'        => 'required',
-
+            'total_retur'    => 'required|numeric',
+            'old_qty'        => 'required|numeric',
         ]);
 
         DB::beginTransaction();
 
         try {
-
-            // Create Retur Log (Retur Orders = 4)
             $findcode = Receiving::findOrFail($request->transaction_id);
-            $now = Carbon::now()->format('Y-m-d');
+            $now      = Carbon::now()->format('Y-m-d');
 
-
+            // Lock medicine and batch rows to prevent race conditions
             $medicine = Medicines::where('id', $request->medicine_id)
                 ->lockForUpdate()
                 ->firstOrFail();
-            $qty_before = $medicine->stock;
-            $batch = Batches::where('medicine_id', $request->medicine_id)
-                ->where('name', $request->batch)
-                ->where('expired_date', $request->expired_date)
-                ->lockForUpdate()
-                ->first();
 
-            if (!$batch) {
-                $batch = Batches::create([
-                    'medicine_id'  => $request->medicine_id,
-                    'name'         => $request->batch,
-                    'expired_date' => $request->expired_date,
-                    'stock'        => 0,
-                    'status'       => 0,
-                ]);
+            $batch = Batches::where('id', $request->batch_id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            // ── Stock check BEFORE any decrement (was after decrement — critical bug fix) ──
+            if ($medicine->stock < $request->qty_retur) {
+                DB::rollBack();
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Stok obat tidak mencukupi untuk diretur.',
+                ], 422);
             }
 
+            if ($batch->stock < $request->qty_retur) {
+                DB::rollBack();
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Stok batch tidak mencukupi untuk diretur.',
+                ], 422);
+            }
+
+            $qty_before = $medicine->stock;
+
+            // Decrement both medicine stock and batch stock
+            $medicine->decrement('stock', $request->qty_retur);
             $batch->decrement('stock', $request->qty_retur);
 
-            $itemsLog = ItemsLog::create([
+            // Write items log
+            ItemsLog::create([
                 'transaction_code' => $findcode->code,
                 'code'             => $this->generateItemsLogCode(),
-                'type'             => "RT",
+                'type'             => 'RT',
                 'medicine_id'      => $request->medicine_id,
                 'qty'              => $request->qty_retur,
                 'qty_before'       => $qty_before,
-                'qty_after'        => $medicine->stock - $request->qty_retur,
+                'qty_after'        => $qty_before - $request->qty_retur,
                 'total'            => $request->total_retur,
                 'date'             => $now,
                 'status'           => 4,
-                'batches_id'       => $batch->id
+                'batches_id'       => $batch->id,
             ]);
-            // Get & Update Cart
-            $medicine = Medicines::findOrFail($request->medicine_id);
 
-            if ($medicine->stock < $request->qty_retur) {
-                return response()->json([
-                    'message' => 'Stok Kurang'
-                ], 400);
-            }
-
-            $medicine->decrement('stock', $request->qty_retur);
             DB::commit();
 
-            return redirect()
-                ->back()
-                ->with('success', 'Retur berhasil disimpan');
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Retur berhasil disimpan.',
+            ]);
         } catch (\Throwable $e) {
-
             DB::rollBack();
 
-            return redirect()
-                ->back()
-                ->with('error', 'Gagal menyimpan retur: ' . $e->getMessage());
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Gagal menyimpan retur: ' . $e->getMessage(),
+            ], 500);
         }
     }
 }
