@@ -79,21 +79,23 @@
     </div>
 
     <hr>
-
-    Bukti Pembayaran<br>
-    {{ $transaction->updated_at->format('d/m/Y H:i:s') }}<br><br>
-
+    <div style="text-align: center">
+        Bukti Pembayaran<br>
+        {{ $transaction->updated_at->format('d/m/Y H:i:s') }}
+    </div>
+    <br>
     Nama : {{ $transaction->patients->name ?? '-' }}<br>
     Alamat : {{ $transaction->patients->address ?? '-' }}<br>
     No.Telp : {{ $transaction->patients->phone ?? '-' }}<br>
 
     @if (in_array($transaction->transaction_type, ['RESEP TUNAI', 'KREDIT']))
-        <hr>
-        Nama Dokter : {{ $transaction->doctors->name ?? '-' }}
+        Dokter : {{ $transaction->doctors->name ?? '-' }}
     @endif
 
+    <br><br>
+    Nomor : {{ $transaction->transaction_code }}<br>
+    Kasir : {{ auth()->user()->name }}<br>
     <hr>
-    <br>
 
     {{-- =========================
          ITEM LIST
@@ -135,12 +137,6 @@
     Bayar <span style="float:right">{{ number_format($transaction->paid) }}</span><br>
     Kembalian<span style="float:right">{{ number_format($transaction->changes) }}</span>
 
-    <hr>
-
-    Kasir : {{ auth()->user()->name }}<br>
-
-    <hr>
-
     <div class="text-center">
         Terima Kasih<br>
         Semoga Lekas Sembuh
@@ -162,16 +158,23 @@
 
         <hr>
 
-        Bukti Pembayaran<br>
-        {{ $transaction->updated_at->format('d/m/Y H:i:s') }}<br><br>
+        <div style="text-align: center">
+            Bukti Pembayaran<br>
+            {{ $transaction->updated_at->format('d/m/Y H:i:s') }}
+        </div>
+        <br>
 
         Nama : {{ $transaction->patients->name ?? '-' }}<br>
         Alamat : {{ $transaction->patients->address ?? '-' }}<br>
+        No.Telp : {{ $transaction->patients->phone ?? '-' }}<br>
+        Dokter : {{ $transaction->doctors->name ?? '-' }}
+        <hr>
 
-        <hr>
-        Nama Dokter : {{ $transaction->doctors->name ?? '-' }}
-        <hr>
         <br>
+        Nomor : {{ $transaction->transaction_code }}<br>
+        Kasir : {{ auth()->user()->name }}<br>
+        <hr>
+
         {{-- ITEM --}}
         @foreach ($transactionCart as $items)
             <table class="table-struk">
@@ -199,9 +202,7 @@
         Bayar <span style="float:right">{{ number_format($transaction->paid) }}</span><br>
         Kembalian<span style="float:right">{{ number_format($transaction->changes) }}</span>
 
-        <hr>
 
-        Kasir : {{ auth()->user()->name }}<br>
 
         <hr>
 
