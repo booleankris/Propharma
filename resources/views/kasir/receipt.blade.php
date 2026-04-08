@@ -63,13 +63,11 @@
     }
 
     .table-struk tr {
-        line-height: 1.2;
+        line-height: 1.8;
     }
 </style>
 
-{{-- =========================
-     STRUK 1 (CUSTOMER)
-========================= --}}
+{{-- ========================= STRUK 1 (CUSTOMER) ========================= --}}
 <div class="struk">
     <div class="text-center">
         <strong>APOTEK SAHABAT</strong><br>
@@ -89,10 +87,10 @@
     No.Telp : {{ $transaction->patients->phone ?? '-' }}<br>
 
     @if (in_array($transaction->transaction_type, ['RESEP TUNAI', 'KREDIT']))
-        Dokter : {{ $transaction->doctors->name ?? '-' }}
+        Dokter : {{ $transaction->doctors->name ?? '-' }}<br>
     @endif
 
-    <br><br>
+    <br>
     Nomor : {{ $transaction->transaction_code }}<br>
     Kasir : {{ auth()->user()->name }}<br>
     <hr>
@@ -143,9 +141,7 @@
     </div>
 </div>
 
-{{-- =========================
-     STRUK 2 (RESEP DETAIL)
-========================= --}}
+{{-- ========================= STRUK 2 (RESEP DETAIL) ========================= --}}
 @if (in_array($transaction->transaction_type, ['RESEP TUNAI', 'KREDIT']))
     <div class="struk page-break">
 
