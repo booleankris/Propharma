@@ -9,7 +9,7 @@ class ItemsLog extends Model
 {
     use HasFactory;
     protected $casts = [
-        'date' => 'datetime', 
+        'date' => 'datetime',
     ];
     protected $table = 'items_log';
     protected $fillable = [
@@ -28,5 +28,9 @@ class ItemsLog extends Model
     public function medicines()
     {
         return $this->belongsTo(Medicines::class, 'medicine_id');
+    }
+    public function transaction()
+    {
+        return $this->belongsTo(MedicineTransactions::class, 'transaction_code', 'transaction_code');
     }
 }

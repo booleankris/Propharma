@@ -2,15 +2,50 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\Report\LiphExport;
 use App\Jobs\ProcessMedicinesExport;
 use App\Jobs\ProcessPatientsExport;
 use App\Jobs\TransactionExportJob;
 use App\Models\ExportJob;
+use App\Models\MedicineTransactions;
+use App\Models\Pharmacies;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Maatwebsite\Excel\Facades\Excel;
 
 class ReportsController extends Controller
 {
+    public function reports(Request $request)
+    {
+
+        if ($request->selectedReport == "LIPH") {
+            $request->validate([
+                'start_date'  => 'required|date',
+                'end_date'    => 'required|date|after_or_equal:start_date',
+            ]);
+            $pharmacy = Pharmacies::findOrFail(auth()->user()->pharmacy_id);
+
+            $filename = 'LIPH_' . $pharmacy->name . '_'
+                . $request->start_date . '_sd_' . $request->end_date . '.xlsx';
+
+            return Excel::download(
+                new LiphExport(
+                    $pharmacy->id,
+                    $request->start_date,
+                    $request->end_date,
+                    $pharmacy->name,
+                    $pharmacy->address,
+                    $request->shift,
+                    $request->shiftType,
+                ),
+                $filename
+            );
+        }
+
+        return response()->json([
+            'status'   => "success",
+        ]);
+    }
     public function transactions()
     {
         return view('report.transactions');
@@ -97,7 +132,7 @@ class ReportsController extends Controller
                 : null
         ]);
     }
-    
+
     public function transactionExportDownload($id)
     {
         $job = ExportJob::findOrFail($id);

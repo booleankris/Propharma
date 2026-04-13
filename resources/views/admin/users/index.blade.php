@@ -65,6 +65,7 @@
                                             <th width="5%">#</th>
                                             <th>Nama</th>
                                             <th>Email</th>
+                                            <th width="15%">Apotek</th>
                                             <th width="15%">Level</th>
                                             <th width="20%">&nbsp;</th>
                                         </tr>
@@ -123,6 +124,11 @@
                     {
                         data: 'email',
                         name: 'email'
+                    },
+                    {
+                        data: 'pharmacy',
+                        orderable: false,
+                        searchable: false
                     },
                     {
                         data: 'roles',

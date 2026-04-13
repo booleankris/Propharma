@@ -683,73 +683,214 @@
 <div id="reportModal"
     class="modal-hide modal-transition fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
     w-[92%] max-w-[480px] bg-white rounded-3xl shadow-2xl z-50 overflow-hidden">
-    <div class="relative bg-gradient-to-br from-[#4a90d9] via-[#6196c0] to-[#3a7bd5] px-6 pt-6 pb-8">
-        <div class="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2"></div>
-        <div class="absolute bottom-0 left-4 w-16 h-16 bg-white/10 rounded-full translate-y-1/2"></div>
-        <div class="relative flex items-center justify-between">
-            <div>
-                <p class="text-blue-100 text-xs font-medium tracking-widest uppercase mb-1">Manajemen Sistem</p>
-                <h2 class="text-2xl font-bold text-white">Laporan / Report</h2>
-            </div>
-            <div class="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm">
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-white" fill="none"
-                    viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round"
-                        d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                </svg>
-            </div>
+    <div class="bg-slate-800 px-6 py-5 flex items-center justify-between">
+        <div>
+            <p class="text-slate-400 text-xs font-semibold tracking-widest uppercase mb-1">Manajemen Sistem</p>
+            <h2 class="text-white text-xl font-semibold">Laporan Penjualan</h2>
+        </div>
+        <div class="w-10 h-10 bg-white/10 rounded-2xl flex items-center justify-center">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                <polyline points="14,2 14,8 20,8" />
+                <line x1="16" y1="13" x2="8" y2="13" />
+                <line x1="16" y1="17" x2="8" y2="17" />
+            </svg>
         </div>
     </div>
-    <div class="px-5 py-6 max-h-[60vh] overflow-y-auto">
-        <div class="grid grid-cols-2 gap-3">
-            <a href="{{ route('reports.transactions') }}"
-                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-violet-50 hover:bg-violet-500 border border-violet-100 hover:border-violet-500 transition-all duration-200 hover:-translate-y-0.5">
-                <div
-                    class="w-9 h-9 rounded-xl bg-violet-100 group-hover:bg-violet-400 flex items-center justify-center flex-shrink-0 transition-colors">
-                    <svg class="w-5 h-5 text-violet-500 group-hover:text-white transition-colors" fill="none"
-                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                            d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
-                    </svg>
-                </div>
-                <span class="text-sm font-semibold text-violet-700 group-hover:text-white transition-colors">Report
-                    Transaksi</span>
-            </a>
-            <a href="{{ route('reports.patients') }}"
-                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-pink-50 hover:bg-pink-500 border border-pink-100 hover:border-pink-500 transition-all duration-200 hover:-translate-y-0.5">
-                <div
-                    class="w-9 h-9 rounded-xl bg-pink-100 group-hover:bg-pink-400 flex items-center justify-center flex-shrink-0 transition-colors">
-                    <svg class="w-5 h-5 text-pink-500 group-hover:text-white transition-colors" fill="none"
-                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                            d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                </div>
-                <span class="text-sm font-semibold text-pink-700 group-hover:text-white transition-colors">Report
-                    Pasien</span>
-            </a>
-            <a href="{{ route('reports.doctors') }}"
-                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-orange-50 hover:bg-orange-500 border border-orange-100 hover:border-orange-500 transition-all duration-200 hover:-translate-y-0.5">
-                <div
-                    class="w-9 h-9 rounded-xl bg-orange-100 group-hover:bg-orange-400 flex items-center justify-center flex-shrink-0 transition-colors">
-                    <svg class="w-5 h-5 text-orange-500 group-hover:text-white transition-colors" fill="none"
-                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                            d="M3 7h2l2 9h10l2-9h2M3 7l1-4h16l1 4M9 16v2m6-2v2" />
-                    </svg>
-                </div>
-                <span class="text-sm font-semibold text-orange-700 group-hover:text-white transition-colors">Report
-                    Dokter</span>
-            </a>
+
+    <div class="px-5 py-5 space-y-5">
+
+        <div>
+            <p class="text-xs font-semibold tracking-widest uppercase text-slate-400 mb-3">Jenis Laporan</p>
+            <div class="grid grid-cols-2 gap-2" id="report-grid">
+
+                <button onclick="selectReport(this)" data-active="true"
+                    class="report-btn flex items-center gap-3 p-3 rounded-2xl border border-violet-200 bg-violet-50 text-left transition-all">
+                    <div class="w-8 h-8 rounded-xl bg-violet-100 flex items-center justify-center flex-shrink-0">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#7c3aed"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="7" height="7" />
+                            <rect x="14" y="3" width="7" height="7" />
+                            <rect x="3" y="14" width="7" height="7" />
+                            <rect x="14" y="14" width="7" height="7" />
+                        </svg>
+                    </div>
+                    <span class="text-sm font-semibold text-violet-700">LIPH</span>
+                </button>
+
+                <button onclick="selectReport(this)"
+                    class="report-btn flex items-center gap-3 p-3 rounded-2xl border border-slate-100 bg-slate-50 text-left transition-all hover:border-slate-200 hover:bg-white">
+                    <div class="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center flex-shrink-0">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#059669"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path
+                                d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18" />
+                        </svg>
+                    </div>
+                    <span class="text-sm font-semibold text-slate-600">Obat</span>
+                </button>
+
+                <button onclick="selectReport(this)"
+                    class="report-btn flex items-center gap-3 p-3 rounded-2xl border border-slate-100 bg-slate-50 text-left transition-all hover:border-slate-200 hover:bg-white">
+                    <div class="w-8 h-8 rounded-xl bg-amber-50 flex items-center justify-center flex-shrink-0">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#d97706"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="3" />
+                            <path
+                                d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" />
+                        </svg>
+                    </div>
+                    <span class="text-sm font-semibold text-slate-600">Golongan</span>
+                </button>
+
+                <button onclick="selectReport(this)"
+                    class="report-btn flex items-center gap-3 p-3 rounded-2xl border border-slate-100 bg-slate-50 text-left transition-all hover:border-slate-200 hover:bg-white">
+                    <div class="w-8 h-8 rounded-xl bg-orange-50 flex items-center justify-center flex-shrink-0">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ea580c"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M3 7h2l2 9h10l2-9h2M3 7l1-4h16l1 4M9 16v2m6-2v2" />
+                        </svg>
+                    </div>
+                    <span class="text-sm font-semibold text-slate-600">Pabrik</span>
+                </button>
+
+                <button onclick="selectReport(this)"
+                    class="report-btn flex items-center gap-3 p-3 rounded-2xl border border-slate-100 bg-slate-50 text-left transition-all hover:border-slate-200 hover:bg-white">
+                    <div class="w-8 h-8 rounded-xl bg-pink-50 flex items-center justify-center flex-shrink-0">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#db2777"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+                            <circle cx="12" cy="7" r="4" />
+                        </svg>
+                    </div>
+                    <span class="text-sm font-semibold text-slate-600">Dokter</span>
+                </button>
+
+                <button onclick="selectReport(this)"
+                    class="report-btn flex items-center gap-3 p-3 rounded-2xl border border-slate-100 bg-slate-50 text-left transition-all hover:border-slate-200 hover:bg-white">
+                    <div class="w-8 h-8 rounded-xl bg-sky-50 flex items-center justify-center flex-shrink-0">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#0284c7"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M9 12h6M9 16h6M17 2H7a2 2 0 00-2 2v18l3-3 2 3 2-3 2 3 2-3 3 3V4a2 2 0 00-2-2z" />
+                        </svg>
+                    </div>
+                    <span class="text-sm font-semibold text-slate-600">Daftar Resep</span>
+                </button>
+
+                <button onclick="selectReport(this)"
+                    class="report-btn col-span-2 flex items-center gap-3 p-3 rounded-2xl border border-slate-100 bg-slate-50 text-left transition-all hover:border-slate-200 hover:bg-white">
+                    <div class="w-8 h-8 rounded-xl bg-teal-50 flex items-center justify-center flex-shrink-0">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#0d9488"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="1 4 1 10 7 10" />
+                            <path d="M3.51 15a9 9 0 102.13-9.36L1 10" />
+                        </svg>
+                    </div>
+                    <span class="text-sm font-semibold text-slate-600">Retur Jual</span>
+                </button>
+
+            </div>
         </div>
-        <button
-            class="closeModal mt-5 w-full py-2.5 flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-600 font-semibold rounded-2xl transition-all">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+
+        <div class="h-px bg-slate-100"></div>
+
+        <div>
+            <p class="text-xs font-semibold tracking-widest uppercase text-slate-400 mb-3">Rentang Tanggal</p>
+            <div class="flex items-center gap-2">
+                <input type="date" value="2026-03-05" id="start_date" name="start_date"
+                    class="flex-1 text-sm border border-slate-200 rounded-xl px-3 py-2 text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300" />
+                <span class="text-slate-400 text-sm font-medium">—</span>
+                <input type="date" value="2026-03-05" id="end_date" name="end_date"
+                    class="flex-1 text-sm border border-slate-200 rounded-xl px-3 py-2 text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300" />
+            </div>
+        </div>
+
+        <div class="h-px bg-slate-100"></div>
+
+        <div>
+            <p class="text-xs font-semibold tracking-widest uppercase text-slate-400 mb-3">Filter Harian</p>
+            <div class="flex gap-2 mb-3">
+                <button onclick="setFilter('semua', this)" id="btn-semua"
+                    class="flex-1 flex items-center gap-2 px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-600 text-sm font-semibold transition-all">
+                    <span class="w-3.5 h-3.5 rounded-full border-2 border-slate-300 flex-shrink-0"></span>
+                    Semua
+                </button>
+                <button onclick="setFilter('shift', this)" id="btn-shift"
+                    class="flex-1 flex items-center gap-2 px-3 py-2.5 rounded-xl border border-slate-800 bg-slate-800 text-white text-sm font-semibold transition-all">
+                    <span class="w-3.5 h-3.5 rounded-full border-2 border-slate-300 flex-shrink-0"></span>
+                    Per Shift
+                </button>
+            </div>
+            <div class="flex flex-col py-2 gap-2 w-full max-w-md">
+                <p class="text-xs font-semibold tracking-widest uppercase text-slate-400 mb-1">Filter Tipe</p>
+
+                <div data-value="rekap" onclick="selectOption(this)"
+                    class="opt flex items-center gap-5 p-2 rounded-2xl border-2 border-blue-400 bg-blue-50 cursor-pointer transition-all duration-200 hover:-translate-y-0.5">
+                    <div
+                        class="icon-box w-7 h-7 rounded-xl flex items-center justify-center shrink-0 bg-blue-400 transition-all duration-200">
+                        <svg class="icon-svg text-white" width="14" height="14" viewBox="0 0 24 24"
+                            fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                            stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                            <polyline points="14 2 14 8 20 8" />
+                            <line x1="16" y1="13" x2="8" y2="13" />
+                            <line x1="16" y1="17" x2="8" y2="17" />
+                            <polyline points="10 9 9 9 8 9" />
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="opt-title text-[12px] font-semibold tracking-tight text-blue-900 m-0">Rekap</p>
+                        <p class="opt-desc text-[9px] text-blue-500 m-0 mt-0.5">Hasil Perhitungan Keseluruhan</p>
+                    </div>
+                </div>
+
+                <div data-value="detail" onclick="selectOption(this)"
+                    class="opt flex items-center gap-5 p-2 rounded-2xl border-2 border-gray-200 bg-white cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:border-gray-300 hover:bg-gray-50">
+                    <div
+                        class="icon-box w-7 h-7 rounded-xl flex items-center justify-center shrink-0 bg-gray-100 transition-all duration-200">
+                        <svg class="icon-svg text-gray-400" width="14" height="14" viewBox="0 0 24 24"
+                            fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                            stroke-linejoin="round">
+                            <circle cx="11" cy="11" r="8" />
+                            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                            <line x1="11" y1="8" x2="11" y2="14" />
+                            <line x1="8" y1="11" x2="14" y2="11" />
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="opt-title text-[12px] font-semibold tracking-tight text-gray-800 m-0">Detail</p>
+                        <p class="opt-desc text-[9px] text-gray-400 m-0 mt-0.5">Menampilkan Seluruh Data
+                        </p>
+                    </div>
+                </div>
+
+            </div>
+            @php
+                $getshift = \App\Models\Shifts::all();
+            @endphp
+            <div id="shift-select">
+                <select id="shift" name="shift"
+                    class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300 pr-8">
+                    @foreach ($getshift as $shift)
+                        <option value="{{ $shift->id }}">{{ $shift->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+        </div>
+
+        {{-- Submit Report --}}
+        <button onclick="getReport()"
+            class="w-full flex items-center justify-center gap-2 bg-[linear-gradient(45deg,_#41a8f4,_#7cd086)] hover:bg-slate-700 active:scale-[0.98] text-white text-sm font-semibold py-3 rounded-2xl transition-all">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 6 2 18 2 18 9" />
+                <path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2" />
+                <rect x="6" y="14" width="12" height="8" />
             </svg>
-            Tutup
+            Cetak Laporan
         </button>
+
     </div>
 </div>
 
@@ -934,32 +1075,98 @@
 {{-- Persediaan Modal --}}
 <div id="logModal"
     class="modal-hide modal-transition fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
-    w-[90%] max-w-[400px] bg-white rounded-3xl shadow-2xl z-50 overflow-hidden">
+    w-[92%] max-w-[480px] bg-white rounded-3xl shadow-2xl z-50 overflow-hidden">
     <div class="relative bg-gradient-to-br from-[#4a90d9] via-[#6196c0] to-[#3a7bd5] px-6 pt-6 pb-8">
+        <div class="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2"></div>
+        <div class="absolute bottom-0 left-4 w-16 h-16 bg-white/10 rounded-full translate-y-1/2"></div>
         <div class="relative flex items-center justify-between">
             <div>
                 <p class="text-blue-100 text-xs font-medium tracking-widest uppercase mb-1">Manajemen Sistem</p>
                 <h2 class="text-2xl font-bold text-white">Persediaan</h2>
             </div>
+            <div class="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-white" fill="none"
+                    viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                </svg>
+            </div>
         </div>
     </div>
-    <div class="px-5 py-5">
-        <div class="flex flex-col gap-2">
+    <div class="px-5 py-6 max-h-[60vh] overflow-y-auto">
+        <div class="grid grid-cols-2 gap-3">
+
             <a href="{{ route('supplies.index') }}"
-                class="py-3 px-4 bg-[#6196c0] hover:bg-[#4a7aaa] text-center text-white rounded-xl font-medium transition-colors">Kartu
-                Stok</a>
+                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-blue-50 hover:bg-blue-500 border border-blue-100 hover:border-blue-500 transition-all duration-200 hover:-translate-y-0.5">
+                <div
+                    class="w-9 h-9 rounded-xl bg-blue-100 group-hover:bg-blue-400 flex items-center justify-center flex-shrink-0 transition-colors">
+                    <svg class="w-5 h-5 text-blue-600 group-hover:text-white transition-colors" fill="none"
+                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M3 10h18M3 14h18M10 3v18M14 3v18M3 6a3 3 0 013-3h12a3 3 0 013 3v12a3 3 0 01-3 3H6a3 3 0 01-3-3V6z" />
+                    </svg>
+                </div>
+                <span class="text-sm font-semibold text-blue-700 group-hover:text-white transition-colors">Kartu
+                    Stok</span>
+            </a>
+
             <a href="{{ route('supplies.stockDetail') }}"
-                class="py-3 px-4 bg-[#6196c0] hover:bg-[#4a7aaa] text-center text-white rounded-xl font-medium transition-colors">Data
-                Stok Pelayanan</a>
+                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-green-50 hover:bg-green-500 border border-green-100 hover:border-green-500 transition-all duration-200 hover:-translate-y-0.5">
+                <div
+                    class="w-9 h-9 rounded-xl bg-green-100 group-hover:bg-green-400 flex items-center justify-center flex-shrink-0 transition-colors">
+                    <svg class="w-5 h-5 text-green-600 group-hover:text-white transition-colors" fill="none"
+                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                </div>
+                <span class="text-sm font-semibold text-green-700 group-hover:text-white transition-colors">Stok
+                    Pelayanan</span>
+            </a>
+
             <a href="{{ route('supplies.storage') }}"
-                class="py-3 px-4 bg-[#6196c0] hover:bg-[#4a7aaa] text-center text-white rounded-xl font-medium transition-colors">Data
-                Stok Gudang</a>
+                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-purple-50 hover:bg-purple-500 border border-purple-100 hover:border-purple-500 transition-all duration-200 hover:-translate-y-0.5">
+                <div
+                    class="w-9 h-9 rounded-xl bg-purple-100 group-hover:bg-purple-400 flex items-center justify-center flex-shrink-0 transition-colors">
+                    <svg class="w-5 h-5 text-purple-600 group-hover:text-white transition-colors" fill="none"
+                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z" />
+                    </svg>
+                </div>
+                <span class="text-sm font-semibold text-purple-700 group-hover:text-white transition-colors">Stok
+                    Gudang</span>
+            </a>
+
             <a href="{{ route('supplies.stockData') }}"
-                class="py-3 px-4 bg-[#6196c0] hover:bg-[#4a7aaa] text-center text-white rounded-xl font-medium transition-colors">Data
-                Stok</a>
+                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-orange-50 hover:bg-orange-500 border border-orange-100 hover:border-orange-500 transition-all duration-200 hover:-translate-y-0.5">
+                <div
+                    class="w-9 h-9 rounded-xl bg-orange-100 group-hover:bg-orange-400 flex items-center justify-center flex-shrink-0 transition-colors">
+                    <svg class="w-5 h-5 text-orange-600 group-hover:text-white transition-colors" fill="none"
+                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                </div>
+                <span class="text-sm font-semibold text-orange-700 group-hover:text-white transition-colors">Data
+                    Stok</span>
+            </a>
+
+            {{-- 5th item spans full width --}}
             <a href="{{ route('supplies.stockOpname') }}"
-                class="py-3 px-4 bg-[#6196c0] hover:bg-[#4a7aaa] text-center text-white rounded-xl font-medium transition-colors">Stok
-                Opname</a>
+                class="col-span-2 group flex items-center gap-3 p-3.5 rounded-2xl bg-amber-50 hover:bg-amber-500 border border-amber-100 hover:border-amber-500 transition-all duration-200 hover:-translate-y-0.5">
+                <div
+                    class="w-9 h-9 rounded-xl bg-amber-100 group-hover:bg-amber-400 flex items-center justify-center flex-shrink-0 transition-colors">
+                    <svg class="w-5 h-5 text-amber-600 group-hover:text-white transition-colors" fill="none"
+                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                    </svg>
+                </div>
+                <span class="text-sm font-semibold text-amber-700 group-hover:text-white transition-colors">Stok
+                    Opname</span>
+            </a>
+
         </div>
         <button
             class="closeModal mt-5 w-full py-2.5 flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-600 font-semibold rounded-2xl transition-all">
@@ -974,29 +1181,84 @@
 {{-- Pembelian Modal --}}
 <div id="receivingModal"
     class="modal-hide modal-transition fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
-    w-[90%] max-w-[400px] bg-white rounded-3xl shadow-2xl z-50 overflow-hidden">
+    w-[92%] max-w-[480px] bg-white rounded-3xl shadow-2xl z-50 overflow-hidden">
     <div class="relative bg-gradient-to-br from-[#4a90d9] via-[#6196c0] to-[#3a7bd5] px-6 pt-6 pb-8">
+        <div class="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2"></div>
+        <div class="absolute bottom-0 left-4 w-16 h-16 bg-white/10 rounded-full translate-y-1/2"></div>
         <div class="relative flex items-center justify-between">
             <div>
                 <p class="text-blue-100 text-xs font-medium tracking-widest uppercase mb-1">Manajemen Sistem</p>
                 <h2 class="text-2xl font-bold text-white">Pembelian</h2>
             </div>
+            <div class="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-white" fill="none"
+                    viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                </svg>
+            </div>
         </div>
     </div>
-    <div class="px-5 py-5">
-        <div class="flex flex-col gap-2">
+    <div class="px-5 py-6 max-h-[60vh] overflow-y-auto">
+        <div class="grid grid-cols-2 gap-3">
+
             <a href="{{ route('receiving.index') }}"
-                class="py-3 px-4 bg-[#6196c0] hover:bg-[#4a7aaa] text-center text-white rounded-xl font-medium transition-colors">Pemesanan
-                dan Penerimaan Barang</a>
+                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-blue-50 hover:bg-blue-500 border border-blue-100 hover:border-blue-500 transition-all duration-200 hover:-translate-y-0.5">
+                <div
+                    class="w-9 h-9 rounded-xl bg-blue-100 group-hover:bg-blue-400 flex items-center justify-center flex-shrink-0 transition-colors">
+                    <svg class="w-5 h-5 text-blue-600 group-hover:text-white transition-colors" fill="none"
+                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                    </svg>
+                </div>
+                <span
+                    class="text-sm font-semibold text-blue-700 group-hover:text-white transition-colors leading-tight">Pemesanan
+                    & Penerimaan</span>
+            </a>
+
             <a href="{{ route('receiving.history') }}"
-                class="py-3 px-4 bg-[#6196c0] hover:bg-[#4a7aaa] text-center text-white rounded-xl font-medium transition-colors">History
-                Harga Beli</a>
+                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-green-50 hover:bg-green-500 border border-green-100 hover:border-green-500 transition-all duration-200 hover:-translate-y-0.5">
+                <div
+                    class="w-9 h-9 rounded-xl bg-green-100 group-hover:bg-green-400 flex items-center justify-center flex-shrink-0 transition-colors">
+                    <svg class="w-5 h-5 text-green-600 group-hover:text-white transition-colors" fill="none"
+                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
+                    </svg>
+                </div>
+                <span class="text-sm font-semibold text-green-700 group-hover:text-white transition-colors">History
+                    Harga Beli</span>
+            </a>
+
             <a href="{{ route('receiving.orderhistory') }}"
-                class="py-3 px-4 bg-[#6196c0] hover:bg-[#4a7aaa] text-center text-white rounded-xl font-medium transition-colors">Data
-                Pembelian</a>
+                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-purple-50 hover:bg-purple-500 border border-purple-100 hover:border-purple-500 transition-all duration-200 hover:-translate-y-0.5">
+                <div
+                    class="w-9 h-9 rounded-xl bg-purple-100 group-hover:bg-purple-400 flex items-center justify-center flex-shrink-0 transition-colors">
+                    <svg class="w-5 h-5 text-purple-600 group-hover:text-white transition-colors" fill="none"
+                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                </div>
+                <span class="text-sm font-semibold text-purple-700 group-hover:text-white transition-colors">Data
+                    Pembelian</span>
+            </a>
+
             <a href="{{ route('returdata.returorders') }}"
-                class="py-3 px-4 bg-[#6196c0] hover:bg-[#4a7aaa] text-center text-white rounded-xl font-medium transition-colors">Retur
-                Pembelian</a>
+                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-amber-50 hover:bg-amber-500 border border-amber-100 hover:border-amber-500 transition-all duration-200 hover:-translate-y-0.5">
+                <div
+                    class="w-9 h-9 rounded-xl bg-amber-100 group-hover:bg-amber-400 flex items-center justify-center flex-shrink-0 transition-colors">
+                    <svg class="w-5 h-5 text-amber-600 group-hover:text-white transition-colors" fill="none"
+                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                    </svg>
+                </div>
+                <span class="text-sm font-semibold text-amber-700 group-hover:text-white transition-colors">Retur
+                    Pembelian</span>
+            </a>
+
         </div>
         <button
             class="closeModal mt-5 w-full py-2.5 flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-600 font-semibold rounded-2xl transition-all">
@@ -1009,7 +1271,7 @@
 </div>
 
 {{-- Penjualan Modal --}}
-<div id="salesModal"
+{{-- <div id="salesModal"
     class="modal-hide modal-transition fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
     w-[90%] max-w-[400px] bg-white rounded-3xl shadow-2xl z-50 overflow-hidden">
     <div class="relative bg-gradient-to-br from-[#4a90d9] via-[#6196c0] to-[#3a7bd5] px-6 pt-6 pb-8">
@@ -1062,6 +1324,95 @@
                 Penjualan</a>
             <a href="{{ route('sales.reject') }}"
                 class="py-3 px-4 bg-[#6196c0] hover:bg-[#4a7aaa] text-center text-white rounded-xl font-medium transition-colors">Penolakan</a>
+        </div>
+        <button
+            class="closeModal mt-5 w-full py-2.5 flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-600 font-semibold rounded-2xl transition-all">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+            Tutup
+        </button>
+    </div>
+</div> --}}
+<div id="salesModal"
+    class="modal-hide modal-transition fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
+    w-[92%] max-w-[480px] bg-white rounded-3xl shadow-2xl z-50 overflow-hidden">
+    <div class="relative bg-gradient-to-br from-[#4a90d9] via-[#6196c0] to-[#3a7bd5] px-6 pt-6 pb-8">
+        <div class="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2"></div>
+        <div class="absolute bottom-0 left-4 w-16 h-16 bg-white/10 rounded-full translate-y-1/2"></div>
+        <div class="relative flex items-center justify-between">
+            <div>
+                <p class="text-blue-100 text-xs font-medium tracking-widest uppercase mb-1">Manajemen Sistem</p>
+                <h2 class="text-2xl font-bold text-white">Penjualan</h2>
+            </div>
+            <div class="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-white" fill="none"
+                    viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+            </div>
+        </div>
+    </div>
+    <div class="px-5 py-6 max-h-[60vh] overflow-y-auto">
+        <div class="grid grid-cols-2 gap-3">
+
+            <a href="{{ route('salesdata.index') }}"
+                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-blue-50 hover:bg-blue-500 border border-blue-100 hover:border-blue-500 transition-all duration-200 hover:-translate-y-0.5">
+                <div
+                    class="w-9 h-9 rounded-xl bg-blue-100 group-hover:bg-blue-400 flex items-center justify-center flex-shrink-0 transition-colors">
+                    <svg class="w-5 h-5 text-blue-600 group-hover:text-white transition-colors" fill="none"
+                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                </div>
+                <span class="text-sm font-semibold text-blue-700 group-hover:text-white transition-colors">Data
+                    Penjualan</span>
+            </a>
+
+            <a href="{{ route('returdata.retur') }}"
+                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-amber-50 hover:bg-amber-500 border border-amber-100 hover:border-amber-500 transition-all duration-200 hover:-translate-y-0.5">
+                <div
+                    class="w-9 h-9 rounded-xl bg-amber-100 group-hover:bg-amber-400 flex items-center justify-center flex-shrink-0 transition-colors">
+                    <svg class="w-5 h-5 text-amber-600 group-hover:text-white transition-colors" fill="none"
+                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                    </svg>
+                </div>
+                <span class="text-sm font-semibold text-amber-700 group-hover:text-white transition-colors">Retur
+                    Penjualan</span>
+            </a>
+
+            <a href="{{ route('returdata.index') }}"
+                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-green-50 hover:bg-green-500 border border-green-100 hover:border-green-500 transition-all duration-200 hover:-translate-y-0.5">
+                <div
+                    class="w-9 h-9 rounded-xl bg-green-100 group-hover:bg-green-400 flex items-center justify-center flex-shrink-0 transition-colors">
+                    <svg class="w-5 h-5 text-green-600 group-hover:text-white transition-colors" fill="none"
+                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                </div>
+                <span class="text-sm font-semibold text-green-700 group-hover:text-white transition-colors">Data
+                    Retur</span>
+            </a>
+
+            <a href="{{ route('sales.reject') }}"
+                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-red-50 hover:bg-red-500 border border-red-100 hover:border-red-500 transition-all duration-200 hover:-translate-y-0.5">
+                <div
+                    class="w-9 h-9 rounded-xl bg-red-100 group-hover:bg-red-400 flex items-center justify-center flex-shrink-0 transition-colors">
+                    <svg class="w-5 h-5 text-red-600 group-hover:text-white transition-colors" fill="none"
+                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                    </svg>
+                </div>
+                <span
+                    class="text-sm font-semibold text-red-700 group-hover:text-white transition-colors">Penolakan</span>
+            </a>
+
         </div>
         <button
             class="closeModal mt-5 w-full py-2.5 flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-600 font-semibold rounded-2xl transition-all">
@@ -1255,8 +1606,38 @@
         @endforelse
     </div>
 </div>
+<div id="loading-overlay"
+    class="hidden fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
 
+    <div
+        class="bg-white/90 backdrop-blur-xl rounded-2xl shadow-2xl px-10 py-8 flex flex-col items-center gap-5 animate-fadeIn">
+        <div class="relative">
+            <div class="w-14 h-14 border-4 border-blue-200 rounded-full"></div>
+            <div
+                class="w-14 h-14 border-4 border-blue-500 border-t-transparent rounded-full animate-spin absolute top-0 left-0">
+            </div>
+        </div>
+
+        <div class="text-center">
+            <p class="text-lg font-semibold text-gray-800">Generating Report</p>
+            <p class="text-sm text-gray-500 mt-1">Please wait a moment...</p>
+        </div>
+
+        <div class="flex gap-1 mt-2">
+            <span class="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></span>
+            <span class="w-2 h-2 bg-blue-500 rounded-full animate-bounce delay-150"></span>
+            <span class="w-2 h-2 bg-blue-500 rounded-full animate-bounce delay-300"></span>
+        </div>
+
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 <script>
+    var selectedReport = "LIPH";
+    var selectedShift = "";
+    var selectedType = 'recap';
+    var selectedShiftType = "shift";
+
     // ─── Sidebar (mobile) ─────────────────────────────────────────────────────────
     function toggleSidebar() {
         document.getElementById('sidebar').classList.toggle('open');
@@ -1316,4 +1697,121 @@
             }
         });
     });
+
+    function selectReport(el) {
+        document.querySelectorAll('.report-btn').forEach(btn => {
+            btn.classList.remove('border-violet-200', 'bg-violet-50');
+            btn.classList.add('border-slate-100', 'bg-slate-50');
+            const label = btn.querySelector('span.text-sm');
+            if (label) {
+                label.classList.remove('text-violet-700');
+                label.classList.add('text-slate-600');
+            }
+        });
+        el.classList.remove('border-slate-100', 'bg-slate-50');
+        el.classList.add('border-violet-200', 'bg-violet-50');
+        const label = el.querySelector('span.text-sm');
+        if (label) {
+            label.classList.remove('text-slate-600');
+            label.classList.add('text-violet-700');
+        }
+        selectedReport = label ? label.textContent.trim() : null;
+        console.log('Selected report:', selectedReport);
+    }
+
+    function setFilter(type, el) {
+        const btnSemua = document.getElementById('btn-semua');
+        const btnShift = document.getElementById('btn-shift');
+        const shiftSel = document.getElementById('shift-select');
+
+        [btnSemua, btnShift].forEach(btn => {
+            btn.classList.remove('border-slate-800', 'bg-slate-800', 'text-white');
+            btn.classList.add('border-slate-200', 'bg-slate-50', 'text-slate-600');
+        });
+
+        el.classList.remove('border-slate-200', 'bg-slate-50', 'text-slate-600');
+        el.classList.add('border-slate-800', 'bg-slate-800', 'text-white');
+
+        shiftSel.style.display = type === 'shift' ? 'block' : 'none';
+
+        selectedShiftType = type;
+    }
+
+    function getReport() {
+        const start_date = document.getElementById('start_date').value;
+        const end_date = document.getElementById('end_date').value;
+        const shift = document.getElementById('shift').value;
+
+        // Start Loading
+        const overlay = document.getElementById('loading-overlay');
+        overlay.style.display = 'flex';
+
+
+        axios.post('/reports', {
+            start_date: start_date,
+            end_date: end_date,
+            selectedReport: selectedReport,
+            selectedType: selectedType,
+            shift: shift,
+            shiftType: selectedShiftType
+        }, {
+            responseType: 'blob'
+        }).then((result) => {
+            const url = window.URL.createObjectURL(new Blob([result.data]));
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `LIPH_${start_date}_${end_date}.xlsx`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }).catch((err) => {
+            console.log(err);
+        }).finally(() => {
+            // Hide loading
+            overlay.style.display = 'none';
+        });;
+    }
+
+    const active = {
+        card: ['border-blue-400', 'bg-blue-50'],
+        icon: ['bg-blue-400'],
+        svg: ['text-white'],
+        title: ['text-blue-900'],
+        desc: ['text-blue-500'],
+    };
+    const inactive = {
+        card: ['border-gray-200', 'bg-white'],
+        icon: ['bg-gray-100'],
+        svg: ['text-gray-400'],
+        title: ['text-gray-800'],
+        desc: ['text-gray-400'],
+    };
+
+    function selectOption(el) {
+        document.querySelectorAll('.opt').forEach(o => {
+            o.classList.remove(...active.card);
+            o.classList.add(...inactive.card);
+            o.querySelector('.icon-box').classList.remove(...active.icon);
+            o.querySelector('.icon-box').classList.add(...inactive.icon);
+            o.querySelector('.icon-svg').classList.remove(...active.svg);
+            o.querySelector('.icon-svg').classList.add(...inactive.svg);
+            o.querySelector('.opt-title').classList.remove(...active.title);
+            o.querySelector('.opt-title').classList.add(...inactive.title);
+            o.querySelector('.opt-desc').classList.remove(...active.desc);
+            o.querySelector('.opt-desc').classList.add(...inactive.desc);
+        });
+
+        el.classList.remove(...inactive.card);
+        el.classList.add(...active.card);
+        el.querySelector('.icon-box').classList.remove(...inactive.icon);
+        el.querySelector('.icon-box').classList.add(...active.icon);
+        el.querySelector('.icon-svg').classList.remove(...inactive.svg);
+        el.querySelector('.icon-svg').classList.add(...active.svg);
+        el.querySelector('.opt-title').classList.remove(...inactive.title);
+        el.querySelector('.opt-title').classList.add(...active.title);
+        el.querySelector('.opt-desc').classList.remove(...inactive.desc);
+        el.querySelector('.opt-desc').classList.add(...active.desc);
+
+        selectedType = el.dataset.value;
+        console.log(selectedType);
+    }
 </script>

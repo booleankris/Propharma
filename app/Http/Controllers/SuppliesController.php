@@ -144,8 +144,9 @@ class SuppliesController extends Controller
                         text-transform:uppercase;
                         background-color:rgba(34,197,94,0.2);
                         color:#16a34a;
-                        padding:6px 4px;
-                        font-size:12px;
+                        padding: 6px 4px;
+                        width:100px;
+                        font-size:9px;
                         font-family: Poppins;
                         border-radius:25px;'>
                         Penjualan
@@ -157,7 +158,8 @@ class SuppliesController extends Controller
                         background-color: #d6e8ff94;
                         color: #7f8eff;
                         padding: 6px 4px;
-                        font-size: 12px;
+                        width:100px;
+                        font-size: 9px;
                         font-family: Poppins;
                         border-radius: 25px;'>
                         Pembelian
@@ -170,7 +172,8 @@ class SuppliesController extends Controller
                         background-color: rgb(255 0 0 / 17%);
                         color: #a31616;
                         padding: 6px 4px;
-                        font-size: 12px;
+                        width:100px;
+                        font-size: 9px;
                         font-family: Poppins;
                         border-radius: 25px;'>
                         Retur Jual
@@ -183,7 +186,8 @@ class SuppliesController extends Controller
                         background-color: rgb(255 177 0 / 31%);
                         color: #c17800;
                         padding: 6px 4px;
-                        font-size: 12px;
+                        width:100px;
+                        font-size: 9px;
                         font-family: Poppins;
                         border-radius: 25px;'>
                         Retur Beli
@@ -195,8 +199,9 @@ class SuppliesController extends Controller
                         text-transform: uppercase;
                         background-color: #fff035;
                         color: #7a7817;
-                        padding: 7px 6px;
-                        font-size: 10px;
+                        padding: 6px 4px;
+                        width:100px;
+                        font-size: 9px;
                         font-family: Poppins;
                         border-radius: 25px;'>
                         Stock Opname
@@ -208,8 +213,9 @@ class SuppliesController extends Controller
                         text-transform: uppercase;
                         background-color: #aeffeaad;
                         color: #238787;
-                        padding: 7px 6px;
-                        font-size: 10px;
+                        padding: 6px 4px;
+                        width:100px;
+                        font-size: 9px;
                         font-family: Poppins;
                         border-radius: 25px;'>
                         Mutasi Stok
@@ -268,7 +274,7 @@ class SuppliesController extends Controller
                         $color = $row->qty >= 0 ? '#854F0B' : '#A32D2D';
                         return "<div style='color:{$color};font-weight:600;'>{$sign}{$row->qty}</div>";
                     }
-                    // status 6 — fallback (was missing entirely)
+                    // status 6 
                     if ($row->status == 6) {
                         return "<div style='color:#185FA5;font-weight:600;'>{$row->qty}</div>";
                     }
@@ -412,8 +418,8 @@ class SuppliesController extends Controller
                         text-transform:uppercase;
                         background-color:rgba(34,197,94,0.2);
                         color:#16a34a;
-                        padding:6px 4px;
-                        font-size:12px;
+                        padding: 7px 6px;
+                        font-size:9px;
                         font-family: Poppins;
                         border-radius:25px;'>
                         Penjualan
@@ -424,8 +430,9 @@ class SuppliesController extends Controller
                         text-transform: uppercase;
                         background-color: #d6e8ff94;
                         color: #7f8eff;
-                        padding: 6px 4px;
-                        font-size: 12px;
+                        padding: 7px 6px;
+                        width:100px;
+                        font-size: 9px;
                         font-family: Poppins;
                         border-radius: 25px;'>
                         Pembelian
@@ -437,8 +444,9 @@ class SuppliesController extends Controller
                         text-transform: uppercase;
                         background-color: rgb(255 0 0 / 17%);
                         color: #a31616;
-                        padding: 6px 4px;
-                        font-size: 12px;
+                        padding: 7px 6px;
+                        width:100px;
+                        font-size: 9px;
                         font-family: Poppins;
                         border-radius: 25px;'>
                         Retur Jual
@@ -450,8 +458,9 @@ class SuppliesController extends Controller
                         text-transform: uppercase;
                         background-color: rgb(255 177 0 / 31%);
                         color: #c17800;
-                        padding: 6px 4px;
-                        font-size: 12px;
+                        padding: 7px 6px;
+                        width:100px;
+                        font-size: 9px;
                         font-family: Poppins;
                         border-radius: 25px;'>
                         Retur Beli
@@ -464,7 +473,7 @@ class SuppliesController extends Controller
                         background-color: #fff035;
                         color: #7a7817;
                         padding: 7px 6px;
-                        font-size: 10px;
+                        font-size: 9px;
                         font-family: Poppins;
                         border-radius: 25px;'>
                         Stock Opname
@@ -477,7 +486,7 @@ class SuppliesController extends Controller
                         background-color: #aeffeaad;
                         color: #238787;
                         padding: 7px 6px;
-                        font-size: 10px;
+                        font-size: 9px;
                         font-family: Poppins;
                         border-radius: 25px;'>
                         Mutasi Stok
@@ -647,8 +656,8 @@ class SuppliesController extends Controller
                         text-transform:uppercase;
                         background-color:rgba(34,197,94,0.2);
                         color:#16a34a;
-                        padding:6px 4px;
-                        font-size:12px;
+                        padding: 10px 4px;
+                        font-size:9px;
                         font-family: Poppins;
                         border-radius:25px;'>
                         Penjualan
@@ -660,7 +669,8 @@ class SuppliesController extends Controller
                         background-color: #d6e8ff94;
                         color: #7f8eff;
                         padding: 6px 4px;
-                        font-size: 12px;
+                        width:100px;
+                        font-size: 9px;
                         font-family: Poppins;
                         border-radius: 25px;'>
                         Pembelian
@@ -673,7 +683,8 @@ class SuppliesController extends Controller
                         background-color: rgb(255 0 0 / 17%);
                         color: #a31616;
                         padding: 6px 4px;
-                        font-size: 12px;
+                        width:100px;
+                        font-size: 9px;
                         font-family: Poppins;
                         border-radius: 25px;'>
                         Retur Jual
@@ -686,7 +697,8 @@ class SuppliesController extends Controller
                         background-color: rgb(255 177 0 / 31%);
                         color: #c17800;
                         padding: 6px 4px;
-                        font-size: 12px;
+                        width:100px;
+                        font-size: 9px;
                         font-family: Poppins;
                         border-radius: 25px;'>
                         Retur Beli
@@ -699,7 +711,7 @@ class SuppliesController extends Controller
                         background-color: #fff035;
                         color: #7a7817;
                         padding: 7px 6px;
-                        font-size: 10px;
+                        font-size: 9px;
                         font-family: Poppins;
                         border-radius: 25px;'>
                         Stock Opname
@@ -712,7 +724,7 @@ class SuppliesController extends Controller
                         background-color: #aeffeaad;
                         color: #238787;
                         padding: 7px 6px;
-                        font-size: 10px;
+                        font-size: 9px;
                         font-family: Poppins;
                         border-radius: 25px;'>
                         Mutasi Stok

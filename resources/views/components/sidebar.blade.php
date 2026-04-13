@@ -49,9 +49,16 @@
 
                     <li class="">
                         <a class="nav-link"
-                            href="{{ route('users.index') }}">User</a>
+                            href="{{ route('pharmacies.index') }}">Manage Apotek</a>
                     </li>
 
+
+                    <li class="">
+                        <a class="nav-link"
+                            href="{{ route('users.index') }}">Manage Pengguna Apotek</a>
+                    </li>
+
+                   
                     <li class="">
                         <a class="nav-link"
                             href="{{ route('roles.index') }}">Level User</a>

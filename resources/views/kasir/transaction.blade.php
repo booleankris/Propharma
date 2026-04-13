@@ -1565,6 +1565,8 @@
     console.log({{ $parameters }});
     var rounding = {{ $rounding }};
     var parameters = {{ $parameters }};
+    var service = @json($service) || 0;
+
     var totaltransaction = {{ $totaltransaction }};
     var transaction_type = "{{ $transaction?->transaction_type ?? 'null' }}";
 
@@ -2105,7 +2107,7 @@
         if (it.het_price != 0) {
             raw = it.het_price;
         } else {
-            raw = (+it.net_price * +parameters);
+            raw = (+it.net_price * +parameters + parseInt(service));
         }
 
         // let rounded;
@@ -2633,7 +2635,11 @@
         console.log('harganya itu adalah : ' + price2);
         total_item = val;
         roundedtotal = price2 * val - discount;
-        subtotal = Math.ceil(roundedtotal / 1000) * 1000;
+        if (currenttransaction == "KREDIT") {
+            subtotal = roundedtotal;
+        } else {
+            subtotal = Math.ceil(roundedtotal / 1000) * 1000;
+        }
         totalprice.value = formatRupiah(subtotal);
         pharmacy_price = price2 * val;
         final_price = subtotal;
@@ -2693,6 +2699,8 @@
 
     function addToCart(medicine_id, transaction_id, quantity, discount, embalase, cart_type, package, dosage_r, price2,
         raw_total, total_price, final_price, racikstatus) {
+
+        var medicine_type = currenttransaction;
         if (edit_status != 0) {
             axios.post("{{ route('transaction.updateCart') }}", {
                     id: selectedRowId,
@@ -2710,6 +2718,9 @@
                     final_price,
                     grossprice,
                     racikstatus,
+                    medicine_type,
+                    service,
+
                 })
                 .then(response => {
 
@@ -2803,6 +2814,8 @@
                 final_price,
                 grossprice,
                 racikstatus,
+                medicine_type,
+                service
 
             }).then(response => {
                 const item = response.data;
@@ -3206,7 +3219,7 @@
                 onBtnCancelResep: () => CheckoutModal.close(),
             });
 
-            hideCheckoutLoading(); 
+            hideCheckoutLoading();
 
             CheckoutModal.open(transaction_type);
 

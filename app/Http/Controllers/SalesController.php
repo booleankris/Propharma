@@ -56,6 +56,7 @@ class SalesController extends Controller
         $parameterHV          = $paymentParams->otc;
         $parameterUP          = $paymentParams->pdu;
         $parameterRT          = $paymentParams->receipt;
+        $service              = $paymentParams->embalas;
         $ChangeFakturParameters = $paymentParams->pdu;
         $ChangeFakturRounding = $paymentParams->rounding;
         $rounding             = $dbType === 'KREDIT' ? '0' : $paymentParams->rounding;
@@ -178,6 +179,7 @@ class SalesController extends Controller
             'parameterRT',
             'parameterHV',
             'parameterUP',
+            'service',
             'ChangeFakturRounding'
         ));
     }
@@ -334,6 +336,11 @@ class SalesController extends Controller
 
         return response()->json($items);
     }
+    // Transaction Type
+    // 1 = Resep Tunai
+    // 2 = UPDS
+    // 3 = HV/OTC
+    // 4 = Resep Kredit
     public function generateTransactionCode($code)
     {
         $pharmacyId = auth()->user()->pharmacy_id;
@@ -359,15 +366,10 @@ class SalesController extends Controller
         $transactionCode = $prefix . $serial;
         return $transactionCode;
     }
-    public function regenerateTransactionCode($type, $code)
+    public function regenerateTransactionCode($newTypeCode, $oldCode)
     {
-        $transactionCode = $code;
-        $newDigit = $type;
-
-        $transactionCode[4] = $newDigit;
-        return $transactionCode;
+        return $this->generateTransactionCode($newTypeCode);
     }
-
     public function searchPatients(Request $request)
     {
         $q = trim($request->get('q', ''));
@@ -540,6 +542,8 @@ class SalesController extends Controller
             'status'         => 0,
             'recipe_status'  => $recipeStatus,
             'recipe_number'  => $recipeNumber,
+            'medicine_type'  => $request->get('medicine_type'),
+            'service_fee'    => $request->get('service'),
 
 
 

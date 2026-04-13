@@ -8,6 +8,7 @@ use App\Models\MedicineTransactions;
 use App\Models\OrderItems;
 use App\Models\Reject;
 use App\Models\Sales;
+use App\Models\Shifts;
 use App\Models\TicketTransaction;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -56,8 +57,10 @@ class HomeController extends Controller
         $total_sales_rp = formatRupiah($total_sales);
         $total_orders_rp = formatRupiah($total_orders);
         $total_reject_rp = formatRupiah($total_reject);
+        
+        // Reports
 
-        return view('kasir.home', compact('totalproduct', 'totaltransaction', 'qty_sales' ,'items', 'cart_status', 'cart_total', 'cart_subtotal', 'total_sales_rp', 'total_orders_rp', 'total_reject_rp'));
+        return view('kasir.home', compact('totalproduct', 'totaltransaction','qty_sales' ,'items', 'cart_status', 'cart_total', 'cart_subtotal', 'total_sales_rp', 'total_orders_rp', 'total_reject_rp'));
     }
     public function profile($edit = null)
     {

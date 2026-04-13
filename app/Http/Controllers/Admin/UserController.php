@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Pharmacies;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
@@ -29,7 +30,7 @@ class UserController extends Controller
     public function index(Request $request)
     {
         if ($request->ajax()) {
-            $users = User::select(['id', 'email', 'name',  'is_fixed']);
+            $users = User::select(['id', 'pharmacy_id', 'email', 'name',  'is_fixed']);
             if ($request->has('order') == false) {
                 $users = $users->orderBy('is_fixed', 'DESC')
                     ->orderBy('name', 'ASC');
@@ -46,14 +47,23 @@ class UserController extends Controller
                         $query->where('email', 'like', "%{$request->get('email')}%");
                     }
                 })
+                ->addColumn('pharmacy', function ($user) {
+                    return $user->pharmacy
+                        ? '<span class="badge badge-outline-info px-2 py-1">'
+                        . ucfirst($user->pharmacy->name) .
+                        '</span>'
+                        : '-';
+                })
                 ->addColumn('roles', function ($user) {
-                    $roles = ' ';
-                    if (!empty($user->getRoleNames())):
-                        foreach ($user->getRoleNames() as $role) {
-                            $roles .= '<label class="badge badge-primary">' . ucfirst($role) . '</label>';
-                        }
-                    endif;
-                    return $roles;
+                    $roles = '';
+
+                    foreach ($user->getRoleNames() as $role) {
+                        $roles .= '<span class="badge badge-primary mr-1">'
+                            . ucfirst($role) .
+                            '</span>';
+                    }
+
+                    return $roles ?: '-';
                 })
                 ->addColumn('action', function ($user) {
                     $button = '<div class="btn-toolbar" role="toolbar">
@@ -74,8 +84,7 @@ class UserController extends Controller
                     $button .= '</div>';
                     return $button;
                 })
-                ->escapeColumns(['roles, action'])
-                ->toJson();
+                ->rawColumns(['roles', 'action', 'pharmacy'])->toJson();
         }
 
         return view('admin.users.index');
@@ -84,18 +93,20 @@ class UserController extends Controller
     public function create()
     {
         $roles = Role::pluck('name', 'name')->all();
+        $pharmacies = Pharmacies::pluck('name', 'id')->all();
 
-        return view('admin.users.create', compact('roles'));
+        return view('admin.users.create', compact('roles', 'pharmacies'));
     }
 
     public function store(Request $request)
     {
 
-        $this->validate($request, [
-            'name'      => 'required|string|min:3|max:255',
-            'email'     => 'required|email|unique:users,email',
-            'password'  => 'required|min:6|same:confirm-password',
-            'roles'    => 'required'
+        $validate = $this->validate($request, [
+            'name'        => 'required|string|min:3|max:255',
+            'email'       => 'required|email|unique:users,email',
+            'pharmacy_id' => 'required|exists:pharmacies,id',
+            'password'    => 'required|min:6|same:confirm-password',
+            'roles'       => 'required'
         ]);
 
         $input = $request->all();
@@ -160,9 +171,18 @@ class UserController extends Controller
     {
         $user = User::findOrFail($id);
 
-        if ($user->fixed != 1) {
-            // $user->delete();
-            return response()->json(['status' => true, 'message' => 'Administrator Berhasil dihapus!!']);
+        if ($user->is_fixed != 1) {
+            $user->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Administrator berhasil dihapus'
+            ]);
         }
+
+        return response()->json([
+            'success' => false,
+            'message' => 'User ini tidak bisa dihapus'
+        ], 403);
     }
 }

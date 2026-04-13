@@ -14,6 +14,7 @@ use App\Http\Controllers\Admin\SquadOffcicialController;
 use App\Http\Controllers\Admin\TeamsController;
 use App\Http\Controllers\Admin\MatchDayController;
 use App\Http\Controllers\Admin\MatchController;
+use App\Http\Controllers\Admin\PharmacyController;
 use App\Http\Controllers\Admin\ScanningController;
 use App\Http\Controllers\Admin\TicketController;
 use App\Http\Controllers\Master\CreditorsController;
@@ -44,6 +45,7 @@ use App\Http\Controllers\ProductController;
 use App\Http\Controllers\RejectController;
 use App\Http\Controllers\ReportsController;
 use App\Http\Controllers\ReturController;
+use App\Http\Controllers\Sales\ReturDataController;
 use App\Http\Controllers\Sales\SalesDataController;
 use App\Http\Controllers\SalesController;
 use App\Http\Controllers\SuppliesController;
@@ -102,6 +104,7 @@ Route::middleware(['auth', 'role:administrator'])->group(function () {
         'show',
         'edit'
     ]]);
+
     // Route::get('')
     Route::resource('teams.squadofficials', SquadOffcicialController::class);
     Route::resource('teams.squadmembers', SquadMembersController::class);
@@ -110,7 +113,7 @@ Route::middleware(['auth', 'role:administrator'])->group(function () {
     Route::get('downloadteam/', [TeamsController::class, 'downloadteam'])->name('allteam.download');
     Route::resource('roles', RolesController::class);
     Route::resource('adminitems', AdminItemController::class);
-
+    Route::resource('pharmacies', PharmacyController::class);
     Route::resource('teams', TeamsController::class);
     Route::resource('matchday', MatchDayController::class);
     Route::resource('matchday.matches', MatchController::class);
@@ -210,6 +213,7 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     Route::get('/sales/transaction/{id}/items', [SalesDataController::class, 'transactionItems']);
 
 
+
     // Sales Reject
     Route::get('/reject', [RejectController::class, 'reject'])->name('sales.reject');
     Route::get('/getreject', [RejectController::class, 'getReject'])->name('sales.getreject');
@@ -223,6 +227,7 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     Route::get('/salesdata/returdata', [ReturController::class, 'returdata'])->name('returdata.returdata');
     Route::get('/salesdata/getreturmedicine', [ReturController::class, 'getReturMedicines'])->name('returdata.medicines');
     Route::get('retur/batches', [ReturController::class, 'getBatchesByMedicine'])->name('returdata.batches');
+    Route::get('/data/retur', [ReturDataController::class, 'index'])->name('returdata.index');
 
     // Orders Retur
     Route::get('/returorder', [ReturController::class, 'returOrders'])->name('returdata.returorders');
@@ -274,6 +279,10 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     Route::get('/reports/medicines', [ReportsController::class, 'medicines'])->name('reports.medicines');
     Route::get('/reports/doctors', [ReportsController::class, 'doctors'])->name('reports.doctors');
     Route::get('/reports/patients', [ReportsController::class, 'patients'])->name('reports.patients');
+
+    Route::post('/reports', [ReportsController::class, 'reports'])->name('reports');
+
+
 
     // Patient Export
     Route::post('/reports/export/patients', [ReportsController::class, 'exportPatients'])
