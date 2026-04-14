@@ -1634,9 +1634,6 @@
 
     </div>
 </div>
-<span id="qzStatus" class="badge bg-secondary">
-    🖨️ Printer: Checking...
-</span>
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 <script>
     var selectedReport = "LIPH";
