@@ -286,6 +286,8 @@
                                     <option value="">-- Pilih Pembayaran --</option>
                                     <option value="KREDIT">Kredit</option>
                                     <option value="TUNAI">Tunai</option>
+                                    <option value="KONSINYASI">Konsinyasi</option>
+
                                 </select>
                             </div>
 

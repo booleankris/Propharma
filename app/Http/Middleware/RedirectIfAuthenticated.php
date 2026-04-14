@@ -25,11 +25,11 @@ class RedirectIfAuthenticated
                 }
 
                 if ($user->hasRole('Kasir')) {
-                    return redirect()->route('homekasir');
+                    return redirect()->route('kasir');
                 }
-                if ($user->hasRole('APJ')) {
-                    return redirect()->route('homeapj');
-                }
+                // if ($user->hasRole('APJ')) {
+                //     return redirect()->route('homeapj');
+                // }
 
                 return redirect('/'); // fallback
             }
