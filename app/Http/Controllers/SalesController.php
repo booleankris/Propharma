@@ -734,40 +734,43 @@ class SalesController extends Controller
             'bank_name'        => 'nullable|string',
             'user_id'          => 'nullable|integer|exists:users,id',
             'shift_logs_id'    => 'nullable|integer|exists:shift_logs,id',
-
         ]);
 
         DB::beginTransaction();
         try {
-            // Idempotency
             $transaction = MedicineTransactions::findOrFail($validated['transaction_id']);
 
+            // ── Idempotency ──────────────────────────────────────────
             if ($transaction->status === 1) {
                 DB::rollBack();
+            
+                $transaction->load('transactions.medicine', 'patients', 'doctors');
+            
                 return response()->json([
-                    'success'   => true,
-                    'print_url' => route('sales.print', $transaction->id),
+                    'success'          => true,
+                    'print_url'        => route('sales.print', $transaction->id),
+                    'print_resep_url'  => route('salesrecipe.print', $transaction->id),
+                    'commands'         => $this->buildEscPos($transaction),
                 ]);
             }
-            $transaction->update([
-                'status'               => 1,
-                'paid'                 => $validated['paid'],
-                'discount'             => $validated['discounsubtotal'],
-                'subtotal'             => $validated['totaltransaction'],
-                'changes'              => $validated['changes'],
-                'patient_id'           => $validated['patient_id'],
-                'doctor_id'            => $validated['doctor_id'],
-                'debtor_id'            => $validated['debtor_id'],
-                'payment_method'       => $validated['paymentType'],
-                'transfer_bank_name'   => $validated['bank_name'],
-                'user_id'              => $validated['user_id'],
-                'shift_logs_id'        => $validated['shift_logs_id'],
 
+            $transaction->update([
+                'status'             => 1,
+                'paid'               => $validated['paid'],
+                'discount'           => $validated['discounsubtotal'],
+                'subtotal'           => $validated['totaltransaction'],
+                'changes'            => $validated['changes'],
+                'patient_id'         => $validated['patient_id'],
+                'doctor_id'          => $validated['doctor_id'],
+                'debtor_id'          => $validated['debtor_id'],
+                'payment_method'     => $validated['paymentType'],
+                'transfer_bank_name' => $validated['bank_name'],
+                'user_id'            => $validated['user_id'],
+                'shift_logs_id'      => $validated['shift_logs_id'],
             ]);
 
             MedicineCart::where('transaction_id', $validated['transaction_id'])
                 ->update(['status' => 1]);
-
 
             $txWithItems = MedicineTransactions::with('transactions.medicine')
                 ->findOrFail($validated['transaction_id']);
@@ -779,11 +782,13 @@ class SalesController extends Controller
                 $qty_before  = $medicine->stock;
                 $medicine_id = $medicine->id;
                 $qty_bought  = $cart->quantity;
+
                 \Log::info('Sale debug', [
-                    'medicine_id' => $medicine_id,
+                    'medicine_id'   => $medicine_id,
                     'medicine_name' => $medicine->name,
-                    'qty_bought' => $qty_bought,
+                    'qty_bought'    => $qty_bought,
                 ]);
+
                 while ($qty_bought > 0) {
                     $transfer = MedicineTransfers::join('batches', 'medicine_transfers.batches_id', '=', 'batches.id')
                         ->where('batches.medicine_id', $medicine_id)
@@ -816,19 +821,15 @@ class SalesController extends Controller
                         $transfer->save();
                         $qty_bought = 0;
                     } else {
-                        $qty_bought -= $transfer->stock;
-                        $transfer->stock = 0;
+                        $qty_bought      -= $transfer->stock;
+                        $transfer->stock  = 0;
                         $transfer->save();
                     }
                 }
 
-
-                // Reduce medicine total stock
                 $medicine->stock -= $cart->quantity;
                 $medicine->save();
 
-                // Log The Stock
-                // Sales status = 1 
                 ItemsLog::create([
                     'transaction_code' => $txWithItems->transaction_code,
                     'code'             => $this->generateItemsLogCode(),
@@ -841,19 +842,21 @@ class SalesController extends Controller
                     'date'             => $now,
                     'status'           => 1,
                     'batches_id'       => $transfer->batches_id,
-
                 ]);
             }
 
             DB::commit();
 
+            // Load relations needed for receipt
+            $txWithItems->load('patients', 'doctors');
+
             return response()->json([
-                'success'        => true,
-                'print_url'      => route('sales.print', $transaction->id),
-                'print_resep_url' => route('salesrecipe.print', $transaction->id),
+                'success'          => true,
+                'print_url'        => route('sales.print', $transaction->id),
+                'print_resep_url'  => route('salesrecipe.print', $transaction->id),
+                'commands'         => $this->buildEscPos($txWithItems),
             ]);
         } catch (ModelNotFoundException $e) {
-            // 7. Specific catch for 404 — don't leak internal model names
             DB::rollBack();
             return response()->json([
                 'success' => false,
@@ -866,14 +869,98 @@ class SalesController extends Controller
                 'error'          => $e->getMessage(),
                 'trace'          => $e->getTraceAsString(),
             ]);
-
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
             ], 500);
         }
     }
+    private function buildEscPos(MedicineTransactions $tx): array
+    {
+        $width = 32; // 58mm paper = 32 chars
+        $cmds  = [];
 
+        $cmds[] = "\x1B\x40";
+
+        $cmds[] = "\x1B\x61\x01";          // center
+        $cmds[] = "\x1B\x45\x01";          // bold on
+        $cmds[] = "\x1B\x21\x30";          // double size
+        $cmds[] = "APOTEK SAHABAT\n";
+        $cmds[] = "\x1B\x21\x00";          // normal size
+        $cmds[] = "\x1B\x45\x00";          // bold off
+        $cmds[] = "Jl. Palang Merah Ind No.16 A-B-C\n";
+        $cmds[] = "Telp: 081257586688\n";
+        $cmds[] = "SAMARINDA\n";
+
+        $cmds[] = str_repeat('-', $width) . "\n";
+
+        $cmds[] = "\x1B\x61\x00";          // left
+        $cmds[] = "Bukti Pembayaran\n";
+        $cmds[] = $tx->updated_at->format('d/m/Y H:i:s') . "\n";
+        $cmds[] = "\n";
+        $cmds[] = "Nama   : " . ($tx->patients->name    ?? '-') . "\n";
+        $cmds[] = "Alamat : " . ($tx->patients->address ?? '-') . "\n";
+
+        $cmds[] = str_repeat('-', $width) . "\n";
+        $cmds[] = "Nama Dokter : " . ($tx->doctors->name ?? '-') . "\n";
+        $cmds[] = str_repeat('-', $width) . "\n";
+
+        // ── Items ────────────────────────────────────────────────────
+        foreach ($tx->transactions as $cart) {
+            $cmds[] = mb_substr($cart->medicine->name, 0, $width) . "\n";
+
+            $left  = str_pad(
+                $cart->quantity . ' x ' . number_format($cart->item_price, 0, ',', '.'),
+                $width - 12
+            );
+            $right = str_pad(
+                number_format($cart->raw_total, 0, ',', '.'),
+                12,
+                ' ',
+                STR_PAD_LEFT
+            );
+            $cmds[] = $left . $right . "\n";
+        }
+
+        $cmds[] = str_repeat('-', $width) . "\n";
+
+        // ── Totals ───────────────────────────────────────────────────
+        $row = fn($label, $value) =>
+        str_pad($label, $width - 12) .
+            str_pad(number_format($value, 0, ',', '.'), 12, ' ', STR_PAD_LEFT) . "\n";
+
+        // Sub Total
+        $totalRawTotal  = $tx->transactions->sum('raw_total');
+        $totaldiscount  = $tx->discount ?? 0;
+        $payment        = $totalRawTotal - $totaldiscount;
+
+        $cmds[] = $row('Sub Total', $totalRawTotal);
+        $cmds[] = $row('Discount', -$totaldiscount);
+
+        // Bold total
+        $cmds[] = "\x1B\x45\x01";
+        $cmds[] = $row('Jumlah', $payment);
+        $cmds[] = "\x1B\x45\x00";
+
+        $cmds[] = $row('Bayar',     $tx->paid);
+        $cmds[] = $row('Kembalian', $tx->changes);
+
+        // ── Kasir ────────────────────────────────────────────────────
+        $cmds[] = str_repeat('-', $width) . "\n";
+        $cmds[] = "Kasir : " . auth()->user()->name . "\n";
+        $cmds[] = str_repeat('-', $width) . "\n";
+
+        // ── Footer ───────────────────────────────────────────────────
+        $cmds[] = "\x1B\x61\x01";          // center
+        $cmds[] = "Terima Kasih\n";
+        $cmds[] = "Semoga Lekas Sembuh\n";
+        $cmds[] = "\n\n\n";
+
+        // ── Cut ──────────────────────────────────────────────────────
+        $cmds[] = "\x1D\x56\x00";
+
+        return $cmds;
+    }
     public function getTransactionItem(Request $request)
     {
         $transaction = MedicineCart::with('medicine', 'transactions', 'user')->where('transaction_id', $request->get('transaction_id'))->first();

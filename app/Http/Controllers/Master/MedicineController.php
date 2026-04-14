@@ -82,6 +82,10 @@ class MedicineController extends Controller
             'status'               => 'nullable|boolean',
         ]);
 
+        // Handle checkbox: if checked, set content to 1, otherwise use the input value
+        $contentValue = $request->has('is_active') ? ($request->input('content') ?: null) : 1;
+
+        // Insert the new medicine record
         $insert = Medicines::create([
             'code'                 => Medicines::generateCode(),
             'barcode'              => $request->barcode,
@@ -94,7 +98,7 @@ class MedicineController extends Controller
             'name'                 => $request->name,
             'packaging'            => $request->packaging,
             'unit'                 => $request->unit,
-            'content'              => $request->content,
+            'content'              => $contentValue,  // Store content value (either 1 or user input)
             'dosage'               => $request->dosage,
             'raw_price'            => $request->raw_price,
             'pharmacy_net_price'   => $request->pharmacy_net_price,
@@ -130,6 +134,7 @@ class MedicineController extends Controller
      */
     public function update(Request $request, $id)
     {
+        // Validation rules
         $request->validate([
             'generic'              => 'nullable|string|max:255',
             'pharmacy_id'          => 'required|integer',
@@ -155,8 +160,13 @@ class MedicineController extends Controller
             'status'               => 'nullable|boolean',
         ]);
 
+        // Find the existing medicine record
         $medicine = Medicines::findOrFail($id);
 
+        // Check if checkbox is checked, if so, set content to 1, otherwise use the input value
+        $contentValue = $request->has('is_active') ? ($request->input('content') ?: null) : 1;
+
+        // Update the medicine record
         $medicine->update([
             'barcode'              => $request->barcode,
             'generic'              => $request->generic,
@@ -168,7 +178,7 @@ class MedicineController extends Controller
             'name'                 => $request->name,
             'packaging'            => $request->packaging,
             'unit'                 => $request->unit,
-            'content'              => $request->content,
+            'content'              => $contentValue,  // Store the content value (either 1 or user input)
             'dosage'               => $request->dosage,
             'raw_price'            => $request->raw_price,
             'pharmacy_net_price'   => $request->pharmacy_net_price,
@@ -177,7 +187,6 @@ class MedicineController extends Controller
             'minimal_stock'        => $request->minimal_stock,
             'stock'                => $request->stock ?? 0,
             'psychotropic'         => $request->boolean('psychotropic') ? 1 : 0,
-            // FIX: was incorrectly storing boolean for preparations (a text field)
             'preparations'         => $request->preparations,
             'whole'                => $request->boolean('whole') ? 1 : 0,
             'precursor'            => $request->boolean('precursor') ? 1 : 0,
@@ -188,7 +197,7 @@ class MedicineController extends Controller
             'status'               => 1,
         ]);
 
-        // FIX: was calling findOrFail + update twice (duplicate). Now sync creditors cleanly.
+        // Sync creditors (if applicable)
         $codes = array_filter(array_map('trim', explode(',', $request->get('creditor_ids', ''))));
         $medicine->creditors()->sync($codes);
 

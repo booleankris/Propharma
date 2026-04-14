@@ -88,11 +88,11 @@ class DebtorsController extends Controller
         $debtor = Debtors::create([
             'code'    => $code,
             'name'    => $validated['name'],
-            'address' => $validated['address'] ?? null,
-            'city'    => $validated['city'] ?? null,
-            'phone'   => $validated['phone'] ?? null,
-            'contact' => $validated['contact'] ?? null,
-            'email'   => $validated['email'] ?? null,
+            'address' => $validated['address'] ?? '-',
+            'city'    => $validated['city'] ?? '-',
+            'phone'   => $validated['phone'] ?? '-',
+            'contact' => $validated['contact'] ?? '-',
+            'email'   => $validated['email'] ?? '-',
             'status'  => $request->status ?? 0,
         ]);
 
@@ -127,11 +127,11 @@ class DebtorsController extends Controller
 
         $debtor->update([
             'name'    => $validated['name'],
-            'address' => $validated['address'] ?? null,
-            'city'    => $validated['city'] ?? null,
-            'phone'   => $validated['phone'] ?? null,
-            'contact' => $validated['contact'] ?? null,
-            'email'   => $validated['email'] ?? null,
+            'address' => $validated['address'] ?? '-',
+            'city'    => $validated['city'] ?? '-',
+            'phone'   => $validated['phone'] ?? '-',
+            'contact' => $validated['contact'] ?? '-',
+            'email'   => $validated['email'] ?? '-',
             'status'  => $request->status ?? 0,
         ]);
 

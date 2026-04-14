@@ -46,9 +46,9 @@
                         </div>
     
                         <div class="form-group row">
-                            <label for="email" class="col-sm-3 col-form-label">Email</label>
+                            <label for="username" class="col-sm-3 col-form-label">Username</label>
                             <div class="col-sm-9">
-                                {!! Form::text('email', null, array('id' => 'email', 'placeholder' => 'Email', 'class' => 'form-control', 'required')) !!}
+                                {!! Form::text('username', null, array('id' => 'username', 'placeholder' => 'Username', 'class' => 'form-control', 'required')) !!}
                             </div>
                         </div>
     

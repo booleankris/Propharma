@@ -157,6 +157,7 @@
                                 <th>Kode Transaksi</th>
                                 <th>Pasien</th>
                                 <th>Obat</th>
+                                <th>Jenis</th>
                                 <th class="col-right">Total Retur</th>
                                 <th class="col-right">Total</th>
                             </tr>
@@ -218,6 +219,9 @@
                     },
                     {
                         data: 'medicine_name'
+                    },
+                    {
+                        data: 'jenis'
                     },
                     {
                         data: 'qty_retur',

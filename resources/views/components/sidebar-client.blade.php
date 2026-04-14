@@ -493,7 +493,10 @@
                 </svg>
             </div>
             <div>
-                <div class="brand-name">Dashboard</div>
+                @php
+                    $pharmacy = \App\Models\Pharmacies::where('id', auth()->user()->pharmacy_id)->first();
+                @endphp
+                <div class="brand-name font-poppins">{{ $pharmacy->name }}</div>
                 <div class="brand-sub"></div>
             </div>
         </div>
@@ -1631,6 +1634,9 @@
 
     </div>
 </div>
+<span id="qzStatus" class="badge bg-secondary">
+    🖨️ Printer: Checking...
+</span>
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 <script>
     var selectedReport = "LIPH";

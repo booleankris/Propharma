@@ -30,7 +30,7 @@ class UserController extends Controller
     public function index(Request $request)
     {
         if ($request->ajax()) {
-            $users = User::select(['id', 'pharmacy_id', 'email', 'name',  'is_fixed']);
+            $users = User::select(['id', 'pharmacy_id', 'username', 'name',  'is_fixed']);
             if ($request->has('order') == false) {
                 $users = $users->orderBy('is_fixed', 'DESC')
                     ->orderBy('name', 'ASC');
@@ -43,8 +43,8 @@ class UserController extends Controller
                         $query->where('name', 'like', "%{$request->get('name')}%");
                     }
 
-                    if ($request->has('email')) {
-                        $query->where('email', 'like', "%{$request->get('email')}%");
+                    if ($request->has('username')) {
+                        $query->where('username', 'like', "%{$request->get('username')}%");
                     }
                 })
                 ->addColumn('pharmacy', function ($user) {
@@ -103,7 +103,7 @@ class UserController extends Controller
 
         $validate = $this->validate($request, [
             'name'        => 'required|string|min:3|max:255',
-            'email'       => 'required|email|unique:users,email',
+            'username'    => 'required|string|min:3|max:255',
             'pharmacy_id' => 'required|exists:pharmacies,id',
             'password'    => 'required|min:6|same:confirm-password',
             'roles'       => 'required'
@@ -143,7 +143,7 @@ class UserController extends Controller
     {
         $this->validate($request, [
             'name'      => 'required',
-            'email'     => 'required|email|unique:users,email,' . $id,
+            'username'     => 'required',
             'password'  => 'same:confirm-password',
             'roles'     => 'required'
         ]);

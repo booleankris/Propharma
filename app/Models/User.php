@@ -21,7 +21,7 @@ class User extends Authenticatable
     protected $fillable = [
         'pharmacy_id',
         'name',
-        'email',
+        'username',
         'password',
         'is_fixed'
     ];

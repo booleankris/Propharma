@@ -36,8 +36,8 @@
                                         <input type="text" class="form-control" id="name" autocomplete="off">
                                     </div>
                                     <div class="form-group col-md-6 mb-0">
-                                        <label for="email">Cari Email</label>
-                                        <input type="text" class="form-control" id="email" autocomplete="off">
+                                        <label for="username">Cari Username</label>
+                                        <input type="text" class="form-control" id="username" autocomplete="off">
                                     </div>
                                 </div>
                             </div>
@@ -64,7 +64,7 @@
                                         <tr>
                                             <th width="5%">#</th>
                                             <th>Nama</th>
-                                            <th>Email</th>
+                                            <th>Username</th>
                                             <th width="15%">Apotek</th>
                                             <th width="15%">Level</th>
                                             <th width="20%">&nbsp;</th>
@@ -108,7 +108,7 @@
                     url: '{{ route('users.index') }}',
                     data: function(f) {
                         f.name = $('#name').val();
-                        f.email = $('#email').val();
+                        f.username = $('#username').val();
                     }
                 },
                 order: [],
@@ -122,8 +122,8 @@
                         name: 'name'
                     },
                     {
-                        data: 'email',
-                        name: 'email'
+                        data: 'username',
+                        name: 'username'
                     },
                     {
                         data: 'pharmacy',
@@ -152,7 +152,7 @@
             $('#reset-form').on('click', function(e) {
                 e.preventDefault();
                 $('#name').val('');
-                $('#email').val('');
+                $('#username').val('');
                 tableData.draw();
             })
         });

@@ -10,6 +10,12 @@ use Illuminate\Foundation\Auth\AuthenticatesUsers;
 class LoginController extends Controller
 {
     use AuthenticatesUsers;
+
+    public function username()
+    {
+        return 'username';
+    }
+
     protected function authenticated(Request $request, $user)
     {
         if ($user->hasRole('administrator') || $user->hasRole('Manager')) {
@@ -20,7 +26,6 @@ class LoginController extends Controller
         }
         return redirect('/');
     }
-
 
     public function __construct()
     {

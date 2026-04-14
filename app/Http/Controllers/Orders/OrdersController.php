@@ -73,12 +73,12 @@ class OrdersController extends Controller
     }
     public function createOrder(Request $request)
     {
-
         $now = Carbon::now()->format('d/m/Y');
         $check_transaction = Order::where('pharmacy_id', Auth()->user()->pharmacy_id)
             ->where('status', '0')->first();
 
         if ($check_transaction) {
+
             $last = Order::where('pharmacy_id', Auth()->user()->pharmacy_id)
                 ->where('status', '0')
                 ->first();
@@ -95,8 +95,8 @@ class OrdersController extends Controller
             $year   = now()->format('y');
             $month  = now()->format('m');
             $prefix = $year . $month . 'OR';
-            $last = Order::where('pharmacy_id', Auth()->user()->pharmacy_id)
-                ->where('code', 'like', $prefix . '%')
+
+            $last = Order::where('code', 'like', $prefix . '%')
                 ->orderBy('code', 'desc')
                 ->first();
 
@@ -110,6 +110,7 @@ class OrdersController extends Controller
             $serial = str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
 
             $transactionCode = $prefix . $serial;
+
             try {
                 DB::beginTransaction();
 
@@ -120,7 +121,6 @@ class OrdersController extends Controller
                     'date'              => $now,
                     'status'            => 0,
                 ]);
-
                 DB::commit();
                 return redirect()->back()->with('message', "Berhasil Menyimpan! ");
             } catch (\Exception $e) {
@@ -385,7 +385,7 @@ class OrdersController extends Controller
             DB::commit();
 
             return response()->json([
-                'status' => 'success', 
+                'status' => 'success',
                 'message' => 'Pemesanan Berhasil!',
                 'redirect' => route('receiving.index')
             ]);

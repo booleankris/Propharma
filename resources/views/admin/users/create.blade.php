@@ -58,11 +58,11 @@
                             </div>
 
                             <div class="form-group row">
-                                <label for="email" class="col-sm-3 col-form-label">Email</label>
+                                <label for="username" class="col-sm-3 col-form-label">Username</label>
                                 <div class="col-sm-9">
-                                    {!! Form::text('email', null, [
-                                        'id' => 'email',
-                                        'placeholder' => 'Email',
+                                    {!! Form::text('username', null, [
+                                        'id' => 'username',
+                                        'placeholder' => 'Username',
                                         'class' => 'form-control',
                                         'required',
                                     ]) !!}

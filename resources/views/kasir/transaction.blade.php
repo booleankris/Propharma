@@ -1486,8 +1486,16 @@
 
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 <script src="{{ asset('templates/library/izitoast/dist/js/iziToast.min.js') }}"></script>
+<script src="https://cdn.jsdelivr.net/npm/qz-tray@2.2.4/qz-tray.js"></script>
 
 <script>
+    window.QZ = {
+        async connect() {
+            if (!qz.websocket.isActive()) {
+                await qz.websocket.connect();
+            }
+        }
+    };
     // WHEN PAGE LOADED
     let page = 1;
     let loading = false;
@@ -3124,6 +3132,114 @@
     }
 
     // ======================== Checkout & Invoice ========================
+    const Printer = (() => {
+        let connected = false;
+
+        // ── Run ONCE at module init, before any connect() ──────────────
+        function setupSecurity() {
+            qz.security.setCertificatePromise(function(resolve, reject) {
+                fetch('/qz-certificate.txt', {
+                        cache: 'no-store'
+                    })
+                    .then(r => r.ok ? r.text() : Promise.reject('Certificate not found'))
+                    .then(resolve)
+                    .catch(reject);
+            });
+
+            qz.security.setSignatureAlgorithm('SHA512');
+            qz.security.setSignaturePromise(function(toSign) {
+                return function(resolve, reject) {
+                    fetch('/qz/sign', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector(
+                                    'meta[name="csrf-token"]')?.content ?? '',
+                            },
+                            body: JSON.stringify({
+                                data: toSign
+                            }),
+                        })
+                        .then(r => r.json())
+                        .then(d => d.signature ? resolve(d.signature) : reject('Signing failed'))
+                        .catch(reject);
+                };
+            });
+        }
+
+        // Call once immediately when the module loads
+        if (typeof qz !== 'undefined') {
+            setupSecurity(); // ← moved here
+        }
+
+        async function connect() {
+            if (connected) return;
+            // setupSecurity() no longer called here
+            await qz.websocket.connect();
+            connected = true;
+            qz.websocket.setClosedCallbacks(() => {
+                connected = false;
+            });
+        }
+
+        async function print(commands) {
+            await connect();
+            const config = qz.configs.create('EPSON TM-U220', {
+                encoding: 'Cp866',
+                copies: 1,
+            });
+            await qz.print(config, commands);
+        }
+
+        async function printReceipt(commands, fallbackUrl) {
+            if (typeof qz === 'undefined') {
+                window.open(fallbackUrl, '_blank');
+                return;
+            }
+            try {
+                await print(commands);
+                iziToast.success({
+                    title: 'Berhasil',
+                    message: 'Struk berhasil dicetak',
+                    position: 'topRight'
+                });
+            } catch (err) {
+                console.warn('QZ Tray gagal, fallback browser:', err);
+                iziToast.warning({
+                    title: 'QZ Tray Gagal',
+                    message: 'Mencetak via browser...',
+                    position: 'topRight'
+                });
+                window.open(fallbackUrl, '_blank');
+            }
+        }
+
+        return {
+            print,
+            printReceipt,
+            connect
+        };
+    })();
+
+    // ── QZ Tray Status on page load ───────────────────────────────
+    document.addEventListener('DOMContentLoaded', async () => {
+        const badge = document.getElementById('qzStatus');
+        if (!badge) return;
+
+        if (typeof qz === 'undefined') {
+            badge.className = 'badge bg-danger';
+            badge.textContent = '🖨️ QZ Tray: Not Installed';
+            return;
+        }
+        try {
+            await Printer.connect();
+            badge.className = 'badge bg-success';
+            badge.textContent = '🖨️ Printer: Ready';
+        } catch (e) {
+            badge.className = 'badge bg-warning';
+            badge.textContent = '🖨️ QZ Tray: Not Running';
+        }
+    });
 
     function checkoutItem() {
         const paid = document.getElementById('pay').value;
@@ -3223,44 +3339,59 @@
 
             CheckoutModal.open(transaction_type);
 
-            function doCheckout(printMode) {
+            async function doCheckout(printMode) {
                 CheckoutModal.close();
 
                 const cleanPaid = cleanRupiah(document.getElementById('pay').value);
                 const cleanChanges = cleanRupiah(document.getElementById('trchange').value);
                 const discounsubtotal = document.getElementById('discounsubtotal').value;
-                const bank_name = bank_name_input ? bank_name_input.value || null : null;;
+                const bank_name = bank_name_input ? bank_name_input.value || null : null;
 
                 document.getElementById('paid').value = cleanPaid;
                 document.getElementById('changes').value = cleanChanges;
                 document.getElementById('transaction_id').value = transaction_id;
 
-                axios.post("{{ route('transaction.checkout') }}", {
-                    transaction_id,
-                    paid: cleanPaid,
-                    discounsubtotal,
-                    totaltransaction,
-                    changes: cleanChanges,
-                    doctor_id,
-                    debtor_id,
-                    patient_id,
-                    print_receipt: printMode !== 'none' ? 1 : 0,
-                    paymentType,
-                    bank_name,
-                    user_id,
-                    shift_logs_id,
-                }).then(res => {
-                    if (res.data.success) {
-                        if (printMode === 'pelanggan') {
-                            window.open(res.data.print_url, '_blank');
+                try {
+                    const res = await axios.post("{{ route('transaction.checkout') }}", {
+                        transaction_id,
+                        paid: cleanPaid,
+                        discounsubtotal,
+                        totaltransaction,
+                        changes: cleanChanges,
+                        doctor_id,
+                        debtor_id,
+                        patient_id,
+                        print_receipt: printMode !== 'none' ? 1 : 0,
+                        paymentType,
+                        bank_name,
+                        user_id,
+                        shift_logs_id,
+                    });
 
-                        } else if (printMode === 'pelanggan_resep') {
-                            window.open(res.data.print_url, '_blank');
-                            window.location.href = res.data.print_resep_url;
+                    if (res.data.success) {
+
+                        // ── pelanggan: print receipt only ─────────────────
+                        if (printMode === 'pelanggan') {
+                            await Printer.printReceipt(
+                                res.data.commands,
+                                res.data.print_url // fallback if QZ fails
+                            );
                         }
+
+                        // ── pelanggan_resep: print receipt + open resep ───
+                        else if (printMode === 'pelanggan_resep') {
+                            await Printer.printReceipt(
+                                res.data.commands,
+                                res.data.print_url // fallback if QZ fails
+                            );
+                            // Resep still opens in browser (not a receipt)
+                            window.open(res.data.print_resep_url, '_blank');
+                        }
+
                         setTimeout(() => window.location.reload(), 300);
                     }
-                }).catch(err => {
+
+                } catch (err) {
                     hideCheckoutLoading();
                     console.error(err);
                     iziToast.error({
@@ -3268,7 +3399,7 @@
                         message: 'Gagal menyimpan transaksi',
                         position: 'topRight'
                     });
-                });
+                }
             }
 
         }).catch(error => {

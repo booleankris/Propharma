@@ -35,7 +35,8 @@ class SalesDataController extends Controller
                 MAX(created_at) as created_at,
                 SUM(final_price) as final_price
             ')
-                ->groupBy('transaction_id');
+                ->groupBy('transaction_id')
+                ->orderBy('created_at');
 
             if ($search) {
                 $query->where(function ($q) use ($search, $parsedDate) {

@@ -23,6 +23,7 @@ class ReceivingController extends Controller
 
     public function createReceiving(Request $request)
     {
+        dd('kontol');
 
         $now = Carbon::now()->format('d/m/Y');
         $transaction = Receiving::where('pharmacy_id', Auth()->user()->pharmacy_id)
@@ -47,6 +48,7 @@ class ReceivingController extends Controller
             }
             return view('orders.receiving', compact('order_code', 'transaction', 'now', 'order_exist', 'receiving_id'));
         } else {
+            dd('kontol');
             $year   = now()->format('y');
             $month  = now()->format('m');
             $prefix = $year . $month . 'RE';
@@ -347,6 +349,7 @@ class ReceivingController extends Controller
     public function orderList(Request $request)
     {
         $items = Order::query()
+            ->where('pharmacy_id', auth()->user()->pharmacy_id)
             ->with(['order_items'])
             ->withSum('order_items', 'total')
             ->orderByDesc('id');
@@ -619,7 +622,7 @@ class ReceivingController extends Controller
             'extra_discount'   => 'required',
             'expired_date'     => 'required',
             'batch'            => 'required',
-           
+
             'status'           => 'required',
             'invoice_date'     => 'required',
             'invoice_due'      => 'required',

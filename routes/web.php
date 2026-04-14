@@ -376,3 +376,20 @@ Route::get('/patients/search', [SalesController::class, 'searchPatients'])
 Route::get('/doctors/search', [SalesController::class, 'searchDoctors'])
     ->middleware('auth')
     ->name('doctors.search');
+
+Route::post('/qz/sign', function (\Illuminate\Http\Request $request) {
+    $privateKeyPath = storage_path('app/qz/private-key.pem');
+
+    if (!file_exists($privateKeyPath)) {
+        return response()->json(['error' => 'Private key not found'], 500);
+    }
+
+    $privateKey = file_get_contents($privateKeyPath);
+    $data       = $request->input('data');
+
+    openssl_sign($data, $signature, $privateKey, OPENSSL_ALGO_SHA512);
+
+    return response()->json([
+        'signature' => base64_encode($signature)
+    ]);
+})->middleware('auth');
