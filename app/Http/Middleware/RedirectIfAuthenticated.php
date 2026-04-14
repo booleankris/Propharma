@@ -25,7 +25,7 @@ class RedirectIfAuthenticated
                 }
 
                 if ($user->hasRole('Kasir')) {
-                    return redirect()->route('kasir');
+                    return redirect()->route('home');
                 }
                 // if ($user->hasRole('APJ')) {
                 //     return redirect()->route('homeapj');
