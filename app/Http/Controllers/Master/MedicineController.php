@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Master;
 use App\Http\Controllers\Controller;
 use App\Models\Creditor;
 use App\Models\MedicineCreditor;
+use App\Models\MedicinePriceHistory;
 use App\Models\Medicines;
 use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
@@ -195,6 +196,13 @@ class MedicineController extends Controller
             'location'             => $request->input('location'),
             'type'                 => $request->type,
             'status'               => 1,
+        ]);
+        // Add Medicine Price History
+
+        $history = MedicinePriceHistory::create([
+            'user_id'      => auth()->user()->id,
+            'medicine_id'  => $id,
+            'new_price'    => $request->pharmacy_net_price
         ]);
 
         // Sync creditors (if applicable)

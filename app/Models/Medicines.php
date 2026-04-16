@@ -86,6 +86,10 @@ class Medicines extends Model
     {
         return $this->hasMany(ItemsLog::class, 'medicine_id');
     }
+    public function history()
+    {
+        return $this->hasMany(MedicinePriceHistory::class, 'medicine_id');
+    }
     public static function generateCode()
     {
         $last = self::orderBy('id', 'desc')->first();

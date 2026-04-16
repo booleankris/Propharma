@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Batches;
 use App\Models\Creditor;
 use App\Models\ItemsLog;
+use App\Models\MedicinePriceHistory;
 use App\Models\Medicines;
 use App\Models\MedicineTransfers;
 use App\Models\Order;
@@ -223,47 +224,64 @@ class ReceivingController extends Controller
     }
     public function gethistory(Request $request)
     {
-        $items = ReceivingItems::with([
-            'receiving_details.creditor',
-            'receiving_details.receiving',
-            'order_items.medicines'
-        ]);
+        $query = MedicinePriceHistory::with(['medicines', 'user'])
+            ->select('medicine_price_history.*');
 
-        if ($request->filled('searchMedicine')) {
-            $items->whereHas('order_items.medicines', function ($q) use ($request) {
-                $q->where(function ($sub) use ($request) {
-                    $sub->where('name', 'like', "%{$request->searchMedicine}%")
-                        ->orWhere('code', 'like', "%{$request->searchMedicine}%");
-                });
+        // ── Filter by medicine name or code ──
+        if ($request->filled('search_medicine')) {
+            $kw = $request->search_medicine;
+            $query->whereHas('medicines', function ($q) use ($kw) {
+                $q->where('name', 'like', "%{$kw}%")
+                    ->orWhere('code', 'like', "%{$kw}%");
             });
         }
 
+        // ── Filter by date range (created_at of the history row) ──
         if ($request->filled('start_date')) {
-            $items->whereHas('receiving_details', function ($q) use ($request) {
-                $q->whereDate('invoice_date', '>=', $request->start_date);
-            });
+            $query->whereDate('created_at', '>=', $request->start_date);
         }
-
         if ($request->filled('end_date')) {
-            $items->whereHas('receiving_details', function ($q) use ($request) {
-                $q->whereDate('invoice_date', '<=', $request->end_date);
-            });
+            $query->whereDate('created_at', '<=', $request->end_date);
         }
 
-        return DataTables::eloquent($items)
+        $query->orderByDesc('created_at');
+
+        return DataTables::of($query)
             ->addIndexColumn()
-            ->addColumn('receiving_code', fn($row) => $row->receiving_details?->receiving?->code ?? '-')
-            ->addColumn('invoice_date', fn($row) => $row->receiving_details?->invoice_date ?? '-')
-            ->addColumn('name', fn($row) => $row->order_items?->creditors?->name ?? '-')
-            ->addColumn('qty', fn($row) => $row->qty_received)
-            ->addColumn('unit', fn($row) => $row->order_items?->medicines?->unit ?? '-')
-            ->addColumn(
-                'total',
-                fn($row) =>
-                'Rp ' . number_format($row->order_items->price * 1.11, 0, ',', '.')
-            )
+
+            ->addColumn('medicine_code', fn($row) => $row->medicines?->code ?? '-')
+            ->addColumn('medicine_name', fn($row) => $row->medicines?->name ?? '-')
+            ->addColumn('medicine_unit', fn($row) => $row->medicines?->unit ?? '-')
+
+            ->addColumn('current_price', function ($row) {
+                $price = $row->medicines?->net_price ?? 0;
+                return 'Rp ' . number_format($price, 0, ',', '.');
+            })
+
+            ->addColumn('new_price_fmt', function ($row) {
+                return 'Rp ' . number_format($row->new_price, 0, ',', '.');
+            })
+
+            ->addColumn('changed_by', fn($row) => $row->user?->name ?? '-')
+
+            ->addColumn('changed_at', fn($row) => $row->created_at?->format('d/m/Y H:i') ?? '-')
+
+            ->addColumn('direction', function ($row) {
+                $current = $row->medicines?->net_price ?? 0;
+                $new     = $row->new_price;
+
+                if ($new > $current) {
+                    return '<span class="badge-up">▲ Naik</span>';
+                } elseif ($new < $current) {
+                    return '<span class="badge-down">▼ Turun</span>';
+                }
+                return '<span class="badge-same">— Sama</span>';
+            })
+
+            ->rawColumns(['direction'])
             ->make(true);
     }
+
     public function getorderhistory(Request $request)
     {
         // $items = Receiving::with([
