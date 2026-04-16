@@ -768,7 +768,7 @@ class ReceivingController extends Controller
         $totalwithdiscount = $subtotal;
         $total_receiving = $subtotal - $totaldiscount;
 
-        return view('Orders.printReceiving', compact(
+        return view('orders.printReceiving', compact(
             'totaldiscount',
             'totalwithdiscount',
             'total_receiving',
