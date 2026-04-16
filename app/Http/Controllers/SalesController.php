@@ -246,6 +246,7 @@ class SalesController extends Controller
     public function search(Request $request)
     {
         $q = trim($request->get('q', ''));
+        $pharmacyId = auth()->user()->pharmacy_id;
 
         $items = Medicines::query()
             ->select([
@@ -263,18 +264,39 @@ class SalesController extends Controller
                 'packaging',
                 'content',
                 'dosage',
-                DB::raw('(SELECT COALESCE(SUM(stock), 0) FROM batches WHERE medicine_id = medicines.id) as storage_stock'),
-                DB::raw('(SELECT COALESCE(SUM(mt.stock), 0) FROM medicine_transfers mt JOIN batches b ON b.id = mt.batches_id WHERE b.medicine_id = medicines.id AND mt.status = 1) as counter_stock'),
             ])
+
+            ->selectRaw('(
+            SELECT COALESCE(SUM(stock), 0)
+            FROM batches
+            WHERE medicine_id = medicines.id
+            AND pharmacy_id = ?
+        ) as storage_stock', [$pharmacyId])
+
+            ->selectRaw('(
+            SELECT COALESCE(SUM(mt.stock), 0)
+            FROM medicine_transfers mt
+            JOIN batches b ON b.id = mt.batches_id
+            WHERE b.medicine_id = medicines.id
+            AND mt.status = 1
+            AND b.pharmacy_id = ?
+        ) as counter_stock', [$pharmacyId])
+
             ->with(['etalases', 'locations'])
+
             ->when($q !== '', function ($builder) use ($q) {
-                $builder->where(function ($x) use ($q) {  // grouped — keeps OR inside parentheses
-                    $x->where('code',      'like', $q . '%')
+                $builder->where(function ($x) use ($q) {
+                    $x->where('code', 'like', $q . '%')
                         ->orWhere('barcode', 'like', $q . '%')
-                        ->orWhere('name',    'like', '%' . $q . '%');
+                        ->orWhere('name', 'like', '%' . $q . '%');
                 });
             })
-            ->orderByRaw("CASE WHEN code LIKE ? THEN 0 ELSE 1 END, code ASC", [$q . '%'])
+
+            ->orderByRaw(
+                "CASE WHEN code LIKE ? THEN 0 ELSE 1 END, code ASC",
+                [$q . '%']
+            )
+
             ->limit(40)
             ->get();
 
@@ -743,9 +765,9 @@ class SalesController extends Controller
             // ── Idempotency ──────────────────────────────────────────
             if ($transaction->status === 1) {
                 DB::rollBack();
-            
+
                 $transaction->load('transactions.medicine', 'patients', 'doctors');
-            
+
                 return response()->json([
                     'success'          => true,
                     'print_url'        => route('sales.print', $transaction->id),
@@ -792,6 +814,7 @@ class SalesController extends Controller
                 while ($qty_bought > 0) {
                     $transfer = MedicineTransfers::join('batches', 'medicine_transfers.batches_id', '=', 'batches.id')
                         ->where('batches.medicine_id', $medicine_id)
+                        ->where('batches.pharmacy_id', auth()->user()->pharmacy_id)
                         ->where('medicine_transfers.stock', '>', 0)
                         ->orderBy('batches.expired_date', 'asc')
                         ->lockForUpdate()
@@ -801,6 +824,7 @@ class SalesController extends Controller
                     if (!$transfer) {
                         $transfer = MedicineTransfers::join('batches', 'medicine_transfers.batches_id', '=', 'batches.id')
                             ->where('batches.medicine_id', $medicine_id)
+                            ->where('batches.pharmacy_id', auth()->user()->pharmacy_id)
                             ->orderBy('batches.expired_date', 'desc')
                             ->lockForUpdate()
                             ->select('medicine_transfers.*')

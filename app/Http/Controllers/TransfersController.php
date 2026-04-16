@@ -7,6 +7,7 @@ use App\Models\Items;
 use App\Models\ItemsLog;
 use App\Models\Medicines;
 use App\Models\MedicineTransfers;
+use App\Models\Pharmacies;
 use App\Models\Transfers;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -76,6 +77,7 @@ class TransfersController extends Controller
                     );
             })
             ->where('stock', '>', 0)
+            ->where('pharmacy_id', auth()->user()->pharmacy_id)
             ->paginate(10);
 
         $data->getCollection()->transform(function ($item) {
@@ -95,7 +97,8 @@ class TransfersController extends Controller
     {
         $now = Carbon::now();
         $code = $this->generateTransfersCode();
-        return view('kasir.transfers.create_transfers', compact('now', 'code'));
+        $pharmacies = Pharmacies::all();
+        return view('kasir.transfers.create_transfers', compact('now', 'pharmacies', 'code'));
     }
     public function transfer(Request $request)
     {
@@ -107,12 +110,42 @@ class TransfersController extends Controller
         ]);
         try {
             DB::transaction(function () use ($request) {
+                $now         = Carbon::now()->format('Y-m-d');
+                $pharmacyId  = $request->pharmacy;
+
+                // ───────────────────── 1. Find The Batch & Medicine Detail ─────────────────────
+                $item        = Batches::findOrFail($request->batches_id);
+                $medicines   = Medicines::where('id', $item->medicine_id)->get();
+
+                // ───────────────────── 2. Check Existing Batches ─────────────────────
+                $existingBatches = Batches::where('pharmacy_id', $pharmacyId)
+                    ->where('medicine_id',  $item->medicine_id)
+                    ->where('name',         $item->batch)
+                    ->where('expired_date', $item->expired_date)
+                    ->first();
+
+                // ───────────────────── 3. Create New Batch If Not Exist ─────────────────────
+
+                if (!$existingBatches) {
+                    $batch = Batches::create([
+                        'medicine_id'  => $item->medicine_id,
+                        'name'         => $item->name,
+                        'expired_date' => $item->expired_date,
+                        'status'       => 0,
+                        'pharmacy_id'  => $pharmacyId,
+                        'stock'        => 0,
+                    ]);
+                }
+
+                $batch->increment('stock', $request->qty);
+
                 $insert = MedicineTransfers::create([
-                    'batches_id' => $request->batches_id,
+                    'batches_id' => $batch->id,
                     'etalases_id' => $request->etalases_id,
                     'code'       => $request->code,
                     'stock'        => $request->qty,
                     'status'     => 0,
+
                 ]);
             });
             return redirect()->back()->with('success', "Berhasil Menyimpan! ");
@@ -152,6 +185,9 @@ class TransfersController extends Controller
     public function incomingTransfers()
     {
         $transfers = MedicineTransfers::with(['batches.medicines', 'etalases'])
+            ->whereHas('batches', function ($getpid) {
+                $getpid->where('pharmacy_id', auth()->user()->pharmacy_id);
+            })
             ->latest()
             ->get();
 
@@ -174,9 +210,9 @@ class TransfersController extends Controller
 
     public function acceptTransfer(MedicineTransfers $transfer)
     {
-       
+
         try {
-            
+
             DB::transaction(function () use ($transfer) {
                 $now = Carbon::now();
                 $medicine = Medicines::findOrFail($transfer->batches->medicine_id);
@@ -185,8 +221,8 @@ class TransfersController extends Controller
 
                 $transfer->batches->decrement('stock', $transfer->stock);
                 $transfer->update(['status' => 1]);
-                
-                 // Transfers status     = 7
+
+                // Transfers status     = 7
                 ItemsLog::create([
                     'transaction_code' => $transfer->code,
                     'code'             => $this->generateItemsLogCode(),
@@ -203,7 +239,7 @@ class TransfersController extends Controller
                 ]);
             });
 
-           
+
             return redirect()->back()->with('success', 'Mutasi Stock diterima!');
         } catch (\Throwable $e) {
             return redirect()->back()->with('message', 'Gagal menerima: ' . $e->getMessage());

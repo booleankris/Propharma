@@ -344,42 +344,49 @@ class OrdersController extends Controller
     public function completeOrder(Request $request)
     {
         $request->validate([
-            'order_id' => 'required',
+            'order_id' => 'required|exists:orders,id',
         ]);
 
-        $item = Order::findOrFail($request->order_id);
-        $item->update([
-            'status' => 1,
-        ]);
-        $now = Carbon::now()->format('d/m/Y');
-        $year   = now()->format('y');
-        $month  = now()->format('m');
-        $prefix = $year . $month . 'RE';
-        $last = Receiving::where('pharmacy_id', Auth()->user()->pharmacy_id)
-            ->where('code', 'like', $prefix . '%')
-            ->orderBy('code', 'desc')
-            ->first();
-
-        if ($last) {
-            $lastNumber = intval(substr($last->code, -4));
-            $nextNumber = $lastNumber + 1;
-        } else {
-            $nextNumber = 0;
-        }
-
-        $serial = str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
-
-        $receiving_code = $prefix . $serial;
         try {
             DB::beginTransaction();
 
-            $transaction = Receiving::create([
-                'order_id'          => $request->order_id,
-                'creditors_id'      => NULL,
-                'pharmacy_id'       => Auth()->user()->pharmacy_id,
-                'code'              => $receiving_code,
-                'date'              => $now,
-                'status'            => 0,
+            $order = Order::findOrFail($request->order_id);
+
+            // ❗ Check if empty
+            if ($order->order_items()->count() === 0) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Order harus memiliki minimal 1 item!'
+                ], 422);
+            }
+
+            $order->update([
+                'status' => 1,
+            ]);
+
+            $now    = now()->format('d/m/Y');
+            $year   = now()->format('y');
+            $month  = now()->format('m');
+            $prefix = $year . $month . 'RE';
+
+            $last = Receiving::where('code', 'like', $prefix . '%')
+                ->orderBy('code', 'desc')
+                ->first();
+
+            $nextNumber = $last
+                ? intval(substr($last->code, -4)) + 1
+                : 1;
+
+            $serial = str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+            $receiving_code = $prefix . $serial;
+
+            Receiving::create([
+                'order_id'     => $order->id,
+                'creditors_id' => null,
+                'pharmacy_id'  => auth()->user()->pharmacy_id,
+                'code'         => $receiving_code,
+                'date'         => $now,
+                'status'       => 0,
             ]);
 
             DB::commit();
@@ -391,10 +398,11 @@ class OrdersController extends Controller
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
-            return redirect()->back()->with([
+
+            return response()->json([
                 'status' => 'error',
-                'message' => "Gagal Menyimpan! " . $e->getMessage()
-            ]);
+                'message' => 'Gagal Menyimpan! ' . $e->getMessage()
+            ], 500);
         }
     }
     public function getCreditors($id)

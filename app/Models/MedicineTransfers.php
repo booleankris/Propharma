@@ -14,7 +14,8 @@ class MedicineTransfers extends Model
         'code',
         'stock',
         'status',
-        'etalases_id'
+        'etalases_id',
+        'pharmacy_id',
     ];
     public function batches()
     {

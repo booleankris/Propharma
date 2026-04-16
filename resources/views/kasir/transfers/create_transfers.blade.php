@@ -615,7 +615,21 @@
                             </svg>
                         </button>
                     </div>
+                    <br>
+                    <div class="w-full" id="etalaseSection">
+                        <div class="section-label mb-2">Tujuan Apotek</div>
+                        <select
+                            class="flex-1 min-w-0 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-[13px] text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
+                            name="pharmacy" id="pharmacy1">
+                            <option value="">-- Pilih Tujuan Apotek </option>
+                            @foreach($pharmacies as $pharmacy)
+                                <option @if($pharmacy->id == 1) selected @endif value="{{ $pharmacy->id }}">{{ $pharmacy->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
                 </div>
+
+
                 {{-- Step 2: Qty Transfer --}}
                 <div class="section-block" id="qtySection" style="display:none;">
                     <div class="section-label">Jumlah Transfer</div>

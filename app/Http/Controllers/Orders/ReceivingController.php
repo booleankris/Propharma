@@ -7,11 +7,13 @@ use App\Models\Batches;
 use App\Models\Creditor;
 use App\Models\ItemsLog;
 use App\Models\Medicines;
+use App\Models\MedicineTransfers;
 use App\Models\Order;
 use App\Models\OrderItems;
 use App\Models\Receiving;
 use App\Models\ReceivingDetails;
 use App\Models\ReceivingItems;
+use App\Models\Transfers;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -536,15 +538,16 @@ class ReceivingController extends Controller
     }
     public function receive($id)
     {
+
         $now = Carbon::now()->format('d/m/Y');
         $datenow = Carbon::now()->format('Y-m-d');
 
-        $transaction = Receiving::where('pharmacy_id', Auth()->user()->pharmacy_id)
-            ->where('status', 0)->first();
+        $transaction = Receiving::where('status', 0)->first();
         $check_order = OrderItems::with('orders')->whereHas('orders', function ($q) use ($id) {
             $q->where('id', $id);
         })
             ->first();
+
         if ($check_order->orders->status == 2) {
             return redirect()->route('receiving.index')->with('success', "Pesanan Berhasil Diterima");
         }
@@ -557,8 +560,11 @@ class ReceivingController extends Controller
             ->pluck('creditors')
             ->unique('code')
             ->values();
+
         if ($transaction) {
+
             $getOrder = Order::findOrFail($id);
+
             $receiving_id = $transaction->id;
             $receiving_code = $transaction->code;
             $order_id = $getOrder->id;
@@ -796,6 +802,27 @@ class ReceivingController extends Controller
             'invoice'
         ));
     }
+    function generateTransfersCode()
+    {
+        $now = Carbon::now();
+
+        $year  = $now->format('y');
+        $month = $now->format('m');
+        $prefix = "{$year}{$month}MUT";
+
+        $lastCode = Transfers::where('code', 'like', "{$prefix}%")
+            ->orderBy('code', 'desc')
+            ->value('code');
+
+        if ($lastCode) {
+            $lastNumber = (int) substr($lastCode, -4);
+            $nextNumber = $lastNumber + 1;
+        } else {
+            $nextNumber = 1;
+        }
+
+        return $prefix . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+    }
     public function completeOrder(Request $request)
     {
         $request->validate([
@@ -826,11 +853,11 @@ class ReceivingController extends Controller
             $now         = Carbon::now()->format('Y-m-d');
             $pharmacyId  = auth()->user()->pharmacy_id;
 
-            // ───────────────────── 1. Pre-fetch all medicines in one query ─────────────────────
+            // ───────────────────── 1. Pre-fetch All Medicines In One Query ─────────────────────
             $medicineIds = $receivingItems->pluck('order_items.medicine_id')->unique()->values();
             $medicines   = Medicines::whereIn('id', $medicineIds)->get()->keyBy('id');
 
-            // ───────────────────── 2. Pre-fetch all matching batches in one query ─────────────────────
+            // ───────────────────── 2. Pre-fetch all Matching batches In One Query ─────────────────────
             $existingBatches = Batches::where('pharmacy_id', $pharmacyId)
                 ->where(function ($q) use ($receivingItems) {
                     foreach ($receivingItems as $item) {
@@ -845,7 +872,7 @@ class ReceivingController extends Controller
                 ->get()
                 ->keyBy(fn($b) => "{$b->medicine_id}|{$b->name}|{$b->expired_date}");
 
-            // ───────────────────── 3. Loop — zero DB calls per iteration ─────────────────────
+            // ───────────────────── 3. Looping ─────────────────────
             $itemsLogInserts      = [];
             $batchIncrements      = [];  // batch_id   => qty
             $medicineIncrements   = [];  // medicine_id => qty
@@ -899,11 +926,45 @@ class ReceivingController extends Controller
                 ];
             }
 
-            // ─────────────────── 4. Bulk writes ─────────────────────
+            // ─────────────────── 4. Bulk Writes ─────────────────────
 
-            foreach ($batchIncrements as $batchId => $qty) {
-                Batches::where('id', $batchId)->increment('stock', $qty);
-            }
+            DB::transaction(function () use ($batchIncrements) {
+                foreach ($batchIncrements as $batchId => $qty) {
+
+                    if (auth()->user()->pharmacy_id != 1) {
+
+                        Batches::where('id', $batchId)->update(['stock' => 0]);
+
+                        $transfer = MedicineTransfers::create([
+                            'batches_id' => $batchId,
+                            'etalases_id' => 99,
+                            'code' => $this->generateTransfersCode(),
+                            'stock' => $qty,
+                            'status' => 1,
+                        ]);
+                        $now = Carbon::now();
+                        $medicine = Medicines::findOrFail($transfer->batches->medicine_id);
+                        $qtybefore = 0;
+
+                        ItemsLog::create([
+                            'transaction_code' => $transfer->code,
+                            'code'             => $this->generateItemsLogCode(),
+                            'type'             => 'MU',
+                            'medicine_id'      => $medicine->id,
+                            'qty'              => $transfer->stock,
+                            'qty_before'       => $qtybefore,
+                            'qty_after'        => $transfer->batches->stock,
+                            'total'            => 0,
+                            'date'             => $now,
+                            'status'           => 7,
+                            'batches_id'       => $transfer->batches_id,
+
+                        ]);
+                    } else {
+                        Batches::where('id', $batchId)->increment('stock', $qty);
+                    }
+                }
+            });
 
             foreach ($medicineIncrements as $medicineId => $qty) {
                 Medicines::where('id', $medicineId)->increment('stock', $qty);
@@ -921,9 +982,11 @@ class ReceivingController extends Controller
                 ->chunk(500)
                 ->each(fn($chunk) => ItemsLog::insert($chunk->values()->all()));
 
-            // ───────────────────── 5. Finalize order & receiving ─────────────────────
-            $order->update(['status' => 2]);
-            $receiving->update(['status' => 1]);
+
+
+            // ───────────────────── 6. Finalize order & receiving ─────────────────────
+            $order->update(['status' => 2]); // 1 ordered 2 Received
+            $receiving->update(['status' => 1]); // 1 Completed
 
             DB::commit();
 

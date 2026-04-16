@@ -965,44 +965,55 @@
         function completeOrder() {
 
             axios.post("{{ route('orders.completeOrder') }}", {
-                order_id: orderid,
-            }, {
-                headers: {
-                    'X-CSRF-TOKEN': document
-                        .querySelector('meta[name="csrf-token"]')
-                        .content
-                }
-            }).then(res => {
-                const data = res.data;
+                    order_id: orderid,
+                }, {
+                    headers: {
+                        'X-CSRF-TOKEN': document
+                            .querySelector('meta[name="csrf-token"]')
+                            .content
+                    }
+                }).then(res => {
+                    const data = res.data;
 
-                // SweetAlert
-                Swal.fire({
-                    icon: data.status, // success or error
-                    title: data.status === 'success' ? 'Berhasil' : 'Gagal',
-                    text: data.message,
-                    confirmButtonText: 'OK'
-                }).then(() => {
-                    if (data.redirect) {
-                        window.location.href = data.redirect; // redirect after OK
-                    } else {
-                        // optional fallback: reload table
-                        orderItemsTable.ajax.reload(null, false);
+                    // SweetAlert
+                    Swal.fire({
+                        icon: data.status, // success or error
+                        title: data.status === 'success' ? 'Berhasil' : 'Gagal',
+                        text: data.message,
+                        confirmButtonText: 'OK'
+                    }).then(() => {
+                        if (data.redirect) {
+                            window.location.href = data.redirect; // redirect after OK
+                        } else {
+                            // optional fallback: reload table
+                            orderItemsTable.ajax.reload(null, false);
+                        }
+
+                        // reset inputs only if needed
+                        resetInputs();
+                        selectedRowData = null;
+                        selectedRowIndex = null;
+                    });
+
+                })
+                .catch(err => {
+                    let message = 'Terjadi kesalahan sistem!';
+
+                    if (err.response) {
+                        if (err.response.status === 422) {
+                            message = err.response.data.message;
+                        } else if (err.response.data?.message) {
+                            message = err.response.data.message;
+                        }
                     }
 
-                    // reset inputs only if needed
-                    resetInputs();
-                    selectedRowData = null;
-                    selectedRowIndex = null;
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Gagal',
+                        text: message
+                    });
                 });
 
-            }).catch(err => {
-                console.error(err);
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Gagal',
-                    text: 'Terjadi kesalahan sistem!'
-                });
-            });
         }
 
         function printSPB() {
