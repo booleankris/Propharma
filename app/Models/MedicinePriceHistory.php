@@ -24,6 +24,6 @@ class MedicinePriceHistory extends Model
 
     public function medicines()
     {
-        return $this->belongsTo(Medicines::class);
+        return $this->belongsTo(Medicines::class, 'medicine_id');
     }
 }

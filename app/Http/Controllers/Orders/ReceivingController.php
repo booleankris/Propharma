@@ -253,10 +253,7 @@ class ReceivingController extends Controller
             ->addColumn('medicine_name', fn($row) => $row->medicines?->name ?? '-')
             ->addColumn('medicine_unit', fn($row) => $row->medicines?->unit ?? '-')
 
-            ->addColumn('current_price', function ($row) {
-                $price = $row->medicines?->net_price ?? 0;
-                return 'Rp ' . number_format($price, 0, ',', '.');
-            })
+      
 
             ->addColumn('new_price_fmt', function ($row) {
                 return 'Rp ' . number_format($row->new_price, 0, ',', '.');

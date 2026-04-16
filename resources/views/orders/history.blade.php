@@ -175,7 +175,7 @@
             </div>
 
             {{-- ─── Summary cards ─── --}}
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-3" id="summaryCards">
+            <div class=" hidden grid-cols-2 md:grid-cols-4 gap-3" id="summaryCards">
                 <div class="stat-card">
                     <div class="icon" style="background:#eff6ff">📋</div>
                     <div>
@@ -245,9 +245,7 @@
                             <th>Kode Obat</th>
                             <th>Nama Obat</th>
                             <th>Satuan</th>
-                            <th>Harga Baru</th>
-                            <th>Harga Saat Ini</th>
-                            <th>Tren</th>
+                            <th>Harga Beli</th>
                             <th>Diubah Oleh</th>
                         </tr>
                     </thead>
@@ -366,16 +364,7 @@
                         render: (data) => `<span class="price-new">${data}</span>`,
                         orderable: false
                     },
-                    {
-                        // Current master price — smaller grey
-                        data: 'current_price',
-                        render: (data) => `<span class="price-current">${data}</span>`,
-                        orderable: false
-                    },
-                    {
-                        data: 'direction',
-                        orderable: false
-                    },
+                
                     {
                         data: 'changed_by',
                         orderable: false
