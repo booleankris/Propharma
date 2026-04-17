@@ -266,6 +266,7 @@ class SalesController extends Controller
                 'dosage',
             ])
 
+            // Total stock in storage
             ->selectRaw('(
             SELECT COALESCE(SUM(stock), 0)
             FROM batches
@@ -273,6 +274,7 @@ class SalesController extends Controller
             AND pharmacy_id = ?
         ) as storage_stock', [$pharmacyId])
 
+            // Total stock in counter (medicine_transfers)
             ->selectRaw('(
             SELECT COALESCE(SUM(mt.stock), 0)
             FROM medicine_transfers mt
@@ -281,6 +283,18 @@ class SalesController extends Controller
             AND mt.status = 1
             AND b.pharmacy_id = ?
         ) as counter_stock', [$pharmacyId])
+
+            // Latest etalase_id from medicine_transfers (Option 1)
+            ->selectRaw('(
+            SELECT mt.etalases_id
+            FROM medicine_transfers mt
+            JOIN batches b ON b.id = mt.batches_id
+            WHERE b.medicine_id = medicines.id
+            AND mt.status = 1
+            AND b.pharmacy_id = ?
+            ORDER BY mt.created_at DESC
+            LIMIT 1
+        ) as transfer_etalase_id', [$pharmacyId])
 
             ->with(['etalases', 'locations'])
 
