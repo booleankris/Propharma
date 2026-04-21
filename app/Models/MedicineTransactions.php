@@ -43,4 +43,8 @@ class MedicineTransactions extends Model
     {
         return $this->belongsTo(ShiftLogs::class, 'shift_logs_id');
     }
+    public function medicine()
+    {
+        return $this->belongsTo(Medicines::class, 'medicine_id');
+    }
 }

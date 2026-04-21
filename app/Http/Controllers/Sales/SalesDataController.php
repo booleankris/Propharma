@@ -28,8 +28,11 @@ class SalesDataController extends Controller
             }
 
             $query = MedicineCart::query()
-                ->with(['transactions.patients'])
+                ->with(['transactions.patients', 'transactions'])
                 ->where('status', 1)
+                ->whereHas('transactions', function($transaction){
+                    $transaction->where('pharmacy_id', auth()->user()->pharmacy_id);
+                })
                 ->selectRaw('
                 transaction_id,
                 MAX(created_at) as created_at,

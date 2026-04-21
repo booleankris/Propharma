@@ -14,6 +14,11 @@
         transition: all 0.25s ease-out;
     }
 
+    .reportModalContent {
+        max-height: 70vh;
+        overflow-y: scroll;
+    }
+
     @keyframes fadeIn {
         from {
             opacity: 0;
@@ -476,6 +481,18 @@
             opacity: 1;
         }
     }
+
+    .select2-container .select2-selection--single {
+        height: 41px !important;
+    }
+
+    .select2-container .select2-selection--single .select2-selection__rendered {
+        display: block;
+        padding: 6px 18px!important;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
 </style>
 
 {{-- Sidebar overlay (mobile tap to close) --}}
@@ -680,12 +697,12 @@
 </div>
 
 {{-- Modal backdrop --}}
-<div id="modalBackdrop" class="hidden fixed inset-0 bg-black bg-opacity-40 z-40"></div>
+<div id="modalBackdrop" class="hidden fixed inset-0 bg-black bg-opacity-40 z-[9998]"></div>
 
 {{-- Report Modal --}}
 <div id="reportModal"
     class="modal-hide modal-transition fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
-    w-[92%] max-w-[480px] bg-white rounded-3xl shadow-2xl z-50 overflow-hidden">
+    w-[92%] max-w-[880px] bg-white rounded-3xl shadow-2xl z-[9999] overflow-hidden">
     <div class="bg-slate-800 px-6 py-5 flex items-center justify-between">
         <div>
             <p class="text-slate-400 text-xs font-semibold tracking-widest uppercase mb-1">Manajemen Sistem</p>
@@ -701,188 +718,230 @@
             </svg>
         </div>
     </div>
+    <div class="reportModalContent bg-red">
+        <div class="px-5 py-5 space-y-5">
+            <div>
+                <p class="text-xs font-semibold tracking-widest uppercase text-slate-400 mb-3">Jenis Laporan</p>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-2" id="report-grid">
 
-    <div class="px-5 py-5 space-y-5">
+                    <button onclick="selectReport(this)" data-active="true"
+                        class="report-btn flex items-center gap-3 p-3 rounded-2xl border border-violet-200 bg-violet-50 text-left transition-all">
+                        <div class="w-8 h-8 rounded-xl bg-violet-100 flex items-center justify-center flex-shrink-0">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#7c3aed"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="3" width="7" height="7" />
+                                <rect x="14" y="3" width="7" height="7" />
+                                <rect x="3" y="14" width="7" height="7" />
+                                <rect x="14" y="14" width="7" height="7" />
+                            </svg>
+                        </div>
+                        <span class="text-sm font-semibold text-violet-700">LIPH</span>
+                    </button>
 
-        <div>
-            <p class="text-xs font-semibold tracking-widest uppercase text-slate-400 mb-3">Jenis Laporan</p>
-            <div class="grid grid-cols-2 gap-2" id="report-grid">
+                    <button onclick="selectReport(this)"
+                        class="report-btn flex items-center gap-3 p-3 flex-wrap rounded-2xl border border-slate-100 bg-slate-50 text-left transition-all hover:border-slate-200 hover:bg-white">
+                        <div class="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center flex-shrink-0">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#059669"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path
+                                    d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18" />
+                            </svg>
+                        </div>
+                        <span class="text-sm font-semibold text-slate-600">Obat</span>
+                    </button>
 
-                <button onclick="selectReport(this)" data-active="true"
-                    class="report-btn flex items-center gap-3 p-3 rounded-2xl border border-violet-200 bg-violet-50 text-left transition-all">
-                    <div class="w-8 h-8 rounded-xl bg-violet-100 flex items-center justify-center flex-shrink-0">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#7c3aed"
-                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <rect x="3" y="3" width="7" height="7" />
-                            <rect x="14" y="3" width="7" height="7" />
-                            <rect x="3" y="14" width="7" height="7" />
-                            <rect x="14" y="14" width="7" height="7" />
-                        </svg>
-                    </div>
-                    <span class="text-sm font-semibold text-violet-700">LIPH</span>
-                </button>
+                    <button onclick="selectReport(this)"
+                        class="report-btn flex items-center gap-3 p-3 flex-wrap rounded-2xl border border-slate-100 bg-slate-50 text-left transition-all hover:border-slate-200 hover:bg-white">
+                        <div class="w-8 h-8 rounded-xl bg-amber-50 flex items-center justify-center flex-shrink-0">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#d97706"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="3" />
+                                <path
+                                    d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" />
+                            </svg>
+                        </div>
+                        <span class="text-sm font-semibold text-slate-600">Golongan</span>
+                    </button>
 
-                <button onclick="selectReport(this)"
-                    class="report-btn flex items-center gap-3 p-3 rounded-2xl border border-slate-100 bg-slate-50 text-left transition-all hover:border-slate-200 hover:bg-white">
-                    <div class="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center flex-shrink-0">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#059669"
-                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path
-                                d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18" />
-                        </svg>
-                    </div>
-                    <span class="text-sm font-semibold text-slate-600">Obat</span>
-                </button>
+                    <button onclick="selectReport(this)"
+                        class="report-btn flex items-center gap-3 p-3 flex-wrap rounded-2xl border border-slate-100 bg-slate-50 text-left transition-all hover:border-slate-200 hover:bg-white">
+                        <div class="w-8 h-8 rounded-xl bg-orange-50 flex items-center justify-center flex-shrink-0">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ea580c"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M3 7h2l2 9h10l2-9h2M3 7l1-4h16l1 4M9 16v2m6-2v2" />
+                            </svg>
+                        </div>
+                        <span class="text-sm font-semibold text-slate-600">Pabrik</span>
+                    </button>
 
-                <button onclick="selectReport(this)"
-                    class="report-btn flex items-center gap-3 p-3 rounded-2xl border border-slate-100 bg-slate-50 text-left transition-all hover:border-slate-200 hover:bg-white">
-                    <div class="w-8 h-8 rounded-xl bg-amber-50 flex items-center justify-center flex-shrink-0">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#d97706"
-                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="12" cy="12" r="3" />
-                            <path
-                                d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" />
-                        </svg>
-                    </div>
-                    <span class="text-sm font-semibold text-slate-600">Golongan</span>
-                </button>
+                    <button onclick="selectReport(this)"
+                        class="report-btn flex items-center gap-3 p-3 flex-wrap rounded-2xl border border-slate-100 bg-slate-50 text-left transition-all hover:border-slate-200 hover:bg-white">
+                        <div class="w-8 h-8 rounded-xl bg-pink-50 flex items-center justify-center flex-shrink-0">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#db2777"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+                                <circle cx="12" cy="7" r="4" />
+                            </svg>
+                        </div>
+                        <span class="text-sm font-semibold text-slate-600">Dokter</span>
+                    </button>
 
-                <button onclick="selectReport(this)"
-                    class="report-btn flex items-center gap-3 p-3 rounded-2xl border border-slate-100 bg-slate-50 text-left transition-all hover:border-slate-200 hover:bg-white">
-                    <div class="w-8 h-8 rounded-xl bg-orange-50 flex items-center justify-center flex-shrink-0">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ea580c"
-                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M3 7h2l2 9h10l2-9h2M3 7l1-4h16l1 4M9 16v2m6-2v2" />
-                        </svg>
-                    </div>
-                    <span class="text-sm font-semibold text-slate-600">Pabrik</span>
-                </button>
+                    <button onclick="selectReport(this)"
+                        class="report-btn flex items-center gap-3 p-3 flex-wrap rounded-2xl border border-slate-100 bg-slate-50 text-left transition-all hover:border-slate-200 hover:bg-white">
+                        <div class="w-8 h-8 rounded-xl bg-sky-50 flex items-center justify-center flex-shrink-0">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#0284c7"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path
+                                    d="M9 12h6M9 16h6M17 2H7a2 2 0 00-2 2v18l3-3 2 3 2-3 2 3 2-3 3 3V4a2 2 0 00-2-2z" />
+                            </svg>
+                        </div>
+                        <span class="text-sm font-semibold text-slate-600">Daftar Resep</span>
+                    </button>
 
-                <button onclick="selectReport(this)"
-                    class="report-btn flex items-center gap-3 p-3 rounded-2xl border border-slate-100 bg-slate-50 text-left transition-all hover:border-slate-200 hover:bg-white">
-                    <div class="w-8 h-8 rounded-xl bg-pink-50 flex items-center justify-center flex-shrink-0">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#db2777"
-                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
-                            <circle cx="12" cy="7" r="4" />
-                        </svg>
-                    </div>
-                    <span class="text-sm font-semibold text-slate-600">Dokter</span>
-                </button>
+                    <button onclick="selectReport(this)"
+                        class="report-btn col-span-2 flex items-center gap-3 p-3 rounded-2xl border border-slate-100 bg-slate-50 text-left transition-all hover:border-slate-200 hover:bg-white">
+                        <div class="w-8 h-8 rounded-xl bg-teal-50 flex items-center justify-center flex-shrink-0">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#0d9488"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="1 4 1 10 7 10" />
+                                <path d="M3.51 15a9 9 0 102.13-9.36L1 10" />
+                            </svg>
+                        </div>
+                        <span class="text-sm font-semibold text-slate-600">Retur Jual</span>
+                    </button>
 
-                <button onclick="selectReport(this)"
-                    class="report-btn flex items-center gap-3 p-3 rounded-2xl border border-slate-100 bg-slate-50 text-left transition-all hover:border-slate-200 hover:bg-white">
-                    <div class="w-8 h-8 rounded-xl bg-sky-50 flex items-center justify-center flex-shrink-0">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#0284c7"
-                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M9 12h6M9 16h6M17 2H7a2 2 0 00-2 2v18l3-3 2 3 2-3 2 3 2-3 3 3V4a2 2 0 00-2-2z" />
-                        </svg>
-                    </div>
-                    <span class="text-sm font-semibold text-slate-600">Daftar Resep</span>
-                </button>
-
-                <button onclick="selectReport(this)"
-                    class="report-btn col-span-2 flex items-center gap-3 p-3 rounded-2xl border border-slate-100 bg-slate-50 text-left transition-all hover:border-slate-200 hover:bg-white">
-                    <div class="w-8 h-8 rounded-xl bg-teal-50 flex items-center justify-center flex-shrink-0">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#0d9488"
-                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <polyline points="1 4 1 10 7 10" />
-                            <path d="M3.51 15a9 9 0 102.13-9.36L1 10" />
-                        </svg>
-                    </div>
-                    <span class="text-sm font-semibold text-slate-600">Retur Jual</span>
-                </button>
-
+                </div>
             </div>
-        </div>
 
-        <div class="h-px bg-slate-100"></div>
+            <div class="h-px bg-slate-100"></div>
 
-        <div>
-            <p class="text-xs font-semibold tracking-widest uppercase text-slate-400 mb-3">Rentang Tanggal</p>
-            <div class="flex items-center gap-2">
-                <input type="date" value="2026-03-05" id="start_date" name="start_date"
-                    class="flex-1 text-sm border border-slate-200 rounded-xl px-3 py-2 text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300" />
-                <span class="text-slate-400 text-sm font-medium">—</span>
-                <input type="date" value="2026-03-05" id="end_date" name="end_date"
-                    class="flex-1 text-sm border border-slate-200 rounded-xl px-3 py-2 text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300" />
+            <div>
+                <p class="text-xs font-semibold tracking-widest uppercase text-slate-400 mb-3">Rentang Tanggal</p>
+                <div class="flex items-center gap-2">
+                    <input type="date" value="{{ \Carbon\Carbon::now()->format('Y-m-d') }}" id="start_date"
+                        name="start_date"
+                        class="flex-1 text-sm border border-slate-200 rounded-xl px-3 py-2 text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300" />
+                    <span class="text-slate-400 text-sm font-medium">—</span>
+                    <input type="date" value="{{ \Carbon\Carbon::now()->format('Y-m-d') }}" id="end_date"
+                        name="end_date"
+                        class="flex-1 text-sm border border-slate-200 rounded-xl px-3 py-2 text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300" />
+                </div>
             </div>
-        </div>
 
-        <div class="h-px bg-slate-100"></div>
+            <div class="h-px bg-slate-100"></div>
 
-        <div>
-            <p class="text-xs font-semibold tracking-widest uppercase text-slate-400 mb-3">Filter Harian</p>
-            <div class="flex gap-2 mb-3">
-                <button onclick="setFilter('semua', this)" id="btn-semua"
-                    class="flex-1 flex items-center gap-2 px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-600 text-sm font-semibold transition-all">
-                    <span class="w-3.5 h-3.5 rounded-full border-2 border-slate-300 flex-shrink-0"></span>
-                    Semua
-                </button>
-                <button onclick="setFilter('shift', this)" id="btn-shift"
-                    class="flex-1 flex items-center gap-2 px-3 py-2.5 rounded-xl border border-slate-800 bg-slate-800 text-white text-sm font-semibold transition-all">
-                    <span class="w-3.5 h-3.5 rounded-full border-2 border-slate-300 flex-shrink-0"></span>
-                    Per Shift
-                </button>
-            </div>
-            <div class="flex flex-col py-2 gap-2 w-full max-w-md">
-                <p class="text-xs font-semibold tracking-widest uppercase text-slate-400 mb-1">Filter Tipe</p>
-
-                <div data-value="rekap" onclick="selectOption(this)"
-                    class="opt flex items-center gap-5 p-2 rounded-2xl border-2 border-blue-400 bg-blue-50 cursor-pointer transition-all duration-200 hover:-translate-y-0.5">
-                    <div
-                        class="icon-box w-7 h-7 rounded-xl flex items-center justify-center shrink-0 bg-blue-400 transition-all duration-200">
-                        <svg class="icon-svg text-white" width="14" height="14" viewBox="0 0 24 24"
-                            fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                            stroke-linejoin="round">
-                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                            <polyline points="14 2 14 8 20 8" />
-                            <line x1="16" y1="13" x2="8" y2="13" />
-                            <line x1="16" y1="17" x2="8" y2="17" />
-                            <polyline points="10 9 9 9 8 9" />
-                        </svg>
-                    </div>
-                    <div>
-                        <p class="opt-title text-[12px] font-semibold tracking-tight text-blue-900 m-0">Rekap</p>
-                        <p class="opt-desc text-[9px] text-blue-500 m-0 mt-0.5">Hasil Perhitungan Keseluruhan</p>
+            <div>
+                <div id="date_filter">
+                    <p class="text-xs font-semibold tracking-widest uppercase text-slate-400 mb-3">Filter Harian</p>
+                    <div class="flex gap-2 mb-3">
+                        <button onclick="setFilter('semua', this)" id="btn-semua"
+                            class="flex-1 flex items-center gap-2 px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-600 text-sm font-semibold transition-all">
+                            <span class="w-3.5 h-3.5 rounded-full border-2 border-slate-300 flex-shrink-0"></span>
+                            Semua
+                        </button>
+                        <button onclick="setFilter('shift', this)" id="btn-shift"
+                            class="flex-1 flex items-center gap-2 px-3 py-2.5 rounded-xl border border-slate-800 bg-slate-800 text-white text-sm font-semibold transition-all">
+                            <span class="w-3.5 h-3.5 rounded-full border-2 border-slate-300 flex-shrink-0"></span>
+                            Per Shift
+                        </button>
                     </div>
                 </div>
-
-                <div data-value="detail" onclick="selectOption(this)"
-                    class="opt flex items-center gap-5 p-2 rounded-2xl border-2 border-gray-200 bg-white cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:border-gray-300 hover:bg-gray-50">
-                    <div
-                        class="icon-box w-7 h-7 rounded-xl flex items-center justify-center shrink-0 bg-gray-100 transition-all duration-200">
-                        <svg class="icon-svg text-gray-400" width="14" height="14" viewBox="0 0 24 24"
-                            fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                            stroke-linejoin="round">
-                            <circle cx="11" cy="11" r="8" />
-                            <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                            <line x1="11" y1="8" x2="11" y2="14" />
-                            <line x1="8" y1="11" x2="14" y2="11" />
-                        </svg>
-                    </div>
-                    <div>
-                        <p class="opt-title text-[12px] font-semibold tracking-tight text-gray-800 m-0">Detail</p>
-                        <p class="opt-desc text-[9px] text-gray-400 m-0 mt-0.5">Menampilkan Seluruh Data
-                        </p>
-                    </div>
+                @php
+                    $getshift = \App\Models\Shifts::all();
+                @endphp
+                <div id="shift-select">
+                    <select id="shift" name="shift"
+                        class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300 pr-8">
+                        @foreach ($getshift as $shift)
+                            <option value="{{ $shift->id }}">{{ $shift->name }}</option>
+                        @endforeach
+                    </select>
                 </div>
 
-            </div>
-            @php
-                $getshift = \App\Models\Shifts::all();
-            @endphp
-            <div id="shift-select">
-                <select id="shift" name="shift"
-                    class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300 pr-8">
-                    @foreach ($getshift as $shift)
-                        <option value="{{ $shift->id }}">{{ $shift->name }}</option>
-                    @endforeach
-                </select>
-            </div>
-        </div>
 
-        {{-- Submit Report --}}
+                <div id="type_filter">
+
+                    <div class="flex flex-col py-3 gap-2 w-full max-w-md">
+                        <p class="text-xs font-semibold tracking-widest uppercase text-slate-400 mb-1">Filter Tipe</p>
+
+                        <div class="flex gap-2">
+                            <div data-value="rekap" onclick="selectOption(this)"
+                                class="opt flex items-center gap-5 p-2 px-2 w-[300px] rounded-2xl border-2 border-blue-400 bg-blue-50 cursor-pointer transition-all duration-200 hover:-translate-y-0.5">
+                                <div
+                                    class="icon-box w-7 h-7 rounded-xl flex items-center justify-center shrink-0 bg-blue-400 transition-all duration-200">
+                                    <svg class="icon-svg text-white" width="14" height="14"
+                                        viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                        stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                        <polyline points="14 2 14 8 20 8" />
+                                        <line x1="16" y1="13" x2="8" y2="13" />
+                                        <line x1="16" y1="17" x2="8" y2="17" />
+                                        <polyline points="10 9 9 9 8 9" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <p class="opt-title text-[12px] font-semibold tracking-tight text-blue-900 m-0">
+                                        Rekap
+                                    </p>
+                                    <p class="opt-desc text-[9px] text-blue-500 m-0 mt-0.5">Hasil Perhitungan
+                                        Keseluruhan
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div data-value="detail" onclick="selectOption(this)"
+                                class="opt flex items-center gap-5 p-2 px-2 w-[300px] rounded-2xl border-2 border-gray-200 bg-white cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:border-gray-300 hover:bg-gray-50">
+                                <div
+                                    class="icon-box w-7 h-7 rounded-xl flex items-center justify-center shrink-0 bg-gray-100 transition-all duration-200">
+                                    <svg class="icon-svg text-gray-400" width="14" height="14"
+                                        viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                        stroke-linecap="round" stroke-linejoin="round">
+                                        <circle cx="11" cy="11" r="8" />
+                                        <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                                        <line x1="11" y1="8" x2="11" y2="14" />
+                                        <line x1="8" y1="11" x2="14" y2="11" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <p class="opt-title text-[12px] font-semibold tracking-tight text-gray-800 m-0">
+                                        Detail
+                                    </p>
+                                    <p class="opt-desc text-[9px] text-gray-400 m-0 mt-0.5">Menampilkan Seluruh Data
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="factory-select">
+                    @php
+                        $getfactory = \App\Models\Factory::all();
+                    @endphp
+                    <p class="text-xs font-semibold tracking-widest uppercase text-slate-400 mb-3">Pilih Pabrik</p>
+                    <select id="factory" name="factory" class="w-full select2-factory">
+                        <option></option>
+                        @foreach ($getfactory as $factory)
+                            <option value="{{ $factory->id }}">{{ $factory->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div id="doctor-select">
+                    @php
+                        $getdoctor = \App\Models\Doctors::all();
+                    @endphp
+                    <p class="text-xs font-semibold tracking-widest uppercase text-slate-400 mb-3">Pilih Dokter</p>
+                    <select id="doctor" name="doctor" class="w-full py-3 select2-doctor">
+                        <option></option>
+                        @foreach ($getdoctor as $doctor)
+                            <option value="{{ $doctor->id }}">{{ $doctor->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
+            {{-- Submit Report --}}
+        </div>
+    </div>
+    <div class="mb-5 mx-5">
         <button onclick="getReport()"
             class="w-full flex items-center justify-center gap-2 bg-[linear-gradient(45deg,_#41a8f4,_#7cd086)] hover:bg-slate-700 active:scale-[0.98] text-white text-sm font-semibold py-3 rounded-2xl transition-all">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"
@@ -893,14 +952,14 @@
             </svg>
             Cetak Laporan
         </button>
-
     </div>
+
 </div>
 
 {{-- Master Modal --}}
 <div id="masterModal"
     class="modal-hide modal-transition fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
-    w-[92%] max-w-[480px] bg-white rounded-3xl shadow-2xl z-50 overflow-hidden">
+    w-[92%] max-w-[480px] bg-white rounded-3xl shadow-2xl z-[9999] overflow-hidden">
     <div class="relative bg-gradient-to-br from-[#4a90d9] via-[#6196c0] to-[#3a7bd5] px-6 pt-6 pb-8">
         <div class="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2"></div>
         <div class="absolute bottom-0 left-4 w-16 h-16 bg-white/10 rounded-full translate-y-1/2"></div>
@@ -1078,7 +1137,7 @@
 {{-- Persediaan Modal --}}
 <div id="logModal"
     class="modal-hide modal-transition fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
-    w-[92%] max-w-[480px] bg-white rounded-3xl shadow-2xl z-50 overflow-hidden">
+    w-[92%] max-w-[480px] bg-white rounded-3xl shadow-2xl z-[9999] overflow-hidden">
     <div class="relative bg-gradient-to-br from-[#4a90d9] via-[#6196c0] to-[#3a7bd5] px-6 pt-6 pb-8">
         <div class="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2"></div>
         <div class="absolute bottom-0 left-4 w-16 h-16 bg-white/10 rounded-full translate-y-1/2"></div>
@@ -1184,7 +1243,7 @@
 {{-- Pembelian Modal --}}
 <div id="receivingModal"
     class="modal-hide modal-transition fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
-    w-[92%] max-w-[480px] bg-white rounded-3xl shadow-2xl z-50 overflow-hidden">
+    w-[92%] max-w-[480px] bg-white rounded-3xl shadow-2xl z-[9999] overflow-hidden">
     <div class="relative bg-gradient-to-br from-[#4a90d9] via-[#6196c0] to-[#3a7bd5] px-6 pt-6 pb-8">
         <div class="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2"></div>
         <div class="absolute bottom-0 left-4 w-16 h-16 bg-white/10 rounded-full translate-y-1/2"></div>
@@ -1276,7 +1335,7 @@
 {{-- Penjualan Modal --}}
 {{-- <div id="salesModal"
     class="modal-hide modal-transition fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
-    w-[90%] max-w-[400px] bg-white rounded-3xl shadow-2xl z-50 overflow-hidden">
+    w-[90%] max-w-[400px] bg-white rounded-3xl shadow-2xl z-[9999] overflow-hidden">
     <div class="relative bg-gradient-to-br from-[#4a90d9] via-[#6196c0] to-[#3a7bd5] px-6 pt-6 pb-8">
         <div class="relative flex items-center justify-between">
             <div>
@@ -1308,7 +1367,7 @@
 
 <div id="salesModal"
     class="modal-hide modal-transition fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
-    w-[90%] max-w-[400px] bg-white rounded-3xl shadow-2xl z-50 overflow-hidden">
+    w-[90%] max-w-[400px] bg-white rounded-3xl shadow-2xl z-[9999] overflow-hidden">
     <div class="relative bg-gradient-to-br from-[#4a90d9] via-[#6196c0] to-[#3a7bd5] px-6 pt-6 pb-8">
         <div class="relative flex items-center justify-between">
             <div>
@@ -1339,7 +1398,7 @@
 </div> --}}
 <div id="salesModal"
     class="modal-hide modal-transition fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
-    w-[92%] max-w-[480px] bg-white rounded-3xl shadow-2xl z-50 overflow-hidden">
+    w-[92%] max-w-[480px] bg-white rounded-3xl shadow-2xl z-[9999] overflow-hidden">
     <div class="relative bg-gradient-to-br from-[#4a90d9] via-[#6196c0] to-[#3a7bd5] px-6 pt-6 pb-8">
         <div class="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2"></div>
         <div class="absolute bottom-0 left-4 w-16 h-16 bg-white/10 rounded-full translate-y-1/2"></div>
@@ -1429,7 +1488,7 @@
 
 <div id="transfersModal"
     class="modal-hide modal-transition fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
-    w-[92%] max-w-[480px] bg-white rounded-3xl shadow-2xl z-50 overflow-hidden">
+    w-[92%] max-w-[480px] bg-white rounded-3xl shadow-2xl z-[9999] overflow-hidden">
     <div class="relative bg-gradient-to-br from-[#4a90d9] via-[#6196c0] to-[#3a7bd5] px-6 pt-6 pb-8">
         <div class="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2"></div>
         <div class="absolute bottom-0 left-4 w-16 h-16 bg-white/10 rounded-full translate-y-1/2"></div>
@@ -1634,187 +1693,3 @@
 
     </div>
 </div>
-<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-<script>
-    var selectedReport = "LIPH";
-    var selectedShift = "";
-    var selectedType = 'recap';
-    var selectedShiftType = "shift";
-
-    // ─── Sidebar (mobile) ─────────────────────────────────────────────────────────
-    function toggleSidebar() {
-        document.getElementById('sidebar').classList.toggle('open');
-        document.getElementById('sidebarOverlay').classList.toggle('open');
-    }
-
-    function closeSidebar() {
-        document.getElementById('sidebar').classList.remove('open');
-        document.getElementById('sidebarOverlay').classList.remove('open');
-    }
-
-    document.querySelectorAll('.nav-item').forEach(item => {
-        item.addEventListener('click', () => {
-            if (window.innerWidth <= 768) closeSidebar();
-        });
-    });
-
-    const backdrop = document.getElementById('modalBackdrop');
-
-    window.openModal = function(id) {
-        const modal = document.getElementById(id);
-        if (!modal) return;
-        modal.classList.remove('modal-hide');
-        modal.classList.add('modal-show');
-        backdrop.classList.remove('hidden');
-    };
-
-    window.closeModals = function() {
-        document.querySelectorAll('.modal-show').forEach(modal => {
-            modal.classList.remove('modal-show');
-            modal.classList.add('modal-hide');
-        });
-        backdrop.classList.add('hidden');
-    };
-
-    document.querySelectorAll('.closeModal').forEach(btn => {
-        btn.addEventListener('click', window.closeModals);
-    });
-
-    backdrop.addEventListener('click', window.closeModals);
-
-    function toggleModal(id) {
-        const target = document.getElementById(id);
-        if (!target) return;
-        document.querySelectorAll('#notif-modal, #expiry-modal').forEach(m => {
-            if (m.id !== id) m.classList.add('hidden');
-        });
-        target.classList.toggle('hidden');
-    }
-
-    document.addEventListener('click', function(e) {
-        ['notif-modal', 'expiry-modal'].forEach(id => {
-            const modal = document.getElementById(id);
-            if (!modal) return;
-            if (!e.target.closest(`#${id}`) && !e.target.closest(`[onclick*="${id}"]`)) {
-                modal.classList.add('hidden');
-            }
-        });
-    });
-
-    function selectReport(el) {
-        document.querySelectorAll('.report-btn').forEach(btn => {
-            btn.classList.remove('border-violet-200', 'bg-violet-50');
-            btn.classList.add('border-slate-100', 'bg-slate-50');
-            const label = btn.querySelector('span.text-sm');
-            if (label) {
-                label.classList.remove('text-violet-700');
-                label.classList.add('text-slate-600');
-            }
-        });
-        el.classList.remove('border-slate-100', 'bg-slate-50');
-        el.classList.add('border-violet-200', 'bg-violet-50');
-        const label = el.querySelector('span.text-sm');
-        if (label) {
-            label.classList.remove('text-slate-600');
-            label.classList.add('text-violet-700');
-        }
-        selectedReport = label ? label.textContent.trim() : null;
-        console.log('Selected report:', selectedReport);
-    }
-
-    function setFilter(type, el) {
-        const btnSemua = document.getElementById('btn-semua');
-        const btnShift = document.getElementById('btn-shift');
-        const shiftSel = document.getElementById('shift-select');
-
-        [btnSemua, btnShift].forEach(btn => {
-            btn.classList.remove('border-slate-800', 'bg-slate-800', 'text-white');
-            btn.classList.add('border-slate-200', 'bg-slate-50', 'text-slate-600');
-        });
-
-        el.classList.remove('border-slate-200', 'bg-slate-50', 'text-slate-600');
-        el.classList.add('border-slate-800', 'bg-slate-800', 'text-white');
-
-        shiftSel.style.display = type === 'shift' ? 'block' : 'none';
-
-        selectedShiftType = type;
-    }
-
-    function getReport() {
-        const start_date = document.getElementById('start_date').value;
-        const end_date = document.getElementById('end_date').value;
-        const shift = document.getElementById('shift').value;
-
-        // Start Loading
-        const overlay = document.getElementById('loading-overlay');
-        overlay.style.display = 'flex';
-
-
-        axios.post('/reports', {
-            start_date: start_date,
-            end_date: end_date,
-            selectedReport: selectedReport,
-            selectedType: selectedType,
-            shift: shift,
-            shiftType: selectedShiftType
-        }, {
-            responseType: 'blob'
-        }).then((result) => {
-            const url = window.URL.createObjectURL(new Blob([result.data]));
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `LIPH_${start_date}_${end_date}.xlsx`;
-            a.click();
-            window.URL.revokeObjectURL(url);
-        }).catch((err) => {
-            console.log(err);
-        }).finally(() => {
-            // Hide loading
-            overlay.style.display = 'none';
-        });;
-    }
-
-    const active = {
-        card: ['border-blue-400', 'bg-blue-50'],
-        icon: ['bg-blue-400'],
-        svg: ['text-white'],
-        title: ['text-blue-900'],
-        desc: ['text-blue-500'],
-    };
-    const inactive = {
-        card: ['border-gray-200', 'bg-white'],
-        icon: ['bg-gray-100'],
-        svg: ['text-gray-400'],
-        title: ['text-gray-800'],
-        desc: ['text-gray-400'],
-    };
-
-    function selectOption(el) {
-        document.querySelectorAll('.opt').forEach(o => {
-            o.classList.remove(...active.card);
-            o.classList.add(...inactive.card);
-            o.querySelector('.icon-box').classList.remove(...active.icon);
-            o.querySelector('.icon-box').classList.add(...inactive.icon);
-            o.querySelector('.icon-svg').classList.remove(...active.svg);
-            o.querySelector('.icon-svg').classList.add(...inactive.svg);
-            o.querySelector('.opt-title').classList.remove(...active.title);
-            o.querySelector('.opt-title').classList.add(...inactive.title);
-            o.querySelector('.opt-desc').classList.remove(...active.desc);
-            o.querySelector('.opt-desc').classList.add(...inactive.desc);
-        });
-
-        el.classList.remove(...inactive.card);
-        el.classList.add(...active.card);
-        el.querySelector('.icon-box').classList.remove(...inactive.icon);
-        el.querySelector('.icon-box').classList.add(...active.icon);
-        el.querySelector('.icon-svg').classList.remove(...inactive.svg);
-        el.querySelector('.icon-svg').classList.add(...active.svg);
-        el.querySelector('.opt-title').classList.remove(...inactive.title);
-        el.querySelector('.opt-title').classList.add(...active.title);
-        el.querySelector('.opt-desc').classList.remove(...inactive.desc);
-        el.querySelector('.opt-desc').classList.add(...active.desc);
-
-        selectedType = el.dataset.value;
-        console.log(selectedType);
-    }
-</script>

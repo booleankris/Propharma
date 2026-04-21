@@ -110,4 +110,7 @@ class Medicines extends Model
 
         return $prefix . str_pad($number, 5, '0', STR_PAD_LEFT);
     }
+    public function medicine_transactions(){
+        return $this->hasMany(MedicineTransactions::class, 'id');
+    }
 }
