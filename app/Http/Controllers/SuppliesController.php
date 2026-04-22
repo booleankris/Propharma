@@ -536,7 +536,9 @@ class SuppliesController extends Controller
     public function medicineStockLog(Request $request)
     {
         if ($request->ajax()) {
-            $items = ItemsLog::with(['medicines']);
+            $items = ItemsLog::with(['medicines','batches'])->whereHas('batches', function ($batch) {
+                $batch->where('pharmacy_id', auth()->user()->pharmacy_id);
+            });
             if ($request->filled('searchMedicine')) {
                 $items->whereHas('medicines', function ($q) use ($request) {
                     $q->where('name', 'like', "%{$request->searchMedicine}%")
@@ -553,7 +555,7 @@ class SuppliesController extends Controller
             }
             $total_sales = (clone $items)->where('status', 1)->sum('qty');
             $total_orders = (clone $items)->where('status', 2)->sum('qty');
-            $stock_start = (clone $items)->where('date', 'asc')->first();
+            $stock_start = (clone $items)->orderBy('date', 'asc')->first();
             return DataTables::eloquent($items)
                 ->addIndexColumn()
                 ->addColumn('date', function ($row) {
@@ -980,58 +982,58 @@ class SuppliesController extends Controller
 
         return DataTables::of($query)
 
-        ->addIndexColumn()
+            ->addIndexColumn()
 
-        ->filter(function ($query) use ($request) {
+            ->filter(function ($query) use ($request) {
 
-            // Filter status
-            if ($request->status !== null && $request->status !== '') {
-                $query->where('status', $request->status);
-            }
+                // Filter status
+                if ($request->status !== null && $request->status !== '') {
+                    $query->where('status', $request->status);
+                }
 
-            // Filter search
-            if ($request->search) {
-                $search = $request->search;
+                // Filter search
+                if ($request->search) {
+                    $search = $request->search;
 
-                $query->whereHas('batches.medicines', function ($q) use ($search) {
-                    $q->where(function ($q2) use ($search) {
-                        $q2->where('name', 'like', "%{$search}%")
-                            ->orWhere('code', 'like', "%{$search}%");
+                    $query->whereHas('batches.medicines', function ($q) use ($search) {
+                        $q->where(function ($q2) use ($search) {
+                            $q2->where('name', 'like', "%{$search}%")
+                                ->orWhere('code', 'like', "%{$search}%");
+                        });
                     });
-                });
-            }
-        })
+                }
+            })
 
-        ->addColumn('medicine_name', function ($item) {
-            return optional($item->batches->medicines)->name ?? '-';
-        })
+            ->addColumn('medicine_name', function ($item) {
+                return optional($item->batches->medicines)->name ?? '-';
+            })
 
-        ->addColumn('batch_name', function ($item) {
-            return $item->batches->name ?? '-';
-        })
+            ->addColumn('batch_name', function ($item) {
+                return $item->batches->name ?? '-';
+            })
 
-        ->addColumn('expired_date', function ($item) {
-            return $item->batches->expired_date ?? '-';
-        })
+            ->addColumn('expired_date', function ($item) {
+                return $item->batches->expired_date ?? '-';
+            })
 
-        ->addColumn('etalase', function ($item) {
-            return optional($item->etalases)->name ?? '-';
-        })
+            ->addColumn('etalase', function ($item) {
+                return optional($item->etalases)->name ?? '-';
+            })
 
-        ->addColumn('pharmacy', function ($item) {
-            return optional($item->batches->pharmacy)->name ?? '-';
-        })
+            ->addColumn('pharmacy', function ($item) {
+                return optional($item->batches->pharmacy)->name ?? '-';
+            })
 
-        ->editColumn('stock', function ($item) {
-            return $item->stock ?? 0;
-        })
+            ->editColumn('stock', function ($item) {
+                return $item->stock ?? 0;
+            })
 
-        ->editColumn('status', function ($item) {
-            return (int) $item->status;
-        })
+            ->editColumn('status', function ($item) {
+                return (int) $item->status;
+            })
 
-        ->rawColumns([]) 
+            ->rawColumns([])
 
-        ->make(true);
+            ->make(true);
     }
 }

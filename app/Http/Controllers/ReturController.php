@@ -67,7 +67,7 @@ class ReturController extends Controller
                         $q2->where('transaction_code', 'LIKE', "%{$search}%")
                             ->orWhereHas('patients', function ($q3) use ($search) {
                                 $q3->where('name', 'LIKE', "%{$search}%");
-                            });
+                            })->where('pharmacy_id', auth()->user()->pharmacy_id);
                     });
             })
             ->select('transaction_id')
@@ -300,6 +300,7 @@ class ReturController extends Controller
 
         $transfers = MedicineTransfers::join('batches', 'medicine_transfers.batches_id', '=', 'batches.id')
             ->where('batches.medicine_id', $medicine_id)
+            ->where('pharmacy_id', auth()->user()->pharmacy_id)
             ->orderBy('batches.expired_date', 'asc') // FEFO
             ->select(
                 'medicine_transfers.id as transfer_id',

@@ -33,4 +33,8 @@ class ItemsLog extends Model
     {
         return $this->belongsTo(MedicineTransactions::class, 'transaction_code', 'transaction_code');
     }
+    public function batches()
+    {
+        return $this->belongsTo(Batches::class, 'batches_id');
+    }
 }
