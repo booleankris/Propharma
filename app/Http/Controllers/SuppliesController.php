@@ -536,7 +536,7 @@ class SuppliesController extends Controller
     public function medicineStockLog(Request $request)
     {
         if ($request->ajax()) {
-            $items = ItemsLog::with(['medicines','batches'])->whereHas('batches', function ($batch) {
+            $items = ItemsLog::with(['medicines', 'batches'])->whereHas('batches', function ($batch) {
                 $batch->where('pharmacy_id', auth()->user()->pharmacy_id);
             });
             if ($request->filled('searchMedicine')) {
@@ -797,6 +797,35 @@ class SuppliesController extends Controller
         $now = Carbon::now()->format('dmY');
         return Excel::download(new PrintStockOpnameExport($request), 'stock_opname-' . $now . '.xlsx');
     }
+    public function scanBarcode(Request $request)
+    {
+        $barcode = $request->query('barcode');
+
+        $transfer = MedicineTransfers::with(['batches.medicines'])
+            ->whereHas('batches.medicines', function ($q) use ($barcode) {
+                $q->where('barcode', $barcode);
+            })
+            ->first();
+
+        if (!$transfer) {
+            return response()->json(['found' => false], 404);
+        }
+
+        $medicine = $transfer->batches->medicines;
+
+        return response()->json([
+            'found'     => true,
+            'code'      => $medicine->code,
+            'name'      => $medicine->name,
+            'unit'      => $medicine->unit,
+            'raw_price' => $medicine->raw_price,
+            'stock'     => $transfer->stock,  // counter stock from medicine_transfers
+        ]);
+    }
+    public function scannerPage()
+    {
+        return view('supply.scanner');
+    }
     // public function Opname(Request $request)
     // {
     //     $request->validate([
@@ -866,7 +895,7 @@ class SuppliesController extends Controller
     public function batches(Request $request)
     {
         $batches = Batches::where('medicine_id', $request->medicine_id)
-            ->where('pharmacy_id', auth()->user()->pharmacy_id) // scope to current pharmacy
+            ->where('pharmacy_id', auth()->user()->pharmacy_id)
             ->orderBy('expired_date', 'asc')                    // FEFO
             ->get(['id', 'name', 'expired_date', 'stock']);
 

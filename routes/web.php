@@ -252,7 +252,8 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     Route::get('/export-stock', [SuppliesController::class, 'printStockData'])->name('supplies.printstockdata');
     Route::get('/export-stockopname', [SuppliesController::class, 'printStockOpname'])->name('supplies.printstockopname');
     Route::get('supplies/batches', [SuppliesController::class, 'getBatchesByMedicine'])->name('supplies.batches');
-
+    Route::get('/supplies/scanner', [SuppliesController::class, 'scannerPage'])->name('supplies.scanner');
+    Route::get('/supplies/scan',    [SuppliesController::class, 'scanBarcode'])->name('supplies.scan');
 
     // Stock Detail
     Route::get('/stock-detail', [SuppliesController::class, 'stockDetail'])->name('supplies.stockDetail');

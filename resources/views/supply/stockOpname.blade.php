@@ -311,6 +311,40 @@
             border-radius: 99px;
             margin-top: 6px;
         }
+
+        .scanner-fab {
+            display: none;
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 999;
+            background: #2563eb;
+            color: #fff;
+            border-radius: 99px;
+            padding: 14px 20px;
+            font-size: 14px;
+            font-weight: 700;
+            text-decoration: none;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 20px rgba(37, 99, 235, .45);
+            transition: background .15s, transform .15s;
+        }
+
+        .scanner-fab:hover {
+            background: #1d4ed8;
+            color: #fff;
+        }
+
+        .scanner-fab:active {
+            transform: scale(.96);
+        }
+
+        @media (max-width: 768px) {
+            .scanner-fab {
+                display: flex;
+            }
+        }
     </style>
 @endsection
 
@@ -353,6 +387,18 @@
                             <input type="text" readonly id="medicine_name" placeholder="Klik 2x pada tabel..."
                                 class="field-input" autocomplete="off">
                         </div>
+                        {{-- Mobile-only scanner button --}}
+                        <a href="{{ route('supplies.scanner') }}" class="scanner-fab" title="Scan Barcode">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-6 h-6">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v1M4 12h1M19 12h1M12 19v1
+                              M5.636 5.636l.707.707
+                              M17.657 5.636l-.707.707
+                              M5.636 18.364l.707-.707
+                              M17.657 18.364l-.707-.707" />
+                                <rect x="9" y="9" width="6" height="6" rx="1" />
+                            </svg>
+                            <span>Scan</span>
+                        </a>
                     </div>
 
                     {{-- Medicine datatable --}}
