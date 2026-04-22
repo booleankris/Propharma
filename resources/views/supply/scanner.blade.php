@@ -397,28 +397,45 @@
         // ── Start ZXing scanner ────────────────────────────────────────────
         const codeReader = new ZXing.BrowserMultiFormatReader();
 
-        codeReader.listVideoInputDevices().then(devices => {
-            // Prefer back camera on mobile
-            const device = devices.find(d =>
-                /back|rear|environment/i.test(d.label)
-            ) || devices[devices.length - 1];
-
-            if (!device) {
-                statusEl.textContent = '⚠️ Kamera tidak ditemukan';
-                return;
-            }
-
-            statusEl.textContent = 'Siap scan…';
-
-            codeReader.decodeFromVideoDevice(device.deviceId, 'preview', (result, err) => {
-                if (!scanning) return; // debounce — wait for user to rescan
+        codeReader.decodeFromConstraints({
+                video: {
+                    facingMode: {
+                        exact: 'environment'
+                    }, // force back camera
+                    width: {
+                        ideal: 1280
+                    },
+                    height: {
+                        ideal: 720
+                    },
+                }
+            },
+            'preview',
+            (result, err) => {
+                if (!scanning) return;
                 if (result) {
-                    scanning = false; // pause scanning while we look up
+                    scanning = false;
                     lookupBarcode(result.getText());
                 }
+            }
+        ).catch(err => {
+            // Fallback: try without 'exact' (works on devices with one camera)
+            codeReader.decodeFromConstraints({
+                    video: {
+                        facingMode: 'environment'
+                    }
+                },
+                'preview',
+                (result, err) => {
+                    if (!scanning) return;
+                    if (result) {
+                        scanning = false;
+                        lookupBarcode(result.getText());
+                    }
+                }
+            ).catch(() => {
+                statusEl.textContent = '⚠️ Kamera tidak dapat dibuka';
             });
-        }).catch(() => {
-            statusEl.textContent = '⚠️ Izin kamera ditolak';
         });
     </script>
 @endsection
