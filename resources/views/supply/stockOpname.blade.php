@@ -1,153 +1,65 @@
 @extends('layouts.app')
 
 @section('title', 'Stock Opname')
-
 @section('style')
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
     <link rel="stylesheet" href="{{ asset('templates/library/izitoast/dist/css/iziToast.min.css') }}">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 
     <style>
-        /* ── Base ── */
         * {
             box-sizing: border-box;
         }
 
-        /* ── DataTable overrides ── */
-        table.dataTable thead th,
-        table.dataTable thead td {
-            padding: 10px 14px !important;
-            background: #f8fafc !important;
-            border-bottom: 2px solid #e2e8f0 !important;
-            font-size: 11px !important;
-            font-weight: 700 !important;
-            text-transform: uppercase !important;
-            letter-spacing: .05em !important;
-            color: #64748b !important;
+        html,
+        body {
+            overflow-x: hidden;
+            max-width: 100%;
         }
 
-        table.dataTable tbody td {
-            padding: 10px 14px !important;
-            font-size: 13px !important;
-            vertical-align: middle !important;
-            border-bottom: 1px solid #f1f5f9 !important;
+        .section,
+        .section-body {
+            max-width: 100%;
+            overflow-x: hidden;
         }
 
-        table.dataTable tbody tr:hover {
-            background: #f8fafc !important;
+        /* ── Layout grid ── */
+        .opname-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
+            gap: 16px;
+            align-items: start;
+            width: 100%;
         }
 
-        .dataTables_wrapper .top {
-            display: flex !important;
-            justify-content: space-between !important;
-            align-items: center !important;
-            margin-bottom: 10px !important;
-            gap: 8px !important;
+        @media (max-width: 768px) {
+            .opname-grid {
+                grid-template-columns: minmax(0, 1fr) !important;
+            }
         }
 
-        .dataTables_filter input {
-            padding: 6px 10px !important;
-            border-radius: 8px !important;
-            border: 1px solid #e2e8f0 !important;
-            font-size: 13px !important;
-            outline: none !important;
-            transition: border .15s;
-        }
-
-        .dataTables_filter input:focus {
-            border-color: #3b82f6 !important;
-        }
-
-        .dataTables_length select {
-            padding: 4px 8px !important;
-            border-radius: 8px !important;
-            border: 1px solid #e2e8f0 !important;
-            font-size: 13px !important;
-        }
-
-        .dataTables_paginate .paginate_button {
-            padding: 5px 10px !important;
-            border-radius: 6px !important;
-            margin: 0 2px !important;
-            font-size: 12px !important;
-            background: #f1f5f9 !important;
-            border: none !important;
-        }
-
-        .dataTables_wrapper .dataTables_paginate .paginate_button.current {
-            background: #2563eb !important;
-            color: #fff !important;
-            border: none !important;
-        }
-
-        .dataTables_wrapper .dataTables_paginate .paginate_button.disabled {
-            opacity: .4 !important;
-            background: transparent !important;
-        }
-
-        .paginate_button.previous {
-            background: #fee2e2 !important;
-        }
-
-        .paginate_button.next {
-            background: #dcfce7 !important;
-        }
-
-        /* ── Log panel ── */
-        .log-panel {
-            height: 38vh;
-            overflow-y: auto;
-            background: #f8fafc;
+        /* ── Card panels ── */
+        .card-panel {
+            background: #fff;
+            border: 1px solid #e2e8f0;
             border-radius: 14px;
-            border: 1px solid #e2e8f0;
+            padding: 16px 18px;
+            min-width: 0;
+            overflow: hidden;
+            width: 100%;
         }
 
-        .log-panel::-webkit-scrollbar {
-            width: 5px;
-        }
-
-        .log-panel::-webkit-scrollbar-track {
-            background: transparent;
-        }
-
-        .log-panel::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
-            border-radius: 99px;
-        }
-
-        /* ── Stat cards ── */
-        .stat-card {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 2px;
-            padding: 10px 18px;
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 12px;
-            min-width: 80px;
-            transition: box-shadow .15s;
-        }
-
-        .stat-card:hover {
-            box-shadow: 0 4px 12px rgba(37, 99, 235, .1);
-        }
-
-        .stat-card .val {
-            font-size: 22px;
-            font-weight: 800;
-            color: #2563eb;
-            line-height: 1;
-        }
-
-        .stat-card .lbl {
+        .section-label {
+            display: block;
             font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .07em;
             color: #94a3b8;
-            font-weight: 500;
-            white-space: nowrap;
+            margin-bottom: 10px;
         }
 
-        /* ── Form inputs ── */
+        /* ── Form fields ── */
         .field-label {
             display: block;
             font-size: 11px;
@@ -162,16 +74,18 @@
             width: 100%;
             border: 1.5px solid #e2e8f0;
             border-radius: 10px;
-            padding: 9px 12px;
+            padding: 8px 12px;
             font-size: 13px;
             background: #fff;
+            color: #1e293b;
             transition: border .15s, box-shadow .15s;
             outline: none;
         }
 
-        .field-input:focus {
-            border-color: #3b82f6;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, .12);
+        .field-input:focus,
+        .nav-input:focus {
+            border-color: #3b82f6 !important;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, .12) !important;
         }
 
         .field-input[readonly] {
@@ -185,7 +99,266 @@
             color: #dc2626 !important;
         }
 
-        /* ── Medicine table row ── */
+        select.field-input {
+            height: 38px;
+        }
+
+        /* ── Opname form grid ── */
+        .opname-form-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        @media (max-width: 600px) {
+            .opname-form-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* ── DataTable overrides ── */
+        #medicines_data,
+        #orderItemsTable {
+            width: 100% !important;
+            max-width: 100%;
+            table-layout: fixed;
+        }
+
+        #medicines_data td,
+        #medicines_data th,
+        #orderItemsTable td,
+        #orderItemsTable th {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .dataTables_wrapper {
+            width: 100%;
+            overflow-x: auto;
+        }
+
+        table.dataTable thead th,
+        table.dataTable thead td {
+            padding: 9px 12px !important;
+            background: #f8fafc !important;
+            border-bottom: 1px solid #e2e8f0 !important;
+            font-size: 11px !important;
+            font-weight: 700 !important;
+            text-transform: uppercase !important;
+            letter-spacing: .04em !important;
+            color: #64748b !important;
+            white-space: nowrap;
+        }
+
+        table.dataTable tbody td {
+            padding: 9px 12px !important;
+            font-size: 13px !important;
+            vertical-align: middle !important;
+            border-bottom: 1px solid #f1f5f9 !important;
+        }
+
+        table.dataTable tbody tr:hover {
+            background: #f8fafc !important;
+        }
+
+        /* ── DataTable controls ── */
+        .dataTables_wrapper .top,
+        .dataTables_wrapper .bottom {
+            display: flex !important;
+            flex-direction: row !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+            flex-wrap: wrap !important;
+            gap: 6px !important;
+            padding: 0 0 8px 0 !important;
+        }
+
+        .dataTables_wrapper .dataTables_length,
+        .dataTables_wrapper .dataTables_filter {
+            float: none !important;
+            text-align: left !important;
+        }
+
+        .dataTables_length label,
+        .dataTables_filter label {
+            display: flex !important;
+            align-items: center !important;
+            gap: 6px !important;
+            font-size: 13px !important;
+            white-space: nowrap !important;
+            margin: 0 !important;
+        }
+
+        .dataTables_filter input {
+            display: inline-block !important;
+            width: 130px !important;
+            max-width: 130px !important;
+            padding: 5px 10px !important;
+            border-radius: 8px !important;
+            border: 1px solid #e2e8f0 !important;
+            font-size: 13px !important;
+            outline: none !important;
+            margin: 0 !important;
+        }
+
+        .dataTables_filter input:focus {
+            border-color: #3b82f6 !important;
+        }
+
+        .dataTables_length select {
+            width: auto !important;
+            padding: 4px 6px !important;
+            border-radius: 8px !important;
+            border: 1px solid #e2e8f0 !important;
+            font-size: 13px !important;
+            margin: 0 !important;
+        }
+
+        .dataTables_info {
+            font-size: 12px !important;
+            color: #94a3b8 !important;
+            white-space: nowrap !important;
+        }
+
+        /* ── Pagination ── */
+        .dataTables_wrapper .dataTables_paginate {
+            display: flex !important;
+            flex-wrap: wrap !important;
+            align-items: center !important;
+            gap: 3px !important;
+            justify-content: flex-end !important;
+            padding: 6px 0 0 !important;
+        }
+
+        .dataTables_paginate .paginate_button {
+            padding: 4px 9px !important;
+            border-radius: 6px !important;
+            margin: 0 !important;
+            font-size: 12px !important;
+            background: #f1f5f9 !important;
+            border: none !important;
+            cursor: pointer !important;
+        }
+
+        .dataTables_wrapper .dataTables_paginate .paginate_button.current {
+            background: #2563eb !important;
+            color: #fff !important;
+            border: none !important;
+        }
+
+        .dataTables_wrapper .dataTables_paginate .paginate_button.disabled {
+            opacity: .4 !important;
+            background: transparent !important;
+            cursor: default !important;
+        }
+
+        .dataTables_wrapper .dataTables_paginate .paginate_button:not(.current):not(.disabled):hover {
+            background: #e2e8f0 !important;
+            color: #1e293b !important;
+            border: none !important;
+        }
+
+        .paginate_button.previous {
+            background: #fee2e2 !important;
+            color: #b91c1c !important;
+        }
+
+        .paginate_button.next {
+            background: #dcfce7 !important;
+            color: #166534 !important;
+        }
+
+        @media (max-width: 768px) {
+            .dataTables_paginate .paginate_button {
+                padding: 4px 7px !important;
+                font-size: 11px !important;
+            }
+
+            .dataTables_filter input {
+                width: 110px !important;
+                max-width: 110px !important;
+            }
+        }
+
+        /* ── Log panel ── */
+        .log-panel {
+            max-height: 36vh;
+            overflow-x: auto;
+            overflow-y: auto;
+            background: #f8fafc;
+            border-radius: 10px;
+            border: 1px solid #e2e8f0;
+        }
+
+        @media (max-width: 768px) {
+            .log-panel {
+                max-height: 240px;
+            }
+        }
+
+        .log-panel::-webkit-scrollbar {
+            width: 4px;
+            height: 4px;
+        }
+
+        .log-panel::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .log-panel::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 99px;
+        }
+
+        #orderItemsTable thead th {
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            background: #f8fafc !important;
+        }
+
+        /* ── Stat cards ── */
+        .stat-row {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        @media (max-width: 480px) {
+            .stat-row {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        .stat-card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+            padding: 10px 8px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+        }
+
+        .stat-card .val {
+            font-size: 20px;
+            font-weight: 800;
+            color: #2563eb;
+            line-height: 1;
+        }
+
+        .stat-card .lbl {
+            font-size: 11px;
+            color: #94a3b8;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        /* ── Medicine table rows ── */
         #medicines_data tbody tr {
             cursor: pointer;
             transition: background .1s;
@@ -203,105 +376,6 @@
             background: #dbeafe !important;
         }
 
-        /* ── Buttons ── */
-        .btn-primary {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 10px 20px;
-            background: #2563eb;
-            color: #fff;
-            font-size: 13px;
-            font-weight: 600;
-            border-radius: 10px;
-            border: none;
-            cursor: pointer;
-            transition: background .15s, box-shadow .15s;
-            box-shadow: 0 2px 8px rgba(37, 99, 235, .25);
-        }
-
-        .btn-primary:hover {
-            background: #1d4ed8;
-            box-shadow: 0 4px 14px rgba(37, 99, 235, .35);
-        }
-
-        .btn-danger {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 10px 20px;
-            background: #dc2626;
-            color: #fff;
-            font-size: 13px;
-            font-weight: 600;
-            border-radius: 10px;
-            border: none;
-            cursor: pointer;
-            transition: background .15s;
-        }
-
-        .btn-danger:hover {
-            background: #b91c1c;
-        }
-
-        .btn-export {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 10px 20px;
-            background: #16a34a;
-            color: #fff;
-            font-size: 13px;
-            font-weight: 600;
-            border-radius: 10px;
-            border: none;
-            cursor: pointer;
-            transition: background .15s;
-            text-decoration: none;
-        }
-
-        .btn-export:hover {
-            background: #15803d;
-            color: #fff;
-        }
-
-        /* ── Section label ── */
-        .section-label {
-            font-size: 11px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: .07em;
-            color: #94a3b8;
-            margin-bottom: 10px;
-        }
-
-        /* ── Layout ── */
-        .opname-grid {
-            display: grid;
-            grid-template-columns: 380px 1fr;
-            gap: 20px;
-            align-items: start;
-        }
-
-        @media (max-width: 1024px) {
-            .opname-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        .card-panel {
-            background: #fff;
-            border: 1px solid #e2e8f0;
-            border-radius: 16px;
-            padding: 20px;
-        }
-
-        /* ── Nav input highlight ── */
-        .nav-input:focus {
-            border-color: #3b82f6 !important;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, .15) !important;
-        }
-
         /* ── Discrepancy badge ── */
         #discrepancy_badge {
             display: none;
@@ -312,6 +386,52 @@
             margin-top: 6px;
         }
 
+        /* ── Buttons ── */
+        .btn-primary,
+        .btn-danger,
+        .btn-export {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 0 14px;
+            height: 36px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            border: none;
+            cursor: pointer;
+            text-decoration: none;
+            white-space: nowrap;
+        }
+
+        .btn-primary {
+            background: #2563eb;
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            background: #1d4ed8;
+        }
+
+        .btn-danger {
+            background: #fee2e2;
+            color: #b91c1c;
+        }
+
+        .btn-danger:hover {
+            background: #fecaca;
+        }
+
+        .btn-export {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .btn-export:hover {
+            background: #bbf7d0;
+        }
+
+        /* ── Scanner FAB — mobile only, fixed bottom-right ── */
         .scanner-fab {
             display: none;
             position: fixed;
@@ -321,23 +441,19 @@
             background: #2563eb;
             color: #fff;
             border-radius: 99px;
-            padding: 14px 20px;
+            padding: 13px 20px;
             font-size: 14px;
-            font-weight: 700;
+            font-weight: 600;
             text-decoration: none;
             align-items: center;
             gap: 8px;
-            box-shadow: 0 4px 20px rgba(37, 99, 235, .45);
-            transition: background .15s, transform .15s;
+            border: none;
         }
 
-        .scanner-fab:hover {
-            background: #1d4ed8;
-            color: #fff;
-        }
-
-        .scanner-fab:active {
-            transform: scale(.96);
+        .scanner-fab svg {
+            width: 18px;
+            height: 18px;
+            flex-shrink: 0;
         }
 
         @media (max-width: 768px) {
@@ -353,19 +469,18 @@
         <div class="section-body">
 
             {{-- Page header --}}
-            <div class="flex items-center justify-between mb-5">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center shadow-md">
-                        <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                            stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round"
-                                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                        </svg>
-                    </div>
-                    <div>
-                        <h1 class="text-xl font-bold text-gray-800 leading-tight">Stock Opname</h1>
-                        <p class="text-[12px] text-gray-400">Rekonsiliasi stok fisik vs sistem</p>
-                    </div>
+            <div class="flex items-center gap-3 mb-5">
+                <div class="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center flex-shrink-0">
+                    <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                        stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2
+                                           M9 5a2 2 0 002 2h2a2 2 0 002-2
+                                           M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold text-gray-800 leading-tight">Stock Opname</h1>
+                    <p class="text-[12px] text-gray-400">Rekonsiliasi stok fisik vs sistem</p>
                 </div>
             </div>
 
@@ -373,9 +488,8 @@
 
                 {{-- LEFT: Medicine selector --}}
                 <div class="card-panel">
-                    <p class="section-label">Pilih Obat</p>
+                    <span class="section-label">Pilih Obat</span>
 
-                    {{-- Filters --}}
                     <div class="grid grid-cols-1 gap-3 mb-4">
                         <div>
                             <label class="field-label">Rentang Tanggal</label>
@@ -387,21 +501,8 @@
                             <input type="text" readonly id="medicine_name" placeholder="Klik 2x pada tabel..."
                                 class="field-input" autocomplete="off">
                         </div>
-                        {{-- Mobile-only scanner button --}}
-                        <a href="{{ route('supplies.scanner') }}" class="scanner-fab" title="Scan Barcode">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-6 h-6">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v1M4 12h1M19 12h1M12 19v1
-                              M5.636 5.636l.707.707
-                              M17.657 5.636l-.707.707
-                              M5.636 18.364l.707-.707
-                              M17.657 18.364l-.707-.707" />
-                                <rect x="9" y="9" width="6" height="6" rx="1" />
-                            </svg>
-                            <span>Scan</span>
-                        </a>
                     </div>
 
-                    {{-- Medicine datatable --}}
                     <table id="medicines_data" class="w-full text-sm text-left text-gray-600">
                         <thead class="bg-gray-100 text-gray-700 uppercase text-xs">
                             <tr>
@@ -426,7 +527,7 @@
 
                     {{-- Stock log panel --}}
                     <div class="card-panel">
-                        <p class="section-label">Riwayat Stok</p>
+                        <span class="section-label">Riwayat Stok</span>
                         <div class="log-panel">
                             <table id="orderItemsTable" class="w-full text-sm text-left text-gray-600">
                                 <thead>
@@ -446,8 +547,7 @@
                             </table>
                         </div>
 
-                        {{-- Stat cards --}}
-                        <div class="flex flex-wrap gap-3 mt-4">
+                        <div class="stat-row">
                             <div class="stat-card">
                                 <span class="val" id="qty_awal">—</span>
                                 <span class="lbl">QTY Awal</span>
@@ -469,9 +569,9 @@
 
                     {{-- Opname form --}}
                     <div class="card-panel">
-                        <p class="section-label">Input Opname</p>
+                        <span class="section-label">Input Opname</span>
 
-                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+                        <div class="opname-form-grid">
                             <div>
                                 <label class="field-label">Stok Fisik (Gudang)</label>
                                 <input type="number" id="stock_physic" data-nav-enter="counter_stock_physic"
@@ -484,7 +584,7 @@
                                     placeholder="Stok counter fisik..." class="nav-input field-input" autocomplete="off">
                             </div>
                             <div>
-                                <label class="field-label">Selisih Stok (Gudang)</label>
+                                <label class="field-label">Selisih Stok</label>
                                 <input type="text" readonly id="stock_discrepancy" placeholder="—"
                                     class="field-input">
                                 <span id="discrepancy_badge"></span>
@@ -494,8 +594,10 @@
                         <div class="mb-4">
                             <label class="field-label">
                                 Batch
-                                <span class="normal-case font-normal text-gray-400 ml-1">(opsional — default: expired
-                                    terdekat)</span>
+                                <span
+                                    style="font-size:11px;font-weight:400;text-transform:none;letter-spacing:0;color:#94a3b8;margin-left:4px;">
+                                    (opsional — default: expired terdekat)
+                                </span>
                             </label>
                             <select id="batch_select" data-nav-enter="submit" class="nav-input field-input">
                                 <option value="">— Otomatis (FEFO) —</option>
@@ -532,12 +634,21 @@
                     </div>
 
                 </div>
-            </div>
+            </div>{{-- /.opname-grid --}}
 
         </div>
     </section>
-@endsection
 
+    {{-- Scanner FAB — rendered outside the grid so position:fixed works correctly --}}
+    <a href="{{ route('supplies.scanner') }}" class="scanner-fab" title="Scan Barcode">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round"
+                d="M5 9V7a2 2 0 012-2h2M15 5h2a2 2 0 012 2v2M19 15v2a2 2 0 01-2 2h-2M9 19H7a2 2 0 01-2-2v-2" />
+            <rect x="9" y="9" width="6" height="6" rx="1" />
+        </svg>
+        <span>Scan</span>
+    </a>
+@endsection
 @section('scripts')
     <script src="{{ asset('templates/library/datatables/media/js/jquery.dataTables.min.js') }}"></script>
     <script src="{{ asset('templates/library/jquery-ui-dist/jquery-ui.min.js') }}"></script>
@@ -823,6 +934,7 @@
                 responsive: true,
                 serverSide: true,
                 ajax: "{{ route('supplies.medicines') }}",
+                dom: '<"top"lf>rt<"bottom"ip>', // ← this controls the layout order
                 columns: [{
                         data: 'DT_RowIndex',
                         orderable: false,
@@ -835,6 +947,7 @@
                         data: 'unit'
                     },
                 ],
+                pageLength: 10,
                 initComplete: function() {
                     $('#medicines_data_filter input').focus();
                 }
