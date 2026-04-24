@@ -2111,7 +2111,7 @@
         if (it.het_price != 0) {
             raw = it.het_price;
         } else {
-            raw = (+it.net_price * +parameters + parseInt(service));
+            raw = (+it.net_price * +parameters);
         }
 
         // let rounded;
@@ -2120,6 +2120,7 @@
         // } else {
         //     rounded = Math.floor(raw / 1000) * 1000;
         // }
+        console.log(it.net_price);
         price.value = formatRupiah(raw);
         console.log("harga Total : " + raw);
         price2 = raw;
@@ -2640,9 +2641,9 @@
         total_item = val;
         roundedtotal = price2 * val - discount;
         if (currenttransaction == "KREDIT") {
-            subtotal = roundedtotal;
+            subtotal = roundedtotal + parseInt(service);
         } else {
-            subtotal = Math.ceil(roundedtotal / 1000) * 1000;
+            subtotal = Math.ceil(roundedtotal / 1000) * 1000 + parseInt(service);
         }
         totalprice.value = formatRupiah(subtotal);
         pharmacy_price = price2 * val;
