@@ -2642,8 +2642,10 @@
         roundedtotal = price2 * val - discount;
         if (currenttransaction == "KREDIT") {
             subtotal = roundedtotal + parseInt(service);
-        } else {
+        } else if (currenttransaction == "RESEP TUNAI") {
             subtotal = Math.ceil(roundedtotal / 1000) * 1000 + parseInt(service);
+        } else {
+            subtotal = Math.ceil(roundedtotal / 1000) * 1000;
         }
         totalprice.value = formatRupiah(subtotal);
         pharmacy_price = price2 * val;
