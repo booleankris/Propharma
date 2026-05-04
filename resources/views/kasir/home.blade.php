@@ -29,7 +29,7 @@
                 <h1 class="text-2xl font-montserrat font-black text-[#008bff] capitalize leading-tight">Dashboard Kasir
                 </h1>
             </div>
-            <div class="grid md:grid-cols-8 grid-cols-4 gap-3 py-6">
+            <div class="grid md:grid-cols-9 grid-cols-4 gap-3 py-6">
 
                 {{-- Penjualan --}}
                 <a href="{{ url('transaction/upds') }}"
@@ -106,9 +106,23 @@
                             <line x1="16" y1="17" x2="8" y2="17" />
                         </svg>
                     </div>
-                    <span class="text-[11.5px] font-semibold leading-tight text-red-800">Report Data</span>
+                    <span class="text-[11.5px] font-semibold leading-tight text-red-800">Laporan Penjualan</span>
                 </a>
-
+                {{-- Receiving Raport Data --}}
+                <a onclick="openModal('orderReportModal')"
+                    class="group flex flex-col items-center gap-2.5 rounded-2xl border border-[#ffc5fa] bg-[#fff1fc] px-3 py-4 text-center no-underline transition-all duration-300 hover:-translate-y-1.5 hover:shadow-lg hover:shadow-red-100 active:scale-95 cursor-pointer">
+                    <div
+                        class="flex h-12 w-12 items-center justify-center rounded-xl bg-red-100 transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-6">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#991b1b"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                            <polyline points="14 2 14 8 20 8" />
+                            <line x1="16" y1="13" x2="8" y2="13" />
+                            <line x1="16" y1="17" x2="8" y2="17" />
+                        </svg>
+                    </div>
+                    <span class="text-[11.5px] font-semibold leading-tight text-red-800">Laporan Pembelian</span>
+                </a>
                 {{-- Master Data --}}
                 <a onclick="openModal('masterModal')"
                     class="group flex flex-col items-center gap-2.5 rounded-2xl border border-teal-200 bg-teal-50 px-3 py-4 text-center no-underline transition-all duration-300 hover:-translate-y-1.5 hover:shadow-lg hover:shadow-teal-100 active:scale-95 cursor-pointer">

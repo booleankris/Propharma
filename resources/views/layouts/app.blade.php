@@ -29,14 +29,13 @@
     <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-    {{-- Sidebar Code --}}
 
     <script>
         $(document).ready(function() {
             initFactorySelect();
             initDoctorSelect();
         });
-        // Report Onpage load (Starting point)
+        // Sales Report Onpage load (Starting point)
         document.addEventListener("DOMContentLoaded", function() {
 
             const activeBtn = document.querySelector('.report-btn[data-active="true"]');
@@ -120,10 +119,13 @@
             modal.classList.remove('modal-hide');
             modal.classList.add('modal-show');
             backdrop.classList.remove('hidden');
+
             if (id === 'reportModal') {
-                setTimeout(() => {
-                    initFactorySelect();
-                }, 100);
+                setTimeout(() => initFactorySelect(), 100);
+            }
+            // ← add this
+            if (id === 'orderReportModal') {
+                setTimeout(() => initOrderSupplierSelect(), 100);
             }
         };
         window.closeModals = function() {
@@ -350,6 +352,194 @@
                 document.getElementById('doctor-select').style.display = 'none';
             }
             console.log(selectedType);
+        }
+
+
+
+        // ─── Orders Report ────────────────────────────────────────────────────────────
+
+        var selectedOrderReport = "Laporan Pembelian";
+        var selectedOrderType = "rekap";
+
+        // Visibility map: which filters each report type shows
+        // Keys match the button label text exactly
+        const orderReportFilters = {
+            "Laporan Pembelian": {
+                type_filter: false,
+                supplier_select: false
+            },
+            "Faktur Pembelian": {
+                type_filter: true,
+                supplier_select: false
+            },
+            "Per Supplier": {
+                type_filter: true,
+                supplier_select: false
+            }, // supplier shown only on detail
+            "Daftar PO": {
+                type_filter: false,
+                supplier_select: false
+            },
+            "Retur Beli": {
+                type_filter: false,
+                supplier_select: false
+            },
+            "Hutang": {
+                type_filter: false,
+                supplier_select: false
+            },
+        };
+        // Order Initial Setup
+        document.addEventListener("DOMContentLoaded", function() {
+            initOrderSupplierSelect();
+
+            // Set initial state based on data-active button
+            const activeBtn = document.querySelector('.order-report-btn[data-active="true"]');
+            const label = activeBtn.innerText.trim();
+
+            if (label === "Faktur Pembelian") {
+                document.getElementById('order_type_filter').style.display = 'block';
+                document.getElementById('factory-select').style.display = 'none';
+                document.getElementById('doctor-select').style.display = 'none';
+
+            }
+            if (activeBtn) applyOrderFilters(activeBtn.querySelector('span.text-sm')?.textContent.trim());
+        });
+
+        function initOrderSupplierSelect() {
+            const el = $('#order_supplier');
+            if (el.hasClass("select2-hidden-accessible")) el.select2('destroy');
+            el.select2({
+                placeholder: 'Pilih supplier...',
+                allowClear: true,
+                width: '100%',
+             
+            });
+        }
+
+        function applyOrderFilters(reportLabel) {
+            const config = orderReportFilters[reportLabel] ?? {
+                type_filter: false,
+                supplier_select: false
+            };
+
+            document.getElementById('order_type_filter').style.display = config.type_filter ? 'block' : 'none';
+            document.getElementById('order_supplier_select').style.display = config.supplier_select ? 'block' : 'none';
+
+            // Reset type to rekap whenever report changes
+            selectedOrderType = 'rekap';
+            const rekapOpt = document.querySelector('.order-opt[data-value="rekap"]');
+            if (rekapOpt) selectOrderOption(rekapOpt);
+        }
+
+        function selectOrderReport(el) {
+            // Reset all buttons to inactive style
+            document.querySelectorAll('.order-report-btn').forEach(btn => {
+                btn.classList.remove('border-violet-200', 'bg-violet-50');
+                btn.classList.add('border-slate-100', 'bg-slate-50');
+                const lbl = btn.querySelector('span.text-sm');
+                if (lbl) {
+                    lbl.classList.remove('text-violet-700');
+                    lbl.classList.add('text-slate-600');
+                }
+            });
+
+            // Activate clicked button
+            el.classList.remove('border-slate-100', 'bg-slate-50');
+            el.classList.add('border-violet-200', 'bg-violet-50');
+            const lbl = el.querySelector('span.text-sm');
+            if (lbl) {
+                lbl.classList.remove('text-slate-600');
+                lbl.classList.add('text-violet-700');
+            }
+
+            selectedOrderReport = lbl ? lbl.textContent.trim() : null;
+            applyOrderFilters(selectedOrderReport);
+
+            if (selectedOrderReport === "Per Supplier") {
+                setTimeout(() => initOrderSupplierSelect(), 100);
+            }
+
+            console.log('Selected order report:', selectedOrderReport);
+        }
+
+        const orderActive = {
+            card: ['border-blue-400', 'bg-blue-50'],
+            icon: ['bg-blue-400'],
+            svg: ['text-white'],
+            title: ['text-blue-900'],
+            desc: ['text-blue-500'],
+        };
+        const orderInactive = {
+            card: ['border-gray-200', 'bg-white'],
+            icon: ['bg-gray-100'],
+            svg: ['text-gray-400'],
+            title: ['text-gray-800'],
+            desc: ['text-gray-400'],
+        };
+
+        function selectOrderOption(el) {
+            document.querySelectorAll('.order-opt').forEach(o => {
+                o.classList.remove(...orderActive.card);
+                o.classList.add(...orderInactive.card);
+                o.querySelector('.order-icon-box').classList.remove(...orderActive.icon);
+                o.querySelector('.order-icon-box').classList.add(...orderInactive.icon);
+                o.querySelector('.order-icon-svg').classList.remove(...orderActive.svg);
+                o.querySelector('.order-icon-svg').classList.add(...orderInactive.svg);
+                o.querySelector('.order-opt-title').classList.remove(...orderActive.title);
+                o.querySelector('.order-opt-title').classList.add(...orderInactive.title);
+                o.querySelector('.order-opt-desc').classList.remove(...orderActive.desc);
+                o.querySelector('.order-opt-desc').classList.add(...orderInactive.desc);
+            });
+
+            el.classList.remove(...orderInactive.card);
+            el.classList.add(...orderActive.card);
+            el.querySelector('.order-icon-box').classList.remove(...orderInactive.icon);
+            el.querySelector('.order-icon-box').classList.add(...orderActive.icon);
+            el.querySelector('.order-icon-svg').classList.remove(...orderInactive.svg);
+            el.querySelector('.order-icon-svg').classList.add(...orderActive.svg);
+            el.querySelector('.order-opt-title').classList.remove(...orderInactive.title);
+            el.querySelector('.order-opt-title').classList.add(...orderActive.title);
+            el.querySelector('.order-opt-desc').classList.remove(...orderInactive.desc);
+            el.querySelector('.order-opt-desc').classList.add(...orderActive.desc);
+
+            selectedOrderType = el.dataset.value;
+
+            // Show supplier select only when Per Supplier + Detail
+            // const showSupplier = selectedOrderType === 'detail' && selectedOrderReport === 'Faktur Pembelian';
+            // document.getElementById('order_supplier_select').style.display = showSupplier ? 'block' : 'none';
+
+            console.log('Order type:', selectedOrderType);
+        }
+
+        function getOrderReport() {
+            const start_date = document.getElementById('order_start_date').value;
+            const end_date = document.getElementById('order_end_date').value;
+            const supplier = document.getElementById('order_supplier').value;
+
+            const overlay = document.getElementById('loading-overlay');
+            overlay.style.display = 'flex';
+
+            axios.post('/reports', {
+                start_date: start_date,
+                end_date: end_date,
+                selectedReport: selectedOrderReport,
+                selectedType: selectedOrderType,
+                supplier: supplier,
+            }, {
+                responseType: 'blob'
+            }).then((result) => {
+                const url = window.URL.createObjectURL(new Blob([result.data]));
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `Laporan_Beli_${selectedOrderReport}_${start_date}_${end_date}.xlsx`;
+                a.click();
+                window.URL.revokeObjectURL(url);
+            }).catch((err) => {
+                console.error(err);
+            }).finally(() => {
+                overlay.style.display = 'none';
+            });
         }
     </script>
     {{-- =========== --}}

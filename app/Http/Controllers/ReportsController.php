@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\Orders\InvoiceExport;
+use App\Exports\Orders\OrdersExport;
 use App\Exports\Report\CategoryExport;
 use App\Exports\Report\DoctorExport;
 use App\Exports\Report\FactoryExport;
@@ -23,6 +25,8 @@ class ReportsController extends Controller
 {
     public function reports(Request $request)
     {
+
+        // ================================ Penjualan / Sales ===================================
         // Export LIPH
         if ($request->selectedReport == "LIPH") {
             $request->validate([
@@ -186,6 +190,39 @@ class ReportsController extends Controller
                 $filename
             );
         }
+
+
+        // ================================ ================== ===================================
+
+        // ================================ Pembelian / Orders ===================================
+
+        // Laporan Pembelian
+        if ($request->selectedReport == "Laporan Pembelian") {
+            $pharmacy = Pharmacies::findOrFail(auth()->user()->pharmacy_id);
+            return Excel::download(
+                new OrdersExport(
+                    $pharmacy->id,
+                    $request->start_date,
+                    $request->end_date,
+                ),
+                'DATA_PEMBELIAN_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx'
+            );
+        }
+        if ($request->selectedReport == "Faktur Pembelian") {
+            $pharmacy = Pharmacies::findOrFail(auth()->user()->pharmacy_id);
+            return Excel::download(
+                new InvoiceExport(
+                    $pharmacy->id,
+                    $request->start_date,
+                    $request->end_date,
+                    $request->selectedType,
+
+                ),
+                'DATA_FAKTUR_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx'
+            );
+        }
+        // ================================ ================== ===================================
+
 
         return response()->json([
             'status'   => "success",

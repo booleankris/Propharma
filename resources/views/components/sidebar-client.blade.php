@@ -486,9 +486,13 @@
         height: 41px !important;
     }
 
+    .select2-container {
+        z-index: 9999 !important;
+    }
+
     .select2-container .select2-selection--single .select2-selection__rendered {
         display: block;
-        padding: 6px 18px!important;
+        padding: 6px 18px !important;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -699,6 +703,171 @@
 {{-- Modal backdrop --}}
 <div id="modalBackdrop" class="hidden fixed inset-0 bg-black bg-opacity-40 z-[9998]"></div>
 
+
+
+{{-- Orders Report Modal --}}
+{{-- Orders Report Modal --}}
+<div id="orderReportModal"
+    class="modal-hide modal-transition fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
+    md:w-[62%] w-[800px] bg-white rounded-3xl shadow-2xl z-[9999] overflow-hidden">
+
+    {{-- Header --}}
+    <div class="bg-slate-800 px-6 py-5 flex items-center justify-between">
+        <div>
+            <p class="text-slate-400 text-xs font-semibold tracking-widest uppercase mb-1">Manajemen Sistem</p>
+            <h2 class="text-white text-xl font-semibold">Laporan Pembelian</h2>
+        </div>
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-white/10 rounded-2xl flex items-center justify-center">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" />
+                    <line x1="3" y1="6" x2="21" y2="6" />
+                    <path d="M16 10a4 4 0 01-8 0" />
+                </svg>
+            </div>
+            <button
+                class="closeModal w-10 h-10 bg-white/10 hover:bg-white/20 rounded-2xl flex items-center justify-center transition">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white"
+                    stroke-width="2.5">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    {{-- Scrollable content --}}
+    <div class="max-h-[75vh] overflow-y-auto">
+        <div id="orderReportContent" class="px-5 py-5 space-y-5">
+
+            {{-- Report type grid --}}
+            <div>
+                <p class="text-xs font-semibold tracking-widest uppercase text-slate-400 mb-3">Jenis Laporan</p>
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-2" id="order-report-grid">
+
+                    <button onclick="selectOrderReport(this)" data-active="true"
+                        class="order-report-btn flex items-center gap-3 p-3 rounded-2xl border border-violet-200 bg-violet-50 text-left transition-all">
+                        <div class="w-8 h-8 rounded-xl bg-violet-100 flex items-center justify-center flex-shrink-0">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#7c3aed"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="3" width="7" height="7" />
+                                <rect x="14" y="3" width="7" height="7" />
+                                <rect x="3" y="14" width="7" height="7" />
+                                <rect x="14" y="14" width="7" height="7" />
+                            </svg>
+                        </div>
+                        <span class="text-sm font-semibold text-violet-700">Laporan Pembelian</span>
+                    </button>
+
+                    <button onclick="selectOrderReport(this)"
+                        class="order-report-btn flex items-center gap-3 p-3 rounded-2xl border border-slate-100 bg-slate-50 text-left transition-all hover:border-slate-200 hover:bg-white">
+                        <div class="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center flex-shrink-0">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#059669"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path
+                                    d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18" />
+                            </svg>
+                        </div>
+                        <span class="text-sm font-semibold text-slate-600">Faktur Pembelian</span>
+                    </button>
+
+                </div>
+            </div>
+
+            <div class="h-px bg-slate-100"></div>
+
+            {{-- Date range --}}
+            <div>
+                <p class="text-xs font-semibold tracking-widest uppercase text-slate-400 mb-3">Rentang Tanggal</p>
+                <div class="flex items-center gap-2">
+                    <input type="date" value="{{ \Carbon\Carbon::now()->format('Y-m-d') }}" id="order_start_date"
+                        class="flex-1 text-sm border border-slate-200 rounded-xl px-3 py-2 text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300" />
+                    <span class="text-slate-400 text-sm font-medium">—</span>
+                    <input type="date" value="{{ \Carbon\Carbon::now()->format('Y-m-d') }}" id="order_end_date"
+                        class="flex-1 text-sm border border-slate-200 rounded-xl px-3 py-2 text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300" />
+                </div>
+            </div>
+
+            <div class="h-px bg-slate-100"></div>
+
+            {{-- Conditional filters --}}
+            <div id="order_type_filter" style="display:none;">
+                <p class="text-xs font-semibold tracking-widest uppercase text-slate-400 mb-3">Filter Tipe</p>
+                <div class="flex gap-2">
+                    <div data-value="rekap" onclick="selectOrderOption(this)"
+                        class="order-opt flex items-center gap-4 p-2 px-3 flex-1 rounded-2xl border-2 border-blue-400 bg-blue-50 cursor-pointer transition-all duration-200 hover:-translate-y-0.5">
+                        <div
+                            class="order-icon-box w-7 h-7 rounded-xl flex items-center justify-center shrink-0 bg-blue-400 transition-all duration-200">
+                            <svg class="order-icon-svg text-white" width="14" height="14" viewBox="0 0 24 24"
+                                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                <polyline points="14 2 14 8 20 8" />
+                                <line x1="16" y1="13" x2="8" y2="13" />
+                                <line x1="16" y1="17" x2="8" y2="17" />
+                            </svg>
+                        </div>
+                        <div>
+                            <p class="order-opt-title text-[12px] font-semibold tracking-tight text-blue-900 m-0">Rekap
+                            </p>
+                            <p class="order-opt-desc text-[9px] text-blue-500 m-0 mt-0.5">Hasil perhitungan keseluruhan
+                            </p>
+                        </div>
+                    </div>
+                    <div data-value="detail" onclick="selectOrderOption(this)"
+                        class="order-opt flex items-center gap-4 p-2 px-3 flex-1 rounded-2xl border-2 border-gray-200 bg-white cursor-pointer transition-all duration-200 hover:-translate-y-0.5">
+                        <div
+                            class="order-icon-box w-7 h-7 rounded-xl flex items-center justify-center shrink-0 bg-gray-100 transition-all duration-200">
+                            <svg class="order-icon-svg text-gray-400" width="14" height="14"
+                                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="11" cy="11" r="8" />
+                                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                                <line x1="11" y1="8" x2="11" y2="14" />
+                                <line x1="8" y1="11" x2="14" y2="11" />
+                            </svg>
+                        </div>
+                        <div>
+                            <p class="order-opt-title text-[12px] font-semibold tracking-tight text-gray-800 m-0">
+                                Detail</p>
+                            <p class="order-opt-desc text-[9px] text-gray-400 m-0 mt-0.5">Menampilkan seluruh data</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {{-- Supplier/Creditor select — shown only when Per Supplier + Detail --}}
+            <div id="order_supplier_select" style="display:none;">
+                @php $getcreditor = \App\Models\Creditor::all(); @endphp
+                <p class="text-xs font-semibold tracking-widest uppercase text-slate-400 mb-3">Pilih Kreditur</p>
+                <select id="order_supplier" name="order_supplier" class="w-full select2-order-supplier">
+                    <option></option>
+                    @foreach ($getcreditor as $creditor)
+                        <option value="{{ $creditor->id }}">{{ $creditor->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+        </div>
+    </div>
+
+    {{-- Footer submit — outside scroll area, always visible --}}
+    <div class="mb-5 mx-5">
+        <button onclick="getOrderReport()"
+            class="w-full flex items-center justify-center gap-2 bg-[linear-gradient(45deg,_#41a8f4,_#7cd086)] active:scale-[0.98] text-white text-sm font-semibold py-3 rounded-2xl transition-all">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 6 2 18 2 18 9" />
+                <path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2" />
+                <rect x="6" y="14" width="12" height="8" />
+            </svg>
+            Cetak Laporan
+        </button>
+    </div>
+</div>
+
+
 {{-- Report Modal --}}
 <div id="reportModal"
     class="modal-hide modal-transition fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
@@ -706,7 +875,7 @@
     <div class="bg-slate-800 px-6 py-5 flex items-center justify-between">
         <div>
             <p class="text-slate-400 text-xs font-semibold tracking-widest uppercase mb-1">Manajemen Sistem</p>
-            <h2 class="text-white text-xl font-semibold">Laporan Penjualan</h2>
+            <h2 class="text-white text-xl font-semibold" id="reporttitle">Laporan Penjualan</h2>
         </div>
         <div class="w-10 h-10 bg-white/10 rounded-2xl flex items-center justify-center">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"
@@ -718,8 +887,10 @@
             </svg>
         </div>
     </div>
+    {{-- Orders Report Modal --}}
+
     <div class="reportModalContent bg-red">
-        <div class="px-5 py-5 space-y-5">
+        <div id="reportcontent" class="px-5 py-5 space-y-5">
             <div>
                 <p class="text-xs font-semibold tracking-widest uppercase text-slate-400 mb-3">Jenis Laporan</p>
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-2" id="report-grid">
@@ -955,6 +1126,9 @@
     </div>
 
 </div>
+
+
+
 
 {{-- Master Modal --}}
 <div id="masterModal"
