@@ -115,10 +115,9 @@
                         class="flex h-12 w-12 items-center justify-center rounded-xl bg-red-100 transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-6">
                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#991b1b"
                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                            <polyline points="14 2 14 8 20 8" />
-                            <line x1="16" y1="13" x2="8" y2="13" />
-                            <line x1="16" y1="17" x2="8" y2="17" />
+                            <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" />
+                            <line x1="3" y1="6" x2="21" y2="6" />
+                            <path d="M16 10a4 4 0 01-8 0" />
                         </svg>
                     </div>
                     <span class="text-[11.5px] font-semibold leading-tight text-red-800">Laporan Pembelian</span>
