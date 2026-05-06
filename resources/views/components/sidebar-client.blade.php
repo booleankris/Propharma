@@ -93,7 +93,7 @@
         font-weight: 700;
         letter-spacing: 0.12em;
         text-transform: uppercase;
-        color: #475569;
+        color: #afd0ff;
         padding: 8px 12px 6px;
         margin-top: 8px;
     }
@@ -580,7 +580,7 @@
         </a>
 
 
-        <div class="nav-section-title">Laporan</div>
+        <div class="nav-section-title">Statistik</div>
 
         <a onclick="openModal('salesModal')" class="nav-item {{ request()->is('sales*') ? 'active' : '' }}"
             style="cursor:pointer;">
@@ -624,6 +624,18 @@
                 <path d="M16 10a4 4 0 01-8 0" />
             </svg>
             Laporan Pembelian
+        </a>
+        <a href="{{ route('pareto.index') }}" class="nav-item" style="cursor:pointer;">
+
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-chart-sankey">
+                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                <path d="M3 3v18h18" />
+                <path d="M3 6h18" />
+                <path d="M3 8c10 0 8 9 18 9" />
+            </svg>
+            Pareto
         </a>
 
         <div class="nav-section-title">Master</div>

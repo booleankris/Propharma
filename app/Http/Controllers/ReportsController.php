@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\Export\ParetoExport;
 use App\Exports\Orders\InvoiceExport;
 use App\Exports\Orders\OrdersExport;
 use App\Exports\Report\CategoryExport;
@@ -23,6 +24,7 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class ReportsController extends Controller
 {
+    // Report Data
     public function reports(Request $request)
     {
 
@@ -223,11 +225,11 @@ class ReportsController extends Controller
         }
         // ================================ ================== ===================================
 
-
         return response()->json([
             'status'   => "success",
         ]);
     }
+
     public function transactions()
     {
         return view('report.transactions');

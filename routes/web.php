@@ -40,6 +40,7 @@ use App\Http\Controllers\Master\ParametersController;
 use App\Http\Controllers\Master\PatientsController;
 use App\Http\Controllers\Orders\OrdersController;
 use App\Http\Controllers\Orders\ReceivingController;
+use App\Http\Controllers\ParetoController;
 use App\Http\Controllers\PrintController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\RejectController;
@@ -280,11 +281,15 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     Route::get('/reports/medicines', [ReportsController::class, 'medicines'])->name('reports.medicines');
     Route::get('/reports/doctors', [ReportsController::class, 'doctors'])->name('reports.doctors');
     Route::get('/reports/patients', [ReportsController::class, 'patients'])->name('reports.patients');
-
     Route::post('/reports', [ReportsController::class, 'reports'])->name('reports');
 
+    // Pareto
+    Route::get('/pareto', [ParetoController::class, 'index'])->name('pareto.index');
+    Route::get('/getpareto', [ParetoController::class, 'salesPareto'])->name('pareto.get');
+    Route::get('/getparetoorders', [ParetoController::class, 'ordersPareto'])->name('pareto.orders.get');
+    Route::get('/exportpareto', [ParetoController::class, 'export'])->name('pareto.export');
 
-
+    
     // Patient Export
     Route::post('/reports/export/patients', [ReportsController::class, 'exportPatients'])
         ->name('reports.export.patients');

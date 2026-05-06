@@ -29,237 +29,248 @@
                 <h1 class="text-2xl font-montserrat font-black text-[#008bff] capitalize leading-tight">Dashboard Kasir
                 </h1>
             </div>
-            <div class="grid md:grid-cols-9 grid-cols-4 gap-3 py-6">
+            <div
+                class="px-[30px] py-[5px] my-[18px] bg-[#ebf8ff] rounded-[20px] shadow-[0px_12px_24px_#8f8f8f1c] border border-[#73e2ff]">
+                <div class="py-5 space-y-3 w-full md:w-[70%]">
 
-                {{-- Penjualan --}}
-                <a href="{{ url('transaction/upds') }}"
-                    class="group flex flex-col items-center gap-2.5 rounded-2xl border border-blue-200 bg-[#d2eeff] px-3 py-4 text-center no-underline transition-all duration-300 hover:-translate-y-1.5 hover:shadow-lg hover:shadow-blue-100 active:scale-95">
-                    <div
-                        class="flex h-12 w-12 items-center justify-center rounded-xl bg-[#bde7ff] transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-6">
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1d6fbe"
-                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
-                            <line x1="3" y1="6" x2="21" y2="6" />
-                            <path d="M16 10a4 4 0 0 1-8 0" />
-                        </svg>
-                    </div>
-                    <span class="text-[11.5px] font-semibold leading-tight text-blue-700">Penjualan</span>
-                </a>
+                    {{-- TRANSAKSI --}}
+                    <div>
+                        <p class="text-[10.5px] font-semibold uppercase tracking-widest mb-2.5 px-0.5"
+                            style="color:#7aa3c0; letter-spacing:0.09em;">
+                            Transaksi
+                        </p>
+                        <div class="grid grid-cols-2 gap-2 w-full md:w-auto md:inline-grid"
+                            style="grid-template-columns: repeat(3, minmax(80px, 224px))">
 
-                {{-- Pembelian --}}
-                <a href="{{ route('receiving.index') }}"
-                    class="group flex flex-col items-center gap-2.5 rounded-2xl border border-green-200 bg-green-50 px-3 py-4 text-center no-underline transition-all duration-300 hover:-translate-y-1.5 hover:shadow-lg hover:shadow-green-100 active:scale-95">
-                    <div
-                        class="flex h-12 w-12 items-center justify-center rounded-xl bg-green-100 transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-6">
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#166534"
-                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="9" cy="21" r="1" />
-                            <circle cx="20" cy="21" r="1" />
-                            <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
-                        </svg>
-                    </div>
-                    <span class="text-[11.5px] font-semibold leading-tight text-green-800">Pembelian</span>
-                </a>
+                            {{-- Penjualan --}}
+                            <a href="{{ url('transaction/upds') }}"
+                                class="group flex flex-col items-center gap-2 rounded-2xl px-3 py-4 text-center transition-all duration-200
+          bg-[#1d7ed8] text-white shadow-[0px_6px_16px_#1d7ed866]
+          hover:-translate-y-0.5 hover:bg-[#1669b2] active:scale-95">
 
-                {{-- Data Penjualan --}}
-                <a onclick="openModal('salesModal')"
-                    class="group flex flex-col items-center gap-2.5 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-4 text-center no-underline transition-all duration-300 hover:-translate-y-1.5 hover:shadow-lg hover:shadow-amber-100 active:scale-95 cursor-pointer">
-                    <div
-                        class="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-100 transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-6">
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#92400e"
-                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <line x1="12" y1="20" x2="12" y2="10" />
-                            <line x1="18" y1="20" x2="18" y2="4" />
-                            <line x1="6" y1="20" x2="6" y2="16" />
-                            <polyline points="1 20 23 20" />
-                        </svg>
-                    </div>
-                    <span class="text-[11.5px] font-semibold leading-tight text-amber-800">Data Penjualan</span>
-                </a>
+                                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-white/20">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+                                        stroke="currentColor" stroke-width="2">
+                                        <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
+                                        <line x1="3" y1="6" x2="21" y2="6" />
+                                        <path d="M16 10a4 4 0 0 1-8 0" />
+                                    </svg>
+                                </div>
 
-                {{-- Data Pembelian --}}
-                <a onclick="openModal('receivingModal')"
-                    class="group flex flex-col items-center gap-2.5 rounded-2xl border border-purple-200 bg-purple-50 px-3 py-4 text-center no-underline transition-all duration-300 hover:-translate-y-1.5 hover:shadow-lg hover:shadow-purple-100 active:scale-95 cursor-pointer">
-                    <div
-                        class="flex h-12 w-12 items-center justify-center rounded-xl bg-purple-100 transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-6">
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6b21a8"
-                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <rect x="1" y="3" width="15" height="13" rx="2" />
-                            <path d="M16 8h4l4 5v4h-8V8z" />
-                            <circle cx="5.5" cy="18.5" r="2.5" />
-                            <circle cx="18.5" cy="18.5" r="2.5" />
-                        </svg>
-                    </div>
-                    <span class="text-[11.5px] font-semibold leading-tight text-purple-800">Data Pembelian</span>
-                </a>
+                                <span class="text-[12px] font-semibold">Penjualan</span>
+                            </a>
 
-                {{-- Report Data --}}
-                <a onclick="openModal('reportModal')"
-                    class="group flex flex-col items-center gap-2.5 rounded-2xl border border-red-200 bg-red-50 px-3 py-4 text-center no-underline transition-all duration-300 hover:-translate-y-1.5 hover:shadow-lg hover:shadow-red-100 active:scale-95 cursor-pointer">
-                    <div
-                        class="flex h-12 w-12 items-center justify-center rounded-xl bg-red-100 transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-6">
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#991b1b"
-                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                            <polyline points="14 2 14 8 20 8" />
-                            <line x1="16" y1="13" x2="8" y2="13" />
-                            <line x1="16" y1="17" x2="8" y2="17" />
-                        </svg>
-                    </div>
-                    <span class="text-[11.5px] font-semibold leading-tight text-red-800">Laporan Penjualan</span>
-                </a>
-                {{-- Receiving Raport Data --}}
-                <a onclick="openModal('orderReportModal')"
-                    class="group flex flex-col items-center gap-2.5 rounded-2xl border border-[#ffc5fa] bg-[#fff1fc] px-3 py-4 text-center no-underline transition-all duration-300 hover:-translate-y-1.5 hover:shadow-lg hover:shadow-red-100 active:scale-95 cursor-pointer">
-                    <div
-                        class="flex h-12 w-12 items-center justify-center rounded-xl bg-red-100 transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-6">
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#991b1b"
-                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" />
-                            <line x1="3" y1="6" x2="21" y2="6" />
-                            <path d="M16 10a4 4 0 01-8 0" />
-                        </svg>
-                    </div>
-                    <span class="text-[11.5px] font-semibold leading-tight text-red-800">Laporan Pembelian</span>
-                </a>
-                {{-- Master Data --}}
-                <a onclick="openModal('masterModal')"
-                    class="group flex flex-col items-center gap-2.5 rounded-2xl border border-teal-200 bg-teal-50 px-3 py-4 text-center no-underline transition-all duration-300 hover:-translate-y-1.5 hover:shadow-lg hover:shadow-teal-100 active:scale-95 cursor-pointer">
-                    <div
-                        class="flex h-12 w-12 items-center justify-center rounded-xl bg-teal-100 transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-6">
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0f766e"
-                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <ellipse cx="12" cy="5" rx="9" ry="3" />
-                            <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
-                            <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
-                        </svg>
-                    </div>
-                    <span class="text-[11.5px] font-semibold leading-tight text-teal-800">Master Data</span>
-                </a>
+                            {{-- Pembelian --}}
+                            <a href="{{ route('receiving.index') }}"
+                                class="group flex flex-col items-center gap-2 rounded-2xl px-3 py-4 text-center transition-all duration-200
+          bg-[#2e7d32] text-white shadow-[0px_6px_16px_#2e7d3266]
+          hover:-translate-y-0.5 hover:bg-[#256628] active:scale-95">
 
-                {{-- Persediaan --}}
-                <a onclick="openModal('logModal')"
-                    class="group flex flex-col items-center gap-2.5 rounded-2xl border border-orange-200 bg-orange-50 px-3 py-4 text-center no-underline transition-all duration-300 hover:-translate-y-1.5 hover:shadow-lg hover:shadow-orange-100 active:scale-95 cursor-pointer">
-                    <div
-                        class="flex h-12 w-12 items-center justify-center rounded-xl bg-orange-100 transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-6">
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#9a3412"
-                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path
-                                d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-                            <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
-                            <line x1="12" y1="22.08" x2="12" y2="12" />
-                        </svg>
-                    </div>
-                    <span class="text-[11.5px] font-semibold leading-tight text-orange-800">Persediaan</span>
-                </a>
+                                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-white/20">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+                                        stroke="currentColor" stroke-width="2">
+                                        <circle cx="9" cy="21" r="1" />
+                                        <circle cx="20" cy="21" r="1" />
+                                        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+                                    </svg>
+                                </div>
 
-                {{-- Mutasi --}}
-                <a onclick="openModal('transfersModal')"
-                    class="group flex flex-col items-center gap-2.5 rounded-2xl border border-indigo-200 bg-indigo-50 px-3 py-4 text-center no-underline transition-all duration-300 hover:-translate-y-1.5 hover:shadow-lg hover:shadow-indigo-100 active:scale-95 cursor-pointer">
-                    <div
-                        class="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-100 transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-6">
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3730a3"
-                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <polyline points="17 1 21 5 17 9" />
-                            <path d="M3 11V9a4 4 0 0 1 4-4h14" />
-                            <polyline points="7 23 3 19 7 15" />
-                            <path d="M21 13v2a4 4 0 0 1-4 4H3" />
-                        </svg>
+                                <span class="text-[12px] font-semibold">Pembelian</span>
+                            </a>
+                        </div>
                     </div>
-                    <span class="text-[11.5px] font-semibold leading-tight text-indigo-800">Mutasi</span>
-                </a>
 
+                    <hr style="border-color:#cce0f0;">
+
+                    {{-- DATA & LAPORAN --}}
+                    <div>
+                        <p class="text-[10.5px] font-semibold uppercase tracking-widest mb-2.5 px-0.5"
+                            style="color:#7aa3c0; letter-spacing:0.09em;">
+                            Data &amp; Laporan
+                        </p>
+                        <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+
+                            {{-- Data Penjualan --}}
+                            <a onclick="openModal('salesModal')"
+                                class="group flex flex-col items-center gap-2 shadow-[0px_2px_10px_#218aeb38] rounded-2xl bg-white px-2 py-4 text-center transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#f7fbff] active:scale-95 cursor-pointer"
+                                style="border: 1px solid #d4e8f7;">
+                                <div class="flex h-11 w-11 items-center justify-center rounded-xl transition-colors duration-200"
+                                    style="background:#fef0d6; color:#7a4a08;" onmouseover="this.style.background='#fde5b8'"
+                                    onmouseout="this.style.background='#fef0d6'">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+                                        stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round">
+                                        <line x1="12" y1="20" x2="12" y2="10" />
+                                        <line x1="18" y1="20" x2="18" y2="4" />
+                                        <line x1="6" y1="20" x2="6" y2="16" />
+                                        <polyline points="1 20 23 20" />
+                                    </svg>
+                                </div>
+                                <span class="text-[11.5px] font-medium leading-tight" style="color:#2d4a62;">Data
+                                    Penjualan</span>
+                            </a>
+
+                            {{-- Data Pembelian --}}
+                            <a onclick="openModal('receivingModal')"
+                                class="group flex flex-col items-center gap-2 shadow-[0px_2px_10px_#218aeb38] rounded-2xl bg-white px-2 py-4 text-center transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#f7fbff] active:scale-95 cursor-pointer"
+                                style="border: 1px solid #d4e8f7;">
+                                <div class="flex h-11 w-11 items-center justify-center rounded-xl transition-colors duration-200"
+                                    style="background:#eeecfd; color:#4c41b5;" onmouseover="this.style.background='#e0ddfb'"
+                                    onmouseout="this.style.background='#eeecfd'">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+                                        stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round">
+                                        <rect x="1" y="3" width="15" height="13" rx="2" />
+                                        <path d="M16 8h4l4 5v4h-8V8z" />
+                                        <circle cx="5.5" cy="18.5" r="2.5" />
+                                        <circle cx="18.5" cy="18.5" r="2.5" />
+                                    </svg>
+                                </div>
+                                <span class="text-[11.5px] font-medium leading-tight" style="color:#2d4a62;">Data
+                                    Pembelian</span>
+                            </a>
+
+                            {{-- Laporan Penjualan --}}
+                            <a onclick="openModal('reportModal')"
+                                class="group flex flex-col items-center gap-2 shadow-[0px_2px_10px_#218aeb38] rounded-2xl bg-white px-2 py-4 text-center transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#f7fbff] active:scale-95 cursor-pointer"
+                                style="border: 1px solid #d4e8f7;">
+                                <div class="flex h-11 w-11 items-center justify-center rounded-xl transition-colors duration-200"
+                                    style="background:#fde8e8; color:#9b2020;"
+                                    onmouseover="this.style.background='#fcd4d4'"
+                                    onmouseout="this.style.background='#fde8e8'">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+                                        stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round">
+                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                        <polyline points="14 2 14 8 20 8" />
+                                        <line x1="16" y1="13" x2="8" y2="13" />
+                                        <line x1="16" y1="17" x2="8" y2="17" />
+                                    </svg>
+                                </div>
+                                <span class="text-[11.5px] font-medium leading-tight" style="color:#2d4a62;">Laporan
+                                    Penjualan</span>
+                            </a>
+
+                            {{-- Laporan Pembelian --}}
+                            <a onclick="openModal('orderReportModal')"
+                                class="group flex flex-col items-center gap-2 shadow-[0px_2px_10px_#218aeb38] rounded-2xl bg-white px-2 py-4 text-center transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#f7fbff] active:scale-95 cursor-pointer"
+                                style="border: 1px solid #d4e8f7;">
+                                <div class="flex h-11 w-11 items-center justify-center rounded-xl transition-colors duration-200"
+                                    style="background:#fdeae2; color:#8c3418;"
+                                    onmouseover="this.style.background='#fcd8cc'"
+                                    onmouseout="this.style.background='#fdeae2'">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+                                        stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round">
+                                        <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" />
+                                        <line x1="3" y1="6" x2="21" y2="6" />
+                                        <path d="M16 10a4 4 0 01-8 0" />
+                                    </svg>
+                                </div>
+                                <span class="text-[11.5px] font-medium leading-tight" style="color:#2d4a62;">Laporan
+                                    Pembelian</span>
+                            </a>
+
+                            {{-- Pareto --}}
+                            <a href="{{ route('pareto.index') }}"
+                                class="group flex flex-col items-center gap-2 shadow-[0px_2px_10px_#218aeb38] rounded-2xl bg-white px-2 py-4 text-center transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#f7fbff] active:scale-95 cursor-pointer"
+                                style="border: 1px solid #d4e8f7;">
+                                <div class="flex h-11 w-11 items-center justify-center rounded-xl transition-colors duration-200"
+                                    style="background:#fce8f3; color:#8b2857;"
+                                    onmouseover="this.style.background='#f9d4e8'"
+                                    onmouseout="this.style.background='#fce8f3'">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"
+                                        viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                        stroke-linecap="round" stroke-linejoin="round">
+                                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                        <path d="M3 3v18h18" />
+                                        <path d="M3 6h18" />
+                                        <path d="M3 8c10 0 8 9 18 9" />
+                                    </svg>
+                                </div>
+                                <span class="text-[11.5px] font-medium leading-tight" style="color:#2d4a62;">Pareto</span>
+                            </a>
+
+                        </div>
+                    </div>
+
+                    <hr style="border-color:#cce0f0;">
+
+                    {{-- MANAJEMEN --}}
+                    <div>
+                        <p class="text-[10.5px] font-semibold uppercase tracking-widest mb-2.5 px-0.5"
+                            style="color:#7aa3c0; letter-spacing:0.09em;">
+                            Manajemen
+                        </p>
+                        <div class="grid grid-cols-3 gap-2 w-full md:w-auto md:inline-grid"
+                            style="grid-template-columns: repeat(3, minmax(80px, 110px))">
+
+                            {{-- Master Data --}}
+                            <a onclick="openModal('masterModal')"
+                                class="group flex flex-col items-center gap-2 shadow-[0px_2px_10px_#218aeb38] rounded-2xl bg-white px-2 py-4 text-center transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#f7fbff] active:scale-95 cursor-pointer"
+                                style="border: 1px solid #d4e8f7;">
+                                <div class="flex h-11 w-11 items-center justify-center rounded-xl transition-colors duration-200"
+                                    style="background:#d8f2eb; color:#0d6b55;"
+                                    onmouseover="this.style.background='#c2ece1'"
+                                    onmouseout="this.style.background='#d8f2eb'">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+                                        stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round">
+                                        <ellipse cx="12" cy="5" rx="9" ry="3" />
+                                        <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
+                                        <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
+                                    </svg>
+                                </div>
+                                <span class="text-[11.5px] font-medium leading-tight" style="color:#2d4a62;">Master
+                                    Data</span>
+                            </a>
+
+                            {{-- Persediaan --}}
+                            <a onclick="openModal('logModal')"
+                                class="group flex flex-col items-center gap-2 shadow-[0px_2px_10px_#218aeb38] rounded-2xl bg-white px-2 py-4 text-center transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#f7fbff] active:scale-95 cursor-pointer"
+                                style="border: 1px solid #d4e8f7;">
+                                <div class="flex h-11 w-11 items-center justify-center rounded-xl transition-colors duration-200"
+                                    style="background:#fef0d6; color:#7a4a08;"
+                                    onmouseover="this.style.background='#fde5b8'"
+                                    onmouseout="this.style.background='#fef0d6'">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+                                        stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round">
+                                        <path
+                                            d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                                        <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+                                        <line x1="12" y1="22.08" x2="12" y2="12" />
+                                    </svg>
+                                </div>
+                                <span class="text-[11.5px] font-medium leading-tight"
+                                    style="color:#2d4a62;">Persediaan</span>
+                            </a>
+                            {{-- Mutasi --}}
+                            <a onclick="openModal('transfersModal')"
+                                class="group flex flex-col items-center gap-2 rounded-2xl shadow-[0px_2px_10px_#218aeb38] bg-white px-2 py-4 text-center transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#f7fbff] active:scale-95 cursor-pointer"
+                                style="border: 1px solid #d4e8f7;">
+                                <div class="flex h-11 w-11 items-center justify-center rounded-xl transition-colors duration-200"
+                                    style="background:#d8f2eb; color:#0d6b55;"
+                                    onmouseover="this.style.background='#c2ece1'"
+                                    onmouseout="this.style.background='#d8f2eb'">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+                                        stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round">
+                                        <polyline points="17 1 21 5 17 9" />
+                                        <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+                                        <polyline points="7 23 3 19 7 15" />
+                                        <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+                                    </svg>
+                                </div>
+                                <span class="text-[11.5px] font-medium leading-tight" style="color:#2d4a62;">Mutasi</span>
+                            </a>
+
+                        </div>
+                    </div>
+
+                </div>
             </div>
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-7">
-
-                {{-- Penjualan --}}
-                <div class="stat-card stat-blue">
-                    <div class="stat-card-top">
-                        <div class="stat-icon">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0C447C"
-                                stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                                <line x1="12" y1="1" x2="12" y2="23" />
-                                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-                            </svg>
-                        </div>
-                    </div>
-                    <div>
-                        <div class="stat-value">{{ $total_orders_rp }}</div>
-                        <div class="stat-label">Pembelian</div>
-                    </div>
-                </div>
-
-                <div class="stat-card stat-green">
-                    <div class="stat-card-top">
-                        <div class="stat-icon">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0C447C"
-                                stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                                <line x1="12" y1="1" x2="12" y2="23" />
-                                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-                            </svg>
-                        </div>
-                    </div>
-                    <div>
-                        <div class="stat-value">{{ $total_sales_rp }}</div>
-                        <div class="stat-label">Penjualan</div>
-                    </div>
-                </div>
-
-                {{-- Transaksi --}
-                <div class="stat-card stat-green">
-                    <div class="stat-card-top">
-                        <div class="stat-icon">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#27500A"
-                                stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-                            </svg>
-                        </div>
-                    </div>
-                    <div>
-                        <div class="stat-value">{{ $qty_sales }}</div>
-                        <div class="stat-label">Transaksi</div>
-                    </div>
-                </div>
-
-                {{-- Stok Menipis --}}
-                <div class="stat-card stat-amber">
-                    <div class="stat-card-top">
-                        <div class="stat-icon">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#633806"
-                                stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                                <path
-                                    d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-                            </svg>
-                        </div>
-                        <span class="stat-badge">↑ 3 item</span>
-                    </div>
-                    <div>
-                        <div class="stat-value">14 item</div>
-                        <div class="stat-label">Stok menipis</div>
-                    </div>
-                </div>
-
-                {{-- Pasien --}}
-                <div class="stat-card stat-purple">
-                    <div class="stat-card-top">
-                        <div class="stat-icon">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3C3489"
-                                stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                                <circle cx="9" cy="7" r="4" />
-                                <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                            </svg>
-                        </div>
-                        <span class="stat-badge">↑ 5,2%</span>
-                    </div>
-                    <div>
-                        <div class="stat-value">87</div>
-                        <div class="stat-label">Pasien</div>
-                    </div>
-                </div>
-
-            </div>
+            
             <div
                 class="min-w-[375px] md:min-w-[700px] xl:min-w-[800px] mt-3 grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-3 3xl:grid-cols-6">
                 <div
