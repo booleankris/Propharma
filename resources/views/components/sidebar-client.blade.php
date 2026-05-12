@@ -637,7 +637,7 @@
             </svg>
             Pareto
         </a>
-        <a href="{{ route('pareto.index') }}" class="nav-item" style="cursor:pointer;">
+        <a href="{{ route('invoices.index') }}" class="nav-item" style="cursor:pointer;">
 
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
                 fill="currentColor" class="icon icon-tabler icons-tabler-filled icon-tabler-receipt">
@@ -647,7 +647,7 @@
             </svg>
             Klaim Tagihan
         </a>
-        <a href="{{ route('pareto.index') }}" class="nav-item" style="cursor:pointer;">
+        <a href="{{ route('orders-payment.index') }}" class="nav-item" style="cursor:pointer;">
 
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
                 fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
