@@ -1,5 +1,6 @@
 <?php
 
+use App\Exports\Orders\InvoiceExport;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
@@ -28,6 +29,7 @@ use App\Http\Controllers\AdminItemController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\CreditorController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\InvoicesController;
 use App\Http\Controllers\Master\CategoriesController;
 use App\Http\Controllers\Master\CompositionsController;
 use App\Http\Controllers\Master\DebtorsController;
@@ -40,6 +42,7 @@ use App\Http\Controllers\Master\ParametersController;
 use App\Http\Controllers\Master\PatientsController;
 use App\Http\Controllers\Orders\OrdersController;
 use App\Http\Controllers\Orders\ReceivingController;
+use App\Http\Controllers\OrdersPayment;
 use App\Http\Controllers\ParetoController;
 use App\Http\Controllers\PrintController;
 use App\Http\Controllers\ProductController;
@@ -289,7 +292,7 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     Route::get('/getparetoorders', [ParetoController::class, 'ordersPareto'])->name('pareto.orders.get');
     Route::get('/exportpareto', [ParetoController::class, 'export'])->name('pareto.export');
 
-    
+
     // Patient Export
     Route::post('/reports/export/patients', [ReportsController::class, 'exportPatients'])
         ->name('reports.export.patients');
@@ -356,7 +359,21 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
 
     Route::get('/receiving/orders', [ReceivingController::class, 'orders'])->name('receiving.orders');
 
+    // ================================ Statistic ================================
 
+    // INVOICES (Tagihan)
+    Route::prefix('invoices')->name('invoices.')->group(function () {
+        Route::get('/',              [InvoicesController::class, 'index'])->name('index');
+        Route::get('/get',           [InvoicesController::class, 'getInvoices'])->name('get');
+        Route::post('/klaim/{id}',   [InvoicesController::class, 'klaim'])->name('klaim');
+    });
+
+    // Hutang Dagang
+    Route::prefix('orders-payment')->name('orders-payment.')->group(function () {
+        Route::get('/',             [OrdersPayment::class, 'index'])->name('index');
+        Route::get('/get',          [OrdersPayment::class, 'getOrdersPayment'])->name('get');
+        Route::post('/selesai/{id}', [OrdersPayment::class, 'selesai'])->name('selesai');
+    });
 
     Route::get('/compositions/select', [CompositionsController::class, 'select'])->name('composition.select');
     Route::get('/factories/select', [FactoriesController::class, 'select'])->name('factories.select');

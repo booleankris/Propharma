@@ -39,6 +39,10 @@ class MedicineTransactions extends Model
     {
         return $this->belongsTo(Doctors::class, 'doctor_id');
     }
+    public function debtors()
+    {
+        return $this->belongsTo(Debtors::class, 'debtor_id');
+    }
     public function shift_logs()
     {
         return $this->belongsTo(ShiftLogs::class, 'shift_logs_id');
