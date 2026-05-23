@@ -70,14 +70,15 @@
                             </div>
 
                             <div class="form-group row">
-                                <label for="password" class="col-sm-3 col-form-label">Password</label>
+                                <label for="password" class="col-sm-3 col-form-label">Password / PIN Rahasia</label>
                                 <div class="col-sm-9">
                                     {!! Form::password('password', [
                                         'id' => 'password',
-                                        'placeholder' => 'Password',
+                                        'placeholder' => 'Password / PIN Rahasia',
                                         'class' => 'form-control pwstrength',
                                         'data-indicator' => 'pwindicator',
                                         'required',
+                                        'maxlength' => 6,
                                     ]) !!}
                                     <div id="pwindicator" class="pwindicator">
                                         <div class="bar"></div>
@@ -87,13 +88,14 @@
                             </div>
 
                             <div class="form-group row">
-                                <label for="confirm-password" class="col-sm-3 col-form-label">Confirm Password</label>
+                                <label for="confirm-password" class="col-sm-3 col-form-label">Konfirmasi Password / PIN Rahasia</label>
                                 <div class="col-sm-9">
                                     {!! Form::password('confirm-password', [
                                         'id' => 'confirm-password',
-                                        'placeholder' => 'Confirm Password',
+                                        'placeholder' => 'Konfirmasi Password / PIN Rahasia',
                                         'class' => 'form-control',
                                         'required',
+                                        'maxlength' => 6,
                                     ]) !!}
                                 </div>
                             </div>

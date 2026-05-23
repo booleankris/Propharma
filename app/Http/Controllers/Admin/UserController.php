@@ -108,8 +108,8 @@ class UserController extends Controller
             'password'    => 'required|min:6|same:confirm-password',
             'roles'       => 'required'
         ]);
-
         $input = $request->all();
+        $input['secret_pin'] =  $input['password'];
         $input['password'] = FacadesHash::make($input['password']);
 
         $user = User::create($input);
