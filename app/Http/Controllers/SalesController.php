@@ -20,7 +20,7 @@ use App\Models\Sales;
 use App\Models\TicketPayment;
 use App\Models\TicketTransaction;
 use App\Models\MedicineTransfers;
-
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -1252,6 +1252,31 @@ class SalesController extends Controller
         return response()->json(
             $query->orderBy('id', 'desc')->paginate($perPage)
         );
+    }
+    public function verifyPin(Request $request)
+    {
+        $request->validate([
+            'pin' => ['required', 'digits:6'],
+        ]);
+
+        $user = User::where('secret_pin', $request->pin)->first();
+
+        if (!$user) {
+
+            return response()->json([
+                'success' => false,
+                'message' => 'PIN salah, silahkan coba lagi'
+            ], 401);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'PIN ditemukan',
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+            ]
+        ]);
     }
     public function openSearch(Request $request)
     {

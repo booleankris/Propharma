@@ -46,12 +46,14 @@ use App\Http\Controllers\OrdersPayment;
 use App\Http\Controllers\ParetoController;
 use App\Http\Controllers\PrintController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RejectController;
 use App\Http\Controllers\ReportsController;
 use App\Http\Controllers\ReturController;
 use App\Http\Controllers\Sales\ReturDataController;
 use App\Http\Controllers\Sales\SalesDataController;
 use App\Http\Controllers\SalesController;
+use App\Http\Controllers\StaffStatsController;
 use App\Http\Controllers\SuppliesController;
 use App\Http\Controllers\TransactionReportController;
 use App\Http\Controllers\TransfersController;
@@ -157,11 +159,14 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
 
 
     // Medicine Data 
-    Route::get('/transactions/getmedicinemaster', [SalesController::class, 'openMedicineMaster']);
+    Route::get('/transactions/getmedicinemaster', [SalesController::class, 'openMedicineMaster'])->name('openMedicineMaster');
 
     // Transaction Data
     Route::get('/transactions/gettransactiondata', [SalesController::class, 'openTransactionData']);
     Route::get('/transactions/{id}/items', [SalesController::class, 'getTransactionItems'])->name('transactions.items');
+
+    // Verify PIN
+    Route::post('/verifypin', [SalesController::class, 'verifyPin'])->name('transactions.verifypin');
 
 
     // ------ Modal Data On Transaction (For Modal) -----
@@ -365,6 +370,7 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     Route::prefix('invoices')->name('invoices.')->group(function () {
         Route::get('/',              [InvoicesController::class, 'index'])->name('index');
         Route::get('/get',           [InvoicesController::class, 'getInvoices'])->name('get');
+        Route::get('/getall',        [InvoicesController::class, 'getAllInvoices'])->name('getall');
         Route::post('/klaim/{id}',   [InvoicesController::class, 'klaim'])->name('klaim');
     });
 
@@ -381,6 +387,14 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     Route::get('/creditors/select', [CreditorsController::class, 'select'])->name('creditors.select');
     Route::get('locations/select', [LocationsController::class, 'select'])->name('locations.select');
     Route::get('/items/select', [ItemsController::class, 'select'])->name('items.select');
+
+    // ================================ Profile ================================
+    Route::get('/profile', [ProfileController::class, 'index'])->name('profile.index');
+    Route::get('/staff-stats', [StaffStatsController::class, 'index'])
+        ->name('admin.staff-stats-page');
+
+    Route::get('/staff-stats/data', [StaffStatsController::class, 'data'])
+        ->name('admin.staff-stats');
 });
 
 

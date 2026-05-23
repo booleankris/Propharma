@@ -30,10 +30,10 @@ class InvoicesController extends Controller
 
         // ── Base query ────────────────────────────────────────────────────────
         $query = MedicineCart::with([
-                'medicine',
-                'transactions.doctors',
-                'transactions.debtors',
-            ])
+            'medicine',
+            'transactions.doctors',
+            'transactions.debtors',
+        ])
             ->where('medicine_cart.medicine_type', 'KREDIT');
 
         // ── Filters ───────────────────────────────────────────────────────────
@@ -53,7 +53,7 @@ class InvoicesController extends Controller
         if ($search) {
             $query->whereHas('medicine', function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('code', 'like', "%{$search}%");
+                    ->orWhere('code', 'like', "%{$search}%");
             });
         }
 
@@ -100,8 +100,108 @@ class InvoicesController extends Controller
                 'DT_RowIndex'       => $rowNumber++,
                 'DT_RowAttr'        => ['data-transaction-id' => $transId],
                 'tanggal'           => $cart->updated_at
-                                            ? $cart->updated_at->format('d/m/Y H:i')
-                                            : '-',
+                    ? $cart->updated_at->format('d/m/Y H:i')
+                    : '-',
+                'nomor_resep'       => $transaction->transaction_code ?? '-',
+                'dokter'            => $transaction->doctors->name ?? '-',
+                'debtor'            => $transaction->debtors->name ?? '-',
+                'nama_obat'         => $cart->medicine->name ?? '-',
+                'qty'               => $cart->quantity,
+                'harga'             => 'Rp ' . number_format($cart->final_price, 0, ',', '.'),
+                'jumlah'            => 'Rp ' . number_format($jumlah, 0, ',', '.'),
+                'status'            => $cart->status,
+                'is_first_in_group' => $isFirstInGroup,
+                'transaction_id'    => $transId,
+            ];
+        });
+
+        return response()->json([
+            'draw'            => (int) $request->input('draw'),
+            'recordsTotal'    => $totalRecords,
+            'recordsFiltered' => $filteredRecords,
+            'data'            => $data->values(),
+        ]);
+    }
+
+    public function getAllInvoices(Request $request)
+    {
+        $startDate = $request->input('start_date');
+        $endDate   = $request->input('end_date');
+        $debtorId  = $request->input('debtor_id');
+        $search    = $request->input('search_medicine');
+
+        // ── Base query ────────────────────────────────────────────────────────
+        $query = MedicineCart::with([
+            'medicine',
+            'transactions.doctors',
+            'transactions.debtors',
+        ]);
+
+        // ── Filters ───────────────────────────────────────────────────────────
+        if ($startDate && $endDate) {
+            $query->whereBetween('medicine_cart.updated_at', [
+                $startDate . ' 00:00:00',
+                $endDate   . ' 23:59:59',
+            ]);
+        }
+
+        if ($debtorId) {
+            $query->whereHas('transactions', function ($q) use ($debtorId) {
+                $q->where('debtor_id', $debtorId);
+            });
+        }
+
+        if ($search) {
+            $query->whereHas('medicine', function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('code', 'like', "%{$search}%");
+            });
+        }
+
+        // ── DataTables paging ─────────────────────────────────────────────────
+        $totalRecords    = (clone $query)->count();
+        $filteredRecords = $totalRecords;
+
+        $start  = (int) $request->input('start', 0);
+        $length = (int) $request->input('length', 25);
+
+        $items = $query
+            ->orderBy('medicine_cart.updated_at', 'desc')
+            ->orderBy('medicine_cart.transaction_id')
+            ->skip($start)
+            ->take($length)
+            ->get();
+
+        // ── Pre-compute SUM(final_price) per transaction_id ───────────────────
+        $transactionIds = $items->pluck('transaction_id')->unique()->values();
+
+        $jumlahMap = MedicineCart::whereIn('transaction_id', $transactionIds)
+            ->select('transaction_id', DB::raw('SUM(final_price) as total_jumlah'))
+            ->groupBy('transaction_id')
+            ->get()
+            ->keyBy('transaction_id');
+
+        // ── Build rows ────────────────────────────────────────────────────────
+        $claimRendered = [];
+        $rowNumber     = $start + 1;
+
+        $data = $items->map(function ($cart) use (&$claimRendered, &$rowNumber, $jumlahMap) {
+            $transaction    = $cart->transactions;
+            $transId        = $cart->transaction_id;
+            $isFirstInGroup = !in_array($transId, $claimRendered);
+
+            if ($isFirstInGroup) {
+                $claimRendered[] = $transId;
+            }
+
+            $jumlah = $jumlahMap[$transId]->total_jumlah ?? 0;
+
+            return [
+                'DT_RowIndex'       => $rowNumber++,
+                'DT_RowAttr'        => ['data-transaction-id' => $transId],
+                'tanggal'           => $cart->updated_at
+                    ? $cart->updated_at->format('d/m/Y H:i')
+                    : '-',
                 'nomor_resep'       => $transaction->transaction_code ?? '-',
                 'dokter'            => $transaction->doctors->name ?? '-',
                 'debtor'            => $transaction->debtors->name ?? '-',

@@ -1352,56 +1352,205 @@
         </div>
     </div>
 @endif
+{{-- ================================= All Sales Modal =============================== --}}
 
-<div id="masterModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-50">
-    <div class="bg-white rounded-xl w-[90%] p-6 relative">
+{{-- Master Modal --}}
+<div id="masterModalMedicine" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-[99999]">
+    <div class="bg-white rounded-2xl w-[90%] max-w-4xl overflow-hidden shadow-xl relative">
 
-        <div class="card w-full shadow-md rounded-2xl p-6 bg-white">
-            <div class="flex items-center mb-6">
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-blue-600 mr-3 drop-shadow-md"
-                    fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" />
-                </svg>
-                <h2 class="text-2xl font-bold text-gray-800 drop-shadow-sm">
-                    Master Data
-                </h2>
-            </div>
-
-            <div id="medicineScroll" class="overflow-y-auto overflow-x-auto p-3 max-h-[400px]">
-                <input type="text" placeholder="Search medicine..." onkeyup="onSearch(this.value)"
-                    class="w-full border rounded-lg px-3 py-2 text-sm mb-2">
-
-                <table class="w-full masterTable">
-                    <thead class="sticky top-0 bg-white z-10">
-                        <tr>
-                            <th>#</th>
-                            <th>Name</th>
-                            <th>Pabrik</th>
-                            <th>Komposisi</th>
-                            <th>Kemasan</th>
-                            <th>Harga</th>
-                            <th>Stok</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody id="masterTable"></tbody>
-                </table>
-
-                <div id="loader" class="text-center py-3 hidden">
-                    Loading...
+        {{-- Header --}}
+        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-blue-600" fill="none"
+                        viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2v-4M9 21H5a2 2 0 01-2-2v-4m0 0h18" />
+                    </svg>
                 </div>
+                <div>
+                    <p class="text-sm font-semibold text-gray-800 leading-tight">Master data medicine</p>
+                    <p class="text-xs text-gray-400 leading-tight">Medicine inventory &amp; stock</p>
+                </div>
+            </div>
+            <button id="closeMasterModal"
+                class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:text-red-500 hover:border-red-200 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24"
+                    stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+
+        {{-- Search --}}
+        <div class="px-6 pt-4 pb-3">
+            <div class="relative">
+                <svg xmlns="http://www.w3.org/2000/svg"
+                    class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none"
+                    viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z" />
+                </svg>
+                <input type="text" placeholder="Search medicine, manufacturer, composition…"
+                    onkeyup="onSearch(this.value)"
+                    class="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 placeholder-gray-400 transition" />
             </div>
         </div>
 
-        <button id="closeMasterModal" class="absolute top-3 right-3 text-gray-500 hover:text-red-500">
-            ✕
-        </button>
+        {{-- Table --}}
+        <div id="medicineScroll" class="overflow-x-auto overflow-y-auto max-h-[400px] px-6">
+            <table class="w-full masterTable text-sm" style="table-layout: fixed;">
+                <colgroup>
+                    <col style="width: 40px">
+                    <col style="width: 160px">
+                    <col style="width: 120px">
+                    <col style="width: 140px">
+                    <col style="width: 80px">
+                    <col style="width: 100px">
+                    <col style="width: 60px">
+                    <col style="width: 80px">
+                </colgroup>
+                <thead class="sticky top-0 z-10">
+                    <tr class="bg-amber-400">
+                        <th
+                            class="py-2.5 px-2 text-left text-[11px] font-bold uppercase tracking-wide text-amber-900">
+                            #</th>
+                        <th
+                            class="py-2.5 px-2 text-left text-[11px] font-bold uppercase tracking-wide text-amber-900">
+                            Name</th>
+                        <th
+                            class="py-2.5 px-2 text-left text-[11px] font-bold uppercase tracking-wide text-amber-900">
+                            Pabrik</th>
+                        <th
+                            class="py-2.5 px-2 text-left text-[11px] font-bold uppercase tracking-wide text-amber-900">
+                            Komposisi</th>
+                        <th
+                            class="py-2.5 px-2 text-left text-[11px] font-bold uppercase tracking-wide text-amber-900">
+                            Kemasan</th>
+                        <th
+                            class="py-2.5 px-2 text-right text-[11px] font-bold uppercase tracking-wide text-amber-900">
+                            Harga</th>
+                        <th
+                            class="py-2.5 px-2 text-right text-[11px] font-bold uppercase tracking-wide text-amber-900">
+                            Stok</th>
+                        <th
+                            class="py-2.5 px-2 text-center text-[11px] font-bold uppercase tracking-wide text-amber-900">
+                            Status</th>
+                    </tr>
+                </thead>
+                <tbody id="masterTable" class="divide-y divide-gray-100">
+                    {{-- Rows injected via JS --}}
+                </tbody>
+            </table>
+
+            <div id="loader" class="text-center py-4 text-sm text-gray-400 hidden">
+                Loading…
+            </div>
+        </div>
+
+        {{-- Footer --}}
+        <div class="px-6 py-3 border-t border-gray-100 flex items-center justify-between">
+            <p id="masterTableCount" class="text-xs text-gray-400">Showing 0 items</p>
+            <div class="flex items-center gap-1">
+                <button id="masterPrevPage"
+                    class="px-2 py-1 text-xs border border-gray-200 rounded-md text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition">
+                    ‹
+                </button>
+                <span id="masterPageInfo" class="text-xs text-gray-400 px-2">Page 1</span>
+                <button id="masterNextPage"
+                    class="px-2 py-1 text-xs border border-gray-200 rounded-md text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition">
+                    ›
+                </button>
+            </div>
+        </div>
+
     </div>
 </div>
+<div id="pinModal" class="hidden fixed inset-0 z-[999999] items-center justify-center bg-black/40">
+    <div id="pinModalCard" class="bg-white rounded-2xl p-6 w-full max-w-sm mx-4"
+        style="border: 0.5px solid rgba(0,0,0,0.08);">
 
+        {{-- Icon --}}
+        <div class="w-10 h-10 rounded-xl flex items-center justify-center mb-4" style="background: #FFF7ED;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F97316"
+                stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+        </div>
+        <h3 class="text-[15px] font-medium text-gray-800 mb-1">Masukkan PIN rahasia</h3>
+        <p class="text-[12px] text-gray-400 mb-5">Masukkan 6 digit PIN untuk melanjutkan aksi ini.</p>
 
-<div id="transactionModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-50">
+        {{-- PIN Dots --}}
+        <div class="flex justify-center gap-3 mb-2" id="pinModalDots">
+            <div class="pin-modal-dot w-3 h-3 rounded-full border-2 border-gray-300 transition-all duration-150">
+            </div>
+            <div class="pin-modal-dot w-3 h-3 rounded-full border-2 border-gray-300 transition-all duration-150">
+            </div>
+            <div class="pin-modal-dot w-3 h-3 rounded-full border-2 border-gray-300 transition-all duration-150">
+            </div>
+            <div class="pin-modal-dot w-3 h-3 rounded-full border-2 border-gray-300 transition-all duration-150">
+            </div>
+            <div class="pin-modal-dot w-3 h-3 rounded-full border-2 border-gray-300 transition-all duration-150">
+            </div>
+            <div class="pin-modal-dot w-3 h-3 rounded-full border-2 border-gray-300 transition-all duration-150">
+            </div>
+        </div>
+
+        {{-- Error --}}
+        <p id="pinModalError" class="hidden text-center text-[11px] text-red-500 mb-3">PIN salah. Coba lagi.</p>
+
+        {{-- Numpad --}}
+        <div class="grid grid-cols-3 gap-2 mb-4" id="pinModalNumpad">
+
+            @foreach (['1', '2', '3', '4', '5', '6', '7', '8', '9'] as $key)
+                <button data-pin-key="{{ $key }}"
+                    class="h-12 rounded-xl border border-gray-100 bg-white text-[15px] font-medium text-gray-700 hover:bg-gray-50 active:scale-95 transition-all duration-100">
+                    {{ $key }}
+                </button>
+            @endforeach
+
+            {{-- Empty --}}
+            <div></div>
+
+            {{-- 0 --}}
+            <button data-pin-key="0"
+                class="h-12 rounded-xl border border-gray-100 bg-white text-[15px] font-medium text-gray-700 hover:bg-gray-50 active:scale-95 transition-all duration-100">
+                0
+            </button>
+
+            {{-- Backspace --}}
+            <button data-pin-key="backspace"
+                class="h-12 rounded-xl border border-gray-100 bg-white flex items-center justify-center text-gray-400 hover:bg-gray-50 active:scale-95 transition-all duration-100">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z" />
+                    <line x1="18" y1="9" x2="12" y2="15" />
+                    <line x1="12" y1="9" x2="18" y2="15" />
+                </svg>
+            </button>
+
+        </div>
+
+        {{-- Cancel --}}
+        <button id="pinModalCancelBtn"
+            class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 text-left transition-colors">
+            <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 text-gray-500 flex-shrink-0">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M19 12H5M5 12l7-7M5 12l7 7" />
+                </svg>
+            </div>
+            <div class="flex-1">
+                <span class="block text-[13px] font-medium text-gray-700">Batal</span>
+                <span class="block text-[11px] text-gray-400">Kembali ke transaksi</span>
+            </div>
+        </button>
+
+    </div>
+</div>
+<div id="transactionModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-[99999]">
 
     <div class="bg-white rounded-xl w-[95%] p-6 relative">
 
@@ -1536,7 +1685,8 @@
     // Global Variable
 
     const faktur = document.getElementById('faktur');
-
+    let checkoutPayload = {};
+    let checkoutProcessing = false;
 
 
     // Modals JS
@@ -1555,12 +1705,21 @@
     const openMasterModal = document.getElementById('openMasterModal');
     const openSearchModal = document.getElementById('openSearchModal');
 
-    const masterModal = document.getElementById('masterModal');
+    const masterModal = document.getElementById('masterModalMedicine');
     const transactionModal = document.getElementById('transactionModal');
 
     const closeMasterModal = document.getElementById('closeMasterModal');
     const closeTransactionModal = document.getElementById('closeTransactionModal');
 
+    // Pin JS
+    let pinModalValue = '';
+
+    const pinModal = document.getElementById('pinModal');
+    const pinModalCard = document.getElementById('pinModalCard');
+    const pinModalDots = document.querySelectorAll('#pinModalDots .pin-modal-dot');
+    const pinModalError = document.getElementById('pinModalError');
+    const pinModalNumpad = document.getElementById('pinModalNumpad');
+    const pinModalCancel = document.getElementById('pinModalCancelBtn');
 
     // Endpoints
     const endpoint = "{{ route('products.search') }}";
@@ -3240,75 +3399,149 @@
         }
     });
 
-    function checkoutItem() {
-        const paid = document.getElementById('pay').value;
-        const changes = document.getElementById('trchange').value;
+
+    async function checkoutItem() {
+
+        const paid = cleanRupiah(
+            document.getElementById('pay').value
+        );
+
+        const changes = cleanRupiah(
+            document.getElementById('trchange').value
+        );
 
         let doctor_id = null;
         let debtor_id = null;
 
+        // TRANSACTION TYPE
         if (transaction_type === 'RESEP TUNAI') {
-            doctor_id = document.getElementById('doctor_id').value || null;
+
+            doctor_id =
+                document.getElementById('doctor_id').value || null;
+
             debtor_id = null;
 
-        } else if (transaction_type === 'UPDS' || transaction_type === 'HV/OTC') {
+        } else if (
+            transaction_type === 'UPDS' ||
+            transaction_type === 'HV/OTC'
+        ) {
+
             doctor_id = null;
             debtor_id = null;
 
         } else {
-            doctor_id = document.getElementById('doctor_id').value || null;
-            debtor_id = document.getElementById('debtor_id').value || null;
+
+            doctor_id =
+                document.getElementById('doctor_id').value || null;
+
+            debtor_id =
+                document.getElementById('debtor_id').value || null;
         }
 
-        const patient_id = document.getElementById('patient_id').value || null;
+        const patient_id =
+            document.getElementById('patient_id').value || null;
 
-        // ── Validation ────────────────────────────────────────────────────────
-        if (transaction_type === 'RESEP TUNAI' && !doctor_id) {
+        // VALIDATION
+        if (
+            transaction_type === 'RESEP TUNAI' &&
+            !doctor_id
+        ) {
+
             iziToast.warning({
                 title: 'Peringatan',
                 message: 'Silahkan Pilih Dokter Dulu',
                 position: 'topRight'
             });
+
             return;
         }
-        if ((transaction_type === 'RESEP KREDIT' || transaction_type === 'RESEP ASURANSI') && !debtor_id) {
+
+        if (
+            (
+                transaction_type === 'RESEP KREDIT' ||
+                transaction_type === 'RESEP ASURANSI'
+            ) &&
+            !debtor_id
+        ) {
+
             iziToast.warning({
                 title: 'Peringatan',
                 message: 'Silahkan Pilih Debitur Dulu',
                 position: 'topRight'
             });
+
             return;
         }
+
         if (!patient_id) {
+
             iziToast.warning({
                 title: 'Peringatan',
                 message: 'Silahkan Pilih Pasien',
                 position: 'topRight'
             });
+
             return;
         }
-        showCheckoutLoading();
-        // ── Step 1: Get transaction items ─────────────────────────────────────
-        axios.post("{{ route('transaction.getTransactionItem') }}", {
+
+        // PREVENT DOUBLE CLICK
+        if (checkoutProcessing) {
+            return;
+        }
+
+        // SAVE PAYLOAD
+        checkoutPayload = {
             transaction_id,
             paid,
             subtotal,
             doctor_id,
             debtor_id,
             patient_id,
-            changes
-        }).then(response => {
-            const transaction_items = response.data.itemTransaction;
-            const transaction = response.data.transaction;
+            changes,
+        };
 
-            // ── Fill invoice ──────────────────────────────────────────────────
-            document.getElementById('receipt').textContent = transaction.transactions.transaction_code;
-            document.getElementById('type').textContent = transaction.transactions.transaction_type;
-            document.getElementById('cashier').textContent = transaction.user.name;
-            document.getElementById('customer').textContent = "Client";
+        showCheckoutLoading();
 
-            document.getElementById('invoiceItems').innerHTML = "";
+        try {
+
+            // GET TRANSACTION ITEMS
+            const response = await axios.post(
+                "{{ route('transaction.getTransactionItem') }}", {
+                    transaction_id,
+                    paid,
+                    subtotal,
+                    doctor_id,
+                    debtor_id,
+                    patient_id,
+                    changes
+                }
+            );
+
+            const transaction_items =
+                response.data.itemTransaction;
+
+            const transaction =
+                response.data.transaction;
+
+            // FILL HEADER
+            document.getElementById('receipt').textContent =
+                transaction.transactions.transaction_code;
+
+            document.getElementById('type').textContent =
+                transaction.transactions.transaction_type;
+
+            document.getElementById('cashier').textContent =
+                transaction.user.name;
+
+            document.getElementById('customer').textContent =
+                'Client';
+
+            // CLEAR ITEMS
+            document.getElementById('invoiceItems').innerHTML = '';
+
+            // FILL ITEMS
             transaction_items.forEach(item => {
+
                 document.getElementById('invoiceItems').innerHTML += `
                 <tr>
                     <td>${item.medicine.name}</td>
@@ -3318,98 +3551,96 @@
             `;
             });
 
+            // TOTAL
             document.getElementById('invoiceTotal').innerHTML = `
-            <tr><td>Total</td><td></td><td>${formatRupiah(totaltransaction)}</td></tr>
-            <tr><td>Tunai</td><td></td><td>${paid}</td></tr>
-            <tr><td>Kembali</td><td></td><td>${changes}</td></tr>
+            <tr>
+                <td>Total</td>
+                <td></td>
+                <td>${formatRupiah(totaltransaction)}</td>
+            </tr>
+
+            <tr>
+                <td>Tunai</td>
+                <td></td>
+                <td>${formatRupiah(paid)}</td>
+            </tr>
+
+            <tr>
+                <td>Kembali</td>
+                <td></td>
+                <td>${formatRupiah(changes)}</td>
+            </tr>
         `;
 
-
+            // BIND BUTTONS
             CheckoutModal.bindButtons({
-                onBtnPrint: () => doCheckout('pelanggan'),
-                onBtnSkipPrint: () => doCheckout('none'),
-                onBtnCancel: () => CheckoutModal.close(),
-                onBtnStrukPelanggan: () => doCheckout('pelanggan'),
-                onBtnStrukPelangganResep: () => doCheckout('pelanggan_resep'),
-                onBtnCancelResep: () => CheckoutModal.close(),
+
+                onBtnPrint: () =>
+                    doCheckout('pelanggan'),
+
+                onBtnSkipPrint: () =>
+                    doCheckout('none'),
+
+                onBtnCancel: () => {
+
+                    checkoutProcessing = false;
+
+                    CheckoutModal.close();
+                },
+
+                onBtnStrukPelanggan: () =>
+                    doCheckout('pelanggan'),
+
+                onBtnStrukPelangganResep: () =>
+                    doCheckout('pelanggan_resep'),
+
+                onBtnCancelResep: () => {
+
+                    checkoutProcessing = false;
+
+                    CheckoutModal.close();
+                },
             });
 
             hideCheckoutLoading();
 
             CheckoutModal.open(transaction_type);
 
-            async function doCheckout(printMode) {
-                CheckoutModal.close();
+        } catch (error) {
 
-                const cleanPaid = cleanRupiah(document.getElementById('pay').value);
-                const cleanChanges = cleanRupiah(document.getElementById('trchange').value);
-                const discounsubtotal = document.getElementById('discounsubtotal').value;
-                const bank_name = bank_name_input ? bank_name_input.value || null : null;
-
-                document.getElementById('paid').value = cleanPaid;
-                document.getElementById('changes').value = cleanChanges;
-                document.getElementById('transaction_id').value = transaction_id;
-
-                try {
-                    const res = await axios.post("{{ route('transaction.checkout') }}", {
-                        transaction_id,
-                        paid: cleanPaid,
-                        discounsubtotal,
-                        totaltransaction,
-                        changes: cleanChanges,
-                        doctor_id,
-                        debtor_id,
-                        patient_id,
-                        print_receipt: printMode !== 'none' ? 1 : 0,
-                        paymentType,
-                        bank_name,
-                        user_id,
-                        shift_logs_id,
-                    });
-
-                    if (res.data.success) {
-
-                        // ── pelanggan: print receipt only ─────────────────
-                        if (printMode === 'pelanggan') {
-                            await Printer.printReceipt(
-                                res.data.commands,
-                                res.data.print_url // fallback if QZ fails
-                            );
-                        }
-
-                        // ── pelanggan_resep: print receipt + open resep ───
-                        else if (printMode === 'pelanggan_resep') {
-                            await Printer.printReceipt(
-                                res.data.commands,
-                                res.data.print_url // fallback if QZ fails
-                            );
-                            // Resep still opens in browser (not a receipt)
-                            window.open(res.data.print_resep_url, '_blank');
-                        }
-
-                        setTimeout(() => window.location.reload(), 300);
-                    }
-
-                } catch (err) {
-                    hideCheckoutLoading();
-                    console.error(err);
-                    iziToast.error({
-                        title: 'Gagal',
-                        message: 'Gagal menyimpan transaksi',
-                        position: 'topRight'
-                    });
-                }
-            }
-
-        }).catch(error => {
             hideCheckoutLoading();
-            console.error("Error:", error.response ? error.response.data : error.message);
+
+            checkoutProcessing = false;
+
+            console.error(
+                'Error:',
+                error.response ?
+                error.response.data :
+                error.message
+            );
+
             iziToast.error({
                 title: 'Gagal',
                 message: 'Gagal memuat transaksi',
                 position: 'topRight'
             });
-        });
+        }
+    }
+
+    async function doCheckout(printMode) {
+
+        if (checkoutProcessing) {
+            return;
+        }
+
+        checkoutProcessing = true;
+
+        CheckoutModal.close();
+
+        openPinModal(printMode);
+        setTimeout(() => {
+            document.getElementById('pinInput').focus();
+        }, 100);
     }
 
     function closeInvoice() {
@@ -3827,6 +4058,7 @@
     }
 
     openMasterModal.addEventListener('click', () => {
+
         masterModal.classList.remove('hidden');
         masterModal.classList.add('flex');
     });
@@ -3890,6 +4122,272 @@
         `);
         });
     }
+
+
+    // ==================== PIN Function ====================
+    function openPinModal(printMode) {
+        pinModalReset();
+        document.getElementById('pay').blur();
+        pinModal.classList.remove('hidden');
+        pinModal.classList.add('flex');
+        pinModal._printMode = printMode;
+    }
+
+    function closePinModal() {
+        pinModal.classList.add('hidden');
+        pinModal.classList.remove('flex');
+        pinModalReset();
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────
+    function pinModalReset() {
+        pinModalValue = '';
+        pinModalError.classList.add('hidden');
+        pinModalRenderDots();
+    }
+
+    function pinModalRenderDots() {
+        pinModalDots.forEach((dot, i) => {
+            if (i < pinModalValue.length) {
+                dot.classList.add('bg-orange-400', 'border-orange-400');
+                dot.classList.remove('border-gray-300');
+            } else {
+                dot.classList.remove('bg-orange-400', 'border-orange-400');
+                dot.classList.add('border-gray-300');
+            }
+        });
+    }
+
+    function pinModalShakeAndReset(message = 'PIN salah. Coba lagi.') {
+        pinModalError.textContent = message;
+        pinModalError.classList.remove('hidden');
+        pinModalCard.classList.add('animate-shake');
+        setTimeout(() => pinModalCard.classList.remove('animate-shake'), 500);
+        pinModalValue = '';
+        pinModalRenderDots();
+    }
+
+    function pinModalHandleKey(key) {
+        pinModalError.classList.add('hidden');
+
+        if (key === 'backspace') {
+            pinModalValue = pinModalValue.slice(0, -1);
+            pinModalRenderDots();
+            return;
+        }
+
+        if (pinModalValue.length >= 6) return;
+        pinModalValue += key;
+        pinModalRenderDots();
+
+        if (pinModalValue.length === 6) {
+            setTimeout(pinModalVerify, 150);
+        }
+    }
+
+    async function pinModalVerify() {
+
+        pinModalNumpad.style.pointerEvents = 'none';
+
+        try {
+
+            // VERIFY PIN
+            const {
+                data
+            } = await axios.post(
+                '{{ route('transactions.verifypin') }}', {
+                    pin: pinModalValue,
+                }
+            );
+
+            // INVALID PIN
+            if (!data.success) {
+
+                checkoutProcessing = false;
+
+                pinModalShakeAndReset(
+                    data.message ?? 'PIN salah. Coba lagi.'
+                );
+
+                return;
+            }
+
+            closePinModal();
+
+            showCheckoutLoading();
+
+            try {
+
+                const cleanPaid = cleanRupiah(
+                    document.getElementById('pay').value
+                );
+
+                const cleanChanges = cleanRupiah(
+                    document.getElementById('trchange').value
+                );
+
+                const discounsubtotal =
+                    document.getElementById('discounsubtotal').value || 0;
+
+                const bank_name =
+                    bank_name_input ?
+                    bank_name_input.value || null :
+                    null;
+
+                // SAVE HIDDEN INPUTS
+                document.getElementById('paid').value = cleanPaid;
+
+                document.getElementById('changes').value = cleanChanges;
+
+                document.getElementById('transaction_id').value =
+                    checkoutPayload.transaction_id;
+
+                // FINAL CHECKOUT
+                var userbypin = data.user.id;
+                const res = await axios.post(
+                    "{{ route('transaction.checkout') }}", {
+                        transaction_id: checkoutPayload.transaction_id,
+
+                        paid: checkoutPayload.paid,
+
+                        discounsubtotal,
+
+                        totaltransaction,
+
+                        changes: checkoutPayload.changes,
+
+                        doctor_id: checkoutPayload.doctor_id,
+
+                        debtor_id: checkoutPayload.debtor_id,
+
+                        patient_id: Number(
+                            checkoutPayload.patient_id
+                        ),
+
+                        print_receipt: pinModal._printMode !== 'none' ?
+                            1 : 0,
+
+                        print_mode: pinModal._printMode,
+
+                        paymentType,
+
+                        bank_name,
+
+                        user_id : userbypin,
+
+                        shift_logs_id,
+                    }
+                );
+
+                // SUCCESS
+                if (res.data.success) {
+
+                    // PRINT RECEIPT
+                    if (pinModal._printMode === 'pelanggan') {
+
+                        await Printer.printReceipt(
+                            res.data.commands,
+                            res.data.print_url
+                        );
+                    }
+
+                    // PRINT RECEIPT + RESEP
+                    else if (
+                        pinModal._printMode ===
+                        'pelanggan_resep'
+                    ) {
+
+                        await Printer.printReceipt(
+                            res.data.commands,
+                            res.data.print_url
+                        );
+
+                        window.open(
+                            res.data.print_resep_url,
+                            '_blank'
+                        );
+                    }
+
+                    iziToast.success({
+                        title: 'Berhasil',
+                        message: 'Transaksi berhasil disimpan',
+                        position: 'topRight'
+                    });
+
+                    // WAIT FOR PRINTER
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 2000);
+
+                } else {
+
+                    iziToast.error({
+                        title: 'Gagal',
+                        message: res.data.message ||
+                            'Checkout gagal',
+                        position: 'topRight'
+                    });
+
+                    checkoutProcessing = false;
+                }
+
+            } catch (err) {
+
+                console.error(err);
+
+                iziToast.error({
+                    title: 'Gagal',
+                    message: err.response?.data?.message ||
+                        'Gagal menyimpan transaksi',
+                    position: 'topRight'
+                });
+
+                checkoutProcessing = false;
+
+            } finally {
+
+                hideCheckoutLoading();
+            }
+
+        } catch (err) {
+
+            console.error(err);
+
+            checkoutProcessing = false;
+
+            const message =
+                err.response?.data?.message ??
+                'Terjadi kesalahan. Coba lagi.';
+
+            pinModalShakeAndReset(message);
+
+        } finally {
+
+            pinModalNumpad.style.pointerEvents = '';
+        }
+    }
+
+    // ── Events ────────────────────────────────────────────────────
+    pinModalNumpad.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-pin-key]');
+        if (btn) pinModalHandleKey(btn.dataset.pinKey);
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (pinModal.classList.contains('hidden')) return;
+        if (e.key >= '0' && e.key <= '9') pinModalHandleKey(e.key);
+        if (e.key === 'Backspace') pinModalHandleKey('backspace');
+        if (e.key === 'Escape') closePinModal();
+    });
+
+    pinModalCancel.addEventListener('click', closePinModal);
+
+    // ── Expose ────────────────────────────────────────────────────
+    window.openPinModal = openPinModal;
+    window.closePinModal = closePinModal;
+    window.onPinModalSuccess = function(data) {
+        console.log('PIN verified', data);
+    };
 
     // Transaction Data
     function loadTransactionData() {
