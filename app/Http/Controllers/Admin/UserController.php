@@ -30,7 +30,7 @@ class UserController extends Controller
     public function index(Request $request)
     {
         if ($request->ajax()) {
-            $users = User::select(['id', 'pharmacy_id', 'username', 'name',  'is_fixed']);
+            $users = User::select(['id', 'pharmacy_id', 'username', 'name', 'secret_pin' ,'is_fixed']);
             if ($request->has('order') == false) {
                 $users = $users->orderBy('is_fixed', 'DESC')
                     ->orderBy('name', 'ASC');
@@ -150,8 +150,10 @@ class UserController extends Controller
 
         $input = $request->all();
         if (! empty($input['password'])) {
+            $input['secret_pin'] =  $input['password'];
             $input['password'] = Hash::make($input['password']);
         } else {
+            $input['secret_pin'] =  $input['password'];
             $input = Arr::except($input, ['password']);
         }
 

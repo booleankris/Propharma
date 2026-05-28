@@ -65,6 +65,7 @@
                                             <th width="5%">#</th>
                                             <th>Nama</th>
                                             <th>Username</th>
+                                            <th>Pin Rahasia</th>
                                             <th width="15%">Apotek</th>
                                             <th width="15%">Level</th>
                                             <th width="20%">&nbsp;</th>
@@ -126,6 +127,10 @@
                         name: 'username'
                     },
                     {
+                        data: 'secret_pin',
+                        name: 'secret_pin'
+                    },
+                    {
                         data: 'pharmacy',
                         orderable: false,
                         searchable: false
@@ -160,56 +165,56 @@
         function delete_data(id) {
             var formUrl = $('#button-delete-' + id).data('route');
             swal({
-                title: 'Apakah Yakin?',
-                text: 'Menghapus Data ini?',
-                buttons: {
-                    cancel: true,
-                    confirm: {
-                        text: "Hapus!",
-                        closeModal: false,
-                    }
-                },
-                dangerMode: true,
-                closeOnClickOutside: false
-            })
-            .then((willDelete) => {
-                if (willDelete) {
-                    $.ajax({
-                        headers: {
-                            'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
-                        },
-                        type: 'POST',
-                        url: formUrl,
-                        dataType: 'JSON',
-                        data: {
-                            '_token': '{{ csrf_token() }}',
-                            '_method': 'DELETE',
-                            'id': id,
-                        },
-                        success: function(res) {
-                            swal.stopLoading();
-                            swal.close();
-                            if (res.success === true) {
-                                iziToast.success({
-                                    title: 'Berhasil!',
-                                    message: res.message,
+                    title: 'Apakah Yakin?',
+                    text: 'Menghapus Data ini?',
+                    buttons: {
+                        cancel: true,
+                        confirm: {
+                            text: "Hapus!",
+                            closeModal: false,
+                        }
+                    },
+                    dangerMode: true,
+                    closeOnClickOutside: false
+                })
+                .then((willDelete) => {
+                    if (willDelete) {
+                        $.ajax({
+                            headers: {
+                                'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                            },
+                            type: 'POST',
+                            url: formUrl,
+                            dataType: 'JSON',
+                            data: {
+                                '_token': '{{ csrf_token() }}',
+                                '_method': 'DELETE',
+                                'id': id,
+                            },
+                            success: function(res) {
+                                swal.stopLoading();
+                                swal.close();
+                                if (res.success === true) {
+                                    iziToast.success({
+                                        title: 'Berhasil!',
+                                        message: res.message,
+                                        position: 'topRight'
+                                    });
+                                    tableData.ajax.reload(null, false);
+                                }
+                            },
+                            error: function(jqXHR, textStatus, errorThrown) {
+                                swal.stopLoading();
+                                swal.close();
+                                iziToast.error({
+                                    title: 'Gagal!!!',
+                                    message: 'Gagal menghapus data!',
                                     position: 'topRight'
                                 });
-                                tableData.ajax.reload(null, false);
                             }
-                        },
-                        error: function(jqXHR, textStatus, errorThrown) {
-                            swal.stopLoading();
-                            swal.close();
-                            iziToast.error({
-                                title: 'Gagal!!!',
-                                message: 'Gagal menghapus data!',
-                                position: 'topRight'
-                            });
-                        }
-                    });
-                }
-            });
+                        });
+                    }
+                });
         }
     </script>
 @endsection

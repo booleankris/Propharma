@@ -3217,7 +3217,6 @@
             console.log('SelectedRowId =', selectedRowId);
 
             if (!selectedRowId) {
-                alert('Pilih Item Dulu.');
                 return;
             }
 
