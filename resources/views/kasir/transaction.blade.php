@@ -3297,8 +3297,11 @@
                 fetch('/qz/digital-certificate.txt', {
                         cache: 'no-store'
                     })
-                    .then(r => r.ok ? r.text() : Promise.reject('Certificate not found'))
-                    .then(resolve)
+                    .then(r => r.text())
+                    .then(cert => {
+                        console.log(cert);
+                        resolve(cert);
+                    })
                     .catch(reject);
             });
 
@@ -4271,7 +4274,7 @@
 
                         bank_name,
 
-                        user_id : userbypin,
+                        user_id: userbypin,
 
                         shift_logs_id,
                     }
