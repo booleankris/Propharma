@@ -416,6 +416,13 @@ Route::get('/doctors/search', [SalesController::class, 'searchDoctors'])
 
 Route::post('/qz/sign', function (\Illuminate\Http\Request $request) {
 
+
+    \Log::info('QZ SIGN REQUEST', [
+        'data' => $request->input('data')
+    ]);
+
+    // existing code...
+
     $privateKeyPath = storage_path('app/new_qz/private-key.pem');
 
     if (!file_exists($privateKeyPath)) {
@@ -448,7 +455,7 @@ Route::post('/qz/sign', function (\Illuminate\Http\Request $request) {
             'error' => 'Signing failed'
         ], 500);
     }
-
+    \Log::info('QZ SIGN SUCCESS');
     return response()->json([
         'signature' => base64_encode($signature)
     ]);
