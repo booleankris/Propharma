@@ -416,7 +416,7 @@ Route::get('/doctors/search', [SalesController::class, 'searchDoctors'])
 
 Route::post('/qz/sign', function (\Illuminate\Http\Request $request) {
 
-    $privateKeyPath = storage_path('app/qz/private-key.pem');
+    $privateKeyPath = storage_path('app/new_qz/private-key.pem');
 
     if (!file_exists($privateKeyPath)) {
         return response()->json([

@@ -18,4 +18,5 @@ yarn-error.log
 /.fleet
 /.idea
 /.vscode
+/storage/app/new_qz/private-key.pem
 .DS_Store
