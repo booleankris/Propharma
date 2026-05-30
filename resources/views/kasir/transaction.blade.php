@@ -3295,7 +3295,7 @@
         // ── Run ONCE at module init, before any connect() ──────────────
         function setupSecurity() {
             qz.security.setCertificatePromise(function(resolve, reject) {
-                fetch('/qz-certificate.txt', {
+                fetch('/qz/qz-certificate.txt', {
                         cache: 'no-store'
                     })
                     .then(r => r.ok ? r.text() : Promise.reject('Certificate not found'))

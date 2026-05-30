@@ -415,16 +415,39 @@ Route::get('/doctors/search', [SalesController::class, 'searchDoctors'])
     ->name('doctors.search');
 
 Route::post('/qz/sign', function (\Illuminate\Http\Request $request) {
+
     $privateKeyPath = storage_path('app/qz/private-key.pem');
 
     if (!file_exists($privateKeyPath)) {
-        return response()->json(['error' => 'Private key not found'], 500);
+        return response()->json([
+            'error' => 'Private key not found'
+        ], 500);
     }
 
-    $privateKey = file_get_contents($privateKeyPath);
-    $data       = $request->input('data');
+    $privateKey = openssl_pkey_get_private(
+        file_get_contents($privateKeyPath)
+    );
 
-    openssl_sign($data, $signature, $privateKey, OPENSSL_ALGO_SHA512);
+    if (!$privateKey) {
+        return response()->json([
+            'error' => 'Unable to load private key'
+        ], 500);
+    }
+
+    $data = $request->input('data');
+
+    $success = openssl_sign(
+        $data,
+        $signature,
+        $privateKey,
+        OPENSSL_ALGO_SHA512
+    );
+
+    if (!$success) {
+        return response()->json([
+            'error' => 'Signing failed'
+        ], 500);
+    }
 
     return response()->json([
         'signature' => base64_encode($signature)
