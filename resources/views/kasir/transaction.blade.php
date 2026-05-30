@@ -3292,7 +3292,6 @@
     const Printer = (() => {
         let connected = false;
 
-        // ── Run ONCE at module init, before any connect() ──────────────
         function setupSecurity() {
             qz.security.setCertificatePromise(function(resolve, reject) {
                 fetch('/qz/digital-certificate.txt', {
@@ -3303,7 +3302,7 @@
                     .catch(reject);
             });
 
-            qz.security.setSignatureAlgorithm('SHA512');
+            qz.security.setSignatureAlgorithm('SHA256');
             qz.security.setSignaturePromise(function(toSign) {
                 return function(resolve, reject) {
                     fetch('/qz/sign', {

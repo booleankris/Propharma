@@ -447,7 +447,7 @@ Route::post('/qz/sign', function (\Illuminate\Http\Request $request) {
         $data,
         $signature,
         $privateKey,
-        OPENSSL_ALGO_SHA512
+        OPENSSL_ALGO_SHA256
     );
 
     if (!$success) {
