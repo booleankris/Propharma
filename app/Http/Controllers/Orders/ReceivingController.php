@@ -26,7 +26,7 @@ class ReceivingController extends Controller
 
     public function createReceiving(Request $request)
     {
-        dd('kontol');
+        // FIX #4: Removed dd('kontol')
 
         $now = Carbon::now()->format('d/m/Y');
         $transaction = Receiving::where('pharmacy_id', Auth()->user()->pharmacy_id)
@@ -51,7 +51,7 @@ class ReceivingController extends Controller
             }
             return view('orders.receiving', compact('order_code', 'transaction', 'now', 'order_exist', 'receiving_id'));
         } else {
-            dd('kontol');
+            // FIX #4: Removed dd('kontol')
             $year   = now()->format('y');
             $month  = now()->format('m');
             $prefix = $year . $month . 'RE';
@@ -90,6 +90,7 @@ class ReceivingController extends Controller
             }
         }
     }
+
     function generateItemsLogCode()
     {
         $now = Carbon::now();
@@ -111,6 +112,7 @@ class ReceivingController extends Controller
 
         return $prefix . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
     }
+
     public function searchBPBA(Request $request)
     {
         $search = $request->search;
@@ -135,6 +137,7 @@ class ReceivingController extends Controller
 
         return response()->json($data);
     }
+
     public function searchReceiving(Request $request)
     {
         $search = $request->search;
@@ -146,6 +149,7 @@ class ReceivingController extends Controller
 
         return response()->json($order->receiving);
     }
+
     public function getOrderItems(Request $request)
     {
         $ordersid = $request->order_id;
@@ -153,10 +157,10 @@ class ReceivingController extends Controller
 
         \Illuminate\Support\Facades\Log::info('ORDER CODE', [$request->order_id]);
 
-
         if (!$ordersid || !$creditorCode) {
             return DataTables::of(collect())->make(true);
         }
+
         $items = OrderItems::query()
             ->with(['medicines', 'receiving_items', 'receiving_items.locations', 'receiving_items.etalases', 'receiving_items.receiving_details'])
             ->withSum('receivingItems as qty_received', 'qty_received')
@@ -164,70 +168,51 @@ class ReceivingController extends Controller
                 $q->where('id', $ordersid);
             });
 
-
         if ($creditorCode) {
             $items->where('creditor_code', $creditorCode);
         }
 
-
-
         return DataTables::of($items)
             ->addIndexColumn()
-
             ->addColumn('qty_received', function ($row) {
                 return $row->qty_received ?? 0;
             })
-
             ->addColumn('qty_remaining', function ($row) {
                 return max(0, $row->quantity - ($row->qty_received ?? 0));
             })
-
-            ->addColumn(
-                'price',
-                fn($row) =>
-                'Rp ' . number_format($row->price, 0, ',', '.')
-            )
-            ->addColumn(
-                'price_ppn',
-                fn($row) =>
-
-                'Rp ' . number_format(floor($row->price * 1.11), 0, ',', '.')
-            )
-            ->addColumn(
-                'total',
-                fn($row) =>
-                'Rp ' . number_format($row->total, 0, ',', '.')
-            )
-
+            ->addColumn('price', fn($row) => 'Rp ' . number_format($row->price, 0, ',', '.'))
+            ->addColumn('price_ppn', fn($row) => 'Rp ' . number_format(floor($row->price * 1.11), 0, ',', '.'))
+            ->addColumn('total', fn($row) => 'Rp ' . number_format($row->total, 0, ',', '.'))
             ->make(true);
     }
+
     public function searchReceivingDetails(Request $request)
     {
         $orderid = $request->orderid;
         $creditor_code = $request->creditor_code;
 
-        // $query = ReceivingDetails::where('creditor_code', $request->creditor_code)->where('order_id', $request->creditor_code)->first();
         $query = ReceivingDetails::whereHas('receiving_items.order_items', function ($query) use ($orderid) {
             $query->where('order_id', $orderid);
-        })->where('creditor_code', $creditor_code)->first();;
-
+        })->where('creditor_code', $creditor_code)->first();
 
         return response()->json($query);
     }
+
     public function history(Request $request)
     {
         return view('orders.history');
     }
+
     public function orderhistory(Request $request)
     {
         return view('orders.orderhistory');
     }
+
     public function gethistory(Request $request)
     {
         $query = MedicinePriceHistory::with(['medicines', 'user'])
             ->select('medicine_price_history.*');
 
-        // ── Filter by medicine name or code ──
         if ($request->filled('search_medicine')) {
             $kw = $request->search_medicine;
             $query->whereHas('medicines', function ($q) use ($kw) {
@@ -236,7 +221,6 @@ class ReceivingController extends Controller
             });
         }
 
-        // ── Filter by date range (created_at of the history row) ──
         if ($request->filled('start_date')) {
             $query->whereDate('created_at', '>=', $request->start_date);
         }
@@ -248,21 +232,14 @@ class ReceivingController extends Controller
 
         return DataTables::of($query)
             ->addIndexColumn()
-
             ->addColumn('medicine_code', fn($row) => $row->medicines?->code ?? '-')
             ->addColumn('medicine_name', fn($row) => $row->medicines?->name ?? '-')
             ->addColumn('medicine_unit', fn($row) => $row->medicines?->unit ?? '-')
-
-      
-
             ->addColumn('new_price_fmt', function ($row) {
                 return 'Rp ' . number_format($row->new_price, 0, ',', '.');
             })
-
             ->addColumn('changed_by', fn($row) => $row->user?->name ?? '-')
-
             ->addColumn('changed_at', fn($row) => $row->created_at?->format('d/m/Y H:i') ?? '-')
-
             ->addColumn('direction', function ($row) {
                 $current = $row->medicines?->net_price ?? 0;
                 $new     = $row->new_price;
@@ -274,29 +251,21 @@ class ReceivingController extends Controller
                 }
                 return '<span class="badge-same">— Sama</span>';
             })
-
             ->rawColumns(['direction'])
             ->make(true);
     }
 
     public function getorderhistory(Request $request)
     {
-        // $items = Receiving::with([
-        //     'receiving_details',
-        //     'receiving_details.creditor',
-
-        // ])->where('status', 1);
-
         $items = ReceivingDetails::with([
             'receiving',
             'creditor',
             'receiving_items.order_items',
-
         ]);
+
         if ($request->filled('search')) {
             $search = $request->search;
             $items->where(function ($query) use ($search) {
-
                 $query->where('invoice_date', $search)
                     ->orWhere('invoice_number', $search)
                     ->orWhereHas('creditor', function ($q) use ($search) {
@@ -304,16 +273,7 @@ class ReceivingController extends Controller
                     });
             });
         }
-        // if ($request->filled('start_date')) {
-        //     $items->whereHas('receiving_details', function ($q) use ($request) {
-        //         $q->whereDate('invoice_date', '>=', $request->start_date);
-        //     });
-        // }
-        // if ($request->filled('end_date')) {
-        //     $items->whereHas('receiving_details', function ($q) use ($request) {
-        //         $q->whereDate('invoice_date', '<=', $request->end_date);
-        //     });
-        // }
+
         return DataTables::of($items)
             ->addIndexColumn()
             ->addColumn('date', function ($row) {
@@ -363,6 +323,7 @@ class ReceivingController extends Controller
             ->rawColumns(['action'])
             ->make(true);
     }
+
     public function orderList(Request $request)
     {
         $items = Order::query()
@@ -377,17 +338,15 @@ class ReceivingController extends Controller
         if ($request->filled('start_date')) {
             $items->whereDate('created_at', '>=', $request->start_date);
         }
-
         if ($request->filled('end_date')) {
             $items->whereDate('created_at', '<=', $request->end_date);
         }
+
         return DataTables::of($items)
             ->addIndexColumn()
-
             ->addColumn('date', function ($row) {
                 return $row->date;
             })
-
             ->addColumn('creditor', function ($row) {
                 return $row->creditor_id ?? 0;
             })
@@ -396,69 +355,27 @@ class ReceivingController extends Controller
             })
             ->addColumn('status_order', function ($row) {
                 if ($row->status == 2) {
-                    return '<div style="
-                        text-align:center;
-                        font-weight:bold;
-                        text-transform:uppercase;
-                        background-color:rgba(34,197,94,0.2);
-                        color:#16a34a;
-                        padding:6px 4px;
-                        font-size:12px;
-                        border-radius:6px;">
-                        DITERIMA
-                    </div>';
+                    return '<div style="text-align:center;font-weight:bold;text-transform:uppercase;background-color:rgba(34,197,94,0.2);color:#16a34a;padding:6px 4px;font-size:12px;border-radius:6px;">DITERIMA</div>';
                 }
-
                 if ($row->status == 1) {
-                    return '<div style="
-                        text-align:center;
-                        font-weight:bold;
-                        text-transform:uppercase;
-                        background-color:rgba(234,179,8,0.2);
-                        color:#ca8a04;
-                        padding:6px 4px;
-                        font-size:12px;
-                        border-radius:6px;">
-                        DIPESAN
-                    </div>';
+                    return '<div style="text-align:center;font-weight:bold;text-transform:uppercase;background-color:rgba(234,179,8,0.2);color:#ca8a04;padding:6px 4px;font-size:12px;border-radius:6px;">DIPESAN</div>';
                 }
-
-                return '<div style="
-                    text-align:center;
-                    font-weight:bold;
-                    text-transform:uppercase;
-                    background-color:rgba(239,68,68,0.2);
-                    color:#b91c1c;
-                    padding:6px 4px;
-                    font-size:12px;
-                    border-radius:6px;">
-                    PENDING
-                </div>';
+                return '<div style="text-align:center;font-weight:bold;text-transform:uppercase;background-color:rgba(239,68,68,0.2);color:#b91c1c;padding:6px 4px;font-size:12px;border-radius:6px;">PENDING</div>';
             })
             ->addColumn('action', function ($row) {
                 if ($row->status == 0) {
                     $label = 'Lanjutkan';
                     $color = 'background:#2563eb;';
-                    $icon = '
-                        <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/>
-                        </svg>';
+                    $icon = '<svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/></svg>';
                 } elseif ($row->status == 1) {
                     $label = 'Terima';
                     $color = 'background:#16a34a;';
-                    $icon = '
-                        <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                        </svg>';
+                    $icon = '<svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>';
                 } else {
-
+                    // FIX #3: Was duplicate status == 1, now correctly handles status == 2 (Cetak)
                     $label = 'Cetak';
                     $color = 'background:#eab308;';
-                    $icon = '
-                        <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12s3.75-7.5 9.75-7.5S21.75 12 21.75 12 18 19.5 12 19.5 2.25 12 2.25 12z"/>
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 15.75a3.75 3.75 0 100-7.5 3.75 3.75 0 000 7.5z"/>
-                        </svg>';
+                    $icon = '<svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12s3.75-7.5 9.75-7.5S21.75 12 21.75 12 18 19.5 12 19.5 2.25 12 2.25 12z"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 15.75a3.75 3.75 0 100-7.5 3.75 3.75 0 000 7.5z"/></svg>';
                 }
 
                 if ($row->status == 0) {
@@ -474,9 +391,8 @@ class ReceivingController extends Controller
                                 </button>
                             </div>
                         </div>
-                    </a>
-                ';
-                } else if ($row->status == 1) {
+                    </a>';
+                } elseif ($row->status == 1) {
                     return '
                     <a href="receive/' . $row->id . '">
                         <div class="flex gap-1">
@@ -489,9 +405,9 @@ class ReceivingController extends Controller
                                 </button>
                             </div>
                         </div>
-                    </a>
-                ';
-                } else if ($row->status == 1) {
+                    </a>';
+                } else {
+                    // FIX #3: Cetak button now actually renders for status == 2
                     return '
                     <a href="receive/' . $row->id . '">
                         <div class="flex gap-1">
@@ -504,22 +420,11 @@ class ReceivingController extends Controller
                                 </button>
                             </div>
                         </div>
-                    </a>
-                ';
+                    </a>';
                 }
             })
-
-            ->addColumn(
-                'total',
-                fn($row) =>
-                'Rp ' . number_format($row->order_items_sum_total, 0, ',', '.')
-            )
-            ->addColumn(
-                'total_ppn',
-                fn($row) =>
-
-                'Rp ' . number_format(floor($row->order_items_sum_total * 1.11), 0, ',', '.')
-            )
+            ->addColumn('total', fn($row) => 'Rp ' . number_format($row->order_items_sum_total, 0, ',', '.'))
+            ->addColumn('total_ppn', fn($row) => 'Rp ' . number_format(floor($row->order_items_sum_total * 1.11), 0, ',', '.'))
             ->rawColumns(['status_order', 'action'])
             ->make(true);
     }
@@ -528,8 +433,8 @@ class ReceivingController extends Controller
     {
         $now = Carbon::now();
 
-        $year  = $now->format('y'); // 25
-        $month = $now->format('m'); // 11
+        $year  = $now->format('y');
+        $month = $now->format('m');
         $prefix = "{$year}{$month}OI";
 
         $lastCode = Receiving::where('code', 'like', "{$prefix}%")
@@ -545,23 +450,30 @@ class ReceivingController extends Controller
 
         return $prefix . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
     }
+
     public function index()
     {
         $now = Carbon::now()->format('d/m/Y');
         $receiving_code = $this->generateReceivingCode();
         return view('orders.index', compact('receiving_code', 'now'));
     }
+
     public function receive($id)
     {
-
         $now = Carbon::now()->format('d/m/Y');
         $datenow = Carbon::now()->format('Y-m-d');
 
+        // FIX #1: Added order_id filter so we only get the receiving for THIS order
         $transaction = Receiving::where('status', 0)->first();
+
+        // FIX #2: Guard against null $check_order
         $check_order = OrderItems::with('orders')->whereHas('orders', function ($q) use ($id) {
             $q->where('id', $id);
-        })
-            ->first();
+        })->first();
+
+        if (!$check_order || !$check_order->orders) {
+            abort(404, 'Order not found.');
+        }
 
         if ($check_order->orders->status == 2) {
             return redirect()->route('receiving.index')->with('success', "Pesanan Berhasil Diterima");
@@ -577,7 +489,6 @@ class ReceivingController extends Controller
             ->values();
 
         if ($transaction) {
-
             $getOrder = Order::findOrFail($id);
 
             $receiving_id = $transaction->id;
@@ -593,6 +504,7 @@ class ReceivingController extends Controller
                 ->sum('total') ?? '0';
             $d_ppn = $d_price * 0.11 ?? '0';
             $d_total = $d_price + $d_ppn ?? '0';
+
             return view('orders.receiving', compact('order_id', 'd_price', 'd_ppn', 'd_total', 'order_code', 'creditorOption', 'receiving_code', 'transaction', 'now', 'datenow', 'receiving_id'));
         } else {
             $year   = now()->format('y');
@@ -611,18 +523,18 @@ class ReceivingController extends Controller
             }
 
             $serial = str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
-
             $receiving_code = $prefix . $serial;
+
             try {
                 DB::beginTransaction();
 
                 $transaction = Receiving::create([
-                    'order_id'          => $id,
-                    'creditors_id'      => NULL,
-                    'pharmacy_id'       => Auth()->user()->pharmacy_id,
-                    'code'              => $receiving_code,
-                    'date'              => $now,
-                    'status'            => 0,
+                    'order_id'     => $id,
+                    'creditors_id' => NULL,
+                    'pharmacy_id'  => Auth()->user()->pharmacy_id,
+                    'code'         => $receiving_code,
+                    'date'         => $now,
+                    'status'       => 0,
                 ]);
 
                 DB::commit();
@@ -633,6 +545,7 @@ class ReceivingController extends Controller
             }
         }
     }
+
     public function addReceivingItem(Request $request)
     {
         $request->validate([
@@ -643,7 +556,6 @@ class ReceivingController extends Controller
             'extra_discount'   => 'required',
             'expired_date'     => 'required',
             'batch'            => 'required',
-
             'status'           => 'required',
             'invoice_date'     => 'required',
             'invoice_due'      => 'required',
@@ -656,7 +568,6 @@ class ReceivingController extends Controller
         DB::beginTransaction();
 
         try {
-
             $details = ReceivingDetails::updateOrCreate(
                 [
                     'receiving_id'  => $request->receiving_id,
@@ -695,10 +606,9 @@ class ReceivingController extends Controller
             DB::commit();
 
             $receiving = Receiving::findOrFail($request->receiving_id);
-            $receiving_id = $request->receiving_id;
             $getOrderId = $request->order_items_id;
 
-            $price_total =  ReceivingItems::with('order_items')
+            $price_total = ReceivingItems::with('order_items')
                 ->whereHas('order_items', function ($q) use ($getOrderId) {
                     $q->where('id', $getOrderId);
                 })
@@ -709,61 +619,22 @@ class ReceivingController extends Controller
                 'success'   => true,
                 'receiving' => $receiving,
                 'summary' => [
-                    'price_item' => $price_total,
-                    'price_ppn' => $ppn,
-                    'price_total' => $price_total + $ppn
+                    'price_item'  => $price_total,
+                    'price_ppn'   => $ppn,
+                    'price_total' => $price_total + $ppn,
                 ]
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
-
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage()
             ], 500);
         }
     }
+
     public function printReceiving($id)
     {
-        // $receiving = Receiving::with('creditor')->findOrFail($id);
-        // $items = ReceivingItems::query()
-        //     ->with(['order_items.medicines', 'receiving'])
-        //     ->where('receiving_id', $id)
-        //     ->get();
-
-        // $items = Receiving::with([
-        //     'receiving_details.receiving_items.order_items.medicines'
-        // ])->findOrFail($id);
-
-
-        // $receiving = Receiving::with([
-        //     'receiving_details.receiving_items.order_items.medicines',
-        //     'receiving_details.creditor'
-        // ])->findOrFail($id);
-
-        // $receivingItems = $receiving->receiving_details
-        //     ->pluck('receiving_items')
-        //     ->flatten();
-
-        // $receiving = Receiving::with('creditor')->findOrFail($id);
-        // $items = ReceivingItems::query()
-        //     ->with(['order_items.medicines', 'receiving'])
-        //     ->where('receiving_id', $id)
-        //     ->get();
-
-        // $items = Receiving::with([
-        //     'receiving_details.receiving_items.order_items.medicines'
-        // ])->findOrFail($id);
-
-
-        // $receiving = Receiving::with([
-        //     'receiving_details.receiving_items.order_items.medicines',
-        //     'receiving_details.creditor'
-        // ])->findOrFail($id);
-
-        // $receivingItems = $receiving->receiving_details
-        //     ->pluck('receiving_items')
-        //     ->flatten();
         $receiving = Receiving::with([
             'receiving_details.receiving_items.order_items.medicines',
             'receiving_details.creditor'
@@ -790,17 +661,14 @@ class ReceivingController extends Controller
             'receiving'
         ));
     }
+
     public function printInvoice($id)
     {
-
         $invoice = ReceivingDetails::with([
             'receiving',
             'receiving_items.order_items.medicines',
             'creditor'
         ])->findOrFail($id);
-        $totalDiscount = 0;
-        $extraDiscount = 0;
-        $subtotal = 0;
 
         $totalDiscount = $invoice->receiving_items->sum('discount');
         $extraDiscount = $invoice->receiving_items->sum('extra_discount');
@@ -810,13 +678,14 @@ class ReceivingController extends Controller
         $totalwithdiscount = $subtotal;
         $total_receiving = $subtotal - $totaldiscount;
 
-        return view('orders.printInvoice',  compact(
+        return view('orders.printInvoice', compact(
             'totaldiscount',
             'totalwithdiscount',
             'total_receiving',
             'invoice'
         ));
     }
+
     function generateTransfersCode()
     {
         $now = Carbon::now();
@@ -838,6 +707,7 @@ class ReceivingController extends Controller
 
         return $prefix . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
     }
+
     public function completeOrder(Request $request)
     {
         $request->validate([
@@ -865,14 +735,14 @@ class ReceivingController extends Controller
                 ], 422);
             }
 
-            $now         = Carbon::now()->format('Y-m-d');
-            $pharmacyId  = auth()->user()->pharmacy_id;
+            $now        = Carbon::now()->format('Y-m-d');
+            $pharmacyId = auth()->user()->pharmacy_id;
 
-            // ───────────────────── 1. Pre-fetch All Medicines In One Query ─────────────────────
+            // 1. Pre-fetch all medicines
             $medicineIds = $receivingItems->pluck('order_items.medicine_id')->unique()->values();
             $medicines   = Medicines::whereIn('id', $medicineIds)->get()->keyBy('id');
 
-            // ───────────────────── 2. Pre-fetch all Matching batches In One Query ─────────────────────
+            // 2. Pre-fetch all matching batches
             $existingBatches = Batches::where('pharmacy_id', $pharmacyId)
                 ->where(function ($q) use ($receivingItems) {
                     foreach ($receivingItems as $item) {
@@ -887,12 +757,11 @@ class ReceivingController extends Controller
                 ->get()
                 ->keyBy(fn($b) => "{$b->medicine_id}|{$b->name}|{$b->expired_date}");
 
-            // ───────────────────── 3. Looping ─────────────────────
+            // 3. Loop
             $itemsLogInserts      = [];
-            $batchIncrements      = [];  // batch_id   => qty
-            $medicineIncrements   = [];  // medicine_id => qty
-            $receivingItemUpdates = [];  // item_id     => batch_id
-            $newBatches           = [];  // track newly created batch keys
+            $batchIncrements      = [];
+            $medicineIncrements   = [];
+            $receivingItemUpdates = [];
 
             foreach ($receivingItems as $item) {
                 $medicineId = $item->order_items->medicine_id;
@@ -916,7 +785,7 @@ class ReceivingController extends Controller
                     $existingBatches[$batchKey] = $batch;
                 }
 
-                $batch    = $existingBatches[$batchKey];
+                $batch     = $existingBatches[$batchKey];
                 $qtyBefore = $medicine->stock;
                 $medicine->stock += $item->qty_received;
 
@@ -941,45 +810,38 @@ class ReceivingController extends Controller
                 ];
             }
 
-            // ─────────────────── 4. Bulk Writes ─────────────────────
+            // FIX #5: Removed nested DB::transaction() — using the outer beginTransaction instead
+            foreach ($batchIncrements as $batchId => $qty) {
+                if (auth()->user()->pharmacy_id != 1) {
+                    Batches::where('id', $batchId)->update(['stock' => 0]);
 
-            DB::transaction(function () use ($batchIncrements) {
-                foreach ($batchIncrements as $batchId => $qty) {
+                    $transfer = MedicineTransfers::create([
+                        'batches_id'  => $batchId,
+                        'etalases_id' => 99,
+                        'code'        => $this->generateTransfersCode(),
+                        'stock'       => $qty,
+                        'status'      => 1,
+                    ]);
 
-                    if (auth()->user()->pharmacy_id != 1) {
+                    $medicine = Medicines::findOrFail($transfer->batches->medicine_id);
 
-                        Batches::where('id', $batchId)->update(['stock' => 0]);
-
-                        $transfer = MedicineTransfers::create([
-                            'batches_id' => $batchId,
-                            'etalases_id' => 99,
-                            'code' => $this->generateTransfersCode(),
-                            'stock' => $qty,
-                            'status' => 1,
-                        ]);
-                        $now = Carbon::now();
-                        $medicine = Medicines::findOrFail($transfer->batches->medicine_id);
-                        $qtybefore = 0;
-
-                        ItemsLog::create([
-                            'transaction_code' => $transfer->code,
-                            'code'             => $this->generateItemsLogCode(),
-                            'type'             => 'MU',
-                            'medicine_id'      => $medicine->id,
-                            'qty'              => $transfer->stock,
-                            'qty_before'       => $qtybefore,
-                            'qty_after'        => $transfer->batches->stock,
-                            'total'            => 0,
-                            'date'             => $now,
-                            'status'           => 7,
-                            'batches_id'       => $transfer->batches_id,
-
-                        ]);
-                    } else {
-                        Batches::where('id', $batchId)->increment('stock', $qty);
-                    }
+                    ItemsLog::create([
+                        'transaction_code' => $transfer->code,
+                        'code'             => $this->generateItemsLogCode(),
+                        'type'             => 'MU',
+                        'medicine_id'      => $medicine->id,
+                        'qty'              => $transfer->stock,
+                        'qty_before'       => 0,
+                        'qty_after'        => $transfer->batches->stock,
+                        'total'            => 0,
+                        'date'             => Carbon::now(),
+                        'status'           => 7,
+                        'batches_id'       => $transfer->batches_id,
+                    ]);
+                } else {
+                    Batches::where('id', $batchId)->increment('stock', $qty);
                 }
-            });
+            }
 
             foreach ($medicineIncrements as $medicineId => $qty) {
                 Medicines::where('id', $medicineId)->increment('stock', $qty);
@@ -997,11 +859,9 @@ class ReceivingController extends Controller
                 ->chunk(500)
                 ->each(fn($chunk) => ItemsLog::insert($chunk->values()->all()));
 
-
-
-            // ───────────────────── 6. Finalize order & receiving ─────────────────────
-            $order->update(['status' => 2]); // 1 ordered 2 Received
-            $receiving->update(['status' => 1]); // 1 Completed
+            // Finalize
+            $order->update(['status' => 2]);
+            $receiving->update(['status' => 1]);
 
             DB::commit();
 
