@@ -1814,7 +1814,7 @@
     // var patient_id = "";
     // var doctor_id = "";
 
-    let totalbought = {{ $rawtotal->raw_total + $rawtotal->embalase }};
+    let totalbought = {{ $priceTotal->total_price + $priceTotal->embalase }};
     var subtotal = "";
     var final_price = "";
     let items = [];

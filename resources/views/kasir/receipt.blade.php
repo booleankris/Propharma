@@ -119,7 +119,7 @@
                             {{ $item->quantity }}
                         </td>
                         <td class="col-total">
-                            {{ number_format($item->raw_total) }}
+                            {{ number_format($item->final_price) }}
                         </td>
                     </tr>
                 @endforeach
@@ -129,7 +129,7 @@
 
     <hr>
 
-    Jumlah <span style="float:right">{{ number_format($totalRawTotal) }}</span><br>
+    Jumlah <span style="float:right">{{ number_format($totalFinalPrice) }}</span><br>
     Discount <span style="float:right">-{{ number_format($totaldiscount) }}</span><br>
     <strong>Total Beli <span style="float:right">{{ number_format($payment) }}</span></strong><br>
     Bayar <span style="float:right">{{ number_format($transaction->paid) }}</span><br>
@@ -184,7 +184,7 @@
                             {{ $item->quantity }}
                         </td>
                         <td class="col-total">
-                            {{ number_format($item->raw_total) }}
+                            {{ number_format($item->final_price) }}
                         </td>
                     </tr>
                 @endforeach
@@ -192,7 +192,7 @@
         @endforeach
 
         <br>
-        Sub Total <span style="float:right">{{ number_format($totalRawTotal) }}</span><br>
+        Sub Total <span style="float:right">{{ number_format($totalFinalPrice) }}</span><br>
         Discount <span style="float:right">-{{ number_format($totaldiscount) }}</span><br>
         <strong>Jumlah <span style="float:right">{{ number_format($payment) }}</span></strong><br>
         Bayar <span style="float:right">{{ number_format($transaction->paid) }}</span><br>

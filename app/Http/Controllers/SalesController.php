@@ -139,9 +139,9 @@ class SalesController extends Controller
             ->where('transaction_id', $trx_id)
             ->sum('final_price');
 
-        $rawtotal = MedicineCart::where('user_id', $user_id)
+        $priceTotal = MedicineCart::where('user_id', $user_id)
             ->where('transaction_id', $trx_id)
-            ->selectRaw('SUM(raw_total) as raw_total, SUM(embalase) as embalase')
+            ->selectRaw('SUM(total_price) as total_price, SUM(embalase) as embalase')
             ->first();
 
         $existingpackage = MedicineCart::where('user_id', $user_id)
@@ -169,7 +169,7 @@ class SalesController extends Controller
             'trx_id',
             'transaction',
             'existingpackage',
-            'rawtotal',
+            'priceTotal',
             'parameters',
             'rounding',
             'itemInCart',

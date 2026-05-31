@@ -19,17 +19,17 @@ class PrintController extends Controller
         $transaction     = MedicineTransactions::with(['patients', 'doctors'])->findOrFail($id);
 
         $totalEmbalase   = $items->sum('embalase');
-        $totalRawTotal = ceil($items->sum('raw_total') + $totalEmbalase);
+        $totalFinalPrice = $items->sum('final_price') + $totalEmbalase;
         $discount        = $items->sum('discount');
         $subtotaldiscount = $transaction->discount ?? 0;
         $totaldiscount   = ceil(($discount + $subtotaldiscount) / 1000) * 1000;
-        $payment         = $totalRawTotal - $totaldiscount;
+        $payment         = $totalFinalPrice - $totaldiscount;
 
         return view('kasir.receipt', compact(
             'payment',
             'transaction',
             'transactionCart',
-            'totalRawTotal',
+            'totalFinalPrice',
             'totaldiscount'
         ));
     }
@@ -49,20 +49,18 @@ class PrintController extends Controller
 
         $totalEmbalase = $items->sum('embalase');
         $totalPrice = $items->sum('final_price');
-        $totalRawTotal = ceil($items->sum('raw_total') + $totalEmbalase);
-        $totalFinalPrice = $items->sum('final_price');
+        $totalFinalPrice = $items->sum('final_price') + $totalEmbalase;
         $discount = $items->sum('discount');
 
         $subtotaldiscount = $transaction->discount ?? 0;
         $totaldiscount = ceil(($discount + $subtotaldiscount) / 1000) * 1000;
 
-        $payment = $totalRawTotal - $totaldiscount;
+        $payment = $totalFinalPrice - $totaldiscount;
 
         return view('kasir.allreceipt', compact(
             'payment',
             'transaction',
             'transactionCart',
-            'totalRawTotal',
             'totalPrice',
             'totalFinalPrice',
             'totaldiscount',
