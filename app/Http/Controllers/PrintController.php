@@ -49,7 +49,7 @@ class PrintController extends Controller
 
         $totalEmbalase = $items->sum('embalase');
         $totalPrice = $items->sum('final_price');
-        $totalRawTotal = $items->sum('raw_total') + $totalEmbalase;
+        $totalRawTotal = ceil($items->sum('raw_total') + $totalEmbalase);
         $totalFinalPrice = $items->sum('final_price');
         $discount = $items->sum('discount');
 
