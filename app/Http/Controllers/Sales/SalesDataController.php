@@ -30,7 +30,7 @@ class SalesDataController extends Controller
             $query = MedicineCart::query()
                 ->with(['transactions.patients', 'transactions'])
                 ->where('status', 1)
-                ->whereHas('transactions', function($transaction){
+                ->whereHas('transactions', function ($transaction) {
                     $transaction->where('pharmacy_id', auth()->user()->pharmacy_id);
                 })
                 ->selectRaw('
@@ -61,7 +61,22 @@ class SalesDataController extends Controller
                     });
                 });
             }
+            $dateFrom = $request->input('date_from');
+            $dateTo   = $request->input('date_to');
 
+            if ($dateFrom) {
+                try {
+                    $query->whereDate('created_at', '>=', Carbon::createFromFormat('d/m/Y', $dateFrom)->format('Y-m-d'));
+                } catch (\Exception $e) {
+                }
+            }
+
+            if ($dateTo) {
+                try {
+                    $query->whereDate('created_at', '<=', Carbon::createFromFormat('d/m/Y', $dateTo)->format('Y-m-d'));
+                } catch (\Exception $e) {
+                }
+            }
             return DataTables::of($query)
                 ->addIndexColumn()
                 ->addColumn('date', function ($row) {
@@ -78,6 +93,9 @@ class SalesDataController extends Controller
                 })
                 ->addColumn('final_price', function ($row) {
                     return 'Rp ' . number_format($row->final_price, 0, ',', '.');
+                })
+                ->addColumn('payment_method', function ($row) {
+                    return $row->transactions?->payment_method;
                 })
                 ->addColumn('print', function ($row) {
                     return '
@@ -107,7 +125,7 @@ class SalesDataController extends Controller
                     </div>
                     ';
                 })
-              
+
                 ->rawColumns(['final_price', 'print'])
                 ->make(true);
         }

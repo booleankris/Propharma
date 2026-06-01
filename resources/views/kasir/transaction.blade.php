@@ -1356,7 +1356,7 @@
 
 {{-- Master Modal --}}
 <div id="masterModalMedicine" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-[99999]">
-    <div class="bg-white rounded-2xl w-[90%] max-w-4xl overflow-hidden shadow-xl relative">
+    <div class="bg-white rounded-2xl w-[90%] overflow-hidden shadow-xl relative">
 
         {{-- Header --}}
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
@@ -4111,7 +4111,7 @@
                 <td>${item.name}</td>
                 <td>${item.factory?.name ?? '-'}</td>
                 <td>${item.composition?.name ?? '-'}</td>
-                <td>${item.packaging ?? '-'}</td>
+                <td>${item.packaging ?? '-'}${item.content != 1 ? item.content ?? '' : ''}${item.unit ?? '-'}</td>
                 <td>${formatRupiah(item.net_price)}</td>
                 <td>${item.stock ?? '-'}</td>
                 <td>

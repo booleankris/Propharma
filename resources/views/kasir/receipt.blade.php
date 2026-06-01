@@ -65,6 +65,34 @@
     .table-struk tr {
         line-height: 1.8;
     }
+
+    .info-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .info-table td {
+        font-size: 11px;
+        padding: 0;
+        vertical-align: top;
+        line-height: 1.5;
+    }
+
+    .info-label {
+        width: 45%;
+        white-space: nowrap;
+    }
+
+    .info-colon {
+        width: 5%;
+        text-align: center;
+    }
+
+    .info-value {
+        width: 50%;
+        word-break: break-word;
+        white-space: normal;
+    }
 </style>
 
 {{-- ========================= STRUK 1 (CUSTOMER) ========================= --}}
@@ -82,17 +110,48 @@
         {{ $transaction->updated_at->format('d/m/Y H:i:s') }}
     </div>
     <br>
-    Nama : {{ $transaction->patients->name ?? '-' }}<br>
-    Alamat : {{ $transaction->patients->address ?? '-' }}<br>
-    No.Telp : {{ $transaction->patients->phone ?? '-' }}<br>
 
-    @if (in_array($transaction->transaction_type, ['RESEP TUNAI', 'KREDIT']))
-        Dokter : {{ $transaction->doctors->name ?? '-' }}<br>
-    @endif
+    <table class="info-table">
+        <tr>
+            <td class="info-label">Nama</td>
+            <td class="info-colon">:</td>
+            <td class="info-value">{{ $transaction->patients->name ?? '-' }}</td>
+        </tr>
+        <tr>
+            <td class="info-label">Alamat</td>
+            <td class="info-colon">:</td>
+            <td class="info-value">{{ $transaction->patients->address ?? '-' }}</td>
+        </tr>
+        <tr>
+            <td class="info-label">No.Telp</td>
+            <td class="info-colon">:</td>
+            <td class="info-value">{{ $transaction->patients->phone ?? '-' }}</td>
+        </tr>
+        @if (in_array($transaction->transaction_type, ['RESEP TUNAI', 'KREDIT']))
+            <tr>
+                <td class="info-label">Dokter</td>
+                <td class="info-colon">:</td>
+                <td class="info-value">{{ $transaction->doctors->name ?? '-' }}</td>
+            </tr>
+        @endif
+    </table>
 
     <br>
-    Nomor : {{ $transaction->transaction_code }}<br>
-    Kasir : {{ auth()->user()->name }}<br>
+
+    {{-- Transaction info --}}
+    <table class="info-table">
+        <tr>
+            <td class="info-label">Nomor</td>
+            <td class="info-colon">:</td>
+            <td class="info-value">{{ $transaction->transaction_code }}</td>
+        </tr>
+        <tr>
+            <td class="info-label">Kasir</td>
+            <td class="info-colon">:</td>
+            <td class="info-value">{{ auth()->user()->name }}</td>
+        </tr>
+    </table>
+
     <hr>
 
     {{-- =========================
@@ -160,15 +219,44 @@
         </div>
         <br>
 
-        Nama : {{ $transaction->patients->name ?? '-' }}<br>
-        Alamat : {{ $transaction->patients->address ?? '-' }}<br>
-        No.Telp : {{ $transaction->patients->phone ?? '-' }}<br>
-        Dokter : {{ $transaction->doctors->name ?? '-' }}
+        <table class="info-table">
+            <tr>
+                <td class="info-label">Nama</td>
+                <td class="info-colon">:</td>
+                <td class="info-value">{{ $transaction->patients->name ?? '-' }}</td>
+            </tr>
+            <tr>
+                <td class="info-label">Alamat</td>
+                <td class="info-colon">:</td>
+                <td class="info-value">{{ $transaction->patients->address ?? '-' }}</td>
+            </tr>
+            <tr>
+                <td class="info-label">No.Telp</td>
+                <td class="info-colon">:</td>
+                <td class="info-value">{{ $transaction->patients->phone ?? '-' }}</td>
+            </tr>
+            <tr>
+                <td class="info-label">Dokter</td>
+                <td class="info-colon">:</td>
+                <td class="info-value">{{ $transaction->doctors->name ?? '-' }}</td>
+            </tr>
+        </table>
+
         <hr>
 
-        <br>
-        Nomor : {{ $transaction->transaction_code }}<br>
-        Kasir : {{ auth()->user()->name }}<br>
+        <table class="info-table">
+            <tr>
+                <td class="info-label">Nomor</td>
+                <td class="info-colon">:</td>
+                <td class="info-value">{{ $transaction->transaction_code }}</td>
+            </tr>
+            <tr>
+                <td class="info-label">Kasir</td>
+                <td class="info-colon">:</td>
+                <td class="info-value">{{ auth()->user()->name }}</td>
+            </tr>
+        </table>
+
         <hr>
 
         {{-- ITEM --}}
