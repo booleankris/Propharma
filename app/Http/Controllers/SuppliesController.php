@@ -60,7 +60,7 @@ class SuppliesController extends Controller
                     return $row->type;
                 })
                 ->addColumn('name', function ($row) {
-                    return $row->medicines->name;
+                    return $row->medicines?->name ?? '-';
                 })
                 ->addColumn('stock', function ($row) {
                     if ($row->status == 1) {
