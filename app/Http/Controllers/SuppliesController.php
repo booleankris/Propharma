@@ -134,7 +134,7 @@ class SuppliesController extends Controller
                     return  $row->qty_after;
                 })
                 ->addColumn('supply', function ($row) {
-                    return $row->medicines->stock;
+                    return $row->medicines?->stock ?? '-';
                 })
                 ->addColumn('status', function ($row) {
                     if ($row->status == 1) {
