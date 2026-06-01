@@ -115,6 +115,7 @@ class MedicineController extends Controller
             'etalase'              => $request->input('etalase'),
             'location'             => $request->input('location'),
             'type'                 => $request->type,
+            'strip'                 => $request->strip,
             'status'               => 1,
         ]);
 
@@ -195,6 +196,7 @@ class MedicineController extends Controller
             'etalase'              => $request->input('etalase'),
             'location'             => $request->input('location'),
             'type'                 => $request->type,
+            'strip'                => $request->strip,
             'status'               => 1,
         ]);
         // Add Medicine Price History

@@ -37,7 +37,8 @@ class Medicines extends Model
         'receipt',
         'etalase',
         'location',
-        'type'
+        'type',
+        'strip'
     ];
     public function factory()
     {

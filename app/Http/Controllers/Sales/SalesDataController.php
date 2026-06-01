@@ -80,10 +80,10 @@ class SalesDataController extends Controller
             return DataTables::of($query)
                 ->addIndexColumn()
                 ->addColumn('date', function ($row) {
-                    return Carbon::parse($row->created_at)->format('d/m/Y');
+                    return Carbon::parse($row->updated_at)->format('d/m/Y');
                 })
                 ->addColumn('time', function ($row) {
-                    return Carbon::parse($row->created_at)->format('H:i:s');
+                    return Carbon::parse($row->updated_at)->format('H:i:s');
                 })
                 ->addColumn('code', function ($row) {
                     return $row->transactions?->transaction_code ?? '-';
