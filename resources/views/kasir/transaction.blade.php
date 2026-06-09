@@ -2268,10 +2268,10 @@
         let raw;
         console.log(it);
 
-        if (it.het_price != 0) {
-            raw = it.het_price;
+        if (it.het_price !== null && it.het_price !== 0 && it.het_price !== '') {
+            raw = Number(it.het_price);
         } else {
-            raw = (+it.net_price * +parameters);
+            raw = Number(it.net_price) * Number(parameters || 1);
         }
 
         // let rounded;
