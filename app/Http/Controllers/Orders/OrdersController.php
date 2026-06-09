@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Orders;
 
+use App\Exports\Export\OrdersExport as ExportOrdersExport;
 use App\Exports\Orders\OrdersExport;
 use App\Http\Controllers\Controller;
 use App\Models\MedicineCart;
@@ -183,7 +184,7 @@ class OrdersController extends Controller
     {
         $order = Order::where('id', $id)->first();
         return Excel::download(
-            new OrdersExport($id),
+            new ExportOrdersExport($id),
             $order->code . '.xlsx'
         );
     }

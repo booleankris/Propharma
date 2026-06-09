@@ -85,7 +85,7 @@
                                 <rect x="2" y="5" width="20" height="14" rx="2" />
                                 <line x1="2" y1="10" x2="22" y2="10" />
                             </svg>
-                            {{ $transaction->transaction_code }}
+                            {{ $transaction_code }}
                         </div>
                     @endif
                 </div>
@@ -1582,6 +1582,7 @@
                                     <th>Code</th>
                                     <th>Nama Pasien</th>
                                     <th>Total</th>
+                                    <th>Aksi</th>
                                 </tr>
                             </thead>
                             <tbody id="transactionTable"></tbody>
@@ -2800,7 +2801,7 @@
         total_item = val;
         roundedtotal = price2 * val - discount;
         if (currenttransaction == "KREDIT") {
-            subtotal = roundedtotal + parseInt(service);
+            subtotal = roundedtotal;
         } else if (currenttransaction == "RESEP TUNAI") {
             subtotal = Math.ceil(roundedtotal / 1000) * 1000 + parseInt(service);
         } else {
@@ -4433,6 +4434,24 @@
                 <td>${item.code}</td>
                 <td>${item.name}</td>
                 <td>${formatRupiah(item.final_price)}</td>
+                <td>
+                    ${
+                        item.status == 1
+                            ? '<span class="text-green-600">Selesai</span>'
+                            : `
+                            <a href="/transaction/${item.type}/${item.transaction_id}">                                    <div class="px-6 sm:px-0 max-w-sm">
+                                        <button
+                                            type="button"
+                                            class="w-full text-white bg-[#4285F4] hover:bg-[#4285F4]/90 focus:ring-4 focus:outline-none focus:ring-[#4285F4]/50 font-medium rounded-lg text-sm px-5 py-2.5 text-center inline-flex items-center justify-center"
+                                        >
+                                            Buka
+                                        </button>
+                                    </div>
+                                </a>
+                            `
+                    }                
+                </td>
+
             </tr>
         `);
         });

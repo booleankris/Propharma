@@ -61,20 +61,37 @@ class SalesController extends Controller
         $ChangeFakturRounding = $paymentParams->rounding;
         $rounding             = $dbType === 'KREDIT' ? '0' : $paymentParams->rounding;
         $parameters           = $dbType === 'KREDIT' ? '0' : $paymentParams->{$paramKey};
-
+        $transaction_code     = $this->generateTransactionCode($meta['code']);
         // 3. Resolve which transaction to use
         if ($id !== null) {
             // Tab already has a specific transaction, load it, guard status
             $transaction = MedicineTransactions::where('pharmacy_id', $pharmacy_id)
                 ->where('id', $id)
+                ->where('user_id', Auth()->user()->id)
                 ->where('status', 0)
                 ->first();
 
             if (!$transaction) {
-                // Transaction finished or doesn't belong to this pharmacy
+                // Transaction finished or doesn't belong to this user id
                 // Fall back to opening a fresh transaction of the requested type
-                return redirect()->route('transaction', ['type' => $type])
-                    ->with('message', 'Transaksi sudah selesai atau tidak ditemukan. Transaksi baru dibuka.');
+                try {
+                    DB::beginTransaction();
+
+                    $transaction = MedicineTransactions::create([
+                        'pharmacy_id'      => $pharmacy_id,
+                        'user_id'           => Auth()->user()->id,
+                        'debtor_id'        => null,
+                        'transaction_type' => $dbType,
+                        'subtotal'         => null,
+                        'discount'         => null,
+                        'status'           => 0,
+                    ]);
+
+                    DB::commit();
+                } catch (\Exception $e) {
+                    DB::rollBack();
+                    return redirect()->back()->with('message', 'Gagal membuat transaksi: ' . $e->getMessage());
+                }
             }
 
             $trx_id = $transaction->id;
@@ -82,6 +99,7 @@ class SalesController extends Controller
             // No ID supplied — look for ANY pending transaction for this pharmacy
             $transaction = MedicineTransactions::where('pharmacy_id', $pharmacy_id)
                 ->where('status', 0)
+                ->where('user_id', Auth()->user()->id)
                 ->latest()
                 ->first();
 
@@ -100,9 +118,10 @@ class SalesController extends Controller
 
                 $transaction = MedicineTransactions::create([
                     'pharmacy_id'      => $pharmacy_id,
+                    'user_id'           => Auth()->user()->id,
                     'debtor_id'        => null,
                     'transaction_type' => $dbType,
-                    'transaction_code' => $this->generateTransactionCode($meta['code']),
+                    'transaction_code' => null,
                     'subtotal'         => null,
                     'discount'         => null,
                     'status'           => 0,
@@ -128,7 +147,7 @@ class SalesController extends Controller
         if ($transaction->transaction_type !== $dbType) {
             $new_type = $meta['code'];
             $new_code = $this->regenerateTransactionCode($new_type, $transaction->transaction_code);
-            $transaction->update(['transaction_type' => $dbType, 'transaction_code' => $new_code]);
+            $transaction->update(['transaction_type' => $dbType, 'transaction_code' => null]);
             MedicineCart::where('transaction_id', $transaction->id)->delete();
         }
 
@@ -164,6 +183,7 @@ class SalesController extends Controller
             ->get();
 
         return view('kasir.transaction', compact(
+            'transaction_code',
             'check_transaction',
             'type',
             'trx_id',
@@ -385,8 +405,8 @@ class SalesController extends Controller
         $month  = now()->format('m');
         $prefix = $year . $month . strtoupper($code);
 
-        $last = MedicineTransactions::where('pharmacy_id', Auth()->user()->pharmacy_id)
-            ->where('transaction_code', 'like', $prefix . '%')
+        $last = MedicineTransactions::where('transaction_code', 'like', $prefix . '%')
+            ->where('status', 1)
             ->orderBy('transaction_code', 'desc')
             ->first();
 
@@ -484,9 +504,10 @@ class SalesController extends Controller
 
             $transaction = MedicineTransactions::create([
                 'pharmacy_id'       => Auth()->user()->pharmacy_id,
+                'user_id'           => Auth()->user()->id,
                 'debtor_id'         => NULL,
                 'transaction_type'  => $typenew,
-                'transaction_code'  => $transactionCode,
+                'transaction_code'  => NULL,
                 'subtotal'          => NULL,
                 'discount'          => NULL,
                 'status'            => 0,
@@ -758,6 +779,7 @@ class SalesController extends Controller
     public function checkout(Request $request)
     {
         $validated = $request->validate([
+            'user_id'        => Auth()->user()->id,
             'transaction_id'   => 'required|integer|',
             'paid'             => 'required|numeric|min:0',
             'discounsubtotal'  => 'nullable|numeric|min:0',
@@ -775,6 +797,16 @@ class SalesController extends Controller
         DB::beginTransaction();
         try {
             $transaction = MedicineTransactions::findOrFail($validated['transaction_id']);
+            $type = $transaction->transaction_type;
+            $typeMap = [
+                'RESEP TUNAI'  => ['db' => 'RESEP TUNAI', 'param_key' => 'receipt', 'code' => '1'],
+                'KREDIT' => ['db' => 'KREDIT',      'param_key' => null,      'code' => '4'],
+                'UPDS'   => ['db' => 'UPDS',        'param_key' => 'pdu',     'code' => '2'],
+                'HV/OTC' => ['db' => 'HV/OTC',      'param_key' => 'otc',     'code' => '3'],
+            ];
+
+
+            $meta = $typeMap[$type];
 
             // ── Idempotency ──────────────────────────────────────────
             if ($transaction->status === 1) {
@@ -793,6 +825,7 @@ class SalesController extends Controller
             $transaction->update([
                 'status'             => 1,
                 'paid'               => $validated['paid'],
+                'transaction_code'   => $this->generateTransactionCode($meta['code']),
                 'discount'           => $validated['discounsubtotal'],
                 'subtotal'           => $validated['totaltransaction'],
                 'changes'            => $validated['changes'],
@@ -1310,15 +1343,14 @@ class SalesController extends Controller
         $perPage = 30;
 
         $query = MedicineCart::query()
-            ->where('status', 1)
             ->selectRaw('
-            transaction_id,
+            transaction_id, 
             MAX(created_at) as created_at,
             SUM(final_price) as final_price
         ')
             ->groupBy('transaction_id')
             ->with([
-                'transactions:id,transaction_code,patient_id,created_at',
+                'transactions:id,transaction_code,patient_id,created_at,status,transaction_type',
                 'transactions.patients:id,name'
             ]);
 
@@ -1352,14 +1384,26 @@ class SalesController extends Controller
         }
 
         $result = $query->orderByDesc('created_at')->paginate($perPage);
-        $result->getCollection()->transform(function ($row) {
+        $typeMap = [
+            'RESEP TUNAI' => 'receipt',
+            'KREDIT'      => 'kredit',
+            'UPDS'        => 'upds',
+            'HV/OTC'      => 'hv',
+        ];
+        $result->getCollection()->transform(function ($row) use ($typeMap) {
+
+            $transaction = $row->transactions;
+            $type = $transaction?->transaction_type;
+
             return [
                 'transaction_id' => $row->transaction_id,
-                'code'           => $row->transactions?->transaction_code ?? '-',
-                'name'           => $row->transactions?->patients?->name ?? '-',
+                'code'           => $transaction?->transaction_code ?? '-',
+                'name'           => $transaction?->patients?->name ?? '-',
                 'date'           => Carbon::parse($row->created_at)->format('d-m-Y'),
                 'time'           => Carbon::parse($row->created_at)->format('H:i:s'),
                 'final_price'    => $row->final_price,
+                'status'         => $transaction?->status ?? null,
+                'type'           => $typeMap[$type] ?? strtolower($type ?? ''),
             ];
         });
         return response()->json($result);
