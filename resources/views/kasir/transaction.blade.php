@@ -2210,6 +2210,10 @@
                             <div class="text-xs text-gray-700 font-mono">${escapeHtml(it.barcode || '—')}</div>
                         </div>
                         <div>
+                            <div class="text-[10px] uppercase tracking-wide text-gray-400">Strip</div>
+                            <div class="text-xs text-gray-700 font-mono">${escapeHtml(it.strip || '—')}</div>
+                        </div>
+                        <div>
                             <div class="text-[10px] uppercase tracking-wide text-gray-400">Transfer Etalase</div>
                             <div class="text-xs text-gray-700">${escapeHtml(it.transfer_etalase_id || '—')}</div>
                         </div>

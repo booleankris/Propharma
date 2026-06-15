@@ -68,6 +68,7 @@ class MedicineController extends Controller
             'unit'                 => 'nullable|string|max:100',
             'content'              => 'nullable|string|max:255',
             'dosage'               => 'nullable|string|max:255',
+            'strip'               => 'nullable|string|max:255',
             'raw_price'            => 'nullable|numeric',
             'pharmacy_net_price'   => 'nullable|numeric',
             'net_price'            => 'nullable|numeric',
@@ -101,6 +102,7 @@ class MedicineController extends Controller
             'unit'                 => $request->unit,
             'content'              => $contentValue,  // Store content value (either 1 or user input)
             'dosage'               => $request->dosage,
+            'strip'                => $request->strip,
             'raw_price'            => $request->raw_price,
             'pharmacy_net_price'   => $request->pharmacy_net_price,
             'net_price'            => $request->net_price,
@@ -147,6 +149,7 @@ class MedicineController extends Controller
             'unit'                 => 'nullable|string|max:100',
             'content'              => 'nullable|string|max:255',
             'dosage'               => 'nullable|string|max:255',
+            'strip'                => 'nullable|string|max:255',
             'raw_price'            => 'nullable|numeric',
             'pharmacy_net_price'   => 'nullable|numeric',
             'net_price'            => 'nullable|numeric',
@@ -182,6 +185,7 @@ class MedicineController extends Controller
             'unit'                 => $request->unit,
             'content'              => $contentValue,  // Store the content value (either 1 or user input)
             'dosage'               => $request->dosage,
+            'strip'                => $request->strip,
             'raw_price'            => $request->raw_price,
             'pharmacy_net_price'   => $request->pharmacy_net_price,
             'net_price'            => $request->net_price,
@@ -239,5 +243,38 @@ class MedicineController extends Controller
                 'code' => $c->code,
             ]),
         ]);
+    }
+
+    // Orders Page - Modifying Creditors on order page
+
+    public function syncCreditors(Request $request, $id)
+    {
+        $request->validate([
+            'creditor_codes'   => 'array',
+            'creditor_codes.*' => 'exists:creditors,code',
+        ]);
+
+        Medicines::findOrFail($id);
+
+        MedicineCreditor::where('medicine_id', $id)->delete();
+
+        foreach ($request->creditor_codes as $code) {
+            MedicineCreditor::create([
+                'medicine_id'   => $id,
+                'creditor_code' => $code,
+            ]);
+        }
+
+        return response()->json(['success' => true]);
+    }
+
+    public function getAll()
+    {
+        $creditors = Creditor::where('status', 1)
+            ->select('code', 'name')
+            ->orderBy('name')
+            ->get();
+
+        return response()->json(['creditors' => $creditors]);
     }
 }

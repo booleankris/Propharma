@@ -93,7 +93,7 @@
             <div style="page-break-before: always;"></div>
         @endif
 
-        @if ($type == 'Reguler')
+        @if ($type == 'REGULER')
             @foreach ($items as $creditorCode => $items)
                 <table style="width:100%; border-collapse:collapse;">
                     <tr>
@@ -194,7 +194,7 @@
                     <div style="page-break-after: always;"></div>
                 @endif
             @endforeach
-        @elseif ($type == 'Prekursor')
+        @elseif ($type == 'PREKURSOR')
             <style>
                 .center {
                     text-align: center;
@@ -484,7 +484,7 @@
                     <div style="page-break-after: always;"></div>
                 @endif
             @endforeach
-        @elseif ($type == 'Narkotika')
+        @elseif ($type == 'NARKOTIKA')
             <style>
                 .center {
                     text-align: center;
@@ -694,7 +694,7 @@
                     <div style="page-break-after: always;"></div>
                 @endif
             @endforeach
-        @elseif ($type == 'OBAT GOLONGAN PSIKOTROPIKA (P)')
+        @elseif ($type == 'Psikotropika')
             <style>
                 .center {
                     text-align: center;

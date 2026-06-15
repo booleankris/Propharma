@@ -281,8 +281,13 @@
                                     class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px]">
                             </div>
                             <div class="w-full">
-                                <label class="block text-[14px] font-semibold text-gray-800 mb-1">Dosage</label>
+                                <label class="block text-[14px] font-semibold text-gray-800 mb-1">Dosis</label>
                                 <input id="dosage" name="dosage" type="text"
+                                    class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px]">
+                            </div>
+                            <div class="w-full">
+                                <label class="block text-[14px] font-semibold text-gray-800 mb-1">Strip</label>
+                                <input id="strip" name="strip" type="text"
                                     class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px]">
                             </div>
                         </div>
@@ -331,13 +336,13 @@
                         {{-- CREDITORS --}}
                         <div class="w-full space-y-1" id="creditorSelect">
                             <label class="block text-[14px] font-semibold text-gray-800">Pilih Kreditur</label>
-                            <div id="pillContainer" class="flex flex-wrap gap-2 min-h-[28px]"></div>
+                            <div id="pillContainer" class="flex flex-wrap gap-2"></div>
                             <div class="relative">
                                 <input id="searchInput" type="text" placeholder="Cari Kreditor...."
                                     class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px]"
                                     autocomplete="off">
                                 <ul id="creditorDropdown"
-                                    class="absolute z-50 mt-1 w-full rounded-xl border bg-white shadow-lg max-h-60 overflow-y-auto hidden">
+                                    class="absolute z-[99999] mt-1 w-full rounded-xl border bg-white shadow-lg max-h-60 overflow-y-auto hidden">
                                 </ul>
                             </div>
                             <input type="hidden" name="creditor_ids" id="creditor_ids">
@@ -616,7 +621,7 @@
         function populateForm(row) {
             // Plain inputs
             ['code', 'name', 'barcode', 'content', 'dosage',
-                'minimal_stock', 'stock', 'preparations'
+                'minimal_stock', 'strip', 'stock', 'preparations'
             ].forEach(key => {
                 const el = document.getElementById(key);
                 if (el) el.value = row[key] ?? '';
@@ -739,6 +744,10 @@
                 type: 'input'
             },
             {
+                id: 'strip',
+                type: 'input'
+            },
+            {
                 id: 'preparations',
                 type: 'input'
             },
@@ -799,7 +808,7 @@
 
         // ── Plain inputs: Enter → move forward ──
         document.querySelectorAll(
-            '#name,#barcode,#content,#dosage,#preparations,' +
+            '#name,#barcode,#content,#dosage,#strip,#preparations,' +
             '#pharmacy_net_price,#het_price,#minimal_stock'
         ).forEach(el => {
             el.addEventListener('keydown', function(e) {

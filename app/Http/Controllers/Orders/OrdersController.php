@@ -353,7 +353,6 @@ class OrdersController extends Controller
 
             $order = Order::findOrFail($request->order_id);
 
-            // ❗ Check if empty
             if ($order->order_items()->count() === 0) {
                 return response()->json([
                     'status' => 'error',
@@ -434,7 +433,7 @@ class OrdersController extends Controller
         $pdf = Pdf::loadView('orders.printSPB', compact('order', 'date', 'grouped'))
             ->setPaper('A4', 'portrait');
 
-        return $pdf->stream("ORDER-{$order->code}.pdf");
+        return $pdf->stream("SPB-{$order->code}.pdf");
     }
     public function printPreview($order_id)
     {

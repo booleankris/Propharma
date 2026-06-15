@@ -279,6 +279,7 @@ class SalesController extends Controller
                 'net_price',
                 'location',
                 'etalase',
+                'strip',
                 'stock',
                 'unit',
                 'packaging',

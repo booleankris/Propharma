@@ -14,15 +14,14 @@ class Creditor extends Model
         'code',
         'name',
         'address',
-        'city',
         'phone',
-        'fax',
         'ppn_type',
         'numbers',
         'bank_type',
         'bank_number',
         'bank_name',
         'npwp',
+        'credit_time',
         'status',
     ];
 }

@@ -208,6 +208,7 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
         Route::delete('/{id}',              [MedicineController::class, 'destroy'])->name('destroy');
         Route::get('/{id}/edit-creditor',   [MedicineController::class, 'editCreditor'])->name('editCreditor');
     });
+
     Route::resource('parameters', ParametersController::class)->except(['show']);
     Route::resource('items', ItemsController::class)->except(['show']);
     Route::resource('locations', LocationsController::class)->except(['show']);
@@ -340,6 +341,8 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     Route::get('/orders/printorder/{id}', [OrdersController::class, 'printOrder'])->name('orders.printorder');
     Route::get('/orders/print-preview/{order_id}', [OrdersController::class, 'printPreview']);
 
+    Route::put('ordercreditors/{id}/sync-creditors', [MedicineController::class, 'syncCreditors'])->name('syncCreditors');    
+    Route::get('/creditors/all', [MedicineController::class, 'getAll'])->name('creditors.all');
 
 
     // Receiving

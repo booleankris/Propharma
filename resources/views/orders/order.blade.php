@@ -172,29 +172,28 @@
                 <div id="searchWrapper" class="flex gap-5" style="position: relative; width: 100%;">
                     <div class="w-11/12">
                         <div class="flex items-end justify-between md:block">
-                            <h1 class="text-2xl font-semibold tracking-tight font-poppins text-[#1c1c1c]">Pemesanan
-                            </h1>
+                            <h1 class="text-2xl font-semibold tracking-tight font-poppins text-[#1c1c1c]">Pemesanan</h1>
                         </div>
+
                         <div class="flex py-2 gap-1">
                             <div>
                                 <div class="py-1 text-[13px] font-bold">Tanggal Order</div>
                                 <input type="text" id="returdate"
                                     class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
-                                    placeholder="" value="{{ $now }}" readonly
-                                    onkeyup="searchMedicineData(this.value)" autocomplete="off">
+                                    value="{{ $now }}" readonly autocomplete="off">
                             </div>
                             <div>
-                                <div class="py-1 text-[13px] font-bold" for="returnumber">Nomor Order</div>
+                                <div class="py-1 text-[13px] font-bold">Nomor Order</div>
                                 <input type="text" id="returnumber"
                                     class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
-                                    placeholder="" value="{{ $order_code }}" readonly
-                                    onkeyup="searchMedicineData(this.value)" autocomplete="off">
+                                    value="{{ $order_code }}" readonly autocomplete="off">
                             </div>
                         </div>
 
                         <input type="text" autofocus id="searchInput"
                             class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
                             placeholder="Cari Obat..." oninput="searchMedicineData(this.value)" autocomplete="off">
+
                         <div id="searchDropdown" class="dropdown-table" style="display:none;">
                             <table class="table table-sm table-bordered mb-0">
                                 <thead>
@@ -206,37 +205,30 @@
                                     </tr>
                                 </thead>
                             </table>
-                            <!-- scroll container -->
                             <div id="tableScroll" style="max-height: 250px; overflow-y: auto;" onscroll="handleScroll()">
                                 <table class="table table-sm table-bordered mb-0">
                                     <tbody id="searchResults"></tbody>
                                 </table>
                             </div>
                         </div>
+
                         <form method="post" action="{{ route('orders.addItemOrder') }}" class="mt-3">
                             @csrf
 
+                            {{-- Row 1: Kode, Nama, Satuan --}}
                             <div class="flex flex-wrap gap-3 py-2 w-full">
-                                {{-- <input type="hidden" name="medicine_id">
-                                <input type="hidden" name="order_id">
-                                <input type="hidden" name="transaction_id">
-                                <input type="hidden" name="total_price">
-                                <input type="hidden" name="total_qty"> --}}
-
                                 <div class="w-full sm:w-40">
                                     <div class="py-1 text-[13px] font-bold">Kode Obat</div>
                                     <input id="medicine_code" readonly
                                         class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
                                         placeholder="Kode Obat">
                                 </div>
-
                                 <div class="flex-1 min-w-[200px]">
                                     <div class="py-1 text-[13px] font-bold">Nama Obat</div>
                                     <input id="medicine_name" readonly
                                         class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
                                         placeholder="Nama Obat">
                                 </div>
-
                                 <div class="w-full sm:w-32">
                                     <div class="py-1 text-[13px] font-bold">Satuan</div>
                                     <input id="unit" readonly
@@ -245,6 +237,7 @@
                                 </div>
                             </div>
 
+                            {{-- Row 2: Kemasan, QTY, Isi, Harga, Jumlah --}}
                             <div class="flex flex-wrap items-center gap-3 py-2 w-full">
                                 <div class="w-full sm:w-32">
                                     <div class="py-1 text-[13px] font-bold">Kemasan</div>
@@ -254,7 +247,6 @@
                                         <span class="text-sm">Utuh</span>
                                     </label>
                                 </div>
-
                                 <div class="w-full sm:w-40">
                                     <div class="py-1 text-[13px] font-bold">QTY BPBA</div>
                                     <input id="qty" type="number" name="qty"
@@ -267,48 +259,60 @@
                                         class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
                                         placeholder="Isi Obat">
                                 </div>
-
                                 <div class="w-full sm:w-40">
                                     <div class="py-1 text-[13px] font-bold">Hrg HNA</div>
                                     <input id="item_price" readonly
                                         class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
                                         placeholder="Harga Satuan">
                                 </div>
-
                                 <div class="flex-1 min-w-[200px]">
                                     <div class="py-1 text-[13px] font-bold">Jumlah</div>
                                     <input id="total_price" readonly name="total_price"
                                         class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
                                         placeholder="Jumlah">
                                 </div>
-
                             </div>
-                            <div>
 
-                                <div class="flex items-center gap-3 mt-4">
-                                    <div class="flex-1 min-w-[200px]">
-                                        <div class="py-1 text-[13px] font-bold">Kreditur</div>
-                                        <select id="creditor" name="creditor_id"
-                                            class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
-                                            placeholder="Jumlah">
-                                            <option value="" required>--Pilih Kreditur--</option>
-                                        </select>
+                            {{-- Row 3: Pill editor + Kreditur select + Buttons --}}
+                            <div class="flex flex-wrap items-start gap-3 pt-3 mt-1 border-t border-gray-100">
+
+                                {{-- Pill editor (hidden by default) --}}
+                                <div id="creditorPillEditor" class="w-full hidden">
+                                    <div class="py-1 text-[13px] font-bold text-gray-700">Kelola Kreditur Obat</div>
+                                    <div id="pillContainer"
+                                        class="flex flex-wrap gap-2 mb-2 min-h-[32px] p-2 bg-gray-50 rounded-lg border border-dashed border-gray-300">
                                     </div>
-                                    <div class="flex gap-2 items-center flex-wrap">
-                                        <div>
-                                            <button onclick="submit_data()" type="button"
-                                                class="btn btn-pharma !bg-[#2196F3] btn-lg">
-                                                Tambahkan
-                                            </button>
-                                        </div>
-                                        <div>
-                                            <button id="back" type="button" id="back"
-                                                class="btn btn-pharma !bg-[#b72929] btn-lg">
-                                                Kembali
-                                            </button>
-                                        </div>
+                                    <div class="relative">
+                                        <input id="creditorPillSearch" type="text"
+                                            placeholder="Cari & tambah kreditur..."
+                                            class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
+                                            autocomplete="off">
+                                        <ul id="creditorPillDropdown"
+                                            class="absolute z-[99999] mt-1 w-full rounded-xl border bg-white shadow-lg max-h-48 overflow-y-auto hidden">
+                                        </ul>
                                     </div>
                                 </div>
+
+                                {{-- Kreditur select --}}
+                                <div class="flex-1 min-w-[200px]">
+                                    <div class="py-1 text-[13px] font-bold">Kreditur</div>
+                                    <select id="creditor" name="creditor_id"
+                                        class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200">
+                                        <option value="">--Pilih Kreditur--</option>
+                                    </select>
+                                </div>
+
+                                {{-- Buttons --}}
+                                <div class="flex gap-2 items-end pb-0.5 self-end">
+                                    <button onclick="submit_data()" type="button"
+                                        class="btn btn-pharma !bg-[#2196F3] btn-lg">
+                                        Tambahkan
+                                    </button>
+                                    <button id="back" type="button" class="btn btn-pharma !bg-[#b72929] btn-lg">
+                                        Kembali
+                                    </button>
+                                </div>
+
                             </div>
                         </form>
                     </div>
@@ -415,7 +419,9 @@
         let total_transaction = '';
         let itempack = '0';
         var itemcreditor = '';
-
+        let allSystemCreditors = []; // all creditors from GET /creditors/all
+        let medicineCreditors = []; // creditors currently linked to selected medicine
+        let currentMedicineId = null;
 
         var pack = document.getElementById('pack');
         let orderItemsTable;
@@ -436,7 +442,7 @@
         });
         // Datatable
         document.addEventListener('DOMContentLoaded', function() {
-
+            loadAllSystemCreditors();
             orderItemsTable = $('#orderItemsTable').DataTable({
                 processing: true,
                 serverSide: true,
@@ -513,21 +519,8 @@
             document.getElementById('medicine_code').value = data.medicines.code;
             document.getElementById('total_price').value = formatRupiah(data.total);
             console.log(data.creditor_code);
-            axios.get(`/orders/${data.medicine_id}/creditors`)
-                .then(res => {
-                    let creditors = res.data.creditors;
-                    console.log(creditors);
-                    let select = $("#creditor");
-                    select.empty();
+            loadMedicineCreditors(data.medicine_id, data.creditor_code);
 
-                    creditors.forEach(c => {
-                        select.append(new Option(c.name, c.code));
-                    });
-                    select.val(data.creditor_code).trigger("change");
-
-                    select.trigger("change");
-                })
-                .catch(err => console.log(err));
             if (data.pack == "1") {
                 pack.checked = true;
             }
@@ -573,43 +566,49 @@
         function updateItem() {
             const qty = parseInt(document.getElementById('qty').value);
             const total = qty * itemprice;
-            axios.post("{{ route('orders.updateOrderItem') }}", {
-                order_id: selectedRowData.order_item_id,
-                creditor_code: document.getElementById('creditor')?.value ?? null,
-                medicine_id: selectedRowData.medicines.id,
-                pack: itempack,
-                price: itemprice,
-                quantity: itemqty,
-                total: itemtotal,
-            }, {
-                headers: {
-                    'X-CSRF-TOKEN': document
-                        .querySelector('meta[name="csrf-token"]')
-                        .content
-                }
-            }).then(res => {
-                if (res.data.success) {
-                    orderItemsTable.ajax.reload(null, false);
-                    resetInputs();
-                    selectedRowData = null;
-                    selectedRowIndex = null;
-                    let item = res.data.summary;
-                    orderItemsTable.ajax.reload(null, false);
-                    console.log(item.price);
+            syncMedicineCreditors().then(() => {
 
-                    d_price = item.price_item;
-                    d_ppn = item.price_ppn
-                    d_total = item.price_total;
+                axios.post("{{ route('orders.updateOrderItem') }}", {
+                    order_id: selectedRowData.order_item_id,
+                    creditor_code: document.getElementById('creditor')?.value ?? null,
+                    medicine_id: selectedRowData.medicines.id,
+                    pack: itempack,
+                    price: itemprice,
+                    quantity: itemqty,
+                    total: itemtotal,
+                }, {
+                    headers: {
+                        'X-CSRF-TOKEN': document
+                            .querySelector('meta[name="csrf-token"]')
+                            .content
+                    }
+                }).then(res => {
+                    if (res.data.success) {
+                        orderItemsTable.ajax.reload(null, false);
+                        resetInputs();
+                        selectedRowData = null;
+                        selectedRowIndex = null;
+                        let item = res.data.summary;
+                        orderItemsTable.ajax.reload(null, false);
+                        console.log(item.price);
 
-                    $('#d_price').val(formatRupiah(d_price));
-                    $('#d_ppn').val(formatRupiah(d_ppn));
-                    $('#d_total').val(formatRupiah(d_total));
-                }
+                        d_price = item.price_item;
+                        d_ppn = item.price_ppn
+                        d_total = item.price_total;
+
+                        $('#d_price').val(formatRupiah(d_price));
+                        $('#d_ppn').val(formatRupiah(d_ppn));
+                        $('#d_total').val(formatRupiah(d_total));
+                    }
+                }).catch(err => {
+                    console.error(err);
+                    console.log(err.response.data);
+
+                    alert('Update failed');
+                });
             }).catch(err => {
                 console.error(err);
-                console.log(err.response.data);
-
-                alert('Update failed');
+                alert('Gagal menyimpan kreditur!');
             });
         }
 
@@ -767,6 +766,121 @@
             }
         });
 
+        // Load medicine creditors
+
+
+        function loadAllSystemCreditors() {
+            axios.get("{{ route('creditors.all') }}")
+                .then(res => {
+                    allSystemCreditors = res.data.creditors;
+                })
+                .catch(err => console.error(err));
+        }
+
+        function loadMedicineCreditors(medicineId, preselectedCode = null) {
+            currentMedicineId = medicineId;
+            axios.get(`/orders/${medicineId}/creditors`)
+                .then(res => {
+                    medicineCreditors = res.data.creditors;
+                    renderPills();
+                    renderCreditorSelect(preselectedCode);
+                    document.getElementById('creditorPillEditor').classList.remove('hidden');
+                })
+                .catch(err => console.error(err));
+        }
+
+        function renderPills() {
+            const container = document.getElementById('pillContainer');
+            container.innerHTML = '';
+
+            medicineCreditors.forEach(c => {
+                const pill = document.createElement('span');
+                pill.className =
+                    'flex items-center gap-1 bg-blue-100 text-blue-800 text-[12px] font-medium px-2.5 py-1 rounded-full';
+                pill.innerHTML =
+                    `${c.name} <button type="button" data-code="${c.code}" class="ml-1 text-blue-500 hover:text-red-500 font-bold">&times;</button>`;
+                pill.querySelector('button').addEventListener('click', () => {
+                    medicineCreditors = medicineCreditors.filter(x => x.code !== c.code);
+                    renderPills();
+                    renderCreditorSelect();
+                });
+                container.appendChild(pill);
+            });
+        }
+
+        function renderCreditorSelect(preselectedCode = null) {
+            const select = document.getElementById('creditor');
+            select.innerHTML = '<option value="">--Pilih Kreditur--</option>';
+            medicineCreditors.forEach(c => {
+                const opt = new Option(c.name, c.code);
+                select.appendChild(opt);
+            });
+            if (preselectedCode) select.value = preselectedCode;
+        }
+
+        document.getElementById('creditorPillSearch').addEventListener('input', function() {
+            const keyword = this.value.toLowerCase().trim();
+            const ul = document.getElementById('creditorPillDropdown');
+
+            if (!keyword) {
+                ul.classList.add('hidden');
+                return;
+            }
+
+            const filtered = allSystemCreditors.filter(c =>
+                c.name.toLowerCase().includes(keyword) &&
+                !medicineCreditors.find(m => m.code === c.code)
+            );
+
+            if (!filtered.length) {
+                ul.classList.add('hidden');
+                return;
+            }
+
+            ul.innerHTML = '';
+            filtered.forEach(c => {
+                const li = document.createElement('li');
+                li.className = 'px-4 py-2 text-[13px] hover:bg-blue-50 cursor-pointer';
+                li.textContent = c.name;
+                li.addEventListener('mousedown', e => {
+                    e.preventDefault();
+                    medicineCreditors.push(c);
+                    renderPills();
+                    renderCreditorSelect();
+                    document.getElementById('creditorPillSearch').value = '';
+                    ul.classList.add('hidden');
+                });
+                ul.appendChild(li);
+            });
+            ul.classList.remove('hidden');
+        });
+
+        document.getElementById('creditorPillSearch').addEventListener('blur', function() {
+            setTimeout(() => document.getElementById('creditorPillDropdown').classList.add('hidden'), 150);
+        });
+
+        // ── Sync creditors to medicine master before add/update ───────────
+        function syncMedicineCreditors() {
+            if (!currentMedicineId) return Promise.resolve();
+            return axios.put(`/ordercreditors/${currentMedicineId}/sync-creditors`, {
+                creditor_codes: medicineCreditors.map(c => c.code)
+            }, {
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                }
+            });
+        }
+
+        // ── Reset pill editor ─────────────────────────────────────────────
+        function resetCreditorPills() {
+            medicineCreditors = [];
+            currentMedicineId = null;
+            renderPills();
+            document.getElementById('creditor').innerHTML = '<option value="">--Pilih Kreditur--</option>';
+            document.getElementById('creditorPillSearch').value = '';
+            document.getElementById('creditorPillDropdown').classList.add('hidden');
+            document.getElementById('creditorPillEditor').classList.add('hidden');
+        }
 
         function calculateReturTotal() {
             const oldQty = parseFloat(document.getElementById('old_qty').value) || 0;
@@ -822,22 +936,7 @@
             document.getElementById('creditor').value = "";
 
             document.getElementById('qty')?.focus();
-            axios.get(`/orders/${item.id}/creditors`)
-                .then(res => {
-                    let creditors = res.data.creditors;
-                    console.log(creditors);
-
-                    let select = $("#creditor");
-                    select.empty();
-
-                    creditors.forEach(c => {
-                        select.append(new Option(c.name, c.code));
-                    });
-                    select.val(data.creditor_code).trigger("change");
-
-                    select.trigger("change");
-                })
-                .catch(err => console.log(err));
+            loadMedicineCreditors(item.id);
         }
 
         // Update
@@ -914,52 +1013,47 @@
             itemcreditor = null;
             selectedRowData = null;
             document.getElementById('searchInput').focus();
-            empyCreditorOption();
+            resetCreditorPills();
 
         }
 
         function addItem() {
-            const payload = {
-                order_id: orderid,
-                medicine_id: itemcode,
-                creditor_code: document.getElementById('creditor').value ?? null,
-                pack: itempack,
-                price: itemprice,
-                quantity: itemqty,
-                total: itemtotal,
-            };
-            console.log(payload);
-            axios.post("{{ route('orders.addItemOrder') }}", payload, {
+            syncMedicineCreditors().then(() => {
+                const payload = {
+                    order_id: orderid,
+                    medicine_id: itemcode,
+                    creditor_code: document.getElementById('creditor').value ?? null,
+                    pack: itempack,
+                    price: itemprice,
+                    quantity: itemqty,
+                    total: itemtotal,
+                };
+                axios.post("{{ route('orders.addItemOrder') }}", payload, {
                     headers: {
-                        'X-CSRF-TOKEN': document
-                            .querySelector('meta[name="csrf-token"]')
-                            .content
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
                     }
-                })
-                .then(res => {
+                }).then(res => {
                     if (res.data.success) {
                         let item = res.data.summary;
                         orderItemsTable.ajax.reload(null, false);
-                        console.log(item.price);
-
                         d_price = item.price_item;
-                        d_ppn = item.price_ppn
+                        d_ppn = item.price_ppn;
                         d_total = item.price_total;
-
                         $('#d_price').val(formatRupiah(d_price));
                         $('#d_ppn').val(formatRupiah(d_ppn));
                         $('#d_total').val(formatRupiah(d_total));
-
                         resetInputs();
                         empyCreditorOption();
-
                     }
-                })
-                .catch(err => {
+                }).catch(err => {
                     console.error(err);
                     empyCreditorOption();
                     alert('Isi Form Dengan Benar!');
                 });
+            }).catch(err => {
+                console.error(err);
+                alert('Gagal menyimpan kreditur!');
+            });
         }
 
         function completeOrder() {
