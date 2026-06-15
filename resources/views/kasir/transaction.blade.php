@@ -2214,8 +2214,8 @@
                             <div class="text-xs text-gray-700 font-mono">${escapeHtml(it.strip || '—')}</div>
                         </div>
                         <div>
-                            <div class="text-[10px] uppercase tracking-wide text-gray-400">Transfer Etalase</div>
-                            <div class="text-xs text-gray-700">${escapeHtml(it.transfer_etalase_id || '—')}</div>
+                            <div class="text-[10px] uppercase tracking-wide text-gray-400">Etalase</div>
+                            <div class="text-xs text-gray-700">${escapeHtml(it.etalases.name || '—')}</div>
                         </div>
                     </div>
 
