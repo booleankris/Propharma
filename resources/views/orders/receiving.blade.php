@@ -344,9 +344,11 @@
                                     class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
                                     placeholder="PPN">
 
-                                    <option @if ($transaction->invoice_ppn == 'INCLUDE') selected @endif value="INCLUDE">Include
+                                    <option value="INCLUDE">Include
                                     </option>
-                                    <option @if ($transaction->invoice_ppn == 'EXCLUDE') selected @endif value="EXCLUDE">Exclude
+                                    <option value="EXCLUDE">Exclude
+                                    </option>
+                                    <option value="TANPA">Tanpa
                                     </option>
                                 </select>
                             </div>
@@ -914,7 +916,7 @@
             }
         });
         $('#creditor').on('change', function() {
-
+            console.log(document.getElementById('invoice_ppn'));
 
             let creditor = $(this).val();
             if (creditor) {
@@ -925,16 +927,32 @@
                         }
                     })
                     .then(function(response) {
-                        invoice_number.value = response.data.invoice_number || '';
-                        invoice_times.value = response.data.invoice_times || '';
-                        $('#invoice_payment')
-                            .val(response.data.invoice_payment || '')
-                            .trigger('change');
-                        invoice_due.value = response.data.invoice_due || '';
-                        invoice_ppn.value = response.data.invoice_ppn || '';
-                        invoice_date.value = response.data.invoice_date || datenow;
+                        // console.log(response);
+                        // console.log(invoice_times);
+                        // console.log(response.data.creditor.credit_time);
 
-                        // invoice_number.value = response.data.invoice_number || '';
+                        // invoice_times.value = 30;
+
+                        // console.log(invoice_times.value);
+
+                        invoice_number.value = response.data.query?.invoice_number || '';
+                        invoice_times.value = response.data.query?.invoice_times || response.data.creditor
+                            .credit_time || '';
+                        $('#invoice_payment')
+                            .val(response.data.query?.invoice_payment || '')
+                            .trigger('change');
+                        invoice_due.value = response.data.query?.invoice_due || '';
+                        invoice_date.value = response.data.query?.invoice_date ?? invoice_date.value;
+
+                        const ppn =
+                            response.data.query?.invoice_ppn?.trim() ||
+                            response.data.creditor?.ppn_type?.trim() ||
+                            'TANPA';
+
+                        document.getElementById('invoice_ppn').value = ppn;
+                        
+                        count_due();
+                        // invoice_number.value = response.data.query?.invoice_number || '';
 
                     })
                     .catch(function(error) {

@@ -21,7 +21,7 @@ class CreditorsController extends Controller
     public function index(Request $request)
     {
         if ($request->ajax()) {
-            $creditors = Creditor::select('id', 'code', 'name', 'address', 'city', 'phone', 'fax', 'bank_type','numbers', 'ppn_type', 'bank_name', 'bank_number', 'npwp' ,'status', 'created_at');
+            $creditors = Creditor::select('id', 'code', 'name', 'address', 'phone', 'bank_type','numbers', 'ppn_type', 'bank_name', 'bank_number', 'npwp', 'credit_time','status', 'created_at');
 
             if (!$request->has('order')) {
                 $creditors = $creditors->orderBy('created_at', 'ASC');

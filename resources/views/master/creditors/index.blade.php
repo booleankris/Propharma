@@ -31,9 +31,9 @@
                                     <th class="px-4 py-3">Code</th>
                                     <th class="px-4 py-3">Name</th>
                                     <th class="px-4 py-3">Address</th>
-                                    <th class="px-4 py-3">City</th>
+                                    <th class="px-4 py-3">PPN</th>
                                     <th class="px-4 py-3">Phone</th>
-                                    <th class="px-4 py-3">fax</th>
+                                    <th class="px-4 py-3">Waktu Kredit</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-100"></tbody>
@@ -69,12 +69,6 @@
                         </div>
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-                            <div>
-                                <label class="block text-[14px] font-semibold text-gray-800 mb-1">Kota</label>
-                                <input id="city" name="city" type="text"
-                                    class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
-                                    placeholder="Masukkan Kota">
-                            </div>
 
                             <div>
                                 <label class="block text-[14px] font-semibold text-gray-800 mb-1">Phone</label>
@@ -82,13 +76,6 @@
                                     class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
                                     placeholder="Masukkan No.Telp">
                             </div>
-                        </div>
-
-                        <div>
-                            <label class="block text-[14px] font-semibold text-gray-800 mb-1">Fax</label>
-                            <input id="fax" name="fax" type="number"
-                                class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
-                                placeholder="Masukkan Fax Number">
                         </div>
                         <div>
                             <label class="block text-[14px] font-semibold text-gray-800 mb-1">No. Seri</label>
@@ -100,9 +87,17 @@
                         <div>
                             <div>
                                 <label class="block text-[14px] font-semibold text-gray-800 mb-1">Jenis PPN</label>
-                                <input id="ppn_type" name="ppn_type" type="text"
-                                    class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
-                                    placeholder="Masukkan Jenis PPN">
+                                <select id="ppn_type" name="ppn_type"
+                                    class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
+                                    placeholder="PPN">
+
+                                    <option value="INCLUDE">Include
+                                    </option>
+                                    <option value="EXCLUDE">Exclude
+                                    </option>
+                                    <option value="TANPA">Tanpa
+                                    </option>
+                                </select>
                             </div>
                         </div>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
@@ -202,13 +197,13 @@
                         data: 'address'
                     },
                     {
-                        data: 'city'
+                        data: 'ppn_type'
                     },
                     {
                         data: 'phone'
                     },
                     {
-                        data: 'fax'
+                        data: 'credit_time'
                     },
                 ],
             });
@@ -225,14 +220,12 @@
                 $('#code').val(selectedData.code);
                 $('#name').val(selectedData.name);
                 $('#address').val(selectedData.address);
-                $('#city').val(selectedData.city);
                 $('#phone').val(selectedData.phone);
-                $('#fax').val(selectedData.fax);
                 $('#numbers').val(selectedData.numbers);
                 $('#ppn_type').val(selectedData.ppn_type);
                 $('#bank_type').val(selectedData.bank_type);
                 $('#bank_name').val(selectedData.bank_name);
-                $('#bank_number').val(selectedData.ppn_type);
+                $('#bank_number').val(selectedData.bank_number);
                 $('#npwp').val(selectedData.npwp);
             });
             // BACK
@@ -290,9 +283,7 @@
             code: document.getElementById('code'),
             name: document.getElementById('name'),
             address: document.getElementById('address'),
-            city: document.getElementById('city'),
             phone: document.getElementById('phone'),
-            fax: document.getElementById('fax'),
             numbers: document.getElementById('numbers'),
             ppn_type: document.getElementById('ppn_type'),
             bank_type: document.getElementById('bank_type'),
@@ -310,15 +301,9 @@
                             inputs.address.focus();
                             break;
                         case 'address':
-                            inputs.city.focus();
-                            break;
-                        case 'city':
                             inputs.phone.focus();
                             break;
                         case 'phone':
-                            inputs.fax.focus();
-                            break;
-                        case 'fax':
                             inputs.numbers.focus();
                             break;
                         case 'numbers':

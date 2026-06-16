@@ -194,8 +194,11 @@ class ReceivingController extends Controller
         $query = ReceivingDetails::whereHas('receiving_items.order_items', function ($query) use ($orderid) {
             $query->where('order_id', $orderid);
         })->where('creditor_code', $creditor_code)->first();
-
-        return response()->json($query);
+        $creditor = Creditor::where('code', $creditor_code)->first();
+        return response()->json([
+            'query' => $query,
+            'creditor' => $creditor
+        ]);
     }
 
     public function history(Request $request)
