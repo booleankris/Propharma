@@ -2215,7 +2215,7 @@
                         </div>
                         <div>
                             <div class="text-[10px] uppercase tracking-wide text-gray-400">Etalase</div>
-                            <div class="text-xs text-gray-700">${escapeHtml(it.etalases.name || '—')}</div>
+                            <div class="text-xs text-gray-700">${escapeHtml(it.etalases?.name || '—')}</div>
                         </div>
                     </div>
 
