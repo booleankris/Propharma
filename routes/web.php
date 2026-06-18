@@ -366,7 +366,8 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     Route::get('/receiving/getorderhistory', [ReceivingController::class, 'getorderhistory'])->name('receiving.getorderhistory');
 
     Route::get('/receiving/orders', [ReceivingController::class, 'orders'])->name('receiving.orders');
-
+    Route::get('/receiving/{order}/printspbfinal', [ReceivingController::class, 'printSPBFinal'])
+        ->name('orderfinal.print');
     // ================================ Statistic ================================
 
     // INVOICES (Tagihan)

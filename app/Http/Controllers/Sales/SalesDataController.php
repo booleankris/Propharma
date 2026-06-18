@@ -88,6 +88,19 @@ class SalesDataController extends Controller
                 ->addColumn('code', function ($row) {
                     return $row->transactions?->transaction_code ?? '-';
                 })
+                ->addColumn('type', function ($row) {
+                    $type =  $row->transactions?->transaction_type ?? '-';
+                    if($type == "KREDIT"){
+                        $type = "UK";
+                    }else if($type == "RESEP TUNAI"){
+                        $type = "UM";
+                    }else if($type == "HV/OTC"){
+                        $type = "HV";
+                    }else if($type == "UPDS"){
+                        $type = "UP";
+                    }
+                    return $type;
+                })
                 ->addColumn('name', function ($row) {
                     return $row->transactions?->patients?->name ?? '-';
                 })

@@ -265,6 +265,7 @@
                                     <th>Tanggal</th>
                                     <th>Jam</th>
                                     <th>Nomor</th>
+                                    <th>Tipe</th>
                                     <th>Pasien</th>
                                     <th class="col-right">Harga</th>
                                     <th class="col-right">Pembayaran</th>
@@ -385,6 +386,10 @@
                     },
                     {
                         data: 'code',
+                        className: 'col-mono'
+                    },
+                    {
+                        data: 'type',
                         className: 'col-mono'
                     },
                     {

@@ -15,6 +15,7 @@ use App\Models\Receiving;
 use App\Models\ReceivingDetails;
 use App\Models\ReceivingItems;
 use App\Models\Transfers;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -210,7 +211,22 @@ class ReceivingController extends Controller
     {
         return view('orders.orderhistory');
     }
+    public function printSPBFinal($orderId)
+    {
+        $date = Carbon::now()->translatedFormat('d F Y');
+        $order = Order::with(['order_items.receiving_items','order_items.medicines', 'order_items.creditors', 'order_items.medicines.factory', 'order_items.medicines.category'])
+            ->findOrFail($orderId);
+        $grouped = $order->order_items->groupBy(function ($item) {
+            return $item->medicines->type ?? "Kosong";
+        })->map(function ($perCreditor) {
+            return $perCreditor->groupBy('creditor_code') ?? "Kosong";
+        });
+        
+        $pdf = Pdf::loadView('orders.printSPBFinal', compact('order', 'date', 'grouped'))
+            ->setPaper('A4', 'portrait');
 
+        return $pdf->stream("SPBFINAL-{$order->code}.pdf");
+    }
     public function gethistory(Request $request)
     {
         $query = MedicinePriceHistory::with(['medicines', 'user'])
@@ -350,9 +366,6 @@ class ReceivingController extends Controller
             ->addColumn('date', function ($row) {
                 return $row->date;
             })
-            ->addColumn('creditor', function ($row) {
-                return $row->creditor_id ?? 0;
-            })
             ->addColumn('code', function ($row) {
                 return $row->code ?? 0;
             })
@@ -376,9 +389,14 @@ class ReceivingController extends Controller
                     $icon = '<svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>';
                 } else {
                     // FIX #3: Was duplicate status == 1, now correctly handles status == 2 (Cetak)
-                    $label = 'Cetak';
+                    $label = 'Cetak SPB';
                     $color = 'background:#eab308;';
-                    $icon = '<svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12s3.75-7.5 9.75-7.5S21.75 12 21.75 12 18 19.5 12 19.5 2.25 12 2.25 12z"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 15.75a3.75 3.75 0 100-7.5 3.75 3.75 0 000 7.5z"/></svg>';
+                    $icon = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-printer">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                    <path d="M17 17h2a2 2 0 0 0 2 -2v-4a2 2 0 0 0 -2 -2h-14a2 2 0 0 0 -2 2v4a2 2 0 0 0 2 2h2" />
+                    <path d="M17 9v-4a2 2 0 0 0 -2 -2h-6a2 2 0 0 0 -2 2v4" />
+                    <path d="M7 15a2 2 0 0 1 2 -2h6a2 2 0 0 1 2 2v4a2 2 0 0 1 -2 2h-6a2 2 0 0 1 -2 -2l0 -4" />
+                </svg>';
                 }
 
                 if ($row->status == 0) {
@@ -412,7 +430,7 @@ class ReceivingController extends Controller
                 } else {
                     // FIX #3: Cetak button now actually renders for status == 2
                     return '
-                    <a href="receive/' . $row->id . '">
+                    <a target="_blank" href="/receiving/'. $row->id .'/printspbfinal">
                         <div class="flex gap-1">
                             <div class="w-full">
                                 <button style="' . $color . ' color:white;" class="rounded-full px-2 py-2 font-semibold">

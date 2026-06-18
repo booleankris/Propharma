@@ -186,12 +186,10 @@
                             <th>#</th>
                             <th>Date</th>
                             <th>SPB</th>
-                            <th>Kreditur</th>
                             <th>Status</th>
                             <th>Total</th>
                             <th>Total PPN</th>
                             <th>Aksi</th>
-
                         </tr>
                     </thead>
                     <tbody class="font-poppins text-sm"></tbody>
@@ -285,10 +283,7 @@
                         name: 'code',
                         defaultContent: '-'
                     },
-                    {
-                        data: 'creditor',
-                        name: 'creditor'
-                    },
+                    
                     {
                         data: 'status_order'
                     },

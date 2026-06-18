@@ -19,7 +19,7 @@ class PrintController extends Controller
         $transaction     = MedicineTransactions::with(['patients', 'doctors'])->findOrFail($id);
 
         $totalEmbalase   = $items->sum('embalase');
-        $totalFinalPrice = $items->sum('final_price') + $totalEmbalase;
+        $totalFinalPrice = $items->sum('final_price');
         $discount        = $items->sum('discount');
         $subtotaldiscount = $transaction->discount ?? 0;
         $totaldiscount   = ceil(($discount + $subtotaldiscount) / 1000) * 1000;
@@ -49,7 +49,7 @@ class PrintController extends Controller
 
         $totalEmbalase = $items->sum('embalase');
         $totalPrice = $items->sum('final_price');
-        $totalFinalPrice = $items->sum('final_price') + $totalEmbalase;
+        $totalFinalPrice = $items->sum('final_price');
         $discount = $items->sum('discount');
 
         $subtotaldiscount = $transaction->discount ?? 0;

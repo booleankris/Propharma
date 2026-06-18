@@ -1117,10 +1117,17 @@
                     {{-- Bank name input — only visible when Transfer is selected --}}
                     <div id="bankNameWrapper" class="hidden mt-3">
                         <label class="block text-[12px] font-medium text-gray-500 mb-1">Nama bank</label>
-                        <input type="text" id="bank_name" name="bank_name"
-                            placeholder="Contoh: BCA, Mandiri, BNI..." autocomplete="off"
-                            class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-[13px]
-                                   focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400">
+                        <select
+                            class="w-full rounded-xl border my-1 border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                            name="bank_name" id="bank_name">
+                            <option value="">-- Pilih Bank --</option>
+                            <option value="Mandiri">Mandiri</option>
+                            <option value="BCA">BCA</option>
+                            <option value="BRI">BRI</option>
+                            <option value="BSI">BSI</option>
+                            <option value="BNI">BNI</option>
+                            <option value="BTN">BTN</option>
+                        </select>
                     </div>
                 </div>
             @endif
@@ -3126,8 +3133,10 @@
             }
 
             // Determine cart type
-            if (transaction_type === "KREDIT" || transaction_type === "RESEP TUNAI") {
+            if (transaction_type === "RESEP TUNAI") {
                 cart_type = "UM";
+            } else if (transaction_type === "KREDIT") {
+                cart_type = "UK";
             } else if (transaction_type === "UPDS") {
                 cart_type = "UP";
             } else if (transaction_type === "HV/OTC") {
@@ -3325,7 +3334,8 @@
                             }),
                         })
                         .then(r => r.json())
-                        .then(d => d.signature ? resolve(d.signature) : reject('Signing failed'))
+                        .then(d => d.signature ? resolve(d.signature) : reject(
+                            'Signing failed'))
                         .catch(reject);
                 };
             });
