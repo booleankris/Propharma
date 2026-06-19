@@ -272,7 +272,7 @@
                         <label class="block text-[12px] font-medium text-gray-500 mb-1">Batch & Expired Date</label>
                         <select id="batch_select" data-nav-enter="submit"
                             class="nav-input w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400">
-                            <option value="">— Pilih batch —</option>
+                            <option value="">— Pilih batch / etalase —</option>
                         </select>
                         <input id="batch" type="hidden">
                         <input id="expired_date" type="hidden">
@@ -550,7 +550,7 @@
                     transaction_id,
                     qty_retur,
                     total_retur,
-                    transfer_id, 
+                    transfer_id,
                     medicine_code,
                     old_qty,
                     _token: '{{ csrf_token() }}'
@@ -726,27 +726,33 @@
             fetch(`{{ route('returdata.batches') }}?medicine_id=${medicine_id}`)
                 .then(res => res.json())
                 .then(data => {
-                    select.innerHTML = '<option value="">— Pilih batch —</option>';
+                    select.innerHTML = '<option value="">— Pilih batch/etalase —</option>';
 
                     if (!data.length) {
                         select.innerHTML = '<option value="">Tidak ada batch tersedia</option>';
                         return;
                     }
 
-                    data.forEach((item, index) => {
+                    data.forEach((item) => {
                         const option = document.createElement('option');
                         option.value = item.transfer_id;
                         option.textContent =
-                            `${item.batch_name} — Exp: ${item.expired_date} (Stok: ${item.counter_stock})`;
+                            `${item.batch_name} — Exp: ${item.expired_date} (Stok: ${item.counter_stock}) (Etalase: ${item.etalase_name})`;
+
                         option.dataset.batchName = item.batch_name;
                         option.dataset.expiredDate = item.expired_date;
                         option.dataset.transferId = item.transfer_id;
+
                         select.appendChild(option);
                     });
 
                     // Auto-select first (FEFO — already ordered by earliest expiry)
                     select.selectedIndex = 1;
                     syncBatchFields();
+                })
+                .catch(err => {
+                    console.error(err);
+                    select.innerHTML = '<option value="">Gagal memuat batch</option>';
                 });
         }
 

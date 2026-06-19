@@ -299,6 +299,7 @@ class ReturController extends Controller
         $medicine_id = $request->medicine_id;
 
         $transfers = MedicineTransfers::join('batches', 'medicine_transfers.batches_id', '=', 'batches.id')
+            ->join('etalases', 'medicine_transfers.etalases_id', '=', 'etalases.id')
             ->where('batches.medicine_id', $medicine_id)
             ->where('pharmacy_id', auth()->user()->pharmacy_id)
             ->orderBy('batches.expired_date', 'asc') // FEFO
@@ -308,6 +309,7 @@ class ReturController extends Controller
                 'batches.id as batch_id',
                 'batches.name as batch_name',
                 'batches.expired_date',
+                'etalases.name as etalase_name',
             )
             ->get();
 
