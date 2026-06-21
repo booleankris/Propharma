@@ -3,7 +3,6 @@
 @section('style')
     <link rel="stylesheet" href="{{ asset('css/dashboard.css') }}?time={{ time() }}">
     <link rel="stylesheet" href="{{ asset('templates/library/izitoast/dist/css/iziToast.min.css') }}">
-
     @if ($check_transaction != 0)
         @if ($transaction->transaction_type == 'HV/OTC')
             <style>
@@ -447,6 +446,33 @@
                     </div>
 
                 </div>
+                <a href="{{ route('sales.reject') }}">
+                    <div
+                        class="flex flex-col py-1 items-center bg-[#d81e1e] shadow-[0_0_11px_2px_#d05a5ac9] cursor-pointer border-none px-[10px] rounded-md">
+                        <div class="py-[4px] text-white">
+
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
+                                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round"
+                                class="icon icon-tabler icons-tabler-outline icon-tabler-circle-dashed-x">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                <path d="M8.56 3.69a9 9 0 0 0 -2.92 1.95" />
+                                <path d="M3.69 8.56a9 9 0 0 0 -.69 3.44" />
+                                <path d="M3.69 15.44a9 9 0 0 0 1.95 2.92" />
+                                <path d="M8.56 20.31a9 9 0 0 0 3.44 .69" />
+                                <path d="M15.44 20.31a9 9 0 0 0 2.92 -1.95" />
+                                <path d="M20.31 15.44a9 9 0 0 0 .69 -3.44" />
+                                <path d="M20.31 8.56a9 9 0 0 0 -1.95 -2.92" />
+                                <path d="M15.44 3.69a9 9 0 0 0 -3.44 -.69" />
+                                <path d="M14 14l-4 -4" />
+                                <path d="M10 14l4 -4" />
+                            </svg>
+                        </div>
+                        <div class="px-1 font-semibold font-poppins text-[11px] text-white">
+                            Tolak
+                        </div>
+                    </div>
+                </a>
             </div>
         @endif
     </section>
@@ -1321,8 +1347,9 @@
                     class="modal-print-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 text-left transition-colors">
                     <div
                         class="modal-btn-icon w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 text-gray-500 flex-shrink-0 transition-colors">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+                            stroke-linejoin="round">
                             <line x1="18" y1="6" x2="6" y2="18" />
                             <line x1="6" y1="6" x2="18" y2="18" />
                         </svg>
@@ -1867,6 +1894,9 @@
 
     let selectedRowId = null;
     let selectedTransactionId = null;
+
+    // Button / Submitting
+    let isSubmitting = false;
 
 
     // ===============================
@@ -3082,92 +3112,79 @@
     }
 
     function submit() {
+        if (isSubmitting) return; // guard against double-fire
+        isSubmitting = true;
 
-        if (edit_status != 0) {
-            true_price = final_price + jasa;
-            const pkg = document.getElementById('package')?.value || '';
-            const dose = document.getElementById('dosage_r')?.value || '';
-            console.log("🧾 Cart Item Details:", {
-                medicine_id,
-                transaction_id,
-                total_item,
-                discount,
-                jasa,
-                cart_type,
-                pkg,
-                dose,
-                price2,
-                pharmacy_price,
-                true_price,
-                grossprice,
-                racikstatus
-            });
-            addToCart(
-                medicine_id,
-                transaction_id,
-                total_item,
-                discount,
-                jasa,
-                cart_type,
-                pkg,
-                dose,
-                price2,
-                pharmacy_price,
-                true_price,
-                grossprice,
-                racikstatus
-            );
-            pkg.value = pkg;
+        const btn = document.querySelector('button[onclick="submit()"]');
+        if (btn) btn.disabled = true;
 
+        try {
+            if (edit_status != 0) {
+                true_price = final_price + jasa;
+                const pkg = document.getElementById('package')?.value || '';
+                const dose = document.getElementById('dosage_r')?.value || '';
+                console.log("🧾 Cart Item Details:", {
+                    medicine_id,
+                    transaction_id,
+                    total_item,
+                    discount,
+                    jasa,
+                    cart_type,
+                    pkg,
+                    dose,
+                    price2,
+                    pharmacy_price,
+                    true_price,
+                    grossprice,
+                    racikstatus
+                });
+                addToCart(
+                    medicine_id, transaction_id, total_item, discount, jasa,
+                    cart_type, pkg, dose, price2, pharmacy_price, true_price,
+                    grossprice, racikstatus
+                );
+            } else {
+                console.log('grossprice =', grossprice);
 
+                if (discountInput.value === "") {
+                    final_price = subtotal;
+                    discount = 0;
+                }
+                if (jasa === "") {
+                    jasa = 0;
+                }
 
-        } else {
-            console.log('grossprice =', grossprice);
+                if (transaction_type === "RESEP TUNAI") {
+                    cart_type = "UM";
+                } else if (transaction_type === "KREDIT") {
+                    cart_type = "UK";
+                } else if (transaction_type === "UPDS") {
+                    cart_type = "UP";
+                } else if (transaction_type === "HV/OTC") {
+                    cart_type = "HV";
+                }
 
-            if (discountInput.value === "") {
-                final_price = subtotal;
-                discount = 0;
+                true_price = final_price + jasa;
+                const pkg = document.getElementById('package')?.value || '';
+                const dose = document.getElementById('dosage_r')?.value || '';
+                console.log("count() => subtotal:", subtotal, "grossprice:", grossprice);
+
+                addToCart(
+                    medicine_id, transaction_id, total_item, discount, jasa,
+                    cart_type, pkg, dose, price2, pharmacy_price, true_price,
+                    grossprice, racikstatus
+                );
             }
-            if (jasa === "") {
-                jasa = 0;
-            }
 
-            // Determine cart type
-            if (transaction_type === "RESEP TUNAI") {
-                cart_type = "UM";
-            } else if (transaction_type === "KREDIT") {
-                cart_type = "UK";
-            } else if (transaction_type === "UPDS") {
-                cart_type = "UP";
-            } else if (transaction_type === "HV/OTC") {
-                cart_type = "HV";
-            }
+            edit_status = 0;
+            discount = 0;
 
-            true_price = final_price + jasa;
-            const pkg = document.getElementById('package')?.value || '';
-            const dose = document.getElementById('dosage_r')?.value || '';
-            console.log("count() => subtotal:", subtotal, "grossprice:", grossprice);
-
-            addToCart(
-                medicine_id,
-                transaction_id,
-                total_item,
-                discount,
-                jasa,
-                cart_type,
-                pkg,
-                dose,
-                price2,
-                pharmacy_price,
-                true_price,
-                grossprice,
-                racikstatus
-            );
-            pkg.value = pkg;
+        } finally {
+            setTimeout(() => {
+                isSubmitting = false;
+                if (btn) btn.disabled = false;
+            }, 1000);
         }
-        edit_status = 0;
-        discount = 0;
-
     }
 
     // edit cart

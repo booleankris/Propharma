@@ -27,20 +27,40 @@ class ReportsController extends Controller
     // Report Data
     public function reports(Request $request)
     {
+        $pharmacy = Pharmacies::findOrFail(auth()->user()->pharmacy_id);
+        $report   = $request->selectedReport;
 
-        // ================================ Penjualan / Sales ===================================
-        // Export LIPH
-        if ($request->selectedReport == "LIPH") {
-            $request->validate([
-                'start_date'  => 'required|date',
-                'end_date'    => 'required|date|after_or_equal:start_date',
+        [$export, $filename] = $this->resolveReportExport($report, $request, $pharmacy);
+
+        if (!$export) {
+            return response()->json(['status' => 'success']);
+        }
+
+        // mode=preview -> render HTML table, mode anything else (or absent) -> download
+        if ($request->mode === 'preview') {
+            if (!method_exists($export, 'array')) {
+                return response()->json(['status' => 'error', 'message' => 'Preview not supported for this report'], 422);
+            }
+
+            return view('reports.preview', [
+                'rows'        => $export->array(),
+                'reportTitle' => method_exists($export, 'title') ? $export->title() : $report,
+                'queryParams' => $request->except('mode'),
             ]);
-            $pharmacy = Pharmacies::findOrFail(auth()->user()->pharmacy_id);
+        }
+        
+        return Excel::download($export, $filename);
+    }
 
-            $filename = 'LIPH_' . $pharmacy->name . '_'
-                . $request->start_date . '_sd_' . $request->end_date . '.xlsx';
+    private function resolveReportExport(string $report, Request $request, Pharmacies $pharmacy): array
+    {
+        $request->validate([
+            'start_date' => 'required_if:selectedReport,LIPH,Obat,Golongan,Pabrik,Dokter,Daftar Resep,Retur Jual|date',
+            'end_date'   => 'required_if:selectedReport,LIPH,Obat,Golongan,Pabrik,Dokter,Daftar Resep,Retur Jual|date|after_or_equal:start_date',
+        ]);
 
-            return Excel::download(
+        return match ($report) {
+            'LIPH' => [
                 new LiphExport(
                     $pharmacy->id,
                     $request->start_date,
@@ -50,21 +70,9 @@ class ReportsController extends Controller
                     $request->shift,
                     $request->shiftType,
                 ),
-                $filename
-            );
-        }
-        // Export Obat
-        if ($request->selectedReport == "Obat") {
-            $request->validate([
-                'start_date'  => 'required|date',
-                'end_date'    => 'required|date|after_or_equal:start_date',
-            ]);
-            $pharmacy = Pharmacies::findOrFail(auth()->user()->pharmacy_id);
-
-            $filename = 'DATAOBAT_' . $pharmacy->name . '_'
-                . $request->start_date . '_sd_' . $request->end_date . '.xlsx';
-
-            return Excel::download(
+                'LIPH_' . $pharmacy->name . '_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx',
+            ],
+            'Obat' => [
                 new MedicineExport(
                     $pharmacy->id,
                     $request->start_date,
@@ -73,22 +81,9 @@ class ReportsController extends Controller
                     $request->shiftType,
                     $request->selectedType,
                 ),
-                $filename
-            );
-        }
-
-        // Export Category
-        if ($request->selectedReport == "Golongan") {
-            $request->validate([
-                'start_date'  => 'required|date',
-                'end_date'    => 'required|date|after_or_equal:start_date',
-            ]);
-            $pharmacy = Pharmacies::findOrFail(auth()->user()->pharmacy_id);
-
-            $filename = 'KATEGORI_OBAT' . $pharmacy->name . '_'
-                . $request->start_date . '_sd_' . $request->end_date . '.xlsx';
-
-            return Excel::download(
+                'DATAOBAT_' . $pharmacy->name . '_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx',
+            ],
+            'Golongan' => [
                 new CategoryExport(
                     $pharmacy->id,
                     $request->start_date,
@@ -97,21 +92,9 @@ class ReportsController extends Controller
                     $request->shiftType,
                     $request->selectedType,
                 ),
-                $filename
-            );
-        }
-
-        if ($request->selectedReport == "Pabrik") {
-            $request->validate([
-                'start_date'  => 'required|date',
-                'end_date'    => 'required|date|after_or_equal:start_date',
-            ]);
-            $pharmacy = Pharmacies::findOrFail(auth()->user()->pharmacy_id);
-
-            $filename = 'KATEGORI_OBAT' . $pharmacy->name . '_'
-                . $request->start_date . '_sd_' . $request->end_date . '.xlsx';
-
-            return Excel::download(
+                'KATEGORI_OBAT' . $pharmacy->name . '_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx',
+            ],
+            'Pabrik' => [
                 new FactoryExport(
                     $pharmacy->id,
                     $request->start_date,
@@ -121,21 +104,9 @@ class ReportsController extends Controller
                     $request->selectedType,
                     $request->factory,
                 ),
-                $filename
-            );
-        }
-
-        if ($request->selectedReport == "Dokter") {
-            $request->validate([
-                'start_date'  => 'required|date',
-                'end_date'    => 'required|date|after_or_equal:start_date',
-            ]);
-            $pharmacy = Pharmacies::findOrFail(auth()->user()->pharmacy_id);
-
-            $filename = 'DOKTER' . $pharmacy->name . '_'
-                . $request->start_date . '_sd_' . $request->end_date . '.xlsx';
-
-            return Excel::download(
+                'KATEGORI_OBAT' . $pharmacy->name . '_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx',
+            ],
+            'Dokter' => [
                 new DoctorExport(
                     $pharmacy->id,
                     $request->start_date,
@@ -145,21 +116,9 @@ class ReportsController extends Controller
                     $request->selectedType,
                     $request->doctor,
                 ),
-                $filename
-            );
-        }
-
-        if ($request->selectedReport == "Daftar Resep") {
-            $request->validate([
-                'start_date'  => 'required|date',
-                'end_date'    => 'required|date|after_or_equal:start_date',
-            ]);
-            $pharmacy = Pharmacies::findOrFail(auth()->user()->pharmacy_id);
-
-            $filename = 'RESEP' . $pharmacy->name . '_'
-                . $request->start_date . '_sd_' . $request->end_date . '.xlsx';
-
-            return Excel::download(
+                'DOKTER' . $pharmacy->name . '_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx',
+            ],
+            'Daftar Resep' => [
                 new RecipeExport(
                     $pharmacy->id,
                     $request->start_date,
@@ -169,66 +128,29 @@ class ReportsController extends Controller
                     $request->selectedType,
                     $request->doctor,
                 ),
-                $filename
-            );
-        }
-
-        if ($request->selectedReport == "Retur Jual") {
-            $request->validate([
-                'start_date'  => 'required|date',
-                'end_date'    => 'required|date|after_or_equal:start_date',
-            ]);
-            $pharmacy = Pharmacies::findOrFail(auth()->user()->pharmacy_id);
-
-            $filename = 'RESEP' . $pharmacy->name . '_'
-                . $request->start_date . '_sd_' . $request->end_date . '.xlsx';
-
-            return Excel::download(
-                new ReturExport(
-                    $pharmacy->id,
-                    $request->start_date,
-                    $request->end_date,
-                ),
-                $filename
-            );
-        }
-
-
-        // ================================ ================== ===================================
-
-        // ================================ Pembelian / Orders ===================================
-
-        // Laporan Pembelian
-        if ($request->selectedReport == "Laporan Pembelian") {
-            $pharmacy = Pharmacies::findOrFail(auth()->user()->pharmacy_id);
-            return Excel::download(
-                new OrdersExport(
-                    $pharmacy->id,
-                    $request->start_date,
-                    $request->end_date,
-                ),
-                'DATA_PEMBELIAN_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx'
-            );
-        }
-        if ($request->selectedReport == "Faktur Pembelian") {
-            $pharmacy = Pharmacies::findOrFail(auth()->user()->pharmacy_id);
-            return Excel::download(
-                new InvoiceExport(
-                    $pharmacy->id,
-                    $request->start_date,
-                    $request->end_date,
-                    $request->selectedType,
-
-                ),
-                'DATA_FAKTUR_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx'
-            );
-        }
-        // ================================ ================== ===================================
-
-        return response()->json([
-            'status'   => "success",
-        ]);
+                'RESEP' . $pharmacy->name . '_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx',
+            ],
+            'Retur Jual' => [
+                new ReturExport($pharmacy->id, $request->start_date, $request->end_date),
+                'RESEP' . $pharmacy->name . '_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx',
+            ],
+            'Laporan Pembelian' => [
+                new OrdersExport($pharmacy->id, $request->start_date, $request->end_date),
+                'DATA_PEMBELIAN_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx',
+            ],
+            'Faktur Pembelian' => [
+                new InvoiceExport($pharmacy->id, $request->start_date, $request->end_date, $request->selectedType),
+                'DATA_FAKTUR_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx',
+            ],
+            default => [null, null],
+        };
     }
+
+    // Sales Export Function (Generate)
+
+
+
+    // ================================ ================== ===================================
 
     public function transactions()
     {

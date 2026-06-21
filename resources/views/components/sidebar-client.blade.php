@@ -1,4 +1,8 @@
 <style>
+    /* Chrome, Safari, Opera */
+    .sidebar-nav::-webkit-scrollbar {
+        display: none;
+    }
     .modal-show {
         opacity: 1;
         transform: translate(-50%, -50%) scale(1);

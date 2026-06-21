@@ -263,7 +263,7 @@
                         </div>
                         <div>
                             <label class="block text-[12px] font-medium text-gray-500 mb-1">Jumlah retur</label>
-                            <input id="total_retur" type="text" readonly placeholder="Rp 0"
+                            <input id="total_retur" type="text" placeholder="Rp 0"
                                 class="w-full rounded-lg border border-gray-200 bg-gray-50 text-gray-500 px-3 py-2 text-[13px] focus:outline-none">
                         </div>
                     </div>
@@ -435,11 +435,20 @@
         // ─── Calculate retur total ────────────────────────────────────────────────────
         function calculateReturTotal() {
             const oldQty = parseFloat(document.getElementById('old_qty').value) || 0;
-            const returQty = parseFloat(document.getElementById('qty').value) || 0;
+            let returQty = Math.round(parseFloat(document.getElementById('qty').value) || 0);
+
+            if (returQty > oldQty) {
+                returQty = oldQty;
+                document.getElementById('qty').value = returQty;
+            } else {
+                document.getElementById('qty').value = returQty;
+            }
+
             const itemPrice = parseFloat(
                 (document.getElementById('item_price').value || '0').replace(/[^\d.-]/g, '')
             ) || 0;
-            document.getElementById('total_retur').value = ((oldQty - returQty) * itemPrice).toFixed(0);
+
+            document.getElementById('total_retur').value = Math.ceil(((oldQty - returQty) * itemPrice) / 1000) * 1000;
         }
 
         // ─── Enter key navigation ─────────────────────────────────────────────────────
