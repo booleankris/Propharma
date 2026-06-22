@@ -16,10 +16,15 @@ class MedicineTransfers extends Model
         'status',
         'etalases_id',
         'pharmacy_id',
+        'user_id'
     ];
     public function batches()
     {
         return $this->belongsTo(Batches::class, 'batches_id', 'id');
+    }
+    public function users()
+    {
+        return $this->belongsTo(User::class, 'user_id', 'id');
     }
     public function etalases()
     {

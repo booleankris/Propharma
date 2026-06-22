@@ -27,71 +27,59 @@ class ReceivingController extends Controller
 
     public function createReceiving(Request $request)
     {
-        // FIX #4: Removed dd('kontol')
-
         $now = Carbon::now()->format('d/m/Y');
-        $transaction = Receiving::where('pharmacy_id', Auth()->user()->pharmacy_id)
-            ->where('status', '0')->first();
-        if ($transaction) {
-            $last = Receiving::with('orders')->where('pharmacy_id', Auth()->user()->pharmacy_id)
-                ->where('status', '0')
-                ->first();
-            $receiving_id = $last->id;
-            $order_code = $last->code;
-            $check_order =  Receiving::where('pharmacy_id', Auth()->user()->pharmacy_id)
-                ->where('status', '0')->where('order_id', '!=', NULL)->first();
 
-            if ($check_order) {
-                $order_exist = Receiving::with('orders')
-                    ->where('pharmacy_id', Auth()->user()->pharmacy_id)
-                    ->where('status', 0)
-                    ->whereRelation('orders', 'code', $last->orders->code)
-                    ->first();
-            } else {
-                $order_exist = '';
-            }
+        $transaction = Receiving::where('pharmacy_id', auth()->user()->pharmacy_id)
+            ->where('status', 0)
+            ->first();
+
+        if ($transaction) {
+            $receiving_id = $transaction->id;
+            $order_code   = $transaction->code;
+
+            /*
+         * Check if this in-progress receiving already has items
+         * linked to a purchase order, traversing:
+         * receiving → receiving_details → receiving_items → order_items → orders
+         */
+            $order_exist = Order::whereHas('order_items.receivingItems.receiving_details.receiving', function ($q) use ($transaction) {
+                $q->where('id', $transaction->id);
+            })
+                ->where('status', '!=', 2) // not yet completed — adjust value to match your status convention
+                ->first();
+
             return view('orders.receiving', compact('order_code', 'transaction', 'now', 'order_exist', 'receiving_id'));
         } else {
-            // FIX #4: Removed dd('kontol')
             $year   = now()->format('y');
             $month  = now()->format('m');
             $prefix = $year . $month . 'RE';
-            $last = Receiving::where('pharmacy_id', Auth()->user()->pharmacy_id)
+
+            $last = Receiving::where('pharmacy_id', auth()->user()->pharmacy_id)
                 ->where('code', 'like', $prefix . '%')
                 ->orderBy('code', 'desc')
                 ->first();
 
-            if ($last) {
-                $lastNumber = intval(substr($last->code, -4));
-                $nextNumber = $lastNumber + 1;
-            } else {
-                $nextNumber = 0;
-            }
+            $nextNumber = $last ? intval(substr($last->code, -4)) + 1 : 0;
+            $serial     = str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
 
-            $serial = str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
-
-            $receiving_code = $prefix . $serial;
             try {
                 DB::beginTransaction();
 
                 $transaction = Receiving::create([
-                    'order_items_id'    => NULL,
-                    'creditors_id'      => NULL,
-                    'pharmacy_id'       => Auth()->user()->pharmacy_id,
-                    'code'              => $receiving_code,
-                    'date'              => $now,
-                    'status'            => 0,
+                    'pharmacy_id' => auth()->user()->pharmacy_id,
+                    'code'        => $prefix . $serial,
+                    'date'        => $now,
+                    'status'      => 0,
                 ]);
 
                 DB::commit();
                 return redirect()->route('receiving.create');
             } catch (\Exception $e) {
                 DB::rollBack();
-                return redirect()->back()->with('message', "Gagal Menyimpan! " . $e->getMessage());
+                return redirect()->back()->with('message', 'Gagal Menyimpan! ' . $e->getMessage());
             }
         }
     }
-
     function generateItemsLogCode()
     {
         $now = Carbon::now();
@@ -214,14 +202,14 @@ class ReceivingController extends Controller
     public function printSPBFinal($orderId)
     {
         $date = Carbon::now()->translatedFormat('d F Y');
-        $order = Order::with(['order_items.receiving_items','order_items.medicines', 'order_items.creditors', 'order_items.medicines.factory', 'order_items.medicines.category'])
+        $order = Order::with(['order_items.receiving_items', 'order_items.medicines', 'order_items.creditors', 'order_items.medicines.factory', 'order_items.medicines.category'])
             ->findOrFail($orderId);
         $grouped = $order->order_items->groupBy(function ($item) {
             return $item->medicines->type ?? "Kosong";
         })->map(function ($perCreditor) {
             return $perCreditor->groupBy('creditor_code') ?? "Kosong";
         });
-        
+
         $pdf = Pdf::loadView('orders.printSPBFinal', compact('order', 'date', 'grouped'))
             ->setPaper('A4', 'portrait');
 
@@ -430,7 +418,7 @@ class ReceivingController extends Controller
                 } else {
                     // FIX #3: Cetak button now actually renders for status == 2
                     return '
-                    <a target="_blank" href="/receiving/'. $row->id .'/printspbfinal">
+                    <a target="_blank" href="/receiving/' . $row->id . '/printspbfinal">
                         <div class="flex gap-1">
                             <div class="w-full">
                                 <button style="' . $color . ' color:white;" class="rounded-full px-2 py-2 font-semibold">

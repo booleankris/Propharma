@@ -145,6 +145,7 @@ class TransfersController extends Controller
                     'code'       => $request->code,
                     'stock'        => $request->qty,
                     'status'     => 0,
+                    'user_id' => auth()->user()->id,
 
                 ]);
             });
@@ -184,15 +185,26 @@ class TransfersController extends Controller
     }
     public function incomingTransfers()
     {
-        $transfers = MedicineTransfers::with(['batches.medicines', 'etalases'])
+
+        // from batches = destination
+        // from users = source
+        $incoming = MedicineTransfers::with(['batches','users', 'batches.medicines', 'etalases'])
             ->whereHas('batches', function ($getpid) {
                 $getpid->where('pharmacy_id', auth()->user()->pharmacy_id);
             })
             ->latest()
             ->get();
 
-        $pending  = $transfers->where('status', 0);
-        $accepted = $transfers->where('status', 1);
+        $transfers = MedicineTransfers::with(['batches', 'batches.medicines', 'etalases'])
+            ->whereHas('users', function ($getpid) {
+                $getpid->where('pharmacy_id', auth()->user()->pharmacy_id);
+            })
+            
+            ->latest()
+            ->get();
+
+        $pending  = $transfers->whereIn('status', [0, 1, 2]);
+        $accepted = $incoming->whereIn('status', [0, 1]);
         $denied   = $transfers->where('status', 2);
 
         $transferData = $transfers->keyBy('id')->map(fn($t) => [

@@ -2894,7 +2894,7 @@
 
     function resetInputs() {
         const ids = ['pay', 'change', 'quantity', 'dosage', 'dosage_r'];
-
+        
         ids.forEach(id => {
             const el = document.getElementById(id);
             if (el) el.value = "";
@@ -2909,57 +2909,58 @@
         raw_total, total_price, final_price, racikstatus) {
 
         var medicine_type = currenttransaction;
-        if (edit_status != 0) {
-            axios.post("{{ route('transaction.updateCart') }}", {
-                    id: selectedRowId,
-                    medicine_id,
-                    transaction_id,
-                    quantity,
-                    discount,
-                    embalase,
-                    cart_type,
-                    package,
-                    dosage_r,
-                    price2,
-                    raw_total,
-                    total_price,
-                    final_price,
-                    grossprice,
-                    racikstatus,
-                    medicine_type,
-                    service,
+        if (document.getElementById('quantity').value != "") {
+            if (edit_status != 0) {
+                axios.post("{{ route('transaction.updateCart') }}", {
+                        id: selectedRowId,
+                        medicine_id,
+                        transaction_id,
+                        quantity,
+                        discount,
+                        embalase,
+                        cart_type,
+                        package,
+                        dosage_r,
+                        price2,
+                        raw_total,
+                        total_price,
+                        final_price,
+                        grossprice,
+                        racikstatus,
+                        medicine_type,
+                        service,
 
-                })
-                .then(response => {
+                    })
+                    .then(response => {
 
-                    const item = response.data.item;
-                    totaltransaction = response.data.total_transaction;
-                    total_discount = response.data.total_discount;
-                    totalbought = response.data.totalbought;
+                        const item = response.data.item;
+                        totaltransaction = response.data.total_transaction;
+                        total_discount = response.data.total_discount;
+                        totalbought = response.data.totalbought;
 
-                    console.log("Updated cart item:", item);
-                    // Reset Inputs and variables value
-                    [stock, unit, quantity, price, name, totalprice].forEach(el => el.value = "");
-                    discountInput.value = "";
-                    discount = 0;
+                        console.log("Updated cart item:", item);
+                        // Reset Inputs and variables value
+                        [stock, unit, quantity, price, name, totalprice].forEach(el => el.value = "");
+                        discountInput.value = "";
+                        discount = 0;
 
-                    resetInputs();
-                    document.getElementById('productSearch').focus();
-                    closeBox();
-                    cartTotalInput.value = formatRupiah(totaltransaction);
-                    if (subtotalpreview) {
+                        resetInputs();
+                        document.getElementById('productSearch').focus();
+                        closeBox();
+                        cartTotalInput.value = formatRupiah(totaltransaction);
+                        if (subtotalpreview) {
 
-                        subtotalpreview.value = formatRupiah(totaltransaction);
-                    }
-                    previewdiscounttotal.value = formatRupiah(total_discount);
-                    previewtransactiontotal.value = formatRupiah(totaltransaction);
-                    payment_total.value = formatRupiah(totalbought);
+                            subtotalpreview.value = formatRupiah(totaltransaction);
+                        }
+                        previewdiscounttotal.value = formatRupiah(total_discount);
+                        previewtransactiontotal.value = formatRupiah(totaltransaction);
+                        payment_total.value = formatRupiah(totalbought);
 
-                    const existingRow = document.getElementById(`itemincart${item.id}`);
+                        const existingRow = document.getElementById(`itemincart${item.id}`);
 
-                    if (existingRow) {
-                        //   bakcup
-                        existingRow.innerHTML = `
+                        if (existingRow) {
+                            //   bakcup
+                            existingRow.innerHTML = `
                             <td class="px-1 py-1 text-center text-gray-600">${existingRow.rowIndex}</td>
                             <td colspan="7" class="leading-normal text-[10px] px-1 py-1 font-semibold text-gray-800">
                                 ${item.medicine.name}
@@ -2978,10 +2979,10 @@
                             </td>
                             <td class="px-1 py-1 text-center font-semibold text-blue-600">${item.cart_type}</td>
                         `;
-                    } else {
-                        // If not found (failsafe)
-                        console.warn("⚠️ Row not found, inserting new one");
-                        document.getElementById('carts').insertAdjacentHTML('beforeend', `
+                        } else {
+                            // If not found (failsafe)
+                            console.warn("⚠️ Row not found, inserting new one");
+                            document.getElementById('carts').insertAdjacentHTML('beforeend', `
                             <tr id="itemincart${item.id}" data-id="${item.id}" class="cart-row border-b hover:bg-blue-50 transition text-[10px] cursor-pointer">
                                 <td class="px-1 py-1 text-center text-gray-600">${document.querySelectorAll('#carts tr').length + 1}</td>
                                 <td colspan="7" class="leading-normal text-[10px] px-1 py-1 font-semibold text-gray-800">${item.medicine.name}</td>
@@ -2998,80 +2999,80 @@
                                 <td class="px-1 py-1 text-center font-semibold text-blue-600">${item.cart_type}</td>
                             </tr>
                         `);
+                        }
+
+                        // Reattach event listeners if needed
+                        attachRowEvents(document.getElementById(`itemincart${item.id}`));
+                    })
+                    .catch(error => {
+                        console.error("Error updating cart:", error.response ? error.response.data : error.message);
+                    });
+            } else {
+                axios.post("{{ route('transaction.addToCart') }}", {
+                    medicine_id,
+                    transaction_id,
+                    quantity,
+                    discount,
+                    embalase,
+                    cart_type,
+                    package,
+                    dosage_r,
+                    price2,
+                    raw_total,
+                    total_price,
+                    final_price,
+                    grossprice,
+                    racikstatus,
+                    medicine_type,
+                    service
+
+                }).then(response => {
+                    const item = response.data;
+                    let recipe_row = "";
+
+                    totaltransaction += total_price;
+                    totalbought = parseFloat(totalbought) + parseFloat(grossprice);
+                    total_discount += parseFloat(discount);
+                    // price2 = formatRupiah(totaltransaction);
+                    // Reset input fields
+                    [stock, unit, quantity, price, name, totalprice].forEach(el => el.value = "");
+                    discount = 0;
+                    console.log("Discount item:", discount);
+                    discountInput.value = "";
+
+                    resetInputs();
+
+
+                    discountInput.value = "";
+                    if (racikstatus == 1 && transaction_type != 'UPDS' && transaction_type != 'HV/OTC') {
+                        document.getElementById('productSearch').focus();
+                        closeBox();
+
+                    } else {
+                        document.getElementById('productSearch').focus();
+                        closeBox();
+
+                    }
+                    console.log(item);
+
+                    // UPDATE PREVIEW 
+                    cartTotalInput.value = formatRupiah(totaltransaction);
+                    if (subtotalpreview) {
+                        subtotalpreview.value = formatRupiah(totaltransaction);
                     }
 
-                    // Reattach event listeners if needed
-                    attachRowEvents(document.getElementById(`itemincart${item.id}`));
-                })
-                .catch(error => {
-                    console.error("Error updating cart:", error.response ? error.response.data : error.message);
-                });
-        } else {
-            axios.post("{{ route('transaction.addToCart') }}", {
-                medicine_id,
-                transaction_id,
-                quantity,
-                discount,
-                embalase,
-                cart_type,
-                package,
-                dosage_r,
-                price2,
-                raw_total,
-                total_price,
-                final_price,
-                grossprice,
-                racikstatus,
-                medicine_type,
-                service
+                    previewdiscounttotal.value = formatRupiah(total_discount);
 
-            }).then(response => {
-                const item = response.data;
-                let recipe_row = "";
-
-                totaltransaction += total_price;
-                totalbought = parseFloat(totalbought) + parseFloat(grossprice);
-                total_discount += parseFloat(discount);
-                // price2 = formatRupiah(totaltransaction);
-                // Reset input fields
-                [stock, unit, quantity, price, name, totalprice].forEach(el => el.value = "");
-                discount = 0;
-                console.log("Discount item:", discount);
-                discountInput.value = "";
-
-                resetInputs();
-
-
-                discountInput.value = "";
-                if (racikstatus == 1 && transaction_type != 'UPDS' && transaction_type != 'HV/OTC') {
-                    document.getElementById('productSearch').focus();
-                    closeBox();
-
-                } else {
-                    document.getElementById('productSearch').focus();
-                    closeBox();
-
-                }
-                console.log(item);
-
-                // UPDATE PREVIEW 
-                cartTotalInput.value = formatRupiah(totaltransaction);
-                if (subtotalpreview) {
-                    subtotalpreview.value = formatRupiah(totaltransaction);
-                }
-
-                previewdiscounttotal.value = formatRupiah(total_discount);
-
-                previewtransactiontotal.value = formatRupiah(totaltransaction);
-                payment_total.value = formatRupiah(totalbought);
+                    previewtransactiontotal.value = formatRupiah(totaltransaction);
+                    payment_total.value = formatRupiah(totalbought);
 
 
 
-                if (racikstatus != 0) {
-                    recipe_row = "bg-[#eefff8]";
-                }
+                    if (racikstatus != 0) {
+                        recipe_row = "bg-[#eefff8]";
+                    }
 
-                document.getElementById('carts').insertAdjacentHTML('beforeend', `
+                    document.getElementById('carts').insertAdjacentHTML('beforeend', `
                     <tr id="itemincart${item.id}" data-id="${item.id}" 
                         class="cart-row border-b ${recipe_row} hover:bg-blue-50 transition text-[10px] cursor-pointer">
                         <td class="px-1 py-1 text-center text-gray-600">
@@ -3096,16 +3097,20 @@
                     </tr>
                 `);
 
-                const newRow = document.getElementById(`itemincart${item.id}`); // safer
-                console.log('Newly inserted row:', newRow);
-                attachRowEvents(newRow);
-                discount = 0;
-                console.log('Reseting the discount variable', discount);
+                    const newRow = document.getElementById(`itemincart${item.id}`); // safer
+                    console.log('Newly inserted row:', newRow);
+                    attachRowEvents(newRow);
+                    discount = 0;
+                    console.log('Reseting the discount variable', discount);
 
 
-            }).catch(error => {
-                console.error("Error adding to cart:", error.response ? error.response.data : error.message);
-            });
+                }).catch(error => {
+                    console.error("Error adding to cart:", error.response ? error.response.data : error
+                    .message);
+                });
+            }
+        }else{
+            alert('isi transaksi dengan benar!');
         }
 
 
