@@ -171,6 +171,7 @@ class SalesController extends Controller
 
         $discount_total = MedicineCart::where('user_id', $user_id)
             ->where('status', '0')
+            ->where('transaction_id', $trx_id)
             ->sum('discount');
 
         $check_transaction = MedicineTransactions::where('pharmacy_id', $pharmacy_id)

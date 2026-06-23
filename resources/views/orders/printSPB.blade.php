@@ -281,7 +281,7 @@
                 </table>
 
                 {{-- TITLE --}}
-                <div class="title">SURAT PESANAN</div>
+                <div class="title">SURAT PESANAN PREKURSOR</div>
 
                 <div>Mohon dikirim obat-obatan untuk keperluan apotek :</div>
 
