@@ -1839,6 +1839,8 @@
     var price2 = "";
     var item_finalprice = "";
     let grossprice = "";
+    let rawprice
+    let het;
     var payInput = document.getElementById('pay');
     var bank_name_input = document.getElementById('bank_name');
     var discounsubtotal = document.getElementById('discounsubtotal');
@@ -2297,9 +2299,11 @@
         input.value = '';
         quantity.value = '';
         totalprice.value = '';
+        discount = '';
         stock.value = it.stock;
         unit.value = it.unit;
         name.value = it.name;
+
         if (currenttransaction == 'KREDIT' || currenttransaction == 'RESEP TUNAI') {
             dosage.value = it.dosage;
         }
@@ -2309,10 +2313,17 @@
         let raw;
         console.log(it);
 
+        // GET HET RAW PRICE FOR PARAMETER CHANGE PURPOSES
+
         if (it.het_price !== null && it.het_price !== 0 && it.het_price !== '') {
             raw = Number(it.het_price);
+            rawprice = raw;
+            het = 1;
+
         } else {
             raw = Number(it.net_price) * Number(parameters || 1);
+            rawprice = it.net_price;
+            het = 0;
         }
 
         // let rounded;
@@ -2894,7 +2905,7 @@
 
     function resetInputs() {
         const ids = ['pay', 'change', 'quantity', 'dosage', 'dosage_r'];
-        
+
         ids.forEach(id => {
             const el = document.getElementById(id);
             if (el) el.value = "";
@@ -2942,7 +2953,7 @@
                         // Reset Inputs and variables value
                         [stock, unit, quantity, price, name, totalprice].forEach(el => el.value = "");
                         discountInput.value = "";
-                        discount = 0;
+                        discount = "";
 
                         resetInputs();
                         document.getElementById('productSearch').focus();
@@ -3036,7 +3047,7 @@
                     // price2 = formatRupiah(totaltransaction);
                     // Reset input fields
                     [stock, unit, quantity, price, name, totalprice].forEach(el => el.value = "");
-                    discount = 0;
+                    discount = "";
                     console.log("Discount item:", discount);
                     discountInput.value = "";
 
@@ -3106,10 +3117,10 @@
 
                 }).catch(error => {
                     console.error("Error adding to cart:", error.response ? error.response.data : error
-                    .message);
+                        .message);
                 });
             }
-        }else{
+        } else {
             alert('isi transaksi dengan benar!');
         }
 
@@ -3311,9 +3322,20 @@
                         }
                     }
                 }
+                if (item.cart_type == "UP") {
+                    transaction_type = "UPDS";
+                    price2 = item.raw_total;
+                    price.value = formatRupiah(item.raw_total);
+
+                } else if (item.cart_type == "HV") {
+                    transaction_type = "HV/OTC";
+                    price2 = item.raw_total;
+                    price.value = formatRupiah(item.raw_total);
+
+                }
                 totalprice.value = formatRupiah(item.total_price);
                 quantity.value = item.quantity;
-                price.value = formatRupiah(rounded);
+                // price.value = formatRupiah(rounded);
                 discountInput.value = item.discount;
 
 
@@ -3869,7 +3891,33 @@
             //     packageInput.classList.add('readonly');
             //     dosageRInput.classList.add('readonly');
             // }
-            console.log(parameters);
+            console.log("Changed the Parameter To : " + parameters + "Harga ASLI : " + rawprice);
+            // let raw;
+            // // console.log(it);
+
+            // // if (it.het_price !== null && it.het_price !== 0 && it.het_price !== '') {
+            // //     raw = Number(it.het_price);
+            // // } else {
+            // //     raw = Number(it.net_price) * Number(parameters || 1);
+            // // }
+
+            // // let rounded;
+            // // if (currenttransaction === 'KREDIT') {
+            // //     rounded = Math.round(raw);
+            // // } else {
+            // //     rounded = Math.floor(raw / 1000) * 1000;
+            // // }
+
+            if (het === 1) {
+                raw = Number(it.het_price);
+            } else {
+                raw = Number(rawprice) * Number(parameters || 1);
+            }
+
+            price.value = formatRupiah(raw);
+            console.log("harga Total : " + raw);
+            price2 = raw;
+            item_finalprice = raw;
 
         }
     }
