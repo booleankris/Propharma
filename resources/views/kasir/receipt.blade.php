@@ -188,9 +188,9 @@
 
     <hr>
 
-    Jumlah <span style="float:right">{{ number_format($totalFinalPrice) }}</span><br>
+    Jumlah <span style="float:right">{{ number_format($totalPrice) }}</span><br>
     Discount <span style="float:right">-{{ number_format($totaldiscount) }}</span><br>
-    <strong>Total Beli <span style="float:right">{{ number_format($payment) }}</span></strong><br>
+    <strong>Total Beli <span style="float:right">{{ number_format($totalFinalPrice) }}</span></strong><br>
     Bayar <span style="float:right">{{ number_format($transaction->paid) }}</span><br>
     Kembalian<span style="float:right">{{ number_format($transaction->changes) }}</span>
 
@@ -280,9 +280,9 @@
         @endforeach
 
         <br>
-        Sub Total <span style="float:right">{{ number_format($totalFinalPrice) }}</span><br>
+        Sub Total <span style="float:right">{{ number_format($totalPrice) }}</span><br>
         Discount <span style="float:right">-{{ number_format($totaldiscount) }}</span><br>
-        <strong>Jumlah <span style="float:right">{{ number_format($payment) }}</span></strong><br>
+        <strong>Jumlah <span style="float:right">{{ number_format($totalFinalPrice) }}</span></strong><br>
         Bayar <span style="float:right">{{ number_format($transaction->paid) }}</span><br>
         Kembalian<span style="float:right">{{ number_format($transaction->changes) }}</span>
 

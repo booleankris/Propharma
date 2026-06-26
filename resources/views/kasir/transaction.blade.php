@@ -3410,26 +3410,9 @@
         }
 
         async function printReceipt(commands, fallbackUrl) {
-            if (typeof qz === 'undefined') {
-                window.open(fallbackUrl, '_blank');
-                return;
-            }
-            try {
-                await print(commands);
-                iziToast.success({
-                    title: 'Berhasil',
-                    message: 'Struk berhasil dicetak',
-                    position: 'topRight'
-                });
-            } catch (err) {
-                console.warn('QZ Tray gagal, fallback browser:', err);
-                iziToast.warning({
-                    title: 'QZ Tray Gagal',
-                    message: 'Mencetak via browser...',
-                    position: 'topRight'
-                });
-                window.open(fallbackUrl, '_blank');
-            }
+
+            window.open(fallbackUrl, '_blank');
+
         }
 
         return {
