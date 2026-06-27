@@ -623,12 +623,12 @@
                                         </td>
                                         <td class="px-1 py-1 text-center">{{ $cart->medicine->unit }}</td>
                                         <td class="px-1 py-1 text-center">Rp
-                                            {{ number_format($rounded, 0, ',', '.') }}</td>
+                                            {{ number_format($cart->raw_total, 0, ',', '.') }}</td>
                                         <td class="px-1 py-1 text-center">{{ $cart->quantity }}</td>
                                         <td class="px-1 py-1 text-center">
                                             Rp.{{ number_format($cart->discount, 0, ',', ',') }}</td>
                                         <td class="px-1 py-1 text-center">Rp
-                                            {{ number_format($cart->raw_total, 0, ',', '.') }}</td>
+                                            {{ number_format($cart->total_price, 0, ',', '.') }}</td>
                                         @if ($transaction->transaction_type == 'KREDIT' || $transaction->transaction_type == 'RESEP TUNAI')
                                             <td class="clEmbalase px-1 py-1 text-center">Rp
                                                 {{ number_format($cart->embalase, 0, ',', '.') }}</td>
