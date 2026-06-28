@@ -29,14 +29,15 @@ class SalesDataController extends Controller
 
             $query = MedicineCart::query()
                 ->with(['transactions.patients', 'transactions'])
-                ->where('status', 1)
                 ->whereHas('transactions', function ($transaction) {
                     $transaction->where('pharmacy_id', auth()->user()->pharmacy_id);
                 })
                 ->selectRaw('
                 transaction_id,
                 MAX(created_at) as created_at,
-                SUM(final_price) as final_price
+                SUM(final_price) as final_price,
+                MAX(status) as status
+
             ')
                 ->groupBy('transaction_id')
                 ->orderBy('created_at');
@@ -90,13 +91,13 @@ class SalesDataController extends Controller
                 })
                 ->addColumn('type', function ($row) {
                     $type =  $row->transactions?->transaction_type ?? '-';
-                    if($type == "KREDIT"){
+                    if ($type == "KREDIT") {
                         $type = "UK";
-                    }else if($type == "RESEP TUNAI"){
+                    } else if ($type == "RESEP TUNAI") {
                         $type = "UM";
-                    }else if($type == "HV/OTC"){
+                    } else if ($type == "HV/OTC") {
                         $type = "HV";
-                    }else if($type == "UPDS"){
+                    } else if ($type == "UPDS") {
                         $type = "UP";
                     }
                     return $type;
@@ -138,8 +139,17 @@ class SalesDataController extends Controller
                     </div>
                     ';
                 })
-
-                ->rawColumns(['final_price', 'print'])
+                ->addColumn('status', function ($row) {
+                    if ($row->status == 1) {
+                        $status = '<a class="status-completed">Selesai</a>';
+                    } else if ($row->status == 0) {
+                        $status = '<a class="status-pending">Pending</a>';
+                    } else {
+                        $status = '<a class="status-completed">NULL</a>';
+                    }
+                    return $status;
+                })
+                ->rawColumns(['final_price', 'status', 'print'])
                 ->make(true);
         }
 
@@ -148,9 +158,7 @@ class SalesDataController extends Controller
     public function transactionItems($transactionId)
     {
         $items = MedicineCart::with('medicine')
-            ->where('transaction_id', $transactionId)
-            ->where('status', 1);
-
+            ->where('transaction_id', $transactionId);
         return DataTables::of($items)
             ->addIndexColumn()
 

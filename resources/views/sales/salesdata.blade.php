@@ -75,7 +75,7 @@
         #table-data tbody td,
         #items-table tbody td {
             font-size: 12px !important;
-            padding: 9px 10px !important;
+            padding: 9px 2px !important;
             vertical-align: middle !important;
             color: #111827;
             border-bottom: 0.5px solid #f3f4f6 !important;
@@ -126,6 +126,37 @@
             border: 0.5px solid #bfdbfe;
             background: #eff6ff;
             color: #1d4ed8;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: background .12s;
+            line-height: 1.4;
+        }
+
+        .status-completed {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+            padding: 3px 8px;
+            border-radius: 6px;
+            border: 0.5px solid #bfdbfe;
+            background: #00940b;
+            color: #ffffff;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: background .12s;
+            line-height: 1.4;
+        }
+
+        .status-pending {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+            padding: 3px 8px;
+            border-radius: 6px;
+            background: #e29e00;
+            color: #ffffff;
             cursor: pointer;
             white-space: nowrap;
             transition: background .12s;
@@ -270,6 +301,7 @@
                                     <th class="col-right">Harga</th>
                                     <th class="col-right">Pembayaran</th>
                                     <th></th>
+                                    <th></th>
                                 </tr>
                             </thead>
                             <tbody></tbody>
@@ -413,6 +445,9 @@
                         <path d="M4 12H3a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1"/>
                         <rect x="4" y="10" width="8" height="5"/>
                     </svg>Cetak</button>`
+                    },
+                    {
+                        data: 'status'
                     },
                 ],
             });
