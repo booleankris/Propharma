@@ -106,7 +106,7 @@ class SalesDataController extends Controller
                     return $row->transactions?->patients?->name ?? '-';
                 })
                 ->addColumn('final_price', function ($row) {
-                    return 'Rp ' . number_format($row->final_price, 0, ',', '.');
+                    return 'Rp ' . number_format($row->final_price - $row->transactions?->discount, 0, ',', '.');
                 })
                 ->addColumn('payment_method', function ($row) {
                     return $row->transactions?->payment_method;

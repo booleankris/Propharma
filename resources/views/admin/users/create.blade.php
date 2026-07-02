@@ -78,7 +78,7 @@
                                         'class' => 'form-control pwstrength',
                                         'data-indicator' => 'pwindicator',
                                         'required',
-                                        'maxlength' => 6,
+                                        'maxlength' => 4,
                                     ]) !!}
                                     <div id="pwindicator" class="pwindicator">
                                         <div class="bar"></div>
@@ -95,7 +95,7 @@
                                         'placeholder' => 'Konfirmasi Password / PIN Rahasia',
                                         'class' => 'form-control',
                                         'required',
-                                        'maxlength' => 6,
+                                        'maxlength' => 4,
                                     ]) !!}
                                 </div>
                             </div>

@@ -105,7 +105,7 @@ class UserController extends Controller
             'name'        => 'required|string|min:3|max:255',
             'username'    => 'required|string|min:3|max:255',
             'pharmacy_id' => 'required|exists:pharmacies,id',
-            'password'    => 'required|min:6|same:confirm-password',
+            'password'    => 'required|min:4|same:confirm-password',
             'roles'       => 'required'
         ]);
         $input = $request->all();
