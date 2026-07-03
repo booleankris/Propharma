@@ -16,6 +16,10 @@ class ReturDataController extends Controller
 
             $search     = trim($request->input('search.value'));
             $parsedDate = $this->parseDate($search);
+            $startDate  = $request->input('start_date');
+            $endDate    = $request->input('end_date');
+
+
 
             // ======================
             // SUB QUERY
@@ -72,7 +76,10 @@ class ReturDataController extends Controller
                         ->orWhere('jenis',            'like', "%{$search}%");
                 });
             }
-
+            if ($startDate && $endDate) {
+                $query->whereDate('created_at', '>=', $startDate)
+                    ->whereDate('created_at', '<=', $endDate);
+            }
             // ======================
             // ORDER
             // ======================

@@ -1844,14 +1844,14 @@
     var payInput = document.getElementById('pay');
     var bank_name_input = document.getElementById('bank_name');
     var discounsubtotal = document.getElementById('discounsubtotal');
-
+    var discounsubtotalvalue = "";
     var payment_total = document.getElementById('payment_total');
     var edit_status = 0;
     // var debtor_id = "";
     // var patient_id = "";
     // var doctor_id = "";
 
-    let totalbought = {{ $priceTotal->total_price + $priceTotal->embalase }};
+    let totalbought = {{ $rawtotal->raw_total + $rawtotal->embalase }};
     var subtotal = "";
     var final_price = "";
     let items = [];
@@ -2866,9 +2866,11 @@
         console.log("count() => subtotal:", subtotal, "grossprice:", grossprice, "pharmacy_price price :",
             pharmacy_price);
 
+    
     }
 
     function countDiscount(val) {
+       
         if (val > 100) {
             final_price = subtotal - val;
             discount = Math.round(val / 1000) * 1000;
@@ -2893,6 +2895,7 @@
         }
         discount = Math.ceil(discount / 1000) * 1000;
         final_price = totaltransaction - discount;
+        discounsubtotalvalue = discount;
         final_price = Math.ceil(final_price / 1000) * 1000;
         subtotal_discount = discount;
         cartTotalInput.value = formatRupiah(final_price);
@@ -3281,14 +3284,17 @@
             .then(response => {
                 edit_status = 1;
                 const item = response.data;
-                let raw = (+item.medicine.net_price * +parameters) + +rounding;
-                let rounded = Math.floor(raw / 1000) * 1000;
-
+                let raw = item.item_price;
+                let rounded = raw;
+                let totalval;
+                
                 medicine_id = item.medicine_id;
                 total_item = item.quantity;
                 item_finalprice = rounded;
                 price2 = rounded;
-                subtotal = price2 * item.quantity;
+                
+                totalval = price2 * item.quantity;
+                subtotal = Math.ceil(totalval / 1000) * 1000;
                 pharmacy_price = subtotal;
                 final_price = subtotal - item.discount;
                 discount = item.discount;
@@ -3324,16 +3330,16 @@
                 }
                 if (item.cart_type == "UP") {
                     transaction_type = "UPDS";
-                    price2 = item.raw_total;
-                    price.value = formatRupiah(item.raw_total);
+                    price2 = item.item_price;
+                    price.value = formatRupiah(item.item_price);
 
                 } else if (item.cart_type == "HV") {
                     transaction_type = "HV/OTC";
-                    price2 = item.raw_total;
-                    price.value = formatRupiah(item.raw_total);
+                    price2 = item.item_price;
+                    price.value = formatRupiah(item.item_price);
 
                 }
-                totalprice.value = formatRupiah(item.total_price);
+                totalprice.value = formatRupiah(item.total_price - item.discount);
                 quantity.value = item.quantity;
                 // price.value = formatRupiah(rounded);
                 discountInput.value = item.discount;
@@ -3836,27 +3842,50 @@
         const isF3 = e.key === 'F3' || e.keyCode === 114;
         if (isF3) {
             e.preventDefault();
-            if (transaction_type == 'RESEP TUNAI') {
-                parameters = {{ $parameterUP }};
-                transaction_type = "UPDS";
-                faktur.innerHTML = `
+            if (currenttransaction == "RESEP TUNAI" || currenttransaction == "KREDIT") {
+                if (transaction_type == 'RESEP TUNAI') {
+                    parameters = {{ $parameterUP }};
+                    transaction_type = "UPDS";
+                    faktur.innerHTML = `
                             <span
                             class="bg-green-100 text-green-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md dark:bg-green-900 dark:text-green-300">UPDS</span>
                     `;
-            } else if (transaction_type == "UPDS") {
-                parameters = {{ $parameterHV }};
-                transaction_type = "HV/OTC";
-                faktur.innerHTML = `
+                } else if (transaction_type == "UPDS") {
+                    parameters = {{ $parameterHV }};
+                    transaction_type = "HV/OTC";
+                    faktur.innerHTML = `
                         <span class="bg-blue-100 text-blue-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md dark:bg-blue-900 dark:text-blue-300">HV/OTC</span>
                     `;
-            } else if (transaction_type == "HV/OTC") {
-                parameters = {{ $parameterRT }};
-                transaction_type = "RESEP TUNAI";
-                faktur.innerHTML = `
+                } else if (transaction_type == "HV/OTC") {
+                    parameters = {{ $parameterRT }};
+                    transaction_type = "RESEP TUNAI";
+                    faktur.innerHTML = `
                             <span class="bg-red-100 text-red-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md dark:bg-red-900 dark:text-red-300">Resep Tunai</span>
                     `;
+                }
+            } else {
+                if (transaction_type == 'HV/OTC') {
+                    parameters = {{ $parameterUP }};
+                    transaction_type = "UPDS";
+                    faktur.innerHTML = `
+                            <span
+                            class="bg-green-100 text-green-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md dark:bg-green-900 dark:text-green-300">UPDS</span>
+                    `;
+                } else if (transaction_type == "UPDS") {
+                    parameters = {{ $parameterHV }};
+                    transaction_type = "HV/OTC";
+                    faktur.innerHTML = `
+                        <span class="bg-blue-100 text-blue-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md dark:bg-blue-900 dark:text-blue-300">HV/OTC</span>
+                    `;
+                }
+                // } else if (transaction_type == "HV/OTC") {
+                //     parameters = {{ $parameterRT }};
+                //     transaction_type = "RESEP TUNAI";
+                //     faktur.innerHTML = `
+                //             <span class="bg-red-100 text-red-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md dark:bg-red-900 dark:text-red-300">Resep Tunai</span>
+                //     `;
+                // }
             }
-
 
             // if (checkbox.checked) {
             //     document.getElementById('receiptbox').checked = false;
@@ -4295,9 +4324,6 @@
                     document.getElementById('trchange').value
                 );
 
-                const discounsubtotal =
-                    document.getElementById('discounsubtotal').value || 0;
-
                 const bank_name =
                     bank_name_input ?
                     bank_name_input.value || null :
@@ -4319,7 +4345,7 @@
 
                         paid: checkoutPayload.paid,
 
-                        discounsubtotal,
+                        discounsubtotalvalue,
 
                         totaltransaction,
 

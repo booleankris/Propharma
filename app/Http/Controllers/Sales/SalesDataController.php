@@ -28,15 +28,20 @@ class SalesDataController extends Controller
             }
 
             $query = MedicineCart::query()
+                ->join('medicine_transactions', 'medicine_transactions.id', '=', 'medicine_cart.transaction_id')
                 ->with(['transactions.patients', 'transactions'])
                 ->whereHas('transactions', function ($transaction) {
                     $transaction->where('pharmacy_id', auth()->user()->pharmacy_id);
                 })
                 ->selectRaw('
                 transaction_id,
-                MAX(created_at) as created_at,
+                MAX(medicine_cart.created_at) as created_at,
+                SUM(medicine_cart.discount) as totaldiscount,
+                MAX(medicine_cart.status) as status,
                 SUM(final_price) as final_price,
-                MAX(status) as status
+                SUM(total_price) as subtotal,
+                MAX(medicine_transactions.discount) as cart_discount
+                
 
             ')
                 ->groupBy('transaction_id')
@@ -107,6 +112,12 @@ class SalesDataController extends Controller
                 })
                 ->addColumn('final_price', function ($row) {
                     return 'Rp ' . number_format($row->final_price - $row->transactions?->discount, 0, ',', '.');
+                })
+                ->addColumn('subtotal', function ($row) {
+                    return 'Rp ' . number_format($row->subtotal, 0, ',', '.');
+                })
+                ->addColumn('totaldiscount', function ($row) {
+                    return 'Rp ' . number_format($row->totaldiscount + $row->cart_discount, 0, ',', '.');
                 })
                 ->addColumn('payment_method', function ($row) {
                     return $row->transactions?->payment_method;

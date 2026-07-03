@@ -341,6 +341,14 @@
                             </table>
                         </div>
                         <div class="total-row">
+                            <span>Subtotal</span>
+                            <span id="detail-subtotal">—</span>
+                        </div>
+                        <div class="total-row">
+                            <span>Total Diskon</span>
+                            <span id="detail-discount">—</span>
+                        </div>
+                        <div class="total-row">
                             <span>Total</span>
                             <span id="detail-total">—</span>
                         </div>
@@ -459,12 +467,12 @@
                 $('#table-data tbody tr').removeClass('active');
                 $(this).addClass('active');
                 document.getElementById('detail-code').textContent = data.code;
-                loadItems(data.transaction_id, data.final_price);
+                loadItems(data.transaction_id, data.final_price, data.subtotal, data.totaldiscount);
             });
         });
 
         // ── Load items table ──────────────────────────────────────────────────
-        function loadItems(transactionId, totalPrice) {
+        function loadItems(transactionId, totalPrice, subtotal, totaldiscount) {
             if (itemsTable) {
                 itemsTable.destroy();
                 $('#items-table tbody').empty();
@@ -473,6 +481,8 @@
             document.getElementById('detail-empty').classList.add('hidden');
             document.getElementById('detail-wrap').classList.remove('hidden');
             document.getElementById('detail-total').textContent = totalPrice ?? '—';
+            document.getElementById('detail-discount').textContent = totaldiscount ?? '—';
+            document.getElementById('detail-subtotal').textContent = subtotal ?? '—';
 
             itemsTable = $('#items-table').DataTable({
                 processing: true,

@@ -158,11 +158,14 @@ class SalesController extends Controller
             ->where('transaction_id', $trx_id)
             ->sum('final_price');
 
-        $priceTotal = MedicineCart::where('user_id', $user_id)
+        // $priceTotal = MedicineCart::where('user_id', $user_id)
+        //     ->where('transaction_id', $trx_id)
+        //     ->selectRaw('SUM(total_price) as total_price, SUM(embalase) as embalase')
+        //     ->first();
+        $rawtotal = MedicineCart::where('user_id', $user_id)
             ->where('transaction_id', $trx_id)
-            ->selectRaw('SUM(total_price) as total_price, SUM(embalase) as embalase')
+            ->selectRaw('SUM(raw_total) as raw_total, SUM(embalase) as embalase')
             ->first();
-
         $existingpackage = MedicineCart::where('user_id', $user_id)
             ->where('transaction_id', $trx_id)
             ->where('recipe_status', '0')
@@ -190,7 +193,8 @@ class SalesController extends Controller
             'trx_id',
             'transaction',
             'existingpackage',
-            'priceTotal',
+            // 'priceTotal',
+            'rawtotal',
             'parameters',
             'rounding',
             'itemInCart',
@@ -784,7 +788,7 @@ class SalesController extends Controller
             'user_id'        => Auth()->user()->id,
             'transaction_id'   => 'required|integer|',
             'paid'             => 'required|numeric|min:0',
-            'discounsubtotal'  => 'nullable|numeric|min:0',
+            'discounsubtotalvalue'  => 'nullable|numeric|min:0',
             'totaltransaction' => 'required|numeric|min:0',
             'changes'          => 'required|numeric|min:0',
             'patient_id'       => 'nullable|integer|exists:patients,id',
@@ -828,7 +832,7 @@ class SalesController extends Controller
                 'status'             => 1,
                 'paid'               => $validated['paid'],
                 'transaction_code'   => $this->generateTransactionCode($meta['code']),
-                'discount'           => $validated['discounsubtotal'],
+                'discount'           => $validated['discounsubtotalvalue'],
                 'subtotal'           => $validated['totaltransaction'],
                 'changes'            => $validated['changes'],
                 'patient_id'         => $validated['patient_id'],
@@ -906,7 +910,7 @@ class SalesController extends Controller
                 ItemsLog::create([
                     'transaction_code' => $txWithItems->transaction_code,
                     'code'             => $this->generateItemsLogCode(),
-                    'type'             => 'UM',
+                    'type'             => $cart->cart_type,
                     'medicine_id'      => $cart->medicine_id,
                     'qty'              => $cart->quantity,
                     'qty_before'       => $qty_before,

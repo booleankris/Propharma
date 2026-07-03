@@ -5,6 +5,8 @@
 @section('style')
     <link rel="stylesheet" href="{{ asset('templates/library/datatables/media/css/jquery.dataTables.min.css') }}">
     <link rel="stylesheet" href="{{ asset('templates/library/izitoast/dist/css/iziToast.min.css') }}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+
     <style>
         /* ── DataTables overrides ── */
         .dataTables_wrapper .dataTables_filter {
@@ -146,6 +148,17 @@
                         Kembali
                     </a>
                 </div>
+                <div class="flex items-center gap-2 mb-4">
+                    <label for="retur-daterange" class="text-[12px] text-gray-500">Filter Tanggal:</label>
+                    <input type="text" id="retur-daterange" placeholder="Pilih rentang tanggal" readonly
+                        class="px-3 py-1.5 text-[12px] border border-gray-200 rounded-lg w-[210px] cursor-pointer
+                               focus:outline-none focus:ring-2 focus:ring-amber-100 focus:border-amber-300">
+                    <button id="btn-reset-filter" type="button"
+                        class="hidden px-3 py-1.5 text-[12px] text-gray-500 border border-gray-200 rounded-lg
+                               hover:bg-gray-50 transition-colors">
+                        Reset
+                    </button>
+                </div>
 
                 <div class="overflow-x-auto">
                     <table id="table-retur" class="w-full">
@@ -177,15 +190,28 @@
     <script src="{{ asset('templates/js/page/modules-datatables.js') }}"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="{{ asset('templates/library/izitoast/dist/js/iziToast.min.js') }}"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
     <script>
         $(function() {
-            $('#table-retur').DataTable({
+            // Holds the active date range filter (Y-m-d, sent to backend)
+            let selectedDates = {
+                start: null,
+                end: null
+            };
+
+            const table = $('#table-retur').DataTable({
                 responsive: true,
                 autoWidth: false,
                 processing: true,
                 serverSide: true,
-                ajax: '{{ route('returdata.index') }}',
+                ajax: {
+                    url: '{{ route('returdata.index') }}',
+                    data: function(d) {
+                        d.start_date = selectedDates.start;
+                        d.end_date = selectedDates.end;
+                    }
+                },
                 language: {
                     search: '',
                     searchPlaceholder: 'Cari kode, pasien, obat...'
@@ -235,6 +261,35 @@
                         orderable: false
                     },
                 ],
+            });
+
+            // ── Flatpickr range picker ──
+            const fp = flatpickr('#retur-daterange', {
+                mode: 'range',
+                dateFormat: 'd/m/Y',
+                onChange: function(dates) {
+                    if (dates.length === 2) {
+                        selectedDates.start = toBackendFormat(dates[0]);
+                        selectedDates.end = toBackendFormat(dates[1]);
+                        $('#btn-reset-filter').removeClass('hidden');
+                        table.draw();
+                    }
+                }
+            });
+
+            function toBackendFormat(date) {
+                const y = date.getFullYear();
+                const m = String(date.getMonth() + 1).padStart(2, '0');
+                const d = String(date.getDate()).padStart(2, '0');
+                return `${y}-${m}-${d}`;
+            }
+
+            $('#btn-reset-filter').on('click', function() {
+                fp.clear();
+                selectedDates.start = null;
+                selectedDates.end = null;
+                $(this).addClass('hidden');
+                table.draw();
             });
         });
     </script>

@@ -28,6 +28,7 @@ class PrintController extends Controller
 
         return view('kasir.receipt', compact(
             'payment',
+            'totalEmbalase',
             'transaction',
             'transactionCart',
             'totalFinalPrice',
