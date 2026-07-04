@@ -1514,7 +1514,7 @@
             </svg>
         </div>
         <h3 class="text-[15px] font-medium text-gray-800 mb-1">Masukkan PIN rahasia</h3>
-        <p class="text-[12px] text-gray-400 mb-5">Masukkan 6 digit PIN untuk melanjutkan aksi ini.</p>
+        <p class="text-[12px] text-gray-400 mb-5">Masukkan 4 digit PIN untuk melanjutkan aksi ini.</p>
 
         {{-- PIN Dots --}}
         <div class="flex justify-center gap-3 mb-2" id="pinModalDots">
@@ -1526,10 +1526,7 @@
             </div>
             <div class="pin-modal-dot w-3 h-3 rounded-full border-2 border-gray-300 transition-all duration-150">
             </div>
-            <div class="pin-modal-dot w-3 h-3 rounded-full border-2 border-gray-300 transition-all duration-150">
-            </div>
-            <div class="pin-modal-dot w-3 h-3 rounded-full border-2 border-gray-300 transition-all duration-150">
-            </div>
+          
         </div>
 
         {{-- Error --}}
@@ -1851,7 +1848,7 @@
     // var patient_id = "";
     // var doctor_id = "";
 
-    let totalbought = {{ $rawtotal->raw_total + $rawtotal->embalase }};
+    let totalbought = {{ $total_price->total_price + $total_price->embalase }};
     var subtotal = "";
     var final_price = "";
     let items = [];
@@ -4274,11 +4271,11 @@
             return;
         }
 
-        if (pinModalValue.length >= 6) return;
+        if (pinModalValue.length >= 4) return;
         pinModalValue += key;
         pinModalRenderDots();
 
-        if (pinModalValue.length === 6) {
+        if (pinModalValue.length === 4) {
             setTimeout(pinModalVerify, 150);
         }
     }

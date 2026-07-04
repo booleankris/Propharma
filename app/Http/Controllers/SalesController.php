@@ -162,9 +162,9 @@ class SalesController extends Controller
         //     ->where('transaction_id', $trx_id)
         //     ->selectRaw('SUM(total_price) as total_price, SUM(embalase) as embalase')
         //     ->first();
-        $rawtotal = MedicineCart::where('user_id', $user_id)
+        $total_price = MedicineCart::where('user_id', $user_id)
             ->where('transaction_id', $trx_id)
-            ->selectRaw('SUM(raw_total) as raw_total, SUM(embalase) as embalase')
+            ->selectRaw('SUM(total_price) as total_price, SUM(embalase) as embalase')
             ->first();
         $existingpackage = MedicineCart::where('user_id', $user_id)
             ->where('transaction_id', $trx_id)
@@ -194,7 +194,7 @@ class SalesController extends Controller
             'transaction',
             'existingpackage',
             // 'priceTotal',
-            'rawtotal',
+            'total_price',
             'parameters',
             'rounding',
             'itemInCart',
@@ -645,9 +645,9 @@ class SalesController extends Controller
             ->sum('discount');
         $totalbought = MedicineCart::where('transaction_id', $cart->transaction_id)
             ->where('user_id', auth()->id())
-            ->selectRaw('SUM(raw_total) as raw_total, SUM(embalase) as embalase')->first();
+            ->selectRaw('SUM(total_price) as total_price, SUM(embalase) as embalase')->first();
 
-        $total_raw = $totalbought->raw_total + $totalbought->embalase;
+        $total_raw = $totalbought->total_price + $totalbought->embalase;
         return response()->json([
             'success' => true,
             'item' => $cart,
@@ -1154,9 +1154,9 @@ class SalesController extends Controller
 
         $totalbought = MedicineCart::where('transaction_id', $cart->transaction_id)
             ->where('user_id', auth()->id())
-            ->selectRaw('SUM(raw_total) as raw_total, SUM(embalase) as embalase')->first();
+            ->selectRaw('SUM(total_price) as total_price, SUM(embalase) as embalase')->first();
 
-        $total_raw = $totalbought->raw_total + $totalbought->embalase;
+        $total_raw = $totalbought->total_price + $totalbought->embalase;
 
 
         return response()->json([
@@ -1295,7 +1295,7 @@ class SalesController extends Controller
     public function verifyPin(Request $request)
     {
         $request->validate([
-            'pin' => ['required', 'digits:6'],
+            'pin' => ['required', 'digits:4'],
         ]);
 
         $user = User::where('secret_pin', $request->pin)->first();
