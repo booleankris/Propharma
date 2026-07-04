@@ -3842,7 +3842,7 @@
         const isF3 = e.key === 'F3' || e.keyCode === 114;
         if (isF3) {
             e.preventDefault();
-            if (currenttransaction == "RESEP TUNAI" || currenttransaction == "KREDIT") {
+            if (currenttransaction == "RESEP TUNAI") {
                 if (transaction_type == 'RESEP TUNAI') {
                     parameters = {{ $parameterUP }};
                     transaction_type = "UPDS";
