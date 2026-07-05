@@ -623,7 +623,7 @@
                                         </td>
                                         <td class="px-1 py-1 text-center">{{ $cart->medicine->unit }}</td>
                                         <td class="px-1 py-1 text-center">Rp
-                                            {{ number_format($cart->raw_total, 0, ',', '.') }}</td>
+                                            {{ number_format($cart->item_price, 0, ',', '.') }}</td>
                                         <td class="px-1 py-1 text-center">{{ $cart->quantity }}</td>
                                         <td class="px-1 py-1 text-center">
                                             Rp.{{ number_format($cart->discount, 0, ',', ',') }}</td>
@@ -1526,7 +1526,7 @@
             </div>
             <div class="pin-modal-dot w-3 h-3 rounded-full border-2 border-gray-300 transition-all duration-150">
             </div>
-          
+
         </div>
 
         {{-- Error --}}
@@ -2863,11 +2863,11 @@
         console.log("count() => subtotal:", subtotal, "grossprice:", grossprice, "pharmacy_price price :",
             pharmacy_price);
 
-    
+
     }
 
     function countDiscount(val) {
-       
+
         if (val > 100) {
             final_price = subtotal - val;
             discount = Math.round(val / 1000) * 1000;
@@ -3011,7 +3011,9 @@
                             </tr>
                         `);
                         }
-
+                        checkbox.checked = false;
+                        checkbox.dispatchEvent(new Event('change'));
+                        packageInput.value = "";
                         // Reattach event listeners if needed
                         attachRowEvents(document.getElementById(`itemincart${item.id}`));
                     })
@@ -3284,13 +3286,19 @@
                 let raw = item.item_price;
                 let rounded = raw;
                 let totalval;
-                
+
                 medicine_id = item.medicine_id;
                 total_item = item.quantity;
                 item_finalprice = rounded;
                 price2 = rounded;
-                
-                totalval = price2 * item.quantity;
+
+                // Checkbox trigger if racikan
+
+                if (currenttransaction == "RESEP TUNAI" || currenttransaction == "KREDIT") {
+                    totalval = price2 * item.quantity + parseInt(service);
+                } else {
+                    totalval = price2 * item.quantity;
+                }
                 subtotal = Math.ceil(totalval / 1000) * 1000;
                 pharmacy_price = subtotal;
                 final_price = subtotal - item.discount;
@@ -3937,7 +3945,7 @@
             e.preventDefault();
             if (checkbox) {
                 checkbox.checked = !checkbox.checked; // toggle
-                checkbox.dispatchEvent(new Event('change')); // optional: trigger change event
+                checkbox.dispatchEvent(new Event('change'));
             }
             // if (checkbox.checked) {
             //     document.getElementById('receiptbox').checked = false;

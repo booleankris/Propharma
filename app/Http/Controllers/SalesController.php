@@ -1137,7 +1137,7 @@ class SalesController extends Controller
             'dosage_r'     => $request->dosage_r,
             'raw_total'    => $request->raw_total,
             'total_price'  => $request->final_price,
-            'final_price'  => $request->total_price,
+            'final_price'  => $request->total_price + $cart->embalase ?? 0,
         ]);
 
         $cart->load('medicine');
