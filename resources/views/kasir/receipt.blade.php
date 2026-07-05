@@ -146,7 +146,7 @@
             <td class="info-value">{{ $transaction->transaction_code }}</td>
         </tr>
         <tr>
-            <td class="info-label">Kasir</td>
+            <td class="info-label">Operator</td>
             <td class="info-colon">:</td>
             <td class="info-value">{{ auth()->user()->name }}</td>
         </tr>
@@ -178,7 +178,7 @@
                             {{ $item->quantity }}
                         </td>
                         <td class="col-total">
-                            {{ number_format($item->total_price) }}
+                            {{ number_format($item->total_price + $) }}
                         </td>
                     </tr>
                 @endforeach
@@ -189,9 +189,7 @@
     <hr>
 
     Jumlah <span style="float:right">{{ number_format($totalPrice) }}</span><br>
-    @if ($totalEmbalase != 0)
-        Jasa Racik <span style="float:right">{{ number_format($totalEmbalase) }}</span><br>
-    @endif
+  
     Discount <span style="float:right">-{{ number_format($totaldiscount) }}</span><br>
     <strong>Total Beli <span style="float:right">{{ number_format($totalFinalPrice) }}</span></strong><br>
     Bayar <span style="float:right">{{ number_format($transaction->paid) }}</span><br>
@@ -254,7 +252,7 @@
                 <td class="info-value">{{ $transaction->transaction_code }}</td>
             </tr>
             <tr>
-                <td class="info-label">Kasir</td>
+                <td class="info-label">Operator</td>
                 <td class="info-colon">:</td>
                 <td class="info-value">{{ auth()->user()->name }}</td>
             </tr>
@@ -285,9 +283,7 @@
         <br>
 
         Sub Total <span style="float:right">{{ number_format($totalPrice) }}</span><br>
-        @if ($totalEmbalase != 0)
-            Jasa Racik <span style="float:right">{{ number_format($totalEmbalase) }}</span><br>
-        @endif
+      
         Discount <span style="float:right">-{{ number_format($totaldiscount) }}</span><br>
         <strong>Jumlah <span style="float:right">{{ number_format($totalFinalPrice) }}</span></strong><br>
         Bayar <span style="float:right">{{ number_format($transaction->paid) }}</span><br>
