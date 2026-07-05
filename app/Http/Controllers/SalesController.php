@@ -1133,7 +1133,6 @@ class SalesController extends Controller
         $cart->update([
             'quantity'     => $request->quantity,
             'discount'     => $request->discount,
-            'embalase'     => 999,
             'package'      => $request->package,
             'dosage_r'     => $request->dosage_r,
             'raw_total'    => $request->raw_total,

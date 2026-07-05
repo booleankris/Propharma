@@ -146,7 +146,7 @@
             <td class="info-value">{{ $transaction->transaction_code }}</td>
         </tr>
         <tr>
-            <td class="info-label">Operator</td>
+            <td class="info-label">Kasir</td>
             <td class="info-colon">:</td>
             <td class="info-value">{{ auth()->user()->name }}</td>
         </tr>
@@ -178,7 +178,7 @@
                             {{ $item->quantity }}
                         </td>
                         <td class="col-total">
-                            {{ number_format($item->total_price + $) }}
+                            {{ number_format($item->total_price + $totalEmbalase) }}
                         </td>
                     </tr>
                 @endforeach
@@ -252,7 +252,7 @@
                 <td class="info-value">{{ $transaction->transaction_code }}</td>
             </tr>
             <tr>
-                <td class="info-label">Operator</td>
+                <td class="info-label">Kasir</td>
                 <td class="info-colon">:</td>
                 <td class="info-value">{{ auth()->user()->name }}</td>
             </tr>
@@ -273,7 +273,7 @@
                             {{ $item->quantity }}
                         </td>
                         <td class="col-total">
-                            {{ number_format($item->total_price) }}
+                            {{ number_format($item->total_price + $totalEmbalase) }}
                         </td>
                     </tr>
                 @endforeach
