@@ -51,11 +51,11 @@ class SalesDataController extends Controller
                 $query->where(function ($q) use ($search, $parsedDate) {
 
                     if ($parsedDate) {
-                        $q->whereDate('created_at', $parsedDate->format('Y-m-d'));
+                        $q->whereDate('medicine_cart.created_at', $parsedDate->format('Y-m-d'));
                     }
 
                     if (preg_match('/^\d{4}$/', $search)) {
-                        $q->orWhereYear('created_at', $search);
+                        $q->orWhereYear('medicine_cart.created_at', $search);
                     }
 
                     $q->orWhereHas('transactions', function ($t) use ($search) {
@@ -72,14 +72,14 @@ class SalesDataController extends Controller
 
             if ($dateFrom) {
                 try {
-                    $query->whereDate('created_at', '>=', Carbon::createFromFormat('d/m/Y', $dateFrom)->format('Y-m-d'));
+                    $query->whereDate('medicine_cart.created_at', '>=', Carbon::createFromFormat('d/m/Y', $dateFrom)->format('Y-m-d'));
                 } catch (\Exception $e) {
                 }
             }
 
             if ($dateTo) {
                 try {
-                    $query->whereDate('created_at', '<=', Carbon::createFromFormat('d/m/Y', $dateTo)->format('Y-m-d'));
+                    $query->whereDate('medicine_cart.created_at', '<=', Carbon::createFromFormat('d/m/Y', $dateTo)->format('Y-m-d'));
                 } catch (\Exception $e) {
                 }
             }
