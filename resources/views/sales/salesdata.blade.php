@@ -382,8 +382,10 @@
                 locale: {
                     firstDayOfWeek: 1
                 },
-                onChange: function(selectedDates) {
-                    if (selectedDates.length === 2) tableData.ajax.reload();
+                onClose: function(selectedDates) {
+                    if (selectedDates.length === 1 || selectedDates.length === 2) {
+                        tableData.ajax.reload();
+                    }
                 },
             });
 

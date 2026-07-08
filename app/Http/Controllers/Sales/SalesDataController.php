@@ -18,14 +18,9 @@ class SalesDataController extends Controller
     {
         if ($request->ajax()) {
 
-            $search = trim($request->input('search.value'));
-            $parsedDate = null;
-
-            try {
-                $parsedDate = Carbon::createFromFormat('d/m/Y', $search);
-            } catch (\Exception $e) {
-                $parsedDate = null;
-            }
+            $search   = trim($request->input('search.value'));
+            $dateFrom = $request->input('date_from');
+            $dateTo   = $request->input('date_to');
 
             $query = MedicineCart::query()
                 ->join('medicine_transactions', 'medicine_transactions.id', '=', 'medicine_cart.transaction_id')
@@ -35,54 +30,56 @@ class SalesDataController extends Controller
                 })
                 ->selectRaw('
                 transaction_id,
-                MAX(medicine_cart.created_at) as created_at,
+                MAX(medicine_cart.updated_at) as updated_at,
                 SUM(medicine_cart.discount) as totaldiscount,
                 MAX(medicine_cart.status) as status,
                 SUM(final_price) as final_price,
                 SUM(total_price) as subtotal,
                 MAX(medicine_transactions.discount) as cart_discount
-                
-
             ')
                 ->groupBy('transaction_id')
-                ->orderBy('created_at');
+                ->orderBy('updated_at');
 
+            // text search only
             if ($search) {
-                $query->where(function ($q) use ($search, $parsedDate) {
-
-                    if ($parsedDate) {
-                        $q->whereDate('medicine_cart.created_at', $parsedDate->format('Y-m-d'));
-                    }
-
+                $query->where(function ($q) use ($search) {
                     if (preg_match('/^\d{4}$/', $search)) {
-                        $q->orWhereYear('medicine_cart.created_at', $search);
+                        $q->whereYear('medicine_cart.updated_at', $search);
+                    } else {
+                        $q->whereHas('transactions', function ($t) use ($search) {
+                            $t->where('transaction_code', 'like', "%{$search}%");
+                        })
+                            ->orWhereHas('transactions.patients', function ($p) use ($search) {
+                                $p->where('name', 'like', "%{$search}%");
+                            });
                     }
-
-                    $q->orWhereHas('transactions', function ($t) use ($search) {
-                        $t->where('transaction_code', 'like', "%{$search}%");
-                    });
-
-                    $q->orWhereHas('transactions.patients', function ($p) use ($search) {
-                        $p->where('name', 'like', "%{$search}%");
-                    });
                 });
             }
+
             $dateFrom = $request->input('date_from');
             $dateTo   = $request->input('date_to');
 
+            // If only one date was sent, treat it as a single-day filter
+            if ($dateFrom && !$dateTo) {
+                $dateTo = $dateFrom;
+            } elseif ($dateTo && !$dateFrom) {
+                $dateFrom = $dateTo;
+            }
+
             if ($dateFrom) {
                 try {
-                    $query->whereDate('medicine_cart.created_at', '>=', Carbon::createFromFormat('d/m/Y', $dateFrom)->format('Y-m-d'));
+                    $query->whereDate('medicine_cart.updated_at', '>=', Carbon::createFromFormat('d/m/Y', $dateFrom)->format('Y-m-d'));
                 } catch (\Exception $e) {
                 }
             }
 
             if ($dateTo) {
                 try {
-                    $query->whereDate('medicine_cart.created_at', '<=', Carbon::createFromFormat('d/m/Y', $dateTo)->format('Y-m-d'));
+                    $query->whereDate('medicine_cart.updated_at', '<=', Carbon::createFromFormat('d/m/Y', $dateTo)->format('Y-m-d'));
                 } catch (\Exception $e) {
                 }
             }
+
             return DataTables::of($query)
                 ->addIndexColumn()
                 ->addColumn('date', function ($row) {
@@ -95,16 +92,13 @@ class SalesDataController extends Controller
                     return $row->transactions?->transaction_code ?? '-';
                 })
                 ->addColumn('type', function ($row) {
-                    $type =  $row->transactions?->transaction_type ?? '-';
-                    if ($type == "KREDIT") {
-                        $type = "UK";
-                    } else if ($type == "RESEP TUNAI") {
-                        $type = "UM";
-                    } else if ($type == "HV/OTC") {
-                        $type = "HV";
-                    } else if ($type == "UPDS") {
-                        $type = "UP";
-                    }
+                    $type = $row->transactions?->transaction_type ?? '-';
+
+                    if ($type == "KREDIT") $type = "UK";
+                    else if ($type == "RESEP TUNAI") $type = "UM";
+                    else if ($type == "HV/OTC") $type = "HV";
+                    else if ($type == "UPDS") $type = "UP";
+
                     return $type;
                 })
                 ->addColumn('name', function ($row) {
@@ -122,45 +116,16 @@ class SalesDataController extends Controller
                 ->addColumn('payment_method', function ($row) {
                     return $row->transactions?->payment_method;
                 })
-                ->addColumn('print', function ($row) {
-                    return '
-                    <div class="flex gap-2">
-                        <a href="' . url('print/receipt/' . $row->transactions->id) . '" target="_blank">
-                            <button class="group rounded-md shadow bg-blue-500 text-white cursor-pointer flex justify-between items-center overflow-hidden transition-all hover:glow">
-                                <div class="relative w-12 h-12 bg-white bg-opacity-20 flex justify-center items-center transition-all">
-                                    <svg class="w-4 h-4 transition-all group-hover:-translate-y-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
-                                    </svg>
-                                </div>
-                                <p class="px-5">Struk</p>
-                            </button>
-                        </a>
-                        <a href="' . url('print/payment-receipt/' . $row->transactions->id) . '" target="_blank">
-                            <button style="background:#bd9c33" class="group rounded-md shadow text-white cursor-pointer flex justify-between items-center overflow-hidden transition-all hover:glow">
-                                <div class="relative w-10 h-12 bg-white bg-opacity-20 flex justify-center items-center transition-all">
-                                    <svg class="w-4 h-4 transition-all group-hover:-translate-y-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
-                                    </svg>
-                                </div>
-                                <p class="px-3">Kwitansi</p>
-                            </button>
-                        </a>
-                    </div>
-                    ';
-                })
                 ->addColumn('status', function ($row) {
                     if ($row->status == 1) {
-                        $status = '<a class="status-completed">Selesai</a>';
-                    } else if ($row->status == 0) {
-                        $status = '<a class="status-pending">Pending</a>';
-                    } else {
-                        $status = '<a class="status-completed">NULL</a>';
+                        return '<a class="status-completed">Selesai</a>';
+                    } elseif ($row->status == 0) {
+                        return '<a class="status-pending">Pending</a>';
                     }
-                    return $status;
+
+                    return '<a class="status-completed">NULL</a>';
                 })
-                ->rawColumns(['final_price', 'status', 'print'])
+                ->rawColumns(['final_price', 'status'])
                 ->make(true);
         }
 
