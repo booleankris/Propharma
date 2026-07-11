@@ -448,7 +448,7 @@
                 (document.getElementById('item_price').value || '0').replace(/[^\d.-]/g, '')
             ) || 0;
 
-            document.getElementById('total_retur').value = Math.ceil(((oldQty - returQty) * itemPrice) / 1000) * 1000;
+            document.getElementById('total_retur').value = $('#price').val() - Math.ceil(((oldQty - returQty) * itemPrice) / 1000) * 1000;
         }
 
         // ─── Enter key navigation ─────────────────────────────────────────────────────
@@ -669,7 +669,7 @@
                 info: true,
                 lengthChange: true,
                 autoWidth: false,
-
+                deferLoading: 0,
                 ajax: {
                     url: '{{ route('returdata.medicines') }}',
                     data: d => {

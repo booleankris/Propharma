@@ -91,25 +91,31 @@ class ReturController extends Controller
     {
         $transactionCode = $request->transaction_code;
 
-        $transactionCart = MedicineCart::with([
-            'medicine',
-            'transactions'
-        ])
+        if (empty($transactionCode)) {
+            return response()->json([]);
+        }
+
+        $transactionCart = MedicineCart::with(['medicine', 'transactions'])
             ->whereHas('transactions', function ($q) use ($transactionCode) {
                 $q->where('transaction_code', $transactionCode);
             })
-            ->get();
-
-
-        $transactionCart->map(function ($item) {
-            return [
-                'medicine_id'   => $item->medicine_id,
-                'name'          => $item->medicine->name,
-                'quantity'      => $item->quantity,
-                'final_price'   => $item->final_price,
-            ];
-        });
-
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'id'            => $item->id,
+                    'medicine_id'   => $item->medicine_id,
+                    'transaction_id' => $item->transaction_id ?? null,
+                    'quantity'      => $item->quantity,
+                    'final_price'   => $item->final_price,
+                    'item_price'    => $item->item_price ?? 0,
+                    'medicine'      => [
+                        'id'   => $item->medicine->id ?? null,
+                        'code' => $item->medicine->code ?? '',
+                        'name' => $item->medicine->name ?? '',
+                        'unit' => $item->medicine->unit ?? '',
+                    ],
+                ];
+            });
 
         return response()->json($transactionCart);
     }

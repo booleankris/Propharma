@@ -4720,6 +4720,8 @@
             totaltransaction = response.data.totaltransaction;
             const roundedtotal = roundUpToNearestThousand(totaltransaction);
             cartTotalInput.value = formatRupiah(roundedtotal);
+            subtotalpreview.value = formatRupiah(roundedtotal);
+
             console.log('Before:', totaltransaction);
             console.log('After:', roundUpToNearestThousand(totaltransaction));
 

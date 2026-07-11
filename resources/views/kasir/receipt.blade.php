@@ -157,19 +157,32 @@
     {{-- =========================
          ITEM LIST
     ========================= --}}
-    @foreach ($transactionCart as $key => $items)
+    @foreach ($transactionCart as $key => $groupItems)
         @if ($key !== 'single')
             <table style="width:100%">
                 <tr>
                     <td><strong>Racikan {{ $key }}</strong></td>
                     <td class="text-right">
-                        {{ number_format($items->sum('total_price')) }}
+                        @php
+                            // 1. Sum the 'total_price' of all medicines inside this specific Racikan
+                            $racikanPrice = $groupItems->sum('total_price');
+
+                            // 2. Get the embalase for this Racikan.
+                            // Assuming the embalase fee (e.g., 20000) is saved on the rows for this recipe.
+                            // We use first() to grab the fee once, so we don't accidentally multiply it
+                            // if you have multiple medicines in the same Racikan.
+                            $embalase = $groupItems->sum('embalase') ?? 0;
+                        @endphp
+
+                        {{-- Output the correctly calculated total (160,000 + 20,000 = 180,000) --}}
+                        {{ number_format($racikanPrice + $embalase) }}
                     </td>
                 </tr>
             </table>
         @else
             <table class="table-struk">
-                @foreach ($items as $item)
+                {{-- Loop through $groupItems for the single items --}}
+                @foreach ($groupItems as $item)
                     <tr>
                         <td class="col-name">
                             {{ $item->medicine->name }}
@@ -178,7 +191,8 @@
                             {{ $item->quantity }}
                         </td>
                         <td class="col-total">
-                            {{ number_format($item->total_price + $totalEmbalase) }}
+                            {{-- Add the item's specific embalase to its total_price --}}
+                            {{ number_format($item->total_price + ($item->embalase ?? 0)) }}
                         </td>
                     </tr>
                 @endforeach
@@ -188,8 +202,8 @@
 
     <hr>
 
-    Jumlah <span style="float:right">{{ number_format($totalPrice) }}</span><br>
-  
+    Jumlah <span style="float:right">{{ number_format($totalPrice + $totalEmbalase ?? 0) }}</span><br>
+
     Discount <span style="float:right">-{{ number_format($totaldiscount) }}</span><br>
     <strong>Total Beli <span style="float:right">{{ number_format($totalFinalPrice) }}</span></strong><br>
     Bayar <span style="float:right">{{ number_format($transaction->paid) }}</span><br>
@@ -273,7 +287,7 @@
                             {{ $item->quantity }}
                         </td>
                         <td class="col-total">
-                            {{ number_format($item->total_price + $totalEmbalase) }}
+                            {{ number_format($item->total_price + $item->embalase) }}
                         </td>
                     </tr>
                 @endforeach
@@ -282,8 +296,8 @@
 
         <br>
 
-        Sub Total <span style="float:right">{{ number_format($totalPrice) }}</span><br>
-      
+        Sub Total <span style="float:right">{{ number_format($totalPrice + $totalEmbalase) }}</span><br>
+
         Discount <span style="float:right">-{{ number_format($totaldiscount) }}</span><br>
         <strong>Jumlah <span style="float:right">{{ number_format($totalFinalPrice) }}</span></strong><br>
         Bayar <span style="float:right">{{ number_format($transaction->paid) }}</span><br>

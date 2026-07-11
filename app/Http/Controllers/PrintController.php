@@ -15,7 +15,9 @@ class PrintController extends Controller
             ->whereHas('transactions', fn($q) => $q->where('id', $id))
             ->get();
 
+        // Yang pecah jadi satu-satu itulahh
         $transactionCart = $items->groupBy(fn($recipe) => $recipe->recipe_number ?? 'single');
+     
         $transaction     = MedicineTransactions::with(['patients', 'doctors'])->findOrFail($id);
 
         $totalEmbalase   = $items->sum('embalase');
