@@ -80,7 +80,9 @@
             color: #111827;
             border-bottom: 0.5px solid #f3f4f6 !important;
         }
-
+        #table-data tbody td{
+            text-align: center!important;
+        }
         #table-data tbody tr,
         #items-table tbody tr {
             cursor: pointer;
@@ -301,7 +303,6 @@
                                     <th class="col-right">Harga</th>
                                     <th class="col-right">Pembayaran</th>
                                     <th></th>
-                                    <th></th>
                                 </tr>
                             </thead>
                             <tbody></tbody>
@@ -442,7 +443,8 @@
                         className: 'col-price'
                     },
                     {
-                        data: 'payment_method'
+                        data: 'payment_method',
+                        defaultContent: '-'
                     },
                     {
                         data: null,
@@ -455,9 +457,6 @@
                         <path d="M4 12H3a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1"/>
                         <rect x="4" y="10" width="8" height="5"/>
                     </svg>Cetak</button>`
-                    },
-                    {
-                        data: 'status'
                     },
                 ],
             });

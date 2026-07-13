@@ -25,6 +25,7 @@ class SalesDataController extends Controller
             $query = MedicineCart::query()
                 ->join('medicine_transactions', 'medicine_transactions.id', '=', 'medicine_cart.transaction_id')
                 ->with(['transactions.patients', 'transactions'])
+                ->where('medicine_transactions.status', 1)
                 ->whereHas('transactions', function ($transaction) {
                     $transaction->where('pharmacy_id', auth()->user()->pharmacy_id);
                 })
@@ -117,16 +118,8 @@ class SalesDataController extends Controller
                 ->addColumn('payment_method', function ($row) {
                     return $row->transactions?->payment_method;
                 })
-                ->addColumn('status', function ($row) {
-                    if ($row->status == 1) {
-                        return '<a class="status-completed">Selesai</a>';
-                    } elseif ($row->status == 0) {
-                        return '<a class="status-pending">Pending</a>';
-                    }
-
-                    return '<a class="status-completed">NULL</a>';
-                })
-                ->rawColumns(['final_price', 'status'])
+              
+                ->rawColumns(['final_price'])
                 ->make(true);
         }
 
