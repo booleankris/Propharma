@@ -137,7 +137,7 @@ class SalesDataController extends Controller
             })
 
             ->addColumn('price', function ($row) {
-                return 'Rp ' . number_format($row->total_price, 0, ',', '.');
+                return 'Rp ' . number_format($row->item_price, 0, ',', '.');
             })
 
             ->addColumn('total', function ($row) {
