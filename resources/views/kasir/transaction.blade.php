@@ -2851,7 +2851,7 @@
         roundedtotal = price2 * val - discount;
         if (currenttransaction == "KREDIT") {
             subtotal = roundedtotal;
-        } else if (currenttransaction == "RESEP TUNAI") {
+        } else if (transaction_type == "RESEP TUNAI") {
             subtotal = Math.ceil(roundedtotal / 1000) * 1000 + parseInt(service);
         } else {
             subtotal = Math.ceil(roundedtotal / 1000) * 1000;
@@ -3294,7 +3294,7 @@
 
                 // Checkbox trigger if racikan
 
-                if (currenttransaction == "RESEP TUNAI" || currenttransaction == "KREDIT") {
+                if (transaction_type == "RESEP TUNAI" || currenttransaction == "KREDIT") {
                     totalval = price2 * item.quantity + parseInt(service);
                 } else {
                     totalval = price2 * item.quantity;

@@ -30,6 +30,7 @@ class SalesDataController extends Controller
                 })
                 ->selectRaw('
                 transaction_id,
+                MAX(medicine_transactions.transaction_code) as transaction_code,
                 MAX(medicine_cart.updated_at) as updated_at,
                 SUM(medicine_cart.discount) as totaldiscount,
                 MAX(medicine_cart.status) as status,
@@ -38,7 +39,7 @@ class SalesDataController extends Controller
                 MAX(medicine_transactions.discount) as cart_discount
             ')
                 ->groupBy('transaction_id')
-                ->orderBy('updated_at');
+                ->orderBy('transaction_code');
 
             // text search only
             if ($search) {

@@ -360,6 +360,8 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
         ->name('receiving.completeOrder');
     Route::get('/receiving/orderlist', [ReceivingController::class, 'orderList'])->name('receiving.orderlist');
     Route::get('/searchreceivingdetails', [ReceivingController::class, 'searchReceivingDetails'])->name('receiving.searchreceivingdetails');
+    Route::get('/searchselectcreditors', [ReceivingController::class, 'selectCreditors'])->name('receiving.selectCreditors');
+
     Route::get('/receiving/history', [ReceivingController::class, 'history'])->name('receiving.history');
     Route::get('/receiving/gethistory', [ReceivingController::class, 'gethistory'])->name('receiving.gethistory');
     Route::get('/receiving/orderhistory', [ReceivingController::class, 'orderhistory'])->name('receiving.orderhistory');

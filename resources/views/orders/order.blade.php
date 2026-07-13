@@ -230,10 +230,10 @@
                                         placeholder="Nama Obat">
                                 </div>
                                 <div class="w-full sm:w-32">
-                                    <div class="py-1 text-[13px] font-bold">Satuan</div>
+                                    <div class="py-1 text-[13px] font-bold">Kemasan</div>
                                     <input id="unit" readonly
                                         class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
-                                        placeholder="Satuan">
+                                        placeholder="Kemasan">
                                 </div>
                             </div>
 
@@ -467,8 +467,8 @@
                         name: 'creditors'
                     },
                     {
-                        data: 'medicines.unit',
-                        name: 'medicines.unit'
+                        data: 'medicines.packaging',
+                        name: 'medicines.packaging'
                     },
                     {
                         data: 'item_price',
@@ -512,7 +512,7 @@
 
             // Fill inputs
             document.getElementById('medicine_name').value = data.medicines.name ?? '';
-            document.getElementById('unit').value = data.medicines.unit ?? '';
+            document.getElementById('unit').value = data.medicines.packaging ?? '';
             document.getElementById('content').value = data.medicines.content ?? '';
             document.getElementById('item_price').value = formatRupiah(data.medicines.raw_price);
             document.getElementById('qty').value = data.quantity;
@@ -927,7 +927,7 @@
 
             document.getElementById('medicine_code').value = item.code ?? '';
             document.getElementById('medicine_name').value = item.name ?? '';
-            document.getElementById('unit').value = item.unit ?? '';
+            document.getElementById('unit').value = item.packaging ?? '';
             document.getElementById('content').value = item.content ?? '';
             document.getElementById('item_price').value = formatRupiah(item.raw_price ?? 0);
 

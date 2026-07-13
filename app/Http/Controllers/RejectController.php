@@ -14,8 +14,8 @@ class RejectController extends Controller
     {
         $now = Carbon::now();
 
-        $year  = $now->format('y'); // 25
-        $month = $now->format('m'); // 11
+        $year  = $now->format('y'); 
+        $month = $now->format('m');
         $prefix = "{$year}{$month}RJ";
 
         $lastCode = Reject::where('code', 'like', "{$prefix}%")
@@ -48,7 +48,6 @@ class RejectController extends Controller
             ->orWhere('medicines.code', 'LIKE', "%{$search}%")
             ->paginate(10);
 
-        // format response for frontend
         $data->getCollection()->transform(function ($item) {
             return [
                 'id'           => $item->id,

@@ -118,7 +118,7 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                 d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" />
                         </svg>
-                        <h2 class="text-2xl font-bold text-gray-800 drop-shadow-sm">Persediaan</h2>
+                        <h2 class="text-2xl font-bold text-gray-800 drop-shadow-sm">Kartu Stok</h2>
 
                     </div>
                     <div class="flex py-2 gap-1">

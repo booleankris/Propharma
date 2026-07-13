@@ -177,6 +177,22 @@ class ReceivingController extends Controller
 
     public function searchReceivingDetails(Request $request)
     {
+
+        $query = ReceivingDetails::where('id', $request->detail_id)->first();
+        $creditor_code = $query->creditor_code;
+
+        // $query = ReceivingDetails::whereHas('receiving_items.order_items', function ($query) use ($orderid) {
+        //     $query->where('order_id', $orderid);
+        // })->where('creditor_code', $creditor_code)->first();
+        $creditor = Creditor::where('code', $creditor_code)->first();
+        return response()->json([
+            'query' => $query,
+            'creditor' => $creditor
+        ]);
+    }
+
+    public function selectCreditors(Request $request)
+    {
         $orderid = $request->orderid;
         $creditor_code = $request->creditor_code;
 
@@ -189,7 +205,7 @@ class ReceivingController extends Controller
             'creditor' => $creditor
         ]);
     }
-
+    
     public function history(Request $request)
     {
         return view('orders.history');
@@ -577,13 +593,22 @@ class ReceivingController extends Controller
         DB::beginTransaction();
 
         try {
+
+            // $details = ReceivingDetails::where('receiving_id', $request->receiving_id)->findOrFail();
+            // if($details == )
+
+
+            // Check the creditor. If the combination of
+            // creditor and receiving_id is already exist, update the data.
+            // If not, create new data.
             $details = ReceivingDetails::updateOrCreate(
+
                 [
-                    'receiving_id'  => $request->receiving_id,
+                    'receiving_id'    => $request->receiving_id,
+                    'invoice_number'  => $request->invoice_number,
                     'creditor_code' => $request->creditor_code,
                 ],
                 [
-                    'invoice_number'  => $request->invoice_number,
                     'invoice_date'    => $request->invoice_date,
                     'invoice_times'   => $request->invoice_times,
                     'invoice_due'     => $request->invoice_due,

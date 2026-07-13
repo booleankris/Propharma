@@ -306,7 +306,7 @@ class OrdersController extends Controller
                 'name'         => $item->name,
                 'factory_id'   => $item->factory?->id,
                 'factory_name' => $item->factory?->name,
-                'unit'         => $item->unit,
+                'packaging'    => $item->packaging,
                 'content'      => $item->content,
                 'raw_price'    => $item->raw_price,
             ];

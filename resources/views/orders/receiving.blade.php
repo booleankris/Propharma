@@ -435,13 +435,13 @@
 
                                 <div class="w-full sm:w-40">
                                     <div class="py-1 text-[13px] font-bold">Diskon</div>
-                                    <input id="discount" type="number"
+                                    <input id="discount" value="0" type="number"
                                         class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
                                         placeholder="Diskon">
                                 </div>
                                 <div class="w-full sm:w-40">
                                     <div class="py-1 text-[13px] font-bold">Ekstra Diskon</div>
-                                    <input id="extra_discount" type="number" required value="0"
+                                    <input id="extra_discount" value="0" type="number" required value="0"
                                         class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
                                         placeholder="Extra Diskon">
                                 </div>
@@ -879,8 +879,8 @@
             document.getElementById('qty_received').value = data.qty_received ?? '';
             document.getElementById('batch').value = data.receiving_items?.batch ?? '';
 
-            document.getElementById('discount').value = data.receiving_items?.discount ?? '';
-            document.getElementById('extra_discount').value = data.receiving_items?.extra_discount ?? '';
+            document.getElementById('discount').value = data.receiving_items?.discount ?? 0;
+            document.getElementById('extra_discount').value = data.receiving_items?.extra_discount ?? 0;
             document.getElementById('status').value = data.receiving_items?.status ?? '';
             document.getElementById('expired_date').value = data.receiving_items?.expired_date ?? '';
             document.getElementById('receiving_items_id').value = data.receiving_items?.id ?? '';
@@ -898,7 +898,44 @@
             if (data.pack == "1") {
                 pack.checked = true;
             }
-            console.log(data.receiving_items?.id ?? '');
+            axios.get('/searchreceivingdetails', {
+                    params: {
+                        detail_id: data.receiving_items?.receiving_details_id ?? '',
+                    }
+                })
+            .then(function(response) {
+                // console.log(response);
+                // console.log(invoice_times);
+                // console.log(response.data.creditor.credit_time);
+
+                // invoice_times.value = 30;
+
+                // console.log(invoice_times.value);
+
+                invoice_number.value = response.data.query?.invoice_number || '';
+                invoice_times.value = response.data.query?.invoice_times || response.data.creditor
+                    .credit_time || '';
+                $('#invoice_payment')
+                    .val(response.data.query?.invoice_payment || '')
+                    .trigger('change');
+                invoice_due.value = response.data.query?.invoice_due || '';
+                invoice_date.value = response.data.query?.invoice_date ?? invoice_date.value;
+
+                const ppn =
+                    response.data.query?.invoice_ppn?.trim() ||
+                    response.data.creditor?.ppn_type?.trim() ||
+                    'TANPA';
+
+                document.getElementById('invoice_ppn').value = ppn;
+
+                count_due();
+                // invoice_number.value = response.data.query?.invoice_number || '';
+
+            })
+            .catch(function(error) {
+                console.error(error);
+            });
+            console.log(data.receiving_items?.receiving_details_id ?? '');
             itemcode = data.medicine_id;
             itemprice = data.medicines.raw_price;
             itemqty = data.quantity;
@@ -915,19 +952,21 @@
                 addItem();
             }
         });
+
+        // Creditor select
         $('#creditor').on('change', function() {
             console.log(document.getElementById('invoice_ppn'));
 
             let creditor = $(this).val();
             if (creditor) {
-                axios.get('/searchreceivingdetails', {
+                axios.get('/searchselectcreditors', {
                         params: {
                             creditor_code: creditor,
                             orderid: ordersid
                         }
                     })
                     .then(function(response) {
-                        // console.log(response);
+                        console.log(response);
                         // console.log(invoice_times);
                         // console.log(response.data.creditor.credit_time);
 
@@ -935,7 +974,6 @@
 
                         // console.log(invoice_times.value);
 
-                        invoice_number.value = response.data.query?.invoice_number || '';
                         invoice_times.value = response.data.query?.invoice_times || response.data.creditor
                             .credit_time || '';
                         $('#invoice_payment')
@@ -950,7 +988,7 @@
                             'TANPA';
 
                         document.getElementById('invoice_ppn').value = ppn;
-                        
+
                         count_due();
                         // invoice_number.value = response.data.query?.invoice_number || '';
 
@@ -1219,6 +1257,9 @@
             let qty = parseInt(document.getElementById('qty_received').value) || 0;
             itemqty = qty;
 
+            const qtyOrder = parseFloat(document.getElementById('qty').value) || 0;
+            itemstatus.value = "Diterima Lengkap"
+
             if (pack.checked) {
                 itemtotal = qty * itemcontent * itemprice;
                 total_transaction = itemtotal;
@@ -1234,6 +1275,17 @@
         function counttotalreceived() {
             let qty = parseInt(document.getElementById('qty_received').value) || 0;
             itemqty = qty;
+
+            const qtyOrder = parseFloat(document.getElementById('qty').value) || 0;
+            if (qty == qtyOrder) {
+                itemstatus.value = "Diterima Lengkap"
+            } else if (qty < qtyOrder) {
+                itemstatus.value = "Diterima Kurang";
+            }
+
+            if (qty == 0) {
+                itemstatus.value = "Tidak Diterima";
+            }
 
             if (pack.checked) {
                 itemtotal = qty * itemcontent * itemprice;
@@ -1387,20 +1439,20 @@
 
             invoice_due.value = `${yyyy}-${mm}-${dd}`;
         }
-        // Count Items Left
-        function count_itemsleft() {
-            const qtyOrder = parseFloat(document.getElementById('qty').value) || 0;
-            const input = document.getElementById('qty_received');
-            let value = parseFloat(input.value) || 0;
+        // // Count Items Left
+        // function count_itemsleft() {
+        //     const qtyOrder = parseFloat(document.getElementById('qty').value) || 0;
+        //     const input = document.getElementById('qty_received');
+        //     let value = parseFloat(input.value) || 0;
 
-            if (value > qtyOrder) {
-                input.value = qtyOrder;
-            }
+        //     if (value > qtyOrder) {
+        //         input.value = qtyOrder;
+        //     }
 
-            if (value < 0) {
-                input.value = 0;
-            }
-        }
+        //     if (value < 0) {
+        //         input.value = 0;
+        //     }
+        // }
 
         // ENTER REDIRECTION AND SUBMIT
         document.getElementById('qty_received').addEventListener('keydown', function(e) {
