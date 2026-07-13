@@ -80,11 +80,9 @@
             color: #111827;
             border-bottom: 0.5px solid #f3f4f6 !important;
         }
-
-        #table-data tbody td {
-            text-align: center !important;
+        #table-data tbody td{
+            text-align: center!important;
         }
-
         #table-data tbody tr,
         #items-table tbody tr {
             cursor: pointer;
@@ -335,8 +333,8 @@
                                     <tr>
                                         <th>#</th>
                                         <th>Obat</th>
-                                        <th class="col-right">Qty</th>
                                         <th class="col-right">Harga</th>
+                                        <th class="col-right">Qty</th>
                                         <th class="col-right">Disc</th>
                                         <th class="col-right">Total</th>
                                     </tr>
@@ -503,14 +501,13 @@
                     {
                         data: 'medicine'
                     },
-
                     {
-                        data: 'quantity',
+                        data: 'price',
                         className: 'col-right',
                         render: val => `<span class="qty-badge">${val}</span>`
                     },
                     {
-                        data: 'price',
+                        data: 'quantity',
                         className: 'col-right',
                         render: val => `<span class="qty-badge">${val}</span>`
                     },
