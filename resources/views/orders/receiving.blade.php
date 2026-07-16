@@ -1251,7 +1251,12 @@
             if (e.key === 'Enter') {
                 document.getElementById('qty').focus();
             }
-        })
+        });
+        invoice_ppn.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                addItem();
+            }
+        });
 
         function counttotal() {
             let qty = parseInt(document.getElementById('qty_received').value) || 0;

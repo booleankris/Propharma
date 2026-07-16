@@ -28,23 +28,48 @@ class SuppliesController extends Controller
     public function getSupplies(Request $request)
     {
         if ($request->ajax()) {
-            $items = ItemsLog::with('medicines')
-                ->whereNotIn('status', [5, 6, 7]);
+
+            // 1. BASE QUERY: Apply filters without eager load
+            $baseQuery = ItemsLog::query();
+
             if ($request->filled('searchMedicine')) {
-                $items->whereHas('medicines', function ($q) use ($request) {
-                    $q->where('name', 'like', "%{$request->searchMedicine}%")
-                        ->orWhere('code', 'like', "%{$request->searchMedicine}%");
+                $searchValue = $request->searchMedicine;
+
+                $baseQuery->whereHas('medicines', function ($q) use ($searchValue) {
+                    if (is_numeric($searchValue)) {
+                        $q->where('id', $searchValue);
+                    } else {
+                        $q->where('name', 'like', "%{$searchValue}%")
+                            ->orWhere('code', 'like', "%{$searchValue}%");
+                    }
                 });
             }
 
             if ($request->filled('start_date')) {
-                $items->whereDate('date', '>=', $request->start_date);
+                $baseQuery->whereDate('date', '>=', $request->start_date);
             }
 
             if ($request->filled('end_date')) {
-                $items->whereDate('date', '<=', $request->end_date);
+                $baseQuery->whereDate('date', '<=', $request->end_date);
             }
 
+            // 2. STATS CALCULATION: Calculate all sums 
+            $stats = (clone $baseQuery)->selectRaw("
+            SUM(CASE WHEN status = 1 THEN qty ELSE 0 END) as qty_sold,
+            SUM(CASE WHEN status = 2 THEN qty ELSE 0 END) as qty_bought,
+            SUM(CASE WHEN status = 3 THEN qty ELSE 0 END) as qty_sold_rt,
+            SUM(CASE WHEN status = 4 THEN qty ELSE 0 END) as qty_bought_rt
+        ")->first();
+
+            // 3. BALANCE CALCULATION: Get the very first and very last records for the balances
+            $firstRecord = (clone $baseQuery)->orderBy('date', 'asc')->orderBy('id', 'asc')->first();
+            $lastRecord = (clone $baseQuery)->orderBy('date', 'desc')->orderBy('id', 'desc')->first();
+
+            // 4. TABLE QUERY
+            $items = (clone $baseQuery)->with('medicines')
+                ->whereNotIn('status', [5, 6, 7]);
+
+            // 5. RETURN DATATABLES RESPONSE
             return DataTables::eloquent($items)
                 ->addIndexColumn()
                 ->addColumn('date', function ($row) {
@@ -64,165 +89,69 @@ class SuppliesController extends Controller
                 })
                 ->addColumn('stock', function ($row) {
                     if ($row->status == 1) {
-                        return "
-                        <div style='color:#16a34a;font-weight:bold;'>
-                            <span>-</span>
-                            <b'>" . $row->qty . "</b>
-                        </div>";
+                        return "<div style='color:#16a34a;font-weight:bold;'><span>-</span><b>" . $row->qty . "</b></div>";
                     } else if ($row->status == 2) {
-                        return "
-                        <div style='color:#4173d3;font-weight:bold;'>
-                            <span>+</span>
-                            <b'>" . $row->qty . "</b>
-                        </div>";
+                        return "<div style='color:#4173d3;font-weight:bold;'><span>+</span><b>" . $row->qty . "</b></div>";
                     } else if ($row->status == 3) {
-                        return " 
-                    <div style='color:#d34163;font-weight:bold;'>
-                        <span>+</span>
-                        <b'>" . $row->qty . "</b>
-                    </div>";
+                        return "<div style='color:#d34163;font-weight:bold;'><span>+</span><b>" . $row->qty . "</b></div>";
                     } else if ($row->status == 4) {
-                        return "   <div style='color:#d34163;font-weight:bold;'>
-                        <span>-</span>
-                        <b'>" . $row->qty . "</b>
-                    </div>";
+                        return "<div style='color:#d34163;font-weight:bold;'><span>-</span><b>" . $row->qty . "</b></div>";
                     } else if ($row->status == 5) {
                         if ($row->qty < 0) {
-                            return "<div style='color:#d34163;font-weight:bold;'>
-                                        <span></span>
-                                        <b'>" . $row->qty . "</b>
-                                    </div>";
+                            return "<div style='color:#d34163;font-weight:bold;'><span></span><b>" . $row->qty . "</b></div>";
                         } else if ($row->qty > 0) {
-                            return "<div style='color:#d34163;font-weight:bold;'>
-                                        <span>+</span>
-                                        <b'>" . $row->qty . "</b>
-                                    </div>";
+                            return "<div style='color:#d34163;font-weight:bold;'><span>+</span><b>" . $row->qty . "</b></div>";
                         } else {
-                            return "<div style='color:#d34163;font-weight:bold;'>
-                                        <span></span>
-                                        <b'>" . $row->qty . "</b>
-                                    </div>";
+                            return "<div style='color:#d34163;font-weight:bold;'><span></span><b>" . $row->qty . "</b></div>";
                         }
                     } else if ($row->status == 7) {
-                        return "<div style='color:#248787;font-weight:bold;'>
-                        <span></span>
-                        <b'> -" . $row->qty . "</b>
-                    </div>";
+                        return "<div style='color:#248787;font-weight:bold;'><span></span><b>-" . $row->qty . "</b></div>";
                     }
+                    return "";
                 })
                 ->addColumn('qty_before', function ($row) {
-                    return "
-                        <div style='color:#000000;font-weight:bold;'>
-                            <span></span>
-                            <b'>" . $row->qty_before . "</b>
-                        </div>";
+                    return "<div style='color:#000000;font-weight:bold;'><span></span><b>" . $row->qty_before . "</b></div>";
                 })
                 ->addColumn('qty_after', function ($row) {
-                    return "
-                    <div style='color:#000000;font-weight:bold;'>
-                        <span></span>
-                        <b'>" . $row->qty_after . "</b>
-                    </div>";
-                })
-                ->addColumn('qty_after_number', function ($row) {
-                    return  $row->qty_after;
+                    return "<div style='color:#000000;font-weight:bold;'><span></span><b>" . $row->qty_after . "</b></div>";
                 })
                 ->addColumn('qty_before_number', function ($row) {
-                    return  $row->qty_after;
+                    return $row->qty_before;
                 })
                 ->addColumn('qty_after_number', function ($row) {
-                    return  $row->qty_after;
+                    return $row->qty_after;
                 })
                 ->addColumn('supply', function ($row) {
                     return $row->medicines?->stock ?? '-';
                 })
                 ->addColumn('status', function ($row) {
                     if ($row->status == 1) {
-                        return "<div style='
-                        text-align:center;
-                        font-weight:bold;
-                        text-transform:uppercase;
-                        background-color:rgba(34,197,94,0.2);
-                        color:#16a34a;
-                        padding: 6px 4px;
-                        width:100px;
-                        font-size:9px;
-                        font-family: Poppins;
-                        border-radius:25px;'>
-                        Penjualan
-                        </div";
+                        return "<div style='text-align:center; font-weight:bold; text-transform:uppercase; background-color:rgba(34,197,94,0.2); color:#16a34a; padding: 6px 4px; width:100px; font-size:9px; font-family: Poppins; border-radius:25px;'>Penjualan</div>";
                     } else if ($row->status == 2) {
-                        return "<div style='text-align: center;
-                        font-weight: bold;
-                        text-transform: uppercase;
-                        background-color: #d6e8ff94;
-                        color: #7f8eff;
-                        padding: 6px 4px;
-                        width:100px;
-                        font-size: 9px;
-                        font-family: Poppins;
-                        border-radius: 25px;'>
-                        Pembelian
-                        </div>";
+                        return "<div style='text-align: center; font-weight: bold; text-transform: uppercase; background-color: #d6e8ff94; color: #7f8eff; padding: 6px 4px; width:100px; font-size: 9px; font-family: Poppins; border-radius: 25px;'>Pembelian</div>";
                     } else if ($row->status == 3) {
-                        return "<div style='
-                        text-align: center;
-                        font-weight: bold;
-                        text-transform: uppercase;
-                        background-color: rgb(255 0 0 / 17%);
-                        color: #a31616;
-                        padding: 6px 4px;
-                        width:100px;
-                        font-size: 9px;
-                        font-family: Poppins;
-                        border-radius: 25px;'>
-                        Retur Jual
-                        </div";
+                        return "<div style='text-align: center; font-weight: bold; text-transform: uppercase; background-color: rgb(255 0 0 / 17%); color: #a31616; padding: 6px 4px; width:100px; font-size: 9px; font-family: Poppins; border-radius: 25px;'>Retur Jual</div>";
                     } else if ($row->status == 4) {
-                        return "<div style='
-                        text-align: center;
-                        font-weight: bold;
-                        text-transform: uppercase;
-                        background-color: rgb(255 177 0 / 31%);
-                        color: #c17800;
-                        padding: 6px 4px;
-                        width:100px;
-                        font-size: 9px;
-                        font-family: Poppins;
-                        border-radius: 25px;'>
-                        Retur Beli
-                        </div";
+                        return "<div style='text-align: center; font-weight: bold; text-transform: uppercase; background-color: rgb(255 177 0 / 31%); color: #c17800; padding: 6px 4px; width:100px; font-size: 9px; font-family: Poppins; border-radius: 25px;'>Retur Beli</div>";
                     } else if ($row->status == 5) {
-                        return "<div style='
-                        text-align: center;
-                        font-weight: bold;
-                        text-transform: uppercase;
-                        background-color: #fff035;
-                        color: #7a7817;
-                        padding: 6px 4px;
-                        width:100px;
-                        font-size: 9px;
-                        font-family: Poppins;
-                        border-radius: 25px;'>
-                        Stock Opname
-                        </div";
+                        return "<div style='text-align: center; font-weight: bold; text-transform: uppercase; background-color: #fff035; color: #7a7817; padding: 6px 4px; width:100px; font-size: 9px; font-family: Poppins; border-radius: 25px;'>Stock Opname</div>";
                     } else if ($row->status == 7) {
-                        return "<div style='
-                        text-align: center;
-                        font-weight: bold;
-                        text-transform: uppercase;
-                        background-color: #aeffeaad;
-                        color: #238787;
-                        padding: 6px 4px;
-                        width:100px;
-                        font-size: 9px;
-                        font-family: Poppins;
-                        border-radius: 25px;'>
-                        Mutasi Stok
-                        </div";
+                        return "<div style='text-align: center; font-weight: bold; text-transform: uppercase; background-color: #aeffeaad; color: #238787; padding: 6px 4px; width:100px; font-size: 9px; font-family: Poppins; border-radius: 25px;'>Mutasi Stok</div>";
                     }
+                    return "-";
                 })
                 ->rawColumns(['status', 'stock', 'qty_before', 'qty_after'])
+                // APPEND THE CALCULATED STATS TO DATATABLES JSON
+                ->with([
+                    'stats' => [
+                        'stat_before'    => $firstRecord ? $firstRecord->qty_before : 0, // ✅ Fixed
+                        'stat_bought'    => $stats->qty_bought ?? 0,
+                        'stat_bought_rt' => $stats->qty_bought_rt ?? 0,
+                        'stat_sold'      => $stats->qty_sold ?? 0,
+                        'stat_sold_rt'   => $stats->qty_sold_rt ?? 0,
+                        'stat_balance'   => $lastRecord ? $lastRecord->qty_after : 0,  // ✅ Fixed
+                    ]
+                ])
                 ->make(true);
         }
     }
