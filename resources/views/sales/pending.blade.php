@@ -278,28 +278,23 @@
                         <div class="flex items-center justify-between">
                             <div class="flex items-center gap-3">
                                 <div class="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center">
-                                    
-                                    <svg class="w-5 h-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" width="24" height="24"
-                                        viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                                        stroke-linecap="round" stroke-linejoin="round"
-                                        class="icon icon-tabler icons-tabler-outline icon-tabler-cash-register">
+
+                                    <svg class="w-5 h-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" width="24"
+                                        height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                        class="icon icon-tabler icons-tabler-outline icon-tabler-sort-descending-2">
                                         <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                                         <path
-                                            d="M21 15h-2.5c-.398 0 -.779 .158 -1.061 .439c-.281 .281 -.439 .663 -.439 1.061c0 .398 .158 .779 .439 1.061c.281 .281 .663 .439 1.061 .439h1c.398 0 .779 .158 1.061 .439c.281 .281 .439 .663 .439 1.061c0 .398 -.158 .779 -.439 1.061c-.281 .281 -.663 .439 -1.061 .439h-2.5" />
-                                        <path d="M19 21v1m0 -8v1" />
+                                            d="M5 5.5a.5 .5 0 0 1 .5 -.5h4a.5 .5 0 0 1 .5 .5v4a.5 .5 0 0 1 -.5 .5h-4a.5 .5 0 0 1 -.5 -.5l0 -4" />
                                         <path
-                                            d="M13 21h-7c-.53 0 -1.039 -.211 -1.414 -.586c-.375 -.375 -.586 -.884 -.586 -1.414v-10c0 -.53 .211 -1.039 .586 -1.414c.375 -.375 .884 -.586 1.414 -.586h2m12 3.12v-1.12c0 -.53 -.211 -1.039 -.586 -1.414c-.375 -.375 -.884 -.586 -1.414 -.586h-2" />
-                                        <path
-                                            d="M16 10v-6c0 -.53 -.211 -1.039 -.586 -1.414c-.375 -.375 -.884 -.586 -1.414 -.586h-4c-.53 0 -1.039 .211 -1.414 .586c-.375 .375 -.586 .884 -.586 1.414v6m8 0h-8m8 0h1m-9 0h-1" />
-                                        <path d="M8 14v.01" />
-                                        <path d="M8 17v.01" />
-                                        <path d="M12 13.99v.01" />
-                                        <path d="M12 17v.01" />
+                                            d="M5 14.5a.5 .5 0 0 1 .5 -.5h4a.5 .5 0 0 1 .5 .5v4a.5 .5 0 0 1 -.5 .5h-4a.5 .5 0 0 1 -.5 -.5l0 -4" />
+                                        <path d="M14 15l3 3l3 -3" />
+                                        <path d="M17 18v-12" />
                                     </svg>
                                 </div>
                                 <div>
-                                    <h2 class="text-[15px] font-semibold text-gray-800 leading-tight">Data Penjualan</h2>
-                                    <p class="text-[12px] text-gray-400">Data dan riwayat penjualan kasir</p>
+                                    <h2 class="text-[15px] font-semibold text-gray-800 leading-tight">Data Kunjungan</h2>
+                                    <p class="text-[12px] text-gray-400">Data dan riwayat transaksi yang belum selesai</p>
                                 </div>
                             </div>
                         </div>
@@ -432,7 +427,7 @@
                 processing: true,
                 serverSide: true,
                 ajax: {
-                    url: '{{ route('salesdata.index') }}',
+                    url: '{{ route('salesdata.pending') }}',
                     data: function(d) {
                         const val = $('#date-range').val();
                         const parts = val.split(' to ');
@@ -476,18 +471,7 @@
                         data: 'payment_method',
                         defaultContent: '-'
                     },
-                    {
-                        data: null,
-                        orderable: false,
-                        searchable: false,
-                        render: (d) =>
-                            `<button class="btn-print" onclick="event.stopPropagation(); window.open('/print/receipt/${d.transactions.id}','_blank')">
-                    <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
-                        <polyline points="4 6 4 1 12 1 12 6"/>
-                        <path d="M4 12H3a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1"/>
-                        <rect x="4" y="10" width="8" height="5"/>
-                    </svg>Cetak</button>`
-                    },
+
                 ],
             });
 

@@ -114,14 +114,19 @@
             <div class="">
 
                 <div class="card  shadow-md rounded-2xl p-6 bg-white">
-                    <div class="flex items-center mb-6">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-blue-600 mr-3 drop-shadow-md"
-                            fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" />
-                        </svg>
-                        <h2 class="text-2xl font-bold text-gray-800 drop-shadow-sm">Data Stok</h2>
+                    <div class="flex items-center gap-2">
 
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-blue-600" viewBox="0 0 24 24"
+                            fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                            stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-package">
+                            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                            <path d="M12 3l8 4.5l0 9l-8 4.5l-8 -4.5l0 -9l8 -4.5" />
+                            <path d="M12 12l8 -4.5" />
+                            <path d="M12 12l0 9" />
+                            <path d="M12 12l-8 -4.5" />
+                            <path d="M16 5.25l-8 4.5" />
+                        </svg>
+                        <h2 class="text-lg font-semibold text-gray-800">Kartu Stock</h2>
                     </div>
                     <div class="flex py-2 gap-1">
 

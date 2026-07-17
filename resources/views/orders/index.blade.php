@@ -113,86 +113,87 @@
 @endsection
 
 @section('content')
-    <section class="section px-4">
-        <div class="section-body">
+    <section class="section px-4 py-6 font-poppins text-[#1c1c1c]">
+        <div class="section-body flex flex-col gap-5">
 
-            <div class="relative w-full p-[24px] bg-[#ffffff] rounded-[22px]">
-                <div id="searchWrapper" class="flex gap-5" style="position: relative; width: 100%;">
-                    <div class="w-11/12">
-                        <div class="flex items-end justify-between md:block">
-                            <h1 class="text-2xl font-semibold tracking-tight font-poppins text-[#1c1c1c]">Filter Pesanan
-                            </h1>
-
+            <div class="flex flex-col bg-[#fff] md:flex-row md:items-center justify-between gap-4 p-4 rounded-lg">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center">
+                            <svg class="w-5 h-5 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M5 12h14M12 5l7 7-7 7"></path>
+                            </svg>
                         </div>
-                        <div class="flex py-2 gap-1">
-
-                            <div>
-                                <div class="py-1 text-[13px] font-bold">Tanggal</div>
-                                <input type="text" id="returdate"
-                                    class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
-                                    placeholder="" value="{{ $now }}" readonly
-                                    onkeyup="searchMedicineData(this.value)" autocomplete="off">
-                            </div>
-                            <div>
-                                <div class="py-1 text-[13px] font-bold">Cari Nomor SPB</div>
-                                <input type="text" id="searchInput"
-                                    class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
-                                    placeholder="Cari SPB..." oninput="searchOrderCode(this.value)" autocomplete="off">
-                            </div>
-                            <div>
-                                <div class="py-1 text-[13px] font-bold">Filter Tanggal</div>
-
-                                <input type="text" id="dateRange" placeholder="Pilih rentang tanggal..."
-                                    class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
-                                    autocomplete="off">
-                            </div>
+                        <div>
+                            <h2 class="text-[15px] font-semibold text-gray-800 leading-tight">Daftar Pesanan</h2>
+                            <p class="text-[12px] text-gray-400">Daftar dan riwayat pesanan</p>
                         </div>
                     </div>
                 </div>
-            </div>
-            <div class="mt-3 relative w-full p-[24px] bg-[#ffffff] rounded-[22px]">
+
                 <div class="flex items-center gap-3">
+                    <button id="back"
+                        class="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-gray-600 transition-all hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-300">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
+                            <path d="M15 18l-6-6 6-6" />
+                        </svg>
+                        Kembali
+                    </button>
                     <a href="{{ route('orders.create') }}">
                         <button
-                            class="inline-flex items-center gap-2 rounded-lg btn-pharma !bg-blue-600 !shadow-[0_2px_6px_#2563eb] px-6 py-4 text-sm font-xl text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
-                            <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
                             </svg>
                             Buat Baru
                         </button>
                     </a>
+                </div>
+            </div>
+
+            <div class="w-full p-5 bg-white rounded-xl shadow-sm border border-gray-100">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                        <button id="back"
-                            class="inline-flex cursor-pointer items-center gap-2 rounded-lg font-poppins 
-                                   px-6 py-4 text-sm font-semibold 
-                                   transition-all hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:ring-offset-2"
-                            style="box-shadow: 0 0px 7px -1px #1770ec; background: transparent; color: #2aa0ff;">
-
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"
-                                style="color: #2aa0ff;">
-                                <path d="M15 18l-6-6 6-6" />
-                            </svg>
-
-                            Kembali
-                        </button>
+                        <label
+                            class="block mb-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Tanggal</label>
+                        <input type="text" id="returdate"
+                            class="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm transition-all focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            value="{{ $now }}" readonly onkeyup="searchMedicineData(this.value)"
+                            autocomplete="off">
+                    </div>
+                    <div>
+                        <label class="block mb-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Cari Nomor
+                            SPB</label>
+                        <input type="text" id="searchInput"
+                            class="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="Ketik nomor SPB..." oninput="searchOrderCode(this.value)" autocomplete="off">
+                    </div>
+                    <div>
+                        <label class="block mb-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Filter
+                            Tanggal</label>
+                        <input type="text" id="dateRange"
+                            class="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="Pilih rentang tanggal..." autocomplete="off">
                     </div>
                 </div>
+            </div>
 
-                <br>
-                <table id="orderItemsTable" class="w-full">
+            <div class="w-full p-5 bg-white rounded-xl shadow-sm border border-gray-100 overflow-x-auto">
+                <table id="orderItemsTable" class="w-full text-left border-collapse">
                     <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>Date</th>
-                            <th>SPB</th>
-                            <th>Status</th>
-                            <th>Total</th>
-                            <th>Total PPN</th>
-                            <th>Aksi</th>
+                        <tr class="border-b border-gray-200 text-xs text-gray-500 uppercase tracking-wider">
+                            <th class="pb-3 font-semibold">#</th>
+                            <th class="pb-3 font-semibold">Date</th>
+                            <th class="pb-3 font-semibold">SPB</th>
+                            <th class="pb-3 font-semibold text-center">Status</th>
+                            <th class="pb-3 font-semibold">Total</th>
+                            <th class="pb-3 font-semibold">Total PPN</th>
+                            <th class="pb-3 font-semibold text-center">Aksi</th>
                         </tr>
                     </thead>
-                    <tbody class="font-poppins text-sm"></tbody>
+                    <tbody class="text-sm"></tbody>
                 </table>
             </div>
         </div>
@@ -283,7 +284,7 @@
                         name: 'code',
                         defaultContent: '-'
                     },
-                    
+
                     {
                         data: 'status_order'
                     },

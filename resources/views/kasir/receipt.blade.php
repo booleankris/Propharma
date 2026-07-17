@@ -148,7 +148,7 @@
         <tr>
             <td class="info-label">Operator</td>
             <td class="info-colon">:</td>
-            <td class="info-value">{{ auth()->user()->name }}</td>
+            <td class="info-value">{{ $operator }}</td>
         </tr>
     </table>
 
@@ -268,7 +268,7 @@
             <tr>
                 <td class="info-label">Operator</td>
                 <td class="info-colon">:</td>
-                <td class="info-value">{{ auth()->user()->name }}</td>
+                <td class="info-value">{{ $operator }}</td>
             </tr>
         </table>
 

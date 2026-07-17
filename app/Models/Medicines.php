@@ -87,6 +87,9 @@ class Medicines extends Model
     {
         return $this->hasMany(ItemsLog::class, 'medicine_id');
     }
+    public function order_items(){
+        return $this->hasMany(OrderItems::class, 'medicine_id');
+    }
     public function history()
     {
         return $this->hasMany(MedicinePriceHistory::class, 'medicine_id');

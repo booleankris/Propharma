@@ -75,7 +75,7 @@
     <span style="float:right;">{{ number_format($transaction->changes) }}</span>
 
     <hr>
-    Kasir : {{ auth()->user()->name }}<br>
+    Kasir : {{ $operator }}<br>
     <hr>
 
     <div class="text-center">

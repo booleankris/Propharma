@@ -205,7 +205,7 @@ class ReceivingController extends Controller
             'creditor' => $creditor
         ]);
     }
-    
+
     public function history(Request $request)
     {
         return view('orders.history');
@@ -230,6 +230,41 @@ class ReceivingController extends Controller
             ->setPaper('A4', 'portrait');
 
         return $pdf->stream("SPBFINAL-{$order->code}.pdf");
+    }
+    public function printOrders($orderId)
+    {
+        $order = Order::findOrFail($orderId);
+
+        $receivingItem = ReceivingItems::whereHas('order_items', function ($q) use ($orderId) {
+            $q->where('order_id', $orderId);
+        })
+            ->with('receiving_details.receiving')
+            ->first();
+
+        abort_if(!$receivingItem, 404, 'Data receiving tidak ditemukan untuk order ini.');
+
+        $receivingId = $receivingItem->receiving_details->receiving_id;
+
+        $receiving = Receiving::with([
+            'pharmacy',
+            'receiving_details' => function ($q) use ($orderId) {
+                $q->whereHas('receiving_items.order_items', function ($sub) use ($orderId) {
+                    $sub->where('order_id', $orderId);
+                });
+            },
+            'receiving_details.creditor',
+            'receiving_details.receiving_items' => function ($q) use ($orderId) {
+                $q->whereHas('order_items', function ($sub) use ($orderId) {
+                    $sub->where('order_id', $orderId);
+                });
+            },
+            'receiving_details.receiving_items.order_items.medicines',
+        ])
+            ->findOrFail($receivingId);
+
+        return \PDF::loadView('orders.printOrders', compact('receiving'))
+            ->setPaper('a4', 'landscape')
+            ->stream('tanda-penerimaan-barang-' . $receiving->code . '.pdf');
     }
     public function gethistory(Request $request)
     {
@@ -392,7 +427,6 @@ class ReceivingController extends Controller
                     $color = 'background:#16a34a;';
                     $icon = '<svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>';
                 } else {
-                    // FIX #3: Was duplicate status == 1, now correctly handles status == 2 (Cetak)
                     $label = 'Cetak SPB';
                     $color = 'background:#eab308;';
                     $icon = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-printer">
@@ -401,6 +435,10 @@ class ReceivingController extends Controller
                     <path d="M17 9v-4a2 2 0 0 0 -2 -2h-6a2 2 0 0 0 -2 2v4" />
                     <path d="M7 15a2 2 0 0 1 2 -2h6a2 2 0 0 1 2 2v4a2 2 0 0 1 -2 2h-6a2 2 0 0 1 -2 -2l0 -4" />
                 </svg>';
+                    $icon2 = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-clipboard-data">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                    <path d="M9 5h-2a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-12a2 2 0 0 0 -2 -2h-2" />
+                    <path d="M9 5a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2" /><path d="M9 17v-4" /><path d="M12 17v-1" /><path d="M15 17v-2" /><path d="M12 17v-1" /></svg>';
                 }
 
                 if ($row->status == 0) {
@@ -432,8 +470,8 @@ class ReceivingController extends Controller
                         </div>
                     </a>';
                 } else {
-                    // FIX #3: Cetak button now actually renders for status == 2
                     return '
+                    <div class="flex gap-2">
                     <a target="_blank" href="/receiving/' . $row->id . '/printspbfinal">
                         <div class="flex gap-1">
                             <div class="w-full">
@@ -445,7 +483,20 @@ class ReceivingController extends Controller
                                 </button>
                             </div>
                         </div>
-                    </a>';
+                    </a> <a target="_blank" href="/receiving/' . $row->id . '/printorders">
+                    <div class="flex gap-1">
+                        <div class="w-full">
+                            <button style="background:#eb2579; color:white;" class="rounded-full px-2 py-2 font-semibold">
+                                <div class="flex gap-2 justify-center items-center">
+                                    <span>' . $icon2 . '</span>
+                                    <span class="text-xs pr-2">List Pesanan</span>
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+                </a>
+                    </div>
+                    ';
                 }
             })
             ->addColumn('total', fn($row) => 'Rp ' . number_format($row->order_items_sum_total, 0, ',', '.'))

@@ -40,6 +40,7 @@ use App\Http\Controllers\Master\LocationsController;
 use App\Http\Controllers\Master\MedicineController;
 use App\Http\Controllers\Master\ParametersController;
 use App\Http\Controllers\Master\PatientsController;
+use App\Http\Controllers\MedicineOrderHistoryController;
 use App\Http\Controllers\Orders\OrdersController;
 use App\Http\Controllers\Orders\ReceivingController;
 use App\Http\Controllers\OrdersPayment;
@@ -220,8 +221,18 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
 
     // Sales Data
     Route::get('/data/sales', [SalesDataController::class, 'index'])->name('salesdata.index');
+    Route::get('/data/pending', [SalesDataController::class, 'pending'])->name('salesdata.pending');
     Route::get('/sales/transaction/{id}/items', [SalesDataController::class, 'transactionItems']);
 
+    // Medicine Order History
+    Route::get('/medicineorderhistory', [MedicineOrderHistoryController::class, 'index'])
+        ->name('medicine-order-history.index');
+
+    Route::get('/medicineorderhistory/data', [MedicineOrderHistoryController::class, 'data'])
+        ->name('medicine-order-history.data');
+
+    Route::get('/medicineorderhistory/searchmedicine', [MedicineOrderHistoryController::class, 'searchMedicine'])
+        ->name('medicine-order-history.searchmedicine');
 
 
     // Sales Reject
@@ -284,7 +295,8 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     Route::get('/transfers/incoming', [TransfersController::class, 'incomingTransfers'])->name('transfers.incoming');
     Route::post('/transfers/{transfer}/accept', [TransfersController::class, 'acceptTransfer'])->name('transfers.accept');
     Route::post('/transfers/{transfer}/deny', [TransfersController::class, 'denyTransfer'])->name('transfers.deny');
-
+    Route::get('/transfers/{id}/print', [TransfersController::class, 'printReceipt'])
+        ->name('transfers.print');
     // Reports  
     Route::get('/reports/transactions', [ReportsController::class, 'transactions'])->name('reports.transactions');
     Route::get('/reports/medicines', [ReportsController::class, 'medicines'])->name('reports.medicines');
@@ -341,7 +353,7 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     Route::get('/orders/printorder/{id}', [OrdersController::class, 'printOrder'])->name('orders.printorder');
     Route::get('/orders/print-preview/{order_id}', [OrdersController::class, 'printPreview']);
 
-    Route::put('ordercreditors/{id}/sync-creditors', [MedicineController::class, 'syncCreditors'])->name('syncCreditors');    
+    Route::put('ordercreditors/{id}/sync-creditors', [MedicineController::class, 'syncCreditors'])->name('syncCreditors');
     Route::get('/creditors/all', [MedicineController::class, 'getAll'])->name('creditors.all');
 
 
@@ -370,6 +382,8 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     Route::get('/receiving/orders', [ReceivingController::class, 'orders'])->name('receiving.orders');
     Route::get('/receiving/{order}/printspbfinal', [ReceivingController::class, 'printSPBFinal'])
         ->name('orderfinal.print');
+    Route::get('/receiving/{order}/printorders', [ReceivingController::class, 'printOrders'])
+        ->name('orderfinal.printorders');
     // ================================ Statistic ================================
 
     // INVOICES (Tagihan)

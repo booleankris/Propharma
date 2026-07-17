@@ -12,6 +12,8 @@ use App\Models\Transfers;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Barryvdh\DomPDF\Facade\Pdf;
+
 
 class TransfersController extends Controller
 {
@@ -155,6 +157,21 @@ class TransfersController extends Controller
         }
     }
 
+    public function printReceipt($id)
+    {
+        $transfer = MedicineTransfers::with([
+            'batches.medicines',
+            'batches.pharmacy',
+            'users.pharmacy',
+        ])->findOrFail($id);
+
+        $pdf = Pdf::loadView('kasir.transfers.receipt', compact('transfer'))
+            ->setPaper('a4', 'portrait');
+
+        return $pdf->stream('tanda-terima-barang-' . $transfer->code . '.pdf');
+        // use ->download(...) instead of ->stream(...) if you want a forced download
+    }
+
     public function index()
     {
         return response()->json(
@@ -188,7 +205,7 @@ class TransfersController extends Controller
 
         // from batches = destination
         // from users = source
-        $incoming = MedicineTransfers::with(['batches','users', 'batches.medicines', 'etalases'])
+        $incoming = MedicineTransfers::with(['batches', 'users', 'batches.medicines', 'etalases'])
             ->whereHas('batches', function ($getpid) {
                 $getpid->where('pharmacy_id', auth()->user()->pharmacy_id);
             })
@@ -199,7 +216,7 @@ class TransfersController extends Controller
             ->whereHas('users', function ($getpid) {
                 $getpid->where('pharmacy_id', auth()->user()->pharmacy_id);
             })
-            
+
             ->latest()
             ->get();
 

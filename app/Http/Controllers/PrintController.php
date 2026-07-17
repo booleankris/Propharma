@@ -21,9 +21,10 @@ class PrintController extends Controller
         $transaction     = MedicineTransactions::with(['patients', 'doctors'])->findOrFail($id);
 
         $totalEmbalase   = $items->sum('embalase');
-        $totalFinalPrice = $items->sum('final_price') - ($transaction->discount ?? 0);        ;
+        $totalFinalPrice = $items->sum('final_price') - ($transaction->discount ?? 0);  
         $totalPrice      = $items->sum('total_price');
         $discount        = $items->sum('discount');
+        $operator        = $transaction->user->name;
         $subtotaldiscount = $transaction->discount ?? 0;
         $totaldiscount   = ceil(($discount + $subtotaldiscount) / 1000) * 1000;
         $payment         = $totalFinalPrice - $totaldiscount;
@@ -35,7 +36,8 @@ class PrintController extends Controller
             'transactionCart',
             'totalFinalPrice',
             'totalPrice',
-            'totaldiscount'
+            'totaldiscount',
+            'operator',
         ));
     }
     public function fullReceipt($id)

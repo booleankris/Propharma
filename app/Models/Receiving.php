@@ -24,6 +24,10 @@ class Receiving extends Model
     {
         return $this->belongsTo(ReceivingDetails::class);
     }
+    public function pharmacy()
+    {
+        return $this->belongsTo(Pharmacies::class, 'pharmacy_id');
+    }
     public function receiving_items()
     {
         return $this->hasManyThrough(

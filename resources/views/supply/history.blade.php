@@ -200,14 +200,15 @@
             <div class="">
 
                 <div class="card shadow-md rounded-2xl p-6 bg-white">
-                    <div class="flex items-center mb-4">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-blue-600 mr-3 drop-shadow-md"
-                            fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" />
+                    <div class="flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-blue-600" viewBox="0 0 24 24"
+                            fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                            stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-repeat">
+                            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                            <path d="M4 12v-3a3 3 0 0 1 3 -3h13m-3 -3l3 3l-3 3" />
+                            <path d="M20 12v3a3 3 0 0 1 -3 3h-13m3 3l-3 -3l3 -3" />
                         </svg>
-                        <h2 class="text-2xl font-bold text-gray-800 drop-shadow-sm">Kartu Stok</h2>
-
+                        <h2 class="text-lg font-semibold text-gray-800">Kartu Stock</h2>
                     </div>
                     <div class="flex flex-wrap items-end gap-4 py-2">
                         <div class="flex-1 min-w-[200px]">
@@ -401,12 +402,13 @@
                                     <th class="px-4 py-3">Tanggal</th>
                                     <th class="px-4 py-3">Kode Transaksi</th>
                                     <th class="px-4 py-3">Layanan</th>
-                                    <th class="px-4 py-3">Nama Obat</th>
+                                    <th class="px-4 py-3">Keterangan</th>
                                     <th class="px-4 py-3">Saldo Awal</th>
                                     <th class="px-4 py-3">Qty</th>
                                     <th class="px-4 py-3">Jumlah</th>
                                     <th class="px-4 py-3">Saldo Sekarang</th>
-                                    <th class="px-4 py-3">Keterangan</th>
+                                    <th class="px-4 py-3">PBF / Operator</th>
+
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-100"></tbody>
@@ -487,8 +489,9 @@
                         data: 'type'
                     },
                     {
-                        data: 'name'
+                        data: 'status'
                     },
+
                     {
                         data: 'qty_before'
                     },
@@ -502,8 +505,9 @@
                         data: 'supply'
                     },
                     {
-                        data: 'status'
+                        data: 'name'
                     },
+
                 ],
                 paging: true,
                 searching: false,

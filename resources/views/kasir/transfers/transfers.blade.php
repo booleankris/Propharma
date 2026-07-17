@@ -556,13 +556,26 @@
                                     Pending
                                 </button>
                             @elseif($t->status == 1)
-                                <button type="submit" class="btn btn-confirmed"
-                                    onclick="return confirm('Terima transfer ini?')">
+                                <button type="submit" class="btn btn-confirmed">
                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
                                         stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
                                         <polyline points="20 6 9 17 4 12" />
                                     </svg>
                                     Diterima
+                                </button>
+                                <button type="button" class="btn !bg-[#5085ff] btn-confirmed"
+                                    onclick="window.open('{{ route('transfers.print', $t->id) }}', '_blank')">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round">
+                                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                        <path
+                                            d="M17 17h2a2 2 0 0 0 2 -2v-4a2 2 0 0 0 -2 -2h-14a2 2 0 0 0 -2 2v4a2 2 0 0 0 2 2h2" />
+                                        <path d="M17 9v-4a2 2 0 0 0 -2 -2h-6a2 2 0 0 0 -2 2v4" />
+                                        <path
+                                            d="M7 15a2 2 0 0 1 2 -2h6a2 2 0 0 1 2 2v4a2 2 0 0 1 -2 2h-6a2 2 0 0 1 -2 -2l0 -4" />
+                                    </svg>
+                                    Print
                                 </button>
                             @endif
                         </div>
@@ -625,13 +638,26 @@
                         @if ($t->status == 1)
                             <div class="tr-actions" onclick="event.stopPropagation()">
 
-                                <button type="submit" class="btn btn-confirmed"
-                                    onclick="return confirm('Terima transfer ini?')">
+                                <button type="submit" class="btn btn-confirmed">
                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
                                         stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
                                         <polyline points="20 6 9 17 4 12" />
                                     </svg>
                                     Diterima
+                                </button>
+                                <button type="button" class="btn !bg-[#5085ff] btn-confirmed"
+                                    onclick="window.open('{{ route('transfers.print', $t->id) }}', '_blank')">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round">
+                                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                        <path
+                                            d="M17 17h2a2 2 0 0 0 2 -2v-4a2 2 0 0 0 -2 -2h-14a2 2 0 0 0 -2 2v4a2 2 0 0 0 2 2h2" />
+                                        <path d="M17 9v-4a2 2 0 0 0 -2 -2h-6a2 2 0 0 0 -2 2v4" />
+                                        <path
+                                            d="M7 15a2 2 0 0 1 2 -2h6a2 2 0 0 1 2 2v4a2 2 0 0 1 -2 2h-6a2 2 0 0 1 -2 -2l0 -4" />
+                                    </svg>
+                                    Print
                                 </button>
                             </div>
                         @else

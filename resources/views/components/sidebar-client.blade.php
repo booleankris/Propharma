@@ -3,6 +3,7 @@
     .sidebar-nav::-webkit-scrollbar {
         display: none;
     }
+
     .modal-show {
         opacity: 1;
         transform: translate(-50%, -50%) scale(1);
@@ -1522,7 +1523,7 @@
                     Harga Beli</span>
             </a>
 
-            <a href="{{ route('receiving.orderhistory') }}"
+            <a href="{{ route('medicine-order-history.index') }}"
                 class="group flex items-center gap-3 p-3.5 rounded-2xl bg-purple-50 hover:bg-purple-500 border border-purple-100 hover:border-purple-500 transition-all duration-200 hover:-translate-y-0.5">
                 <div
                     class="w-9 h-9 rounded-xl bg-purple-100 group-hover:bg-purple-400 flex items-center justify-center flex-shrink-0 transition-colors">
@@ -1660,6 +1661,19 @@
                 </div>
                 <span class="text-sm font-semibold text-blue-700 group-hover:text-white transition-colors">Data
                     Penjualan</span>
+            </a>
+            <a href="{{ route('salesdata.pending') }}"
+                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-blue-50 hover:bg-blue-500 border border-blue-100 hover:border-blue-500 transition-all duration-200 hover:-translate-y-0.5">
+                <div
+                    class="w-9 h-9 rounded-xl bg-blue-100 group-hover:bg-blue-400 flex items-center justify-center flex-shrink-0 transition-colors">
+                    <svg class="w-5 h-5 text-blue-600 group-hover:text-white transition-colors" fill="none"
+                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                </div>
+                <span class="text-sm font-semibold text-blue-700 group-hover:text-white transition-colors">Data
+                    Kunjungan</span>
             </a>
 
             <a href="{{ route('returdata.retur') }}"

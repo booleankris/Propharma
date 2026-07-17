@@ -381,8 +381,6 @@ class OrdersController extends Controller
             $receiving_code = $prefix . $serial;
 
             Receiving::create([
-                'order_id'     => $order->id,
-                'creditors_id' => null,
                 'pharmacy_id'  => auth()->user()->pharmacy_id,
                 'code'         => $receiving_code,
                 'date'         => $now,

@@ -55,19 +55,22 @@ class SuppliesController extends Controller
 
             // 2. STATS CALCULATION: Calculate all sums 
             $stats = (clone $baseQuery)->selectRaw("
-            SUM(CASE WHEN status = 1 THEN qty ELSE 0 END) as qty_sold,
-            SUM(CASE WHEN status = 2 THEN qty ELSE 0 END) as qty_bought,
-            SUM(CASE WHEN status = 3 THEN qty ELSE 0 END) as qty_sold_rt,
-            SUM(CASE WHEN status = 4 THEN qty ELSE 0 END) as qty_bought_rt
-        ")->first();
+                SUM(CASE WHEN status = 1 THEN qty ELSE 0 END) as qty_sold,
+                SUM(CASE WHEN status = 2 THEN qty ELSE 0 END) as qty_bought,
+                SUM(CASE WHEN status = 3 THEN qty ELSE 0 END) as qty_sold_rt,
+                SUM(CASE WHEN status = 4 THEN qty ELSE 0 END) as qty_bought_rt
+            ")->first();
 
             // 3. BALANCE CALCULATION: Get the very first and very last records for the balances
             $firstRecord = (clone $baseQuery)->orderBy('date', 'asc')->orderBy('id', 'asc')->first();
             $lastRecord = (clone $baseQuery)->orderBy('date', 'desc')->orderBy('id', 'desc')->first();
 
-            // 4. TABLE QUERY
-            $items = (clone $baseQuery)->with('medicines')
-                ->whereNotIn('status', [5, 6, 7]);
+            // 4. TABLE QUERY: Eager load relations nested deep to prevent performance issues
+            $items = (clone $baseQuery)->with([
+                'medicines',
+                'receiving.receiving_details.creditor', // Fetch creditor through receiving details
+                'medicine_transaction.user'             // Fetch cashier user through transactions
+            ])->whereNotIn('status', [5, 6, 7]);
 
             // 5. RETURN DATATABLES RESPONSE
             return DataTables::eloquent($items)
@@ -84,9 +87,22 @@ class SuppliesController extends Controller
                 ->addColumn('type', function ($row) {
                     return $row->type;
                 })
+                // ----- UPDATED 'NAME' COLUMN LOGIC -----
                 ->addColumn('name', function ($row) {
-                    return $row->medicines?->name ?? '-';
+                    // Case 1: Purchase / Pembelian (Status = 2) -> Show Creditor Name
+                    if ($row->status == 2) {
+                        return $row->receiving?->receiving_details?->first()?->creditor?->name ?? '-';
+                    }
+
+                    // Case 2: Any other status -> Show Cashier User Name (from medicine transactions)
+                    if ($row->medicine_transaction?->user) {
+                        return $row->medicine_transaction->user->name;
+                    }
+
+                    // Fallback: If no cashier is found, display the Medicine Name as a safety net
+                    return '-';
                 })
+                // ----------------------------------------
                 ->addColumn('stock', function ($row) {
                     if ($row->status == 1) {
                         return "<div style='color:#16a34a;font-weight:bold;'><span>-</span><b>" . $row->qty . "</b></div>";
@@ -141,15 +157,14 @@ class SuppliesController extends Controller
                     return "-";
                 })
                 ->rawColumns(['status', 'stock', 'qty_before', 'qty_after'])
-                // APPEND THE CALCULATED STATS TO DATATABLES JSON
                 ->with([
                     'stats' => [
-                        'stat_before'    => $firstRecord ? $firstRecord->qty_before : 0, // ✅ Fixed
+                        'stat_before'    => $firstRecord ? $firstRecord->qty_before : 0,
                         'stat_bought'    => $stats->qty_bought ?? 0,
                         'stat_bought_rt' => $stats->qty_bought_rt ?? 0,
                         'stat_sold'      => $stats->qty_sold ?? 0,
                         'stat_sold_rt'   => $stats->qty_sold_rt ?? 0,
-                        'stat_balance'   => $lastRecord ? $lastRecord->qty_after : 0,  // ✅ Fixed
+                        'stat_balance'   => $lastRecord ? $lastRecord->qty_after : 0,
                     ]
                 ])
                 ->make(true);
