@@ -20,6 +20,18 @@ class ParametersController extends Controller
             return DataTables::of($data)
                 ->addIndexColumn()
 
+                // 1. Failsafe for the row index crash
+                ->filterColumn('DT_RowIndex', function ($query, $keyword) {
+                    // Do nothing
+                })
+
+                // 2. Map the search functionality for debtor_name to the database relationship
+                ->filterColumn('debtor_name', function ($query, $keyword) {
+                    $query->whereHas('debtor', function ($q) use ($keyword) {
+                        $q->where('name', 'like', "%{$keyword}%");
+                    });
+                })
+
                 ->addColumn('debtor_name', fn($row) => $row->debtor?->name ?? '-')
 
                 ->addColumn(
