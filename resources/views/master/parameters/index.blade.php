@@ -722,6 +722,7 @@
                         width: '40px'
                     }, {
                         data: 'debtor_name'
+                        searchable: true,
                     },
                     {
                         data: 'receipt'
