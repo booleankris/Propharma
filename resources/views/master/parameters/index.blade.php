@@ -9,7 +9,11 @@
 
     <style>
         /* ── Reset & Base ─────────────────────────────────── */
-        *, *::before, *::after { box-sizing: border-box; }
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+        }
 
         /* ── Page Layout ──────────────────────────────────── */
         .param-page {
@@ -27,17 +31,20 @@
             flex-wrap: wrap;
             gap: 12px;
         }
+
         .param-page-title {
             font-size: 1.25rem;
             font-weight: 600;
             color: #1a202c;
             margin: 0;
         }
+
         .param-page-sub {
             font-size: 0.8125rem;
             color: #718096;
             margin-top: 2px;
         }
+
         .btn-back {
             display: inline-flex;
             align-items: center;
@@ -53,11 +60,13 @@
             text-decoration: none;
             transition: background 0.15s, border-color 0.15s;
         }
+
         .btn-back:hover {
             background: #f7fafc;
             border-color: #cbd5e0;
             color: #2d3748;
         }
+
         .btn-back svg {
             width: 14px;
             height: 14px;
@@ -69,12 +78,14 @@
             grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
             gap: 10px;
         }
+
         .param-stat-card {
             background: #f7fafc;
             border: 1px solid #e2e8f0;
             border-radius: 10px;
             padding: 12px 16px;
         }
+
         .param-stat-label {
             font-size: 0.6875rem;
             font-weight: 500;
@@ -83,12 +94,14 @@
             color: #a0aec0;
             margin-bottom: 4px;
         }
+
         .param-stat-value {
             font-size: 1.375rem;
             font-weight: 600;
             color: #2d3748;
             line-height: 1;
         }
+
         .param-stat-value.small {
             font-size: 0.875rem;
             font-weight: 500;
@@ -102,6 +115,7 @@
             gap: 16px;
             align-items: start;
         }
+
         @media (max-width: 900px) {
             .param-layout {
                 grid-template-columns: 1fr;
@@ -115,6 +129,7 @@
             border-radius: 14px;
             overflow: hidden;
         }
+
         .param-card-header {
             display: flex;
             align-items: center;
@@ -123,6 +138,7 @@
             border-bottom: 1px solid #e2e8f0;
             gap: 12px;
         }
+
         .param-card-title {
             display: flex;
             align-items: center;
@@ -131,15 +147,18 @@
             font-weight: 600;
             color: #2d3748;
         }
+
         .param-card-title svg {
             width: 15px;
             height: 15px;
             color: #a0aec0;
             flex-shrink: 0;
         }
+
         .param-card-body {
             padding: 18px;
         }
+
         .param-card-body.no-pad {
             padding: 0;
         }
@@ -155,6 +174,7 @@
             border-radius: 20px;
             border: 1px solid #bee3f8;
         }
+
         .edit-badge.visible {
             display: inline-block;
         }
@@ -163,6 +183,7 @@
         .search-wrap {
             position: relative;
         }
+
         .search-wrap input {
             width: 200px;
             height: 32px;
@@ -175,12 +196,17 @@
             outline: none;
             transition: border-color 0.15s, box-shadow 0.15s;
         }
+
         .search-wrap input:focus {
             border-color: #63b3ed;
-            box-shadow: 0 0 0 3px rgba(99,179,237,0.2);
+            box-shadow: 0 0 0 3px rgba(99, 179, 237, 0.2);
             background: #fff;
         }
-        .search-wrap input::placeholder { color: #a0aec0; }
+
+        .search-wrap input::placeholder {
+            color: #a0aec0;
+        }
+
         .search-icon {
             position: absolute;
             left: 9px;
@@ -195,24 +221,29 @@
         /* ── DataTable Overrides ──────────────────────────── */
         #table-data_wrapper .dataTables_filter,
         #table-data_wrapper .dataTables_length {
-            display: none; /* we use our own search */
+            display: none;
+            /* we use our own search */
         }
+
         #table-data_wrapper .dataTables_info,
         #table-data_wrapper .dataTables_paginate {
             padding: 10px 18px;
             font-size: 0.75rem;
             color: #718096;
         }
+
         #table-data_wrapper .paginate_button {
             font-size: 0.75rem !important;
             padding: 3px 8px !important;
             border-radius: 6px !important;
         }
+
         #table-data {
             width: 100% !important;
             border-collapse: collapse;
             font-size: 0.8125rem;
         }
+
         #table-data thead th {
             background: #f7fafc;
             color: #718096;
@@ -225,24 +256,30 @@
             border-top: none;
             white-space: nowrap;
         }
+
         #table-data tbody tr {
             cursor: pointer;
             transition: background 0.1s;
         }
+
         #table-data tbody tr:hover {
             background: #f7fafc;
         }
+
         #table-data tbody tr.selected-row {
             background: #ebf8ff;
         }
+
         #table-data tbody td {
             padding: 10px 12px;
             color: #2d3748;
             border-bottom: 1px solid #f0f4f8;
         }
+
         #table-data tbody tr:last-child td {
             border-bottom: none;
         }
+
         #table-data.dataTable thead .sorting,
         #table-data.dataTable thead .sorting_asc,
         #table-data.dataTable thead .sorting_desc {
@@ -256,21 +293,25 @@
             flex-direction: column;
             gap: 14px;
         }
+
         .form-row-2 {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 10px;
         }
+
         .form-field {
             display: flex;
             flex-direction: column;
             gap: 5px;
         }
+
         .form-field label {
             font-size: 0.75rem;
             font-weight: 600;
             color: #4a5568;
         }
+
         .form-field input[type="number"] {
             height: 36px;
             font-size: 0.8125rem;
@@ -283,11 +324,15 @@
             width: 100%;
             transition: border-color 0.15s, box-shadow 0.15s;
         }
+
         .form-field input[type="number"]:focus {
             border-color: #63b3ed;
-            box-shadow: 0 0 0 3px rgba(99,179,237,0.2);
+            box-shadow: 0 0 0 3px rgba(99, 179, 237, 0.2);
         }
-        .form-field input[type="number"]::placeholder { color: #cbd5e0; }
+
+        .form-field input[type="number"]::placeholder {
+            color: #cbd5e0;
+        }
 
         /* Select2 overrides */
         .select2-container--default .select2-selection--single {
@@ -298,19 +343,23 @@
             display: flex;
             align-items: center;
         }
+
         .select2-container--default .select2-selection--single .select2-selection__rendered {
             line-height: 36px !important;
             padding-left: 10px !important;
             font-size: 0.8125rem !important;
             color: #2d3748 !important;
         }
+
         .select2-container--default .select2-selection--single .select2-selection__arrow {
             height: 36px !important;
         }
+
         .select2-container--default.select2-container--focus .select2-selection--single {
             border-color: #63b3ed !important;
-            box-shadow: 0 0 0 3px rgba(99,179,237,0.2) !important;
+            box-shadow: 0 0 0 3px rgba(99, 179, 237, 0.2) !important;
         }
+
         .select2-dropdown {
             border: 1px solid #e2e8f0 !important;
             border-radius: 8px !important;
@@ -329,14 +378,17 @@
             font-size: 0.8rem;
             color: #2c5282;
         }
+
         .selected-pill.visible {
             display: flex;
         }
+
         .selected-pill svg {
             width: 13px;
             height: 13px;
             flex-shrink: 0;
         }
+
         .selected-pill strong {
             font-weight: 600;
         }
@@ -365,6 +417,7 @@
             flex-wrap: wrap;
             padding-top: 2px;
         }
+
         .btn {
             display: inline-flex;
             align-items: center;
@@ -382,42 +435,51 @@
             transition: background 0.15s, border-color 0.15s, color 0.15s;
             white-space: nowrap;
         }
+
         .btn:hover {
             background: #f7fafc;
             border-color: #cbd5e0;
         }
+
         .btn svg {
             width: 13px;
             height: 13px;
         }
+
         .btn-primary {
             background: #2b6cb0;
             color: #fff;
             border-color: #2b6cb0;
         }
+
         .btn-primary:hover {
             background: #2c5282;
             border-color: #2c5282;
         }
+
         .btn-danger {
             color: #c53030;
             border-color: #fed7d7;
             background: #fff;
         }
+
         .btn-danger:hover {
             background: #fff5f5;
             border-color: #fc8181;
         }
+
         .btn-ghost {
             color: #718096;
             border-color: transparent;
             background: transparent;
         }
+
         .btn-ghost:hover {
             background: #f7fafc;
             border-color: #e2e8f0;
             color: #4a5568;
         }
+
         .btn.hidden {
             display: none;
         }
@@ -435,7 +497,7 @@
             </div>
             <button class="btn-back" onclick="window.location.href='{{ route('home') }}'">
                 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M10 3L5 8l5 5"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M10 3L5 8l5 5" />
                 </svg>
                 Back to home
             </button>
@@ -465,15 +527,16 @@
                 <div class="param-card-header">
                     <div class="param-card-title">
                         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
-                            <rect x="1" y="1" width="14" height="14" rx="2"/>
-                            <path d="M1 5h14M5 5v10"/>
+                            <rect x="1" y="1" width="14" height="14" rx="2" />
+                            <path d="M1 5h14M5 5v10" />
                         </svg>
                         Parameter data
                     </div>
                     <div class="search-wrap">
-                        <svg class="search-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
-                            <circle cx="6.5" cy="6.5" r="4.5"/>
-                            <path d="M10 10l3.5 3.5"/>
+                        <svg class="search-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+                            stroke-width="1.5">
+                            <circle cx="6.5" cy="6.5" r="4.5" />
+                            <path d="M10 10l3.5 3.5" />
                         </svg>
                         <input type="text" id="tableSearch" placeholder="Search debitur…">
                     </div>
@@ -505,8 +568,8 @@
                 <div class="param-card-header">
                     <div class="param-card-title">
                         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
-                            <rect x="2" y="1" width="12" height="14" rx="2"/>
-                            <path d="M5 5h6M5 8h6M5 11h3"/>
+                            <rect x="2" y="1" width="12" height="14" rx="2" />
+                            <path d="M5 5h6M5 8h6M5 11h3" />
                         </svg>
                         <span id="formTitle">New parameter</span>
                     </div>
@@ -521,8 +584,8 @@
                         {{-- Selected info pill --}}
                         <div class="selected-pill" id="selectedPill">
                             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
-                                <circle cx="8" cy="5" r="3"/>
-                                <path d="M2 14c0-3.31 2.69-6 6-6s6 2.69 6 6"/>
+                                <circle cx="8" cy="5" r="3" />
+                                <path d="M2 14c0-3.31 2.69-6 6-6s6 2.69 6 6" />
                             </svg>
                             Editing: <strong id="selectedName">—</strong>
                         </div>
@@ -595,7 +658,7 @@
                         <div class="btn-group">
                             <button type="button" id="submitForm" class="btn btn-primary">
                                 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 8l4 4 6-6"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 8l4 4 6-6" />
                                 </svg>
                                 <span id="submitLabel">Save parameter</span>
                             </button>
@@ -604,7 +667,8 @@
                             </button>
                             <button type="button" id="deleteData" class="btn btn-danger hidden">
                                 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 4h10M6 4V2h4v2M5 4v9a1 1 0 001 1h4a1 1 0 001-1V4"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M3 4h10M6 4V2h4v2M5 4v9a1 1 0 001 1h4a1 1 0 001-1V4" />
                                 </svg>
                                 Delete
                             </button>
@@ -625,7 +689,7 @@
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
     <script>
-        $(document).ready(function () {
+        $(document).ready(function() {
 
             // ── Select2 ──────────────────────────────────────
             $('#debtor_id').select2({
@@ -639,7 +703,7 @@
                 serverSide: true,
                 ajax: {
                     url: '{{ route('parameters.index') }}',
-                    dataSrc: function (json) {
+                    dataSrc: function(json) {
                         // Update stat cards from server response
                         if (json.stats) {
                             $('#statTotal').text(json.stats.total ?? json.recordsTotal ?? '—');
@@ -651,16 +715,35 @@
                         return json.data;
                     }
                 },
-                columns: [
-                    { data: 'DT_RowIndex', orderable: false, width: '40px' },
-                    { data: 'debtor_name' },
-                    { data: 'receipt' },
-                    { data: 'pdu' },
-                    { data: 'otc' },
-                    { data: 'credit' },
-                    { data: 'embalas' },
-                    { data: 'service' },
-                    { data: 'rounding' },
+                columns: [{
+                        data: 'DT_RowIndex',
+                        orderable: false,
+                        searchable: false,
+                        width: '40px'
+                    }, {
+                        data: 'debtor_name'
+                    },
+                    {
+                        data: 'receipt'
+                    },
+                    {
+                        data: 'pdu'
+                    },
+                    {
+                        data: 'otc'
+                    },
+                    {
+                        data: 'credit'
+                    },
+                    {
+                        data: 'embalas'
+                    },
+                    {
+                        data: 'service'
+                    },
+                    {
+                        data: 'rounding'
+                    },
                 ],
                 language: {
                     processing: '<span style="color:#718096;font-size:13px;">Loading…</span>',
@@ -673,12 +756,12 @@
             });
 
             // ── Custom search ─────────────────────────────────
-            $('#tableSearch').on('keyup', function () {
+            $('#tableSearch').on('keyup', function() {
                 tableData.search(this.value).draw();
             });
 
             // ── Row click ─────────────────────────────────────
-            $('#table-data tbody').on('click', 'tr', function () {
+            $('#table-data tbody').on('click', 'tr', function() {
                 var rowData = tableData.row(this).data();
                 if (!rowData) return;
 
@@ -699,43 +782,53 @@
             });
 
             // ── Submit / Update ───────────────────────────────
-            $('#submitForm').on('click', function () {
-                var id  = $('#parameter_id').val();
+            $('#submitForm').on('click', function() {
+                var id = $('#parameter_id').val();
                 var url = id ? '/parameters/' + id : '/parameters';
 
                 var payload = {
-                    debtor_id : $('#debtor_id').val(),
-                    receipt   : $('#receipt').val(),
-                    pdu       : $('#pdu').val(),
-                    otc       : $('#otc').val(),
-                    credit    : $('#credit').val(),
-                    embalas   : $('#embalas').val(),
-                    service   : $('#service').val(),
-                    rounding  : $('#rounding').val(),
-                    _method   : id ? 'PUT' : 'POST'
+                    debtor_id: $('#debtor_id').val(),
+                    receipt: $('#receipt').val(),
+                    pdu: $('#pdu').val(),
+                    otc: $('#otc').val(),
+                    credit: $('#credit').val(),
+                    embalas: $('#embalas').val(),
+                    service: $('#service').val(),
+                    rounding: $('#rounding').val(),
+                    _method: id ? 'PUT' : 'POST'
                 };
 
                 if (!payload.debtor_id) {
-                    iziToast.warning({ title: 'Required', message: 'Please select a debitur.' });
-                    $('#debtor_id').next('.select2-container').find('.select2-selection').css('border-color', '#fc8181');
+                    iziToast.warning({
+                        title: 'Required',
+                        message: 'Please select a debitur.'
+                    });
+                    $('#debtor_id').next('.select2-container').find('.select2-selection').css(
+                        'border-color', '#fc8181');
                     return;
                 }
 
                 axios.post(url, payload)
-                    .then(function (res) {
-                        iziToast.success({ title: 'Success', message: res.data.message });
+                    .then(function(res) {
+                        iziToast.success({
+                            title: 'Success',
+                            message: res.data.message
+                        });
                         resetForm();
                         tableData.ajax.reload(null, false);
                     })
-                    .catch(function (err) {
+                    .catch(function(err) {
                         var msg = err.response?.data?.message || 'Failed to save. Please try again.';
-                        iziToast.error({ title: 'Error', message: msg });
+                        iziToast.error({
+                            title: 'Error',
+                            message: msg
+                        });
                     });
             });
 
             // ── Delete ────────────────────────────────────────
-            $('#deleteData').on('click', function () {
-                var id   = $('#parameter_id').val();
+            $('#deleteData').on('click', function() {
+                var id = $('#parameter_id').val();
                 var name = $('#selectedName').text();
                 if (!id) return;
 
@@ -745,16 +838,22 @@
                     icon: 'warning',
                     buttons: ['Cancel', 'Delete'],
                     dangerMode: true,
-                }).then(function (ok) {
+                }).then(function(ok) {
                     if (!ok) return;
                     axios.delete('/parameters/' + id)
-                        .then(function (res) {
-                            iziToast.success({ title: 'Deleted', message: res.data.message });
+                        .then(function(res) {
+                            iziToast.success({
+                                title: 'Deleted',
+                                message: res.data.message
+                            });
                             resetForm();
                             tableData.ajax.reload(null, false);
                         })
-                        .catch(function () {
-                            iziToast.error({ title: 'Error', message: 'Failed to delete.' });
+                        .catch(function() {
+                            iziToast.error({
+                                title: 'Error',
+                                message: 'Failed to delete.'
+                            });
                         });
                 });
             });
@@ -784,9 +883,9 @@
                 return null;
             }
 
-            paramInputs.forEach(function (input, index) {
+            paramInputs.forEach(function(input, index) {
                 if (!input) return;
-                input.addEventListener('keydown', function (e) {
+                input.addEventListener('keydown', function(e) {
                     if (e.key !== 'Enter') return;
                     e.preventDefault();
                     var next = getNextFocusable(paramInputs, index);
@@ -795,10 +894,14 @@
                 });
             });
 
-            $('#debtor_id').on('select2:select', function () {
-                var index = paramInputs.findIndex(function (el) { return el && el.id === 'debtor_id'; });
-                var next  = getNextFocusable(paramInputs, index);
-                if (next) setTimeout(function () { next.focus(); }, 100);
+            $('#debtor_id').on('select2:select', function() {
+                var index = paramInputs.findIndex(function(el) {
+                    return el && el.id === 'debtor_id';
+                });
+                var next = getNextFocusable(paramInputs, index);
+                if (next) setTimeout(function() {
+                    next.focus();
+                }, 100);
                 // clear red border
                 $(this).next('.select2-container').find('.select2-selection').css('border-color', '');
             });

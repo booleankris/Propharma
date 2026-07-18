@@ -1682,7 +1682,8 @@
     let loading = false;
     let lastPage = false;
     let search = '';
-
+    let isScanning = false;
+    
     function back() {
         window.location.href = "{{ route('home') }}";
     }
@@ -2289,8 +2290,61 @@
         }
     }
 
+  
+    input.addEventListener('input', function(e) {
+        if (isScanning) return;
+
+        const term = input.value.trim();
+        if (term.length > 0) {
+            openBox();
+        } else {
+            closeBox();
+        }
+    });
+
+    input.addEventListener('keydown', function(e) {
+        if (e.key === "Enter") {
+            e.preventDefault();
+            isScanning = true; 
+            renderFix(input.value);
+        }
+    });
+
+    async function renderFix(term) {
+        const url = `${endpoint}?q=${encodeURIComponent(term)}`;
+
+        try {
+            const res = await fetch(url, {
+                headers: {
+                    Accept: 'application/json'
+                }
+            });
+
+            if (!res.ok) {
+                console.error(`Request failed: ${res.status}`);
+                isScanning = false; 
+                return;
+            }
+
+            const items = await res.json();
+            if (items && items.length > 0) {
+                selectItem(items[0]);
+            } else {
+                isScanning = false; 
+                closeBox();
+            }
+        } catch (err) {
+            console.error('Fetch error:', err);
+            isScanning = false;
+        }
+    }
 
     function selectItem(it) {
+        if (!it) {
+            isScanning = false;
+            return;
+        }
+
         hidden.value = it.id;
         medicine_id = it.id;
         input.value = '';
@@ -2306,47 +2360,42 @@
         }
         console.log("Harga : " + it.net_price + "Parameter : " + parameters + "Pembulatan : " + rounding);
 
-
         let raw;
         console.log(it);
-
-        // GET HET RAW PRICE FOR PARAMETER CHANGE PURPOSES
 
         if (it.het_price !== null && it.het_price !== 0 && it.het_price !== '') {
             raw = Number(it.het_price);
             rawprice = raw;
             het = 1;
-
         } else {
             raw = Number(it.net_price) * Number(parameters || 1);
             rawprice = it.net_price;
             het = 0;
         }
 
-        // let rounded;
-        // if (currenttransaction === 'KREDIT') {
-        //     rounded = Math.round(raw);
-        // } else {
-        //     rounded = Math.floor(raw / 1000) * 1000;
-        // }
         console.log(it.net_price);
         price.value = formatRupiah(raw);
         console.log("harga Total : " + raw);
         price2 = raw;
         item_finalprice = raw;
-        if (currenttransaction == 'RESEP TUNAI' && racikstatus != 0) {
-            dosageRInput.focus();
-            closeBox();
 
-        } else if (currenttransaction == 'KREDIT' && racikstatus != 0) {
-            dosageRInput.focus();
-            closeBox();
-        } else {
-            quantity.focus();
-            closeBox();
+        list.innerHTML = '';
 
-        }
+       
+        setTimeout(() => {
+            closeBox();
+            isScanning = false; 
+
+            if (currenttransaction == 'RESEP TUNAI' && racikstatus != 0) {
+                dosageRInput.focus();
+            } else if (currenttransaction == 'KREDIT' && racikstatus != 0) {
+                dosageRInput.focus();
+            } else {
+                quantity.focus();
+            }
+        }, 50);
     }
+    
     // Search (Debounced)
     const doSearch = debounce(async (term) => {
         if (!term.trim()) {
