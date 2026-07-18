@@ -721,7 +721,7 @@
                         searchable: false,
                         width: '40px'
                     }, {
-                        data: 'debtor_name'
+                        data: 'debtor_name',
                         searchable: true,
                     },
                     {
