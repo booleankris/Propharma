@@ -28,7 +28,7 @@ class UpdateMedicines extends Command
      */
     public function handle()
     {
-        $path = storage_path('app/updatemedicine.xlsx');
+        $path = storage_path('app/update_medicine_19JULI.xlsx');
 
         if (!file_exists($path)) {
             $this->error('File not found: ' . $path);
