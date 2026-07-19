@@ -94,8 +94,8 @@
                 @endphp
 
                 <div class="trx-datetime">
-                    <div class="trx-date">{{ now()->translatedFormat('l, d F Y') }}</div>
-                    <div class="trx-time">{{ now()->format('H.i') }} WITA</div>
+                    <div id="live-date" class="trx-date">Memuat tanggal...</div>
+                    <div id="live-time" class="trx-time">Memuat waktu...</div>
                     <div class="trx-badge mt-2">
                         {{ 'Shift : ' . $shift->name }}
                     </div>
@@ -137,7 +137,7 @@
                         <path
                             d="M19.428 15.428a2 2 0 0 0-1.022-.547l-2.387-.477a6 6 0 0 0-3.86.517l-.318.158a6 6 0 0 1-3.86.517L6.05 15.21a2 2 0 0 0-1.806.547M8 4h8l-1 1v5.172a2 2 0 0 0 .586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 0 0 9 10.172V5L8 4z" />
                     </svg>
-                    <span class="trx-chip-lbl">HV/OTC</span>
+                    <span class="trx-chip-lbl">HV</span>
                 </a>
 
                 {{-- UPDS --}}
@@ -1683,7 +1683,7 @@
     let lastPage = false;
     let search = '';
     let isScanning = false;
-    
+
     function back() {
         window.location.href = "{{ route('home') }}";
     }
@@ -2210,9 +2210,9 @@
         if (liTop < lTop) list.scrollTop = liTop;
         else if (liBottom > lBottom) list.scrollTop = liBottom - list.clientHeight;
     }
+
     // Searchbar / Search Medicine
     function render(items) {
-        console.log(items);
         list.innerHTML = '';
         activeIndex = -1;
 
@@ -2228,114 +2228,65 @@
             li.dataset.id = it.id;
 
             li.innerHTML = `
-            <div class="flex items-start justify-between gap-3 p-1">
-                <div class="flex flex-col gap-1 min-w-0">
-                    <div class="font-semibold text-sm text-gray-800">${escapeHtml(it.name)}</div>
-                    <div class="font-mono text-[11px] text-blue-400 bg-blue-50 px-2 py-0.5 rounded-md w-fit">${escapeHtml(it.code)}</div>
+        <div class="flex items-start justify-between gap-3 p-1">
+            <div class="flex flex-col gap-1 min-w-0">
+                <div class="font-semibold text-sm text-gray-800">${escapeHtml(it.name)}</div>
+                <div class="font-mono text-[11px] text-blue-400 bg-blue-50 px-2 py-0.5 rounded-md w-fit">${escapeHtml(it.code)}</div>
 
-                    <div class="grid grid-cols-2 gap-x-4 gap-y-1 mt-1">
-                        <div>
-                            <div class="text-[10px] uppercase tracking-wide text-gray-400">Etalase</div>
-                            <div class="text-xs text-gray-700">${escapeHtml(it.etalases?.name || '—')}</div>
-                        </div>
-                        <div>
-                            <div class="text-[10px] uppercase tracking-wide text-gray-400">Lokasi</div>
-                            <div class="text-xs text-gray-700">${escapeHtml(it.locations?.name || '—')}</div>
-                        </div>
-                        <div>
-                            <div class="text-[10px] uppercase tracking-wide text-gray-400">Barcode</div>
-                            <div class="text-xs text-gray-700 font-mono">${escapeHtml(it.barcode || '—')}</div>
-                        </div>
-                        <div>
-                            <div class="text-[10px] uppercase tracking-wide text-gray-400">Strip</div>
-                            <div class="text-xs text-gray-700 font-mono">${escapeHtml(it.strip || '—')}</div>
-                        </div>
-                        <div>
-                            <div class="text-[10px] uppercase tracking-wide text-gray-400">Etalase</div>
-                            <div class="text-xs text-gray-700">${escapeHtml(it.etalases?.name || '—')}</div>
-                        </div>
+                <div class="grid grid-cols-2 gap-x-4 gap-y-1 mt-1">
+                    <div>
+                        <div class="text-[10px] uppercase tracking-wide text-gray-400">Etalase</div>
+                        <div class="text-xs text-gray-700">${escapeHtml(it.etalases?.name || '—')}</div>
                     </div>
-
-                    <div class="flex gap-2 flex-wrap mt-1">
-                        <div class="flex items-center gap-1 bg-emerald-50 border border-emerald-200 rounded-md px-2 py-1">
-                            <span class="text-[10px] text-emerald-500 font-medium">Stok</span>
-                            <span class="text-xs font-bold text-emerald-700">${escapeHtml(String(it.storage_stock + it.counter_stock || '—'))}</span>
-                        </div>
-                        <div class="flex items-center gap-1 bg-violet-50 border border-violet-200 rounded-md px-2 py-1">
-                            <span class="text-[10px] text-violet-500 font-medium">Gudang</span>
-                            <span class="text-xs font-bold text-violet-700">${escapeHtml(String(it.storage_stock || '—'))}</span>
-                        </div>
-                        <div class="flex items-center gap-1 bg-amber-50 border border-amber-200 rounded-md px-2 py-1">
-                            <span class="text-[10px] text-amber-500 font-medium">Pelayanan</span>
-                            <span class="text-xs font-bold text-amber-700">${escapeHtml(String(it.counter_stock || '—'))}</span>
-                        </div>
+                    <div>
+                        <div class="text-[10px] uppercase tracking-wide text-gray-400">Lokasi</div>
+                        <div class="text-xs text-gray-700">${escapeHtml(it.locations?.name || '—')}</div>
+                    </div>
+                    <div>
+                        <div class="text-[10px] uppercase tracking-wide text-gray-400">Barcode</div>
+                        <div class="text-xs text-gray-700 font-mono">${escapeHtml(it.barcode || '—')}</div>
+                    </div>
+                    <div>
+                        <div class="text-[10px] uppercase tracking-wide text-gray-400">Strip</div>
+                        <div class="text-xs text-gray-700 font-mono">${escapeHtml(it.strip || '—')}</div>
+                    </div>
+                    <div>
+                        <div class="text-[10px] uppercase tracking-wide text-gray-400">Etalase</div>
+                        <div class="text-xs text-gray-700">${escapeHtml(it.etalases?.name || '—')}</div>
                     </div>
                 </div>
 
-                <div class="flex flex-col items-end flex-shrink-0">
-                    <div class="text-sm font-bold text-gray-800 whitespace-nowrap">${formatRupiah(it.raw_price)}</div>
-                    ${it.het_price && Number(it.het_price)
-                        ? `<div class="text-xs font-semibold text-red-500 bg-red-50 border border-red-200 rounded px-1.5 py-0.5 mt-1 whitespace-nowrap">HET: ${formatRupiah(it.het_price)}</div>`
-                        : ''}
+                <div class="flex gap-2 flex-wrap mt-1">
+                    <div class="flex items-center gap-1 bg-emerald-50 border border-emerald-200 rounded-md px-2 py-1">
+                        <span class="text-[10px] text-emerald-500 font-medium">Stok</span>
+                        <span class="text-xs font-bold text-emerald-700">${escapeHtml(String(it.storage_stock + it.counter_stock || '—'))}</span>
+                    </div>
+                    <div class="flex items-center gap-1 bg-violet-50 border border-violet-200 rounded-md px-2 py-1">
+                        <span class="text-[10px] text-violet-500 font-medium">Gudang</span>
+                        <span class="text-xs font-bold text-violet-700">${escapeHtml(String(it.storage_stock || '—'))}</span>
+                    </div>
+                    <div class="flex items-center gap-1 bg-amber-50 border border-amber-200 rounded-md px-2 py-1">
+                        <span class="text-[10px] text-amber-500 font-medium">Pelayanan</span>
+                        <span class="text-xs font-bold text-amber-700">${escapeHtml(String(it.counter_stock || '—'))}</span>
+                    </div>
                 </div>
             </div>
-        `;
+
+            <div class="flex flex-col items-end flex-shrink-0">
+                <div class="text-sm font-bold text-gray-800 whitespace-nowrap">${formatRupiah(it.raw_price)}</div>
+                ${it.het_price && Number(it.het_price)
+                    ? `<div class="text-xs font-semibold text-red-500 bg-red-50 border border-red-200 rounded px-1.5 py-0.5 mt-1 whitespace-nowrap">HET: ${formatRupiah(it.het_price)}</div>`
+                    : ''}
+            </div>
+        </div>
+    `;
 
             li.addEventListener('mousedown', (e) => {
-                selectItem(it);
                 e.preventDefault();
+                selectItem(it);
             });
 
             list.appendChild(li);
-        }
-    }
-
-  
-    input.addEventListener('input', function(e) {
-        if (isScanning) return;
-
-        const term = input.value.trim();
-        if (term.length > 0) {
-            openBox();
-        } else {
-            closeBox();
-        }
-    });
-
-    input.addEventListener('keydown', function(e) {
-        if (e.key === "Enter") {
-            e.preventDefault();
-            isScanning = true; 
-            renderFix(input.value);
-        }
-    });
-
-    async function renderFix(term) {
-        const url = `${endpoint}?q=${encodeURIComponent(term)}`;
-
-        try {
-            const res = await fetch(url, {
-                headers: {
-                    Accept: 'application/json'
-                }
-            });
-
-            if (!res.ok) {
-                console.error(`Request failed: ${res.status}`);
-                isScanning = false; 
-                return;
-            }
-
-            const items = await res.json();
-            if (items && items.length > 0) {
-                selectItem(items[0]);
-            } else {
-                isScanning = false; 
-                closeBox();
-            }
-        } catch (err) {
-            console.error('Fetch error:', err);
-            isScanning = false;
         }
     }
 
@@ -2344,6 +2295,9 @@
             isScanning = false;
             return;
         }
+
+        isScanning = true;
+        clearTimeout(debounceTimer);
 
         hidden.value = it.id;
         medicine_id = it.id;
@@ -2358,11 +2312,8 @@
         if (currenttransaction == 'KREDIT' || currenttransaction == 'RESEP TUNAI') {
             dosage.value = it.dosage;
         }
-        console.log("Harga : " + it.net_price + "Parameter : " + parameters + "Pembulatan : " + rounding);
 
         let raw;
-        console.log(it);
-
         if (it.het_price !== null && it.het_price !== 0 && it.het_price !== '') {
             raw = Number(it.het_price);
             rawprice = raw;
@@ -2373,18 +2324,16 @@
             het = 0;
         }
 
-        console.log(it.net_price);
         price.value = formatRupiah(raw);
-        console.log("harga Total : " + raw);
         price2 = raw;
         item_finalprice = raw;
 
+        items = [];
         list.innerHTML = '';
+        closeBox();
 
-       
         setTimeout(() => {
-            closeBox();
-            isScanning = false; 
+            isScanning = false;
 
             if (currenttransaction == 'RESEP TUNAI' && racikstatus != 0) {
                 dosageRInput.focus();
@@ -2395,32 +2344,99 @@
             }
         }, 50);
     }
-    
+
+    async function renderFix(term) {
+        const url = `${endpoint}?q=${encodeURIComponent(term)}`;
+
+        try {
+            const res = await fetch(url, {
+                headers: {
+                    Accept: 'application/json'
+                }
+            });
+
+            if (!res.ok) {
+                console.error(`Request failed: ${res.status}`);
+                isScanning = false;
+                return;
+            }
+
+            const results = await res.json();
+            if (results && results.length > 0) {
+                selectItem(results[0]);
+            } else {
+                isScanning = false;
+                closeBox();
+            }
+        } catch (err) {
+            console.error('Fetch error:', err);
+            isScanning = false;
+        }
+    }
+
     // Search (Debounced)
+    let debounceTimer = null;
+
+    function debounce(fn, delay) {
+        return (...args) => {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => fn(...args), delay);
+        };
+    }
+
     const doSearch = debounce(async (term) => {
+        if (isScanning) return;
+
         if (!term.trim()) {
             list.innerHTML = '';
             closeBox();
             return;
         }
+
         const url = `${endpoint}?q=${encodeURIComponent(term)}`;
         const res = await fetch(url, {
             headers: {
-                'Accept': 'application/json'
+                Accept: 'application/json'
             }
         });
         if (!res.ok) return;
+
+        if (isScanning) return;
 
         items = await res.json();
         render(items);
         openBox();
     }, 250);
-    input.addEventListener('input', (e) => doSearch(e.target.value));
 
+    // Single input handler
+    input.addEventListener('input', (e) => {
+        if (isScanning) return;
+
+        const term = e.target.value.trim();
+        if (term.length > 0) {
+            doSearch(e.target.value);
+        } else {
+            clearTimeout(debounceTimer);
+            list.innerHTML = '';
+            closeBox();
+        }
+    });
+
+    // Single keydown handler
     input.addEventListener('keydown', (e) => {
         const max = items.length - 1;
 
-        if (e.key === 'ArrowDown') {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            clearTimeout(debounceTimer);
+
+            if (activeIndex >= 0 && items[activeIndex]) {
+                selectItem(items[activeIndex]);
+            } else {
+                isScanning = true;
+                renderFix(input.value);
+            }
+        } else if (e.key === 'ArrowDown') {
             e.preventDefault();
             if (max < 0) return;
             activeIndex = Math.min(max, activeIndex + 1);
@@ -2432,10 +2448,8 @@
             activeIndex = Math.max(0, activeIndex - 1);
             highlight();
             ensureVisible();
-        } else if (e.key === 'Enter' && activeIndex >= 0 && items[activeIndex]) {
-            e.preventDefault();
-            selectItem(items[activeIndex]);
         } else if (e.key === 'Escape') {
+            clearTimeout(debounceTimer);
             closeBox();
         }
     });
@@ -2890,6 +2904,7 @@
 
     // Perhitungan Harga & Diskon
     function count(val) {
+
         val = Math.floor(Number(val) || 0);
         console.log('harga diskon adalah : ' + discount);
         if (discount == "") {
@@ -2911,7 +2926,6 @@
         grossprice = subtotal;
         console.log("count() => subtotal:", subtotal, "grossprice:", grossprice, "pharmacy_price price :",
             pharmacy_price);
-
 
     }
 
@@ -3179,6 +3193,7 @@
     }
 
     function submit() {
+
         if (isSubmitting) return; // guard against double-fire
         isSubmitting = true;
 
@@ -4604,6 +4619,32 @@
         });
     }
 
+    function updateDateTime() {
+        const sekarang = new Date();
+
+        const opsiTanggal = {
+            weekday: 'long',
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric'
+        };
+
+        const formatTanggal = sekarang.toLocaleDateString('id-ID', opsiTanggal);
+
+        const jam = String(sekarang.getHours()).padStart(2, '0');
+        const menit = String(sekarang.getMinutes()).padStart(2, '0');
+        const formatWaktu = `${jam}.${menit} WITA`;
+
+        document.getElementById('live-date').innerText = formatTanggal;
+        document.getElementById('live-time').innerText = formatWaktu;
+    }
+
+    // Jalankan fungsi pertama kali saat halaman dimuat
+    updateDateTime();
+
+    // Perbarui waktu setiap 1 detik (1000 milidetik) tanpa refresh
+    setInterval(updateDateTime, 1000);
+
     function selectTransaction(row, transactionId) {
 
         /* Highlight selected row */
@@ -4810,7 +4851,12 @@
     quantity.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
             e.preventDefault();
-            submit();
+            if (quantity.value == 0) {
+                alert("Isi Qty Barang!");
+            } else {
+                submit();
+
+            }
         } else if (e.key === 'Tab') {
             e.preventDefault();
             document.getElementById('discount').focus();
