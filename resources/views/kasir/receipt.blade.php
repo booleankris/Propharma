@@ -99,7 +99,7 @@
 <div class="struk">
     <div class="text-center">
         <strong>APOTEK SAHABAT</strong><br>
-        Jl. Palang Merah Ind No.16 A-B-C<br>
+        {{ $pharmacy_address }}<br>
         Telp: 081257586688<br>
         SAMARINDA
     </div>

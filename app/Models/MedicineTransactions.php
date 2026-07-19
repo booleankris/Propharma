@@ -55,4 +55,8 @@ class MedicineTransactions extends Model
     {
         return $this->belongsTo(User::class, 'user_id');
     }
+    public function pharmacy()
+    {
+        return $this->belongsTo(Pharmacies::class, 'pharmacy_id');
+    }
 }
