@@ -828,7 +828,10 @@ class SalesController extends Controller
                 ]);
             }
 
+            $getuserpharmacyid = User::where('id', $validated['user_id'])->first();
+
             $transaction->update([
+                'pharmacy_id'        => $getuserpharmacyid->pharmacy_id,
                 'status'             => 1,
                 'paid'               => $validated['paid'],
                 'transaction_code'   => $this->generateTransactionCode($meta['code']),
