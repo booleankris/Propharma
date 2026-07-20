@@ -2273,7 +2273,7 @@
             </div>
 
             <div class="flex flex-col items-end flex-shrink-0">
-                <div class="text-sm font-bold text-gray-800 whitespace-nowrap">${formatRupiah(it.raw_price)}</div>
+                <div class="text-sm font-bold text-gray-800 whitespace-nowrap">${formatRupiah(it.net_price)}</div>
                 ${it.het_price && Number(it.het_price)
                     ? `<div class="text-xs font-semibold text-red-500 bg-red-50 border border-red-200 rounded px-1.5 py-0.5 mt-1 whitespace-nowrap">HET: ${formatRupiah(it.het_price)}</div>`
                     : ''}
