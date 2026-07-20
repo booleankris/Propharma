@@ -98,7 +98,7 @@
 {{-- ========================= STRUK 1 (CUSTOMER) ========================= --}}
 <div class="struk">
     <div class="text-center">
-        <strong>APOTEK SAHABAT</strong><br>
+        <strong>APOTEK {{ $pharmacy_name }}</strong><br>
         {{ $pharmacy_address }}<br>
         Telp: 081257586688<br>
         SAMARINDA
