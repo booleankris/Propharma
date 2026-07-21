@@ -10,26 +10,9 @@ use Illuminate\Support\Facades\App;
 
 class UpdateMedicines extends Command
 {
-    /**
-     * The name and signature of the console command.
-     * Added --dry-run option for safety!
-     *
-     * @var string
-     */
     protected $signature = 'medicines:updatemedicines {--dry-run : Simulate the import without modifying the database}';
+    protected $description = 'Safely updating Medicines data from Excel';
 
-    /**
-     * The console command description.
-     *
-     * @var string
-     */
-    protected $description = 'Safely updating Medicines data based on ID from Excel';
-
-    /**
-     * Execute the console command.
-     *
-     * @return int
-     */
     public function handle()
     {
         $isDryRun = $this->option('dry-run');
@@ -57,18 +40,17 @@ class UpdateMedicines extends Command
         $updated = 0;
         $skipped = 0;
 
-        // Wrap execution in a DB Transaction for safety
         DB::beginTransaction();
 
         try {
             foreach ($rows as $index => $row) {
                 $rowNumber = $index + 2; // Real Excel row number
 
-                // Index 30 = Column AE (ID) -> Primary key used for lookup
-                $id = isset($row[30]) ? (int) $row[30] : null;
+                // Index 30 = Column AE (ID)
+                $id = isset($row[30]) ? trim((string) $row[30]) : null;
 
-                if (empty($id)) {
-                    $this->warn("Row {$rowNumber}: Missing ID in Excel, skipping.");
+                if (empty($id) || !is_numeric($id)) {
+                    $this->warn("Row {$rowNumber}: Invalid or missing ID [{$id}]");
                     $skipped++;
                     continue;
                 }
@@ -76,21 +58,16 @@ class UpdateMedicines extends Command
                 // Index 27 = Column AB (NEW MEDICINE CODE)
                 $code = isset($row[27]) ? trim((string) $row[27]) : null;
 
-                // Index 28 = Column AC (HNA / raw_price)
+                // Parse Prices
                 $rawPrice = (int) str_replace(',', '', $row[28] ?? 0);
-
-                // Calculate net_price with 11% PPN
-                $netPrice = (int) round($rawPrice * 1.11);
-
-                // Index 29 = Column AD (HET / het_price)
+                $netPrice = (int) round($rawPrice * 1.11); // 11% PPN
                 $hetPrice = (int) str_replace(',', '', $row[29] ?? 0);
 
-                // Index 31 = Column AF (BARCODE)
+                // Barcode parsing with Scientific Notation Protection
                 $barcodeInput = isset($row[31]) ? trim((string) $row[31]) : null;
                 $barcode = null;
 
                 if (!empty($barcodeInput)) {
-                    // Prevent scientific notation like 4.01563E+11
                     if (is_numeric($barcodeInput) && str_contains(strtolower($barcodeInput), 'e')) {
                         $barcode = sprintf('%.0f', (float)$barcodeInput);
                     } else {
@@ -98,28 +75,22 @@ class UpdateMedicines extends Command
                     }
                 }
 
-                // Index 32 = Column AG (Strip / strip)
+                // Index 32 = Column AG (Strip)
                 $strip = (int) str_replace(',', '', $row[32] ?? 1);
 
-                // Build Payload
                 $updateData = [
+                    'code'      => $code,
                     'raw_price' => $rawPrice,
                     'net_price' => $netPrice,
                     'het_price' => $hetPrice,
                     'strip'     => $strip,
                 ];
 
-                // Update code if provided in Column AB
-                if (!is_null($code) && $code !== '') {
-                    $updateData['code'] = $code;
-                }
-
-                // Update barcode if provided in Column AF
                 if (!is_null($barcode)) {
                     $updateData['barcode'] = $barcode;
                 }
 
-                // Find record directly by ID (Column AE)
+                // Check if medicine exists by ID
                 $medicine = Medicines::find($id);
 
                 if ($medicine) {
@@ -128,7 +99,7 @@ class UpdateMedicines extends Command
                     }
                     $updated++;
                 } else {
-                    $this->warn("Row {$rowNumber}: Medicine ID [{$id}] not found in DB");
+                    $this->warn("Row {$rowNumber}: Medicine ID not found [{$id}]");
                     $skipped++;
                 }
             }
