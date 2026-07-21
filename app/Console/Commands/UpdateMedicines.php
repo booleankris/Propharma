@@ -23,7 +23,7 @@ class UpdateMedicines extends Command
      *
      * @var string
      */
-    protected $description = 'Safely updating Medicines data from Excel';
+    protected $description = 'Safely updating Medicines data based on ID from Excel';
 
     /**
      * Execute the console command.
@@ -57,27 +57,35 @@ class UpdateMedicines extends Command
         $updated = 0;
         $skipped = 0;
 
-        // Wrap execution in a DB Transaction
+        // Wrap execution in a DB Transaction for safety
         DB::beginTransaction();
 
         try {
             foreach ($rows as $index => $row) {
                 $rowNumber = $index + 2; // Real Excel row number
 
-                // Index 27 = Column AB (NEW MEDICINE CODE)
-                $code = isset($row[27]) ? trim((string) $row[27]) : null;
+                // Index 30 = Column AE (ID) -> Primary key used for lookup
+                $id = isset($row[30]) ? (int) $row[30] : null;
 
-                if (empty($code)) {
+                if (empty($id)) {
+                    $this->warn("Row {$rowNumber}: Missing ID in Excel, skipping.");
                     $skipped++;
                     continue;
                 }
 
-                // Parse Prices
+                // Index 27 = Column AB (NEW MEDICINE CODE)
+                $code = isset($row[27]) ? trim((string) $row[27]) : null;
+
+                // Index 28 = Column AC (HNA / raw_price)
                 $rawPrice = (int) str_replace(',', '', $row[28] ?? 0);
-                $netPrice = (int) round($rawPrice * 1.11); // 11% PPN
+
+                // Calculate net_price with 11% PPN
+                $netPrice = (int) round($rawPrice * 1.11);
+
+                // Index 29 = Column AD (HET / het_price)
                 $hetPrice = (int) str_replace(',', '', $row[29] ?? 0);
 
-                // Barcode parsing with Scientific Notation Protection
+                // Index 31 = Column AF (BARCODE)
                 $barcodeInput = isset($row[31]) ? trim((string) $row[31]) : null;
                 $barcode = null;
 
@@ -90,24 +98,29 @@ class UpdateMedicines extends Command
                     }
                 }
 
-                // Index 32 = Column AG (Strip)
+                // Index 32 = Column AG (Strip / strip)
                 $strip = (int) str_replace(',', '', $row[32] ?? 1);
 
                 // Build Payload
                 $updateData = [
-                    'code'      => $code,
                     'raw_price' => $rawPrice,
                     'net_price' => $netPrice,
                     'het_price' => $hetPrice,
                     'strip'     => $strip,
                 ];
 
+                // Update code if provided in Column AB
+                if (!is_null($code) && $code !== '') {
+                    $updateData['code'] = $code;
+                }
+
+                // Update barcode if provided in Column AF
                 if (!is_null($barcode)) {
                     $updateData['barcode'] = $barcode;
                 }
 
-                // Check if medicine exists
-                $medicine = Medicines::where('code', $code)->first();
+                // Find record directly by ID (Column AE)
+                $medicine = Medicines::find($id);
 
                 if ($medicine) {
                     if (!$isDryRun) {
@@ -115,7 +128,7 @@ class UpdateMedicines extends Command
                     }
                     $updated++;
                 } else {
-                    $this->warn("Row {$rowNumber}: Medicine Code not found [{$code}]");
+                    $this->warn("Row {$rowNumber}: Medicine ID [{$id}] not found in DB");
                     $skipped++;
                 }
             }
