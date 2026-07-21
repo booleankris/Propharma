@@ -1,14 +1,18 @@
 <?php
 
 namespace App\Console\Commands;
+
 use App\Models\Medicines;
 use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\App;
 
 class UpdateMedicines extends Command
 {
     /**
      * The name and signature of the console command.
+     * Added --dry-run option for safety!
      *
      * @var string
      */
@@ -19,7 +23,7 @@ class UpdateMedicines extends Command
      *
      * @var string
      */
-    protected $description = 'Updating Medicines';
+    protected $description = 'Safely updating Medicines data from Excel';
 
     /**
      * Execute the console command.
@@ -28,52 +32,110 @@ class UpdateMedicines extends Command
      */
     public function handle()
     {
-        $path = storage_path('app/update_medicine_19JULI.xlsx');
+        $isDryRun = $this->option('dry-run');
+
+        if ($isDryRun) {
+            $this->warn("🔍 RUNNING IN DRY-RUN MODE: No database changes will be saved.");
+        } elseif (App::environment('production')) {
+            if (!$this->confirm('⚠️ YOU ARE IN PRODUCTION! Are you sure you want to run this update?')) {
+                $this->info('Operation cancelled.');
+                return 0;
+            }
+        }
+
+        $path = storage_path('app/update_medicine_new.xlsx');
 
         if (!file_exists($path)) {
             $this->error('File not found: ' . $path);
-            return;
+            return 1;
         }
 
+        $this->info('Reading Excel file...');
         $rows = Excel::toArray([], $path)[0];
-        array_shift($rows); // remove header row
+        array_shift($rows); // Remove header row
 
         $updated = 0;
         $skipped = 0;
 
-        foreach ($rows as $row) {
-            $code     = trim((string) $row[0]); // column A — code barang
-            $newRaw   = $row[3];                // column D — HNA BARU
-            $barcode  = $row[4];                // column E — Barcode
+        // Wrap execution in a DB Transaction
+        DB::beginTransaction();
 
-            if (empty($code) || is_null($newRaw)) {
-                $skipped++;
-                continue;
+        try {
+            foreach ($rows as $index => $row) {
+                $rowNumber = $index + 2; // Real Excel row number
+
+                // Index 27 = Column AB (NEW MEDICINE CODE)
+                $code = isset($row[27]) ? trim((string) $row[27]) : null;
+
+                if (empty($code)) {
+                    $skipped++;
+                    continue;
+                }
+
+                // Parse Prices
+                $rawPrice = (int) str_replace(',', '', $row[28] ?? 0);
+                $netPrice = (int) round($rawPrice * 1.11); // 11% PPN
+                $hetPrice = (int) str_replace(',', '', $row[29] ?? 0);
+
+                // Barcode parsing with Scientific Notation Protection
+                $barcodeInput = isset($row[31]) ? trim((string) $row[31]) : null;
+                $barcode = null;
+
+                if (!empty($barcodeInput)) {
+                    // Prevent scientific notation like 4.01563E+11
+                    if (is_numeric($barcodeInput) && str_contains(strtolower($barcodeInput), 'e')) {
+                        $barcode = sprintf('%.0f', (float)$barcodeInput);
+                    } else {
+                        $barcode = $barcodeInput;
+                    }
+                }
+
+                // Index 32 = Column AG (Strip)
+                $strip = (int) str_replace(',', '', $row[32] ?? 1);
+
+                // Build Payload
+                $updateData = [
+                    'code'      => $code,
+                    'raw_price' => $rawPrice,
+                    'net_price' => $netPrice,
+                    'het_price' => $hetPrice,
+                    'strip'     => $strip,
+                ];
+
+                if (!is_null($barcode)) {
+                    $updateData['barcode'] = $barcode;
+                }
+
+                // Check if medicine exists
+                $medicine = Medicines::where('code', $code)->first();
+
+                if ($medicine) {
+                    if (!$isDryRun) {
+                        $medicine->update($updateData);
+                    }
+                    $updated++;
+                } else {
+                    $this->warn("Row {$rowNumber}: Medicine Code not found [{$code}]");
+                    $skipped++;
+                }
             }
 
-            // Remove thousand separators if Excel sends "12,500" as string
-            $newRaw = (int) str_replace(',', '', $newRaw);
-
-            // Calculate net_price with PPN 11%
-            $newNet = (int) round($newRaw * 1.11);
-
-            $barcode = !empty(trim((string) $barcode)) ? trim((string) $barcode) : null;
-
-            $affected = Medicines::where('code', $code)
-                ->update([
-                    'raw_price' => $newRaw,
-                    'net_price' => $newNet,
-                    'barcode'   => $barcode,
-                ]);
-
-            if ($affected) {
-                $updated++;
+            if ($isDryRun) {
+                DB::rollBack();
+                $this->info("Dry-run complete. Everything looks good!");
             } else {
-                $this->warn("Code not found in DB: {$code}");
-                $skipped++;
+                DB::commit();
+                $this->info("Database successfully updated and committed!");
             }
+
+            $this->info("Summary -> Updated: {$updated}, Skipped/Not found: {$skipped}");
+        } catch (\Exception $e) {
+            DB::rollBack();
+            $this->error("CRITICAL ERROR on processing! All database changes have been rolled back.");
+            $this->error($e->getMessage());
+            return 1;
         }
 
-        $this->info("Done! Updated: {$updated}, Skipped/Not found: {$skipped}");
+        return 0;
     }
 }
