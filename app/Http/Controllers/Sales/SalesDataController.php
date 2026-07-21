@@ -32,7 +32,7 @@ class SalesDataController extends Controller
                 ->selectRaw('
                 transaction_id,
                 MAX(medicine_transactions.transaction_code) as transaction_code,
-                MAX(medicine_cart.updated_at) as updated_at,
+                MAX(medicine_transactions.updated_at) as updated_at,
                 SUM(medicine_cart.discount) as totaldiscount,
                 MAX(medicine_cart.status) as status,
                 SUM(final_price) as final_price,
@@ -46,7 +46,7 @@ class SalesDataController extends Controller
             if ($search) {
                 $query->where(function ($q) use ($search) {
                     if (preg_match('/^\d{4}$/', $search)) {
-                        $q->whereYear('medicine_cart.updated_at', $search);
+                        $q->whereYear('medicine_transactions.updated_at', $search);
                     } else {
                         $q->whereHas('transactions', function ($t) use ($search) {
                             $t->where('transaction_code', 'like', "%{$search}%");
@@ -70,14 +70,14 @@ class SalesDataController extends Controller
 
             if ($dateFrom) {
                 try {
-                    $query->whereDate('medicine_cart.updated_at', '>=', Carbon::createFromFormat('d/m/Y', $dateFrom)->format('Y-m-d'));
+                    $query->whereDate('medicine_transactions.updated_at', '>=', Carbon::createFromFormat('d/m/Y', $dateFrom)->format('Y-m-d'));
                 } catch (\Exception $e) {
                 }
             }
 
             if ($dateTo) {
                 try {
-                    $query->whereDate('medicine_cart.updated_at', '<=', Carbon::createFromFormat('d/m/Y', $dateTo)->format('Y-m-d'));
+                    $query->whereDate('medicine_transactions.updated_at', '<=', Carbon::createFromFormat('d/m/Y', $dateTo)->format('Y-m-d'));
                 } catch (\Exception $e) {
                 }
             }
