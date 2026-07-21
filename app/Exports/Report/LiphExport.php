@@ -62,91 +62,68 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
     private function buildReportData(): array
     {
         if ($this->shiftType == "shift") {
-            $transactions = MedicineTransactions::with(['transactions','shift_logs'])
+            $transactions = MedicineTransactions::with(['transactions', 'shift_logs'])
                 ->where('pharmacy_id', $this->pharmacyId)
                 ->where('status', 1)
-                ->whereDate('created_at', '>=', $this->startDate->toDateString())
-                ->whereDate('created_at', '<=', $this->endDate->toDateString())
+                ->whereDate('updated_at', '>=', $this->startDate->toDateString())
+                ->whereDate('updated_at', '<=', $this->endDate->toDateString())
                 ->whereIn('transaction_type', array_keys(self::TYPE_MAP))
-                ->wherehas('shift_logs', function($shift){
+                ->whereHas('shift_logs', function ($shift) {
                     $shift->where('shift_id', $this->shift);
                 })
                 ->get();
 
-            $grouped = [];
-
-            foreach ($transactions as $trx) {
-                $map = self::TYPE_MAP[$trx->transaction_type] ?? null;
-                if (!$map) continue;
-
-                [$group, $label] = $map;
-
-                if (!isset($grouped[$group][$label])) {
-                    $grouped[$group][$label] = [
-                        'lembar' => 0,
-                        'r' => 0,
-                        'jasa' => 0,
-                        'embalase' => 0,
-                        'potongan' => 0,
-                        'netto' => 0,
-                    ];
-                }
-
-                $ref = &$grouped[$group][$label];
-
-                $ref['lembar']++;
-                $ref['r'] += $trx->transactions->count();
-                $ref['jasa'] += $this->safeSum($trx->transactions, 'service_fee');
-                $ref['embalase'] += $this->safeSum($trx->transactions, 'embalase');
-                $ref['potongan'] += (int) ($trx->discount ?? 0) + $this->safeSum($trx->transactions, 'discount');
-
-                $netto = (int) ($trx->subtotal ?? 0);
-                if ($label === 'Retur Tunai') $netto = -abs($netto);
-
-                $ref['netto'] += $netto;
-            }
+            $grouped = $this->groupTransactions($transactions);
         } else if ($this->shiftType == 'semua') {
             $transactions = MedicineTransactions::with('transactions')
                 ->where('pharmacy_id', $this->pharmacyId)
                 ->where('status', 1)
-                ->whereDate('created_at', '>=', $this->startDate->toDateString())
-                ->whereDate('created_at', '<=', $this->endDate->toDateString())
+                ->whereDate('updated_at', '>=', $this->startDate->toDateString())
+                ->whereDate('updated_at', '<=', $this->endDate->toDateString())
                 ->whereIn('transaction_type', array_keys(self::TYPE_MAP))
                 ->get();
 
-            $grouped = [];
-
-            foreach ($transactions as $trx) {
-                $map = self::TYPE_MAP[$trx->transaction_type] ?? null;
-                if (!$map) continue;
-
-                [$group, $label] = $map;
-
-                if (!isset($grouped[$group][$label])) {
-                    $grouped[$group][$label] = [
-                        'lembar' => 0,
-                        'r' => 0,
-                        'jasa' => 0,
-                        'embalase' => 0,
-                        'potongan' => 0,
-                        'netto' => 0,
-                    ];
-                }
-
-                $ref = &$grouped[$group][$label];
-
-                $ref['lembar']++;
-                $ref['r'] += $trx->transactions->count();
-                $ref['jasa'] += $this->safeSum($trx->transactions, 'service_fee');
-                $ref['embalase'] += $this->safeSum($trx->transactions, 'embalase');
-                $ref['potongan'] += (int) ($trx->discount ?? 0) + $this->safeSum($trx->transactions, 'discount');
-
-                $netto = (int) ($trx->subtotal ?? 0);
-                if ($label === 'Retur Tunai') $netto = -abs($netto);
-
-                $ref['netto'] += $netto;
-            }
+            $grouped = $this->groupTransactions($transactions);
         }
+
+        return $grouped;
+    }
+
+    private function groupTransactions($transactions): array
+    {
+        $grouped = [];
+
+        foreach ($transactions as $trx) {
+            $map = self::TYPE_MAP[$trx->transaction_type] ?? null;
+            if (!$map) continue;
+
+            [$group, $label] = $map;
+
+            if (!isset($grouped[$group][$label])) {
+                $grouped[$group][$label] = [
+                    'lembar' => 0,
+                    'r' => 0,
+                    'jasa' => 0,
+                    'embalase' => 0,
+                    'potongan' => 0,
+                    'netto' => 0,
+                ];
+            }
+
+            $ref = &$grouped[$group][$label];
+
+            $ref['lembar']++;
+            $ref['r'] += $trx->transactions->count();
+            $ref['jasa'] += $this->safeSum($trx->transactions, 'service_fee');
+            $ref['embalase'] += $this->safeSum($trx->transactions, 'embalase');
+            $ref['potongan'] += (int) ($trx->discount ?? 0) + $this->safeSum($trx->transactions, 'discount');
+
+            $netto = (int) ($trx->subtotal ?? 0);
+            if ($label === 'Retur Tunai') $netto = -abs($netto);
+
+            $ref['netto'] += $netto;
+        }
+
         return $grouped;
     }
 
