@@ -39,69 +39,82 @@ class UpdateMedicines extends Command
 
         $updated = 0;
         $skipped = 0;
+        $records = []; // id => updateData, collected first so we can do a two-phase code update
+
+        foreach ($rows as $index => $row) {
+            $rowNumber = $index + 2;
+
+            $id = isset($row[30]) ? trim((string) $row[30]) : null;
+
+            if (empty($id) || !is_numeric($id)) {
+                $this->warn("Row {$rowNumber}: Invalid or missing ID [{$id}]");
+                $skipped++;
+                continue;
+            }
+
+            $code = isset($row[27]) ? trim((string) $row[27]) : null;
+
+            $rawPrice = (int) str_replace(',', '', $row[28] ?? 0);
+            $netPrice = (int) round($rawPrice * 1.11); // 11% PPN
+            $hetPrice = (int) str_replace(',', '', $row[29] ?? 0);
+
+            $barcodeInput = isset($row[31]) ? trim((string) $row[31]) : null;
+            $barcode = null;
+
+            if (!empty($barcodeInput)) {
+                if (is_numeric($barcodeInput) && str_contains(strtolower($barcodeInput), 'e')) {
+                    $barcode = sprintf('%.0f', (float)$barcodeInput);
+                } else {
+                    $barcode = $barcodeInput;
+                }
+            }
+
+            $strip = (int) str_replace(',', '', $row[32] ?? 1);
+
+            $updateData = [
+                'code'      => $code,
+                'raw_price' => $rawPrice,
+                'net_price' => $netPrice,
+                'het_price' => $hetPrice,
+                'strip'     => $strip,
+            ];
+
+            if (!is_null($barcode)) {
+                $updateData['barcode'] = $barcode;
+            }
+
+            $records[$id] = ['row' => $rowNumber, 'data' => $updateData];
+        }
+
+        // Only touch DB for IDs that actually exist
+        $ids = array_keys($records);
+        $existingIds = Medicines::whereIn('id', $ids)->pluck('id')->all();
+
+        foreach ($ids as $id) {
+            if (!in_array($id, $existingIds)) {
+                $this->warn("Row {$records[$id]['row']}: Medicine ID not found [{$id}]");
+                $skipped++;
+                unset($records[$id]);
+            }
+        }
 
         DB::beginTransaction();
 
         try {
-            foreach ($rows as $index => $row) {
-                $rowNumber = $index + 2; // Real Excel row number
-
-                // Index 30 = Column AE (ID)
-                $id = isset($row[30]) ? trim((string) $row[30]) : null;
-
-                if (empty($id) || !is_numeric($id)) {
-                    $this->warn("Row {$rowNumber}: Invalid or missing ID [{$id}]");
-                    $skipped++;
-                    continue;
+            // PHASE 1: set every code to a temp unique placeholder to avoid
+            // unique constraint collisions when codes are being swapped/reassigned
+            foreach ($records as $id => $info) {
+                if (!$isDryRun) {
+                    Medicines::where('id', $id)->update(['code' => 'TMP-' . $id]);
                 }
+            }
 
-                // Index 27 = Column AB (NEW MEDICINE CODE)
-                $code = isset($row[27]) ? trim((string) $row[27]) : null;
-
-                // Parse Prices
-                $rawPrice = (int) str_replace(',', '', $row[28] ?? 0);
-                $netPrice = (int) round($rawPrice * 1.11); // 11% PPN
-                $hetPrice = (int) str_replace(',', '', $row[29] ?? 0);
-
-                // Barcode parsing with Scientific Notation Protection
-                $barcodeInput = isset($row[31]) ? trim((string) $row[31]) : null;
-                $barcode = null;
-
-                if (!empty($barcodeInput)) {
-                    if (is_numeric($barcodeInput) && str_contains(strtolower($barcodeInput), 'e')) {
-                        $barcode = sprintf('%.0f', (float)$barcodeInput);
-                    } else {
-                        $barcode = $barcodeInput;
-                    }
+            // PHASE 2: apply the real final data (including the true code)
+            foreach ($records as $id => $info) {
+                if (!$isDryRun) {
+                    Medicines::where('id', $id)->update($info['data']);
                 }
-
-                // Index 32 = Column AG (Strip)
-                $strip = (int) str_replace(',', '', $row[32] ?? 1);
-
-                $updateData = [
-                    'code'      => $code,
-                    'raw_price' => $rawPrice,
-                    'net_price' => $netPrice,
-                    'het_price' => $hetPrice,
-                    'strip'     => $strip,
-                ];
-
-                if (!is_null($barcode)) {
-                    $updateData['barcode'] = $barcode;
-                }
-
-                // Check if medicine exists by ID
-                $medicine = Medicines::find($id);
-
-                if ($medicine) {
-                    if (!$isDryRun) {
-                        $medicine->update($updateData);
-                    }
-                    $updated++;
-                } else {
-                    $this->warn("Row {$rowNumber}: Medicine ID not found [{$id}]");
-                    $skipped++;
-                }
+                $updated++;
             }
 
             if ($isDryRun) {
