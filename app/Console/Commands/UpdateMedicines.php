@@ -16,7 +16,7 @@ class UpdateMedicines extends Command
      *
      * @var string
      */
-    protected $signature = 'medicines:updatemedicines';
+    protected $signature = 'medicines:updatemedicines {--dry-run : Simulate the import without modifying the database}';
 
     /**
      * The console command description.
