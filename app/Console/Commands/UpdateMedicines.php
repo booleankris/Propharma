@@ -43,7 +43,7 @@ class UpdateMedicines extends Command
             }
         }
 
-        $path = storage_path('app/update_medicine_new.xlsx');
+        $path = storage_path('app/update_medicine_small.xlsx');
 
         if (!file_exists($path)) {
             $this->error('File not found: ' . $path);
