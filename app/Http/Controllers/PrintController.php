@@ -25,6 +25,7 @@ class PrintController extends Controller
         $totalPrice      = $items->sum('total_price');
         $discount        = $items->sum('discount');
         $operator        = $transaction->user->name;
+        $pharmacy_name = $transaction->pharmacy->name;
         $pharmacy_address = $transaction->pharmacy->address;
         $subtotaldiscount = $transaction->discount ?? 0;
         $totaldiscount   = ceil(($discount + $subtotaldiscount) / 1000) * 1000;
@@ -39,6 +40,7 @@ class PrintController extends Controller
             'totalPrice',
             'totaldiscount',
             'operator',
+            'pharmacy_name',
             'pharmacy_address'
         ));
     }
