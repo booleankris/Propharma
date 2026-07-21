@@ -53,9 +53,7 @@ class UpdateMedicines extends Command
         $this->info('Reading Excel file...');
         $rows = Excel::toArray([], $path)[0];
         array_shift($rows); // Remove header row
-        if ($isDryRun) {
-            dump($rows[0]); // show the first data row's raw contents, indexed
-        }
+
         $updated = 0;
         $skipped = 0;
 
