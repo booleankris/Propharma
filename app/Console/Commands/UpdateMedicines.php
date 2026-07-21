@@ -111,6 +111,7 @@ class UpdateMedicines extends Command
 
                 if ($medicine) {
                     if (!$isDryRun) {
+                        dump($rows[0]);
                         $medicine->update($updateData);
                     }
                     $updated++;
