@@ -278,10 +278,10 @@
                         <div class="flex items-center justify-between">
                             <div class="flex items-center gap-3">
                                 <div class="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center">
-                                    
-                                    <svg class="w-5 h-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" width="24" height="24"
-                                        viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                                        stroke-linecap="round" stroke-linejoin="round"
+
+                                    <svg class="w-5 h-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" width="24"
+                                        height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
                                         class="icon icon-tabler icons-tabler-outline icon-tabler-cash-register">
                                         <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                                         <path
@@ -407,12 +407,15 @@
         $(function() {
 
             // ── Flatpickr instances ───────────────────────────────────────────
+            const today = flatpickr.formatDate(new Date(), 'd/m/Y');
+
             const fpRange = flatpickr('#date-range', {
                 mode: 'range',
                 dateFormat: 'd/m/Y',
                 locale: {
                     firstDayOfWeek: 1
                 },
+                defaultDate: [today, today], 
                 onClose: function(selectedDates) {
                     if (selectedDates.length === 1 || selectedDates.length === 2) {
                         tableData.ajax.reload();
