@@ -65,8 +65,8 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
             $transactions = MedicineTransactions::with(['transactions','shift_logs'])
                 ->where('pharmacy_id', $this->pharmacyId)
                 ->where('status', 1)
-                ->whereDate('created_at', '>=', $this->startDate->toDateString())
-                ->whereDate('created_at', '<=', $this->endDate->toDateString())
+                ->whereDate('updated_at', '>=', $this->startDate->toDateString())
+                ->whereDate('updated_at', '<=', $this->endDate->toDateString())
                 ->whereIn('transaction_type', array_keys(self::TYPE_MAP))
                 ->wherehas('shift_logs', function($shift){
                     $shift->where('shift_id', $this->shift);
