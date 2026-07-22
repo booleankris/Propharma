@@ -587,12 +587,12 @@ class SalesController extends Controller
             $recipeNumber = null;
             $recipeStatus = null;
         }
-
+        $service = 0;
         // Service Filter / Validation, Only UM that can have jasa, 22 JULI 2026
         if($request->get('cart_type') != "UM"){
             $service = 0;
         }else{
-            $request->get('service');
+            $service = $request->get('service');
         }
       
 
