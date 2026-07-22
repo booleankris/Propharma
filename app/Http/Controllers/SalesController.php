@@ -409,7 +409,7 @@ class SalesController extends Controller
 
         $year   = now()->format('y');
         $month  = now()->format('m');
-        $prefix = $year . $month . strtoupper($code);
+        $prefix = $year . $month . strtoupper($code) + $pharmacyId;
 
         $last = MedicineTransactions::where('transaction_code', 'like', $prefix . '%')
             ->where('status', 1)
@@ -588,6 +588,14 @@ class SalesController extends Controller
             $recipeStatus = null;
         }
 
+        // Service Filter / Validation, Only UM that can have jasa, 22 JULI 2026
+        if($request->get('cart_type') != "UM"){
+            $service = 0;
+        }else{
+            $request->get('service');
+        }
+      
+
         $transaction = MedicineCart::create([
             'user_id'        => Auth()->user()->id,
             'medicine_id'    => $request->get('medicine_id'),
@@ -606,10 +614,7 @@ class SalesController extends Controller
             'recipe_status'  => $recipeStatus,
             'recipe_number'  => $recipeNumber,
             'medicine_type'  => $request->get('medicine_type'),
-            'service_fee'    => $request->get('service'),
-
-
-
+            'service_fee'    => $service,
         ]);
         $itemInCart = MedicineCart::with('medicine')->where('transaction_id', $transaction->transaction_id)->where('user_id', Auth()->user()->id)->first();
 
