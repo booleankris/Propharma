@@ -33,6 +33,15 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
 
     const TUNAI_ORDER = ['Obat Bebas', 'Retur Tunai', 'Resep Tunai', 'UPDS'];
 
+    // medicine_cart.cart_type stores abbreviations, not the full
+    // transaction_type strings used as TYPE_MAP keys.
+    const CART_TYPE_ABBR = [
+        'UK' => 'KREDIT',
+        'UM' => 'RESEP TUNAI',
+        'HV' => 'HV/OTC',
+        'UP' => 'UPDS',
+    ];
+
     private function nz($value)
     {
         return is_null($value) || $value === '' ? 0 : $value;
@@ -57,6 +66,19 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
     private function safeSum($collection, $field)
     {
         return $collection->sum(fn($item) => (int) ($item->{$field} ?? 0));
+    }
+
+    private function emptyBucket(): array
+    {
+        return [
+            'lembar'             => 0,
+            'r'                  => 0,
+            'jasa'               => 0,
+            'embalase'           => 0,
+            'potongan'           => 0, // item-level discount only
+            'potongan_transaksi' => 0, // transaction-level discount
+            'netto'              => 0,
+        ];
     }
 
     private function buildReportData(): array
@@ -89,39 +111,100 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         return $grouped;
     }
 
+    /**
+     * Groups a transaction's cart items by their EFFECTIVE type
+     * (cart_type if the user switched it, otherwise the transaction's
+     * own transaction_type), and allocates Lembar/R/ proportionally
+     * across whichever effective types are present.
+     *
+     * Potongan (item discount) is summed strictly per effective type.
+     * Potongan Transaksi (transaction-level discount) follows the
+     * transaction's ORIGINAL type if any item still carries that type;
+     * if the original type has zero items left (fully switched), it's
+     * placed on the single absorbing type instead.
+     */
     private function groupTransactions($transactions): array
     {
         $grouped = [];
 
         foreach ($transactions as $trx) {
-            $map = self::TYPE_MAP[$trx->transaction_type] ?? null;
-            if (!$map) continue;
+            $originalMap = self::TYPE_MAP[$trx->transaction_type] ?? null;
+            if (!$originalMap) continue;
 
-            [$group, $label] = $map;
+            [, $originalLabel] = $originalMap;
 
-            if (!isset($grouped[$group][$label])) {
-                $grouped[$group][$label] = [
-                    'lembar' => 0,
-                    'r' => 0,
-                    'jasa' => 0,
-                    'embalase' => 0,
-                    'potongan' => 0,
-                    'netto' => 0,
-                ];
+            $items = $trx->transactions;
+            $totalItems = $items->count();
+
+            if ($totalItems === 0) {
+                // No cart items at all — count the Lembar under the
+                // original type only, nothing to split.
+                [$group, $label] = $originalMap;
+
+                if (!isset($grouped[$group][$label])) {
+                    $grouped[$group][$label] = $this->emptyBucket();
+                }
+
+                $grouped[$group][$label]['lembar'] += 1;
+                $grouped[$group][$label]['potongan_transaksi'] += (int) ($trx->discount ?? 0);
+                continue;
             }
 
-            $ref = &$grouped[$group][$label];
+            // Bucket cart items by effective type label
+            $byLabel = [];
+            foreach ($items as $item) {
+                if ($item->cart_type) {
+                    $effectiveType = self::CART_TYPE_ABBR[$item->cart_type] ?? $item->cart_type;
+                } else {
+                    $effectiveType = $trx->transaction_type;
+                }
 
-            $ref['lembar']++;
-            $ref['r'] += $trx->transactions->count();
-            $ref['jasa'] += $this->safeSum($trx->transactions, 'service_fee');
-            $ref['embalase'] += $this->safeSum($trx->transactions, 'embalase');
-            $ref['potongan'] += (int) ($trx->discount ?? 0) + $this->safeSum($trx->transactions, 'discount');
+                $map = self::TYPE_MAP[$effectiveType] ?? $originalMap;
+                [$grp, $lbl] = $map;
 
-            $netto = (int) ($trx->subtotal ?? 0);
-            if ($label === 'Retur Tunai') $netto = -abs($netto);
+                $byLabel[$lbl]['group'] = $grp;
+                $byLabel[$lbl]['items'][] = $item;
+            }
 
-            $ref['netto'] += $netto;
+            // Decide where Potongan Transaksi goes
+            if (isset($byLabel[$originalLabel])) {
+                $potonganTransaksiTarget = $originalLabel;
+            } elseif (count($byLabel) === 1) {
+                $potonganTransaksiTarget = array_key_first($byLabel);
+            } else {
+                // Edge case: fully switched AND split across more than
+                // one non-original type. No single natural home — fall
+                // back to the original type so the amount isn't lost.
+                $potonganTransaksiTarget = $originalLabel;
+            }
+
+            foreach ($byLabel as $label => $bucket) {
+                $group = $bucket['group'];
+                $groupItems = collect($bucket['items']);
+                $count = $groupItems->count();
+
+                if (!isset($grouped[$group][$label])) {
+                    $grouped[$group][$label] = $this->emptyBucket();
+                }
+
+                $ref = &$grouped[$group][$label];
+
+                $ref['r']        += $count;
+                $ref['jasa']     += $this->safeSum($groupItems, 'service_fee');
+                $ref['embalase'] += $this->safeSum($groupItems, 'embalase');
+                $ref['potongan'] += $this->safeSum($groupItems, 'discount');
+
+                $itemNetto = $this->safeSum($groupItems, 'final_price');
+                if ($label === 'Retur Tunai') $itemNetto = -abs($itemNetto);
+                $ref['netto'] += $itemNetto;
+
+                if ($label === $potonganTransaksiTarget) {
+                    $ref['lembar'] += 1;
+                    $ref['potongan_transaksi'] += (int) ($trx->discount ?? 0);
+                }
+
+                unset($ref);
+            }
         }
 
         return $grouped;
@@ -132,7 +215,7 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         $rows = [];
         $no   = 1;
 
-        $grand = ['lembar' => 0, 'r' => 0, 'jasa' => 0, 'embalase' => 0, 'potongan' => 0, 'netto' => 0];
+        $grand = $this->emptyBucket();
 
         // HEADER
         $rows[] = [$this->pharmacyName];
@@ -143,24 +226,26 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         $rows[] = [];
 
         // TABLE HEADER
-        $rows[] = ['No.', 'Pelanggan', 'Lembar', 'R/', 'Jasa', 'Embalase', 'Potongan', 'Netto'];
+        $rows[] = ['No.', 'Pelanggan', 'Lembar', 'R/', 'Jasa', 'Embalase', 'Potongan', 'Potongan Transaksi', 'Netto', 'Netto Akhir'];
 
         // KREDIT
-        $rows[] = ['Penjualan Kredit', '', '', '', '', '', '', ''];
+        $rows[] = ['Penjualan Kredit', '', '', '', '', '', '', '', '', ''];
 
         $kredit = $grouped['kredit'] ?? [];
-        $sub = ['lembar' => 0, 'r' => 0, 'jasa' => 0, 'embalase' => 0, 'potongan' => 0, 'netto' => 0];
+        $sub = $this->emptyBucket();
 
         foreach ($kredit as $label => $d) {
             $rows[] = [
                 $no++,
                 $label,
-                $this->nz($d['lembar']),
+                $this->nz(round($d['lembar'], 2)),
                 $this->nz($d['r']),
                 $this->nz($d['jasa']),
                 $this->nz($d['embalase']),
                 $this->nz($d['potongan']),
-                $this->nz($d['netto'])
+                $this->nz($d['potongan_transaksi']),
+                $this->nz($d['netto']),
+                $this->nz($d['netto'] - $d['potongan_transaksi'])
             ];
 
             foreach ($sub as $k => $v) $sub[$k] += $d[$k];
@@ -169,25 +254,27 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         $rows[] = [
             '',
             'Sub Total',
-            $this->nz($sub['lembar']),
+            $this->nz(round($sub['lembar'], 2)),
             $this->nz($sub['r']),
             $this->nz($sub['jasa']),
             $this->nz($sub['embalase']),
             $this->nz($sub['potongan']),
-            $this->nz($sub['netto'])
+            $this->nz($sub['potongan_transaksi']),
+            $this->nz($sub['netto']),
+            $this->nz($sub['netto'] - $sub['potongan_transaksi'])
         ];
 
         foreach ($grand as $k => $v) $grand[$k] += $sub[$k];
 
         // TUNAI
-        $rows[] = ['Penjualan Tunai', '', '', '', '', '', '', ''];
+        $rows[] = ['Penjualan Tunai', '', '', '', '', '', '', '', '', ''];
 
         $tunai = $grouped['tunai'] ?? [];
-        $sub = ['lembar' => 0, 'r' => 0, 'jasa' => 0, 'embalase' => 0, 'potongan' => 0, 'netto' => 0];
+        $sub = $this->emptyBucket();
 
         foreach (self::TUNAI_ORDER as $label) {
 
-            $d = $tunai[$label] ?? ['lembar' => 0, 'r' => 0, 'jasa' => 0, 'embalase' => 0, 'potongan' => 0, 'netto' => 0];
+            $d = $tunai[$label] ?? $this->emptyBucket();
 
             if ($label === 'Retur Tunai') {
                 [$d['lembar'], $d['r']] = [$d['r'], $d['lembar']];
@@ -196,12 +283,14 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
             $rows[] = [
                 $no++,
                 $label,
-                $this->nz($d['lembar']),
+                $this->nz(round($d['lembar'], 2)),
                 $this->nz($d['r']),
                 $this->nz($d['jasa']),
                 $this->nz($d['embalase']),
                 $this->nz($d['potongan']),
-                $this->nz($d['netto'])
+                $this->nz($d['potongan_transaksi']),
+                $this->nz($d['netto']),
+                $this->nz($d['netto'] - $d['potongan_transaksi'])
             ];
 
             foreach ($sub as $k => $v) $sub[$k] += $d[$k];
@@ -210,12 +299,14 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         $rows[] = [
             '',
             'Sub Total',
-            $this->nz($sub['lembar']),
+            $this->nz(round($sub['lembar'], 2)),
             $this->nz($sub['r']),
             $this->nz($sub['jasa']),
             $this->nz($sub['embalase']),
             $this->nz($sub['potongan']),
-            $this->nz($sub['netto'])
+            $this->nz($sub['potongan_transaksi']),
+            $this->nz($sub['netto']),
+            $this->nz($sub['netto'] - $sub['potongan_transaksi'])
         ];
 
         foreach ($grand as $k => $v) $grand[$k] += $sub[$k];
@@ -224,12 +315,14 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         $rows[] = [
             '',
             'Grand Total',
-            $this->nz($grand['lembar']),
+            $this->nz(round($grand['lembar'], 2)),
             $this->nz($grand['r']),
             $this->nz($grand['jasa']),
             $this->nz($grand['embalase']),
             $this->nz($grand['potongan']),
-            $this->nz($grand['netto'])
+            $this->nz($grand['potongan_transaksi']),
+            $this->nz($grand['netto']),
+            $this->nz($grand['netto'] - $grand['potongan_transaksi'])
         ];
 
         return $rows;
@@ -242,11 +335,12 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         $numFmt = '#,##0';
 
         $lastRow = $sheet->getHighestRow();
+        $lastCol = 'J'; // was H — now 10 columns (added Potongan Transaksi, Netto Akhir)
 
         /*
     | FONT (PDF style)
     */
-        $sheet->getStyle("A1:H{$lastRow}")
+        $sheet->getStyle("A1:{$lastCol}{$lastRow}")
             ->getFont()
             ->setName('Arial')
             ->setSize(10);
@@ -261,23 +355,23 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         /*
     | MERGE HEADER TEXT
     */
-        $sheet->mergeCells('A1:H1');
-        $sheet->mergeCells('A2:H2');
-        $sheet->mergeCells('A3:H3');
-        $sheet->mergeCells('A4:H4');
+        $sheet->mergeCells("A1:{$lastCol}1");
+        $sheet->mergeCells("A2:{$lastCol}2");
+        $sheet->mergeCells("A3:{$lastCol}3");
+        $sheet->mergeCells("A4:{$lastCol}4");
 
         $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
 
-        $sheet->getStyle('A1:H4')
+        $sheet->getStyle("A1:{$lastCol}4")
             ->getAlignment()
-            ->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER);
-        $sheet->getStyle('A1:H4')
+            ->setVertical(Alignment::VERTICAL_CENTER);
+        $sheet->getStyle("A1:{$lastCol}4")
             ->getAlignment()
-            ->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_LEFT);
+            ->setHorizontal(Alignment::HORIZONTAL_LEFT);
         /*
     | TABLE HEADER (ROW 5 — IMPORTANT)
     */
-        $sheet->getStyle('A5:H5')->applyFromArray([
+        $sheet->getStyle("A5:{$lastCol}5")->applyFromArray([
             'font' => ['bold' => true],
             'alignment' => [
                 'horizontal' => Alignment::HORIZONTAL_CENTER,
@@ -300,7 +394,7 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         | SECTION TITLE (NO BORDER)
         */
             if (in_array($A, ['Penjualan Kredit', 'Penjualan Tunai'])) {
-                $sheet->mergeCells("A{$row}:H{$row}");
+                $sheet->mergeCells("A{$row}:{$lastCol}{$row}");
 
                 $sheet->getStyle("A{$row}")->applyFromArray([
                     'font' => ['bold' => true],
@@ -316,7 +410,7 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
             /*
         | NORMAL ROW (THIN GRID)
         */
-            $sheet->getStyle("A{$row}:H{$row}")->applyFromArray([
+            $sheet->getStyle("A{$row}:{$lastCol}{$row}")->applyFromArray([
                 'borders' => [
                     'allBorders' => $thin,
                 ],
@@ -328,9 +422,9 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
             $sheet->getStyle("A{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
             $sheet->getStyle("B{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
             $sheet->getStyle("C{$row}:D{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle("E{$row}:H{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+            $sheet->getStyle("E{$row}:{$lastCol}{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
 
-            $sheet->getStyle("A{$row}:H{$row}")
+            $sheet->getStyle("A{$row}:{$lastCol}{$row}")
                 ->getAlignment()
                 ->setVertical(Alignment::VERTICAL_CENTER);
 
@@ -351,7 +445,7 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                     ->setHorizontal(Alignment::HORIZONTAL_CENTER);
             }
 
-            for ($col = 3; $col <= 8; $col++) {
+            for ($col = 3; $col <= 10; $col++) {
                 $cell = $sheet->getCellByColumnAndRow($col, $row);
 
                 if ($cell->getValue() === null || $cell->getValue() === '') {
@@ -365,7 +459,7 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         | SUB TOTAL (MEDIUM BORDER)
         */
             if ($B === 'Sub Total') {
-                $sheet->getStyle("A{$row}:H{$row}")->applyFromArray([
+                $sheet->getStyle("A{$row}:{$lastCol}{$row}")->applyFromArray([
                     'font' => ['bold' => true],
                     'borders' => [
                         'outline' => $medium,
@@ -378,7 +472,7 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         | GRAND TOTAL (STRONGEST)
         */
             if ($B === 'Grand Total') {
-                $sheet->getStyle("A{$row}:H{$row}")->applyFromArray([
+                $sheet->getStyle("A{$row}:{$lastCol}{$row}")->applyFromArray([
                     'font' => ['bold' => true],
                     'borders' => [
                         'outline' => $medium,
@@ -401,7 +495,9 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
             'E' => 14,  // Jasa
             'F' => 14,  // Embalase
             'G' => 14,  // Potongan
-            'H' => 18,  // Netto
+            'H' => 18,  // Potongan Transaksi
+            'I' => 18,  // Netto
+            'J' => 18,  // Netto Akhir
         ];
     }
 

@@ -406,18 +406,23 @@ class SalesController extends Controller
     public function generateTransactionCode($code)
     {
         $pharmacyId = auth()->user()->pharmacy_id;
+        $pharmacyIdPadded = str_pad($pharmacyId, 2, '0', STR_PAD_LEFT);
 
         $year   = now()->format('y');
         $month  = now()->format('m');
         $prefix = $year . $month . strtoupper($code);
 
-        $last = MedicineTransactions::where('transaction_code', 'like', $prefix . '%')
+        $expectedLength = strlen($prefix) + 4 + 2;
+
+        $last = MedicineTransactions::where('transaction_code', 'like', $prefix . '%' . $pharmacyIdPadded)
+            ->whereRaw('LENGTH(transaction_code) = ?', [$expectedLength])
             ->where('status', 1)
             ->orderBy('transaction_code', 'desc')
             ->first();
 
         if ($last) {
-            $lastNumber = intval(substr($last->transaction_code, -4));
+            $withoutPharmacyId = substr($last->transaction_code, 0, -2);
+            $lastNumber = intval(substr($withoutPharmacyId, -4));
             $nextNumber = $lastNumber + 1;
         } else {
             $nextNumber = 0;
@@ -425,7 +430,7 @@ class SalesController extends Controller
 
         $serial = str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
 
-        $transactionCode = $prefix . $serial;
+        $transactionCode = $prefix . $serial . $pharmacyIdPadded;
         return $transactionCode;
     }
     public function regenerateTransactionCode($newTypeCode, $oldCode)
@@ -467,43 +472,15 @@ class SalesController extends Controller
 
     public function createTransaction(Request $request)
     {
-
         if ($request->get('type') == 'resep') {
             $typenew = "RESEP TUNAI";
-            $code = "1";
         } else if ($request->get('type') == 'kredit') {
             $typenew = "RESEP KREDIT";
-            $code = "4";
         } else if ($request->get('type') == 'upds') {
             $typenew = "UPDS";
-            $code = "2";
         } else if ($request->get('type') == 'hv') {
             $typenew = "HV/OTC";
-            $code = "3";
         }
-
-        // Generate Transaction COdes
-        $year   = now()->format('y');
-        $month  = now()->format('m');
-        $prefix = $year . $month . strtoupper($code);
-
-        // find last transaction with same prefix
-        $last = MedicineTransactions::where('pharmacy_id', Auth()->user()->pharmacy_id)
-            ->where('transaction_code', 'like', $prefix . '%')
-            ->orderBy('transaction_code', 'desc')
-            ->first();
-
-        if ($last) {
-            $lastNumber = intval(substr($last->transaction_code, -4));
-            $nextNumber = $lastNumber + 1;
-        } else {
-            $nextNumber = 0;
-        }
-
-        $serial = str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
-
-        $transactionCode = $prefix . $serial;
-        // =====================
 
         try {
             DB::beginTransaction();
@@ -589,12 +566,12 @@ class SalesController extends Controller
         }
         $service = 0;
         // Service Filter / Validation, Only UM that can have jasa, 22 JULI 2026
-        if($request->get('cart_type') != "UM"){
+        if ($request->get('cart_type') != "UM") {
             $service = 0;
-        }else{
+        } else {
             $service = $request->get('service');
         }
-      
+
 
         $transaction = MedicineCart::create([
             'user_id'        => Auth()->user()->id,

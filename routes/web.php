@@ -140,7 +140,7 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     });
 
     Route::resource('sales', SalesController::class);
-
+    
     // Route::get('/transaction', [SalesController::class, 'index'])->name('transaction');
 
     // Initiate New Transaction
@@ -184,7 +184,7 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     Route::post('deleteTransaction', [SalesController::class, 'deleteTransaction'])->name('sales.deletetransaction');
     Route::get('/print/receipt/{id}', [PrintController::class, 'receipt'])->name('sales.print');
     Route::get('/print/fullreceipt/{id}', [PrintController::class, 'fullReceipt'])->name('salesrecipe.print');
-
+    Route::get('/kasir/print-smart-receipt/{id}', [PrintController::class, 'printSmartReceipt'])->name('transaction.printSmartReceipt');
 
     // ================================================================== Add Data =========================================================================
     Route::post('/addpatient', [SalesController::class, 'addPatient'])

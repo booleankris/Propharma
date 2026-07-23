@@ -60,14 +60,15 @@ class ReturController extends Controller
         $data = MedicineCart::query()
             ->with(['transactions.patients'])
             ->whereHas('transactions', function ($q) use ($search) {
-                // Filter transaksi yang bukan RETUR
                 $q->where('transaction_type', '!=', 'RETUR')
+                    // 1. Pastikan pharmacy_id selalu terfilter
+                    ->where('pharmacy_id', auth()->user()->pharmacy_id)
+                    // 2. Grup terpisah khusus untuk logic pencarian (OR)
                     ->where(function ($q2) use ($search) {
-                        // Filter search code atau patient name
                         $q2->where('transaction_code', 'LIKE', "%{$search}%")
                             ->orWhereHas('patients', function ($q3) use ($search) {
                                 $q3->where('name', 'LIKE', "%{$search}%");
-                            })->where('pharmacy_id', auth()->user()->pharmacy_id);
+                            });
                     });
             })
             ->select('transaction_id')
