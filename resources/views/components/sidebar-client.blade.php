@@ -1861,54 +1861,9 @@
             onclick="document.getElementById('expiry-modal').classList.add('hidden')">×</button>
     </div>
     <div class="notif-list">
-        @php
-            use Carbon\Carbon;
-            $today = Carbon::today();
-            $expiredBatches = \App\Models\Batches::with('medicines')
-                ->whereBetween('expired_date', [$today->copy()->startOfYear(), $today->copy()->endOfYear()])
-                ->orderBy('expired_date', 'asc')
-                ->get();
-        @endphp
-
-        @forelse ($expiredBatches as $batch)
-            @php
-                $expDate = Carbon::parse($batch->expired_date);
-                $diffDays = $today->diffInDays($expDate, false);
-                if ($diffDays < 0) {
-                    $status = 1;
-                    $label = 'Kedaluwarsa';
-                    $icon = '!';
-                    $qtyClass = 'qty-out';
-                } else {
-                    $status = 5;
-                    $label = 'Akan Kedaluwarsa';
-                    $icon = '⏳';
-                    $qtyClass = 'qty-neutral';
-                }
-            @endphp
-            <div class="notif-item">
-                <div class="notif-dot dot-{{ $status }}">{{ $icon }}</div>
-                <div style="flex:1; min-width:0;">
-                    <div class="notif-name">{{ $batch->medicines->name ?? $batch->name }}</div>
-                    <div class="text-[10px]" style="color:#94a3b8; margin-bottom:3px;">Batch: {{ $batch->name }}
-                    </div>
-                    <div style="display:flex; align-items:center; gap:6px; margin-bottom:2px;">
-                        <span class="notif-badge badge-{{ $status }}">{{ $label }}</span>
-                    </div>
-                    <div class="notif-meta">
-                        Exp: {{ $expDate->format('d M Y') }}
-                        @if ($diffDays >= 0)
-                            • {{ $diffDays }} hari lagi
-                        @else
-                            • lewat {{ abs($diffDays) }} hari
-                        @endif
-                    </div>
-                </div>
-                <div class="notif-qty {{ $qtyClass }}">{{ $batch->stock }}</div>
-            </div>
-        @empty
-            <div class="notif-empty">Tidak ada obat kedaluwarsa / mendekati</div>
-        @endforelse
+       
+        <div class="notif-empty">Tidak ada obat kedaluwarsa / mendekati</div>
+        
     </div>
 </div>
 <div id="loading-overlay"

@@ -32,18 +32,6 @@ class HomeController extends Controller
         }
 
 
-        $totalproduct = Item::where('user_id', Auth()->id())->count('id');
-        $cart_total = ItemCart::where('status', '0')->where('user_id', Auth()->id())->count('id');
-        $get_subtotal = ItemCart::with('item')->where('user_id', Auth()->id())->where('status', '!=', '1')->get();
-        $cart_subtotal = $get_subtotal->sum(function ($cart) {
-            return $cart->quantity * ($cart->item->item_price ?? 0);
-        });
-
-        $items = Item::where('user_id', Auth::user()->id)->get();
-        $cart_status = Item::with('cart_status')->where('user_id', Auth()->id())->get();
-        $totaltransaction = TicketTransaction::where('user_id', Auth::user()->id)->count('id');
-
-
         // Dashboard 
         $total_sales = MedicineTransactions::where('status', 1)->sum('subtotal');
         $qty_sales = MedicineTransactions::where('status', 1)->count('id');
@@ -60,7 +48,7 @@ class HomeController extends Controller
         
         // Reports
 
-        return view('kasir.home', compact('totalproduct', 'totaltransaction','qty_sales' ,'items', 'cart_status', 'cart_total', 'cart_subtotal', 'total_sales_rp', 'total_orders_rp', 'total_reject_rp'));
+        return view('kasir.home', compact('total_sales_rp', 'total_orders_rp', 'total_reject_rp'));
     }
     public function profile($edit = null)
     {
