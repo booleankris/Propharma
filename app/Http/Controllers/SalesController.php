@@ -409,7 +409,7 @@ class SalesController extends Controller
 
         $year   = now()->format('y');
         $month  = now()->format('m');
-        $prefix = $year . $month . strtoupper($code) + $pharmacyId;
+        $prefix = $year . $month . strtoupper($code);
 
         $last = MedicineTransactions::where('transaction_code', 'like', $prefix . '%')
             ->where('status', 1)
