@@ -236,6 +236,8 @@ class ReturController extends Controller
                 'batches_id'       => $transfer->batches_id
             ]);
 
+            $activeshift = activeShift();
+
             // Create New Retur Transaction
             $getTransactiondata = MedicineTransactions::findOrFail($request->transaction_id);
             $transaction = MedicineTransactions::create([
@@ -249,6 +251,7 @@ class ReturController extends Controller
                 "changes"               => "-",
                 "subtotal"              => $request->total_retur,
                 "discount"              => "-",
+                "shift_logs_id"         => $activeshift->id,
                 "status"                => $getTransactiondata->status,
                 "created_at"            => $getTransactiondata->created_at,
                 "updated_at"            => $getTransactiondata->updated_at,

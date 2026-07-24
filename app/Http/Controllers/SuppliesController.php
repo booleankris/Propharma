@@ -32,25 +32,21 @@ class SuppliesController extends Controller
             // 1. BASE QUERY
             $baseQuery = ItemsLog::query();
 
-            // Filter by pharmacy_id via whereHas
+            // Filter by pharmacy_id via whereHas instead of join (avoids row duplication)
             if ($request->filled('pharmacy_id')) {
-                $pharmacyId = $request->pharmacy_id;
-                $baseQuery->where(function ($q) use ($pharmacyId) {
-                    // sales, returns, mutations — linked via medicine_transactions
-                    $q->whereHas('medicine_transaction', function ($q2) use ($pharmacyId) {
-                        $q2->where('pharmacy_id', $pharmacyId);
+                $baseQuery->where(function ($q) use ($request) {
+                    $q->whereHas('medicine_transaction', function ($q2) use ($request) {
+                        $q2->where('pharmacy_id', $request->pharmacy_id);
                     })
-                        // purchases — linked via receiving table
-                        ->orWhere(function ($q2) use ($pharmacyId) {
-                            $q2->where('status', 2)
-                                ->whereHas('receiving', function ($q3) use ($pharmacyId) {
-                                    $q3->where('pharmacy_id', $pharmacyId);
-                                });
+                        ->orWhereHas('receiving', function ($q2) use ($request) {
+                            // for purchase (status=2) rows that have no medicine_transaction
+                            $q2->whereHas('pharmacy', function ($q3) use ($request) {
+                                $q3->where('id', $request->pharmacy_id);
+                            });
                         });
                 });
             }
 
-            // Search medicine — keep in baseQuery for stats/balance accuracy
             if ($request->filled('searchMedicine')) {
                 $searchValue = $request->searchMedicine;
                 $baseQuery->whereHas('medicines', function ($q) use ($searchValue) {
@@ -84,34 +80,19 @@ class SuppliesController extends Controller
             $lastRecord  = (clone $baseQuery)->orderBy('date', 'desc')->orderBy('id', 'desc')->first();
 
             // 4. TABLE QUERY
-            $items = (clone $baseQuery)
-                ->with([
-                    'medicines',
-                    'receiving.receiving_details.creditor',
-                    'medicine_transaction.user',
-                ])
-                ->whereNotIn('status', [5, 6, 7]);
+            $items = (clone $baseQuery)->with([
+                'medicines',
+                'receiving.receiving_details.creditor',
+                'medicine_transaction.user',
+            ])->whereNotIn('status', [5, 6, 7]);
 
             // 5. DATATABLES
             return DataTables::eloquent($items)
-                ->filter(function ($query) use ($request) {
-                    if ($request->filled('searchMedicine')) {
-                        $searchValue = $request->searchMedicine;
-                        $query->whereHas('medicines', function ($q) use ($searchValue) {
-                            if (is_numeric($searchValue)) {
-                                $q->where('id', $searchValue);
-                            } else {
-                                $q->where('name', 'like', "%{$searchValue}%")
-                                    ->orWhere('code', 'like', "%{$searchValue}%");
-                            }
-                        });
-                    }
-                }, true)
                 ->addIndexColumn()
-                ->addColumn('date',             fn($row) => $row->date)
+                ->addColumn('date', fn($row) => $row->date)
                 ->addColumn('transaction_code', fn($row) => $row->transaction_code)
-                ->addColumn('code',             fn($row) => $row->code)
-                ->addColumn('type',             fn($row) => $row->type)
+                ->addColumn('code', fn($row) => $row->code)
+                ->addColumn('type', fn($row) => $row->type)
                 ->addColumn('name', function ($row) {
                     if ($row->status == 2) {
                         return $row->receiving?->receiving_details?->first()?->creditor?->name ?? '-';
@@ -129,28 +110,26 @@ class SuppliesController extends Controller
                     ];
                     $signs = [1 => '-', 2 => '+', 3 => '+', 4 => '-', 7 => '-'];
                     $style = $styles[$row->status] ?? '';
-                    $sign  = $signs[$row->status]  ?? '';
+                    $sign  = $signs[$row->status] ?? '';
                     if ($row->status == 5) {
                         $sign  = $qty < 0 ? '' : ($qty > 0 ? '+' : '');
                         $style = "color:#d34163;font-weight:bold;";
                     }
-                    return $style
-                        ? "<div style='{$style}'><span>{$sign}</span><b>{$qty}</b></div>"
-                        : '';
+                    return $style ? "<div style='{$style}'><span>{$sign}</span><b>{$qty}</b></div>" : '';
                 })
-                ->addColumn('qty_before',        fn($row) => "<div style='color:#000;font-weight:bold;'><b>{$row->qty_before}</b></div>")
-                ->addColumn('qty_after',         fn($row) => "<div style='color:#000;font-weight:bold;'><b>{$row->qty_after}</b></div>")
+                ->addColumn('qty_before', fn($row) => "<div style='color:#000;font-weight:bold;'><b>{$row->qty_before}</b></div>")
+                ->addColumn('qty_after',  fn($row) => "<div style='color:#000;font-weight:bold;'><b>{$row->qty_after}</b></div>")
                 ->addColumn('qty_before_number', fn($row) => $row->qty_before)
                 ->addColumn('qty_after_number',  fn($row) => $row->qty_after)
-                ->addColumn('supply',            fn($row) => $row->medicines?->stock ?? '-')
+                ->addColumn('supply', fn($row) => $row->medicines?->stock ?? '-')
                 ->addColumn('status', function ($row) {
                     $map = [
-                        1 => ['Penjualan',    'rgba(34,197,94,0.2)',  '#16a34a'],
-                        2 => ['Pembelian',    '#d6e8ff94',            '#7f8eff'],
-                        3 => ['Retur Jual',   'rgb(255 0 0 / 17%)',   '#a31616'],
-                        4 => ['Retur Beli',   'rgb(255 177 0 / 31%)', '#c17800'],
-                        5 => ['Stock Opname', '#fff035',              '#7a7817'],
-                        7 => ['Mutasi Stok',  '#aeffeaad',            '#238787'],
+                        1 => ['Penjualan',    'rgba(34,197,94,0.2)',   '#16a34a'],
+                        2 => ['Pembelian',    '#d6e8ff94',             '#7f8eff'],
+                        3 => ['Retur Jual',   'rgb(255 0 0 / 17%)',    '#a31616'],
+                        4 => ['Retur Beli',   'rgb(255 177 0 / 31%)',  '#c17800'],
+                        5 => ['Stock Opname', '#fff035',               '#7a7817'],
+                        7 => ['Mutasi Stok',  '#aeffeaad',             '#238787'],
                     ];
                     if (!isset($map[$row->status])) return '-';
                     [$label, $bg, $color] = $map[$row->status];
@@ -160,11 +139,11 @@ class SuppliesController extends Controller
                 ->with([
                     'stats' => [
                         'stat_before'    => $firstRecord?->qty_before ?? 0,
-                        'stat_bought'    => $stats->qty_bought         ?? 0,
-                        'stat_bought_rt' => $stats->qty_bought_rt      ?? 0,
-                        'stat_sold'      => $stats->qty_sold           ?? 0,
-                        'stat_sold_rt'   => $stats->qty_sold_rt        ?? 0,
-                        'stat_balance'   => $lastRecord?->qty_after    ?? 0,
+                        'stat_bought'    => $stats->qty_bought    ?? 0,
+                        'stat_bought_rt' => $stats->qty_bought_rt ?? 0,
+                        'stat_sold'      => $stats->qty_sold      ?? 0,
+                        'stat_sold_rt'   => $stats->qty_sold_rt   ?? 0,
+                        'stat_balance'   => $lastRecord?->qty_after ?? 0,
                     ]
                 ])
                 ->make(true);
