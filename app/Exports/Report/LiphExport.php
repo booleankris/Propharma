@@ -289,7 +289,7 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                 $no++,
                 $label,
                 $this->nz(round($d['lembar'], 2)),
-                $this->nz($d['r']),
+                $this->nz($label === 'Retur Tunai' ?  -  $d['r'] : $d['r']),
                 $this->nz($d['jasa']),
                 $this->nz($d['embalase']),
                 $this->nz($d['potongan']),
@@ -298,7 +298,13 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                 $this->nz($d['netto'] - $d['potongan_transaksi'])
             ];
 
-            foreach ($sub as $k => $v) $sub[$k] += $d[$k];
+            foreach ($sub as $k => $v) {
+                if ($label === 'Retur Tunai' && $k === 'r') {
+                    $sub[$k] -= $d[$k];
+                } else {
+                    $sub[$k] += $d[$k];
+                }
+            }
         }
 
         $rows[] = [
