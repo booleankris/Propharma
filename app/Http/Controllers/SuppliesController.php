@@ -34,14 +34,18 @@ class SuppliesController extends Controller
 
             // Filter by pharmacy_id via whereHas
             if ($request->filled('pharmacy_id')) {
-                $baseQuery->where(function ($q) use ($request) {
-                    $q->whereHas('medicine_transaction', function ($q2) use ($request) {
-                        $q2->where('pharmacy_id', $request->pharmacy_id);
+                $pharmacyId = $request->pharmacy_id;
+                $baseQuery->where(function ($q) use ($pharmacyId) {
+                    // sales, returns, mutations — linked via medicine_transactions
+                    $q->whereHas('medicine_transaction', function ($q2) use ($pharmacyId) {
+                        $q2->where('pharmacy_id', $pharmacyId);
                     })
-                        ->orWhereHas('receiving', function ($q2) use ($request) {
-                            $q2->whereHas('pharmacy', function ($q3) use ($request) {
-                                $q3->where('id', $request->pharmacy_id);
-                            });
+                        // purchases — linked via receiving table
+                        ->orWhere(function ($q2) use ($pharmacyId) {
+                            $q2->where('status', 2)
+                                ->whereHas('receiving', function ($q3) use ($pharmacyId) {
+                                    $q3->where('pharmacy_id', $pharmacyId);
+                                });
                         });
                 });
             }
