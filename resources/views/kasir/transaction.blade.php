@@ -4279,7 +4279,7 @@
                 <td>${item.name}</td>
                 <td>${item.factory?.name ?? '-'}</td>
                 <td>${item.composition?.name ?? '-'}</td>
-                <td>${item.packaging ?? '-'}${item.content != 1 ? item.content ?? '' : ''}${item.unit ?? '-'}</td>
+                <td>${item.packaging ?? '-'}${item.content != 1 ? item.content ?? '' : ''}${item.unit ?? '-'}${item.strip != 1 ? item.strip ?? '' : ''}</td>
                 <td>${formatRupiah(item.net_price)}</td>
                 <td>${item.stock ?? '-'}</td>
                 <td>

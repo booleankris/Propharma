@@ -29,8 +29,14 @@ class SuppliesController extends Controller
     {
         if ($request->ajax()) {
 
-            // 1. BASE QUERY: Apply filters without eager load
-            $baseQuery = ItemsLog::query();
+            // 1. BASE QUERY: Join medicine_transactions to filter by pharmacy_id
+            $baseQuery = ItemsLog::query()
+                ->leftJoin('medicine_transactions', 'medicine_transactions.transaction_code', '=', 'items_log.transaction_code');
+
+            // Filter by pharmacy_id from medicine_transactions if present
+            if ($request->filled('pharmacy_id')) {
+                $baseQuery->where('medicine_transactions.pharmacy_id', $request->pharmacy_id);
+            }
 
             if ($request->filled('searchMedicine')) {
                 $searchValue = $request->searchMedicine;
@@ -46,31 +52,44 @@ class SuppliesController extends Controller
             }
 
             if ($request->filled('start_date')) {
-                $baseQuery->whereDate('date', '>=', $request->start_date);
+                $baseQuery->whereDate('items_log.date', '>=', $request->start_date);
             }
 
             if ($request->filled('end_date')) {
-                $baseQuery->whereDate('date', '<=', $request->end_date);
+                $baseQuery->whereDate('items_log.date', '<=', $request->end_date);
             }
 
-            // 2. STATS CALCULATION: Calculate all sums 
-            $stats = (clone $baseQuery)->selectRaw("
-                SUM(CASE WHEN status = 1 THEN qty ELSE 0 END) as qty_sold,
-                SUM(CASE WHEN status = 2 THEN qty ELSE 0 END) as qty_bought,
-                SUM(CASE WHEN status = 3 THEN qty ELSE 0 END) as qty_sold_rt,
-                SUM(CASE WHEN status = 4 THEN qty ELSE 0 END) as qty_bought_rt
-            ")->first();
+            // 2. STATS CALCULATION: Clear selects and calculate all sums safely 
+            $stats = (clone $baseQuery)
+                ->setQuery(clone $baseQuery->getQuery())
+                ->selectRaw("
+                    SUM(CASE WHEN items_log.status = 1 THEN items_log.qty ELSE 0 END) as qty_sold,
+                    SUM(CASE WHEN items_log.status = 2 THEN items_log.qty ELSE 0 END) as qty_bought,
+                    SUM(CASE WHEN items_log.status = 3 THEN items_log.qty ELSE 0 END) as qty_sold_rt,
+                    SUM(CASE WHEN items_log.status = 4 THEN items_log.qty ELSE 0 END) as qty_bought_rt
+                ")->first();
 
             // 3. BALANCE CALCULATION: Get the very first and very last records for the balances
-            $firstRecord = (clone $baseQuery)->orderBy('date', 'asc')->orderBy('id', 'asc')->first();
-            $lastRecord = (clone $baseQuery)->orderBy('date', 'desc')->orderBy('id', 'desc')->first();
+            $firstRecord = (clone $baseQuery)
+                ->select('items_log.*')
+                ->orderBy('items_log.date', 'asc')
+                ->orderBy('items_log.id', 'asc')
+                ->first();
 
-            // 4. TABLE QUERY: Eager load relations nested deep to prevent performance issues
-            $items = (clone $baseQuery)->with([
-                'medicines',
-                'receiving.receiving_details.creditor', // Fetch creditor through receiving details
-                'medicine_transaction.user'             // Fetch cashier user through transactions
-            ])->whereNotIn('status', [5, 6, 7]);
+            $lastRecord = (clone $baseQuery)
+                ->select('items_log.*')
+                ->orderBy('items_log.date', 'desc')
+                ->orderBy('items_log.id', 'desc')
+                ->first();
+
+            // 4. TABLE QUERY: Ensure we only select items_log columns for DataTables and eager load relations
+            $items = (clone $baseQuery)
+                ->select('items_log.*')
+                ->with([
+                    'medicines',
+                    'receiving.receiving_details.creditor',
+                    'medicine_transaction.user'
+                ])->whereNotIn('items_log.status', [5, 6, 7]);
 
             // 5. RETURN DATATABLES RESPONSE
             return DataTables::eloquent($items)
@@ -87,7 +106,6 @@ class SuppliesController extends Controller
                 ->addColumn('type', function ($row) {
                     return $row->type;
                 })
-                // ----- UPDATED 'NAME' COLUMN LOGIC -----
                 ->addColumn('name', function ($row) {
                     // Case 1: Purchase / Pembelian (Status = 2) -> Show Creditor Name
                     if ($row->status == 2) {
@@ -99,10 +117,8 @@ class SuppliesController extends Controller
                         return $row->medicine_transaction->user->name;
                     }
 
-                    // Fallback: If no cashier is found, display the Medicine Name as a safety net
                     return '-';
                 })
-                // ----------------------------------------
                 ->addColumn('stock', function ($row) {
                     if ($row->status == 1) {
                         return "<div style='color:#16a34a;font-weight:bold;'><span>-</span><b>" . $row->qty . "</b></div>";

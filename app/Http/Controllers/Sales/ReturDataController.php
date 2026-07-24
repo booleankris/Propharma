@@ -18,6 +18,7 @@ class ReturDataController extends Controller
             $parsedDate = $this->parseDate($search);
             $startDate  = $request->input('start_date');
             $endDate    = $request->input('end_date');
+            $pharmacyId = $request->input('pharmacy_id'); // 1. Capture pharmacy_id from request
 
 
 
@@ -35,6 +36,7 @@ class ReturDataController extends Controller
                     'items_log.qty',
                     'items_log.total',
                     'items_log.created_at',
+                    'medicine_transactions.pharmacy_id', 
                     'medicines.name  as medicine_name',
                     'patients.name   as patient_name',
 
@@ -45,6 +47,11 @@ class ReturDataController extends Controller
                         END as jenis
                     "),
                 ]);
+
+            // 3. Apply pharmacy_id filter inside the subquery
+            if ($pharmacyId) {
+                $sub->where('items_log.pharmacy_id', $pharmacyId);
+            }
 
             // ======================
             // MAIN QUERY (WRAP SUBQUERY)
@@ -76,10 +83,12 @@ class ReturDataController extends Controller
                         ->orWhere('jenis',            'like', "%{$search}%");
                 });
             }
+
             if ($startDate && $endDate) {
                 $query->whereDate('created_at', '>=', $startDate)
                     ->whereDate('created_at', '<=', $endDate);
             }
+
             // ======================
             // ORDER
             // ======================

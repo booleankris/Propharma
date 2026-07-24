@@ -147,6 +147,11 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
 
                 $grouped[$group][$label]['lembar'] += 1;
                 $grouped[$group][$label]['potongan_transaksi'] += (int) ($trx->discount ?? 0);
+
+                $trxNetto = (int) ($trx->subtotal ?? 0);
+                if ($label === 'Retur Tunai') $trxNetto = -abs($trxNetto);
+                $grouped[$group][$label]['netto'] += $trxNetto;
+
                 continue;
             }
 
