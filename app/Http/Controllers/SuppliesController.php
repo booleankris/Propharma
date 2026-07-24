@@ -29,18 +29,26 @@ class SuppliesController extends Controller
     {
         if ($request->ajax()) {
 
-            // 1. BASE QUERY: Join medicine_transactions to filter by pharmacy_id
-            $baseQuery = ItemsLog::query()
-                ->leftJoin('medicine_transactions', 'medicine_transactions.transaction_code', '=', 'items_log.transaction_code');
+            // 1. BASE QUERY
+            $baseQuery = ItemsLog::query();
 
-            // Filter by pharmacy_id from medicine_transactions if present
+            // Filter by pharmacy_id via whereHas
             if ($request->filled('pharmacy_id')) {
-                $baseQuery->where('medicine_transactions.pharmacy_id', $request->pharmacy_id);
+                $baseQuery->where(function ($q) use ($request) {
+                    $q->whereHas('medicine_transaction', function ($q2) use ($request) {
+                        $q2->where('pharmacy_id', $request->pharmacy_id);
+                    })
+                        ->orWhereHas('receiving', function ($q2) use ($request) {
+                            $q2->whereHas('pharmacy', function ($q3) use ($request) {
+                                $q3->where('id', $request->pharmacy_id);
+                            });
+                        });
+                });
             }
 
+            // Search medicine — keep in baseQuery for stats/balance accuracy
             if ($request->filled('searchMedicine')) {
                 $searchValue = $request->searchMedicine;
-
                 $baseQuery->whereHas('medicines', function ($q) use ($searchValue) {
                     if (is_numeric($searchValue)) {
                         $q->where('id', $searchValue);
@@ -52,135 +60,107 @@ class SuppliesController extends Controller
             }
 
             if ($request->filled('start_date')) {
-                $baseQuery->whereDate('items_log.date', '>=', $request->start_date);
+                $baseQuery->whereDate('date', '>=', $request->start_date);
             }
 
             if ($request->filled('end_date')) {
-                $baseQuery->whereDate('items_log.date', '<=', $request->end_date);
+                $baseQuery->whereDate('date', '<=', $request->end_date);
             }
 
-            // 2. STATS CALCULATION: Clear selects and calculate all sums safely 
-            $stats = (clone $baseQuery)
-                ->setQuery(clone $baseQuery->getQuery())
-                ->selectRaw("
-                    SUM(CASE WHEN items_log.status = 1 THEN items_log.qty ELSE 0 END) as qty_sold,
-                    SUM(CASE WHEN items_log.status = 2 THEN items_log.qty ELSE 0 END) as qty_bought,
-                    SUM(CASE WHEN items_log.status = 3 THEN items_log.qty ELSE 0 END) as qty_sold_rt,
-                    SUM(CASE WHEN items_log.status = 4 THEN items_log.qty ELSE 0 END) as qty_bought_rt
-                ")->first();
+            // 2. STATS
+            $stats = (clone $baseQuery)->selectRaw("
+            SUM(CASE WHEN status = 1 THEN qty ELSE 0 END) as qty_sold,
+            SUM(CASE WHEN status = 2 THEN qty ELSE 0 END) as qty_bought,
+            SUM(CASE WHEN status = 3 THEN qty ELSE 0 END) as qty_sold_rt,
+            SUM(CASE WHEN status = 4 THEN qty ELSE 0 END) as qty_bought_rt
+        ")->first();
 
-            // 3. BALANCE CALCULATION: Get the very first and very last records for the balances
-            $firstRecord = (clone $baseQuery)
-                ->select('items_log.*')
-                ->orderBy('items_log.date', 'asc')
-                ->orderBy('items_log.id', 'asc')
-                ->first();
+            // 3. BALANCE
+            $firstRecord = (clone $baseQuery)->orderBy('date', 'asc')->orderBy('id', 'asc')->first();
+            $lastRecord  = (clone $baseQuery)->orderBy('date', 'desc')->orderBy('id', 'desc')->first();
 
-            $lastRecord = (clone $baseQuery)
-                ->select('items_log.*')
-                ->orderBy('items_log.date', 'desc')
-                ->orderBy('items_log.id', 'desc')
-                ->first();
-
-            // 4. TABLE QUERY: Ensure we only select items_log columns for DataTables and eager load relations
+            // 4. TABLE QUERY
             $items = (clone $baseQuery)
-                ->select('items_log.*')
                 ->with([
                     'medicines',
                     'receiving.receiving_details.creditor',
-                    'medicine_transaction.user'
-                ])->whereNotIn('items_log.status', [5, 6, 7]);
+                    'medicine_transaction.user',
+                ])
+                ->whereNotIn('status', [5, 6, 7]);
 
-            // 5. RETURN DATATABLES RESPONSE
+            // 5. DATATABLES
             return DataTables::eloquent($items)
+                ->filter(function ($query) use ($request) {
+                    if ($request->filled('searchMedicine')) {
+                        $searchValue = $request->searchMedicine;
+                        $query->whereHas('medicines', function ($q) use ($searchValue) {
+                            if (is_numeric($searchValue)) {
+                                $q->where('id', $searchValue);
+                            } else {
+                                $q->where('name', 'like', "%{$searchValue}%")
+                                    ->orWhere('code', 'like', "%{$searchValue}%");
+                            }
+                        });
+                    }
+                }, true)
                 ->addIndexColumn()
-                ->addColumn('date', function ($row) {
-                    return $row->date;
-                })
-                ->addColumn('transaction_code', function ($row) {
-                    return $row->transaction_code;
-                })
-                ->addColumn('code', function ($row) {
-                    return $row->code;
-                })
-                ->addColumn('type', function ($row) {
-                    return $row->type;
-                })
+                ->addColumn('date',             fn($row) => $row->date)
+                ->addColumn('transaction_code', fn($row) => $row->transaction_code)
+                ->addColumn('code',             fn($row) => $row->code)
+                ->addColumn('type',             fn($row) => $row->type)
                 ->addColumn('name', function ($row) {
-                    // Case 1: Purchase / Pembelian (Status = 2) -> Show Creditor Name
                     if ($row->status == 2) {
                         return $row->receiving?->receiving_details?->first()?->creditor?->name ?? '-';
                     }
-
-                    // Case 2: Any other status -> Show Cashier User Name (from medicine transactions)
-                    if ($row->medicine_transaction?->user) {
-                        return $row->medicine_transaction->user->name;
-                    }
-
-                    return '-';
+                    return $row->medicine_transaction?->user?->name ?? '-';
                 })
                 ->addColumn('stock', function ($row) {
-                    if ($row->status == 1) {
-                        return "<div style='color:#16a34a;font-weight:bold;'><span>-</span><b>" . $row->qty . "</b></div>";
-                    } else if ($row->status == 2) {
-                        return "<div style='color:#4173d3;font-weight:bold;'><span>+</span><b>" . $row->qty . "</b></div>";
-                    } else if ($row->status == 3) {
-                        return "<div style='color:#d34163;font-weight:bold;'><span>+</span><b>" . $row->qty . "</b></div>";
-                    } else if ($row->status == 4) {
-                        return "<div style='color:#d34163;font-weight:bold;'><span>-</span><b>" . $row->qty . "</b></div>";
-                    } else if ($row->status == 5) {
-                        if ($row->qty < 0) {
-                            return "<div style='color:#d34163;font-weight:bold;'><span></span><b>" . $row->qty . "</b></div>";
-                        } else if ($row->qty > 0) {
-                            return "<div style='color:#d34163;font-weight:bold;'><span>+</span><b>" . $row->qty . "</b></div>";
-                        } else {
-                            return "<div style='color:#d34163;font-weight:bold;'><span></span><b>" . $row->qty . "</b></div>";
-                        }
-                    } else if ($row->status == 7) {
-                        return "<div style='color:#248787;font-weight:bold;'><span></span><b>-" . $row->qty . "</b></div>";
+                    $qty = $row->qty;
+                    $styles = [
+                        1 => "color:#16a34a;font-weight:bold;",
+                        2 => "color:#4173d3;font-weight:bold;",
+                        3 => "color:#d34163;font-weight:bold;",
+                        4 => "color:#d34163;font-weight:bold;",
+                        7 => "color:#248787;font-weight:bold;",
+                    ];
+                    $signs = [1 => '-', 2 => '+', 3 => '+', 4 => '-', 7 => '-'];
+                    $style = $styles[$row->status] ?? '';
+                    $sign  = $signs[$row->status]  ?? '';
+                    if ($row->status == 5) {
+                        $sign  = $qty < 0 ? '' : ($qty > 0 ? '+' : '');
+                        $style = "color:#d34163;font-weight:bold;";
                     }
-                    return "";
+                    return $style
+                        ? "<div style='{$style}'><span>{$sign}</span><b>{$qty}</b></div>"
+                        : '';
                 })
-                ->addColumn('qty_before', function ($row) {
-                    return "<div style='color:#000000;font-weight:bold;'><span></span><b>" . $row->qty_before . "</b></div>";
-                })
-                ->addColumn('qty_after', function ($row) {
-                    return "<div style='color:#000000;font-weight:bold;'><span></span><b>" . $row->qty_after . "</b></div>";
-                })
-                ->addColumn('qty_before_number', function ($row) {
-                    return $row->qty_before;
-                })
-                ->addColumn('qty_after_number', function ($row) {
-                    return $row->qty_after;
-                })
-                ->addColumn('supply', function ($row) {
-                    return $row->medicines?->stock ?? '-';
-                })
+                ->addColumn('qty_before',        fn($row) => "<div style='color:#000;font-weight:bold;'><b>{$row->qty_before}</b></div>")
+                ->addColumn('qty_after',         fn($row) => "<div style='color:#000;font-weight:bold;'><b>{$row->qty_after}</b></div>")
+                ->addColumn('qty_before_number', fn($row) => $row->qty_before)
+                ->addColumn('qty_after_number',  fn($row) => $row->qty_after)
+                ->addColumn('supply',            fn($row) => $row->medicines?->stock ?? '-')
                 ->addColumn('status', function ($row) {
-                    if ($row->status == 1) {
-                        return "<div style='text-align:center; font-weight:bold; text-transform:uppercase; background-color:rgba(34,197,94,0.2); color:#16a34a; padding: 6px 4px; width:100px; font-size:9px; font-family: Poppins; border-radius:25px;'>Penjualan</div>";
-                    } else if ($row->status == 2) {
-                        return "<div style='text-align: center; font-weight: bold; text-transform: uppercase; background-color: #d6e8ff94; color: #7f8eff; padding: 6px 4px; width:100px; font-size: 9px; font-family: Poppins; border-radius: 25px;'>Pembelian</div>";
-                    } else if ($row->status == 3) {
-                        return "<div style='text-align: center; font-weight: bold; text-transform: uppercase; background-color: rgb(255 0 0 / 17%); color: #a31616; padding: 6px 4px; width:100px; font-size: 9px; font-family: Poppins; border-radius: 25px;'>Retur Jual</div>";
-                    } else if ($row->status == 4) {
-                        return "<div style='text-align: center; font-weight: bold; text-transform: uppercase; background-color: rgb(255 177 0 / 31%); color: #c17800; padding: 6px 4px; width:100px; font-size: 9px; font-family: Poppins; border-radius: 25px;'>Retur Beli</div>";
-                    } else if ($row->status == 5) {
-                        return "<div style='text-align: center; font-weight: bold; text-transform: uppercase; background-color: #fff035; color: #7a7817; padding: 6px 4px; width:100px; font-size: 9px; font-family: Poppins; border-radius: 25px;'>Stock Opname</div>";
-                    } else if ($row->status == 7) {
-                        return "<div style='text-align: center; font-weight: bold; text-transform: uppercase; background-color: #aeffeaad; color: #238787; padding: 6px 4px; width:100px; font-size: 9px; font-family: Poppins; border-radius: 25px;'>Mutasi Stok</div>";
-                    }
-                    return "-";
+                    $map = [
+                        1 => ['Penjualan',    'rgba(34,197,94,0.2)',  '#16a34a'],
+                        2 => ['Pembelian',    '#d6e8ff94',            '#7f8eff'],
+                        3 => ['Retur Jual',   'rgb(255 0 0 / 17%)',   '#a31616'],
+                        4 => ['Retur Beli',   'rgb(255 177 0 / 31%)', '#c17800'],
+                        5 => ['Stock Opname', '#fff035',              '#7a7817'],
+                        7 => ['Mutasi Stok',  '#aeffeaad',            '#238787'],
+                    ];
+                    if (!isset($map[$row->status])) return '-';
+                    [$label, $bg, $color] = $map[$row->status];
+                    return "<div style='text-align:center;font-weight:bold;text-transform:uppercase;background-color:{$bg};color:{$color};padding:6px 4px;width:100px;font-size:9px;font-family:Poppins;border-radius:25px;'>{$label}</div>";
                 })
                 ->rawColumns(['status', 'stock', 'qty_before', 'qty_after'])
                 ->with([
                     'stats' => [
-                        'stat_before'    => $firstRecord ? $firstRecord->qty_before : 0,
-                        'stat_bought'    => $stats->qty_bought ?? 0,
-                        'stat_bought_rt' => $stats->qty_bought_rt ?? 0,
-                        'stat_sold'      => $stats->qty_sold ?? 0,
-                        'stat_sold_rt'   => $stats->qty_sold_rt ?? 0,
-                        'stat_balance'   => $lastRecord ? $lastRecord->qty_after : 0,
+                        'stat_before'    => $firstRecord?->qty_before ?? 0,
+                        'stat_bought'    => $stats->qty_bought         ?? 0,
+                        'stat_bought_rt' => $stats->qty_bought_rt      ?? 0,
+                        'stat_sold'      => $stats->qty_sold           ?? 0,
+                        'stat_sold_rt'   => $stats->qty_sold_rt        ?? 0,
+                        'stat_balance'   => $lastRecord?->qty_after    ?? 0,
                     ]
                 ])
                 ->make(true);
