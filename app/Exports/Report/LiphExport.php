@@ -190,8 +190,8 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                 $ref = &$grouped[$group][$label];
 
                 $ref['r']        += $count;
-                $ref['jasa']     += $this->safeSum($groupItems, 'service_fee');
-                $ref['embalase'] += $this->safeSum($groupItems, 'embalase');
+                $ref['jasa']     += $this->safeSum($groupItems, 'embalase');
+                $ref['embalase'] += $this->safeSum($groupItems, 'service_fee');
                 $ref['potongan'] += $this->safeSum($groupItems, 'discount');
 
                 $itemNetto = $this->safeSum($groupItems, 'final_price');
