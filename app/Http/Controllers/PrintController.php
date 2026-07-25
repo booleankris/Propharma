@@ -17,11 +17,11 @@ class PrintController extends Controller
 
         // Yang pecah jadi satu-satu itulahh
         $transactionCart = $items->groupBy(fn($recipe) => $recipe->recipe_number ?? 'single');
-     
+
         $transaction     = MedicineTransactions::with(['patients', 'doctors'])->findOrFail($id);
 
         $totalEmbalase   = $items->sum('embalase');
-        $totalFinalPrice = $items->sum('final_price') - ($transaction->discount ?? 0);  
+        $totalFinalPrice = $items->sum('final_price') - ($transaction->discount ?? 0);
         $totalPrice      = $items->sum('total_price');
         $discount        = $items->sum('discount');
         $operator        = $transaction->user->name;
@@ -47,35 +47,36 @@ class PrintController extends Controller
     public function fullReceipt($id)
     {
         $items = MedicineCart::with(['medicine', 'transactions'])
-            ->whereHas('transactions', function ($q) use ($id) {
-                $q->where('id', $id);
-            })
+            ->whereHas('transactions', fn($q) => $q->where('id', $id))
             ->get();
 
-        $transactionCart = $items->groupBy(function ($recipe) {
-            return $recipe->recipe_number ?? 'single';
-        });
+        // Yang pecah jadi satu-satu itulahh
+        $transactionCart = $items->groupBy(fn($recipe) => $recipe->recipe_number ?? 'single');
 
-        $transaction = MedicineTransactions::with(['patients', 'doctors'])->find($id);
+        $transaction     = MedicineTransactions::with(['patients', 'doctors'])->findOrFail($id);
 
-        $totalEmbalase = $items->sum('embalase');
-        $totalPrice = $items->sum('final_price');
-        $totalFinalPrice = $items->sum('final_price');
-        $discount = $items->sum('discount');
-
+        $totalEmbalase   = $items->sum('embalase');
+        $totalFinalPrice = $items->sum('final_price') - ($transaction->discount ?? 0);
+        $totalPrice      = $items->sum('total_price');
+        $discount        = $items->sum('discount');
+        $operator        = $transaction->user->name;
+        $pharmacy_name = $transaction->pharmacy->name;
+        $pharmacy_address = $transaction->pharmacy->address;
         $subtotaldiscount = $transaction->discount ?? 0;
-        $totaldiscount = ceil(($discount + $subtotaldiscount) / 1000) * 1000;
-
-        $payment = $totalFinalPrice - $totaldiscount;
+        $totaldiscount   = ceil(($discount + $subtotaldiscount) / 1000) * 1000;
+        $payment         = $totalFinalPrice - $totaldiscount;
 
         return view('kasir.allreceipt', compact(
             'payment',
+            'totalEmbalase',
             'transaction',
             'transactionCart',
-            'totalPrice',
             'totalFinalPrice',
+            'totalPrice',
             'totaldiscount',
-            'subtotaldiscount'
+            'operator',
+            'pharmacy_name',
+            'pharmacy_address'
         ));
     }
 }

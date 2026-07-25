@@ -264,7 +264,7 @@ class TransfersController extends Controller
                     'date'             => $now,
                     'status'           => 7,
                     'batches_id'       => $transfer->batches_id,
-
+                    'user_id'          => auth()->user()->id,
                 ]);
             });
 

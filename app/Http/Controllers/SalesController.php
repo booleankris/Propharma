@@ -566,10 +566,11 @@ class SalesController extends Controller
         }
         $service = 0;
         // Service Filter / Validation, Only UM that can have jasa, 22 JULI 2026
-        if ($request->get('cart_type') != "UM") {
-            $service = 0;
-        } else {
+        if ($request->get('cart_type') == "UM" || $request->get('cart_type') == "UK") {
             $service = $request->get('service');
+
+        } else {
+            $service = 0;
         }
 
 
@@ -891,7 +892,6 @@ class SalesController extends Controller
 
                 $medicine->stock -= $cart->quantity;
                 $medicine->save();
-
                 ItemsLog::create([
                     'transaction_code' => $txWithItems->transaction_code,
                     'code'             => $this->generateItemsLogCode(),
@@ -904,6 +904,7 @@ class SalesController extends Controller
                     'date'             => $now,
                     'status'           => 1,
                     'batches_id'       => $transfer->batches_id,
+                    'user_id'          => auth()->user()->id,
                 ]);
             }
 

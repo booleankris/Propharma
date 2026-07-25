@@ -922,6 +922,7 @@ class ReceivingController extends Controller
                         'date'             => Carbon::now(),
                         'status'           => 7,
                         'batches_id'       => $transfer->batches_id,
+                        'user_id'          => auth()->user()->id,
                     ]);
                 } else {
                     Batches::where('id', $batchId)->increment('stock', $qty);

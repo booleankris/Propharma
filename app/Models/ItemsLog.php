@@ -23,7 +23,9 @@ class ItemsLog extends Model
         'qty_after',
         'total',
         'date',
-        'status'
+        'status',
+        'user_id',
+
     ];
     public function medicines()
     {

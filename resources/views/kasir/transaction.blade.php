@@ -3,6 +3,12 @@
 @section('style')
     <link rel="stylesheet" href="{{ asset('css/dashboard.css') }}?time={{ time() }}">
     <link rel="stylesheet" href="{{ asset('templates/library/izitoast/dist/css/iziToast.min.css') }}">
+    {{-- General Style --}}
+    <style>
+        .swal-on-top {
+            z-index: 999999 !important;
+        }
+    </style>
     @if ($check_transaction != 0)
         @if ($transaction->transaction_type == 'HV/OTC')
             <style>
@@ -1261,7 +1267,7 @@
             {{-- RESEP TUNAI buttons --}}
             <div id="btnGroupResep" class="hidden flex-col gap-2">
 
-                <button id="btnStrukPelanggan" data-modal-btn data-mode="pelanggan"
+                <button id="btnPrint" data-modal-btn data-mode="pelanggan"
                     class="modal-print-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 text-left transition-colors">
                     <div
                         class="modal-btn-icon w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 text-gray-500 flex-shrink-0 transition-colors">
@@ -1273,29 +1279,26 @@
                         </svg>
                     </div>
                     <div class="flex-1">
-                        <span class="block text-[13px] font-medium text-gray-700 modal-btn-label">Struk
-                            pelanggan</span>
-                        <span class="block text-[11px] text-gray-400">Print struk pembayaran saja</span>
+                        <span class="block text-[13px] font-medium text-gray-700 modal-btn-label">Cetak struk</span>
+                        <span class="block text-[11px] text-gray-400">Print struk untuk pelanggan</span>
                     </div>
                     <span
                         class="modal-btn-enter text-[11px] text-gray-300 opacity-0 transition-opacity font-mono">↵</span>
                 </button>
 
-                <button id="btnStrukPelangganResep" data-modal-btn data-mode="pelanggan_resep"
+                <button id="btnSkipPrint" data-modal-btn data-mode="none"
                     class="modal-print-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 text-left transition-colors">
                     <div
                         class="modal-btn-icon w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 text-gray-500 flex-shrink-0 transition-colors">
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                            <polyline points="14 2 14 8 20 8" />
-                            <line x1="16" y1="13" x2="8" y2="13" />
-                            <line x1="16" y1="17" x2="8" y2="17" />
+                            <line x1="18" y1="6" x2="6" y2="18" />
+                            <line x1="6" y1="6" x2="18" y2="18" />
                         </svg>
                     </div>
                     <div class="flex-1">
-                        <span class="block text-[13px] font-medium text-gray-700 modal-btn-label">Struk + resep</span>
-                        <span class="block text-[11px] text-gray-400">Print struk dan lembar resep</span>
+                        <span class="block text-[13px] font-medium text-gray-700 modal-btn-label">Tanpa struk</span>
+                        <span class="block text-[11px] text-gray-400">Selesaikan tanpa mencetak</span>
                     </div>
                     <span
                         class="modal-btn-enter text-[11px] text-gray-300 opacity-0 transition-opacity font-mono">↵</span>
@@ -1324,7 +1327,7 @@
             {{-- Default buttons --}}
             <div id="btnGroupDefault" class="hidden flex-col gap-2">
 
-                <button id="btnPrint" data-modal-btn data-mode="pelanggan"
+                <button id="btnPrintPelanggan" data-modal-btn data-mode="pelanggan"
                     class="modal-print-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 text-left transition-colors">
                     <div
                         class="modal-btn-icon w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 text-gray-500 flex-shrink-0 transition-colors">
@@ -1343,7 +1346,7 @@
                         class="modal-btn-enter text-[11px] text-gray-300 opacity-0 transition-opacity font-mono">↵</span>
                 </button>
 
-                <button id="btnSkipPrint" data-modal-btn data-mode="none"
+                <button id="btnSkipPrintPelanggan" data-modal-btn data-mode="none"
                     class="modal-print-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 text-left transition-colors">
                     <div
                         class="modal-btn-icon w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 text-gray-500 flex-shrink-0 transition-colors">
@@ -2145,7 +2148,7 @@
         function close() {
             modal.classList.add('hidden');
             modal.classList.remove('flex');
-            // Reset all button styles
+
             document.querySelectorAll('[data-modal-btn]').forEach(btn => {
                 btn.classList.remove('bg-blue-50', 'border-blue-200');
                 btn.querySelector('.modal-btn-icon').classList.remove('bg-blue-100', 'text-blue-600');
@@ -2155,18 +2158,26 @@
                 btn.querySelector('.modal-btn-enter').classList.add('opacity-0');
                 btn.querySelector('.modal-btn-enter').classList.remove('opacity-100');
             });
+
             activeButtons = [];
             document.removeEventListener('keydown', onKeyDown);
-            document.getElementById('pay').focus();
+
+            // Refocus safely — fall back to the main search box if #pay isn't usable
+            const payEl = document.getElementById('pay');
+            if (payEl && !payEl.disabled && payEl.offsetParent !== null) {
+                payEl.focus();
+            } else {
+                document.getElementById('productSearch')?.focus();
+            }
         }
 
         // ── Bind button handlers (called each checkout to capture fresh closure) ──
         function bindButtons(handlers) {
             document.getElementById('btnPrint').onclick = handlers.onBtnPrint;
+            document.getElementById('btnPrintPelanggan').onclick = handlers.onBtnPrint;
             document.getElementById('btnSkipPrint').onclick = handlers.onBtnSkipPrint;
+            document.getElementById('btnSkipPrintPelanggan').onclick = handlers.onBtnSkipPrint;
             document.getElementById('btnCancel').onclick = handlers.onBtnCancel;
-            document.getElementById('btnStrukPelanggan').onclick = handlers.onBtnStrukPelanggan;
-            document.getElementById('btnStrukPelangganResep').onclick = handlers.onBtnStrukPelangganResep;
             document.getElementById('btnCancelResep').onclick = handlers.onBtnCancelResep;
         }
 
@@ -2896,8 +2907,8 @@
             }
             document.getElementById('debtorSearch').value = it.name;
             document.getElementById('debtor_name').value = it.name;
-            document.getElementById('embalase').value = it.parameters[0].embalas;;
-
+            document.getElementById('embalase').value = it.parameters[0].embalas;
+            service = it.parameters[0].embalas;
             closedebtorBox();
         }
     }
@@ -2914,7 +2925,7 @@
         total_item = val;
         roundedtotal = price2 * val - discount;
         if (currenttransaction == "KREDIT") {
-            subtotal = roundedtotal;
+            subtotal = roundedtotal + parseInt(service);
         } else if (transaction_type == "RESEP TUNAI") {
             subtotal = Math.round(roundedtotal / 1000) * 1000 + parseInt(service);
         } else {
@@ -3746,19 +3757,19 @@
     }
 
     async function doCheckout(printMode) {
-
-        if (checkoutProcessing) {
-            return;
-        }
-
+        if (checkoutProcessing) return;
         checkoutProcessing = true;
 
-        CheckoutModal.close();
-
-        openPinModal(printMode);
-        setTimeout(() => {
-            document.getElementById('pinInput').focus();
-        }, 100);
+        try {
+            CheckoutModal.close();
+            openPinModal(printMode);
+            setTimeout(() => {
+                document.getElementById('pinInput')?.focus();
+            }, 100);
+        } catch (err) {
+            console.error('doCheckout failed:', err);
+            checkoutProcessing = false;
+        }
     }
 
     function closeInvoice() {
@@ -3933,7 +3944,7 @@
                     `;
                 }
             } else if (currenttransaction == "HV/OTC") {
-             
+
             } else {
                 if (transaction_type == 'HV/OTC') {
                     parameters = {{ $parameterUP }};
@@ -4302,10 +4313,12 @@
         pinModal._printMode = printMode;
     }
 
+
     function closePinModal() {
         pinModal.classList.add('hidden');
         pinModal.classList.remove('flex');
         pinModalReset();
+        checkoutProcessing = false;
     }
 
     // ── Helpers ───────────────────────────────────────────────────
@@ -4371,76 +4384,42 @@
 
             // INVALID PIN
             if (!data.success) {
-
                 checkoutProcessing = false;
-
-                pinModalShakeAndReset(
-                    data.message ?? 'PIN salah. Coba lagi.'
-                );
-
+                pinModalShakeAndReset(data.message ?? 'PIN salah. Coba lagi.');
                 return;
             }
 
             closePinModal();
-
             showCheckoutLoading();
 
             try {
 
-                const cleanPaid = cleanRupiah(
-                    document.getElementById('pay').value
-                );
-
-                const cleanChanges = cleanRupiah(
-                    document.getElementById('trchange').value
-                );
-
-                const bank_name =
-                    bank_name_input ?
-                    bank_name_input.value || null :
-                    null;
+                const cleanPaid = cleanRupiah(document.getElementById('pay').value);
+                const cleanChanges = cleanRupiah(document.getElementById('trchange').value);
+                const bank_name = bank_name_input ? bank_name_input.value || null : null;
 
                 // SAVE HIDDEN INPUTS
                 document.getElementById('paid').value = cleanPaid;
-
                 document.getElementById('changes').value = cleanChanges;
-
-                document.getElementById('transaction_id').value =
-                    checkoutPayload.transaction_id;
+                document.getElementById('transaction_id').value = checkoutPayload.transaction_id;
 
                 // FINAL CHECKOUT
                 var userbypin = data.user.id;
                 const res = await axios.post(
                     "{{ route('transaction.checkout') }}", {
                         transaction_id: checkoutPayload.transaction_id,
-
                         paid: checkoutPayload.paid,
-
                         discounsubtotalvalue,
-
                         totaltransaction,
-
                         changes: checkoutPayload.changes,
-
                         doctor_id: checkoutPayload.doctor_id,
-
                         debtor_id: checkoutPayload.debtor_id,
-
-                        patient_id: Number(
-                            checkoutPayload.patient_id
-                        ),
-
-                        print_receipt: pinModal._printMode !== 'none' ?
-                            1 : 0,
-
+                        patient_id: Number(checkoutPayload.patient_id),
+                        print_receipt: pinModal._printMode !== 'none' ? 1 : 0,
                         print_mode: pinModal._printMode,
-
                         paymentType,
-
                         bank_name,
-
                         user_id: userbypin,
-
                         shift_logs_id,
                     }
                 );
@@ -4448,30 +4427,12 @@
                 // SUCCESS
                 if (res.data.success) {
 
-                    // PRINT RECEIPT
+                    // 1. EXECUTE INITIAL PRINT 
                     if (pinModal._printMode === 'pelanggan') {
-
-                        await Printer.printReceipt(
-                            res.data.commands,
-                            res.data.print_url
-                        );
-                    }
-
-                    // PRINT RECEIPT + RESEP
-                    else if (
-                        pinModal._printMode ===
-                        'pelanggan_resep'
-                    ) {
-
-                        await Printer.printReceipt(
-                            res.data.commands,
-                            res.data.print_url
-                        );
-
-                        window.open(
-                            res.data.print_resep_url,
-                            '_blank'
-                        );
+                        await Printer.printReceipt(res.data.commands, res.data.print_url);
+                    } else if (pinModal._printMode === 'pelanggan_resep') {
+                        await Printer.printReceipt(res.data.commands, res.data.print_url);
+                        window.open(res.data.print_resep_url, '_blank');
                     }
 
                     iziToast.success({
@@ -4479,18 +4440,58 @@
                         message: 'Transaksi berhasil disimpan',
                         position: 'topRight'
                     });
+                    const trxId = checkoutPayload.transaction_id;
+                    const fullReceiptUrl = `/print/fullreceipt/${trxId}`;
+                    if (currenttransaction == "RESEP TUNAI" || currenttransaction == "KREDIT") {
+                        if (typeof Swal !== 'undefined') {
+                            Swal.fire({
+                                title: 'Cetak Full Receipt?',
+                                text: "Apakah Anda ingin mencetak versi full receipt?",
+                                icon: 'question',
+                                showCancelButton: true,
+                                confirmButtonColor: '#3085d6',
+                                cancelButtonColor: '#d33',
+                                confirmButtonText: 'Ya, Cetak',
+                                cancelButtonText: 'Selesai',
+                                customClass: {
+                                    container: 'swal-on-top'
+                                }
+                            }).then((result) => {
+                                if (result.isConfirmed) {
+                                    window.open(fullReceiptUrl, '_blank');
+                                    setTimeout(() => {
+                                        window.location.reload();
+                                    }, 500);
+                                } else {
+                                    window.location.reload();
+                                }
+                            });
+                        } else {
+                            setTimeout(() => {
+                                const printAgain = confirm(
+                                    "Transaksi berhasil! Apakah Anda ingin mencetak Full Receipt?");
+                                if (printAgain) {
+                                    window.open(fullReceiptUrl, '_blank');
+                                }
+                                window.location.reload();
+                            }, 500);
+                        }
+                    } else {
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 500);
+                    }
 
-                    // WAIT FOR PRINTER
-                    setTimeout(() => {
-                        window.location.reload();
-                    }, 2000);
+                    // 2. ASK TO PRINT FULL RECEIPT
+
+
+
 
                 } else {
 
                     iziToast.error({
                         title: 'Gagal',
-                        message: res.data.message ||
-                            'Checkout gagal',
+                        message: res.data.message || 'Checkout gagal',
                         position: 'topRight'
                     });
 
@@ -4503,32 +4504,25 @@
 
                 iziToast.error({
                     title: 'Gagal',
-                    message: err.response?.data?.message ||
-                        'Gagal menyimpan transaksi',
+                    message: err.response?.data?.message || 'Gagal menyimpan transaksi',
                     position: 'topRight'
                 });
 
                 checkoutProcessing = false;
 
             } finally {
-
                 hideCheckoutLoading();
             }
 
         } catch (err) {
 
             console.error(err);
-
             checkoutProcessing = false;
 
-            const message =
-                err.response?.data?.message ??
-                'Terjadi kesalahan. Coba lagi.';
-
+            const message = err.response?.data?.message ?? 'Terjadi kesalahan. Coba lagi.';
             pinModalShakeAndReset(message);
 
         } finally {
-
             pinModalNumpad.style.pointerEvents = '';
         }
     }

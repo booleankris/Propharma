@@ -7,6 +7,10 @@
             font-family: monospace;
             font-size: 11px;
         }
+
+        .page-break {
+            page-break-before: always;
+        }
     }
 
     .struk {
@@ -24,10 +28,74 @@
     hr {
         border: none;
         border-top: 1px dashed #000;
+        margin: 4px 0;
+    }
+
+    /* =========================
+       TABLE ITEM STRUK
+    ========================= */
+    .table-struk {
+        width: 100%;
+        table-layout: fixed;
+        border-collapse: collapse;
+    }
+
+    .table-struk td {
+        font-size: 11px;
+        padding: 0;
+        vertical-align: top;
+    }
+
+    .col-name {
+        width: 60%;
+        word-break: break-word;
+        white-space: normal;
+    }
+
+    .col-qty {
+        width: 15%;
+        text-align: center;
+    }
+
+    .col-total {
+        width: 25%;
+        text-align: right;
+    }
+
+    .table-struk tr {
+        line-height: 1.8;
+    }
+
+    .info-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .info-table td {
+        font-size: 11px;
+        padding: 0;
+        vertical-align: top;
+        line-height: 1.5;
+    }
+
+    .info-label {
+        width: 45%;
+        white-space: nowrap;
+    }
+
+    .info-colon {
+        width: 5%;
+        text-align: center;
+    }
+
+    .info-value {
+        width: 50%;
+        word-break: break-word;
+        white-space: normal;
     }
 </style>
-
 <div class="struk">
+
     <div class="text-center">
         <strong>APOTEK SAHABAT</strong><br>
         Jl. Palang Merah Ind No.16 A-B-C<br>
@@ -37,58 +105,94 @@
 
     <hr>
 
-    Bukti Pembayaran<br>
-    {{ $transaction->updated_at->format('d/m/Y H:i:s') }}<br>
-
+    <div style="text-align: center">
+        Bukti Pembayaran<br>
+        {{ $transaction->updated_at->format('d/m/Y H:i:s') }}
+    </div>
     <br>
-    Nama : {{ $transaction->patients->name ?? '-' }}<br>
-    Alamat : {{ $transaction->patients->address ?? '-' }}<br>
-    <hr>
-    Nama Dokter : {{ $transaction->doctors->name ?? '-' }}<br>
+
+    <table class="info-table">
+        <tr>
+            <td class="info-label">Nama</td>
+            <td class="info-colon">:</td>
+            <td class="info-value">{{ $transaction->patients->name ?? '-' }}</td>
+        </tr>
+        <tr>
+            <td class="info-label">Alamat</td>
+            <td class="info-colon">:</td>
+            <td class="info-value">{{ $transaction->patients->address ?? '-' }}</td>
+        </tr>
+        <tr>
+            <td class="info-label">No.Telp</td>
+            <td class="info-colon">:</td>
+            <td class="info-value">{{ $transaction->patients->phone ?? '-' }}</td>
+        </tr>
+        <tr>
+            <td class="info-label">Dokter</td>
+            <td class="info-colon">:</td>
+            <td class="info-value">{{ $transaction->doctors->name ?? '-' }}</td>
+        </tr>
+    </table>
+
     <hr>
 
-    @foreach ($transactionCart as $groupKey => $items)
-        @foreach ($items as $item)
-            {{ $item->medicine->name }}<br>
-            {{ $item->quantity }} x {{ number_format($item->item_price) }}
-            <span style="float:right">{{ number_format($item->raw_total) }}</span><br>
-        @endforeach
+    <table class="info-table">
+        <tr>
+            <td class="info-label">Nomor</td>
+            <td class="info-colon">:</td>
+            <td class="info-value">{{ $transaction->transaction_code }}</td>
+        </tr>
+        <tr>
+            <td class="info-label">Operator</td>
+            <td class="info-colon">:</td>
+            <td class="info-value">{{ $operator }}</td>
+        </tr>
+    </table>
+
+    <hr>
+
+    {{-- ITEM --}}
+    @foreach ($transactionCart as $items)
+        <table class="table-struk">
+            @foreach ($items as $item)
+                <tr>
+                    <td class="col-name">
+                        {{ $item->medicine->name }}
+                        <hr>
+                    </td>
+                    <td class="col-qty">
+                        {{ $item->quantity }}
+                    </td>
+                    <td class="col-total">
+                        {{ number_format($item->total_price + $item->embalase) }}
+                    </td>
+                </tr>
+            @endforeach
+        </table>
     @endforeach
 
-    <hr>
+    <br>
 
-    Sub Total
-    <span style="float:right;">{{ number_format($totalRawTotal) }}</span><br>
+    Sub Total <span style="float:right">{{ number_format($totalPrice + $totalEmbalase) }}</span><br>
 
-    Discount
-    <span style="float:right;">-{{ number_format($totaldiscount) }}</span><br>
+    Discount <span style="float:right">-{{ number_format($totaldiscount) }}</span><br>
+    <strong>Jumlah <span style="float:right">{{ number_format($totalFinalPrice) }}</span></strong><br>
+    Bayar <span style="float:right">{{ number_format($transaction->paid) }}</span><br>
+    Kembalian<span style="float:right">{{ number_format($transaction->changes) }}</span>
 
-    <strong>
-        Jumlah
-        <span style="float:right;">{{ number_format($payment) }}</span>
-    </strong><br>
 
-    Bayar
-    <span style="float:right;">{{ number_format($transaction->paid) }}</span><br>
 
-    Kembalian
-    <span style="float:right;">{{ number_format($transaction->changes) }}</span>
-
-    <hr>
-    Kasir : {{ $operator }}<br>
     <hr>
 
     <div class="text-center">
-        <span>Terima Kasih</span><br>
-        <span>Semoga Lekas Sembuh</span>
+        Terima Kasih<br>
+        Semoga Lekas Sembuh
     </div>
-</div>
 
+</div>
 <script>
     window.onload = () => {
         window.print();
-        window.onafterprint = () => {
-            window.location.href = "{{ route('transaction', 'resep') }}";
-        }
+        window.onafterprint = () => window.close();
     }
 </script>

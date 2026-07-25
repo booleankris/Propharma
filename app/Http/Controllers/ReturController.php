@@ -233,7 +233,8 @@ class ReturController extends Controller
                 'total'            => $request->total_retur,
                 'date'             => $now,
                 'status'           => 3,
-                'batches_id'       => $transfer->batches_id
+                'batches_id'       => $transfer->batches_id,
+                'user_id'          => auth()->user()->id,
             ]);
 
             $activeshift = activeShift();
@@ -486,6 +487,8 @@ class ReturController extends Controller
                 'date'             => $now,
                 'status'           => 4,
                 'batches_id'       => $batch->id,
+                'user_id'          => auth()->user()->id,
+
             ]);
 
             DB::commit();
