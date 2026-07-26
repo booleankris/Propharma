@@ -14,10 +14,12 @@ class Reject extends Model
         'date',
         'pharmacy_id',
         'medicine_id',
+        'medicine_name', 
         'quantity',
         'total',
         'reason',
     ];
+    
     public function medicines()
     {
         return $this->belongsTo(Medicines::class, 'medicine_id');

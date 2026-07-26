@@ -45,7 +45,7 @@ class ReceivingController extends Controller
             $order_exist = Order::whereHas('order_items.receivingItems.receiving_details.receiving', function ($q) use ($transaction) {
                 $q->where('id', $transaction->id);
             })
-                ->where('status', '!=', 2) // not yet completed — adjust value to match your status convention
+                ->where('status', '!=', 2) // not yet completed order
                 ->first();
 
             return view('orders.receiving', compact('order_code', 'transaction', 'now', 'order_exist', 'receiving_id'));
@@ -540,7 +540,8 @@ class ReceivingController extends Controller
         $datenow = Carbon::now()->format('Y-m-d');
 
         // FIX #1: Added order_id filter so we only get the receiving for THIS order
-        $transaction = Receiving::where('status', 0)->first();
+        $transaction = Receiving::where('status', 0)->where('pharmacy_id', 
+        auth()->user()->pharmacy_id)->first();
 
         // FIX #2: Guard against null $check_order
         $check_order = OrderItems::with('orders')->whereHas('orders', function ($q) use ($id) {
@@ -567,7 +568,7 @@ class ReceivingController extends Controller
         if ($transaction) {
             $getOrder = Order::findOrFail($id);
 
-            $receiving_id = $transaction->id;
+            $receiving_id = $getOrder->receiving_id;
             $receiving_code = $transaction->code;
             $order_id = $getOrder->id;
             $order_code = $getOrder->code;
@@ -580,7 +581,7 @@ class ReceivingController extends Controller
                 ->sum('total') ?? '0';
             $d_ppn = $d_price * 0.11 ?? '0';
             $d_total = $d_price + $d_ppn ?? '0';
-
+           
             return view('orders.receiving', compact('order_id', 'd_price', 'd_ppn', 'd_total', 'order_code', 'creditorOption', 'receiving_code', 'transaction', 'now', 'datenow', 'receiving_id'));
         } else {
             $year   = now()->format('y');
@@ -795,6 +796,7 @@ class ReceivingController extends Controller
 
     public function completeOrder(Request $request)
     {
+
         $request->validate([
             'receivingid' => 'required',
             'orderid'     => 'required',
@@ -822,6 +824,7 @@ class ReceivingController extends Controller
 
             $now        = Carbon::now()->format('Y-m-d');
             $pharmacyId = auth()->user()->pharmacy_id;
+
 
             // 1. Pre-fetch all medicines
             $medicineIds = $receivingItems->pluck('order_items.medicine_id')->unique()->values();

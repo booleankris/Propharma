@@ -380,11 +380,16 @@ class OrdersController extends Controller
             $serial = str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
             $receiving_code = $prefix . $serial;
 
-            Receiving::create([
+            $transaction = Receiving::create([
                 'pharmacy_id'  => auth()->user()->pharmacy_id,
                 'code'         => $receiving_code,
                 'date'         => $now,
                 'status'       => 0,
+            ]);
+
+             // 26 Juli 2026 - Edit receiving_id from orders
+            $order->update([
+                'receiving_id' => $transaction->id,
             ]);
 
             DB::commit();

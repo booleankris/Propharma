@@ -191,26 +191,43 @@
                                     onkeyup="searchMedicineData(this.value)" autocomplete="off">
                             </div>
                         </div>
-                        <input autofocus type="text" id="searchInput"
-                            class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
-                            placeholder="Cari Obat..." oninput="searchMedicineData(this.value)" autocomplete="off">
-                        <div id="searchDropdown" class="dropdown-table" style="display:none;">
-                            <table class="table table-sm table-bordered mb-0">
-                                <thead>
-                                    <tr>
-                                        <th>#</th>
-                                        <th>Code</th>
-                                        <th>Name Pelanggan</th>
-                                        <th>Total</th>
-                                    </tr>
-                                </thead>
-                            </table>
+                        <div class="relative flex items-center gap-2">
+                            <div class="relative flex-1">
+                                <input autofocus type="text" id="searchInput"
+                                    class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
+                                    placeholder="Cari Obat..." oninput="searchMedicineData(this.value)" autocomplete="off">
 
-                            <div id="tableScroll" style="max-height: 250px; overflow-y: auto;" onscroll="handleScroll()">
-                                <table class="table table-sm table-bordered mb-0">
-                                    <tbody id="searchResults"></tbody>
-                                </table>
+                                <div id="searchDropdown" class="dropdown-table" style="display:none;">
+                                    <table class="table table-sm table-bordered mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th>#</th>
+                                                <th>Code</th>
+                                                <th>Name Pelanggan</th>
+                                                <th>Total</th>
+                                            </tr>
+                                        </thead>
+                                    </table>
+                                    <div id="tableScroll" style="max-height: 250px; overflow-y: auto;"
+                                        onscroll="handleScroll()">
+                                        <table class="table table-sm table-bordered mb-0">
+                                            <tbody id="searchResults"></tbody>
+                                        </table>
+                                    </div>
+                                </div>
                             </div>
+
+                            <button type="button" id="customMedicineBtn" onclick="toggleCustomMedicine()"
+                                class="flex items-center justify-center shrink-0 h-[42px] w-[42px] rounded-lg bg-[#1678df] text-white hover:bg-blue-600 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-300"
+                                title="Tambah Obat Custom">
+                                <svg id="customMedicineIcon" xmlns="http://www.w3.org/2000/svg" width="20"
+                                    height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                    stroke-linecap="round" stroke-linejoin="round">
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                    <path d="M12 5l0 14" />
+                                    <path d="M5 12l14 0" />
+                                </svg>
+                            </button>
                         </div>
 
                         <div class="flex flex-wrap gap-3 py-2 w-full">
@@ -226,7 +243,7 @@
                                 <div class="py-1 text-[13px] font-bold">Nama Obat</div>
                                 <input id="medicine_name" readonly
                                     class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
-                                    placeholder="Nama Obat">
+                                    placeholder="Nama Obat (pilih dari pencarian)">
                             </div>
 
                             <div class="w-full sm:w-32">
@@ -394,7 +411,7 @@
         let selectedRowIndex = null;
         let d_total = {{ $d_total }};
         let rejection_code = @json($rejection_code);
-
+        let isCustomMode = false;
         // Setting Initial Transaction Value
 
         $('#d_total').val(formatRupiah(d_total));
@@ -403,6 +420,7 @@
 
         // Datatable
         document.addEventListener('DOMContentLoaded', function() {
+            exitCustomMode();
 
             orderItemsTable = $('#orderItemsTable').DataTable({
                 processing: true,
@@ -418,11 +436,14 @@
                         data: 'date',
                         name: 'date',
                         defaultContent: '-'
-
                     },
                     {
-                        data: 'medicines.name',
-                        name: 'name'
+                        data: null,
+                        name: 'medicine_name',
+                        render: function(data, type, row) {
+                            // If standard medicine exists, show it. Otherwise, show custom name.
+                            return row.medicines ? row.medicines.name : (row.medicine_name || '-');
+                        }
                     },
                     {
                         data: 'quantity',
@@ -430,7 +451,10 @@
                     },
                     {
                         data: 'total',
-                        name: 'total'
+                        name: 'total',
+                        render: function(data, type, row) {
+                            return data ? data : 'Rp. 0'; // Handle visual for 0/null
+                        }
                     },
                     {
                         data: 'reason',
@@ -665,65 +689,142 @@
 
 
         function counttotal() {
-            let qty = document.getElementById('qty').value;
+            let qty = parseFloat(document.getElementById('qty').value) || 0;
+            let price = parseFloat(itemprice) || 0;
+
             itemqty = qty;
-            itemtotal = qty * itemprice;
-            total_transaction += itemtotal;
+            itemtotal = qty * price;
+
             document.getElementById('total').value = formatRupiah(itemtotal);
-
-
-
         }
 
-        function resetInputs() {
+        function clearFormFields() {
             document.getElementById('medicine_code').value = '';
             document.getElementById('medicine_name').value = '';
             document.getElementById('unit').value = '';
             document.getElementById('qty').value = '';
             document.getElementById('total').value = '';
+            document.getElementById('item_price').value = '';
             document.getElementById('reason').value = '';
 
-
-
-            // reset JS
             itemcode = '';
             itemprice = '';
             itemqty = '';
             itemtotal = '';
             itemcreditor = null;
+            medicineSelectedId = '';
             selectedRowData = null;
-            document.getElementById('searchInput').focus();
             empyCreditorOption();
+        }
 
+        function resetInputs() {
+            clearFormFields();
+            exitCustomMode();
+            document.getElementById('searchInput').value = '';
+            document.getElementById('searchInput').focus();
+        }
+
+        function setPlusIconState(active) {
+            const icon = document.getElementById('customMedicineIcon');
+            const btn = document.getElementById('customMedicineBtn');
+
+            if (active) {
+                // Tabler "x" icon — cancel custom mode
+                icon.innerHTML = `
+            <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+            <path d="M18 6l-12 12" />
+            <path d="M6 6l12 12" />
+        `;
+                btn.title = 'Batal Mode Custom';
+                btn.classList.remove('bg-[#1678df]', 'hover:bg-blue-600');
+                btn.classList.add('bg-red-500', 'hover:bg-red-600');
+            } else {
+                // Tabler "plus" icon — enter custom mode
+                icon.innerHTML = `
+            <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+            <path d="M12 5l0 14" />
+            <path d="M5 12l14 0" />
+        `;
+                btn.title = 'Tambah Obat Custom';
+                btn.classList.remove('bg-red-500', 'hover:bg-red-600');
+                btn.classList.add('bg-[#1678df]', 'hover:bg-blue-600');
+            }
+        }
+
+        function enterCustomMode() {
+            isCustomMode = true;
+            clearFormFields();
+
+            const nameInput = document.getElementById('medicine_name');
+            const searchInput = document.getElementById('searchInput');
+
+            nameInput.readOnly = false;
+            nameInput.placeholder = 'Ketik Nama Obat Manual';
+            nameInput.style.backgroundColor = '#ffffff';
+            nameInput.style.cursor = 'text';
+
+            searchInput.value = '';
+            searchInput.disabled = true;
+            searchInput.placeholder = 'Nonaktif (mode custom)';
+            searchInput.style.backgroundColor = '#f3f4f6';
+
+            document.getElementById('searchDropdown').style.display = 'none';
+
+            setPlusIconState(true);
+            nameInput.focus();
+        }
+
+        function exitCustomMode() {
+            isCustomMode = false;
+
+            const nameInput = document.getElementById('medicine_name');
+            const searchInput = document.getElementById('searchInput');
+
+            nameInput.readOnly = true;
+            nameInput.placeholder = 'Nama Obat (pilih dari pencarian)';
+            nameInput.style.backgroundColor = '#f3f4f6';
+            nameInput.style.cursor = 'not-allowed';
+
+            searchInput.disabled = false;
+            searchInput.placeholder = 'Cari Obat...';
+            searchInput.style.backgroundColor = '#ffffff';
+
+            setPlusIconState(false);
+        }
+
+        function toggleCustomMedicine() {
+            if (isCustomMode) {
+                exitCustomMode();
+                clearFormFields();
+                document.getElementById('searchInput').focus();
+            } else {
+                enterCustomMode();
+            }
         }
 
         function addItem() {
             const payload = {
                 code: rejection_code,
                 date: date,
-                medicine_id: medicineSelectedId,
+                medicine_id: medicineSelectedId || null,
+                medicine_name: document.getElementById('medicine_name').value,
                 quantity: itemqty,
-                total: itemtotal,
+                total: itemtotal || 0, // raw number now, not formatted string
                 reason: document.getElementById('reason').value,
-
             };
-            console.log(payload);
+
             axios.post("{{ route('sales.addItemReject') }}", payload, {
                     headers: {
-                        'X-CSRF-TOKEN': document
-                            .querySelector('meta[name="csrf-token"]')
-                            .content
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
                     }
                 })
                 .then(res => {
                     if (res.data.success) {
                         let item = res.data.summary;
                         orderItemsTable.ajax.reload(null, false);
-                        console.log(item.price);
                         d_total += item.price_item;
                         $('#d_total').val(formatRupiah(d_total));
                         resetInputs();
-                        empyCreditorOption();
                         iziToast.success({
                             title: 'Berhasil',
                             position: 'topRight',
@@ -733,8 +834,14 @@
                 })
                 .catch(err => {
                     console.error(err);
-                    empyCreditorOption();
-                    alert('Isi Form Dengan Benar!');
+                    // Show the actual validation errors instead of a generic alert
+                    if (err.response?.data?.errors) {
+                        console.log('Validation errors:', err.response.data.errors);
+                        const messages = Object.values(err.response.data.errors).flat().join('\n');
+                        alert('Isi Form Dengan Benar!\n\n' + messages);
+                    } else {
+                        alert('Isi Form Dengan Benar!');
+                    }
                 });
         }
 
@@ -790,6 +897,11 @@
                 btn.disabled = false;
             }, 4000);
         }
+        document.getElementById('medicine_name').addEventListener('keydown', function(e) {
+            if (e.key !== 'Enter') return;
+            e.preventDefault();
+            document.getElementById('qty').focus();
+        });
         $('#back').click(function() {
             window.location.href = "{{ route('home') }}";
         });

@@ -39,6 +39,10 @@ class ItemsLog extends Model
     {
         return $this->belongsTo(Batches::class, 'batches_id');
     }
+    public function users()
+    {
+        return $this->belongsTo(User::class, 'user_id');
+    }
     public function receiving()
     {
         return $this->belongsTo(Receiving::class, 'transaction_code', 'code');

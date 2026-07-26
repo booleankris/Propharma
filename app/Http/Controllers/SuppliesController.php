@@ -27,10 +27,31 @@ class SuppliesController extends Controller
     }
     public function getSupplies(Request $request)
     {
+
         if ($request->ajax()) {
+
+            $pharmacyId = auth()->user()->pharmacy_id;
 
             // 1. BASE QUERY: Apply filters without eager load
             $baseQuery = ItemsLog::query();
+
+            // Restrict to the logged-in user's pharmacy:
+            // - Purchases (status 2) are scoped via receiving.pharmacy_id
+            // - Everything else is scoped via itemslog.user_id -> users.pharmacy_id
+            $baseQuery->where(function ($q) use ($pharmacyId) {
+                $q->where(function ($sub) use ($pharmacyId) {
+                    $sub->where('status', 2)
+                        ->whereHas('receiving', function ($r) use ($pharmacyId) {
+                            $r->where('pharmacy_id', $pharmacyId)
+                            ->where('status', 1);
+                        });
+                })->orWhere(function ($sub) use ($pharmacyId) {
+                    $sub->where('status', '!=', 2)
+                        ->whereHas('users', function ($u) use ($pharmacyId) {
+                            $u->where('pharmacy_id', $pharmacyId);
+                        });
+                });
+            });
 
             if ($request->filled('searchMedicine')) {
                 $searchValue = $request->searchMedicine;

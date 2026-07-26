@@ -14,7 +14,7 @@ class RejectController extends Controller
     {
         $now = Carbon::now();
 
-        $year  = $now->format('y'); 
+        $year  = $now->format('y');
         $month = $now->format('m');
         $prefix = "{$year}{$month}RJ";
 
@@ -35,13 +35,12 @@ class RejectController extends Controller
     {
         $search = $request->search;
         $orderid = $request->orderid;
-        $data = Medicines::where('pharmacy_id', Auth()->user()->pharmacy_id)
-            ->with([
-                'composition',
-                'category',
-                'factory',
-                'creditor'
-            ])
+        $data = Medicines::with([
+            'composition',
+            'category',
+            'factory',
+            'creditor'
+        ])
 
 
             ->where('medicines.name', 'LIKE', "%{$search}%")
@@ -76,12 +75,13 @@ class RejectController extends Controller
             'code'          => 'required',
             'date'          => 'required',
             'pharmacy_id'   => 'nullable',
-            'medicine_id'   => 'required',
+            'medicine_id'   => 'nullable', // <-- Changed to nullable
+            'medicine_name' => 'nullable|string', // <-- New field
             'quantity'      => 'required',
-            'total'         => 'required',
+            'total'         => 'nullable|numeric', // <-- Allow null or 0
             'reason'        => 'required',
-
         ]);
+
         $rejectDate = Carbon::createFromFormat('d/m/Y', $request->date)->format('Y-m-d');
 
         $item = Reject::create([
@@ -89,13 +89,14 @@ class RejectController extends Controller
             'date'          => $rejectDate,
             'pharmacy_id'   => Auth()->user()->pharmacy_id,
             'medicine_id'   => $validated['medicine_id'],
+            'medicine_name' => $validated['medicine_name'] ?? null,
             'quantity'      => $validated['quantity'],
-            'total'         => $validated['total'],
+            'total'         => $validated['total'] ?? 0, // <-- Set to 0 if null
             'reason'        => $validated['reason'],
         ]);
 
-        $price_total = Reject::where('id', $item->id)->sum('total') ?? '';
-
+        // Calculate sum correctly in case of 0 totals
+        $price_total = Reject::where('id', $item->id)->sum('total') ?? 0;
         $ppn = $price_total * 0.11;
 
         return response()->json([

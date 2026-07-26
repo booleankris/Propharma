@@ -263,6 +263,32 @@
             color: #dc2626;
             border-color: #fca5a5;
         }
+
+        .code-copy-wrap {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .btn-copy-code {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 16px;
+            height: 16px;
+            padding: 0;
+            border: none;
+            background: transparent;
+            color: #9ca3af;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background .12s, color .12s;
+        }
+
+        .btn-copy-code:hover {
+            background: #eff6ff;
+            color: #1d4ed8;
+        }
     </style>
 @endsection
 
@@ -404,6 +430,23 @@
         let tableData = null;
         let itemsTable = null;
 
+        function copyCode(btn, code) {
+            navigator.clipboard.writeText(code).then(() => {
+                iziToast.success({
+                    title: 'Disalin',
+                    message: `Nomor ${code} berhasil disalin`,
+                    position: 'topRight',
+                    timeout: 1500
+                });
+            }).catch(() => {
+                iziToast.error({
+                    title: 'Gagal',
+                    message: 'Tidak bisa menyalin nomor',
+                    position: 'topRight',
+                    timeout: 1500
+                });
+            });
+        }
         $(function() {
 
             // ── Flatpickr instances ───────────────────────────────────────────
@@ -415,7 +458,7 @@
                 locale: {
                     firstDayOfWeek: 1
                 },
-                defaultDate: [today, today], 
+                defaultDate: [today, today],
                 onClose: function(selectedDates) {
                     if (selectedDates.length === 1 || selectedDates.length === 2) {
                         tableData.ajax.reload();
@@ -462,7 +505,17 @@
                     },
                     {
                         data: 'code',
-                        className: 'col-mono'
+                        className: 'col-mono',
+                        render: (data) =>
+                            `<span class="code-copy-wrap">
+                                <span class="code-text">${data}</span>
+                                <button type="button" class="btn-copy-code" onclick="event.stopPropagation(); copyCode(this, '${data}')" title="Salin nomor">
+                                    <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
+                                        <rect x="5" y="5" width="9" height="9" rx="1.5"/>
+                                        <path d="M11 5V3a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h2"/>
+                                    </svg>
+                                </button>
+                            </span>`
                     },
                     {
                         data: 'type',

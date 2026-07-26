@@ -16,6 +16,7 @@ class Order extends Model
         'code',
         'date',
         'status',
+        'receiving_id',
     ];
     public function order_items()
     {
