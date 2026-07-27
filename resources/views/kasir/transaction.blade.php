@@ -1831,7 +1831,7 @@
     var total_discount = {{ $discount_total }};
     var discount = "";
     var subtotal_discount = "";
-    var paymentType = "";
+    var paymentType = "CASH";
 
     const subtotalpreview = document.getElementById('subtotal');
 
@@ -2584,7 +2584,7 @@
 
         function getPaymentType() {
             const selected = document.querySelector('input[name="payment_type"]:checked');
-            paymentType = selected ? selected.value : null;
+            paymentType = selected ? selected.value : "CASH";
 
             // Show / hide bank name field
             const bankWrapper = document.getElementById('bankNameWrapper');
