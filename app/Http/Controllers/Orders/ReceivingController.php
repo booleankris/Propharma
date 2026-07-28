@@ -154,7 +154,8 @@ class ReceivingController extends Controller
             ->with(['medicines', 'receiving_items', 'receiving_items.locations', 'receiving_items.etalases', 'receiving_items.receiving_details'])
             ->withSum('receivingItems as qty_received', 'qty_received')
             ->whereHas('orders', function ($q) use ($ordersid) {
-                $q->where('id', $ordersid);
+                $q->where('id', $ordersid)
+                    ->where('pharmacy_id', auth()->user()->pharmacy_id);
             });
 
         if ($creditorCode) {
@@ -540,8 +541,10 @@ class ReceivingController extends Controller
         $datenow = Carbon::now()->format('Y-m-d');
 
         // FIX #1: Added order_id filter so we only get the receiving for THIS order
-        $transaction = Receiving::where('status', 0)->where('pharmacy_id', 
-        auth()->user()->pharmacy_id)->first();
+        $transaction = Receiving::where('status', 0)->where(
+            'pharmacy_id',
+            auth()->user()->pharmacy_id
+        )->first();
 
         // FIX #2: Guard against null $check_order
         $check_order = OrderItems::with('orders')->whereHas('orders', function ($q) use ($id) {
@@ -581,7 +584,7 @@ class ReceivingController extends Controller
                 ->sum('total') ?? '0';
             $d_ppn = $d_price * 0.11 ?? '0';
             $d_total = $d_price + $d_ppn ?? '0';
-           
+
             return view('orders.receiving', compact('order_id', 'd_price', 'd_ppn', 'd_total', 'order_code', 'creditorOption', 'receiving_code', 'transaction', 'now', 'datenow', 'receiving_id'));
         } else {
             $year   = now()->format('y');
