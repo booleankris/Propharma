@@ -42,7 +42,7 @@ class OrdersController extends Controller
                 'creditors'
             ])
             ->whereHas('orders', function ($q) {
-                $q->where('status', 0);
+                $q->where('status', 0)->where('pharmacy_id', auth()->user()->pharmacy_id);
             })
 
             ->when($creditorId, function ($q) use ($creditorId) {
@@ -387,7 +387,7 @@ class OrdersController extends Controller
                 'status'       => 0,
             ]);
 
-             // 26 Juli 2026 - Edit receiving_id from orders
+            // 26 Juli 2026 - Edit receiving_id from orders
             $order->update([
                 'receiving_id' => $transaction->id,
             ]);
