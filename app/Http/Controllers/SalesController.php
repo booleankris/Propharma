@@ -565,13 +565,25 @@ class SalesController extends Controller
             $recipeStatus = null;
         }
         $service = 0;
-        // Service Filter / Validation, Only UM that can have jasa, 22 JULI 2026
-        if ($request->get('cart_type') == "UM" || $request->get('cart_type') == "UK") {
-            $service = $request->get('service');
 
-        } else {
+        // Service Filter / Validation, Only UM that can have jasa, 22 JULI 2026
+        // Service Filter 2, Only racikan can have jasa, 29 JULI 2026
+
+        if ($request->get('racikstatus') == 1) {
             $service = 0;
+        } else {
+            if ($request->get('cart_type') == "UM" || $request->get('cart_type') == "UK") {
+                $service = $request->get('service');
+            } else {
+                $service = 0;
+            }
         }
+
+        // if ($request->get('cart_type') == "UM" || $request->get('cart_type') == "UK") {
+        //     $service = $request->get('service');
+        // } else {
+        //     $service = 0;
+        // }
 
 
         $transaction = MedicineCart::create([

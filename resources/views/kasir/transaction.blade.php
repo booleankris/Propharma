@@ -2924,9 +2924,9 @@
         console.log('harganya itu adalah : ' + price2);
         total_item = val;
         roundedtotal = price2 * val - discount;
-        if (currenttransaction == "KREDIT") {
+        if (currenttransaction == "KREDIT" && racikstatus === 0) {
             subtotal = roundedtotal + parseInt(service);
-        } else if (transaction_type == "RESEP TUNAI") {
+        } else if (transaction_type == "RESEP TUNAI" && racikstatus === 0) {
             subtotal = Math.round(roundedtotal / 1000) * 1000 + parseInt(service);
         } else {
             subtotal = Math.round(roundedtotal / 1000) * 1000;
