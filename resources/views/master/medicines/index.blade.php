@@ -372,11 +372,11 @@
                             <select id="type" name="type"
                                 class="select2 w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px]">
                                 <option value="">-- Pilih Tipe --</option>
-                                <option value="Narkotika">Narkotika</option>
-                                <option value="Psikotropika">Psikotropika</option>
-                                <option value="Reguler">Reguler</option>
-                                <option value="Prekursor">Prekursor</option>
-                                <option value="Obat Tertentu">Obat Tertentu</option>
+                                <option value="NARKOTIKA">Narkotika</option>
+                                <option value="PSIKOTROPIKA">Psikotropika</option>
+                                <option value="REGULER">Reguler</option>
+                                <option value="PREKURSOR">Prekursor</option>
+                                <option value="OBAT-OBAT TERTENTU (OOT)">Obat Tertentu</option>
                             </select>
                         </div>
 
