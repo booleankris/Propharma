@@ -8,10 +8,10 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\App;
 
-class UpdateMedicines extends Command
+class UpdateMedicinesByCode extends Command
 {
-    protected $signature = 'medicines:updatemedicines {--dry-run : Simulate the import without modifying the database}';
-    protected $description = 'Safely updating Medicines data from Excel';
+    protected $signature = 'medicines:updatebycode {--dry-run : Simulate the import without modifying the database}';
+    protected $description = 'Safely update Medicines raw_price, net_price, het_price, content, strip by matching code barang';
 
     public function handle()
     {
@@ -20,13 +20,13 @@ class UpdateMedicines extends Command
         if ($isDryRun) {
             $this->warn("🔍 RUNNING IN DRY-RUN MODE: No database changes will be saved.");
         } elseif (App::environment('production')) {
-            if (!$this->confirm('⚠️ YOU ARE IN PRODUCTION! Are you sure you want to run this update?')) {
+            if (!$this->confirm('⚠️ YOU ARE IN PRODUCTION! This will update raw_price, net_price, het_price, content, and strip. Are you sure?')) {
                 $this->info('Operation cancelled.');
                 return 0;
             }
         }
 
-        $path = storage_path('app/update_medicine_small.xlsx');
+        $path = storage_path('app/1AGUSTUS_UPDATE_HNA.xlsx');
 
         if (!file_exists($path)) {
             $this->error('File not found: ' . $path);
@@ -39,100 +39,88 @@ class UpdateMedicines extends Command
 
         $updated = 0;
         $skipped = 0;
-        $records = []; // id => updateData, collected first so we can do a two-phase code update
-
-        foreach ($rows as $index => $row) {
-            $rowNumber = $index + 2;
-
-            $id = isset($row[30]) ? trim((string) $row[30]) : null;
-
-            if (empty($id) || !is_numeric($id)) {
-                $this->warn("Row {$rowNumber}: Invalid or missing ID [{$id}]");
-                $skipped++;
-                continue;
-            }
-
-            $code = isset($row[27]) ? trim((string) $row[27]) : null;
-
-            $rawPrice = (int) str_replace(',', '', $row[28] ?? 0);
-            $netPrice = (int) round($rawPrice * 1.11); // 11% PPN
-            $hetPrice = (int) str_replace(',', '', $row[29] ?? 0);
-
-            $barcodeInput = isset($row[31]) ? trim((string) $row[31]) : null;
-            $barcode = null;
-
-            if (!empty($barcodeInput)) {
-                if (is_numeric($barcodeInput) && str_contains(strtolower($barcodeInput), 'e')) {
-                    $barcode = sprintf('%.0f', (float)$barcodeInput);
-                } else {
-                    $barcode = $barcodeInput;
-                }
-            }
-
-            $strip = (int) str_replace(',', '', $row[32] ?? 1);
-
-            $updateData = [
-                'code'      => $code,
-                'raw_price' => $rawPrice,
-                'net_price' => $netPrice,
-                'het_price' => $hetPrice,
-                'strip'     => $strip,
-            ];
-
-            if (!is_null($barcode)) {
-                $updateData['barcode'] = $barcode;
-            }
-
-            $records[$id] = ['row' => $rowNumber, 'data' => $updateData];
-        }
-
-        // Only touch DB for IDs that actually exist
-        $ids = array_keys($records);
-        $existingIds = Medicines::whereIn('id', $ids)->pluck('id')->all();
-
-        foreach ($ids as $id) {
-            if (!in_array($id, $existingIds)) {
-                $this->warn("Row {$records[$id]['row']}: Medicine ID not found [{$id}]");
-                $skipped++;
-                unset($records[$id]);
-            }
-        }
-
-        DB::beginTransaction();
+        $zeroHetWarnings = 0;
 
         try {
-            // PHASE 1: set every code to a temp unique placeholder to avoid
-            // unique constraint collisions when codes are being swapped/reassigned
-            foreach ($records as $id => $info) {
-                if (!$isDryRun) {
-                    Medicines::where('id', $id)->update(['code' => 'TMP-' . $id]);
-                }
-            }
+            foreach ($rows as $index => $row) {
+                $rowNumber = $index + 2;
 
-            // PHASE 2: apply the real final data (including the true code)
-            foreach ($records as $id => $info) {
-                if (!$isDryRun) {
-                    Medicines::where('id', $id)->update($info['data']);
+                // Column A (index 0) = code barang
+                $code = isset($row[0]) ? trim((string) $row[0]) : null;
+
+                if (empty($code)) {
+                    $this->warn("Row {$rowNumber}: Missing code barang, skipped.");
+                    $skipped++;
+                    continue;
                 }
+
+                // Column C (index 2) = HNA Baru -> raw_price
+                $rawPrice = $this->parseNumber($row[2] ?? 0);
+                $netPrice = (int) round($rawPrice * 1.11); // 11% PPN
+
+                // Column D (index 3) = HET -> het_price
+                $hetPrice = $this->parseNumber($row[3] ?? 0);
+                if ($hetPrice === 0) {
+                    $zeroHetWarnings++;
+                }
+
+                // Column H (index 7) = ISI/BOX -> content
+                $content = $this->parseNumber($row[7] ?? 0);
+
+                // Column I (index 8) = ISI/STRIP -> strip
+                $strip = $this->parseNumber($row[8] ?? 1);
+
+                $medicine = Medicines::where('code', $code)->first();
+
+                if (!$medicine) {
+                    $this->warn("Row {$rowNumber}: Medicine code not found in DB [{$code}]");
+                    $skipped++;
+                    continue;
+                }
+
+                $updateData = [
+                    'raw_price' => $rawPrice,
+                    'net_price' => $netPrice,
+                    'het_price' => $hetPrice,
+                    'content'   => $content,
+                    'strip'     => $strip,
+                ];
+
+                if (!$isDryRun) {
+                    $medicine->update($updateData);
+                }
+
                 $updated++;
             }
 
-            if ($isDryRun) {
-                DB::rollBack();
-                $this->info("Dry-run complete. Everything looks good!");
-            } else {
-                DB::commit();
-                $this->info("Database successfully updated and committed!");
+            $this->info($isDryRun ? "Dry-run complete. No changes were saved." : "Database successfully updated!");
+            $this->info("Summary -> Updated: {$updated}, Skipped/Not found: {$skipped}");
+
+            if ($zeroHetWarnings > 0) {
+                $this->warn("⚠️ {$zeroHetWarnings} row(s) had HET = 0 in the source file. Double-check this is intentional before trusting het_price for those rows.");
             }
 
-            $this->info("Summary -> Updated: {$updated}, Skipped/Not found: {$skipped}");
         } catch (\Exception $e) {
-            DB::rollBack();
-            $this->error("CRITICAL ERROR on processing! All database changes have been rolled back.");
+            $this->error("CRITICAL ERROR on processing!");
             $this->error($e->getMessage());
             return 1;
         }
 
         return 0;
+    }
+
+    /**
+     * Parse a numeric Excel cell that may come as int, float, or
+     * a comma-formatted string like "12,500".
+     */
+    private function parseNumber($value): int
+    {
+        if (is_numeric($value)) {
+            return (int) round((float) $value);
+        }
+
+        $clean = str_replace(',', '', (string) $value);
+
+        return is_numeric($clean) ? (int) round((float) $clean) : 0;
     }
 }
