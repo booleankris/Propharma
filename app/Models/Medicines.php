@@ -65,7 +65,7 @@ class Medicines extends Model
             'creditor_code',
             'id',
             'code'
-        );
+        )->withPivot('discount')->withTimestamps();
     }
     public function transactions()
     {
@@ -87,7 +87,8 @@ class Medicines extends Model
     {
         return $this->hasMany(ItemsLog::class, 'medicine_id');
     }
-    public function order_items(){
+    public function order_items()
+    {
         return $this->hasMany(OrderItems::class, 'medicine_id');
     }
     public function history()
@@ -114,7 +115,8 @@ class Medicines extends Model
 
         return $prefix . str_pad($number, 5, '0', STR_PAD_LEFT);
     }
-    public function medicine_transactions(){
+    public function medicine_transactions()
+    {
         return $this->hasMany(MedicineTransactions::class, 'id');
     }
 }

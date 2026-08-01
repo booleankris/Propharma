@@ -44,6 +44,7 @@ use App\Http\Controllers\MedicineOrderHistoryController;
 use App\Http\Controllers\Orders\OrdersController;
 use App\Http\Controllers\Orders\ReceivingController;
 use App\Http\Controllers\OrdersPayment;
+use App\Http\Controllers\OrdersTrackingController;
 use App\Http\Controllers\ParetoController;
 use App\Http\Controllers\PrintController;
 use App\Http\Controllers\ProductController;
@@ -140,7 +141,7 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     });
 
     Route::resource('sales', SalesController::class);
-    
+
     // Route::get('/transaction', [SalesController::class, 'index'])->name('transaction');
 
     // Initiate New Transaction
@@ -384,6 +385,8 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
         ->name('orderfinal.print');
     Route::get('/receiving/{order}/printorders', [ReceivingController::class, 'printOrders'])
         ->name('orderfinal.printorders');
+    Route::get('/orders-tracking', [OrdersTrackingController::class, 'index'])->name('orders-tracking.index');
+    Route::get('/orders-tracking/data', [OrdersTrackingController::class, 'data'])->name('orders-tracking.data');
     // ================================ Statistic ================================
 
     // INVOICES (Tagihan)

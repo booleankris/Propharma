@@ -48,7 +48,7 @@ class OrdersExport implements
         return [
             'NAMA',
             'QTY',
-            'SATUAN',
+            'KEMASAN',
             'HRG_HNA',
             'JUMLAH',
             'KREDITUR',
@@ -61,7 +61,7 @@ class OrdersExport implements
         return [
             $order->medicines?->name,
             $order->quantity,
-            $order->medicines?->unit,
+            $order->medicines?->packaging,
             $order->medicines?->pharmacy_net_price,
             $order->total,
             $order->creditors->name,

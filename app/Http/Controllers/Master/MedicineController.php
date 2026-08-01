@@ -121,12 +121,13 @@ class MedicineController extends Controller
             'status'               => 1,
         ]);
 
-        // Attach creditors via pivot
-        $codes = array_filter(explode(',', $request->get('creditor_ids', '')));
-        foreach ($codes as $code) {
+        $creditorPayload = json_decode($request->get('creditor_ids', '[]'), true) ?: [];
+        foreach ($creditorPayload as $row) {
+            if (empty($row['code'])) continue;
             MedicineCreditor::create([
                 'medicine_id'   => $insert->id,
-                'creditor_code' => trim($code),
+                'creditor_code' => trim($row['code']),
+                'discount'      => $row['discount'] ?? 0,
             ]);
         }
 
@@ -212,8 +213,13 @@ class MedicineController extends Controller
         ]);
 
         // Sync creditors (if applicable)
-        $codes = array_filter(array_map('trim', explode(',', $request->get('creditor_ids', ''))));
-        $medicine->creditors()->sync($codes);
+        $creditorPayload = json_decode($request->get('creditor_ids', '[]'), true) ?: [];
+        $syncData = [];
+        foreach ($creditorPayload as $row) {
+            if (empty($row['code'])) continue;
+            $syncData[trim($row['code'])] = ['discount' => $row['discount'] ?? 0];
+        }
+        $medicine->creditors()->sync($syncData);
 
         return response()->json(['message' => 'Obat Berhasil Di-Update.']);
     }
@@ -238,9 +244,10 @@ class MedicineController extends Controller
         return response()->json([
             'medicine'  => $medicine,
             'creditors' => $medicine->creditors->map(fn($c) => [
-                'id'   => $c->id,
-                'name' => $c->name,
-                'code' => $c->code,
+                'id'       => $c->id,
+                'name'     => $c->name,
+                'code'     => $c->code,
+                'discount' => $c->pivot->discount ?? 0,
             ]),
         ]);
     }
@@ -250,18 +257,20 @@ class MedicineController extends Controller
     public function syncCreditors(Request $request, $id)
     {
         $request->validate([
-            'creditor_codes'   => 'array',
-            'creditor_codes.*' => 'exists:creditors,code',
+            'creditors'            => 'array',
+            'creditors.*.code'     => 'exists:creditors,code',
+            'creditors.*.discount' => 'nullable|numeric|min:0|max:100',
         ]);
 
         Medicines::findOrFail($id);
 
         MedicineCreditor::where('medicine_id', $id)->delete();
 
-        foreach ($request->creditor_codes as $code) {
+        foreach ($request->creditors ?? [] as $row) {
             MedicineCreditor::create([
                 'medicine_id'   => $id,
-                'creditor_code' => $code,
+                'creditor_code' => $row['code'],
+                'discount'      => $row['discount'] ?? 0,
             ]);
         }
 

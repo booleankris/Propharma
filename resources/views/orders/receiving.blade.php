@@ -524,6 +524,14 @@
                         </svg>
                         Cetak
                     </button>
+
+                    <button onclick="printSPB()"
+                        class="inline-flex items-center gap-2 rounded-lg  btn-pharma !bg-purple-600 !shadow-[0_2px_6px_#9333ea] px-6 py-4 text-sm font-xl text-white hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M7 3h10v18l-2-1-2 1-2-1-2 1-2-1V3z" />
+                        </svg>
+                        SPB
+                    </button>
                 </div>
 
                 <table id="orderItemsTable" class="w-full">
@@ -706,6 +714,10 @@
             itemcontent = null;
             document.getElementById('creditor').focus();
 
+        }
+
+        function printSPB() {
+            window.open(`/orders/${ordersid}/printspb`, "_blank");
         }
 
         function setSelect2AjaxValue(selector, id, text) {
@@ -903,38 +915,38 @@
                         detail_id: data.receiving_items?.receiving_details_id ?? '',
                     }
                 })
-            .then(function(response) {
-                // console.log(response);
-                // console.log(invoice_times);
-                // console.log(response.data.creditor.credit_time);
+                .then(function(response) {
+                    // console.log(response);
+                    // console.log(invoice_times);
+                    // console.log(response.data.creditor.credit_time);
 
-                // invoice_times.value = 30;
+                    // invoice_times.value = 30;
 
-                // console.log(invoice_times.value);
+                    // console.log(invoice_times.value);
 
-                invoice_number.value = response.data.query?.invoice_number || '';
-                invoice_times.value = response.data.query?.invoice_times || response.data.creditor
-                    .credit_time || '';
-                $('#invoice_payment')
-                    .val(response.data.query?.invoice_payment || '')
-                    .trigger('change');
-                invoice_due.value = response.data.query?.invoice_due || '';
-                invoice_date.value = response.data.query?.invoice_date ?? invoice_date.value;
+                    invoice_number.value = response.data.query?.invoice_number || '';
+                    invoice_times.value = response.data.query?.invoice_times || response.data.creditor
+                        .credit_time || '';
+                    $('#invoice_payment')
+                        .val(response.data.query?.invoice_payment || '')
+                        .trigger('change');
+                    invoice_due.value = response.data.query?.invoice_due || '';
+                    invoice_date.value = response.data.query?.invoice_date ?? invoice_date.value;
 
-                const ppn =
-                    response.data.query?.invoice_ppn?.trim() ||
-                    response.data.creditor?.ppn_type?.trim() ||
-                    'TANPA';
+                    const ppn =
+                        response.data.query?.invoice_ppn?.trim() ||
+                        response.data.creditor?.ppn_type?.trim() ||
+                        'TANPA';
 
-                document.getElementById('invoice_ppn').value = ppn;
+                    document.getElementById('invoice_ppn').value = ppn;
 
-                count_due();
-                // invoice_number.value = response.data.query?.invoice_number || '';
+                    count_due();
+                    // invoice_number.value = response.data.query?.invoice_number || '';
 
-            })
-            .catch(function(error) {
-                console.error(error);
-            });
+                })
+                .catch(function(error) {
+                    console.error(error);
+                });
             console.log(data.receiving_items?.receiving_details_id ?? '');
             itemcode = data.medicine_id;
             itemprice = data.medicines.raw_price;

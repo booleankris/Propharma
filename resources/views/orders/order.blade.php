@@ -797,8 +797,11 @@
                 const pill = document.createElement('span');
                 pill.className =
                     'flex items-center gap-1 bg-blue-100 text-blue-800 text-[12px] font-medium px-2.5 py-1 rounded-full';
-                pill.innerHTML =
-                    `${c.name} <button type="button" data-code="${c.code}" class="ml-1 text-blue-500 hover:text-red-500 font-bold">&times;</button>`;
+                pill.innerHTML = `
+            ${c.name}
+            <span class="text-blue-600 font-semibold">${c.discount ?? 0}%</span>
+            <button type="button" data-code="${c.code}" class="ml-1 text-blue-500 hover:text-red-500 font-bold">&times;</button>
+        `;
                 pill.querySelector('button').addEventListener('click', () => {
                     medicineCreditors = medicineCreditors.filter(x => x.code !== c.code);
                     renderPills();
@@ -863,7 +866,10 @@
         function syncMedicineCreditors() {
             if (!currentMedicineId) return Promise.resolve();
             return axios.put(`/ordercreditors/${currentMedicineId}/sync-creditors`, {
-                creditor_codes: medicineCreditors.map(c => c.code)
+                creditors: medicineCreditors.map(c => ({
+                    code: c.code,
+                    discount: c.discount ?? 0
+                }))
             }, {
                 headers: {
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content

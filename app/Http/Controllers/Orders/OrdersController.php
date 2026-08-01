@@ -416,9 +416,10 @@ class OrdersController extends Controller
             'medicine' => $medicine,
             'creditors' => $medicine->creditors->map(function ($c) {
                 return [
-                    'id' => $c->id,
-                    'name' => $c->name,
-                    'code' => $c->code,
+                    'id'       => $c->id,
+                    'name'     => $c->name,
+                    'code'     => $c->code,
+                    'discount' => $c->pivot->discount ?? 0,
                 ];
             })
         ]);

@@ -116,40 +116,67 @@
     <section class="section px-4 py-6 font-poppins text-[#1c1c1c]">
         <div class="section-body flex flex-col gap-5">
 
-            <div class="flex flex-col bg-[#fff] md:flex-row md:items-center justify-between gap-4 p-4 rounded-lg">
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-3">
-                        <div class="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center">
-                            <svg class="w-5 h-5 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M5 12h14M12 5l7 7-7 7"></path>
-                            </svg>
-                        </div>
-                        <div>
-                            <h2 class="text-[15px] font-semibold text-gray-800 leading-tight">Daftar Pesanan</h2>
-                            <p class="text-[12px] text-gray-400">Daftar dan riwayat pesanan</p>
-                        </div>
+            <div
+                class="flex flex-col gap-4 p-4 bg-white border border-slate-200/80 rounded-xl shadow-xs md:flex-row md:items-center md:justify-between">
+
+                {{-- LEFT: JUDUL & IKON HEADER --}}
+                <div class="flex items-center gap-3">
+                    <div
+                        class="flex items-center justify-center w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 shrink-0">
+                        <svg class="w-5 h-5 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M5 12h14M12 5l7 7-7 7"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h2 class="text-base font-bold text-slate-800 leading-tight">Daftar Pesanan</h2>
+                        <p class="text-xs text-slate-400">Daftar dan riwayat pesanan apotek</p>
                     </div>
                 </div>
 
-                <div class="flex items-center gap-3">
-                    <button id="back"
-                        class="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-gray-600 transition-all hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-300">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4">
-                            <path d="M15 18l-6-6 6-6" />
+                {{-- RIGHT: GRUP TOMBOL AKSI (RESPONSIF) --}}
+                <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full md:w-auto">
+
+                    {{-- 1. TOMBOL KEMBALI (Secondary / Ghost Outline) --}}
+                    <button id="back" type="button"
+                        class="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-semibold text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300 transition-all duration-150">
+                        <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" stroke-width="2"
+                            viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
                         </svg>
-                        Kembali
+                        <span>Kembali</span>
                     </button>
-                    <a href="{{ route('orders.create') }}">
-                        <button
-                            class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
-                            <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+
+                    {{-- 2. TOMBOL TRACKING PESANAN (Soft Emerald + Ikon Truk Pengiriman) --}}
+                    <a href="{{ route('orders-tracking.index') }}" class="w-full sm:w-auto">
+                        <button type="button"
+                            class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-300/80 hover:bg-emerald-100/80 hover:border-emerald-400 rounded-lg shadow-[0_0_8px_rgba(16,185,129,0.15)] hover:shadow-[0_0_12px_rgba(16,185,129,0.3)] transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-emerald-400">
+                          
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-emerald-600" viewBox="0 0 24 24"
+                                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                stroke-linejoin="round"
+                                class="icon icon-tabler icons-tabler-outline icon-tabler-truck-loading">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                <path d="M2 3h1a2 2 0 0 1 2 2v10a2 2 0 0 0 2 2h15" />
+                                <path d="M9 9a3 3 0 0 1 3 -3h4a3 3 0 0 1 3 3v2a3 3 0 0 1 -3 3h-4a3 3 0 0 1 -3 -3l0 -2" />
+                                <path d="M7 19a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
+                                <path d="M16 19a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
                             </svg>
-                            Buat Baru
+                            <span>Tracking Pesanan</span>
                         </button>
                     </a>
+
+                    {{-- 3. TOMBOL BUAT BARU (Primary Blue + Ikon Plus + Soft Blue Glow) --}}
+                    <a href="{{ route('orders.create') }}" class="w-full sm:w-auto">
+                        <button type="button"
+                            class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-[0_0_8px_rgba(37,99,235,0.25)] hover:shadow-[0_0_12px_rgba(37,99,235,0.4)] transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                            </svg>
+                            <span>Buat Baru</span>
+                        </button>
+                    </a>
+
                 </div>
             </div>
 

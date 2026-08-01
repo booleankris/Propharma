@@ -436,7 +436,7 @@
         const pills = document.getElementById('pillContainer');
         const hiddenCreds = document.getElementById('creditor_ids');
 
-        let selected = new Map(); // id → creditor object
+        let selected = new Map();
         let filtered = [];
         let activeIdx = -1;
         let tableData = null;
@@ -562,14 +562,15 @@
         }
 
         function selectCreditor(item) {
-            selected.set(item.id, item);
+            selected.set(item.id, {
+                ...item,
+                discount: item.discount ?? 0
+            });
             input.value = '';
             dropdown.classList.add('hidden');
             activeIdx = -1;
             renderPills();
             syncHidden();
-            // Stay on searchInput so user can add more creditors.
-            // They press Enter on an empty field to advance forward.
             setTimeout(() => input.focus(), 0);
         }
 
@@ -580,22 +581,40 @@
             renderDropdown(input.value);
         }
 
+        function updateDiscount(id, value) {
+            const item = selected.get(id);
+            if (!item) return;
+            item.discount = parseFloat(value) || 0;
+            syncHidden();
+        }
+
         function renderPills() {
             pills.innerHTML = '';
             selected.forEach(item => {
                 const pill = document.createElement('div');
                 pill.className = 'creditor-pill';
-                pill.innerHTML = `${item.name}<button type="button">&times;</button>`;
+                pill.innerHTML = `
+            <span>${item.name}</span>
+            <input type="number" step="0.01" min="0" max="100"
+                   value="${item.discount}" style="width: auto; color: #111; border: none; background: #e4f1ff; text-align: center; border-radius: 30px; padding: 2px 4px;"
+                   class="discount-input">
+            <span style="font-size:11px;">%</span>
+            <button type="button">&times;</button>
+        `;
+                pill.querySelector('.discount-input').addEventListener('input', e => updateDiscount(item.id, e
+                    .target.value));
                 pill.querySelector('button').onclick = () => removeCreditor(item.id);
                 pills.appendChild(pill);
             });
         }
 
         function syncHidden() {
-            hiddenCreds.value = [...selected.values()]
-                .map(c => c.code).filter(Boolean).join(',');
+            const payload = [...selected.values()].map(c => ({
+                code: c.code,
+                discount: c.discount ?? 0
+            })).filter(c => c.code);
+            hiddenCreds.value = JSON.stringify(payload);
         }
-
         // ════════════════════════════════════════════════
         // LOAD CREDITORS FOR EXISTING MEDICINE
         // ════════════════════════════════════════════════
@@ -608,7 +627,12 @@
                 .then(({
                     data
                 }) => {
-                    (data.creditors || []).forEach(c => selected.set(c.id, c));
+                    (data.creditors || []).forEach(c => selected.set(c.id, {
+                        id: c.id,
+                        code: c.code,
+                        name: c.name,
+                        discount: c.discount ?? 0
+                    }));
                     renderPills();
                     syncHidden();
                 })

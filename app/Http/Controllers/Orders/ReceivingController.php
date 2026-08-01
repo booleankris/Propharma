@@ -402,106 +402,76 @@ class ReceivingController extends Controller
 
         return DataTables::of($items)
             ->addIndexColumn()
-            ->addColumn('date', function ($row) {
-                return $row->date;
-            })
+            ->addColumn('date', fn($row) => $row->date ? date('d M Y', strtotime($row->updated_at)) : '-')
             ->addColumn('code', function ($row) {
-                return $row->code ?? 0;
+                $code = e($row->code ?? '0');
+                return '<span class="inline-flex items-center px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 font-mono text-xs font-semibold tracking-wide border border-slate-200">' . $code . '</span>';
             })
             ->addColumn('status_order', function ($row) {
                 if ($row->status == 2) {
-                    return '<div style="text-align:center;font-weight:bold;text-transform:uppercase;background-color:rgba(34,197,94,0.2);color:#16a34a;padding:6px 4px;font-size:12px;border-radius:6px;">DITERIMA</div>';
+                    // DITERIMA
+                    return '<div style="text-align:center;">
+                        <span style="display:inline-flex; align-items:center; gap:6px; padding:4px 12px; border-radius:9999px; font-size:11px; font-weight:700; color:#047857; background-color:#ecfdf5; border:1px solid #a7f3d0; box-shadow:0 0 10px rgb(16 185 129 / 17%);">
+                            <span style="position:relative; display:flex; width:8px; height:8px;">
+                                <span style="position:absolute; width:100%; height:100%; border-radius:50%; background-color:#10b981; box-shadow:0 0 6px #10b981;"></span>
+                            </span>
+                            DITERIMA
+                        </span>
+                    </div>';
+                } elseif ($row->status == 1) {
+                    // DIPESAN
+                    return '<div style="text-align:center;">
+                        <span style="display:inline-flex; align-items:center; gap:6px; padding:4px 12px; border-radius:9999px; font-size:11px; font-weight:700; color:#b45309; background-color:#fffbeb; border:1px solid #fde68a; box-shadow:0 0 10px rgb(245 158 11 / 18%);">
+                            <span style="position:relative; display:flex; width:8px; height:8px;">
+                                <span style="position:absolute; width:100%; height:100%; border-radius:50%; background-color:#f59e0b; box-shadow:0 0 6px #f59e0b;"></span>
+                            </span>
+                            DIPESAN
+                        </span>
+                    </div>';
+                } else {
+                    // PENDING
+                    return '<div style="text-align:center;">
+                        <span style="display:inline-flex; align-items:center; gap:6px; padding:4px 12px; border-radius:9999px; font-size:11px; font-weight:700; color:#be123c; background-color:#fff1f2; border:1px solid #fecdd3; box-shadow:0 0 10px rgb(244 63 94 / 15%);">
+                            <span style="position:relative; display:flex; width:8px; height:8px;">
+                                <span style="position:absolute; width:100%; height:100%; border-radius:50%; background-color:#f43f5e; box-shadow:0 0 6px #f43f5e;"></span>
+                            </span>
+                            PENDING
+                        </span>
+                    </div>';
                 }
-                if ($row->status == 1) {
-                    return '<div style="text-align:center;font-weight:bold;text-transform:uppercase;background-color:rgba(234,179,8,0.2);color:#ca8a04;padding:6px 4px;font-size:12px;border-radius:6px;">DIPESAN</div>';
-                }
-                return '<div style="text-align:center;font-weight:bold;text-transform:uppercase;background-color:rgba(239,68,68,0.2);color:#b91c1c;padding:6px 4px;font-size:12px;border-radius:6px;">PENDING</div>';
             })
             ->addColumn('action', function ($row) {
                 if ($row->status == 0) {
-                    $label = 'Lanjutkan';
-                    $color = 'background:#2563eb;';
-                    $icon = '<svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/></svg>';
-                } elseif ($row->status == 1) {
-                    $label = 'Terima';
-                    $color = 'background:#16a34a;';
-                    $icon = '<svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>';
-                } else {
-                    $label = 'Cetak SPB';
-                    $color = 'background:#eab308;';
-                    $icon = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-printer">
-                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                    <path d="M17 17h2a2 2 0 0 0 2 -2v-4a2 2 0 0 0 -2 -2h-14a2 2 0 0 0 -2 2v4a2 2 0 0 0 2 2h2" />
-                    <path d="M17 9v-4a2 2 0 0 0 -2 -2h-6a2 2 0 0 0 -2 2v4" />
-                    <path d="M7 15a2 2 0 0 1 2 -2h6a2 2 0 0 1 2 2v4a2 2 0 0 1 -2 2h-6a2 2 0 0 1 -2 -2l0 -4" />
-                </svg>';
-                    $icon2 = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-clipboard-data">
-                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                    <path d="M9 5h-2a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-12a2 2 0 0 0 -2 -2h-2" />
-                    <path d="M9 5a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2" /><path d="M9 17v-4" /><path d="M12 17v-1" /><path d="M15 17v-2" /><path d="M12 17v-1" /></svg>';
+                    return '
+                    <a href="/createorder" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm hover:shadow transition-all duration-150">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/></svg>
+                        <span>Lanjutkan</span>
+                    </a>';
                 }
 
-                if ($row->status == 0) {
+                if ($row->status == 1) {
                     return '
-                    <a href="/createorder">
-                        <div class="flex gap-1">
-                            <div class="w-full">
-                                <button style="' . $color . ' color:white;" class="rounded-full px-2 py-2 font-semibold">
-                                    <div class="flex gap-2 justify-center items-center">
-                                        <span>' . $icon . '</span>
-                                        <span class="text-xs pr-2">' . $label . '</span>
-                                    </div>
-                                </button>
-                            </div>
-                        </div>
+                    <a href="/receive/' . $row->id . '" style="background: #e6ffe8; border: solid 1px #00bd5a; color: #078f03; box-shadow: 0 0 10px #2d8c056b;" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm hover:shadow transition-all duration-150">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        <span>Terima</span>
                     </a>';
-                } elseif ($row->status == 1) {
-                    return '
-                    <a href="receive/' . $row->id . '">
-                        <div class="flex gap-1">
-                            <div class="w-full">
-                                <button style="' . $color . ' color:white;" class="rounded-full px-2 py-2 font-semibold">
-                                    <div class="flex gap-2 justify-center items-center">
-                                        <span>' . $icon . '</span>
-                                        <span class="text-xs pr-2">' . $label . '</span>
-                                    </div>
-                                </button>
-                            </div>
-                        </div>
-                    </a>';
-                } else {
-                    return '
-                    <div class="flex gap-2">
-                    <a target="_blank" href="/receiving/' . $row->id . '/printspbfinal">
-                        <div class="flex gap-1">
-                            <div class="w-full">
-                                <button style="' . $color . ' color:white;" class="rounded-full px-2 py-2 font-semibold">
-                                    <div class="flex gap-2 justify-center items-center">
-                                        <span>' . $icon . '</span>
-                                        <span class="text-xs pr-2">' . $label . '</span>
-                                    </div>
-                                </button>
-                            </div>
-                        </div>
-                    </a> <a target="_blank" href="/receiving/' . $row->id . '/printorders">
-                    <div class="flex gap-1">
-                        <div class="w-full">
-                            <button style="background:#eb2579; color:white;" class="rounded-full px-2 py-2 font-semibold">
-                                <div class="flex gap-2 justify-center items-center">
-                                    <span>' . $icon2 . '</span>
-                                    <span class="text-xs pr-2">List Pesanan</span>
-                                </div>
-                            </button>
-                        </div>
-                    </div>
-                </a>
-                    </div>
-                    ';
                 }
+
+                return '
+                <div class="flex items-center gap-2">
+                    <a target="_blank" href="/receiving/' . $row->id . '/printspbfinal" style="box-shadow:0 0 10px rgb(255 236 159 / 47%);" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg shadow-xs transition-all duration-150">
+                        <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0 1 10.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0 .229 2.523a1.125 1.125 0 0 1-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0 0 21 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 0 0-1.913-.247M6.34 18H5.25A2.25 2.25 0 0 1 3 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 0 1 1.913-.247m10.5 0a48.536 48.536 0 0 0-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.656"/></svg>
+                        <span>Cetak SPB</span>
+                    </a>
+                    <a target="_blank" href="/receiving/' . $row->id . '/printorders" style="box-shadow:0 0 10px rgb(245 11 11 / 18%);" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-pink-700 bg-pink-50 hover:bg-pink-100 border border-pink-200 rounded-lg shadow-xs transition-all duration-150">
+                        <svg class="w-4 h-4 text-pink-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m8.25-2.142V8.25"/></svg>
+                        <span>List Pesanan</span>
+                    </a>
+                </div>';
             })
-            ->addColumn('total', fn($row) => 'Rp ' . number_format($row->order_items_sum_total, 0, ',', '.'))
-            ->addColumn('total_ppn', fn($row) => 'Rp ' . number_format(floor($row->order_items_sum_total * 1.11), 0, ',', '.'))
-            ->rawColumns(['status_order', 'action'])
+            ->addColumn('total', fn($row) => '<span class="font-semibold text-slate-700">Rp ' . number_format($row->order_items_sum_total ?? 0, 0, ',', '.') . '</span>')
+            ->addColumn('total_ppn', fn($row) => '<span class="font-bold text-slate-900">Rp ' . number_format(floor(($row->order_items_sum_total ?? 0) * 1.11), 0, ',', '.') . '</span>')
+            ->rawColumns(['code', 'status_order', 'action', 'total', 'total_ppn'])
             ->make(true);
     }
 
@@ -540,8 +510,10 @@ class ReceivingController extends Controller
         $datenow = Carbon::now()->format('Y-m-d');
 
         // FIX #1: Added order_id filter so we only get the receiving for THIS order
-        $transaction = Receiving::where('status', 0)->where('pharmacy_id', 
-        auth()->user()->pharmacy_id)->first();
+        $transaction = Receiving::where('status', 0)->where(
+            'pharmacy_id',
+            auth()->user()->pharmacy_id
+        )->first();
 
         // FIX #2: Guard against null $check_order
         $check_order = OrderItems::with('orders')->whereHas('orders', function ($q) use ($id) {
@@ -581,7 +553,7 @@ class ReceivingController extends Controller
                 ->sum('total') ?? '0';
             $d_ppn = $d_price * 0.11 ?? '0';
             $d_total = $d_price + $d_ppn ?? '0';
-           
+
             return view('orders.receiving', compact('order_id', 'd_price', 'd_ppn', 'd_total', 'order_code', 'creditorOption', 'receiving_code', 'transaction', 'now', 'datenow', 'receiving_id'));
         } else {
             $year   = now()->format('y');

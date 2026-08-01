@@ -14,6 +14,7 @@ class MedicineCreditor extends Model
     protected $fillable = [
         'medicine_id',
         'creditor_code',
+        'discount',
     ];
 
     public function medicine()
