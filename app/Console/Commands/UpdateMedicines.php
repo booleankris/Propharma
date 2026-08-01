@@ -8,7 +8,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\App;
 
-class UpdateMedicinesByCode extends Command
+class UpdateMedicines extends Command
 {
     protected $signature = 'medicines:updatebycode {--dry-run : Simulate the import without modifying the database}';
     protected $description = 'Safely update Medicines raw_price, net_price, het_price, content, strip by matching code barang';
