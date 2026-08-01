@@ -202,37 +202,51 @@ class TransfersController extends Controller
     }
     public function incomingTransfers()
     {
-
         // from batches = destination
         // from users = source
-        $incoming = MedicineTransfers::with(['batches', 'users', 'batches.medicines', 'etalases'])
-            ->whereHas('batches', function ($getpid) {
-                $getpid->where('pharmacy_id', auth()->user()->pharmacy_id);
-            })
+        $pharmacyId = auth()->user()->pharmacy_id;
+
+        // Mutasi Keluar — this pharmacy is the source
+        $pending = MedicineTransfers::with(['batches', 'batches.medicines', 'batches.pharmacy', 'users.pharmacy', 'etalases'])
+            ->whereHas('users', fn($q) => $q->where('pharmacy_id', $pharmacyId))
             ->latest()
-            ->get();
+            ->paginate(10, ['*'], 'pending_page')
+            ->withQueryString();
 
-        $transfers = MedicineTransfers::with(['batches', 'batches.medicines', 'etalases'])
-            ->whereHas('users', function ($getpid) {
-                $getpid->where('pharmacy_id', auth()->user()->pharmacy_id);
-            })
-
+        // Mutasi Masuk — this pharmacy is the destination, still actionable
+        $accepted = MedicineTransfers::with(['batches', 'batches.medicines', 'batches.pharmacy', 'users.pharmacy', 'etalases'])
+            ->whereHas('batches', fn($q) => $q->where('pharmacy_id', $pharmacyId))
+            ->whereIn('status', [0, 1])
             ->latest()
-            ->get();
+            ->paginate(10, ['*'], 'accepted_page')
+            ->withQueryString();
 
-        $pending  = $transfers->whereIn('status', [0, 1, 2]);
-        $accepted = $incoming->whereIn('status', [0, 1]);
-        $denied   = $transfers->where('status', 2);
+        // Ditolak — denied outgoing transfers
+        $denied = MedicineTransfers::with(['batches', 'batches.medicines', 'etalases'])
+            ->whereHas('users', fn($q) => $q->where('pharmacy_id', $pharmacyId))
+            ->where('status', 2)
+            ->latest()
+            ->paginate(10, ['*'], 'denied_page')
+            ->withQueryString();
 
-        $transferData = $transfers->keyBy('id')->map(fn($t) => [
-            'id'       => $t->id,
-            'code'     => $t->code ?? '—',
-            'med_name' => $t->batches?->medicines?->name ?? '—',
-            'batch'    => $t->batches?->name ?? '—',
-            'etalase'  => $t->etalases?->name ?? '—',
-            'stock'    => $t->stock ?? 0,
-            'date'     => $t->created_at?->format('d M Y, H:i') ?? '—',
-        ]);
+        // Only the rows actually rendered on the current pages need modal data
+        $transferData = collect()
+            ->merge($pending->getCollection())
+            ->merge($accepted->getCollection())
+            ->merge($denied->getCollection())
+            ->unique('id')
+            ->keyBy('id')
+            ->map(fn($t) => [
+                'id'         => $t->id,
+                'code'       => $t->code ?? '—',
+                'med_name'   => $t->batches?->medicines?->name ?? '—',
+                'med_code'   => $t->batches?->medicines?->code ?? '—',
+                'batch_name' => $t->batches?->name ?? '—',
+                'etalase'    => $t->etalases?->name ?? '—',
+                'stock'      => $t->stock ?? 0,
+                'status'     => $t->status,
+                'date'       => $t->created_at?->format('d M Y, H:i') ?? '—',
+            ]);
 
         return view('kasir.transfers.transfers', compact('pending', 'accepted', 'denied', 'transferData'));
     }

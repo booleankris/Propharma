@@ -452,6 +452,43 @@
             border-radius: 8px;
             margin-top: 4px;
         }
+
+        /* Navigation */
+        .pagination-bar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 14px;
+            padding: 16px 28px;
+            border-top: 1px solid #f1f5f9;
+        }
+
+        .page-btn {
+            font-size: 12px;
+            font-weight: 600;
+            color: #0f172a;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            padding: 6px 14px;
+            border-radius: 8px;
+            text-decoration: none;
+            transition: background .15s;
+        }
+
+        .page-btn:hover {
+            background: #f1f5f9;
+        }
+
+        .page-btn.disabled {
+            color: #cbd5e1;
+            pointer-events: none;
+        }
+
+        .page-info {
+            font-size: 12px;
+            color: #94a3b8;
+            font-family: 'DM Mono', monospace;
+        }
     </style>
 @endsection
 
@@ -483,17 +520,17 @@
             @endif
 
             <div class="tabs">
-                <button class="tab-btn active" onclick="switchTab('pending', this)">
+                <button class="tab-btn active" data-tab="pending" onclick="switchTab('pending', this)">
                     Mutasi Keluar
-                    <span class="tab-badge badge-pending">{{ $pending->count() }}</span>
+                    <span class="tab-badge badge-pending">{{ $pending->total() }}</span>
                 </button>
-                <button class="tab-btn" onclick="switchTab('accepted', this)">
+                <button class="tab-btn" data-tab="accepted" onclick="switchTab('accepted', this)">
                     Mutasi Masuk
-                    <span class="tab-badge badge-accepted">{{ $accepted->count() }}</span>
+                    <span class="tab-badge badge-accepted">{{ $accepted->total() }}</span>
                 </button>
-                <button class="tab-btn" onclick="switchTab('denied', this)">
+                <button class="tab-btn" data-tab="denied" onclick="switchTab('denied', this)">
                     Ditolak
-                    <span class="tab-badge badge-denied">{{ $denied->count() }}</span>
+                    <span class="tab-badge badge-denied">{{ $denied->total() }}</span>
                 </button>
             </div>
 
@@ -589,6 +626,15 @@
                         <p>Tidak ada transfer yang menunggu.</p>
                     </div>
                 @endforelse
+                @if ($pending->hasPages())
+                    <div class="pagination-bar">
+                        <a href="{{ $pending->previousPageUrl() ? $pending->previousPageUrl() . '#tab-pending' : '#' }}"
+                            class="page-btn {{ $pending->onFirstPage() ? 'disabled' : '' }}">‹ Sebelumnya</a>
+                        <span class="page-info">Hal {{ $pending->currentPage() }} / {{ $pending->lastPage() }}</span>
+                        <a href="{{ $pending->hasMorePages() ? $pending->nextPageUrl() . '#tab-pending' : '#' }}"
+                            class="page-btn {{ $pending->hasMorePages() ? '' : 'disabled' }}">Berikutnya ›</a>
+                    </div>
+                @endif
             </div>
 
             {{-- ── Ingoing Transfer ── --}}
@@ -697,6 +743,15 @@
                         <p>Belum ada transfer yang diterima.</p>
                     </div>
                 @endforelse
+                @if ($accepted->hasPages())
+                    <div class="pagination-bar">
+                        <a href="{{ $accepted->previousPageUrl() ? $accepted->previousPageUrl() . '#tab-accepted' : '#' }}"
+                            class="page-btn {{ $accepted->onFirstPage() ? 'disabled' : '' }}">‹ Sebelumnya</a>
+                        <span class="page-info">Hal {{ $accepted->currentPage() }} / {{ $accepted->lastPage() }}</span>
+                        <a href="{{ $accepted->hasMorePages() ? $accepted->nextPageUrl() . '#tab-accepted' : '#' }}"
+                            class="page-btn {{ $accepted->hasMorePages() ? '' : 'disabled' }}">Berikutnya ›</a>
+                    </div>
+                @endif
             </div>
 
             {{-- ── DENIED ── --}}
@@ -725,6 +780,15 @@
                         <p>Belum ada transfer yang ditolak.</p>
                     </div>
                 @endforelse
+                @if ($denied->hasPages())
+                    <div class="pagination-bar">
+                        <a href="{{ $denied->previousPageUrl() ? $denied->previousPageUrl() . '#tab-denied' : '#' }}"
+                            class="page-btn {{ $denied->onFirstPage() ? 'disabled' : '' }}">‹ Sebelumnya</a>
+                        <span class="page-info">Hal {{ $denied->currentPage() }} / {{ $denied->lastPage() }}</span>
+                        <a href="{{ $denied->hasMorePages() ? $denied->nextPageUrl() . '#tab-denied' : '#' }}"
+                            class="page-btn {{ $denied->hasMorePages() ? '' : 'disabled' }}">Berikutnya ›</a>
+                    </div>
+                @endif
             </div>
 
         </div>
@@ -804,7 +868,17 @@
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             document.getElementById('tab-' + name).classList.add('active');
             btn.classList.add('active');
+            history.replaceState(null, '', '#tab-' + name);
         }
+
+        function activateTabFromHash() {
+            const raw = window.location.hash.replace('#tab-', '');
+            const name = ['pending', 'accepted', 'denied'].includes(raw) ? raw : 'pending';
+            const btn = document.querySelector(`.tab-btn[data-tab="${name}"]`);
+            if (btn) switchTab(name, btn);
+        }
+
+        document.addEventListener('DOMContentLoaded', activateTabFromHash);
 
         function openDetail(id) {
             const t = transferData[id];
