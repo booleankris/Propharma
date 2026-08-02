@@ -161,7 +161,7 @@
                     <tr>
                         <td></td>
                         <td style="text-align:right;">
-                            Di- {{ optional($items->first()->creditors)->city ?? '-' }}
+                            Di- {{ optional($items->first()->creditors)->address ?? '-' }}
                         </td>
                     </tr>
                 </table>
