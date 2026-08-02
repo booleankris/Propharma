@@ -135,7 +135,7 @@
                             <h2 style="margin:0; font-size:8px;">{{ strtoupper($pharmacy->name) }}</h2>
                             <div>{{ $pharmacy->address }}</div>
                             <div>HP. {{ $pharmacy->phone }}</div>
-                            <div>Apoteker : apt. {{ $pharmacy->pharmacist }}</div>
+                            <div>Apoteker : {{ $pharmacy->pharmacist }}</div>
                             <div>No. SIPA : {{ $pharmacy->pharmacist_permit }}</div>
                             @if ($pharmacy->permit)
                                 <div>No. SIA : {{ $pharmacy->permit }}</div>
