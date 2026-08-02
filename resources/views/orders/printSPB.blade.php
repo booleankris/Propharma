@@ -226,7 +226,7 @@
                             @else
                                 <div style="height:35px;"></div> {{-- blank space to sign by hand --}}
                             @endif
-                            <b><u>apt. {{ $pharmacy->pharmacist }}</u></b><br>
+                            <b><u>{{ $pharmacy->pharmacist }}</u></b><br>
                             SIPA : {{ $pharmacy->pharmacist_permit }}
                         </td>
                     </tr>
@@ -255,7 +255,7 @@
                     <tr>
                         <td style="width:60px;">Nama Apoteker</td>
                         <td style="width:8px;">:</td>
-                        <td><b>apt. {{ $pharmacy->pharmacist }}</b></td>
+                        <td><b>{{ $pharmacy->pharmacist }}</b></td>
                     </tr>
                     <tr>
                         <td>Jabatan</td>
@@ -385,7 +385,7 @@
                             @else
                                 <div style="height:35px;"></div> {{-- blank space to sign by hand --}}
                             @endif
-                            <b><u>apt. {{ $pharmacy->pharmacist }}</u></b><br>
+                            <b><u>{{ $pharmacy->pharmacist }}</u></b><br>
                             SIPA : {{ $pharmacy->pharmacist_permit }}
                         </td>
                     </tr>
@@ -416,7 +416,7 @@
                         <td style="width:55px;">Nama</td>
                         <td style="width:8px;">:</td>
                         <td class="dotted">
-                            <b>apt. {{ $pharmacy->pharmacist }}</b>
+                            <b>{{ $pharmacy->pharmacist }}</b>
                         </td>
                     </tr>
                     <tr>
@@ -510,7 +510,7 @@
                             @else
                                 <div style="height:35px;"></div> {{-- blank space to sign by hand --}}
                             @endif
-                            <b>( apt. {{ $pharmacy->pharmacist }} )</b><br>
+                            <b>( {{ $pharmacy->pharmacist }} )</b><br>
                             SIPA : {{ $pharmacy->pharmacist_permit }}
                         </td>
                     </tr>
@@ -545,7 +545,7 @@
                     <tr>
                         <td style="width:60px;">Nama</td>
                         <td style="width:8px;">:</td>
-                        <td><b>apt. {{ $pharmacy->pharmacist }}</b></td>
+                        <td><b>{{ $pharmacy->pharmacist }}</b></td>
                     </tr>
                     <tr>
                         <td>Jabatan</td>
@@ -654,7 +654,7 @@
                             @else
                                 <div style="height:35px;"></div> {{-- blank space to sign by hand --}}
                             @endif
-                            <b><u>apt. {{ $pharmacy->pharmacist }}</u></b><br>
+                            <b><u>{{ $pharmacy->pharmacist }}</u></b><br>
                             SIPA : {{ $pharmacy->pharmacist_permit }}
                         </td>
                     </tr>
@@ -690,7 +690,7 @@
                     <tr>
                         <td style="width:60px;">Nama</td>
                         <td style="width:8px;">:</td>
-                        <td><b>apt. {{ $pharmacy->pharmacist }}</b></td>
+                        <td><b>{{ $pharmacy->pharmacist }}</b></td>
                     </tr>
                     <tr>
                         <td>Jabatan</td>
@@ -788,7 +788,7 @@
                             @else
                                 <div style="height:35px;"></div> {{-- blank space to sign by hand --}}
                             @endif
-                            <b><u>apt. {{ $pharmacy->pharmacist }}</u></b><br>
+                            <b><u>{{ $pharmacy->pharmacist }}</u></b><br>
                             SIPA : {{ $pharmacy->pharmacist_permit }}
                         </td>
                     </tr>
