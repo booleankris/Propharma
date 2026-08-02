@@ -6,6 +6,8 @@
     <!-- CSS Libraries -->
     <link rel="stylesheet" href="{{ asset('templates/library/izitoast/dist/css/iziToast.min.css') }}">
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 
     <style>
         .dropdown-table {
@@ -308,6 +310,10 @@
                                         class="btn btn-pharma !bg-[#2196F3] btn-lg">
                                         Tambahkan
                                     </button>
+                                    <button onclick="openSmartOrder()" type="button"
+                                        class="btn btn-pharma !bg-[#7C3AED] btn-lg">
+                                        ✨ Smart Order
+                                    </button>
                                     <button id="back" type="button" class="btn btn-pharma !bg-[#b72929] btn-lg">
                                         Kembali
                                     </button>
@@ -391,6 +397,40 @@
             </div>
         </div>
     </section>
+    <div id="smartOrderModal" class="fixed inset-0 z-[9999] hidden">
+        <div class="absolute inset-0 bg-black/40" onclick="closeSmartOrder()"></div>
+
+        <div
+            class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[720px] max-w-[92vw] bg-white rounded-2xl shadow-2xl flex flex-col max-h-[85vh]">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+                <div>
+                    <h3 class="text-lg font-semibold text-[#1c1c1c]">Smart Order</h3>
+                    <p class="text-[12px] text-gray-500">Obat terlaris berdasarkan riwayat transaksi</p>
+                </div>
+                <button onclick="closeSmartOrder()"
+                    class="text-gray-400 hover:text-gray-700 text-xl leading-none">&times;</button>
+            </div>
+
+            <div class="px-6 py-3 flex gap-2 border-b border-gray-100">
+                <input type="text" id="smartSearch" placeholder="Cari obat..."
+                    class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-purple-200">
+                <input type="text" id="smartDateRange" placeholder="Rentang tanggal"
+                    class="w-[200px] rounded-lg border border-gray-300 px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-purple-200">
+            </div>
+
+            <div id="smartList" class="flex-1 overflow-y-auto px-6 py-2 divide-y divide-gray-50"></div>
+
+            <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
+                <span id="smartSelectedCount" class="text-[13px] text-gray-500">0 obat dipilih</span>
+                <div class="flex gap-2">
+                    <button onclick="closeSmartOrder()" type="button"
+                        class="btn btn-pharma !bg-gray-200 !text-gray-700">Batal</button>
+                    <button onclick="confirmSmartOrder()" type="button" class="btn btn-pharma !bg-[#7C3AED]">Tambahkan
+                        Item</button>
+                </div>
+            </div>
+        </div>
+    </div>
 @endsection
 
 @section('scripts')
@@ -400,6 +440,9 @@
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="{{ asset('templates/library/izitoast/dist/js/iziToast.min.js') }}"></script>
     <script src="https://unpkg.com/sweetalert/dist/sweetalert.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+
     <script>
         let page = 1;
         let keyword = '';
@@ -430,6 +473,12 @@
         let d_price = {{ $d_price }};
         let d_ppn = {{ $d_ppn }};
         let d_total = {{ $d_total }};
+        let smartSelected = {}; // medicine_id -> { medicine, quantity }
+        let smartPage = 1;
+        let smartHasMore = true;
+        let smartLoading = false;
+        let smartRange;
+
 
         // Setting Initial Transaction Value
         $('#d_price').val(formatRupiah(d_price));
@@ -1142,6 +1191,169 @@
                 Swal.close();
                 btn.disabled = false;
             }, 4000);
+        }
+
+        // Smart Order
+        function openSmartOrder() {
+            smartSelected = {};
+            smartPage = 1;
+            smartHasMore = true;
+            document.getElementById('smartList').innerHTML = '';
+            document.getElementById('smartSearch').value = '';
+            updateSmartSelectedCount();
+
+            if (!smartRange) {
+                smartRange = flatpickr('#smartDateRange', {
+                    mode: 'range',
+                    dateFormat: 'Y-m-d',
+                    defaultDate: [
+                        new Date(new Date().setDate(new Date().getDate() - 30)),
+                        new Date()
+                    ],
+                    onClose: () => fetchSmartMedicines(true)
+                });
+            }
+
+            document.getElementById('smartOrderModal').classList.remove('hidden');
+            fetchSmartMedicines(true);
+        }
+
+        function closeSmartOrder() {
+            document.getElementById('smartOrderModal').classList.add('hidden');
+        }
+
+        document.getElementById('smartSearch').addEventListener('input', debounce(() => {
+            fetchSmartMedicines(true);
+        }, 300));
+
+        document.getElementById('smartList').addEventListener('scroll', function() {
+            if (this.scrollTop + this.clientHeight >= this.scrollHeight - 40) {
+                fetchSmartMedicines(false);
+            }
+        });
+
+        function debounce(fn, delay) {
+            let t;
+            return (...args) => {
+                clearTimeout(t);
+                t = setTimeout(() => fn(...args), delay);
+            };
+        }
+
+        function fetchSmartMedicines(reset) {
+            if (smartLoading || (!reset && !smartHasMore)) return;
+            smartLoading = true;
+
+            if (reset) {
+                smartPage = 1;
+                smartHasMore = true;
+                document.getElementById('smartList').innerHTML = '';
+            }
+
+            const dates = smartRange.selectedDates;
+            const params = new URLSearchParams({
+                page: smartPage,
+                order_id: orderid,
+                search: document.getElementById('smartSearch').value,
+                date_from: dates[0] ? flatpickr.formatDate(dates[0], 'Y-m-d') : '',
+                date_to: dates[1] ? flatpickr.formatDate(dates[1], 'Y-m-d') : (dates[0] ? flatpickr.formatDate(
+                    dates[0], 'Y-m-d') : ''),
+            });
+
+            axios.get(`{{ route('orders.smartMedicines') }}?${params}`)
+                .then(res => {
+                    const data = res.data;
+                    const list = document.getElementById('smartList');
+
+                    if (smartPage === 1 && data.data.length === 0) {
+                        list.innerHTML =
+                            `<div class="text-center text-gray-400 text-[13px] py-10">Tidak ada data terjual pada rentang ini</div>`;
+                    }
+
+                    data.data.forEach(med => {
+                        const row = document.createElement('div');
+                        row.className = 'flex items-center gap-3 py-3';
+                        row.innerHTML = `
+                    <input type="checkbox" data-id="${med.medicine_id}"
+                        class="smart-checkbox h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500">
+                    <div class="flex-1 min-w-0">
+                        <div class="text-[13px] font-medium text-gray-900 truncate">${med.name}</div>
+                        <div class="text-[12px] text-gray-500">${med.code} · ${med.packaging ?? '-'}</div>
+                    </div>
+                    <span class="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-full whitespace-nowrap">
+                        Terjual ${med.total_sold}
+                    </span>
+                    <input type="number" min="1" value="1" data-id="${med.medicine_id}"
+                        class="smart-qty w-16 rounded-lg border border-gray-300 px-2 py-1.5 text-[13px] text-center hidden">
+                `;
+
+                        const checkbox = row.querySelector('.smart-checkbox');
+                        const qtyInput = row.querySelector('.smart-qty');
+
+                        checkbox.addEventListener('change', function() {
+                            qtyInput.classList.toggle('hidden', !this.checked);
+                            if (this.checked) {
+                                smartSelected[med.medicine_id] = {
+                                    medicine: med,
+                                    quantity: parseInt(qtyInput.value) || 1
+                                };
+                            } else {
+                                delete smartSelected[med.medicine_id];
+                            }
+                            updateSmartSelectedCount();
+                        });
+
+                        qtyInput.addEventListener('input', function() {
+                            if (smartSelected[med.medicine_id]) {
+                                smartSelected[med.medicine_id].quantity = parseInt(this.value) || 1;
+                            }
+                        });
+
+                        list.appendChild(row);
+                    });
+
+                    smartHasMore = data.current_page < data.last_page;
+                    smartPage++;
+                })
+                .finally(() => smartLoading = false);
+        }
+
+        function updateSmartSelectedCount() {
+            const count = Object.keys(smartSelected).length;
+            document.getElementById('smartSelectedCount').textContent = `${count} obat dipilih`;
+        }
+
+        function confirmSmartOrder() {
+            const items = Object.values(smartSelected).map(s => ({
+                medicine_id: s.medicine.medicine_id,
+                quantity: s.quantity
+            }));
+
+            if (!items.length) return;
+
+            axios.post("{{ route('orders.addItemsBulk') }}", {
+                order_id: orderid,
+                items: items
+            }, {
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                }
+            }).then(res => {
+                if (res.data.success) {
+                    orderItemsTable.ajax.reload(null, false);
+                    const item = res.data.summary;
+                    d_price = item.price_item;
+                    d_ppn = item.price_ppn;
+                    d_total = item.price_total;
+                    $('#d_price').val(formatRupiah(d_price));
+                    $('#d_ppn').val(formatRupiah(d_ppn));
+                    $('#d_total').val(formatRupiah(d_total));
+                    closeSmartOrder();
+                }
+            }).catch(err => {
+                console.error(err);
+                alert('Gagal menambahkan item!');
+            });
         }
     </script>
 

@@ -427,15 +427,25 @@ class OrdersController extends Controller
     public function printSPB($orderId)
     {
         $date = Carbon::now()->translatedFormat('d F Y');
-        $order = Order::with(['order_items.medicines', 'order_items.creditors', 'order_items.medicines.factory', 'order_items.medicines.category'])
-            ->findOrFail($orderId);
+        $order = Order::with([
+            'pharmacy',
+            'order_items.medicines',
+            'order_items.creditors',
+            'order_items.medicines.factory',
+            'order_items.medicines.category',
+            'order_items.medicines.composition',
+        ])->findOrFail($orderId);
+
+        $pharmacy = $order->pharmacy;
+
         $grouped = $order->order_items->groupBy(function ($item) {
             return $item->medicines->type ?? "Kosong";
         })->map(function ($perCreditor) {
             return $perCreditor->groupBy('creditor_code') ?? "Kosong";
         });
-        $pdf = Pdf::loadView('orders.printSPB', compact('order', 'date', 'grouped'))
-            ->setPaper('A4', 'portrait');
+
+        $pdf = Pdf::loadView('orders.printSPB', compact('order', 'date', 'grouped', 'pharmacy'))
+            ->setPaper('A7', 'portrait');
 
         return $pdf->stream("SPB-{$order->code}.pdf");
     }
@@ -447,5 +457,92 @@ class OrdersController extends Controller
 
 
         return view('orders.printSPB', compact('grouped'));
+    }
+    public function smartMedicines(Request $request)
+    {
+        $dateFrom = $request->date_from ?? now()->subDays(30)->format('Y-m-d');
+        $dateTo   = $request->date_to ?? now()->format('Y-m-d');
+        $search   = $request->search;
+        $orderId  = $request->order_id;
+
+        // exclude medicines already in this order, so Smart Order doesn't duplicate rows
+        $existingIds = OrderItems::where('order_id', $orderId)->pluck('medicine_id');
+
+        $query = MedicineCart::select('medicine_cart.medicine_id')
+            ->selectRaw('SUM(medicine_cart.quantity) as total_sold')
+            ->join('medicine_transactions', 'medicine_transactions.id', '=', 'medicine_cart.transaction_id')
+            ->join('medicines', 'medicines.id', '=', 'medicine_cart.medicine_id')
+            ->whereBetween('medicine_transactions.created_at', ["{$dateFrom} 00:00:00", "{$dateTo} 23:59:59"])
+            ->whereNotIn('medicine_cart.medicine_id', $existingIds)
+            ->when($search, fn($q) => $q->where('medicines.name', 'like', "%{$search}%"))
+            ->groupBy('medicine_cart.medicine_id')
+            ->orderByDesc('total_sold');
+
+        $results = $query->paginate(20);
+
+        $results->getCollection()->transform(function ($row) {
+            $medicine = Medicines::find($row->medicine_id);
+            return [
+                'medicine_id' => $row->medicine_id,
+                'code'        => $medicine->code,
+                'name'        => $medicine->name,
+                'packaging'   => $medicine->packaging,
+                'raw_price'   => $medicine->raw_price,
+                'total_sold'  => (int) $row->total_sold,
+            ];
+        });
+
+        return response()->json($results);
+    }
+
+    public function addItemsBulk(Request $request)
+    {
+        $request->validate([
+            'order_id'              => 'required|exists:orders,id',
+            'items'                 => 'required|array|min:1',
+            'items.*.medicine_id'   => 'required|exists:medicines,id',
+            'items.*.quantity'      => 'required|integer|min:1',
+        ]);
+
+        try {
+            DB::beginTransaction();
+
+            foreach ($request->items as $item) {
+                $medicine = Medicines::find($item['medicine_id']);
+                $qty   = $item['quantity'];
+                $price = $medicine->raw_price;
+
+                OrderItems::create([
+                    'order_id'      => $request->order_id,
+                    'medicine_id'   => $item['medicine_id'],
+                    'creditor_code' => null,
+                    'pack'          => 0,
+                    'price'         => $price,
+                    'quantity'      => $qty,
+                    'total'         => $qty * $price,
+                    'status'        => 0,
+                ]);
+            }
+
+            DB::commit();
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal menambahkan item! ' . $e->getMessage()
+            ], 500);
+        }
+
+        $price_total = OrderItems::where('order_id', $request->order_id)->where('status', '0')->sum('total') ?? 0;
+        $ppn = $price_total * 0.11;
+
+        return response()->json([
+            'success' => true,
+            'summary' => [
+                'price_item'  => $price_total,
+                'price_ppn'   => $ppn,
+                'price_total' => $price_total + $ppn,
+            ]
+        ]);
     }
 }

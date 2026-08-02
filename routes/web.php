@@ -356,7 +356,9 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
 
     Route::put('ordercreditors/{id}/sync-creditors', [MedicineController::class, 'syncCreditors'])->name('syncCreditors');
     Route::get('/creditors/all', [MedicineController::class, 'getAll'])->name('creditors.all');
-
+    // =================== Smart Order ===================
+    Route::get('/orders/smart-medicines', [OrdersController::class, 'smartMedicines'])->name('orders.smartMedicines');
+    Route::post('/orders/addItemsBulk', [OrdersController::class, 'addItemsBulk'])->name('orders.addItemsBulk');
 
     // Receiving
     Route::get('/receiving', [ReceivingController::class, 'index'])->name('receiving.index');

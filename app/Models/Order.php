@@ -26,4 +26,8 @@ class Order extends Model
     {
         return $this->hasMany(Receiving::class);
     }
+    public function pharmacy()
+    {
+        return $this->belongsTo(Pharmacies::class, 'pharmacy_id');
+    }
 }

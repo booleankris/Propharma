@@ -6,13 +6,13 @@
     <title>Surat Pesanan</title>
     <style>
         @page {
-            margin: 15px 25px;
+            margin: 6px 35px;
         }
 
         body {
             font-family: Arial, Helvetica, sans-serif;
-            font-size: 12px;
-            line-height: 1.4;
+            font-size: 6px;
+            line-height: 1.2;
             color: #000;
         }
 
@@ -38,23 +38,23 @@
 
         /* Garis Pemisah Kop */
         .line {
-            border-top: 2px solid #000;
-            margin-top: 8px;
-            margin-bottom: 12px;
+            border-top: 1px solid #000;
+            margin-top: 3px;
+            margin-bottom: 4px;
         }
 
         /* Styling Tabel Utama */
         table.form-table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 10px;
+            margin-top: 3px;
         }
 
         table.form-table th,
         table.form-table td {
-            border: 1px solid #000;
-            padding: 6px;
-            font-size: 11px;
+            border: 0.5px solid #000;
+            padding: 2.5px;
+            font-size: 4px;
         }
 
         table.form-table th {
@@ -65,22 +65,47 @@
 
         /* Identitas / Form List */
         .id-table td {
-            padding: 3px 0;
+            padding: 1px 0;
             vertical-align: top;
+            font-size: 5px;
+        }
+
+        .id-table td.dotted {
+            border-bottom: 1px dotted #000;
+            padding: 0 0 1px 0;
         }
 
         /* Catatan Kaki */
         .notes {
-            font-size: 11px;
-            margin-top: 20px;
+            font-size: 5.5px;
+            margin-top: 4px;
             border-top: 1px dashed #ccc;
-            padding-top: 5px;
+            padding-top: 2px;
         }
 
         /* Mencegah TTD terpotong ke halaman baru */
         .signature-block {
-            margin-top: 20px;
+            margin-top: 4px;
             page-break-inside: avoid;
+        }
+
+        .section-gap {
+            margin-top: 3px;
+            margin-bottom: 2px;
+        }
+
+        .title-main {
+            text-align: center;
+            font-weight: bold;
+            font-size: 9px;
+            text-decoration: underline;
+            margin-top: 3px;
+            margin-bottom: 5px;
+        }
+
+        .subtitle {
+            text-align: center;
+            margin-top: 1px;
         }
     </style>
 </head>
@@ -99,16 +124,24 @@
             @foreach ($items as $creditorCode => $items)
                 <table style="width:100%; border-collapse:collapse;">
                     <tr>
-                        <td style="width:110px; vertical-align:top;">
-                            <img src="{{ public_path('img/logo-shb.png') }}" style="width:90px; height:auto;">
+                        <td style="width:38px; vertical-align:middle;">
+                            @if ($pharmacy->logo && file_exists(public_path('img/'.$pharmacy->logo)))
+                                <img src="{{ public_path('img/'.$pharmacy->logo) }}" style="width:40px; height:auto;">
+                            @else
+                                <img src="{{ public_path('img/logo-shb.png') }}" style="width:40px; height:auto;">
+                            @endif
                         </td>
-                        <td style="vertical-align:top; padding-left:5px;">
-                            <h2 style="margin:0; font-size:18px;">APOTEK SAHABAT</h2>
-                            <div>Jl. Palang Merah Indonesia No. 16 - B Samarinda</div>
-                            <div>HP. 0812 5758 6688</div>
-                            <div>Apoteker : apt. Nurlina Muliani, S.Farm., M. Farm</div>
-                            <div>No. SIPA : 500.16.7/100/SIPA/100.26</div>
-                            <div>No. SIA : 12440004111020004</div>
+                        <td style="vertical-align:top; padding-left:3px;">
+                            <h2 style="margin:0; font-size:8px;">{{ strtoupper($pharmacy->name) }}</h2>
+                            <div>{{ $pharmacy->address }}</div>
+                            <div>HP. {{ $pharmacy->phone }}</div>
+                            <div>Apoteker : apt. {{ $pharmacy->pharmacist }}</div>
+                            <div>No. SIPA : {{ $pharmacy->pharmacist_permit }}</div>
+                            @if ($pharmacy->permit)
+                                <div>No. SIA : {{ $pharmacy->permit }}</div>
+                            @elseif ($pharmacy->pharmacy_registration)
+                                <div>No. STR : {{ $pharmacy->pharmacy_registration }}</div>
+                            @endif
                         </td>
                     </tr>
                 </table>
@@ -116,7 +149,7 @@
                 <div class="line"></div>
 
                 {{-- NO & KEPADA --}}
-                <table style="width:100%; margin-top:10px;">
+                <table style="width:100%; margin-top:2px;">
                     <tr>
                         <td style="width:50%; vertical-align:top;">
                             <b>No :</b> SP-00{{ $items->first()->id }}
@@ -134,12 +167,11 @@
                 </table>
 
                 {{-- TITLE --}}
-                <div
-                    style="text-align:center; font-weight:bold; font-size:18px; text-decoration:underline; margin-top:15px; margin-bottom:10px;">
+                <div class="title-main">
                     SURAT PESANAN
                 </div>
 
-                <div style="margin-bottom:8px;">Mohon dikirim obat-obatan untuk keperluan apotek :</div>
+                <div class="section-gap">Mohon dikirim obat-obatan untuk keperluan apotek :</div>
 
                 {{-- TABLE --}}
                 <table class="form-table">
@@ -165,7 +197,7 @@
                             </tr>
                         @endforeach
 
-                        @for ($i = count($items); $i < 12; $i++)
+                        @for ($i = count($items); $i < 15; $i++)
                             <tr>
                                 <td>&nbsp;</td>
                                 <td></td>
@@ -178,19 +210,24 @@
                 {{-- FOOTER --}}
                 <table class="signature-block" style="width:100%;">
                     <tr>
-                        <td style="width:45%; vertical-align:top; font-size:11px; color:#444;">
+                        <td style="width:45%; vertical-align:top; color:#444;">
                             Asli : Arsip PBF <br>
                             Copy : Arsip Apotek
                         </td>
                         <td style="width:55%; text-align:right; vertical-align:top;">
-                            Samarinda, {{ $date }}
+                            {{ $pharmacy->city }}, {{ $date }}
                             <br>
                             Penanggung Jawab,
-                            <div style="margin: 4px 0;">
-                                <img src="{{ public_path('img/ttd-nurlina.png') }}" style="height:65px; width:auto;">
-                            </div>
-                            <b><u>apt. Nurlina Muliani, S.Farm., M. Farm</u></b><br>
-                            <span style="font-size:11px;">SIPA : 500.16.7/100/SIPA/100.26</span>
+                            @if ($pharmacy->signature && file_exists(public_path('img/'.$pharmacy->signature)))
+                                <div style="margin: 1px 0;">
+                                    <img src="{{ public_path('img/'.$pharmacy->signature) }}"
+                                        style="height:35px; width:auto;">
+                                </div>
+                            @else
+                                <div style="height:35px;"></div> {{-- blank space to sign by hand --}}
+                            @endif
+                            <b><u>apt. {{ $pharmacy->pharmacist }}</u></b><br>
+                            SIPA : {{ $pharmacy->pharmacist_permit }}
                         </td>
                     </tr>
                 </table>
@@ -205,77 +242,96 @@
     ========================================================== --}}
         @elseif ($type == 'PREKURSOR')
             @foreach ($items as $creditorCode => $items)
-                <table style="width:100%; border-collapse:collapse;">
-                    <tr>
-                        <td style="width:110px; vertical-align:top;">
-                            <img src="{{ public_path('img/logo-shb.png') }}" style="width:90px; height:auto;">
-                        </td>
-                        <td style="vertical-align:top; padding-left:5px;">
-                            <h2 style="margin:0; font-size:18px;">APOTEK SAHABAT</h2>
-                            <div>Jl. Palang Merah Indonesia No. 16 - B Samarinda</div>
-                            <div>HP. 0812 5758 6688</div>
-                            <div>Apoteker : apt. Nurlina Muliani, S.Farm., M. Farm</div>
-                            <div>No. SIPA : 500.16.7/100/SIPA/100.26</div>
-                            <div>No. SIA : 12440004111020004</div>
-                        </td>
-                    </tr>
-                </table>
-
-                <div class="line"></div>
-
-                {{-- NO & KEPADA --}}
-                <table style="width:100%; margin-top:10px;">
-                    <tr>
-                        <td style="width:50%; vertical-align:top;">
-                            <b>No :</b> SP-00{{ $items->first()->id }}
-                        </td>
-                        <td style="width:50%; text-align:right; vertical-align:top;">
-                            <b>Kepada Yth :</b> {{ optional($items->first()->creditors)->name ?? '-' }}
-                        </td>
-                    </tr>
-                    <tr>
-                        <td></td>
-                        <td style="text-align:right;">
-                            Di- {{ optional($items->first()->creditors)->city ?? '-' }}
-                        </td>
-                    </tr>
-                </table>
-
-                {{-- TITLE --}}
-                <div
-                    style="text-align:center; font-weight:bold; font-size:18px; text-decoration:underline; margin-top:15px; margin-bottom:10px;">
-                    SURAT PESANAN PREKURSOR
+                <div class="title-main">
+                    SURAT PESANAN OBAT MENGANDUNG PREKURSOR FARMASI
+                </div>
+                <div class="subtitle">
+                    Nomor SP : SP-00{{ $items->first()->id }}
                 </div>
 
-                <div style="margin-bottom:8px;">Mohon dikirim obat-obatan untuk keperluan apotek :</div>
+                <div class="section-gap">Yang bertanda tangan dibawah ini :</div>
+
+                <table class="id-table" style="width:100%; border-collapse:collapse;">
+                    <tr>
+                        <td style="width:60px;">Nama Apoteker</td>
+                        <td style="width:8px;">:</td>
+                        <td><b>apt. {{ $pharmacy->pharmacist }}</b></td>
+                    </tr>
+                    <tr>
+                        <td>Jabatan</td>
+                        <td>:</td>
+                        <td>Apoteker Pengelola Apotek</td>
+                    </tr>
+                    <tr>
+                        <td>No. SIPA</td>
+                        <td>:</td>
+                        <td>{{ $pharmacy->pharmacist_permit }}</td>
+                    </tr>
+                </table>
+
+                <div class="section-gap">
+                    Mengajukan pesanan obat mengandung Prekursor Farmasi kepada :
+                </div>
+
+                <table class="id-table" style="width:100%; border-collapse:collapse;">
+                    <tr>
+                        <td style="width:60px;">Nama PBF</td>
+                        <td style="width:8px;">:</td>
+                        <td class="dotted">
+                            <b>{{ optional($items->first()->creditors)->name ?? '-' }}</b>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>Alamat</td>
+                        <td>:</td>
+                        <td class="dotted">
+                            {{ optional($items->first()->creditors)->address ?? '-' }}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>No. Telp.</td>
+                        <td>:</td>
+                        <td class="dotted">
+                            {{ optional($items->first()->creditors)->phone ?? '-' }}
+                        </td>
+                    </tr>
+                </table>
+
+                <div class="section-gap">
+                    Obat mengandung Prekursor Farmasi tersebut akan digunakan untuk memenuhi kebutuhan :
+                </div>
 
                 {{-- TABLE --}}
                 <table class="form-table">
                     <thead>
                         <tr>
-                            <th style="width:15%;">Jumlah</th>
-                            <th style="width:55%;">Nama Obat</th>
-                            <th style="width:30%;">Keterangan</th>
+                            <th style="width:5%;">No.</th>
+                            <th style="width:30%;">Nama Obat Mengandung Prekursor Farmasi</th>
+                            <th style="width:25%;">Zat Aktif Prekursor Farmasi</th>
+                            <th style="width:15%;">Satuan</th>
+                            <th style="width:12%;">Jumlah</th>
+                            <th style="width:13%;">Ket.</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach ($items as $row)
+                        @foreach ($items as $index => $row)
                             <tr>
+                                <td style="text-align:center;">{{ $index + 1 }}</td>
+                                <td style="text-align:left;">{{ $row->medicines->name ?? '-' }}</td>
                                 <td style="text-align:center;">
-                                    {{ $row->quantity }}
-                                </td>
-                                <td>
-                                    {{ $row->medicines->name ?? '-' }}
-                                </td>
-                                <td>
-                                    {{-- optional --}}
-                                </td>
+                                    {{ optional($row->medicines->composition)->name ?? '-' }}</td>
+                                <td style="text-align:center;">{{ $row->medicines->packaging ?? '-' }}</td>
+                                <td style="text-align:center;">{{ $row->quantity }}</td>
+                                <td></td>
                             </tr>
                         @endforeach
 
-                        @for ($i = count($items); $i < 12; $i++)
+                        @for ($i = count($items); $i < 3; $i++)
                             <tr>
                                 <td>&nbsp;</td>
+                                <td></td>
+                                <td></td>
+                                <td></td>
                                 <td></td>
                                 <td></td>
                             </tr>
@@ -283,22 +339,54 @@
                     </tbody>
                 </table>
 
-                {{-- FOOTER --}}
+                <div class="section-gap">
+                    Obat tersebut mengandung Prekursor tersebut akan digunakan untuk memenuhi kebutuhan:
+                </div>
+
+                <table class="id-table" style="width:100%; border-collapse:collapse;">
+                    <tr>
+                        <td style="width:60px;">Nama Apotek</td>
+                        <td style="width:8px;">:</td>
+                        <td><b>{{ $pharmacy->name }}</b></td>
+                    </tr>
+                    <tr>
+                        <td>Alamat</td>
+                        <td>:</td>
+                        <td>{{ $pharmacy->address }}</td>
+                    </tr>
+                    <tr>
+                        <td>
+                            @if ($pharmacy->permit)
+                                SIA
+                            @elseif ($pharmacy->pharmacy_registration)
+                                STR
+                            @endif
+                        </td>
+                        <td>:</td>
+                        <td>
+                            {{ $pharmacy->permit ?? $pharmacy->pharmacy_registration }}
+                        </td>
+                    </tr>
+                </table>
+
+                {{-- SIGNATURE --}}
                 <table class="signature-block" style="width:100%;">
                     <tr>
-                        <td style="width:45%; vertical-align:top; font-size:11px; color:#444;">
-                            Asli : Arsip PBF <br>
-                            Copy : Arsip Apotek
-                        </td>
-                        <td style="width:55%; text-align:right; vertical-align:top;">
-                            Samarinda, {{ $date }}
+                        <td style="width:50%;"></td>
+                        <td style="width:50%; text-align:center;">
+                            {{ $pharmacy->city }}, {{ $date }}
                             <br>
-                            Penanggung Jawab,
-                            <div style="margin: 4px 0;">
-                                <img src="{{ public_path('img/ttd-nurlina.png') }}" style="height:65px; width:auto;">
-                            </div>
-                            <b><u>apt. Nurlina Muliani, S.Farm., M. Farm</u></b><br>
-                            <span style="font-size:11px;">SIPA : 500.16.7/100/SIPA/100.26</span>
+                            Pemesan,
+                            @if ($pharmacy->signature && file_exists(public_path($pharmacy->signature)))
+                                <div style="margin: 4px 0;">
+                                    <img src="{{ public_path($pharmacy->signature) }}"
+                                        style="height:65px; width:auto;">
+                                </div>
+                            @else
+                                <div style="height:35px;"></div> {{-- blank space to sign by hand --}}
+                            @endif
+                            <b><u>apt. {{ $pharmacy->pharmacist }}</u></b><br>
+                            SIPA : {{ $pharmacy->pharmacist_permit }}
                         </td>
                     </tr>
                 </table>
@@ -313,98 +401,97 @@
     ========================================================== --}}
         @elseif ($type == 'Obat Tertentu' || $type == 'OBAT-OBAT TERTENTU (OOT)')
             @foreach ($items as $creditorCode => $items)
-                <div style="text-align:center; font-weight:bold; font-size:16px; text-decoration:underline;">
+                <div class="title-main">
                     SURAT PESANAN OBAT-OBAT TERTENTU
                 </div>
 
-                <div style="text-align:center; margin-top:4px;">
+                <div class="subtitle">
                     Nomor : SP-00{{ $items->first()->id }}
                 </div>
 
-                <div style="margin-top:15px; margin-bottom:8px;">Yang bertanda tangan dibawah ini :</div>
+                <div class="section-gap">Yang bertanda tangan dibawah ini :</div>
 
-                <table class="id-table" style="width:100%; border-collapse:collapse; margin-bottom:10px;">
+                <table class="id-table" style="width:100%; border-collapse:collapse;">
                     <tr>
-                        <td style="width:130px; padding:3px 0;">Nama</td>
-                        <td style="width:10px;">:</td>
-                        <td style="border-bottom:1px dotted #000; padding:3px 0;">
-                            <b>apt. Nurlina Muliani, S.Farm., M.Farm</b>
+                        <td style="width:55px;">Nama</td>
+                        <td style="width:8px;">:</td>
+                        <td class="dotted">
+                            <b>apt. {{ $pharmacy->pharmacist }}</b>
                         </td>
                     </tr>
                     <tr>
-                        <td style="padding:3px 0;">Jabatan</td>
+                        <td>Jabatan</td>
                         <td>:</td>
-                        <td style="border-bottom:1px dotted #000; padding:3px 0;">
+                        <td class="dotted">
                             Apoteker Pengelola Apotek
                         </td>
                     </tr>
                 </table>
 
-                <div style="margin-top:12px; margin-bottom:8px;">Mengajukan pesanan Obat-Obat Tertentu kepada :</div>
+                <div class="section-gap">Mengajukan pesanan Obat-Obat Tertentu kepada :</div>
 
-                <table class="id-table" style="width:100%; border-collapse:collapse; margin-bottom:10px;">
+                <table class="id-table" style="width:100%; border-collapse:collapse;">
                     <tr>
-                        <td style="width:130px; padding:3px 0;">Nama Distributor</td>
-                        <td style="width:10px;">:</td>
-                        <td style="border-bottom:1px dotted #000; padding:3px 0;">
+                        <td style="width:55px;">Nama Distributor</td>
+                        <td style="width:8px;">:</td>
+                        <td class="dotted">
                             <b>{{ optional($items->first()->creditors)->name ?? '-' }}</b>
                         </td>
                     </tr>
                     <tr>
-                        <td style="padding:3px 0;">Alamat</td>
+                        <td>Alamat</td>
                         <td>:</td>
-                        <td style="border-bottom:1px dotted #000; padding:3px 0;">
+                        <td class="dotted">
                             {{ optional($items->first()->creditors)->address ?? '-' }}
                         </td>
                     </tr>
                     <tr>
-                        <td style="padding:3px 0;">Telp.</td>
+                        <td>Telp.</td>
                         <td>:</td>
-                        <td style="border-bottom:1px dotted #000; padding:3px 0;">
+                        <td class="dotted">
                             {{ optional($items->first()->creditors)->phone ?? '-' }}
                         </td>
                     </tr>
                 </table>
 
-                <div style="margin-top:12px; margin-bottom:8px;">Dengan Obat-Obat Tertentu yang dipesan adalah :</div>
+                <div class="section-gap">Dengan Obat-Obat Tertentu yang dipesan adalah :</div>
 
-                <table style="width:100%; border-collapse:collapse; margin-bottom:10px;">
+                <table style="width:100%; border-collapse:collapse;">
                     @php $no = 1; @endphp
                     @foreach ($items as $row)
                         <tr>
-                            <td style="width:30px; padding:4px 0;">{{ $no++ }})</td>
-                            <td style="border-bottom:1px dotted #000; padding:4px 0;">
+                            <td style="width:14px; padding:1px 0;">{{ $no++ }})</td>
+                            <td style="border-bottom:1px dotted #000; padding:1px 0;">
                                 <b>{{ $row->medicines->name ?? '-' }}</b>
                                 ({{ $row->quantity }})
                             </td>
                         </tr>
                     @endforeach
 
-                    @for ($i = count($items); $i < 4; $i++)
+                    @for ($i = count($items); $i < 2; $i++)
                         <tr>
-                            <td style="padding:4px 0;">{{ $i + 1 }})</td>
-                            <td style="border-bottom:1px dotted #000; padding:4px 0;">&nbsp;</td>
+                            <td style="padding:1px 0;">{{ $i + 1 }})</td>
+                            <td style="border-bottom:1px dotted #000; padding:1px 0;">&nbsp;</td>
                         </tr>
                     @endfor
                 </table>
 
-                <div style="margin-top:12px; margin-bottom:8px;">Obat-Obat Tertentu tersebut akan dipergunakan untuk :
-                </div>
+                <div class="section-gap">Obat-Obat Tertentu tersebut akan dipergunakan untuk :</div>
 
                 <table class="id-table" style="width:100%; border-collapse:collapse;">
                     <tr>
-                        <td style="width:130px; vertical-align:top; padding:3px 0;">Nama Sarana</td>
-                        <td style="width:10px; vertical-align:top; padding:3px 0;">:</td>
-                        <td style="padding:3px 0;">
-                            <b>Apotek Sahabat</b><br>
-                            <span style="font-size:11px; color:#555;">( PBF / Apotek / Instalasi Farmasi Rumah Sakit /
+                        <td style="width:55px; vertical-align:top;">Nama Sarana</td>
+                        <td style="width:8px; vertical-align:top;">:</td>
+                        <td>
+                            <b>{{ $pharmacy->name }}</b><br>
+                            <span style="font-size:5px; color:#555;">( PBF / Apotek / Instalasi Farmasi Rumah Sakit /
                                 Instalasi Farmasi Klinik )</span>
                         </td>
                     </tr>
                     <tr>
-                        <td style="vertical-align:top; padding:3px 0;">Alamat Sarana</td>
-                        <td style="vertical-align:top; padding:3px 0;">:</td>
-                        <td style="padding:3px 0;">Jl. Palang Merah Indonesia No. 16 - B Samarinda</td>
+                        <td style="vertical-align:top;">Alamat Sarana</td>
+                        <td style="vertical-align:top;">:</td>
+                        <td>{{ $pharmacy->address }}</td>
                     </tr>
                 </table>
 
@@ -412,14 +499,19 @@
                     <tr>
                         <td style="width:50%;"></td>
                         <td style="width:50%; text-align:right;">
-                            Samarinda, {{ $date }}
+                            {{ $pharmacy->city }}, {{ $date }}
                             <br>
                             Pemesan,
-                            <div style="margin: 4px 0;">
-                                <img src="{{ public_path('img/ttd-nurlina.png') }}" style="height:65px; width:auto;">
-                            </div>
-                            <b>( apt. Nurlina Muliani, S.Farm., M.Farm )</b><br>
-                            <span style="font-size:11px;">SIPA : 500.16.7/100/SIPA/100.26</span>
+                            @if ($pharmacy->signature && file_exists(public_path($pharmacy->signature)))
+                                <div style="margin: 4px 0;">
+                                    <img src="{{ public_path($pharmacy->signature) }}"
+                                        style="height:65px; width:auto;">
+                                </div>
+                            @else
+                                <div style="height:35px;"></div> {{-- blank space to sign by hand --}}
+                            @endif
+                            <b>( apt. {{ $pharmacy->pharmacist }} )</b><br>
+                            SIPA : {{ $pharmacy->pharmacist_permit }}
                         </td>
                     </tr>
                 </table>
@@ -440,20 +532,20 @@
     ========================================================== --}}
         @elseif ($type == 'NARKOTIKA')
             @foreach ($items as $creditorCode => $items)
-                <div style="text-align:center; font-weight:bold; font-size:16px; text-decoration:underline;">
+                <div class="title-main">
                     SURAT PESANAN NARKOTIKA
                 </div>
-                <div style="text-align:center; margin-top:4px;">
+                <div class="subtitle">
                     Nomor : SP-00{{ $items->first()->id }}
                 </div>
 
                 {{-- IDENTITAS --}}
-                <div style="margin-top:15px; margin-bottom:5px;">Yang bertanda tangan dibawah ini :</div>
+                <div class="section-gap">Yang bertanda tangan dibawah ini :</div>
                 <table class="id-table" style="width:100%;">
                     <tr>
-                        <td style="width:140px;">Nama</td>
-                        <td style="width:10px;">:</td>
-                        <td><b>apt. Nurlina Muliani, S. Farm., M. Farm.</b></td>
+                        <td style="width:60px;">Nama</td>
+                        <td style="width:8px;">:</td>
+                        <td><b>apt. {{ $pharmacy->pharmacist }}</b></td>
                     </tr>
                     <tr>
                         <td>Jabatan</td>
@@ -462,11 +554,11 @@
                     </tr>
                 </table>
 
-                <div style="margin-top:12px; margin-bottom:5px;">Mengajukan pesanan Narkotika kepada :</div>
+                <div class="section-gap">Mengajukan pesanan Narkotika kepada :</div>
                 <table class="id-table" style="width:100%;">
                     <tr>
-                        <td style="width:140px;">Nama Distributor</td>
-                        <td style="width:10px;">:</td>
+                        <td style="width:60px;">Nama Distributor</td>
+                        <td style="width:8px;">:</td>
                         <td><b>{{ optional($items->first()->creditors)->name ?? '-' }}</b></td>
                     </tr>
                     <tr>
@@ -482,7 +574,7 @@
                 </table>
 
                 {{-- TABLE TITLE --}}
-                <div style="margin-top:12px; margin-bottom:5px;">
+                <div class="section-gap">
                     Dengan Narkotika yang dipesan adalah :
                 </div>
 
@@ -508,7 +600,7 @@
                             </tr>
                         @endforeach
 
-                        @for ($i = count($items); $i < 6; $i++)
+                        @for ($i = count($items); $i < 3; $i++)
                             <tr>
                                 <td>&nbsp;</td>
                                 <td></td>
@@ -532,17 +624,17 @@
                 </table>
 
                 {{-- SARANA --}}
-                <div style="margin-top:12px; margin-bottom:5px;">Narkotika tersebut akan dipergunakan untuk :</div>
+                <div class="section-gap">Narkotika tersebut akan dipergunakan untuk :</div>
                 <table class="id-table" style="width:100%;">
                     <tr>
-                        <td style="width:140px;">Nama Sarana</td>
-                        <td style="width:10px;">:</td>
-                        <td><b>Apotek Sahabat</b></td>
+                        <td style="width:60px;">Nama Sarana</td>
+                        <td style="width:8px;">:</td>
+                        <td><b>{{ $pharmacy->name }}</b></td>
                     </tr>
                     <tr>
                         <td>Alamat Sarana</td>
                         <td>:</td>
-                        <td>Jl. Palang Merah Indonesia No. 16 - B Samarinda</td>
+                        <td>{{ $pharmacy->address }}</td>
                     </tr>
                 </table>
 
@@ -551,14 +643,19 @@
                     <tr>
                         <td style="width:50%;"></td>
                         <td style="width:50%; text-align:center;">
-                            Samarinda, {{ $date }}
+                            {{ $pharmacy->city }}, {{ $date }}
                             <br>
                             Pemesan,
-                            <div style="margin: 4px 0;">
-                                <img src="{{ public_path('img/ttd-nurlina.png') }}" style="height:65px; width:auto;">
-                            </div>
-                            <b><u>apt. Nurlina Muliani, S. Farm., M. Farm.</u></b><br>
-                            <span style="font-size:11px;">SIPA : 500.16.7/100/SIPA/100.26</span>
+                            @if ($pharmacy->signature && file_exists(public_path($pharmacy->signature)))
+                                <div style="margin: 4px 0;">
+                                    <img src="{{ public_path($pharmacy->signature) }}"
+                                        style="height:65px; width:auto;">
+                                </div>
+                            @else
+                                <div style="height:35px;"></div> {{-- blank space to sign by hand --}}
+                            @endif
+                            <b><u>apt. {{ $pharmacy->pharmacist }}</u></b><br>
+                            SIPA : {{ $pharmacy->pharmacist_permit }}
                         </td>
                     </tr>
                 </table>
@@ -580,20 +677,20 @@
     ========================================================== --}}
         @elseif ($type == 'Psikotropika' || $type == 'PSIKOTROPIKA')
             @foreach ($items as $creditorCode => $items)
-                <div style="text-align:center; font-weight:bold; font-size:16px; text-decoration:underline;">
+                <div class="title-main">
                     SURAT PESANAN PSIKOTROPIKA
                 </div>
-                <div style="text-align:center; margin-top:4px;">
+                <div class="subtitle">
                     Nomor : SP-00{{ $items->first()->id }}
                 </div>
 
                 {{-- IDENTITAS --}}
-                <div style="margin-top:15px; margin-bottom:5px;">Yang bertanda tangan dibawah ini :</div>
+                <div class="section-gap">Yang bertanda tangan dibawah ini :</div>
                 <table class="id-table" style="width:100%;">
                     <tr>
-                        <td style="width:140px;">Nama</td>
-                        <td style="width:10px;">:</td>
-                        <td><b>apt. Nurlina Muliani, S. Farm., M. Farm</b></td>
+                        <td style="width:60px;">Nama</td>
+                        <td style="width:8px;">:</td>
+                        <td><b>apt. {{ $pharmacy->pharmacist }}</b></td>
                     </tr>
                     <tr>
                         <td>Jabatan</td>
@@ -602,11 +699,11 @@
                     </tr>
                 </table>
 
-                <div style="margin-top:12px; margin-bottom:5px;">Mengajukan pesanan Psikotropika kepada :</div>
+                <div class="section-gap">Mengajukan pesanan Psikotropika kepada :</div>
                 <table class="id-table" style="width:100%;">
                     <tr>
-                        <td style="width:140px;">Nama Distributor</td>
-                        <td style="width:10px;">:</td>
+                        <td style="width:60px;">Nama Distributor</td>
+                        <td style="width:8px;">:</td>
                         <td><b>{{ optional($items->first()->creditors)->name ?? '-' }}</b></td>
                     </tr>
                     <tr>
@@ -622,7 +719,7 @@
                 </table>
 
                 {{-- TABLE TITLE --}}
-                <div style="margin-top:12px; margin-bottom:5px;">
+                <div class="section-gap">
                     Dengan Psikotropika yang dipesan adalah :
                 </div>
 
@@ -648,7 +745,7 @@
                             </tr>
                         @endforeach
 
-                        @for ($i = count($items); $i < 6; $i++)
+                        @for ($i = count($items); $i < 3; $i++)
                             <tr>
                                 <td>&nbsp;</td>
                                 <td></td>
@@ -661,17 +758,17 @@
                 </table>
 
                 {{-- SARANA --}}
-                <div style="margin-top:12px; margin-bottom:5px;">Psikotropika tersebut akan dipergunakan untuk :</div>
+                <div class="section-gap">Psikotropika tersebut akan dipergunakan untuk :</div>
                 <table class="id-table" style="width:100%;">
                     <tr>
-                        <td style="width:140px;">Nama Sarana</td>
-                        <td style="width:10px;">:</td>
-                        <td><b>Apotek Sahabat</b></td>
+                        <td style="width:60px;">Nama Sarana</td>
+                        <td style="width:8px;">:</td>
+                        <td><b>{{ $pharmacy->name }}</b></td>
                     </tr>
                     <tr>
                         <td>Alamat Sarana</td>
                         <td>:</td>
-                        <td>Jl. Palang Merah Indonesia No. 16 - B Samarinda</td>
+                        <td>{{ $pharmacy->address }}</td>
                     </tr>
                 </table>
 
@@ -680,14 +777,19 @@
                     <tr>
                         <td style="width:50%;"></td>
                         <td style="width:50%; text-align:center;">
-                            Samarinda, {{ $date }}
+                            {{ $pharmacy->city }}, {{ $date }}
                             <br>
                             Pemesan,
-                            <div style="margin: 4px 0;">
-                                <img src="{{ public_path('img/ttd-nurlina.png') }}" style="height:65px; width:auto;">
-                            </div>
-                            <b><u>apt. Nurlina Muliani, S. Farm., M. Farm</u></b><br>
-                            <span style="font-size:11px;">SIPA : 500.16.7/100/SIPA/100.26</span>
+                            @if ($pharmacy->signature && file_exists(public_path($pharmacy->signature)))
+                                <div style="margin: 4px 0;">
+                                    <img src="{{ public_path($pharmacy->signature) }}"
+                                        style="height:65px; width:auto;">
+                                </div>
+                            @else
+                                <div style="height:35px;"></div> {{-- blank space to sign by hand --}}
+                            @endif
+                            <b><u>apt. {{ $pharmacy->pharmacist }}</u></b><br>
+                            SIPA : {{ $pharmacy->pharmacist_permit }}
                         </td>
                     </tr>
                 </table>
