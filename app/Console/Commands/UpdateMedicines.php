@@ -65,10 +65,10 @@ class UpdateMedicines extends Command
                 }
 
                 // Column H (index 7) = ISI/BOX -> content
-                $content = $this->parseNumber($row[7] ?? 0);
+                $content = $this->parseNumber($row[17] ?? 0);
 
                 // Column I (index 8) = ISI/STRIP -> strip
-                $strip = $this->parseNumber($row[8] ?? 1);
+                $strip = $this->parseNumber($row[18] ?? 1);
 
                 $medicine = Medicines::where('code', $code)->first();
 
