@@ -160,7 +160,7 @@
                     </tr>
                     <tr>
                         <td></td>
-                        <td style="text-align:right;font-size:6.5px;">
+                        <td style="text-align:right;font-size:6px;">
                             Di- {{ optional($items->first()->creditors)->address ?? '-' }}
                         </td>
                     </tr>
