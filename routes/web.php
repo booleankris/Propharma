@@ -319,7 +319,17 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     // Check Export Status
     Route::get('/reports/export/status/{id}', [ReportsController::class, 'exportStatus'])
         ->name('reports.export.status');
+    Route::get('/test-pdf', function () {
 
+        return Pdf::loadHTML('
+                <!DOCTYPE html>
+                <html>
+                <body>
+                    <img src="' . public_path('img/logo-sahabat.png') . '" width="40">
+                </body>
+                </html>
+            ')->stream('test.pdf');
+    });
     // Transaction Export
     Route::post('/reports/export/transactions', [ReportsController::class, 'exportTransactions'])
         ->name('reports.export.transactions');
