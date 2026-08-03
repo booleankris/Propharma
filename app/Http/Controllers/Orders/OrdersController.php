@@ -9,7 +9,6 @@ use App\Models\MedicineCart;
 use App\Models\Medicines;
 use App\Models\Order;
 use App\Models\OrderItems;
-use App\Models\Pharmacies;
 use App\Models\Receiving;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -446,22 +445,10 @@ class OrdersController extends Controller
                 return $perCreditor->groupBy('creditor_code') ?? "Kosong";
             });
 
-            dd([
-                'pharmacy1' => Pharmacies::find(1)->only([
-                    'name',
-                    'address',
-                    'pharmacist',
-                    'permit',
-                    'pharmacist_permit'
-                ]),
-                'pharmacy5' => Pharmacies::find(5)->only([
-                    'name',
-                    'address',
-                    'pharmacist',
-                    'permit',
-                    'pharmacist_permit'
-                ]),
-            ]);
+            $pdf = Pdf::loadView('orders.printSPB', compact('order', 'date', 'grouped', 'pharmacy'))
+                ->setPaper('A7', 'portrait');
+
+            return $pdf->stream("SPB-{$order->code}.pdf");
         } catch (\Throwable $e) {
             dd($e->getMessage(), $e->getFile(), $e->getLine());
         }
