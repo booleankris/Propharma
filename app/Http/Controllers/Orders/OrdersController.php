@@ -426,28 +426,32 @@ class OrdersController extends Controller
     }
     public function printSPB($orderId)
     {
-        $date = Carbon::now()->translatedFormat('d F Y');
-        $order = Order::with([
-            'pharmacy',
-            'order_items.medicines',
-            'order_items.creditors',
-            'order_items.medicines.factory',
-            'order_items.medicines.category',
-            'order_items.medicines.composition',
-        ])->findOrFail($orderId);
+        try {
+            $date = Carbon::now()->translatedFormat('d F Y');
+            $order = Order::with([
+                'pharmacy',
+                'order_items.medicines',
+                'order_items.creditors',
+                'order_items.medicines.factory',
+                'order_items.medicines.category',
+                'order_items.medicines.composition',
+            ])->findOrFail($orderId);
 
-        $pharmacy = $order->pharmacy;
+            $pharmacy = $order->pharmacy;
 
-        $grouped = $order->order_items->groupBy(function ($item) {
-            return $item->medicines->type ?? "Kosong";
-        })->map(function ($perCreditor) {
-            return $perCreditor->groupBy('creditor_code') ?? "Kosong";
-        });
+            $grouped = $order->order_items->groupBy(function ($item) {
+                return $item->medicines->type ?? "Kosong";
+            })->map(function ($perCreditor) {
+                return $perCreditor->groupBy('creditor_code') ?? "Kosong";
+            });
 
-        $pdf = Pdf::loadView('orders.printSPB', compact('order', 'date', 'grouped', 'pharmacy'))
-            ->setPaper('A7', 'portrait');
+            $pdf = Pdf::loadView('orders.printSPB', compact('order', 'date', 'grouped', 'pharmacy'))
+                ->setPaper('A7', 'portrait');
 
-        return $pdf->stream("SPB-{$order->code}.pdf");
+            return $pdf->stream("SPB-{$order->code}.pdf");
+        } catch (\Throwable $e) {
+            dd($e->getMessage(), $e->getFile(), $e->getLine());
+        }
     }
     public function printPreview($order_id)
     {
