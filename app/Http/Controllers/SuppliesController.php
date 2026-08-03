@@ -99,6 +99,9 @@ class SuppliesController extends Controller
                 ->addColumn('date', function ($row) {
                     return $row->date;
                 })
+                ->addColumn('medicine_name', function ($row) {
+                    return $row->medicines->name;
+                })
                 ->addColumn('transaction_code', function ($row) {
                     return $row->transaction_code;
                 })

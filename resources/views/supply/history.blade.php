@@ -401,6 +401,7 @@
                                     <th class="px-4 py-3">#</th>
                                     <th class="px-4 py-3">Tanggal</th>
                                     <th class="px-4 py-3">Kode Transaksi</th>
+                                    <th class="px-4 py-3">Nama</th>
                                     <th class="px-4 py-3">Layanan</th>
                                     <th class="px-4 py-3">Keterangan</th>
                                     <th class="px-4 py-3">Saldo Awal</th>
@@ -485,6 +486,10 @@
                     {
                         data: 'transaction_code'
                     },
+                    {
+                        data: 'medicine_name'
+                    },
+
                     {
                         data: 'type'
                     },
