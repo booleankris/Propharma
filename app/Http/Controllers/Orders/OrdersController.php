@@ -445,14 +445,10 @@ class OrdersController extends Controller
                 return $perCreditor->groupBy('creditor_code') ?? "Kosong";
             });
 
-            $html = view('orders.printSPB', compact(
-                'order',
-                'date',
-                'grouped',
-                'pharmacy'
-            ))->render();
-            
-            return response($html);
+            $pdf = Pdf::loadView('orders.printSPB', compact('order', 'date', 'grouped', 'pharmacy'))
+                ->setPaper('A4', 'portrait');
+
+            return $pdf->stream("SPB-{$order->code}.pdf");
         } catch (\Throwable $e) {
             dd($e->getMessage(), $e->getFile(), $e->getLine());
         }
