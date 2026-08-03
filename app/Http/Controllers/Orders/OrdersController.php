@@ -441,18 +441,13 @@ class OrdersController extends Controller
         $grouped = $order->order_items->groupBy(function ($item) {
             return $item->medicines->type ?? "Kosong";
         })->map(function ($perCreditor) {
-            return $perCreditor->groupBy('creditor_code');
+            return $perCreditor->groupBy('creditor_code') ?? "Kosong";
         });
 
         $pdf = Pdf::loadView('orders.printSPB', compact('order', 'date', 'grouped', 'pharmacy'))
             ->setPaper('A7', 'portrait');
 
-        $pdfContent = $pdf->output();
-
-        // Force a file download
-        return response($pdfContent)
-            ->header('Content-Type', 'application/pdf')
-            ->header('Content-Disposition', 'attachment; filename="spb_debug.pdf"');
+        return $pdf->stream("SPB-{$order->code}.pdf");
     }
     public function printPreview($order_id)
     {
