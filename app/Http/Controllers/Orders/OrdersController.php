@@ -426,7 +426,7 @@ class OrdersController extends Controller
     }
     public function printSPB($orderId)
     {
-        $date = Carbon::now()->translatedFormat('d F Y');
+        $date = \Carbon\Carbon::now()->translatedFormat('d F Y');
         $order = Order::with([
             'pharmacy',
             'order_items.medicines',
@@ -437,11 +437,25 @@ class OrdersController extends Controller
         ])->findOrFail($orderId);
 
         $pharmacy = $order->pharmacy;
+        if (!$pharmacy) {
+            $pharmacy = (object)[
+                'name' => '-',
+                'address' => '-',
+                'phone' => '-',
+                'pharmacist' => '-',
+                'pharmacist_permit' => '-',
+                'permit' => '-',
+                'pharmacy_registration' => '-',
+                'city' => '-',
+                'logo' => null,
+                'signature' => null,
+            ];
+        }
 
         $grouped = $order->order_items->groupBy(function ($item) {
             return $item->medicines->type ?? "Kosong";
         })->map(function ($perCreditor) {
-            return $perCreditor->groupBy('creditor_code') ?? "Kosong";
+            return $perCreditor->groupBy('creditor_code');
         });
 
         $pdf = Pdf::loadView('orders.printSPB', compact('order', 'date', 'grouped', 'pharmacy'))
