@@ -443,21 +443,11 @@ class OrdersController extends Controller
         })->map(function ($perCreditor) {
             return $perCreditor->groupBy('creditor_code') ?? "Kosong";
         });
-        $pharmacy = $order->pharmacy;
-        // TEMPORARY DEBUG - remove after fixing
-        $logoFile = $pharmacy->logo;
-        $logoPath = public_path('img/' . $logoFile);
-        $info = getimagesize($logoPath);
-        return response(
-            "Dimensions: {$info[0]}x{$info[1]} px<br>" .
-            "Type: {$info['mime']}<br>" .
-            "Filesize: " . filesize($logoPath) . " bytes<br>" .
-            "PHP memory_limit: " . ini_get('memory_limit')
-        );
-        // $pdf = Pdf::loadView('orders.printSPB', compact('order', 'date', 'grouped', 'pharmacy'))
-        //     ->setPaper('A7', 'portrait');
 
-        // return $pdf->stream("SPB-{$order->code}.pdf");
+        $pdf = Pdf::loadView('orders.printSPB', compact('order', 'date', 'grouped', 'pharmacy'))
+            ->setPaper('A7', 'portrait');
+
+        return $pdf->stream("SPB-{$order->code}.pdf");
     }
     public function printPreview($order_id)
     {
