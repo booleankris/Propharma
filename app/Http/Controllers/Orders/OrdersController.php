@@ -426,41 +426,38 @@ class OrdersController extends Controller
     }
     public function printSPB($orderId)
     {
-        try {
-            $date = Carbon::now()->translatedFormat('d F Y');
-            $order = Order::with([
-                'pharmacy',
-                'order_items.medicines',
-                'order_items.creditors',
-                'order_items.medicines.factory',
-                'order_items.medicines.category',
-                'order_items.medicines.composition',
-            ])->findOrFail($orderId);
+        $date = Carbon::now()->translatedFormat('d F Y');
+        $order = Order::with([
+            'pharmacy',
+            'order_items.medicines',
+            'order_items.creditors',
+            'order_items.medicines.factory',
+            'order_items.medicines.category',
+            'order_items.medicines.composition',
+        ])->findOrFail($orderId);
 
-            $pharmacy = $order->pharmacy;
-            if (!$pharmacy) {
-                return response('Error: Order ini tidak memiliki data Apotek (pharmacy is null)', 500);
-            }
+        $pharmacy = $order->pharmacy;
 
-            $grouped = $order->order_items->groupBy(function ($item) {
-                return optional($item->medicines)->type ?? "Kosong";
-            })->map(function ($perCreditor) {
-                return $perCreditor->groupBy('creditor_code');
-            });
+        $grouped = $order->order_items->groupBy(function ($item) {
+            return $item->medicines->type ?? "Kosong";
+        })->map(function ($perCreditor) {
+            return $perCreditor->groupBy('creditor_code') ?? "Kosong";
+        });
+        $pharmacy = $order->pharmacy;
+        // TEMPORARY DEBUG - remove after fixing
+        $logoFile = $pharmacy->logo;
+        $logoPath = public_path('img/' . $logoFile);
+        return response(
+            "Logo field value: [{$logoFile}]<br>" .
+                "Full path: [{$logoPath}]<br>" .
+                "file_exists: " . (file_exists($logoPath) ? 'YES' : 'NO') . "<br>" .
+                "is_readable: " . (is_readable($logoPath) ? 'YES' : 'NO') . "<br>" .
+                "filesize: " . (file_exists($logoPath) ? filesize($logoPath) : 'N/A') . " bytes"
+        );
+        // $pdf = Pdf::loadView('orders.printSPB', compact('order', 'date', 'grouped', 'pharmacy'))
+        //     ->setPaper('A7', 'portrait');
 
-            $pdf = Pdf::loadView('orders.printSPB', compact('order', 'date', 'grouped', 'pharmacy'))
-                ->setPaper('A7', 'portrait');
-
-            return $pdf->stream("SPB-{$order->code}.pdf");
-        } catch (\Throwable $e) {
-            // This will show the EXACT error in the browser
-            return response(
-                'ERROR: ' . $e->getMessage() .
-                    '<br><br>FILE: ' . $e->getFile() .
-                    '<br>LINE: ' . $e->getLine(),
-                500
-            );
-        }
+        // return $pdf->stream("SPB-{$order->code}.pdf");
     }
     public function printPreview($order_id)
     {
