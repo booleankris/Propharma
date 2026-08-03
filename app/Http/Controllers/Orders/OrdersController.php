@@ -444,10 +444,23 @@ class OrdersController extends Controller
             return $perCreditor->groupBy('creditor_code') ?? "Kosong";
         });
 
-        $pdf = Pdf::loadView('orders.printSPB', compact('order', 'date', 'grouped', 'pharmacy'))
-            ->setPaper('A7', 'portrait');
+        $logoPath = public_path('img/' . $pharmacy->logo);
+        $sigPath = public_path('img/' . $pharmacy->signature);
+        $logoData = file_get_contents($logoPath, false, null, 0, 30);
+        $sigData = file_get_contents($sigPath, false, null, 0, 30);
+        return response(
+            "<b>LOGO:</b><br>" .
+                "Size: " . getimagesize($logoPath)[0] . "x" . getimagesize($logoPath)[1] . "<br>" .
+                "Bit depth: " . ord($logoData[24]) . "<br>" .
+                "Color type: " . ord($logoData[25]) . "<br>" .
+                "Interlaced: " . ord($logoData[28]) . "<br><br>" .
 
-        return $pdf->stream("SPB-{$order->code}.pdf");
+                "<b>SIGNATURE:</b><br>" .
+                "Size: " . getimagesize($sigPath)[0] . "x" . getimagesize($sigPath)[1] . "<br>" .
+                "Bit depth: " . ord($sigData[24]) . "<br>" .
+                "Color type: " . ord($sigData[25]) . "<br>" .
+                "Interlaced: " . ord($sigData[28])
+        );
     }
     public function printPreview($order_id)
     {
