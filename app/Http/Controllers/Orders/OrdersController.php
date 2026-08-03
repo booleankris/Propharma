@@ -444,12 +444,18 @@ class OrdersController extends Controller
             })->map(function ($perCreditor) {
                 return $perCreditor->groupBy('creditor_code') ?? "Kosong";
             });
-            return view('orders.printSPB', compact(
-                'order',
-                'date',
-                'grouped',
-                'pharmacy'
-            ));
+            $logo = public_path('img/' . $pharmacy->logo);
+            $signature = public_path('img/' . $pharmacy->signature);
+
+            dd([
+                'logo' => $logo,
+                'logo_exists' => file_exists($logo),
+                'logo_realpath' => realpath($logo),
+
+                'signature' => $signature,
+                'signature_exists' => file_exists($signature),
+                'signature_realpath' => realpath($signature),
+            ]);
         } catch (\Throwable $e) {
             dd($e->getMessage(), $e->getFile(), $e->getLine());
         }
