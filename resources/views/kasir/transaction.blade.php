@@ -2927,9 +2927,9 @@
         if (currenttransaction == "KREDIT" && racikstatus === 0) {
             subtotal = roundedtotal + parseInt(service);
         } else if (transaction_type == "RESEP TUNAI" && racikstatus === 0) {
-            subtotal = Math.round(roundedtotal / 1000) * 1000 + parseInt(service);
+            subtotal = Math.max(1000, Math.round(roundedtotal / 1000) * 1000) + parseInt(service);
         } else {
-            subtotal = Math.round(roundedtotal / 1000) * 1000;
+            subtotal = Math.max(1000, Math.round(roundedtotal / 1000) * 1000);
         }
         totalprice.value = formatRupiah(subtotal);
         pharmacy_price = price2 * val;
