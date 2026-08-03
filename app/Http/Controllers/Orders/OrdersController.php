@@ -447,12 +447,12 @@ class OrdersController extends Controller
         // TEMPORARY DEBUG - remove after fixing
         $logoFile = $pharmacy->logo;
         $logoPath = public_path('img/' . $logoFile);
+        $info = getimagesize($logoPath);
         return response(
-            "Logo field value: [{$logoFile}]<br>" .
-                "Full path: [{$logoPath}]<br>" .
-                "file_exists: " . (file_exists($logoPath) ? 'YES' : 'NO') . "<br>" .
-                "is_readable: " . (is_readable($logoPath) ? 'YES' : 'NO') . "<br>" .
-                "filesize: " . (file_exists($logoPath) ? filesize($logoPath) : 'N/A') . " bytes"
+            "Dimensions: {$info[0]}x{$info[1]} px<br>" .
+            "Type: {$info['mime']}<br>" .
+            "Filesize: " . filesize($logoPath) . " bytes<br>" .
+            "PHP memory_limit: " . ini_get('memory_limit')
         );
         // $pdf = Pdf::loadView('orders.printSPB', compact('order', 'date', 'grouped', 'pharmacy'))
         //     ->setPaper('A7', 'portrait');
