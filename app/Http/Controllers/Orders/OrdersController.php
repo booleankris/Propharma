@@ -446,7 +446,7 @@ class OrdersController extends Controller
             });
 
             $pdf = Pdf::loadView('orders.printSPB', compact('order', 'date', 'grouped', 'pharmacy'))
-                ->setPaper('A7', 'portrait');
+                ->setPaper('A4', 'portrait');
 
             return $pdf->stream("SPB-{$order->code}.pdf");
         } catch (\Throwable $e) {
