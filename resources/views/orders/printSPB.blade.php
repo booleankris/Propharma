@@ -112,6 +112,43 @@
 
 <body>
 
+    @php
+        // 1. Process Logo as Base64 to bypass DomPDF path/permission crashes
+        $logoSrc = null;
+        if (!empty($pharmacy->logo) && file_exists(public_path('img/' . $pharmacy->logo))) {
+            $path = public_path('img/' . $pharmacy->logo);
+            $type = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+            $type = $type == 'jpg' ? 'jpeg' : $type;
+            $data = @file_get_contents($path);
+            if ($data !== false) {
+                $logoSrc = 'data:image/' . $type . ';base64,' . base64_encode($data);
+            }
+        }
+
+        // Fallback logo
+        if (!$logoSrc && file_exists(public_path('img/logo-shb.png'))) {
+            $path = public_path('img/logo-shb.png');
+            $type = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+            $type = $type == 'jpg' ? 'jpeg' : $type;
+            $data = @file_get_contents($path);
+            if ($data !== false) {
+                $logoSrc = 'data:image/' . $type . ';base64,' . base64_encode($data);
+            }
+        }
+
+        // 2. Process Signature as Base64
+        $sigSrc = null;
+        if (!empty($pharmacy->signature) && file_exists(public_path('img/' . $pharmacy->signature))) {
+            $path = public_path('img/' . $pharmacy->signature);
+            $type = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+            $type = $type == 'jpg' ? 'jpeg' : $type;
+            $data = @file_get_contents($path);
+            if ($data !== false) {
+                $sigSrc = 'data:image/' . $type . ';base64,' . base64_encode($data);
+            }
+        }
+    @endphp
+
     @foreach ($grouped as $type => $items)
         @if (!$loop->first)
             <div style="page-break-before: always;"></div>
@@ -119,27 +156,25 @@
 
         {{-- =========================================================
          1) REGULER
-    ========================================================== --}}
+        ========================================================== --}}
         @if ($type == 'REGULER')
-            @foreach ($items as $creditorCode => $items)
+            @foreach ($items as $creditorCode => $creditorItems)
                 <table style="width:100%; border-collapse:collapse;">
                     <tr>
                         <td style="width:38px; vertical-align:middle;">
-                            @if ($pharmacy->logo && file_exists(public_path('img/'.$pharmacy->logo)))
-                                <img src="{{ public_path('img/'.$pharmacy->logo) }}" style="width:40px; height:auto;">
-                            @else
-                                <img src="{{ public_path('img/logo-shb.png') }}" style="width:40px; height:auto;">
+                            @if ($logoSrc)
+                                <img src="{{ $logoSrc }}" style="width:40px; height:auto;">
                             @endif
                         </td>
                         <td style="vertical-align:top; padding-left:3px;">
-                            <h2 style="margin:0; font-size:8px;">{{ strtoupper($pharmacy->name) }}</h2>
-                            <div>{{ $pharmacy->address }}</div>
-                            <div>HP. {{ $pharmacy->phone }}</div>
-                            <div>Apoteker : {{ $pharmacy->pharmacist }}</div>
-                            <div>No. SIPA : {{ $pharmacy->pharmacist_permit }}</div>
-                            @if ($pharmacy->permit)
+                            <h2 style="margin:0; font-size:8px;">{{ strtoupper($pharmacy->name ?? '') }}</h2>
+                            <div>{{ $pharmacy->address ?? '-' }}</div>
+                            <div>HP. {{ $pharmacy->phone ?? '-' }}</div>
+                            <div>Apoteker : {{ $pharmacy->pharmacist ?? '-' }}</div>
+                            <div>No. SIPA : {{ $pharmacy->pharmacist_permit ?? '-' }}</div>
+                            @if (!empty($pharmacy->permit))
                                 <div>No. SIA : {{ $pharmacy->permit }}</div>
-                            @elseif ($pharmacy->pharmacy_registration)
+                            @elseif (!empty($pharmacy->pharmacy_registration))
                                 <div>No. STR : {{ $pharmacy->pharmacy_registration }}</div>
                             @endif
                         </td>
@@ -152,16 +187,17 @@
                 <table style="width:100%; margin-top:2px;">
                     <tr>
                         <td style="width:50%; vertical-align:top;">
-                            <b>No :</b> SP-00{{ $items->first()->id }}
+                            <b>No :</b> SP-00{{ optional($creditorItems->first())->id ?? '-' }}
                         </td>
                         <td style="width:50%; text-align:right; vertical-align:top;">
-                            <b>Kepada Yth :</b> {{ optional($items->first()->creditors)->name ?? '-' }}
+                            <b>Kepada Yth :</b>
+                            {{ optional(optional($creditorItems->first())->creditors)->name ?? '-' }}
                         </td>
                     </tr>
                     <tr>
                         <td></td>
                         <td style="text-align:right;font-size:6px;">
-                            Di- {{ optional($items->first()->creditors)->address ?? '-' }}
+                            Di- {{ optional(optional($creditorItems->first())->creditors)->address ?? '-' }}
                         </td>
                     </tr>
                 </table>
@@ -183,13 +219,13 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach ($items as $row)
+                        @foreach ($creditorItems as $row)
                             <tr>
                                 <td style="text-align:center;">
                                     {{ $row->quantity }}
                                 </td>
                                 <td>
-                                    {{ $row->medicines->name ?? '-' }}
+                                    {{ optional($row->medicines)->name ?? '-' }}
                                 </td>
                                 <td>
                                     {{-- optional --}}
@@ -197,7 +233,7 @@
                             </tr>
                         @endforeach
 
-                        @for ($i = count($items); $i < 15; $i++)
+                        @for ($i = count($creditorItems); $i < 15; $i++)
                             <tr>
                                 <td>&nbsp;</td>
                                 <td></td>
@@ -215,19 +251,18 @@
                             Copy : Arsip Apotek
                         </td>
                         <td style="width:55%; text-align:right; vertical-align:top;">
-                            {{ $pharmacy->city }}, {{ $date }}
+                            {{ $pharmacy->city ?? '-' }}, {{ $date }}
                             <br>
                             Penanggung Jawab,
-                            @if ($pharmacy->signature && file_exists(public_path('img/'.$pharmacy->signature)))
+                            @if ($sigSrc)
                                 <div style="margin: 1px 0;">
-                                    <img src="{{ public_path('img/'.$pharmacy->signature) }}"
-                                        style="height:35px; width:auto;">
+                                    <img src="{{ $sigSrc }}" style="height:35px; width:auto;">
                                 </div>
                             @else
-                                <div style="height:35px;"></div> {{-- blank space to sign by hand --}}
+                                <div style="height:35px;"></div>
                             @endif
-                            <b><u>{{ $pharmacy->pharmacist }}</u></b><br>
-                            SIPA : {{ $pharmacy->pharmacist_permit }}
+                            <b><u>{{ $pharmacy->pharmacist ?? '-' }}</u></b><br>
+                            SIPA : {{ $pharmacy->pharmacist_permit ?? '-' }}
                         </td>
                     </tr>
                 </table>
@@ -239,14 +274,14 @@
 
             {{-- =========================================================
          2) PREKURSOR
-    ========================================================== --}}
+        ========================================================== --}}
         @elseif ($type == 'PREKURSOR')
-            @foreach ($items as $creditorCode => $items)
+            @foreach ($items as $creditorCode => $creditorItems)
                 <div class="title-main">
                     SURAT PESANAN OBAT MENGANDUNG PREKURSOR FARMASI
                 </div>
                 <div class="subtitle">
-                    Nomor SP : SP-00{{ $items->first()->id }}
+                    Nomor SP : SP-00{{ optional($creditorItems->first())->id ?? '-' }}
                 </div>
 
                 <div class="section-gap">Yang bertanda tangan dibawah ini :</div>
@@ -255,7 +290,7 @@
                     <tr>
                         <td style="width:60px;">Nama Apoteker</td>
                         <td style="width:8px;">:</td>
-                        <td><b>{{ $pharmacy->pharmacist }}</b></td>
+                        <td><b>{{ $pharmacy->pharmacist ?? '-' }}</b></td>
                     </tr>
                     <tr>
                         <td>Jabatan</td>
@@ -265,7 +300,7 @@
                     <tr>
                         <td>No. SIPA</td>
                         <td>:</td>
-                        <td>{{ $pharmacy->pharmacist_permit }}</td>
+                        <td>{{ $pharmacy->pharmacist_permit ?? '-' }}</td>
                     </tr>
                 </table>
 
@@ -278,21 +313,21 @@
                         <td style="width:60px;">Nama PBF</td>
                         <td style="width:8px;">:</td>
                         <td class="dotted">
-                            <b>{{ optional($items->first()->creditors)->name ?? '-' }}</b>
+                            <b>{{ optional(optional($creditorItems->first())->creditors)->name ?? '-' }}</b>
                         </td>
                     </tr>
                     <tr>
                         <td>Alamat</td>
                         <td>:</td>
                         <td class="dotted">
-                            {{ optional($items->first()->creditors)->address ?? '-' }}
+                            {{ optional(optional($creditorItems->first())->creditors)->address ?? '-' }}
                         </td>
                     </tr>
                     <tr>
                         <td>No. Telp.</td>
                         <td>:</td>
                         <td class="dotted">
-                            {{ optional($items->first()->creditors)->phone ?? '-' }}
+                            {{ optional(optional($creditorItems->first())->creditors)->phone ?? '-' }}
                         </td>
                     </tr>
                 </table>
@@ -314,19 +349,19 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach ($items as $index => $row)
+                        @foreach ($creditorItems as $index => $row)
                             <tr>
                                 <td style="text-align:center;">{{ $index + 1 }}</td>
-                                <td style="text-align:left;">{{ $row->medicines->name ?? '-' }}</td>
+                                <td style="text-align:left;">{{ optional($row->medicines)->name ?? '-' }}</td>
                                 <td style="text-align:center;">
-                                    {{ optional($row->medicines->composition)->name ?? '-' }}</td>
-                                <td style="text-align:center;">{{ $row->medicines->packaging ?? '-' }}</td>
+                                    {{ optional(optional($row->medicines)->composition)->name ?? '-' }}</td>
+                                <td style="text-align:center;">{{ optional($row->medicines)->packaging ?? '-' }}</td>
                                 <td style="text-align:center;">{{ $row->quantity }}</td>
                                 <td></td>
                             </tr>
                         @endforeach
 
-                        @for ($i = count($items); $i < 3; $i++)
+                        @for ($i = count($creditorItems); $i < 3; $i++)
                             <tr>
                                 <td>&nbsp;</td>
                                 <td></td>
@@ -347,24 +382,26 @@
                     <tr>
                         <td style="width:60px;">Nama Apotek</td>
                         <td style="width:8px;">:</td>
-                        <td><b>{{ $pharmacy->name }}</b></td>
+                        <td><b>{{ $pharmacy->name ?? '-' }}</b></td>
                     </tr>
                     <tr>
                         <td>Alamat</td>
                         <td>:</td>
-                        <td>{{ $pharmacy->address }}</td>
+                        <td>{{ $pharmacy->address ?? '-' }}</td>
                     </tr>
                     <tr>
                         <td>
-                            @if ($pharmacy->permit)
+                            @if (!empty($pharmacy->permit))
                                 SIA
-                            @elseif ($pharmacy->pharmacy_registration)
+                            @elseif (!empty($pharmacy->pharmacy_registration))
                                 STR
+                            @else
+                                SIA/STR
                             @endif
                         </td>
                         <td>:</td>
                         <td>
-                            {{ $pharmacy->permit ?? $pharmacy->pharmacy_registration }}
+                            {{ $pharmacy->permit ?? ($pharmacy->pharmacy_registration ?? '-') }}
                         </td>
                     </tr>
                 </table>
@@ -374,19 +411,18 @@
                     <tr>
                         <td style="width:50%;"></td>
                         <td style="width:50%; text-align:center;">
-                            {{ $pharmacy->city }}, {{ $date }}
+                            {{ $pharmacy->city ?? '-' }}, {{ $date }}
                             <br>
                             Pemesan,
-                            @if ($pharmacy->signature && file_exists(public_path('img/'.$pharmacy->signature)))
+                            @if ($sigSrc)
                                 <div style="margin: 4px 0;">
-                                    <img src="{{ public_path('img/'.$pharmacy->signature) }}"
-                                        style="height:35px; width:auto;">
+                                    <img src="{{ $sigSrc }}" style="height:35px; width:auto;">
                                 </div>
                             @else
-                                <div style="height:35px;"></div> {{-- blank space to sign by hand --}}
+                                <div style="height:35px;"></div>
                             @endif
-                            <b><u>{{ $pharmacy->pharmacist }}</u></b><br>
-                            SIPA : {{ $pharmacy->pharmacist_permit }}
+                            <b><u>{{ $pharmacy->pharmacist ?? '-' }}</u></b><br>
+                            SIPA : {{ $pharmacy->pharmacist_permit ?? '-' }}
                         </td>
                     </tr>
                 </table>
@@ -398,15 +434,15 @@
 
             {{-- =========================================================
          3) OBAT-OBAT TERTENTU (OOT)
-    ========================================================== --}}
+        ========================================================== --}}
         @elseif ($type == 'Obat Tertentu' || $type == 'OBAT-OBAT TERTENTU (OOT)')
-            @foreach ($items as $creditorCode => $items)
+            @foreach ($items as $creditorCode => $creditorItems)
                 <div class="title-main">
                     SURAT PESANAN OBAT-OBAT TERTENTU
                 </div>
 
                 <div class="subtitle">
-                    Nomor : SP-00{{ $items->first()->id }}
+                    Nomor : SP-00{{ optional($creditorItems->first())->id ?? '-' }}
                 </div>
 
                 <div class="section-gap">Yang bertanda tangan dibawah ini :</div>
@@ -416,7 +452,7 @@
                         <td style="width:55px;">Nama</td>
                         <td style="width:8px;">:</td>
                         <td class="dotted">
-                            <b>{{ $pharmacy->pharmacist }}</b>
+                            <b>{{ $pharmacy->pharmacist ?? '-' }}</b>
                         </td>
                     </tr>
                     <tr>
@@ -435,21 +471,21 @@
                         <td style="width:55px;">Nama Distributor</td>
                         <td style="width:8px;">:</td>
                         <td class="dotted">
-                            <b>{{ optional($items->first()->creditors)->name ?? '-' }}</b>
+                            <b>{{ optional(optional($creditorItems->first())->creditors)->name ?? '-' }}</b>
                         </td>
                     </tr>
                     <tr>
                         <td>Alamat</td>
                         <td>:</td>
                         <td class="dotted">
-                            {{ optional($items->first()->creditors)->address ?? '-' }}
+                            {{ optional(optional($creditorItems->first())->creditors)->address ?? '-' }}
                         </td>
                     </tr>
                     <tr>
                         <td>Telp.</td>
                         <td>:</td>
                         <td class="dotted">
-                            {{ optional($items->first()->creditors)->phone ?? '-' }}
+                            {{ optional(optional($creditorItems->first())->creditors)->phone ?? '-' }}
                         </td>
                     </tr>
                 </table>
@@ -458,17 +494,17 @@
 
                 <table style="width:100%; border-collapse:collapse;">
                     @php $no = 1; @endphp
-                    @foreach ($items as $row)
+                    @foreach ($creditorItems as $row)
                         <tr>
                             <td style="width:14px; padding:1px 0;">{{ $no++ }})</td>
                             <td style="border-bottom:1px dotted #000; padding:1px 0;">
-                                <b>{{ $row->medicines->name ?? '-' }}</b>
+                                <b>{{ optional($row->medicines)->name ?? '-' }}</b>
                                 ({{ $row->quantity }})
                             </td>
                         </tr>
                     @endforeach
 
-                    @for ($i = count($items); $i < 2; $i++)
+                    @for ($i = count($creditorItems); $i < 2; $i++)
                         <tr>
                             <td style="padding:1px 0;">{{ $i + 1 }})</td>
                             <td style="border-bottom:1px dotted #000; padding:1px 0;">&nbsp;</td>
@@ -483,7 +519,7 @@
                         <td style="width:55px; vertical-align:top;">Nama Sarana</td>
                         <td style="width:8px; vertical-align:top;">:</td>
                         <td>
-                            <b>{{ $pharmacy->name }}</b><br>
+                            <b>{{ $pharmacy->name ?? '-' }}</b><br>
                             <span style="font-size:5px; color:#555;">( PBF / Apotek / Instalasi Farmasi Rumah Sakit /
                                 Instalasi Farmasi Klinik )</span>
                         </td>
@@ -491,7 +527,7 @@
                     <tr>
                         <td style="vertical-align:top;">Alamat Sarana</td>
                         <td style="vertical-align:top;">:</td>
-                        <td>{{ $pharmacy->address }}</td>
+                        <td>{{ $pharmacy->address ?? '-' }}</td>
                     </tr>
                 </table>
 
@@ -499,19 +535,18 @@
                     <tr>
                         <td style="width:50%;"></td>
                         <td style="width:50%; text-align:right;">
-                            {{ $pharmacy->city }}, {{ $date }}
+                            {{ $pharmacy->city ?? '-' }}, {{ $date }}
                             <br>
                             Pemesan,
-                            @if ($pharmacy->signature && file_exists(public_path('img/'.$pharmacy->signature)))
+                            @if ($sigSrc)
                                 <div style="margin: 4px 0;">
-                                    <img src="{{ public_path('img/'.$pharmacy->signature) }}"
-                                        style="height:35px; width:auto;">
+                                    <img src="{{ $sigSrc }}" style="height:35px; width:auto;">
                                 </div>
                             @else
-                                <div style="height:35px;"></div> {{-- blank space to sign by hand --}}
+                                <div style="height:35px;"></div>
                             @endif
-                            <b>( {{ $pharmacy->pharmacist }} )</b><br>
-                            SIPA : {{ $pharmacy->pharmacist_permit }}
+                            <b>( {{ $pharmacy->pharmacist ?? '-' }} )</b><br>
+                            SIPA : {{ $pharmacy->pharmacist_permit ?? '-' }}
                         </td>
                     </tr>
                 </table>
@@ -529,14 +564,14 @@
 
             {{-- =========================================================
          4) NARKOTIKA
-    ========================================================== --}}
+        ========================================================== --}}
         @elseif ($type == 'NARKOTIKA')
-            @foreach ($items as $creditorCode => $items)
+            @foreach ($items as $creditorCode => $creditorItems)
                 <div class="title-main">
                     SURAT PESANAN NARKOTIKA
                 </div>
                 <div class="subtitle">
-                    Nomor : SP-00{{ $items->first()->id }}
+                    Nomor : SP-00{{ optional($creditorItems->first())->id ?? '-' }}
                 </div>
 
                 {{-- IDENTITAS --}}
@@ -545,7 +580,7 @@
                     <tr>
                         <td style="width:60px;">Nama</td>
                         <td style="width:8px;">:</td>
-                        <td><b>{{ $pharmacy->pharmacist }}</b></td>
+                        <td><b>{{ $pharmacy->pharmacist ?? '-' }}</b></td>
                     </tr>
                     <tr>
                         <td>Jabatan</td>
@@ -559,17 +594,17 @@
                     <tr>
                         <td style="width:60px;">Nama Distributor</td>
                         <td style="width:8px;">:</td>
-                        <td><b>{{ optional($items->first()->creditors)->name ?? '-' }}</b></td>
+                        <td><b>{{ optional(optional($creditorItems->first())->creditors)->name ?? '-' }}</b></td>
                     </tr>
                     <tr>
                         <td>Alamat</td>
                         <td>:</td>
-                        <td>{{ optional($items->first()->creditors)->address ?? '-' }}</td>
+                        <td>{{ optional(optional($creditorItems->first())->creditors)->address ?? '-' }}</td>
                     </tr>
                     <tr>
                         <td>Telp.</td>
                         <td>:</td>
-                        <td>{{ optional($items->first()->creditors)->phone ?? '-' }}</td>
+                        <td>{{ optional(optional($creditorItems->first())->creditors)->phone ?? '-' }}</td>
                     </tr>
                 </table>
 
@@ -590,17 +625,17 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach ($items as $index => $row)
+                        @foreach ($creditorItems as $index => $row)
                             <tr>
                                 <td style="text-align:center;">{{ $index + 1 }}</td>
-                                <td style="text-align:left;">{{ $row->medicines->name ?? '-' }}</td>
-                                <td style="text-align:center;">{{ $row->medicines->form ?? '-' }}</td>
-                                <td style="text-align:center;">{{ $row->medicines->strength ?? '-' }}</td>
+                                <td style="text-align:left;">{{ optional($row->medicines)->name ?? '-' }}</td>
+                                <td style="text-align:center;">{{ optional($row->medicines)->form ?? '-' }}</td>
+                                <td style="text-align:center;">{{ optional($row->medicines)->strength ?? '-' }}</td>
                                 <td style="text-align:center;">{{ $row->quantity }}</td>
                             </tr>
                         @endforeach
 
-                        @for ($i = count($items); $i < 3; $i++)
+                        @for ($i = count($creditorItems); $i < 3; $i++)
                             <tr>
                                 <td>&nbsp;</td>
                                 <td></td>
@@ -611,7 +646,7 @@
                         @endfor
                     </tbody>
                     @php
-                        $totalprice = $items->sum('total');
+                        $totalprice = $creditorItems->sum('total');
                     @endphp
                     <tfoot>
                         <tr>
@@ -629,12 +664,12 @@
                     <tr>
                         <td style="width:60px;">Nama Sarana</td>
                         <td style="width:8px;">:</td>
-                        <td><b>{{ $pharmacy->name }}</b></td>
+                        <td><b>{{ $pharmacy->name ?? '-' }}</b></td>
                     </tr>
                     <tr>
                         <td>Alamat Sarana</td>
                         <td>:</td>
-                        <td>{{ $pharmacy->address }}</td>
+                        <td>{{ $pharmacy->address ?? '-' }}</td>
                     </tr>
                 </table>
 
@@ -643,19 +678,18 @@
                     <tr>
                         <td style="width:50%;"></td>
                         <td style="width:50%; text-align:center;">
-                            {{ $pharmacy->city }}, {{ $date }}
+                            {{ $pharmacy->city ?? '-' }}, {{ $date }}
                             <br>
                             Pemesan,
-                            @if ($pharmacy->signature && file_exists(public_path('img/'.$pharmacy->signature)))
+                            @if ($sigSrc)
                                 <div style="margin: 4px 0;">
-                                    <img src="{{ public_path('img/'.$pharmacy->signature) }}"
-                                        style="height:35px; width:auto;">
+                                    <img src="{{ $sigSrc }}" style="height:35px; width:auto;">
                                 </div>
                             @else
-                                <div style="height:35px;"></div> {{-- blank space to sign by hand --}}
+                                <div style="height:35px;"></div>
                             @endif
-                            <b><u>{{ $pharmacy->pharmacist }}</u></b><br>
-                            SIPA : {{ $pharmacy->pharmacist_permit }}
+                            <b><u>{{ $pharmacy->pharmacist ?? '-' }}</u></b><br>
+                            SIPA : {{ $pharmacy->pharmacist_permit ?? '-' }}
                         </td>
                     </tr>
                 </table>
@@ -674,14 +708,14 @@
 
             {{-- =========================================================
          5) PSIKOTROPIKA
-    ========================================================== --}}
+        ========================================================== --}}
         @elseif ($type == 'Psikotropika' || $type == 'PSIKOTROPIKA')
-            @foreach ($items as $creditorCode => $items)
+            @foreach ($items as $creditorCode => $creditorItems)
                 <div class="title-main">
                     SURAT PESANAN PSIKOTROPIKA
                 </div>
                 <div class="subtitle">
-                    Nomor : SP-00{{ $items->first()->id }}
+                    Nomor : SP-00{{ optional($creditorItems->first())->id ?? '-' }}
                 </div>
 
                 {{-- IDENTITAS --}}
@@ -690,7 +724,7 @@
                     <tr>
                         <td style="width:60px;">Nama</td>
                         <td style="width:8px;">:</td>
-                        <td><b>{{ $pharmacy->pharmacist }}</b></td>
+                        <td><b>{{ $pharmacy->pharmacist ?? '-' }}</b></td>
                     </tr>
                     <tr>
                         <td>Jabatan</td>
@@ -704,17 +738,17 @@
                     <tr>
                         <td style="width:60px;">Nama Distributor</td>
                         <td style="width:8px;">:</td>
-                        <td><b>{{ optional($items->first()->creditors)->name ?? '-' }}</b></td>
+                        <td><b>{{ optional(optional($creditorItems->first())->creditors)->name ?? '-' }}</b></td>
                     </tr>
                     <tr>
                         <td>Alamat</td>
                         <td>:</td>
-                        <td>{{ optional($items->first()->creditors)->address ?? '-' }}</td>
+                        <td>{{ optional(optional($creditorItems->first())->creditors)->address ?? '-' }}</td>
                     </tr>
                     <tr>
                         <td>Telp.</td>
                         <td>:</td>
-                        <td>{{ optional($items->first()->creditors)->phone ?? '-' }}</td>
+                        <td>{{ optional(optional($creditorItems->first())->creditors)->phone ?? '-' }}</td>
                     </tr>
                 </table>
 
@@ -735,17 +769,17 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach ($items as $index => $row)
+                        @foreach ($creditorItems as $index => $row)
                             <tr>
                                 <td style="text-align:center;">{{ $index + 1 }}</td>
-                                <td style="text-align:left;">{{ $row->medicines->name ?? '-' }}</td>
-                                <td style="text-align:center;">{{ $row->medicines->form ?? '-' }}</td>
-                                <td style="text-align:center;">{{ $row->medicines->strength ?? '-' }}</td>
+                                <td style="text-align:left;">{{ optional($row->medicines)->name ?? '-' }}</td>
+                                <td style="text-align:center;">{{ optional($row->medicines)->form ?? '-' }}</td>
+                                <td style="text-align:center;">{{ optional($row->medicines)->strength ?? '-' }}</td>
                                 <td style="text-align:center;">{{ $row->quantity }}</td>
                             </tr>
                         @endforeach
 
-                        @for ($i = count($items); $i < 3; $i++)
+                        @for ($i = count($creditorItems); $i < 3; $i++)
                             <tr>
                                 <td>&nbsp;</td>
                                 <td></td>
@@ -763,12 +797,12 @@
                     <tr>
                         <td style="width:60px;">Nama Sarana</td>
                         <td style="width:8px;">:</td>
-                        <td><b>{{ $pharmacy->name }}</b></td>
+                        <td><b>{{ $pharmacy->name ?? '-' }}</b></td>
                     </tr>
                     <tr>
                         <td>Alamat Sarana</td>
                         <td>:</td>
-                        <td>{{ $pharmacy->address }}</td>
+                        <td>{{ $pharmacy->address ?? '-' }}</td>
                     </tr>
                 </table>
 
@@ -777,19 +811,18 @@
                     <tr>
                         <td style="width:50%;"></td>
                         <td style="width:50%; text-align:center;">
-                            {{ $pharmacy->city }}, {{ $date }}
+                            {{ $pharmacy->city ?? '-' }}, {{ $date }}
                             <br>
                             Pemesan,
-                            @if ($pharmacy->signature && file_exists(public_path('img/'.$pharmacy->signature)))
+                            @if ($sigSrc)
                                 <div style="margin: 4px 0;">
-                                    <img src="{{ public_path('img/'.$pharmacy->signature) }}"
-                                        style="height:35px; width:auto;">
+                                    <img src="{{ $sigSrc }}" style="height:35px; width:auto;">
                                 </div>
                             @else
-                                <div style="height:35px;"></div> {{-- blank space to sign by hand --}}
+                                <div style="height:35px;"></div>
                             @endif
-                            <b><u>{{ $pharmacy->pharmacist }}</u></b><br>
-                            SIPA : {{ $pharmacy->pharmacist_permit }}
+                            <b><u>{{ $pharmacy->pharmacist ?? '-' }}</u></b><br>
+                            SIPA : {{ $pharmacy->pharmacist_permit ?? '-' }}
                         </td>
                     </tr>
                 </table>
