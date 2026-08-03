@@ -461,8 +461,8 @@ class OrdersController extends Controller
         $pdf = Pdf::loadView('orders.printSPB', compact('order', 'date', 'grouped', 'pharmacy'))
             ->setPaper('A7', 'portrait');
 
-        return $pdf->stream("SPB-{$order->code}.pdf");
-    }
+            return view('orders.printSPB', compact('order', 'date', 'grouped', 'pharmacy'));
+        }
     public function printPreview($order_id)
     {
         $order = Order::with(['order_items.medicines', 'order_items.medicines.factory'])
