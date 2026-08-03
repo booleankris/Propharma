@@ -122,43 +122,17 @@
     ========================================================== --}}
         @if ($type == 'REGULER')
             @foreach ($items as $creditorCode => $items)
-                @php
-                    $logoPath = public_path('img/logo-sahabat.png');
-
-                    if (!empty($pharmacy->logo)) {
-                        $customLogo = public_path('img/' . $pharmacy->logo);
-
-                        if (is_file($customLogo)) {
-                            $logoPath = $customLogo;
-                        }
-                    }
-                @endphp
-
-                <table style="width:100%; border-collapse:collapse; table-layout:fixed;">
+                <table style="width:100%; border-collapse:collapse;">
                     <tr>
-                        <td style="width:50px; vertical-align:top; padding:0;">
-                            <img src="{{ $logoPath }}" width="35" height="30"
-                                style="display:block; border:none; margin:0;">
+                        <td style="width:38px; vertical-align:middle;">
+                            <img src="{{ public_path('img/logo-sahabat.png') }}" width="40">
                         </td>
-
-                        <td style="vertical-align:top; padding-left:5px;">
-                            <h2 style="margin:0; font-size:8px;">
-                                {{ strtoupper($pharmacy->name) }}
-                            </h2>
-
-                            <div>{{ $pharmacy->address }}</div>
-                            <div>HP. {{ $pharmacy->phone }}</div>
-                            <div>Apoteker : {{ $pharmacy->pharmacist }}</div>
-                            <div>No. SIPA : {{ $pharmacy->pharmacist_permit }}</div>
-
-                            @if (!empty($pharmacy->permit))
-                                <div>No. SIA : {{ $pharmacy->permit }}</div>
-                            @elseif (!empty($pharmacy->pharmacy_registration))
-                                <div>No. STR : {{ $pharmacy->pharmacy_registration }}</div>
-                            @endif
+                        <td>
+                            <h2>{{ strtoupper($pharmacy->name) }}</h2>
                         </td>
                     </tr>
                 </table>
+
                 <div class="line"></div>
 
                 {{-- NO & KEPADA --}}
