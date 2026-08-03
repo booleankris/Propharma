@@ -126,7 +126,7 @@
                     <tr>
                         <td style="width:38px; vertical-align:middle;">
                             @if ($pharmacy->logo && file_exists(public_path('img/'.$pharmacy->logo)))
-                                <img src="{{ public_path('img/'.$pharmacy->logo) }}" style="width:40px;">
+                                <img src="{{ public_path('img/'.$pharmacy->logo) }}" style="width:35px; margin:0 20px;">
                             @else
                                 <img src="{{ public_path('img/logo-sahabat.png') }}" style="width:20px;">
                             @endif
