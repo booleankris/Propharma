@@ -3204,7 +3204,7 @@
     }
 
     function submit() {
-
+        if(quantity.value == 0) return;
         if (isSubmitting) return; // guard against double-fire
         isSubmitting = true;
 
