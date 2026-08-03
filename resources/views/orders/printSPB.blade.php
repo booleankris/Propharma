@@ -124,13 +124,7 @@
             @foreach ($items as $creditorCode => $items)
                 <table style="width:100%; border-collapse:collapse;">
                     <tr>
-                        <td style="width:38px; vertical-align:middle;">
-                            @if ($pharmacy->logo && file_exists(public_path('img/'.$pharmacy->logo)))
-                                <img src="{{ public_path('img/'.$pharmacy->logo) }}" style="width:40px; height:auto;">
-                            @else
-                                <img src="{{ public_path('img/logo-sahabat.png') }}" style="width:40px; height:auto;">
-                            @endif
-                        </td>
+                   
                         <td style="vertical-align:top; padding-left:3px;">
                             <h2 style="margin:0; font-size:8px;">{{ strtoupper($pharmacy->name) }}</h2>
                             <div>{{ $pharmacy->address }}</div>
