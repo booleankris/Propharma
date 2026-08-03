@@ -125,7 +125,14 @@
                 <table style="width:100%; border-collapse:collapse;">
                     <tr>
                         <td style="width:38px; vertical-align:middle;">
-                           
+                            @if ($pharmacy->signature && file_exists(public_path('img/'.$pharmacy->signature)))
+                                <div style="margin: 1px 0;">
+                                    <img src="{{ public_path('img/'.$pharmacy->signature) }}"
+                                        style="height:35px; width:auto;">
+                                </div>
+                            @else
+                                <div style="height:35px;"></div> {{-- blank space to sign by hand --}}
+                            @endif
                         </td>
                         <td style="vertical-align:top; padding-left:3px;">
                             <h2 style="margin:0; font-size:8px;">{{ strtoupper($pharmacy->name) }}</h2>
