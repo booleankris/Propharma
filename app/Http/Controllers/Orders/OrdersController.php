@@ -426,43 +426,42 @@ class OrdersController extends Controller
     }
     public function printSPB($orderId)
     {
-        $date = \Carbon\Carbon::now()->translatedFormat('d F Y');
-        $order = Order::with([
-            'pharmacy',
-            'order_items.medicines',
-            'order_items.creditors',
-            'order_items.medicines.factory',
-            'order_items.medicines.category',
-            'order_items.medicines.composition',
-        ])->findOrFail($orderId);
+        try {
+            $date = Carbon::now()->translatedFormat('d F Y');
+            $order = Order::with([
+                'pharmacy',
+                'order_items.medicines',
+                'order_items.creditors',
+                'order_items.medicines.factory',
+                'order_items.medicines.category',
+                'order_items.medicines.composition',
+            ])->findOrFail($orderId);
 
-        $pharmacy = $order->pharmacy;
-        if (!$pharmacy) {
-            $pharmacy = (object)[
-                'name' => '-',
-                'address' => '-',
-                'phone' => '-',
-                'pharmacist' => '-',
-                'pharmacist_permit' => '-',
-                'permit' => '-',
-                'pharmacy_registration' => '-',
-                'city' => '-',
-                'logo' => null,
-                'signature' => null,
-            ];
+            $pharmacy = $order->pharmacy;
+            if (!$pharmacy) {
+                return response('Error: Order ini tidak memiliki data Apotek (pharmacy is null)', 500);
+            }
+
+            $grouped = $order->order_items->groupBy(function ($item) {
+                return optional($item->medicines)->type ?? "Kosong";
+            })->map(function ($perCreditor) {
+                return $perCreditor->groupBy('creditor_code');
+            });
+
+            $pdf = Pdf::loadView('orders.printSPB', compact('order', 'date', 'grouped', 'pharmacy'))
+                ->setPaper('A7', 'portrait');
+
+            return $pdf->stream("SPB-{$order->code}.pdf");
+        } catch (\Throwable $e) {
+            // This will show the EXACT error in the browser
+            return response(
+                'ERROR: ' . $e->getMessage() .
+                    '<br><br>FILE: ' . $e->getFile() .
+                    '<br>LINE: ' . $e->getLine(),
+                500
+            );
         }
-
-        $grouped = $order->order_items->groupBy(function ($item) {
-            return $item->medicines->type ?? "Kosong";
-        })->map(function ($perCreditor) {
-            return $perCreditor->groupBy('creditor_code');
-        });
-
-        $pdf = Pdf::loadView('orders.printSPB', compact('order', 'date', 'grouped', 'pharmacy'))
-            ->setPaper('A7', 'portrait');
-
-            return view('orders.printSPB', compact('order', 'date', 'grouped', 'pharmacy'));
-        }
+    }
     public function printPreview($order_id)
     {
         $order = Order::with(['order_items.medicines', 'order_items.medicines.factory'])
