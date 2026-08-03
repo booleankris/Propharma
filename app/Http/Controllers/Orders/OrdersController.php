@@ -449,16 +449,10 @@ class OrdersController extends Controller
 
         $pdfContent = $pdf->output();
 
-        // Grab the very beginning and very end of the PDF data
-        $startOfFile = substr($pdfContent, 0, 150);
-        $endOfFile = substr($pdfContent, -150);
-
-        return response()->json([
-            'file_size_bytes' => strlen($pdfContent),
-            'starts_with_pdf_header' => str_starts_with($pdfContent, '%PDF') ? 'YES' : 'NO',
-            'file_beginning_preview' => $startOfFile,
-            'file_ending_preview' => $endOfFile,
-        ]);
+        // Force a file download
+        return response($pdfContent)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', 'attachment; filename="spb_debug.pdf"');
     }
     public function printPreview($order_id)
     {
