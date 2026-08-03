@@ -444,28 +444,21 @@ class OrdersController extends Controller
             return $perCreditor->groupBy('creditor_code');
         });
 
-        try {
-            // 1. Test Blade rendering
-            view('orders.printSPB', compact('order', 'date', 'grouped', 'pharmacy'))->render();
+        $pdf = Pdf::loadView('orders.printSPB', compact('order', 'date', 'grouped', 'pharmacy'))
+            ->setPaper('A7', 'portrait');
 
-            // 2. Test DomPDF rendering
-            $pdf = Pdf::loadView('orders.printSPB', compact('order', 'date', 'grouped', 'pharmacy'))
-                ->setPaper('A7', 'portrait');
-            $pdf->output(); // Force DomPDF to process
+        $pdfContent = $pdf->output();
 
-            return response("Everything rendered successfully!", 200);
-        } catch (\Throwable $e) {
-            // Return 200 OK so the browser displays this error as text instead of "Failed to load PDF"
-            return response(
-                "<h2>Crash Detected!</h2>" .
-                    "<b>Error Message:</b> " . $e->getMessage() . "<br>" .
-                    "<b>File:</b> " . $e->getFile() . "<br>" .
-                    "<b>Line:</b> " . $e->getLine() . "<br><br>" .
-                    "<b>Pharmacy ID 5 Data:</b><br>" .
-                    "<pre>" . json_encode($pharmacy, JSON_PRETTY_PRINT) . "</pre>",
-                200
-            );
-        }
+        // Grab the very beginning and very end of the PDF data
+        $startOfFile = substr($pdfContent, 0, 150);
+        $endOfFile = substr($pdfContent, -150);
+
+        return response()->json([
+            'file_size_bytes' => strlen($pdfContent),
+            'starts_with_pdf_header' => str_starts_with($pdfContent, '%PDF') ? 'YES' : 'NO',
+            'file_beginning_preview' => $startOfFile,
+            'file_ending_preview' => $endOfFile,
+        ]);
     }
     public function printPreview($order_id)
     {
