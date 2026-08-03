@@ -377,10 +377,10 @@
                             {{ $pharmacy->city }}, {{ $date }}
                             <br>
                             Pemesan,
-                            @if ($pharmacy->signature && file_exists(public_path($pharmacy->signature)))
+                            @if ($pharmacy->signature && file_exists(public_path('img/'.$pharmacy->signature)))
                                 <div style="margin: 4px 0;">
-                                    <img src="{{ public_path($pharmacy->signature) }}"
-                                        style="height:65px; width:auto;">
+                                    <img src="{{ public_path('img/'.$pharmacy->signature) }}"
+                                        style="height:35px; width:auto;">
                                 </div>
                             @else
                                 <div style="height:35px;"></div> {{-- blank space to sign by hand --}}
@@ -502,10 +502,10 @@
                             {{ $pharmacy->city }}, {{ $date }}
                             <br>
                             Pemesan,
-                            @if ($pharmacy->signature && file_exists(public_path($pharmacy->signature)))
+                            @if ($pharmacy->signature && file_exists(public_path('img/'.$pharmacy->signature)))
                                 <div style="margin: 4px 0;">
-                                    <img src="{{ public_path($pharmacy->signature) }}"
-                                        style="height:65px; width:auto;">
+                                    <img src="{{ public_path('img/'.$pharmacy->signature) }}"
+                                        style="height:35px; width:auto;">
                                 </div>
                             @else
                                 <div style="height:35px;"></div> {{-- blank space to sign by hand --}}
@@ -646,10 +646,10 @@
                             {{ $pharmacy->city }}, {{ $date }}
                             <br>
                             Pemesan,
-                            @if ($pharmacy->signature && file_exists(public_path($pharmacy->signature)))
+                            @if ($pharmacy->signature && file_exists(public_path('img/'.$pharmacy->signature)))
                                 <div style="margin: 4px 0;">
-                                    <img src="{{ public_path($pharmacy->signature) }}"
-                                        style="height:65px; width:auto;">
+                                    <img src="{{ public_path('img/'.$pharmacy->signature) }}"
+                                        style="height:35px; width:auto;">
                                 </div>
                             @else
                                 <div style="height:35px;"></div> {{-- blank space to sign by hand --}}
@@ -780,10 +780,10 @@
                             {{ $pharmacy->city }}, {{ $date }}
                             <br>
                             Pemesan,
-                            @if ($pharmacy->signature && file_exists(public_path($pharmacy->signature)))
+                            @if ($pharmacy->signature && file_exists(public_path('img/'.$pharmacy->signature)))
                                 <div style="margin: 4px 0;">
-                                    <img src="{{ public_path($pharmacy->signature) }}"
-                                        style="height:65px; width:auto;">
+                                    <img src="{{ public_path('img/'.$pharmacy->signature) }}"
+                                        style="height:35px; width:auto;">
                                 </div>
                             @else
                                 <div style="height:35px;"></div> {{-- blank space to sign by hand --}}

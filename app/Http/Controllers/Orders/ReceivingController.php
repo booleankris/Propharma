@@ -218,16 +218,26 @@ class ReceivingController extends Controller
     public function printSPBFinal($orderId)
     {
         $date = Carbon::now()->translatedFormat('d F Y');
-        $order = Order::with(['order_items.receiving_items', 'order_items.medicines', 'order_items.creditors', 'order_items.medicines.factory', 'order_items.medicines.category'])
-            ->findOrFail($orderId);
+        $order = Order::with([
+            'pharmacy',
+            'order_items.receiving_items',
+            'order_items.medicines',
+            'order_items.creditors',
+            'order_items.medicines.factory',
+            'order_items.medicines.category',
+            'order_items.medicines.composition',
+        ])->findOrFail($orderId);
+
+        $pharmacy = $order->pharmacy;
+
         $grouped = $order->order_items->groupBy(function ($item) {
             return $item->medicines->type ?? "Kosong";
         })->map(function ($perCreditor) {
             return $perCreditor->groupBy('creditor_code') ?? "Kosong";
         });
 
-        $pdf = Pdf::loadView('orders.printSPBFinal', compact('order', 'date', 'grouped'))
-            ->setPaper('A4', 'portrait');
+        $pdf = Pdf::loadView('orders.printSPBFinal', compact('order', 'date', 'grouped', 'pharmacy'))
+            ->setPaper('A7', 'portrait');
 
         return $pdf->stream("SPBFINAL-{$order->code}.pdf");
     }
