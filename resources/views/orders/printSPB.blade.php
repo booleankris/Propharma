@@ -124,7 +124,11 @@
             @foreach ($items as $creditorCode => $items)
                 <table style="width:100%; border-collapse:collapse;">
                     <tr>
-                   
+                        <td style="width:38px; vertical-align:middle;">
+                        
+                                <img src="{{ public_path('img/logo-sahabat.png') }}" style="width:40px; height:auto;">
+                            
+                        </td>
                         <td style="vertical-align:top; padding-left:3px;">
                             <h2 style="margin:0; font-size:8px;">{{ strtoupper($pharmacy->name) }}</h2>
                             <div>{{ $pharmacy->address }}</div>
