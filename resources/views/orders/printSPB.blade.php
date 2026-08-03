@@ -125,10 +125,10 @@
                 <table style="width:100%; border-collapse:collapse;">
                     <tr>
                         <td style="width:38px; vertical-align:middle;">
-                            @if (!empty($pharmacy->logo) && file_exists(public_path('img/'.$pharmacy->logo)))
-                                <img src="{{ public_path('img/'.$pharmacy->logo) }}" style="width:40px; height:auto;">
-                            @elseif (file_exists(public_path('img/logo-shb.png')))
-                                <img src="{{ public_path('img/logo-shb.png') }}" style="width:40px; height:auto;">
+                            @if (!empty($pharmacy->logo) && file_exists(assets('img/'.$pharmacy->logo)))
+                                <img src="{{ assets('img/'.$pharmacy->logo) }}" style="width:40px; height:auto;">
+                            @elseif (file_exists(assets('img/logo-shb.png')))
+                                <img src="{{ assets('img/logo-shb.png') }}" style="width:40px; height:auto;">
                             @endif
                         </td>
                         <td style="vertical-align:top; padding-left:3px;">
@@ -218,9 +218,9 @@
                             {{ $pharmacy->city ?? '-' }}, {{ $date }}
                             <br>
                             Penanggung Jawab,
-                            @if (!empty($pharmacy->signature) && file_exists(public_path('img/'.$pharmacy->signature)))
+                            @if (!empty($pharmacy->signature) && file_exists(assets('img/'.$pharmacy->signature)))
                                 <div style="margin: 1px 0;">
-                                    <img src="{{ public_path('img/'.$pharmacy->signature) }}"
+                                    <img src="{{ assets('img/'.$pharmacy->signature) }}"
                                         style="height:35px; width:auto;">
                                 </div>
                             @else
@@ -379,9 +379,9 @@
                             {{ $pharmacy->city ?? '-' }}, {{ $date }}
                             <br>
                             Pemesan,
-                            @if (!empty($pharmacy->signature) && file_exists(public_path('img/'.$pharmacy->signature)))
+                            @if (!empty($pharmacy->signature) && file_exists(assets('img/'.$pharmacy->signature)))
                                 <div style="margin: 4px 0;">
-                                    <img src="{{ public_path('img/'.$pharmacy->signature) }}"
+                                    <img src="{{ assets('img/'.$pharmacy->signature) }}"
                                         style="height:35px; width:auto;">
                                 </div>
                             @else
@@ -504,9 +504,9 @@
                             {{ $pharmacy->city ?? '-' }}, {{ $date }}
                             <br>
                             Pemesan,
-                            @if (!empty($pharmacy->signature) && file_exists(public_path('img/'.$pharmacy->signature)))
+                            @if (!empty($pharmacy->signature) && file_exists(assets('img/'.$pharmacy->signature)))
                                 <div style="margin: 4px 0;">
-                                    <img src="{{ public_path('img/'.$pharmacy->signature) }}"
+                                    <img src="{{ assets('img/'.$pharmacy->signature) }}"
                                         style="height:35px; width:auto;">
                                 </div>
                             @else
@@ -648,9 +648,9 @@
                             {{ $pharmacy->city ?? '-' }}, {{ $date }}
                             <br>
                             Pemesan,
-                            @if (!empty($pharmacy->signature) && file_exists(public_path('img/'.$pharmacy->signature)))
+                            @if (!empty($pharmacy->signature) && file_exists(assets('img/'.$pharmacy->signature)))
                                 <div style="margin: 4px 0;">
-                                    <img src="{{ public_path('img/'.$pharmacy->signature) }}"
+                                    <img src="{{ assets('img/'.$pharmacy->signature) }}"
                                         style="height:35px; width:auto;">
                                 </div>
                             @else
@@ -782,9 +782,9 @@
                             {{ $pharmacy->city ?? '-' }}, {{ $date }}
                             <br>
                             Pemesan,
-                            @if (!empty($pharmacy->signature) && file_exists(public_path('img/'.$pharmacy->signature)))
+                            @if (!empty($pharmacy->signature) && file_exists(assets('img/'.$pharmacy->signature)))
                                 <div style="margin: 4px 0;">
-                                    <img src="{{ public_path('img/'.$pharmacy->signature) }}"
+                                    <img src="{{ assets('img/'.$pharmacy->signature) }}"
                                         style="height:35px; width:auto;">
                                 </div>
                             @else
