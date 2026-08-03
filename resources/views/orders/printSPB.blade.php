@@ -122,16 +122,8 @@
     ========================================================== --}}
         @if ($type == 'REGULER')
             @foreach ($items as $creditorCode => $items)
-                <table style="width:100%; border-collapse:collapse;">
-                    <tr>
-                        <td style="width:38px; vertical-align:middle;">
-                            <img src="{{ public_path('img/logo-sahabat.png') }}" width="40">
-                        </td>
-                        <td>
-                            <h2>{{ strtoupper($pharmacy->name) }}</h2>
-                        </td>
-                    </tr>
-                </table>
+                <img src="{{ public_path('img/logo-sahabat.png') }}" width="40">
+
 
                 <div class="line"></div>
 
