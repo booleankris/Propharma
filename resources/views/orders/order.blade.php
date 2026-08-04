@@ -479,13 +479,23 @@
 
             <div id="smartList" class="flex-1 overflow-y-auto px-6 py-2 divide-y divide-gray-50"></div>
 
-            <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
-                <span id="smartSelectedCount" class="text-[13px] text-gray-500">0 obat dipilih</span>
-                <div class="flex gap-2">
-                    <button onclick="closeSmartOrder()" type="button"
-                        class="btn btn-pharma !bg-gray-200 !text-gray-700">Batal</button>
-                    <button onclick="confirmSmartOrder()" type="button" class="btn btn-pharma !bg-[#7C3AED]">Tambahkan
-                        Item</button>
+            <div class="flex items-center justify-between border-t border-gray-100 px-6 py-4">
+                <!-- Status Jumlah Item -->
+                <span id="smartSelectedCount" class="text-sm font-medium text-gray-600">
+                    0 obat dipilih
+                </span>
+
+                <!-- Pembungkus Tombol Aksi -->
+                <div class="flex items-center gap-3">
+                    <button type="button" onclick="closeSmartOrder()"
+                        class="rounded-lg px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-300">
+                        Batal
+                    </button>
+
+                    <button type="button" onclick="confirmSmartOrder()"
+                        class="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2">
+                        Tambahkan Item
+                    </button>
                 </div>
             </div>
         </div>
