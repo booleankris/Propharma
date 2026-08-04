@@ -170,159 +170,218 @@
     <section class="section px-4">
         <div class="section-body">
 
-            <div class="relative w-full p-[24px] bg-[#ffffff] rounded-[22px]">
-                <div id="searchWrapper" class="flex gap-5" style="position: relative; width: 100%;">
-                    <div class="w-11/12">
-                        <div class="flex items-end justify-between md:block">
-                            <h1 class="text-2xl font-semibold tracking-tight font-poppins text-[#1c1c1c]">Pemesanan</h1>
+            <div
+                class="relative w-full p-6 bg-white rounded-xl shadow-sm border border-gray-100 font-poppins text-[#1c1c1c]">
+
+                <!-- HEADER & TOP INFO -->
+                <div class="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-6">
+                    <div>
+                        <h1 class="text-2xl font-bold tracking-tight">Form Pemesanan</h1>
+                        <p class="text-sm text-gray-500 mt-1">Cari dan tambahkan obat ke dalam daftar pesanan Anda.</p>
+                    </div>
+
+                    <div class="flex gap-3 w-full md:w-auto">
+                        <div class="flex-1 md:w-32">
+                            <label
+                                class="block mb-1 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Tanggal
+                                Order</label>
+                            <input type="text" id="returdate"
+                                class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600 cursor-not-allowed focus:outline-none"
+                                value="{{ $now }}" readonly autocomplete="off">
                         </div>
-
-                        <div class="flex py-2 gap-1">
-                            <div>
-                                <div class="py-1 text-[13px] font-bold">Tanggal Order</div>
-                                <input type="text" id="returdate"
-                                    class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
-                                    value="{{ $now }}" readonly autocomplete="off">
-                            </div>
-                            <div>
-                                <div class="py-1 text-[13px] font-bold">Nomor Order</div>
-                                <input type="text" id="returnumber"
-                                    class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
-                                    value="{{ $order_code }}" readonly autocomplete="off">
-                            </div>
+                        <div class="flex-1 md:w-40">
+                            <label class="block mb-1 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Nomor
+                                Order</label>
+                            <input type="text" id="returnumber"
+                                class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600 font-medium cursor-not-allowed focus:outline-none"
+                                value="{{ $order_code }}" readonly autocomplete="off">
                         </div>
-
-                        <input type="text" autofocus id="searchInput"
-                            class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
-                            placeholder="Cari Obat..." oninput="searchMedicineData(this.value)" autocomplete="off">
-
-                        <div id="searchDropdown" class="dropdown-table" style="display:none;">
-                            <table class="table table-sm table-bordered mb-0">
-                                <thead>
-                                    <tr>
-                                        <th>#</th>
-                                        <th>Code</th>
-                                        <th>Name Pelanggan</th>
-                                        <th>Total</th>
-                                    </tr>
-                                </thead>
-                            </table>
-                            <div id="tableScroll" style="max-height: 250px; overflow-y: auto;" onscroll="handleScroll()">
-                                <table class="table table-sm table-bordered mb-0">
-                                    <tbody id="searchResults"></tbody>
-                                </table>
-                            </div>
-                        </div>
-
-                        <form method="post" action="{{ route('orders.addItemOrder') }}" class="mt-3">
-                            @csrf
-
-                            {{-- Row 1: Kode, Nama, Satuan --}}
-                            <div class="flex flex-wrap gap-3 py-2 w-full">
-                                <div class="w-full sm:w-40">
-                                    <div class="py-1 text-[13px] font-bold">Kode Obat</div>
-                                    <input id="medicine_code" readonly
-                                        class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
-                                        placeholder="Kode Obat">
-                                </div>
-                                <div class="flex-1 min-w-[200px]">
-                                    <div class="py-1 text-[13px] font-bold">Nama Obat</div>
-                                    <input id="medicine_name" readonly
-                                        class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
-                                        placeholder="Nama Obat">
-                                </div>
-                                <div class="w-full sm:w-32">
-                                    <div class="py-1 text-[13px] font-bold">Kemasan</div>
-                                    <input id="unit" readonly
-                                        class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
-                                        placeholder="Kemasan">
-                                </div>
-                            </div>
-
-                            {{-- Row 2: Kemasan, QTY, Isi, Harga, Jumlah --}}
-                            <div class="flex flex-wrap items-center gap-3 py-2 w-full">
-                                <div class="w-full sm:w-32">
-                                    <div class="py-1 text-[13px] font-bold">Kemasan</div>
-                                    <label class="flex items-center gap-2 mt-2">
-                                        <input type="checkbox" id="pack" name="is_active"
-                                            class="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                                        <span class="text-sm">Utuh</span>
-                                    </label>
-                                </div>
-                                <div class="w-full sm:w-40">
-                                    <div class="py-1 text-[13px] font-bold">QTY BPBA</div>
-                                    <input id="qty" type="number" name="qty"
-                                        class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
-                                        placeholder="QTY BPBA" onkeyup="counttotal()">
-                                </div>
-                                <div class="w-full sm:w-40">
-                                    <div class="py-1 text-[13px] font-bold">Isi Obat</div>
-                                    <input id="content" readonly
-                                        class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
-                                        placeholder="Isi Obat">
-                                </div>
-                                <div class="w-full sm:w-40">
-                                    <div class="py-1 text-[13px] font-bold">Hrg HNA</div>
-                                    <input id="item_price" readonly
-                                        class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
-                                        placeholder="Harga Satuan">
-                                </div>
-                                <div class="flex-1 min-w-[200px]">
-                                    <div class="py-1 text-[13px] font-bold">Jumlah</div>
-                                    <input id="total_price" readonly name="total_price"
-                                        class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
-                                        placeholder="Jumlah">
-                                </div>
-                            </div>
-
-                            {{-- Row 3: Pill editor + Kreditur select + Buttons --}}
-                            <div class="flex flex-wrap items-start gap-3 pt-3 mt-1 border-t border-gray-100">
-
-                                {{-- Pill editor (hidden by default) --}}
-                                <div id="creditorPillEditor" class="w-full hidden">
-                                    <div class="py-1 text-[13px] font-bold text-gray-700">Kelola Kreditur Obat</div>
-                                    <div id="pillContainer"
-                                        class="flex flex-wrap gap-2 mb-2 min-h-[32px] p-2 bg-gray-50 rounded-lg border border-dashed border-gray-300">
-                                    </div>
-                                    <div class="relative">
-                                        <input id="creditorPillSearch" type="text"
-                                            placeholder="Cari & tambah kreditur..."
-                                            class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
-                                            autocomplete="off">
-                                        <ul id="creditorPillDropdown"
-                                            class="absolute z-[99999] mt-1 w-full rounded-xl border bg-white shadow-lg max-h-48 overflow-y-auto hidden">
-                                        </ul>
-                                    </div>
-                                </div>
-
-                                {{-- Kreditur select --}}
-                                <div class="flex-1 min-w-[200px]">
-                                    <div class="py-1 text-[13px] font-bold">Kreditur</div>
-                                    <select id="creditor" name="creditor_id"
-                                        class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200">
-                                        <option value="">--Pilih Kreditur--</option>
-                                    </select>
-                                </div>
-
-                                {{-- Buttons --}}
-                                <div class="flex gap-2 items-end pb-0.5 self-end">
-                                    <button onclick="submit_data()" type="button"
-                                        class="btn btn-pharma !bg-[#2196F3] btn-lg">
-                                        Tambahkan
-                                    </button>
-                                    <button onclick="openSmartOrder()" type="button"
-                                        class="btn btn-pharma !bg-[#7C3AED] btn-lg">
-                                        ✨ Smart Order
-                                    </button>
-                                    <button id="back" type="button" class="btn btn-pharma !bg-[#b72929] btn-lg">
-                                        Kembali
-                                    </button>
-                                </div>
-
-                            </div>
-                        </form>
                     </div>
                 </div>
+
+                <!-- MAIN SEARCH BAR -->
+                <div class="relative mb-6">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <svg class="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none"
+                            viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                    </div>
+
+                    <input type="text" autofocus id="searchInput"
+                        class="w-full py-[9px] px-[35px] rounded-lg border border-gray-300 bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
+                        placeholder="Cari Obat..." oninput="searchMedicineData(this.value)" autocomplete="off">
+
+                    <div id="searchDropdown" class="dropdown-table" style="display:none;">
+                        <table class="table table-sm table-bordered mb-0">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Code</th>
+                                    <th>Name Pelanggan</th>
+                                    <th>Total</th>
+                                </tr>
+                            </thead>
+                        </table>
+                        <div id="tableScroll" style="max-height: 250px; overflow-y: auto;" onscroll="handleScroll()">
+                            <table class="table table-sm table-bordered mb-0">
+                                <tbody id="searchResults"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- FORM ENTRY -->
+                <form method="post" action="{{ route('orders.addItemOrder') }}"
+                    class="bg-gray-50/50 rounded-xl p-5 border border-gray-100">
+                    @csrf
+
+                    {{-- Row 1: Kode, Nama, Satuan --}}
+                    <div class="grid grid-cols-1 md:grid-cols-12 gap-4 mb-4">
+                        <div class="md:col-span-3">
+                            <label class="block mb-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Kode
+                                Obat</label>
+                            <input id="medicine_code" readonly
+                                class="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-600 focus:outline-none"
+                                placeholder="Kode Obat">
+                        </div>
+                        <div class="md:col-span-6">
+                            <label class="block mb-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Nama
+                                Obat</label>
+                            <input id="medicine_name" readonly
+                                class="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-600 focus:outline-none"
+                                placeholder="Nama Obat">
+                        </div>
+                        <div class="md:col-span-3">
+                            <label
+                                class="block mb-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Kemasan</label>
+                            <input id="unit" readonly
+                                class="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-600 focus:outline-none"
+                                placeholder="Kemasan">
+                        </div>
+                    </div>
+
+                    {{-- Row 2: Utuh, QTY, Isi, Harga, Jumlah --}}
+                    <div class="grid grid-cols-2 md:grid-cols-12 gap-4 mb-6">
+                        <div class="md:col-span-2 flex flex-col justify-center">
+                            <label
+                                class="block mb-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Kemasan</label>
+                            <label class="flex items-center gap-2 h-[42px] cursor-pointer">
+                                <input type="checkbox" id="pack" name="is_active"
+                                    class="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 transition-all cursor-pointer">
+                                <span class="text-sm font-medium text-gray-700">Utuh</span>
+                            </label>
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block mb-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">QTY
+                                BPBA</label>
+                            <input id="qty" type="number" name="qty"
+                                class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                                placeholder="0" onkeyup="counttotal()">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block mb-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Isi
+                                Obat</label>
+                            <input id="content" readonly
+                                class="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm text-gray-600 focus:outline-none"
+                                placeholder="0">
+                        </div>
+                        <div class="md:col-span-3">
+                            <label class="block mb-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Hrg
+                                HNA</label>
+                            <div class="relative">
+                                <span
+                                    class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500 text-sm">Rp</span>
+                                <input id="item_price" readonly
+                                    class="w-full rounded-lg border border-gray-200 bg-gray-50 pl-9 pr-4 py-2.5 text-sm text-gray-600 focus:outline-none"
+                                    placeholder="0">
+                            </div>
+                        </div>
+                        <div class="md:col-span-3">
+                            <label
+                                class="block mb-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Jumlah</label>
+                            <div class="relative">
+                                <span
+                                    class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500 text-sm font-medium">Rp</span>
+                                <input id="total_price" readonly name="total_price"
+                                    class="w-full rounded-lg border border-gray-200 bg-gray-50 pl-9 pr-4 py-2.5 text-sm font-semibold text-gray-800 focus:outline-none"
+                                    placeholder="0">
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- Divider --}}
+                    <hr class="border-gray-200 my-5">
+
+                    {{-- Row 3: Kreditur & Buttons --}}
+                    <div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
+
+                        <div class="w-full flex flex-col gap-3">
+                            {{-- Kreditur select --}}
+                            <div>
+                                <label
+                                    class="block mb-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Kreditur</label>
+                                <select id="creditor" name="creditor_id"
+                                    class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer">
+                                    <option value="">-- Pilih Kreditur --</option>
+                                </select>
+                            </div>
+
+                            {{-- Pill editor (hidden by default) --}}
+                            <div id="creditorPillEditor" class="w-full hidden">
+                                <label
+                                    class="block mb-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Kelola
+                                    Kreditur</label>
+                                <div id="pillContainer"
+                                    class="flex flex-wrap gap-2 mb-2 min-h-[42px] p-2 bg-white rounded-lg border border-dashed border-gray-300">
+                                    <!-- Pills spawn here -->
+                                </div>
+                                <div class="relative">
+                                    <input id="creditorPillSearch" type="text" placeholder="Cari & tambah kreditur..."
+                                        class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        autocomplete="off">
+                                    <ul id="creditorPillDropdown"
+                                        class="absolute z-[99999] mt-1 w-full rounded-xl border border-gray-200 bg-white shadow-xl max-h-48 overflow-y-auto hidden">
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+
+                    </div>
+                    <div class="flex pt-5 flex-wrap md:flex-nowrap gap-3 w-full md:w-auto">
+                        <button id="back" type="button"
+                            class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition-all hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200 w-full md:w-auto order-3 md:order-1">
+                            <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                stroke-width="2" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+                            </svg>
+                            Kembali
+                        </button>
+
+                        <button onclick="openSmartOrder()" type="button"
+                            class="inline-flex items-center justify-center gap-2 rounded-lg bg-purple-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-1 w-full md:w-auto order-2">
+                            <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                stroke-width="2" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z" />
+                            </svg>
+                            Smart Order
+                        </button>
+
+                        <button onclick="submit_data()" type="button"
+                            class="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 w-full md:w-auto order-1 md:order-3">
+                            <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                stroke-width="2" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                            </svg>
+                            Tambahkan
+                        </button>
+                    </div>
+                </form>
             </div>
             <div class="mt-3 relative w-full p-[24px] bg-[#ffffff] rounded-[22px]">
                 <div class="flex items-center gap-3">

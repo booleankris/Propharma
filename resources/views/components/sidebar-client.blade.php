@@ -492,7 +492,7 @@
     }
 
     .select2-container {
-        z-index: 9999 !important;
+        z-index: 999 !important;
     }
 
     .select2-container .select2-selection--single .select2-selection__rendered {
