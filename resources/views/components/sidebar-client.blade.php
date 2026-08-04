@@ -736,22 +736,52 @@
             </svg>
         </button>
 
-        <div class="topbar-right">
-            <div class="topbar-date">{{ \Carbon\Carbon::now()->locale('id')->isoFormat('dddd, D MMMM YYYY') }}</div>
-            <button class="topbar-btn" onclick="toggleModal('notif-modal')" aria-label="Notifikasi stok">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-                    <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+        <div class="topbar-right flex items-center gap-4">
+
+            <!-- Tanggal -->
+            <div class="topbar-date text-sm font-medium text-gray-600">
+                {{ \Carbon\Carbon::now()->locale('id')->isoFormat('dddd, D MMMM YYYY') }}
+            </div>
+
+            <!-- Garis Pemisah (Opsional, agar terlihat lebih rapi) -->
+            <div class="hidden sm:block h-5 w-px bg-gray-200"></div>
+
+            <!-- Grup Tombol Notifikasi -->
+            <div class="flex items-center gap-1.5">
+                <button
+                    class="topbar-btn rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-all focus:outline-none"
+                    onclick="toggleModal('notif-modal')" aria-label="Notifikasi stok">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                    </svg>
+                </button>
+
+                <button
+                    class="topbar-btn rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-all focus:outline-none"
+                    onclick="toggleModal('expiry-modal')" aria-label="Obat kedaluwarsa">
+                    <svg width="18" height="18" xmlns="http://www.w3.org/2000/svg" fill="none"
+                        viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 12a9 9 0 1 0 3-6.708M3 4v5h5" />
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 7v5l3 3" />
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Tombol Akhiri Shift -->
+            <a href="http://127.0.0.1:8000/logout"
+                onclick="event.preventDefault(); document.getElementById('logout-form').submit();"
+                class="inline-flex items-center gap-2 border-[1px] rounded-lg bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 shadow-sm transition-all hover:bg-red-100 hover:text-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1">
+
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                    <polyline points="16 17 21 12 16 7"></polyline>
+                    <line x1="21" y1="12" x2="9" y2="12"></line>
                 </svg>
-            </button>
-            <button class="topbar-btn" onclick="toggleModal('expiry-modal')" aria-label="Obat kedaluwarsa">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
-                    stroke="currentColor" width="16" height="16">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 12a9 9 0 1 0 3-6.708M3 4v5h5" />
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 7v5l3 3" />
-                </svg>
-            </button>
+                Akhiri Shift
+            </a>
         </div>
     </div>
 </div>
@@ -1861,9 +1891,9 @@
             onclick="document.getElementById('expiry-modal').classList.add('hidden')">×</button>
     </div>
     <div class="notif-list">
-       
+
         <div class="notif-empty">Tidak ada obat kedaluwarsa / mendekati</div>
-        
+
     </div>
 </div>
 <div id="loading-overlay"

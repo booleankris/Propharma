@@ -71,6 +71,7 @@
             bottom: -100px;
             right: -100px;
         }
+
         .login-card {
             width: 100%;
             background: rgba(255, 255, 255, 0.13);
@@ -268,15 +269,15 @@
     <div id="app" class="md:w-[30%]">
         <div class="login-card">
 
-            <div class="brand">
-                <div class="brand-icon">
-                    <i class="fas fa-capsules"></i>
+            <div class="brand-logos my-2 flex justify-start">
+                <div>
+                    <img src="{{ asset('img/sahabat-mascot.png') }}" width="150px">
+
                 </div>
-                <span class="brand-name">Apotek Sahabat</span>
             </div>
 
-            <h1 class="login-heading">Welcome back</h1>
-            <p class="login-sub">Sign in to continue</p>
+            <h1 class="login-heading">Hai, Selamat Datang!</h1>
+            <p class="login-sub">Silahkan Login Untuk Memulai Shift</p>
 
             <form method="POST" action="{{ route('login') }}">
                 @csrf
