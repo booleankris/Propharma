@@ -218,15 +218,17 @@
                             </div>
 
                             <button type="button" id="customMedicineBtn" onclick="toggleCustomMedicine()"
-                                class="flex items-center justify-center shrink-0 h-[42px] w-[42px] rounded-lg bg-[#1678df] text-white hover:bg-blue-600 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-300"
+                                class="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 w-full sm:w-auto"
                                 title="Tambah Obat Custom">
-                                <svg id="customMedicineIcon" xmlns="http://www.w3.org/2000/svg" width="20"
-                                    height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+
+                                <svg id="customMedicineIcon" class="w-4 h-4" xmlns="http://www.w3.org/2000/svg"
+                                    viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                                     stroke-linecap="round" stroke-linejoin="round">
                                     <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                                    <path d="M12 5l0 14" />
-                                    <path d="M5 12l14 0" />
+                                    <path d="M12 5v14" />
+                                    <path d="M5 12h14" />
                                 </svg>
+                                <span>Custom Obat</span>
                             </button>
                         </div>
 
