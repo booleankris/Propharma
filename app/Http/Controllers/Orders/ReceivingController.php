@@ -9,6 +9,7 @@ use App\Models\ItemsLog;
 use App\Models\MedicinePriceHistory;
 use App\Models\Medicines;
 use App\Models\MedicineTransfers;
+use App\Models\MedicineTransferItems;
 use App\Models\Order;
 use App\Models\OrderItems;
 use App\Models\Receiving;
@@ -35,13 +36,13 @@ class ReceivingController extends Controller
 
         if ($transaction) {
             $receiving_id = $transaction->id;
-            $order_code   = $transaction->code;
+            $order_code = $transaction->code;
 
             /*
-         * Check if this in-progress receiving already has items
-         * linked to a purchase order, traversing:
-         * receiving → receiving_details → receiving_items → order_items → orders
-         */
+             * Check if this in-progress receiving already has items
+             * linked to a purchase order, traversing:
+             * receiving → receiving_details → receiving_items → order_items → orders
+             */
             $order_exist = Order::whereHas('order_items.receivingItems.receiving_details.receiving', function ($q) use ($transaction) {
                 $q->where('id', $transaction->id);
             })
@@ -50,8 +51,8 @@ class ReceivingController extends Controller
 
             return view('orders.receiving', compact('order_code', 'transaction', 'now', 'order_exist', 'receiving_id'));
         } else {
-            $year   = now()->format('y');
-            $month  = now()->format('m');
+            $year = now()->format('y');
+            $month = now()->format('m');
             $prefix = $year . $month . 'RE';
 
             $last = Receiving::where('pharmacy_id', auth()->user()->pharmacy_id)
@@ -60,16 +61,16 @@ class ReceivingController extends Controller
                 ->first();
 
             $nextNumber = $last ? intval(substr($last->code, -4)) + 1 : 0;
-            $serial     = str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+            $serial = str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
 
             try {
                 DB::beginTransaction();
 
                 $transaction = Receiving::create([
                     'pharmacy_id' => auth()->user()->pharmacy_id,
-                    'code'        => $prefix . $serial,
-                    'date'        => $now,
-                    'status'      => 0,
+                    'code' => $prefix . $serial,
+                    'date' => $now,
+                    'status' => 0,
                 ]);
 
                 DB::commit();
@@ -84,7 +85,7 @@ class ReceivingController extends Controller
     {
         $now = Carbon::now();
 
-        $year  = $now->format('y');
+        $year = $now->format('y');
         $month = $now->format('m');
         $prefix = "{$year}{$month}LOG-";
 
@@ -118,7 +119,7 @@ class ReceivingController extends Controller
 
         $data->getCollection()->transform(function ($order) {
             return [
-                'id'   => $order->id,
+                'id' => $order->id,
                 'code' => $order->code,
                 'items' => $order->order_items,
             ];
@@ -144,34 +145,62 @@ class ReceivingController extends Controller
         $ordersid = $request->order_id;
         $creditorCode = $request->creditor_code;
 
-        \Illuminate\Support\Facades\Log::info('ORDER CODE', [$request->order_id]);
-
         if (!$ordersid || !$creditorCode) {
             return DataTables::of(collect())->make(true);
         }
 
-        $items = OrderItems::query()
-            ->with(['medicines', 'receiving_items', 'receiving_items.locations', 'receiving_items.etalases', 'receiving_items.receiving_details'])
-            ->withSum('receivingItems as qty_received', 'qty_received')
-            ->whereHas('orders', function ($q) use ($ordersid) {
-                $q->where('id', $ordersid);
-            });
+        $orderItems = OrderItems::query()
+            ->with(['medicines', 'receivingItems.locations', 'receivingItems.etalases'])
+            ->withSum('receivingItems as qty_received_total', 'qty_received')
+            ->whereHas('orders', fn($q) => $q->where('id', $ordersid))
+            ->where('creditor_code', $creditorCode)
+            ->get();
 
-        if ($creditorCode) {
-            $items->where('creditor_code', $creditorCode);
+        $rows = collect();
+
+        foreach ($orderItems as $orderItem) {
+            $qtyReceived = $orderItem->qty_received_total ?? 0;
+            $qtyRemaining = max(0, $orderItem->quantity - $qtyReceived);
+
+            if ($orderItem->receivingItems->isEmpty()) {
+                $rows->push([
+                    'id' => $orderItem->id,
+                    'order_id' => $orderItem->order_id,
+                    'medicine_id' => $orderItem->medicine_id,
+                    'medicines' => $orderItem->medicines,
+                    'quantity' => $orderItem->quantity,
+                    'qty_received' => 0,
+                    'qty_remaining' => $orderItem->quantity,
+                    'raw_price' => $orderItem->price,          // Added
+                    'pack' => $orderItem->pack,           // Added
+                    'price' => 'Rp ' . number_format($orderItem->price, 0, ',', '.'),
+                    'price_ppn' => 'Rp ' . number_format(floor($orderItem->price * 1.11), 0, ',', '.'),
+                    'total' => 'Rp ' . number_format($orderItem->total, 0, ',', '.'),
+                    'receiving_items' => null,
+                ]);
+            } else {
+                foreach ($orderItem->receivingItems as $batch) {
+                    $rows->push([
+                        'id' => $orderItem->id,
+                        'order_id' => $orderItem->order_id,
+                        'medicine_id' => $orderItem->medicine_id,
+                        'medicines' => $orderItem->medicines,
+                        'quantity' => $orderItem->quantity,
+                        'qty_received' => $qtyReceived,
+                        'qty_remaining' => $qtyRemaining,
+                        'raw_price' => $batch->raw_price ?? $orderItem->price, // Added
+                        'pack' => $orderItem->pack,                       // Added
+                        'price' => 'Rp ' . number_format($orderItem->price, 0, ',', '.'),
+                        'price_ppn' => 'Rp ' . number_format(floor($orderItem->price * 1.11), 0, ',', '.'),
+                        'total' => 'Rp ' . number_format($batch->total, 0, ',', '.'),
+                        'receiving_items' => $batch,
+                    ]);
+                }
+            }
         }
 
-        return DataTables::of($items)
+        return DataTables::of($rows)
             ->addIndexColumn()
-            ->addColumn('qty_received', function ($row) {
-                return $row->qty_received ?? 0;
-            })
-            ->addColumn('qty_remaining', function ($row) {
-                return max(0, $row->quantity - ($row->qty_received ?? 0));
-            })
-            ->addColumn('price', fn($row) => 'Rp ' . number_format($row->price, 0, ',', '.'))
-            ->addColumn('price_ppn', fn($row) => 'Rp ' . number_format(floor($row->price * 1.11), 0, ',', '.'))
-            ->addColumn('total', fn($row) => 'Rp ' . number_format($row->total, 0, ',', '.'))
             ->make(true);
     }
 
@@ -217,11 +246,13 @@ class ReceivingController extends Controller
     }
     public function printSPBFinal($orderId)
     {
+        ini_set('memory_limit', '512M');
         $date = Carbon::now()->translatedFormat('d F Y');
         $order = Order::with([
             'pharmacy',
-            'order_items.receiving_items',
+            'order_items.receivingItems',
             'order_items.medicines',
+            'order_items.medicines.creditors',
             'order_items.creditors',
             'order_items.medicines.factory',
             'order_items.medicines.category',
@@ -231,7 +262,11 @@ class ReceivingController extends Controller
         $pharmacy = $order->pharmacy;
 
         $grouped = $order->order_items->groupBy(function ($item) {
-            return $item->medicines->type ?? "Kosong";
+            $type = $item->medicines->type ?? "Kosong";
+            if (strtoupper($type) === 'NARKOTIKA') {
+                return 'NARKOTIKA_' . $item->id;
+            }
+            return $type;
         })->map(function ($perCreditor) {
             return $perCreditor->groupBy('creditor_code') ?? "Kosong";
         });
@@ -241,6 +276,79 @@ class ReceivingController extends Controller
 
         return $pdf->stream("SPBFINAL-{$order->code}.pdf");
     }
+
+    public function printSPBFinalByCreditor($orderId, $creditorCode)
+    {
+        ini_set('memory_limit', '512M');
+        $date = Carbon::now()->translatedFormat('d F Y');
+        $order = Order::with([
+            'pharmacy',
+            'order_items' => function ($q) use ($creditorCode) {
+                $q->where('creditor_code', $creditorCode);
+            },
+            'order_items.receivingItems',
+            'order_items.medicines',
+            'order_items.medicines.creditors',
+            'order_items.creditors',
+            'order_items.medicines.factory',
+            'order_items.medicines.category',
+            'order_items.medicines.composition',
+        ])->findOrFail($orderId);
+
+        $pharmacy = $order->pharmacy;
+
+        $grouped = $order->order_items->groupBy(function ($item) {
+            $type = $item->medicines->type ?? "Kosong";
+            if (strtoupper($type) === 'NARKOTIKA') {
+                return 'NARKOTIKA_' . $item->id;
+            }
+            return $type;
+        })->map(function ($perCreditor) {
+            return $perCreditor->groupBy('creditor_code') ?? "Kosong";
+        });
+
+        $pdf = Pdf::loadView('orders.printSPBFinal', compact('order', 'date', 'grouped', 'pharmacy'))
+            ->setPaper('A7', 'portrait');
+
+        return $pdf->stream("SPBFINAL-{$order->code}-{$creditorCode}.pdf");
+    }
+
+    public function printSPBFinalByItem($orderId, $orderItemId)
+    {
+        ini_set('memory_limit', '512M');
+        $date = Carbon::now()->translatedFormat('d F Y');
+        $order = Order::with([
+            'pharmacy',
+            'order_items' => function ($q) use ($orderItemId) {
+                $q->where('id', $orderItemId);
+            },
+            'order_items.receivingItems',
+            'order_items.medicines',
+            'order_items.medicines.creditors',
+            'order_items.creditors',
+            'order_items.medicines.factory',
+            'order_items.medicines.category',
+            'order_items.medicines.composition',
+        ])->findOrFail($orderId);
+
+        $pharmacy = $order->pharmacy;
+
+        $grouped = $order->order_items->groupBy(function ($item) {
+            $type = $item->medicines->type ?? "Kosong";
+            if (strtoupper($type) === 'NARKOTIKA') {
+                return 'NARKOTIKA_' . $item->id;
+            }
+            return $type;
+        })->map(function ($perCreditor) {
+            return $perCreditor->groupBy('creditor_code') ?? "Kosong";
+        });
+
+        $pdf = Pdf::loadView('orders.printSPBFinal', compact('order', 'date', 'grouped', 'pharmacy'))
+            ->setPaper('A7', 'portrait');
+
+        return $pdf->stream("SPBFINAL-{$order->code}-item-{$orderItemId}.pdf");
+    }
+
     public function printOrders($orderId)
     {
         $order = Order::findOrFail($orderId);
@@ -310,7 +418,7 @@ class ReceivingController extends Controller
             ->addColumn('changed_at', fn($row) => $row->created_at?->format('d/m/Y H:i') ?? '-')
             ->addColumn('direction', function ($row) {
                 $current = $row->medicines?->net_price ?? 0;
-                $new     = $row->new_price;
+                $new = $row->new_price;
 
                 if ($new > $current) {
                     return '<span class="badge-up">▲ Naik</span>';
@@ -396,12 +504,18 @@ class ReceivingController extends Controller
     {
         $items = Order::query()
             ->where('pharmacy_id', auth()->user()->pharmacy_id)
-            ->with(['order_items'])
+            ->with(['order_items.receivingItems.receiving_details'])
             ->withSum('order_items', 'total')
             ->orderByDesc('id');
 
         if ($request->filled('order_code')) {
-            $items->where('code', 'like', '%' . $request->order_code . '%');
+            $searchTerm = $request->order_code;
+            $items->where(function ($q) use ($searchTerm) {
+                $q->where('code', 'like', '%' . $searchTerm . '%')
+                    ->orWhereHas('order_items.receivingItems.receiving_details', function ($q2) use ($searchTerm) {
+                        $q2->where('receiving_details_code', 'like', '%' . $searchTerm . '%');
+                    });
+            });
         }
         if ($request->filled('start_date')) {
             $items->whereDate('created_at', '>=', $request->start_date);
@@ -415,10 +529,30 @@ class ReceivingController extends Controller
             ->addColumn('date', fn($row) => $row->date ? date('d M Y', strtotime($row->updated_at)) : '-')
             ->addColumn('code', function ($row) {
                 $code = e($row->code ?? '0');
-                return '<span class="inline-flex items-center px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 font-mono text-xs font-semibold tracking-wide border border-slate-200">' . $code . '</span>';
+                $html = '<span class="inline-flex items-center px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 font-mono text-xs font-semibold tracking-wide border border-slate-200">' . $code . '</span>';
+
+                // Add Nomor Terima badges below SPB code
+                $codes = collect();
+                if ($row->relationLoaded('order_items')) {
+                    $codes = $row->order_items->flatMap(function ($item) {
+                        return $item->receivingItems->map(function ($ri) {
+                            return $ri->receiving_details->receiving_details_code ?? null;
+                        });
+                    })->filter()->unique()->values();
+                }
+
+                if ($codes->isNotEmpty()) {
+                    $html .= '<div class="mt-1 flex flex-wrap gap-1">';
+                    foreach ($codes as $c) {
+                        $html .= '<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-200">' . e($c) . '</span>';
+                    }
+                    $html .= '</div>';
+                }
+
+                return $html;
             })
             ->addColumn('status_order', function ($row) {
-                if ($row->status == 2) {
+                if ($row->status == 3) {
                     // DITERIMA
                     return '<div style="text-align:center;">
                         <span style="display:inline-flex; align-items:center; gap:6px; padding:4px 12px; border-radius:9999px; font-size:11px; font-weight:700; color:#047857; background-color:#ecfdf5; border:1px solid #a7f3d0; box-shadow:0 0 10px rgb(16 185 129 / 17%);">
@@ -428,7 +562,7 @@ class ReceivingController extends Controller
                             DITERIMA
                         </span>
                     </div>';
-                } elseif ($row->status == 1) {
+                } elseif ($row->status == 1 || $row->status == 2) {
                     // DIPESAN
                     return '<div style="text-align:center;">
                         <span style="display:inline-flex; align-items:center; gap:6px; padding:4px 12px; border-radius:9999px; font-size:11px; font-weight:700; color:#b45309; background-color:#fffbeb; border:1px solid #fde68a; box-shadow:0 0 10px rgb(245 158 11 / 18%);">
@@ -457,17 +591,17 @@ class ReceivingController extends Controller
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/></svg>
                         <span>Lanjutkan</span>
                     </a>';
-                }
-
-                if ($row->status == 1) {
+                } else if ($row->status == 1 || $row->status == 2) {
                     return '
                     <a href="/receive/' . $row->id . '" style="background: #e6ffe8; border: solid 1px #00bd5a; color: #078f03; box-shadow: 0 0 10px #2d8c056b;" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm hover:shadow transition-all duration-150">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         <span>Terima</span>
                     </a>';
-                }
+                } else {
 
-                return '
+
+
+                    return '
                 <div class="flex items-center gap-2">
                     <a target="_blank" href="/receiving/' . $row->id . '/printspbfinal" style="box-shadow:0 0 10px rgb(255 236 159 / 47%);" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg shadow-xs transition-all duration-150">
                         <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0 1 10.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0 .229 2.523a1.125 1.125 0 0 1-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0 0 21 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 0 0-1.913-.247M6.34 18H5.25A2.25 2.25 0 0 1 3 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 0 1 1.913-.247m10.5 0a48.536 48.536 0 0 0-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.656"/></svg>
@@ -477,7 +611,11 @@ class ReceivingController extends Controller
                         <svg class="w-4 h-4 text-pink-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m8.25-2.142V8.25"/></svg>
                         <span>List Pesanan</span>
                     </a>
+                    <a href="/orders/' . $row->id . '/revision" style="box-shadow:0 0 10px rgb(43 212 255 / 45%);background:#aceaff;color:#112196;" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium hover:bg-[#aceaff] border border-[#1cb8fe] rounded-lg shadow-xs transition-all duration-150">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-cash-edit"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M7 15h-3a1 1 0 0 1 -1 -1v-8a1 1 0 0 1 1 -1h12a1 1 0 0 1 1 1v3" /><path d="M11 19h-3a1 1 0 0 1 -1 -1v-8a1 1 0 0 1 1 -1h12a1 1 0 0 1 1 1v1.25" /><path d="M18.42 15.61a2.1 2.1 0 1 1 2.97 2.97l-3.39 3.42h-3v-3l3.42 -3.39" /></svg>                        <span>Revisi Faktur</span>
+                    </a>
                 </div>';
+                }
             })
             ->addColumn('total', fn($row) => '<span class="font-semibold text-slate-700">Rp ' . number_format($row->order_items_sum_total ?? 0, 0, ',', '.') . '</span>')
             ->addColumn('total_ppn', fn($row) => '<span class="font-bold text-slate-900">Rp ' . number_format(floor(($row->order_items_sum_total ?? 0) * 1.11), 0, ',', '.') . '</span>')
@@ -489,7 +627,7 @@ class ReceivingController extends Controller
     {
         $now = Carbon::now();
 
-        $year  = $now->format('y');
+        $year = $now->format('y');
         $month = $now->format('m');
         $prefix = "{$year}{$month}OI";
 
@@ -505,6 +643,252 @@ class ReceivingController extends Controller
         }
 
         return $prefix . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+    }
+
+    function generateReceivingDetailsCode($pharmacy_id)
+    {
+        $now = Carbon::now();
+        $year = $now->format('y');
+        $month = $now->format('m');
+        $prefix = "NT-{$year}-{$month}/";
+
+        $lastCode = ReceivingDetails::whereHas('receiving', function ($q) use ($pharmacy_id) {
+            $q->where('pharmacy_id', $pharmacy_id);
+        })
+            ->where('receiving_details_code', 'like', "{$prefix}%")
+            ->orderBy('receiving_details_code', 'desc')
+            ->value('receiving_details_code');
+
+        if ($lastCode) {
+            $lastNumber = (int) substr($lastCode, -4);
+            $nextNumber = $lastNumber + 1;
+        } else {
+            $nextNumber = 1;
+        }
+
+        return $prefix . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+    }
+    public function updateReceivingItem(Request $request, $id)
+    {
+        $request->validate([
+            'qty_received' => 'required|numeric|min:0',
+            'raw_price' => 'required|numeric|min:0',
+            'batch' => 'required',
+            'expired_date' => 'required',
+            'discount' => 'required',
+            'extra_discount' => 'required',
+            'status' => 'required',
+            'total' => 'required',
+        ]);
+
+        try {
+            DB::beginTransaction();
+
+            $item = ReceivingItems::with('order_items')->findOrFail($id);
+
+            $medicineId = $item->order_items->medicine_id;
+            $pharmacyId = auth()->user()->pharmacy_id;
+            $oldQty = $item->qty_received;
+            $newQty = $request->qty_received;
+            $oldBatchKey = "{$medicineId}|{$item->batch}|{$item->expired_date}";
+            $newBatchKey = "{$medicineId}|{$request->batch}|{$request->expired_date}";
+            $medicine = Medicines::findOrFail($medicineId);
+
+            if ($oldBatchKey === $newBatchKey) {
+                $delta = $newQty - $oldQty;
+
+                if ($delta != 0) {
+                    $qtyBefore = $medicine->stock;
+                    $medicine->increment('stock', $delta);
+
+                    if ($pharmacyId != 1) {
+                        $transferItem = MedicineTransferItems::where('receiving_items_id', $item->id)->first();
+                        if ($transferItem) {
+                            $transferItem->update(['qty' => $newQty]);
+                        }
+                    } else {
+                        Batches::where('id', $item->batches_id)->increment('stock', $delta);
+                    }
+
+                    ItemsLog::create([
+                        'transaction_code' => 'REV-' . $item->id,
+                        'code' => $this->generateItemsLogCode(),
+                        'type' => 'RV',
+                        'medicine_id' => $medicineId,
+                        'qty' => $delta,
+                        'qty_before' => $qtyBefore,
+                        'qty_after' => $medicine->stock,
+                        'total' => $request->total,
+                        'date' => Carbon::now()->format('Y-m-d'),
+                        'status' => 8,
+                        'batches_id' => $item->batches_id,
+                        'user_id' => auth()->user()->id,
+                    ]);
+                }
+            } else {
+                $qtyBeforeReverse = $medicine->stock;
+                $medicine->decrement('stock', $oldQty);
+
+                $transferHeaderId = null;
+                if ($pharmacyId != 1) {
+                    $transferItem = MedicineTransferItems::where('receiving_items_id', $item->id)->first();
+                    if ($transferItem) {
+                        $transferHeaderId = $transferItem->medicine_transfer_id;
+                        $transferItem->delete();
+                    }
+                } else {
+                    Batches::where('id', $item->batches_id)->decrement('stock', $oldQty);
+                }
+
+                $newBatch = Batches::firstOrCreate(
+                    [
+                        'medicine_id' => $medicineId,
+                        'name' => $request->batch,
+                        'expired_date' => $request->expired_date,
+                        'pharmacy_id' => $pharmacyId,
+                    ],
+                    ['status' => 0, 'stock' => 0]
+                );
+
+                $medicine->increment('stock', $newQty);
+
+                if ($pharmacyId != 1) {
+                    if (!$transferHeaderId) {
+                        $transferHeader = MedicineTransfers::create([
+                            'code' => $this->generateTransfersCode(),
+                            'status' => 1,
+                        ]);
+                        $transferHeaderId = $transferHeader->id;
+                    }
+
+                    MedicineTransferItems::create([
+                        'medicine_transfer_id' => $transferHeaderId,
+                        'batches_id' => $newBatch->id,
+                        'receiving_items_id' => $item->id,
+                        'etalases_id' => 99,
+                        'qty' => $newQty,
+                        'status' => 1,
+                    ]);
+                } else {
+                    $newBatch->increment('stock', $newQty);
+                }
+
+                ItemsLog::create([
+                    'transaction_code' => 'REV-' . $item->id,
+                    'code' => $this->generateItemsLogCode(),
+                    'type' => 'RV',
+                    'medicine_id' => $medicineId,
+                    'qty' => $newQty - $oldQty,
+                    'qty_before' => $qtyBeforeReverse,
+                    'qty_after' => $medicine->stock,
+                    'total' => $request->total,
+                    'date' => Carbon::now()->format('Y-m-d'),
+                    'status' => 8,
+                    'batches_id' => $newBatch->id,
+                    'user_id' => auth()->user()->id,
+                ]);
+
+                $item->batches_id = $newBatch->id;
+            }
+
+            $item->update([
+                'qty_received' => $newQty,
+                'qty' => $newQty,
+                'raw_price' => $request->raw_price,
+                'batch' => $request->batch,
+                'expired_date' => $request->expired_date,
+                'discount' => $request->discount,
+                'extra_discount' => $request->extra_discount,
+                'status' => $request->status,
+                'total' => $request->total,
+                'batches_id' => $item->batches_id,
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Item berhasil direvisi',
+                'item' => $item,
+            ]);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            \Log::error('Revision error', ['message' => $e->getMessage(), 'line' => $e->getLine()]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal merevisi: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function deleteReceivingItem($id)
+    {
+        try {
+            DB::beginTransaction();
+
+            $item = ReceivingItems::with('order_items')->findOrFail($id);
+            $medicineId = $item->order_items->medicine_id;
+            $pharmacyId = auth()->user()->pharmacy_id;
+            $medicine = Medicines::findOrFail($medicineId);
+
+            $qtyBefore = $medicine->stock;
+            $medicine->decrement('stock', $item->qty_received);
+
+            if ($pharmacyId != 1) {
+                $transferItem = MedicineTransferItems::where('receiving_items_id', $item->id)->first();
+                if ($transferItem) {
+                    $transferHeaderId = $transferItem->medicine_transfer_id;
+                    $transferItem->delete();
+
+                    if (MedicineTransferItems::where('medicine_transfer_id', $transferHeaderId)->count() === 0) {
+                        MedicineTransfers::where('id', $transferHeaderId)->delete();
+                    }
+                }
+            } else {
+                Batches::where('id', $item->batches_id)->decrement('stock', $item->qty_received);
+            }
+
+            ItemsLog::create([
+                'transaction_code' => 'REV-DEL-' . $item->id,
+                'code' => $this->generateItemsLogCode(),
+                'type' => 'RV',
+                'medicine_id' => $medicineId,
+                'qty' => -$item->qty_received,
+                'qty_before' => $qtyBefore,
+                'qty_after' => $medicine->stock,
+                'total' => 0,
+                'date' => Carbon::now()->format('Y-m-d'),
+                'status' => 9,
+                'batches_id' => $item->batches_id,
+                'user_id' => auth()->user()->id,
+            ]);
+
+            $item->delete();
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Item berhasil dihapus',
+            ]);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            \Log::error('Revision delete error', ['message' => $e->getMessage(), 'line' => $e->getLine()]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal menghapus item',
+            ], 500);
+        }
+    }
+    public function invoiceRevision($orderId)
+    {
+        $order = Order::with([
+            'order_items.medicines',
+            'order_items.receivingItems.locations',
+            'order_items.receivingItems.etalases',
+        ])->findOrFail($orderId);
+
+        return view('orders.revision', compact('order'));
     }
 
     public function index()
@@ -534,7 +918,7 @@ class ReceivingController extends Controller
             abort(404, 'Order not found.');
         }
 
-        if ($check_order->orders->status == 2) {
+        if ($check_order->orders->status == 3) {
             return redirect()->route('receiving.index')->with('success', "Pesanan Berhasil Diterima");
         }
 
@@ -544,6 +928,7 @@ class ReceivingController extends Controller
             ->with('creditors:id,code,name')
             ->get()
             ->pluck('creditors')
+            ->filter()
             ->unique('code')
             ->values();
 
@@ -566,8 +951,8 @@ class ReceivingController extends Controller
 
             return view('orders.receiving', compact('order_id', 'd_price', 'd_ppn', 'd_total', 'order_code', 'creditorOption', 'receiving_code', 'transaction', 'now', 'datenow', 'receiving_id'));
         } else {
-            $year   = now()->format('y');
-            $month  = now()->format('m');
+            $year = now()->format('y');
+            $month = now()->format('m');
             $prefix = $year . $month . 'RE';
             $last = Receiving::where('pharmacy_id', Auth()->user()->pharmacy_id)
                 ->where('code', 'like', $prefix . '%')
@@ -588,12 +973,12 @@ class ReceivingController extends Controller
                 DB::beginTransaction();
 
                 $transaction = Receiving::create([
-                    'order_id'     => $id,
+                    'order_id' => $id,
                     'creditors_id' => NULL,
-                    'pharmacy_id'  => Auth()->user()->pharmacy_id,
-                    'code'         => $receiving_code,
-                    'date'         => $now,
-                    'status'       => 0,
+                    'pharmacy_id' => Auth()->user()->pharmacy_id,
+                    'code' => $receiving_code,
+                    'date' => $now,
+                    'status' => 0,
                 ]);
 
                 DB::commit();
@@ -608,87 +993,95 @@ class ReceivingController extends Controller
     public function addReceivingItem(Request $request)
     {
         $request->validate([
-            'receiving_id'     => 'required',
-            'order_items_id'   => 'required',
-            'qty_received'     => 'required|numeric|min:1',
-            'discount'         => 'required',
-            'extra_discount'   => 'required',
-            'expired_date'     => 'required',
-            'batch'            => 'required',
-            'status'           => 'required',
-            'invoice_date'     => 'required',
-            'invoice_due'      => 'required',
-            'invoice_number'   => 'required',
-            'invoice_payment'  => 'required',
-            'invoice_ppn'      => 'required',
-            'invoice_times'    => 'required',
+            'receiving_id' => 'required',
+            'order_items_id' => 'required',
+            'qty_received' => 'required|numeric|min:1',
+            'raw_price' => 'required|numeric|min:0',
+            'discount' => 'required',
+            'extra_discount' => 'required',
+            'expired_date' => 'required',
+            'batch' => 'required',
+            'status' => 'required',
+            'invoice_date' => 'required',
+            'invoice_due' => 'required',
+            'invoice_number' => 'required',
+            'invoice_payment' => 'required',
+            'invoice_ppn' => 'required',
+            'invoice_times' => 'required',
         ]);
+
+        $receiving = Receiving::findOrFail($request->receiving_id);
+
+
+        if ($receiving->status == 3) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pesanan ini sudah diselesaikan dan tidak bisa diubah.',
+            ], 422);
+        }
 
         DB::beginTransaction();
 
         try {
-
-            // $details = ReceivingDetails::where('receiving_id', $request->receiving_id)->findOrFail();
-            // if($details == )
-
-
-            // Check the creditor. If the combination of
-            // creditor and receiving_id is already exist, update the data.
-            // If not, create new data.
             $details = ReceivingDetails::updateOrCreate(
-
                 [
-                    'receiving_id'    => $request->receiving_id,
-                    'invoice_number'  => $request->invoice_number,
+                    'receiving_id' => $request->receiving_id,
+                    'invoice_number' => $request->invoice_number,
                     'creditor_code' => $request->creditor_code,
                 ],
                 [
-                    'invoice_date'    => $request->invoice_date,
-                    'invoice_times'   => $request->invoice_times,
-                    'invoice_due'     => $request->invoice_due,
+                    'invoice_date' => $request->invoice_date,
+                    'invoice_times' => $request->invoice_times,
+                    'invoice_due' => $request->invoice_due,
                     'invoice_payment' => $request->invoice_payment,
-                    'invoice_ppn'     => $request->invoice_ppn,
+                    'invoice_ppn' => $request->invoice_ppn,
                 ]
             );
 
-            ReceivingItems::updateOrCreate(
-                [
-                    'receiving_details_id' => $details->id,
-                    'order_items_id'       => $request->order_items_id,
-                ],
-                [
-                    'batches_id'     => $request->id,
-                    'qty_received'   => $request->qty_received,
-                    'qty'            => $request->qty_received,
-                    'discount'       => $request->discount,
-                    'extra_discount' => $request->extra_discount,
-                    'expired_date'   => $request->expired_date,
-                    'batch'          => $request->batch,
-                    'location'       => NULL,
-                    'etalase'        => NULL,
-                    'total'          => $request->total,
-                    'status'         => $request->status,
-                ]
-            );
+            $itemData = [
+                'receiving_details_id' => $details->id,
+                'order_items_id' => $request->order_items_id,
+                'qty_received' => $request->qty_received,
+                'qty' => $request->qty_received,
+                'raw_price' => $request->raw_price,
+                'discount' => $request->discount,
+                'extra_discount' => $request->extra_discount,
+                'expired_date' => $request->expired_date,
+                'batch' => $request->batch,
+                'location' => null,
+                'etalase' => null,
+                'total' => $request->total,
+                'status' => $request->status,
+            ];
+
+            if ($request->filled('receiving_items_id')) {
+                // Editing an existing batch row for this order item
+                $item = ReceivingItems::findOrFail($request->receiving_items_id);
+                $item->update($itemData);
+            } else {
+                // New batch entry — same medicine can appear multiple times
+                // under one order item with different expiry/qty/price
+                $item = ReceivingItems::create($itemData);
+            }
 
             DB::commit();
 
-            $receiving = Receiving::findOrFail($request->receiving_id);
             $getOrderId = $request->order_items_id;
 
             $price_total = ReceivingItems::with('order_items')
                 ->whereHas('order_items', function ($q) use ($getOrderId) {
                     $q->where('id', $getOrderId);
                 })
-                ->sum('total') ?? '0';
+                ->sum('total') ?? 0;
             $ppn = $price_total * 0.11;
 
             return response()->json([
-                'success'   => true,
+                'success' => true,
                 'receiving' => $receiving,
+                'item' => $item,
                 'summary' => [
-                    'price_item'  => $price_total,
-                    'price_ppn'   => $ppn,
+                    'price_item' => $price_total,
+                    'price_ppn' => $ppn,
                     'price_total' => $price_total + $ppn,
                 ]
             ]);
@@ -758,7 +1151,7 @@ class ReceivingController extends Controller
     {
         $now = Carbon::now();
 
-        $year  = $now->format('y');
+        $year = $now->format('y');
         $month = $now->format('m');
         $prefix = "{$year}{$month}MUT";
 
@@ -776,50 +1169,64 @@ class ReceivingController extends Controller
         return $prefix . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
     }
 
-    public function completeOrder(Request $request)
+    public function saveOrder(Request $request)
     {
-
         $request->validate([
             'receivingid' => 'required',
-            'orderid'     => 'required',
+            'orderid' => 'required',
         ]);
 
         try {
             DB::beginTransaction();
 
-            $receiving = Receiving::with([
-                'receiving_details.receiving_items.order_items'
-            ])->findOrFail($request->receivingid);
+            $receiving = Receiving::with(['receiving_details.receiving_items.order_items'])
+                ->findOrFail($request->receivingid);
 
-            $order = Order::findOrFail($request->orderid);
-
-            $receivingItems = $receiving->receiving_details
-                ->pluck('receiving_items')
-                ->flatten();
-
-            if ($receivingItems->isEmpty()) {
+            if ($receiving->status == 3) {
+                DB::rollBack();
                 return response()->json([
                     'success' => false,
-                    'message' => 'Tidak ada item untuk diproses',
+                    'message' => 'Pesanan ini sudah diselesaikan dan tidak bisa diubah.',
                 ], 422);
             }
 
-            $now        = Carbon::now()->format('Y-m-d');
+            $order = Order::findOrFail($request->orderid);
+
+            // Generate Nomor Terima (NT) for any ReceivingDetails that doesn't have one yet
+            foreach ($receiving->receiving_details as $details) {
+                if (empty($details->receiving_details_code)) {
+                    $details->receiving_details_code = $this->generateReceivingDetailsCode($receiving->pharmacy_id);
+                    $details->save();
+                }
+            }
+
+            $receivingItems = $receiving->receiving_details
+                ->pluck('receiving_items')
+                ->flatten()
+                ->whereNull('batches_id')
+                ->values();
+
+            if ($receivingItems->isEmpty()) {
+                DB::commit();
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Tidak ada item baru untuk disimpan',
+                ]);
+            }
+
+            $now = Carbon::now()->format('Y-m-d');
             $pharmacyId = auth()->user()->pharmacy_id;
 
-
-            // 1. Pre-fetch all medicines
             $medicineIds = $receivingItems->pluck('order_items.medicine_id')->unique()->values();
-            $medicines   = Medicines::whereIn('id', $medicineIds)->get()->keyBy('id');
+            $medicines = Medicines::whereIn('id', $medicineIds)->get()->keyBy('id');
 
-            // 2. Pre-fetch all matching batches
             $existingBatches = Batches::where('pharmacy_id', $pharmacyId)
                 ->where(function ($q) use ($receivingItems) {
                     foreach ($receivingItems as $item) {
                         $q->orWhere(
                             fn($q2) => $q2
-                                ->where('medicine_id',  $item->order_items->medicine_id)
-                                ->where('name',         $item->batch)
+                                ->where('medicine_id', $item->order_items->medicine_id)
+                                ->where('name', $item->batch)
                                 ->where('expired_date', $item->expired_date)
                         );
                     }
@@ -827,15 +1234,21 @@ class ReceivingController extends Controller
                 ->get()
                 ->keyBy(fn($b) => "{$b->medicine_id}|{$b->name}|{$b->expired_date}");
 
-            // 3. Loop
-            $itemsLogInserts      = [];
-            $batchIncrements      = [];
-            $medicineIncrements   = [];
+            $itemsLogInserts = [];
+            $medicineIncrements = [];
             $receivingItemUpdates = [];
+
+            $transferHeader = null;
+            if ($pharmacyId != 1) {
+                $transferHeader = MedicineTransfers::create([
+                    'code' => $this->generateTransfersCode(),
+                    'status' => 1,
+                ]);
+            }
 
             foreach ($receivingItems as $item) {
                 $medicineId = $item->order_items->medicine_id;
-                $medicine   = $medicines->get($medicineId);
+                $medicine = $medicines->get($medicineId);
 
                 if (!$medicine) {
                     throw new \Exception("Medicine ID {$medicineId} not found.");
@@ -845,73 +1258,51 @@ class ReceivingController extends Controller
 
                 if (!isset($existingBatches[$batchKey])) {
                     $batch = Batches::create([
-                        'medicine_id'  => $medicineId,
-                        'name'         => $item->batch,
+                        'medicine_id' => $medicineId,
+                        'name' => $item->batch,
                         'expired_date' => $item->expired_date,
-                        'status'       => 0,
-                        'pharmacy_id'  => $pharmacyId,
-                        'stock'        => 0,
+                        'status' => 0,
+                        'pharmacy_id' => $pharmacyId,
+                        'stock' => 0,
                     ]);
                     $existingBatches[$batchKey] = $batch;
                 }
 
-                $batch     = $existingBatches[$batchKey];
+                $batch = $existingBatches[$batchKey];
                 $qtyBefore = $medicine->stock;
                 $medicine->stock += $item->qty_received;
 
-                $batchIncrements[$batch->id]     = ($batchIncrements[$batch->id]     ?? 0) + $item->qty_received;
                 $medicineIncrements[$medicineId] = ($medicineIncrements[$medicineId] ?? 0) + $item->qty_received;
                 $receivingItemUpdates[$item->id] = $batch->id;
 
-                $itemsLogInserts[] = [
-                    'transaction_code' => $receiving->code,
-                    'code'             => $this->generateItemsLogCode(),
-                    'type'             => 'OR',
-                    'medicine_id'      => $medicineId,
-                    'qty'              => $item->qty_received,
-                    'qty_before'       => $qtyBefore,
-                    'qty_after'        => $medicine->stock,
-                    'total'            => $item->order_items->total ?? 0,
-                    'date'             => $now,
-                    'status'           => 2,
-                    'batches_id'       => $batch->id,
-                    'created_at'       => now(),
-                    'updated_at'       => now(),
-                ];
-            }
-
-            // FIX #5: Removed nested DB::transaction() — using the outer beginTransaction instead
-            foreach ($batchIncrements as $batchId => $qty) {
-                if (auth()->user()->pharmacy_id != 1) {
-                    Batches::where('id', $batchId)->update(['stock' => 0]);
-
-                    $transfer = MedicineTransfers::create([
-                        'batches_id'  => $batchId,
+                if ($pharmacyId != 1) {
+                    MedicineTransferItems::create([
+                        'medicine_transfer_id' => $transferHeader->id,
+                        'batches_id' => $batch->id,
+                        'receiving_items_id' => $item->id,
                         'etalases_id' => 99,
-                        'code'        => $this->generateTransfersCode(),
-                        'stock'       => $qty,
-                        'status'      => 1,
-                    ]);
-
-                    $medicine = Medicines::findOrFail($transfer->batches->medicine_id);
-
-                    ItemsLog::create([
-                        'transaction_code' => $transfer->code,
-                        'code'             => $this->generateItemsLogCode(),
-                        'type'             => 'MU',
-                        'medicine_id'      => $medicine->id,
-                        'qty'              => $transfer->stock,
-                        'qty_before'       => 0,
-                        'qty_after'        => $transfer->batches->stock,
-                        'total'            => 0,
-                        'date'             => Carbon::now(),
-                        'status'           => 7,
-                        'batches_id'       => $transfer->batches_id,
-                        'user_id'          => auth()->user()->id,
+                        'qty' => $item->qty_received,
+                        'status' => 1,
                     ]);
                 } else {
-                    Batches::where('id', $batchId)->increment('stock', $qty);
+                    Batches::where('id', $batch->id)->increment('stock', $item->qty_received);
                 }
+
+                $itemsLogInserts[] = [
+                    'transaction_code' => $receiving->code,
+                    'code' => $this->generateItemsLogCode(),
+                    'type' => 'OR',
+                    'medicine_id' => $medicineId,
+                    'qty' => $item->qty_received,
+                    'qty_before' => $qtyBefore,
+                    'qty_after' => $medicine->stock,
+                    'total' => $item->order_items->total ?? 0,
+                    'date' => $now,
+                    'status' => 2,
+                    'batches_id' => $batch->id,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
             }
 
             foreach ($medicineIncrements as $medicineId => $qty) {
@@ -930,23 +1321,89 @@ class ReceivingController extends Controller
                 ->chunk(500)
                 ->each(fn($chunk) => ItemsLog::insert($chunk->values()->all()));
 
-            // Finalize
             $order->update(['status' => 2]);
-            $receiving->update(['status' => 1]);
+            $receiving->update(['status' => 2]);
 
             DB::commit();
 
             return response()->json([
                 'success' => true,
-                'message' => 'Received',
+                'message' => 'Item Tersimpan',
             ]);
         } catch (\Throwable $e) {
             DB::rollBack();
 
-            \Log::error('Error complete receiving', [
+            \Log::error('Error saving receiving', [
                 'message' => $e->getMessage(),
-                'line'    => $e->getLine(),
-                'trace'   => $e->getTraceAsString(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal menyimpan: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+    public function completeOrder(Request $request)
+    {
+        $request->validate([
+            'receivingid' => 'required',
+            'orderid' => 'required',
+        ]);
+
+        try {
+            DB::beginTransaction();
+
+            $receiving = Receiving::with(['receiving_details.receiving_items'])
+                ->findOrFail($request->receivingid);
+
+            if ($receiving->status == 3) {
+                DB::commit();
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Pesanan sudah diselesaikan sebelumnya',
+                ]);
+            }
+
+            $order = Order::findOrFail($request->orderid);
+
+            $receivingItems = $receiving->receiving_details
+                ->pluck('receiving_items')
+                ->flatten();
+
+            if ($receivingItems->isEmpty()) {
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Tidak ada item untuk diselesaikan',
+                ], 422);
+            }
+
+            if ($receivingItems->whereNull('batches_id')->isNotEmpty()) {
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Masih ada item yang belum disimpan. Klik "Simpan" terlebih dahulu.',
+                ], 422);
+            }
+
+            $order->update(['status' => 3]);
+            $receiving->update(['status' => 3]);
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Pesanan Berhasil Diselesaikan',
+            ]);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+
+            \Log::error('Error completing receiving', [
+                'message' => $e->getMessage(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([

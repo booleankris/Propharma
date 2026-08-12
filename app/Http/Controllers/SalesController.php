@@ -20,6 +20,7 @@ use App\Models\Sales;
 use App\Models\TicketPayment;
 use App\Models\TicketTransaction;
 use App\Models\MedicineTransfers;
+use App\Models\MedicineTransferItems;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -35,33 +36,33 @@ class SalesController extends Controller
     public function index($type, $id = null)
     {
         $pharmacy_id = Auth::user()->pharmacy_id;
-        $user_id     = Auth::user()->id;
+        $user_id = Auth::user()->id;
 
         // 1. Resolve display-type → DB-type + parameter key 
         $typeMap = [
-            'resep'  => ['db' => 'RESEP TUNAI', 'param_key' => 'receipt', 'code' => '1'],
-            'kredit' => ['db' => 'KREDIT',      'param_key' => null,      'code' => '4'],
-            'upds'   => ['db' => 'UPDS',        'param_key' => 'pdu',     'code' => '2'],
-            'hv'     => ['db' => 'HV/OTC',      'param_key' => 'otc',     'code' => '3'],
+            'resep' => ['db' => 'RESEP TUNAI', 'param_key' => 'receipt', 'code' => '1'],
+            'kredit' => ['db' => 'KREDIT', 'param_key' => null, 'code' => '4'],
+            'upds' => ['db' => 'UPDS', 'param_key' => 'pdu', 'code' => '2'],
+            'hv' => ['db' => 'HV/OTC', 'param_key' => 'otc', 'code' => '3'],
         ];
 
         abort_if(!array_key_exists($type, $typeMap), 404, 'Invalid transaction type.');
 
-        $meta      = $typeMap[$type];
-        $dbType    = $meta['db'];
-        $paramKey  = $meta['param_key'];
+        $meta = $typeMap[$type];
+        $dbType = $meta['db'];
+        $paramKey = $meta['param_key'];
 
         // 2. Load payment parameters once
-        $paymentParams        = PaymentParameters::findOrFail(1);
-        $parameterHV          = $paymentParams->otc;
-        $parameterUP          = $paymentParams->pdu;
-        $parameterRT          = $paymentParams->receipt;
-        $service              = $paymentParams->embalas;
+        $paymentParams = PaymentParameters::findOrFail(1);
+        $parameterHV = $paymentParams->otc;
+        $parameterUP = $paymentParams->pdu;
+        $parameterRT = $paymentParams->receipt;
+        $service = $paymentParams->embalas;
         $ChangeFakturParameters = $paymentParams->pdu;
         $ChangeFakturRounding = $paymentParams->rounding;
-        $rounding             = $dbType === 'KREDIT' ? '0' : $paymentParams->rounding;
-        $parameters           = $dbType === 'KREDIT' ? '0' : $paymentParams->{$paramKey};
-        $transaction_code     = $this->generateTransactionCode($meta['code']);
+        $rounding = $dbType === 'KREDIT' ? '0' : $paymentParams->rounding;
+        $parameters = $dbType === 'KREDIT' ? '0' : $paymentParams->{$paramKey};
+        $transaction_code = $this->generateTransactionCode($meta['code']);
         // 3. Resolve which transaction to use
         if ($id !== null) {
             // Tab already has a specific transaction, load it, guard status
@@ -78,13 +79,13 @@ class SalesController extends Controller
                     DB::beginTransaction();
 
                     $transaction = MedicineTransactions::create([
-                        'pharmacy_id'      => $pharmacy_id,
-                        'user_id'           => Auth()->user()->id,
-                        'debtor_id'        => null,
+                        'pharmacy_id' => $pharmacy_id,
+                        'user_id' => Auth()->user()->id,
+                        'debtor_id' => null,
                         'transaction_type' => $dbType,
-                        'subtotal'         => null,
-                        'discount'         => null,
-                        'status'           => 0,
+                        'subtotal' => null,
+                        'discount' => null,
+                        'status' => 0,
                     ]);
 
                     DB::commit();
@@ -108,7 +109,7 @@ class SalesController extends Controller
                 // tab gets a stable URL it can bookmark / re-open
                 return redirect()->route('transaction', [
                     'type' => $this->dbTypeToRouteType($transaction->transaction_type),
-                    'id'   => $transaction->id,
+                    'id' => $transaction->id,
                 ]);
             }
 
@@ -117,14 +118,14 @@ class SalesController extends Controller
                 DB::beginTransaction();
 
                 $transaction = MedicineTransactions::create([
-                    'pharmacy_id'      => $pharmacy_id,
-                    'user_id'           => Auth()->user()->id,
-                    'debtor_id'        => null,
+                    'pharmacy_id' => $pharmacy_id,
+                    'user_id' => Auth()->user()->id,
+                    'debtor_id' => null,
                     'transaction_type' => $dbType,
                     'transaction_code' => null,
-                    'subtotal'         => null,
-                    'discount'         => null,
-                    'status'           => 0,
+                    'subtotal' => null,
+                    'discount' => null,
+                    'status' => 0,
                 ]);
 
                 DB::commit();
@@ -136,7 +137,7 @@ class SalesController extends Controller
             // Redirect WITH the new id so the URL is stable for this tab
             return redirect()->route('transaction', [
                 'type' => $type,
-                'id'   => $transaction->id,
+                'id' => $transaction->id,
             ]);
         }
 
@@ -214,17 +215,17 @@ class SalesController extends Controller
     {
         return match ($dbType) {
             'RESEP TUNAI' => 'resep',
-            'KREDIT'      => 'kredit',
-            'UPDS'        => 'upds',
-            'HV/OTC'      => 'hv',
-            default       => 'resep',
+            'KREDIT' => 'kredit',
+            'UPDS' => 'upds',
+            'HV/OTC' => 'hv',
+            default => 'resep',
         };
     }
     function generateItemsLogCode()
     {
         $now = Carbon::now();
 
-        $year  = $now->format('y');
+        $year = $now->format('y');
         $month = $now->format('m');
         $prefix = "{$year}{$month}LOG-";
 
@@ -257,7 +258,7 @@ class SalesController extends Controller
     0 = In cart
     1 = Processed
     2 = Paid
-    
+
     1. Create Transaction on transaction page( Status = 0 )
     2. If user close or go to other page and go back to transaction page, it check the transaction status, then get the transaction detail of where the transaction status = 0
     3. If transaction with status = 0 is not found, then create new transaction
@@ -300,20 +301,20 @@ class SalesController extends Controller
             AND pharmacy_id = ?
         ) as storage_stock', [$pharmacyId])
 
-            // Total stock in counter (medicine_transfers)
+            // Total qty in counter (medicine_transfer_items)
             ->selectRaw('(
-            SELECT COALESCE(SUM(mt.stock), 0)
-            FROM medicine_transfers mt
+            SELECT COALESCE(SUM(mt.qty), 0)
+            FROM medicine_transfer_items mt
             JOIN batches b ON b.id = mt.batches_id
             WHERE b.medicine_id = medicines.id
             AND mt.status = 1
             AND b.pharmacy_id = ?
         ) as counter_stock', [$pharmacyId])
 
-            // Latest etalase_id from medicine_transfers (Option 1)
+            // Latest etalase_id from medicine_transfer_items (Option 1)
             ->selectRaw('(
             SELECT mt.etalases_id
-            FROM medicine_transfers mt
+            FROM medicine_transfer_items mt
             JOIN batches b ON b.id = mt.batches_id
             WHERE b.medicine_id = medicines.id
             AND mt.status = 1
@@ -363,7 +364,7 @@ class SalesController extends Controller
     //             'content',
     //             'dosage',
     //             DB::raw('(SELECT COALESCE(SUM(stock), 0) FROM batches WHERE medicine_id = medicines.id) as storage_stock'),
-    //             DB::raw('(SELECT COALESCE(SUM(mt.stock), 0) FROM medicine_transfers mt JOIN batches b ON b.id = mt.batches_id WHERE b.medicine_id = medicines.id AND mt.status = 1) as counter_stock'),
+    //             DB::raw('(SELECT COALESCE(SUM(mt.stock), 0) FROM medicine_transfer_items mt JOIN batches b ON b.id = mt.batches_id WHERE b.medicine_id = medicines.id AND mt.status = 1) as counter_stock'),
     //         ])
     //         ->with(['etalases', 'locations'])
     //         ->when(
@@ -408,8 +409,8 @@ class SalesController extends Controller
         $pharmacyId = auth()->user()->pharmacy_id;
         $pharmacyIdPadded = str_pad($pharmacyId, 2, '0', STR_PAD_LEFT);
 
-        $year   = now()->format('y');
-        $month  = now()->format('m');
+        $year = now()->format('y');
+        $month = now()->format('m');
         $prefix = $year . $month . strtoupper($code);
 
         $expectedLength = strlen($prefix) + 4 + 2;
@@ -486,14 +487,14 @@ class SalesController extends Controller
             DB::beginTransaction();
 
             $transaction = MedicineTransactions::create([
-                'pharmacy_id'       => Auth()->user()->pharmacy_id,
-                'user_id'           => Auth()->user()->id,
-                'debtor_id'         => NULL,
-                'transaction_type'  => $typenew,
-                'transaction_code'  => NULL,
-                'subtotal'          => NULL,
-                'discount'          => NULL,
-                'status'            => 0,
+                'pharmacy_id' => Auth()->user()->pharmacy_id,
+                'user_id' => Auth()->user()->id,
+                'debtor_id' => NULL,
+                'transaction_type' => $typenew,
+                'transaction_code' => NULL,
+                'subtotal' => NULL,
+                'discount' => NULL,
+                'status' => 0,
             ]);
 
             DB::commit();
@@ -587,39 +588,39 @@ class SalesController extends Controller
 
 
         $transaction = MedicineCart::create([
-            'user_id'        => Auth()->user()->id,
-            'medicine_id'    => $request->get('medicine_id'),
+            'user_id' => Auth()->user()->id,
+            'medicine_id' => $request->get('medicine_id'),
             'transaction_id' => $request->get('transaction_id'),
-            'quantity'       => $request->get('quantity'),
-            'discount'       => $request->get('discount'),
-            'embalase'       => $request->get('embalase'),
-            'cart_type'      => $request->get('cart_type'),
-            'package'      => $request->get('package'),
-            'dosage_r'      => $request->get('dosage_r'),
-            'item_price'      => $request->get('price2'),
-            'raw_total'    => $request->get('raw_total'),
-            'total_price'    => $request->get('final_price'),
-            'final_price'    => $request->get('total_price'),
-            'status'         => 0,
-            'recipe_status'  => $recipeStatus,
-            'recipe_number'  => $recipeNumber,
-            'medicine_type'  => $request->get('medicine_type'),
-            'service_fee'    => $service,
+            'quantity' => $request->get('quantity'),
+            'discount' => $request->get('discount'),
+            'embalase' => $request->get('embalase'),
+            'cart_type' => $request->get('cart_type'),
+            'package' => $request->get('package'),
+            'dosage_r' => $request->get('dosage_r'),
+            'item_price' => $request->get('price2'),
+            'raw_total' => $request->get('raw_total'),
+            'total_price' => $request->get('final_price'),
+            'final_price' => $request->get('total_price'),
+            'status' => 0,
+            'recipe_status' => $recipeStatus,
+            'recipe_number' => $recipeNumber,
+            'medicine_type' => $request->get('medicine_type'),
+            'service_fee' => $service,
         ]);
         $itemInCart = MedicineCart::with('medicine')->where('transaction_id', $transaction->transaction_id)->where('user_id', Auth()->user()->id)->first();
 
         return response()->json([
-            'id'          => $transaction->id,
-            'name'        => $transaction->medicine->name,
-            'unit'        => $itemInCart->medicine->unit,
-            'price'       => $itemInCart->medicine->net_price,
-            'quantity'    => $transaction->quantity,
-            'discount'    => $transaction->discount,
+            'id' => $transaction->id,
+            'name' => $transaction->medicine->name,
+            'unit' => $itemInCart->medicine->unit,
+            'price' => $itemInCart->medicine->net_price,
+            'quantity' => $transaction->quantity,
+            'discount' => $transaction->discount,
             'total_price' => $transaction->total_price,
-            'embalase'    => $transaction->embalase,
+            'embalase' => $transaction->embalase,
             'final_price' => $transaction->final_price,
-            'cart_type'   => $transaction->cart_type,
-            'remove_url'  => route('sales.removeItem', $transaction->id),
+            'cart_type' => $transaction->cart_type,
+            'remove_url' => route('sales.removeItem', $transaction->id),
         ]);
     }
     public function getCartItem($id)
@@ -654,19 +655,19 @@ class SalesController extends Controller
     public function addPatient(Request $request)
     {
         $request->validate([
-            'name'    => 'required|string|max:255',
+            'name' => 'required|string|max:255',
             'address' => 'nullable|string|max:255',
-            'phone'   => 'nullable|string|max:50',
-            'city'    => 'nullable|string|max:100',
-            'birth'   => 'nullable|date',
+            'phone' => 'nullable|string|max:50',
+            'city' => 'nullable|string|max:100',
+            'birth' => 'nullable|date',
         ]);
 
         $patient = Patients::create([
-            'name'    => $request->get('name'),
+            'name' => $request->get('name'),
             'address' => $request->get('address'),
-            'phone'   => $request->get('phone'),
-            'city'    => $request->get('city'),
-            'birth'   => $request->get('birth'),
+            'phone' => $request->get('phone'),
+            'city' => $request->get('city'),
+            'birth' => $request->get('birth'),
         ]);
 
         return response()->json([
@@ -691,17 +692,17 @@ class SalesController extends Controller
 
         $doctor = Doctors::create([
             'pharmacy_id' => "1",
-            'code'        => $code,
-            'name'        => $request->name,
-            'specialist'  => $request->specialist,
-            'address'     => $request->address,
-            'city'        => $request->city,
-            'phone'       => $request->phone,
+            'code' => $code,
+            'name' => $request->name,
+            'specialist' => $request->specialist,
+            'address' => $request->address,
+            'city' => $request->city,
+            'phone' => $request->phone,
         ]);
 
         return response()->json([
             'success' => true,
-            'doctor'  => $doctor
+            'doctor' => $doctor
         ]);
     }
 
@@ -729,7 +730,7 @@ class SalesController extends Controller
     {
         $item = ItemCart::findOrFail($request->get('id'));
         $item->update([
-            'quantity'   => $item->quantity + 1,
+            'quantity' => $item->quantity + 1,
         ]);
         return redirect()->route('sales.index');
     }
@@ -740,7 +741,7 @@ class SalesController extends Controller
             $item->delete();
         } else {
             $item->update([
-                'quantity'   => $item->quantity - 1,
+                'quantity' => $item->quantity - 1,
             ]);
         }
 
@@ -752,10 +753,10 @@ class SalesController extends Controller
         $item = MedicineCart::findOrFail($request->id);
         $item->delete();
         return response()->json([
-            'id'          => $item->id,
-            'name'        => $item->medicine->name,
+            'id' => $item->id,
+            'name' => $item->medicine->name,
             'total_price' => $item->total_price,
-            'remove_url'  => route('sales.removeItem', $item->id),
+            'remove_url' => route('sales.removeItem', $item->id),
         ]);
     }
     public function ticketPayment($url)
@@ -780,19 +781,19 @@ class SalesController extends Controller
     public function checkout(Request $request)
     {
         $validated = $request->validate([
-            'user_id'        => Auth()->user()->id,
-            'transaction_id'   => 'required|integer|',
-            'paid'             => 'required|numeric|min:0',
-            'discounsubtotalvalue'  => 'nullable|numeric|min:0',
+            'user_id' => Auth()->user()->id,
+            'transaction_id' => 'required|integer|',
+            'paid' => 'required|numeric|min:0',
+            'discounsubtotalvalue' => 'nullable|numeric|min:0',
             'totaltransaction' => 'required|numeric|min:0',
-            'changes'          => 'required|numeric|min:0',
-            'patient_id'       => 'nullable|integer|exists:patients,id',
-            'doctor_id'        => 'nullable|integer|exists:doctors,id',
-            'debtor_id'        => 'nullable|integer|exists:debtors,id',
-            'paymentType'      => 'nullable|string',
-            'bank_name'        => 'nullable|string',
-            'user_id'          => 'nullable|integer|exists:users,id',
-            'shift_logs_id'    => 'nullable|integer|exists:shift_logs,id',
+            'changes' => 'required|numeric|min:0',
+            'patient_id' => 'nullable|integer|exists:patients,id',
+            'doctor_id' => 'nullable|integer|exists:doctors,id',
+            'debtor_id' => 'nullable|integer|exists:debtors,id',
+            'paymentType' => 'nullable|string',
+            'bank_name' => 'nullable|string',
+            'user_id' => 'nullable|integer|exists:users,id',
+            'shift_logs_id' => 'nullable|integer|exists:shift_logs,id',
         ]);
 
         DB::beginTransaction();
@@ -800,10 +801,10 @@ class SalesController extends Controller
             $transaction = MedicineTransactions::findOrFail($validated['transaction_id']);
             $type = $transaction->transaction_type;
             $typeMap = [
-                'RESEP TUNAI'  => ['db' => 'RESEP TUNAI', 'param_key' => 'receipt', 'code' => '1'],
-                'KREDIT' => ['db' => 'KREDIT',      'param_key' => null,      'code' => '4'],
-                'UPDS'   => ['db' => 'UPDS',        'param_key' => 'pdu',     'code' => '2'],
-                'HV/OTC' => ['db' => 'HV/OTC',      'param_key' => 'otc',     'code' => '3'],
+                'RESEP TUNAI' => ['db' => 'RESEP TUNAI', 'param_key' => 'receipt', 'code' => '1'],
+                'KREDIT' => ['db' => 'KREDIT', 'param_key' => null, 'code' => '4'],
+                'UPDS' => ['db' => 'UPDS', 'param_key' => 'pdu', 'code' => '2'],
+                'HV/OTC' => ['db' => 'HV/OTC', 'param_key' => 'otc', 'code' => '3'],
             ];
 
 
@@ -816,30 +817,30 @@ class SalesController extends Controller
                 $transaction->load('transactions.medicine', 'patients', 'doctors');
 
                 return response()->json([
-                    'success'          => true,
-                    'print_url'        => route('sales.print', $transaction->id),
-                    'print_resep_url'  => route('salesrecipe.print', $transaction->id),
-                    'commands'         => $this->buildEscPos($transaction),
+                    'success' => true,
+                    'print_url' => route('sales.print', $transaction->id),
+                    'print_resep_url' => route('salesrecipe.print', $transaction->id),
+                    'commands' => $this->buildEscPos($transaction),
                 ]);
             }
 
             $getuserpharmacyid = User::where('id', $validated['user_id'])->first();
 
             $transaction->update([
-                'pharmacy_id'        => $getuserpharmacyid->pharmacy_id,
-                'status'             => 1,
-                'paid'               => $validated['paid'],
-                'transaction_code'   => $this->generateTransactionCode($meta['code']),
-                'discount'           => $validated['discounsubtotalvalue'],
-                'subtotal'           => $validated['totaltransaction'],
-                'changes'            => $validated['changes'],
-                'patient_id'         => $validated['patient_id'],
-                'doctor_id'          => $validated['doctor_id'],
-                'debtor_id'          => $validated['debtor_id'],
-                'payment_method'     => $validated['paymentType'],
+                'pharmacy_id' => $getuserpharmacyid->pharmacy_id,
+                'status' => 1,
+                'paid' => $validated['paid'],
+                'transaction_code' => $this->generateTransactionCode($meta['code']),
+                'discount' => $validated['discounsubtotalvalue'],
+                'subtotal' => $validated['totaltransaction'],
+                'changes' => $validated['changes'],
+                'patient_id' => $validated['patient_id'],
+                'doctor_id' => $validated['doctor_id'],
+                'debtor_id' => $validated['debtor_id'],
+                'payment_method' => $validated['paymentType'],
                 'transfer_bank_name' => $validated['bank_name'],
-                'user_id'            => $validated['user_id'],
-                'shift_logs_id'      => $validated['shift_logs_id'],
+                'user_id' => $validated['user_id'],
+                'shift_logs_id' => $validated['shift_logs_id'],
             ]);
 
             MedicineCart::where('transaction_id', $validated['transaction_id'])
@@ -851,53 +852,53 @@ class SalesController extends Controller
             $now = Carbon::now()->format('Y-m-d');
 
             foreach ($txWithItems->transactions as $cart) {
-                $medicine    = $cart->medicine;
-                $qty_before  = $medicine->stock;
+                $medicine = $cart->medicine;
+                $qty_before = $medicine->stock;
                 $medicine_id = $medicine->id;
-                $qty_bought  = $cart->quantity;
+                $qty_bought = $cart->quantity;
 
                 \Log::info('Sale debug', [
-                    'medicine_id'   => $medicine_id,
+                    'medicine_id' => $medicine_id,
                     'medicine_name' => $medicine->name,
-                    'qty_bought'    => $qty_bought,
+                    'qty_bought' => $qty_bought,
                 ]);
 
                 while ($qty_bought > 0) {
-                    $transfer = MedicineTransfers::join('batches', 'medicine_transfers.batches_id', '=', 'batches.id')
+                    $transfer = MedicineTransferItems::join('batches', 'medicine_transfer_items.batches_id', '=', 'batches.id')
                         ->where('batches.medicine_id', $medicine_id)
                         ->where('batches.pharmacy_id', auth()->user()->pharmacy_id)
-                        ->where('medicine_transfers.stock', '>', 0)
+                        ->where('medicine_transfer_items.qty', '>', 0)
                         ->orderBy('batches.expired_date', 'asc')
                         ->lockForUpdate()
-                        ->select('medicine_transfers.*')
+                        ->select('medicine_transfer_items.*')
                         ->first();
 
                     if (!$transfer) {
-                        $transfer = MedicineTransfers::join('batches', 'medicine_transfers.batches_id', '=', 'batches.id')
+                        $transfer = MedicineTransferItems::join('batches', 'medicine_transfer_items.batches_id', '=', 'batches.id')
                             ->where('batches.medicine_id', $medicine_id)
                             ->where('batches.pharmacy_id', auth()->user()->pharmacy_id)
                             ->orderBy('batches.expired_date', 'desc')
                             ->lockForUpdate()
-                            ->select('medicine_transfers.*')
+                            ->select('medicine_transfer_items.*')
                             ->first();
 
                         if (!$transfer) {
                             throw new \Exception("Stok counter tidak ditemukan untuk obat: {$medicine->name}.");
                         }
 
-                        $transfer->stock -= $qty_bought;
+                        $transfer->qty -= $qty_bought;
                         $transfer->save();
                         $qty_bought = 0;
                         break;
                     }
 
-                    if ($transfer->stock >= $qty_bought) {
-                        $transfer->stock -= $qty_bought;
+                    if ($transfer->qty >= $qty_bought) {
+                        $transfer->qty -= $qty_bought;
                         $transfer->save();
                         $qty_bought = 0;
                     } else {
-                        $qty_bought      -= $transfer->stock;
-                        $transfer->stock  = 0;
+                        $qty_bought -= $transfer->qty;
+                        $transfer->qty = 0;
                         $transfer->save();
                     }
                 }
@@ -906,17 +907,17 @@ class SalesController extends Controller
                 $medicine->save();
                 ItemsLog::create([
                     'transaction_code' => $txWithItems->transaction_code,
-                    'code'             => $this->generateItemsLogCode(),
-                    'type'             => $cart->cart_type,
-                    'medicine_id'      => $cart->medicine_id,
-                    'qty'              => $cart->quantity,
-                    'qty_before'       => $qty_before,
-                    'qty_after'        => $medicine->stock,
-                    'total'            => $cart->final_price,
-                    'date'             => $now,
-                    'status'           => 1,
-                    'batches_id'       => $transfer->batches_id,
-                    'user_id'          => auth()->user()->id,
+                    'code' => $this->generateItemsLogCode(),
+                    'type' => $cart->cart_type,
+                    'medicine_id' => $cart->medicine_id,
+                    'qty' => $cart->quantity,
+                    'qty_before' => $qty_before,
+                    'qty_after' => $medicine->stock,
+                    'total' => $cart->final_price,
+                    'date' => $now,
+                    'status' => 1,
+                    'batches_id' => $transfer->batches_id,
+                    'user_id' => auth()->user()->id,
                 ]);
             }
 
@@ -926,10 +927,10 @@ class SalesController extends Controller
             $txWithItems->load('patients', 'doctors');
 
             return response()->json([
-                'success'          => true,
-                'print_url'        => route('sales.print', $transaction->id),
-                'print_resep_url'  => route('salesrecipe.print', $transaction->id),
-                'commands'         => $this->buildEscPos($txWithItems),
+                'success' => true,
+                'print_url' => route('sales.print', $transaction->id),
+                'print_resep_url' => route('salesrecipe.print', $transaction->id),
+                'commands' => $this->buildEscPos($txWithItems),
             ]);
         } catch (ModelNotFoundException $e) {
             DB::rollBack();
@@ -941,8 +942,8 @@ class SalesController extends Controller
             DB::rollBack();
             Log::error('Checkout failed', [
                 'transaction_id' => $request->transaction_id,
-                'error'          => $e->getMessage(),
-                'trace'          => $e->getTraceAsString(),
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
             return response()->json([
                 'success' => false,
@@ -953,7 +954,7 @@ class SalesController extends Controller
     private function buildEscPos(MedicineTransactions $tx): array
     {
         $width = 32; // 58mm paper = 32 chars
-        $cmds  = [];
+        $cmds = [];
 
         $cmds[] = "\x1B\x40";
 
@@ -973,7 +974,7 @@ class SalesController extends Controller
         $cmds[] = "Bukti Pembayaran\n";
         $cmds[] = $tx->updated_at->format('d/m/Y H:i:s') . "\n";
         $cmds[] = "\n";
-        $cmds[] = "Nama   : " . ($tx->patients->name    ?? '-') . "\n";
+        $cmds[] = "Nama   : " . ($tx->patients->name ?? '-') . "\n";
         $cmds[] = "Alamat : " . ($tx->patients->address ?? '-') . "\n";
 
         $cmds[] = str_repeat('-', $width) . "\n";
@@ -984,7 +985,7 @@ class SalesController extends Controller
         foreach ($tx->transactions as $cart) {
             $cmds[] = mb_substr($cart->medicine->name, 0, $width) . "\n";
 
-            $left  = str_pad(
+            $left = str_pad(
                 $cart->quantity . ' x ' . number_format($cart->item_price, 0, ',', '.'),
                 $width - 12
             );
@@ -1001,13 +1002,13 @@ class SalesController extends Controller
 
         // ── Totals ───────────────────────────────────────────────────
         $row = fn($label, $value) =>
-        str_pad($label, $width - 12) .
+            str_pad($label, $width - 12) .
             str_pad(number_format($value, 0, ',', '.'), 12, ' ', STR_PAD_LEFT) . "\n";
 
         // Sub Total
-        $totalRawTotal  = $tx->transactions->sum('raw_total');
-        $totaldiscount  = $tx->discount ?? 0;
-        $payment        = $totalRawTotal - $totaldiscount;
+        $totalRawTotal = $tx->transactions->sum('raw_total');
+        $totaldiscount = $tx->discount ?? 0;
+        $payment = $totalRawTotal - $totaldiscount;
 
         $cmds[] = $row('Sub Total', $totalRawTotal);
         $cmds[] = $row('Discount', -$totaldiscount);
@@ -1017,7 +1018,7 @@ class SalesController extends Controller
         $cmds[] = $row('Jumlah', $payment);
         $cmds[] = "\x1B\x45\x00";
 
-        $cmds[] = $row('Bayar',     $tx->paid);
+        $cmds[] = $row('Bayar', $tx->paid);
         $cmds[] = $row('Kembalian', $tx->changes);
 
         // ── Kasir ────────────────────────────────────────────────────
@@ -1043,8 +1044,8 @@ class SalesController extends Controller
 
 
         return response()->json([
-            'success'         => true,
-            'transaction'     => $transaction,
+            'success' => true,
+            'transaction' => $transaction,
             'itemTransaction' => $itemTransaction,
         ]);
     }
@@ -1091,7 +1092,7 @@ class SalesController extends Controller
             $finalprice = $transaction->total_price + $jasaValue;
 
             $transaction->update([
-                'embalase'    => $jasaValue,
+                'embalase' => $jasaValue,
                 'final_price' => $finalprice,
             ]);
 
@@ -1129,13 +1130,13 @@ class SalesController extends Controller
         }
 
         $cart->update([
-            'quantity'     => $request->quantity,
-            'discount'     => $request->discount,
-            'package'      => $request->package,
-            'dosage_r'     => $request->dosage_r,
-            'raw_total'    => $request->raw_total,
-            'total_price'  => $request->final_price,
-            'final_price'  => $request->total_price + $cart->embalase ?? 0,
+            'quantity' => $request->quantity,
+            'discount' => $request->discount,
+            'package' => $request->package,
+            'dosage_r' => $request->dosage_r,
+            'raw_total' => $request->raw_total,
+            'total_price' => $request->final_price,
+            'final_price' => $request->total_price + $cart->embalase ?? 0,
         ]);
 
         $cart->load('medicine');
@@ -1389,9 +1390,9 @@ class SalesController extends Controller
         $result = $query->orderByDesc('created_at')->paginate($perPage);
         $typeMap = [
             'RESEP TUNAI' => 'receipt',
-            'KREDIT'      => 'kredit',
-            'UPDS'        => 'upds',
-            'HV/OTC'      => 'hv',
+            'KREDIT' => 'kredit',
+            'UPDS' => 'upds',
+            'HV/OTC' => 'hv',
         ];
         $result->getCollection()->transform(function ($row) use ($typeMap) {
 
@@ -1400,13 +1401,13 @@ class SalesController extends Controller
 
             return [
                 'transaction_id' => $row->transaction_id,
-                'code'           => $transaction?->transaction_code ?? '-',
-                'name'           => $transaction?->patients?->name ?? '-',
-                'date'           => Carbon::parse($row->created_at)->format('d-m-Y'),
-                'time'           => Carbon::parse($row->created_at)->format('H:i:s'),
-                'final_price'    => $row->final_price,
-                'status'         => $transaction?->status ?? null,
-                'type'           => $typeMap[$type] ?? strtolower($type ?? ''),
+                'code' => $transaction?->transaction_code ?? '-',
+                'name' => $transaction?->patients?->name ?? '-',
+                'date' => Carbon::parse($row->created_at)->format('d-m-Y'),
+                'time' => Carbon::parse($row->created_at)->format('H:i:s'),
+                'final_price' => $row->final_price,
+                'status' => $transaction?->status ?? null,
+                'type' => $typeMap[$type] ?? strtolower($type ?? ''),
             ];
         });
         return response()->json($result);
@@ -1421,11 +1422,11 @@ class SalesController extends Controller
             ->get()
             ->map(function ($item) {
                 return [
-                    'medicine'       => $item->medicine?->name ?? '-',
-                    'quantity'       => $item->quantity,
-                    'discount'       => $item->discount,
-                    'total_price'    => $item->total_price,
-                    'total'          => $item->final_price,
+                    'medicine' => $item->medicine?->name ?? '-',
+                    'quantity' => $item->quantity,
+                    'discount' => $item->discount,
+                    'total_price' => $item->total_price,
+                    'total' => $item->final_price,
                 ];
             });
 

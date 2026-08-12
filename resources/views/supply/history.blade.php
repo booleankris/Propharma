@@ -252,10 +252,9 @@
 
                                 <button type="button" id="searchButton"
                                     class="flex items-center justify-center gap-1.5 h-[38px] px-5 shrink-0 rounded-lg bg-[#1678df] text-white text-[12px] font-bold font-['Montserrat'] hover:bg-blue-600 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-300">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
-                                        viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-                                        stroke-linecap="round" stroke-linejoin="round"
-                                        class="icon icon-tabler icon-tabler-search">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                                        stroke-linejoin="round" class="icon icon-tabler icon-tabler-search">
                                         <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
                                         <path d="M3 10a7 7 0 1 0 14 0a7 7 0 1 0 -14 0"></path>
                                         <path d="M21 21l-6 -6"></path>
@@ -371,8 +370,8 @@
                             <div
                                 class="flex items-center px-3 py-2.5 sm:px-5 sm:py-3 bg-white border border-slate-100 rounded-[60px] shadow-[0_1px_10px_1px_#347ef52e] hover:shadow-md transition-shadow duration-200">
                                 <div class="p-1.5 rounded-xl bg-purple-50 text-purple-600 flex-shrink-0">
-                                    <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-                                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                        stroke="currentColor" stroke-width="2" stroke-linecap="round"
                                         stroke-linejoin="round"
                                         class="icon icon-tabler icons-tabler-outline icon-tabler-package">
                                         <path stroke="none" d="M0 0h24v24H0z" fill="none" />
@@ -395,7 +394,7 @@
                     </div>
 
                     <div class="overflow-x-auto p-3">
-                        <table id="orderItemsTable" class="min-w-full text-sm text-left text-gray-600">
+                        <table id="orderItemsTable" class="min-w-full text-[10px] text-left text-gray-600">
                             <thead class="bg-gray-100 text-gray-700 uppercase text-xs">
                                 <tr>
                                     <th class="px-4 py-3">#</th>
@@ -448,11 +447,11 @@
         let searchRequestId = 0;
         let searchAbortController = null;
 
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             flatpickr("#dateRange", {
                 mode: "range",
                 dateFormat: "Y-m-d",
-                onClose: function(selectedDates, dateStr) {
+                onClose: function (selectedDates, dateStr) {
                     if (selectedDates.length === 2) {
                         startDate = flatpickr.formatDate(selectedDates[0], "Y-m-d");
                         endDate = flatpickr.formatDate(selectedDates[1], "Y-m-d");
@@ -469,56 +468,56 @@
                 serverSide: true,
                 ajax: {
                     url: "{{ route('supplies.getSupplies') }}",
-                    data: function(d) {
+                    data: function (d) {
                         d.searchMedicine = searchMedicine;
                         d.start_date = startDate;
                         d.end_date = endDate;
                     }
                 },
                 columns: [{
-                        data: 'DT_RowIndex',
-                        orderable: false,
-                        searchable: false
-                    },
-                    {
-                        data: 'date'
-                    },
-                    {
-                        data: 'transaction_code'
-                    },
-                    {
-                        data: 'medicine_name'
-                    },
+                    data: 'DT_RowIndex',
+                    orderable: false,
+                    searchable: false
+                },
+                {
+                    data: 'date'
+                },
+                {
+                    data: 'transaction_code'
+                },
+                {
+                    data: 'medicine_name'
+                },
 
-                    {
-                        data: 'type'
-                    },
-                    {
-                        data: 'status'
-                    },
+                {
+                    data: 'type'
+                },
+                {
+                    data: 'status'
+                },
 
-                    {
-                        data: 'qty_before'
-                    },
-                    {
-                        data: 'stock'
-                    },
-                    {
-                        data: 'qty_after'
-                    },
-                    {
-                        data: 'supply'
-                    },
-                    {
-                        data: 'name'
-                    },
+                {
+                    data: 'qty_before'
+                },
+                {
+                    data: 'stock'
+                },
+                {
+                    data: 'qty_after'
+                },
+                {
+                    data: 'supply'
+                },
+                {
+                    data: 'name'
+                },
 
                 ],
                 paging: true,
                 searching: false,
                 info: false,
             });
-            orderItemsTable.on('xhr.dt', function(e, settings, json, xhr) {
+            orderItemsTable.on('xhr.dt', function (e, settings, json, xhr) {
                 if (json && json.stats) {
                     updateStatCard('stat-before', json.stats.stat_before);
                     updateStatCard('stat-bought', json.stats.stat_bought);
@@ -577,8 +576,8 @@
             loading = true;
 
             fetch(`{{ route('sales.searchmedicine') }}?search=${encodeURIComponent(thisKeyword)}&page=${thisPage}`, {
-                    signal: searchAbortController.signal
-                })
+                signal: searchAbortController.signal
+            })
                 .then(res => res.json())
                 .then(res => {
 
@@ -588,9 +587,9 @@
 
                     if (thisPage === 1 && res.data.length === 0) {
                         tbody.innerHTML = `
-                    <tr>
-                        <td colspan="4" class="empty-row">No data found</td>
-                    </tr>`;
+                        <tr>
+                            <td colspan="4" class="empty-row">No data found</td>
+                        </tr>`;
                         hasMore = false;
                         document.getElementById('searchDropdown').style.display = 'block';
                         return;
@@ -598,13 +597,13 @@
 
                     res.data.forEach((item, index) => {
                         tbody.insertAdjacentHTML('beforeend', `
-                    <tr data-item='${JSON.stringify(item)}' tabindex="0">
-                        <td>${((thisPage - 1) * res.per_page) + index + 1}</td>
-                        <td>${item.code ?? '-'}</td>
-                        <td>${item.name ?? '-'}</td>
-                        <td>${item.total ?? '-'}</td>
-                    </tr>
-                `);
+                        <tr data-item='${JSON.stringify(item)}' tabindex="0">
+                            <td>${((thisPage - 1) * res.per_page) + index + 1}</td>
+                            <td>${item.code ?? '-'}</td>
+                            <td>${item.name ?? '-'}</td>
+                            <td>${item.total ?? '-'}</td>
+                        </tr>
+                    `);
                     });
 
                     hasMore = res.current_page < res.last_page;
@@ -641,7 +640,7 @@
             document.getElementById('searchButton').focus();
         }
         // --- NAVIGATION & ENTER KEY LOGIC ---
-        document.addEventListener('keydown', function(e) {
+        document.addEventListener('keydown', function (e) {
             const dropdown = document.getElementById('searchDropdown');
             const isDropdownVisible = dropdown && dropdown.style.display === 'block';
 
@@ -691,7 +690,7 @@
         }
 
         // --- MOUSE EVENTS FOR DROPDOWN ---
-        document.getElementById('searchResults').addEventListener('mouseover', function(e) {
+        document.getElementById('searchResults').addEventListener('mouseover', function (e) {
             const row = e.target.closest('tr');
             if (!row) return;
 
@@ -702,7 +701,7 @@
             activeIndex = rows.indexOf(row);
         });
 
-        document.getElementById('searchResults').addEventListener('click', function(e) {
+        document.getElementById('searchResults').addEventListener('click', function (e) {
             const row = e.target.closest('tr');
             if (row) {
                 selectRow(row);
@@ -710,7 +709,7 @@
             }
         });
 
-        document.addEventListener('click', function(event) {
+        document.addEventListener('click', function (event) {
             const dropdown = document.getElementById('searchDropdown');
             const searchInput = document.getElementById('searchInput');
 
@@ -724,7 +723,7 @@
         // --- THE ONLY PLACE THE TABLE RELOADS ---
         const searchBtn = document.getElementById('searchButton');
 
-        searchBtn.addEventListener('click', function() {
+        searchBtn.addEventListener('click', function () {
             const searchInputVal = document.getElementById('searchInput').value.trim();
 
             if (!searchInputVal) {
@@ -737,7 +736,7 @@
             document.getElementById('searchDropdown').style.display = 'none';
         });
 
-        searchBtn.addEventListener('keydown', function(e) {
+        searchBtn.addEventListener('keydown', function (e) {
             if (e.key === 'Enter') {
                 e.preventDefault();
 
@@ -753,11 +752,11 @@
             }
         });
 
-        $('#back').click(function() {
+        $('#back').click(function () {
             window.location.href = "{{ route('home') }}";
         });
 
-        $('#back').click(function() {
+        $('#back').click(function () {
             if (form) form.reset();
             $('#patient_id').val('');
             $('#table-data tbody tr').removeClass('bg-blue-100');

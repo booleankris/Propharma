@@ -10,24 +10,24 @@ class MedicineTransfers extends Model
     use HasFactory;
     protected $table = 'medicine_transfers';
     protected $fillable = [
-        'batches_id',
         'code',
-        'stock',
+        'user_id',
         'status',
-        'etalases_id',
-        'pharmacy_id',
-        'user_id'
     ];
     public function batches()
     {
         return $this->belongsTo(Batches::class, 'batches_id', 'id');
     }
-    public function users()
-    {
-        return $this->belongsTo(User::class, 'user_id', 'id');
-    }
     public function etalases()
     {
         return $this->belongsTo(Etalases::class, 'etalases_id', 'id');
+    }
+    public function items()
+    {
+        return $this->hasMany(MedicineTransferItems::class, 'medicine_transfer_id');
+    }
+    public function users()
+    {
+        return $this->belongsTo(User::class, 'user_id');
     }
 }

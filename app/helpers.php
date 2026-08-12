@@ -91,3 +91,99 @@ if (!function_exists('currentShift')) {
         return activeShift()?->shift; // null-safe
     }
 }
+
+if (!function_exists('terbilang')) {
+    /**
+     * Convert a number into its Indonesian word representation.
+     * e.g. terbilang(150) => "seratus lima puluh"
+     *
+     * @param  int|float $number
+     * @return string
+     */
+    function terbilang(int|float $number): string
+    {
+        $number = (int) abs($number);
+
+        if ($number === 0) {
+            return 'nol';
+        }
+
+        $words = ['', 'satu', 'dua', 'tiga', 'empat', 'lima',
+                  'enam', 'tujuh', 'delapan', 'sembilan', 'sepuluh',
+                  'sebelas'];
+
+        if ($number < 12) {
+            return $words[$number];
+        }
+
+        if ($number < 20) {
+            return terbilang($number - 10) . ' belas';
+        }
+
+        if ($number < 100) {
+            $quotient  = intdiv($number, 10);
+            $remainder = $number % 10;
+            $result    = $words[$quotient] . ' puluh';
+            if ($remainder > 0) {
+                $result .= ' ' . terbilang($remainder);
+            }
+            return $result;
+        }
+
+        if ($number < 200) {
+            $remainder = $number - 100;
+            $result    = 'seratus';
+            if ($remainder > 0) {
+                $result .= ' ' . terbilang($remainder);
+            }
+            return $result;
+        }
+
+        if ($number < 1000) {
+            $quotient  = intdiv($number, 100);
+            $remainder = $number % 100;
+            $result    = $words[$quotient] . ' ratus';
+            if ($remainder > 0) {
+                $result .= ' ' . terbilang($remainder);
+            }
+            return $result;
+        }
+
+        if ($number < 2000) {
+            $remainder = $number - 1000;
+            $result    = 'seribu';
+            if ($remainder > 0) {
+                $result .= ' ' . terbilang($remainder);
+            }
+            return $result;
+        }
+
+        if ($number < 1_000_000) {
+            $quotient  = intdiv($number, 1000);
+            $remainder = $number % 1000;
+            $result    = terbilang($quotient) . ' ribu';
+            if ($remainder > 0) {
+                $result .= ' ' . terbilang($remainder);
+            }
+            return $result;
+        }
+
+        if ($number < 1_000_000_000) {
+            $quotient  = intdiv($number, 1_000_000);
+            $remainder = $number % 1_000_000;
+            $result    = terbilang($quotient) . ' juta';
+            if ($remainder > 0) {
+                $result .= ' ' . terbilang($remainder);
+            }
+            return $result;
+        }
+
+        $quotient  = intdiv($number, 1_000_000_000);
+        $remainder = $number % 1_000_000_000;
+        $result    = terbilang($quotient) . ' miliar';
+        if ($remainder > 0) {
+            $result .= ' ' . terbilang($remainder);
+        }
+        return $result;
+    }
+}

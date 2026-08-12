@@ -8,6 +8,7 @@ use App\Models\ItemsLog;
 use App\Models\MedicineCart;
 use App\Models\Medicines;
 use App\Models\MedicineTransfers;
+use App\Models\MedicineTransferItems;
 use App\Models\MedicineTransactions;
 use App\Models\Receiving;
 use App\Models\ReceivingItems;
@@ -309,14 +310,14 @@ class ReturController extends Controller
     {
         $medicine_id = $request->medicine_id;
 
-        $transfers = MedicineTransfers::join('batches', 'medicine_transfers.batches_id', '=', 'batches.id')
-            ->join('etalases', 'medicine_transfers.etalases_id', '=', 'etalases.id')
+        $transfers = MedicineTransferItems::join('batches', 'medicine_transfer_items.batches_id', '=', 'batches.id')
+            ->join('etalases', 'medicine_transfer_items.etalases_id', '=', 'etalases.id')
             ->where('batches.medicine_id', $medicine_id)
             ->where('pharmacy_id', auth()->user()->pharmacy_id)
             ->orderBy('batches.expired_date', 'asc') // FEFO
             ->select(
-                'medicine_transfers.id as transfer_id',
-                'medicine_transfers.stock as counter_stock',
+                'medicine_transfer_items.id as transfer_id',
+                'medicine_transfer_items.qty as counter_stock',
                 'batches.id as batch_id',
                 'batches.name as batch_name',
                 'batches.expired_date',

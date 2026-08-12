@@ -189,390 +189,466 @@
 @endsection
 
 @section('content')
-    <section class="section px-4">
-        <div class="section-body">
-            {{-- <div class="flex flex-col lg:flex-row gap-4">
+    <section class="section py-4 px-[18px] bg-gray-50 min-h-screen pb-28">
+        <div class="mx-auto space-y-6">
 
-                <div class="card w-full md:w-[65%] shadow-md rounded-2xl p-6 bg-white">
-                    <div class="flex items-center mb-6">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-blue-600 mr-3 drop-shadow-md"
-                            fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" />
-                        </svg>
-                        <h2 class="text-2xl font-bold text-gray-800 drop-shadow-sm">Retur Penjualan</h2>
-                    </div>
+            <!-- HEADER HALAMAN -->
+            <div class="flex items-center justify-between bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                <div>
+                    <h1 class="text-2xl font-bold uppercase font-poppins text-gray-800">Penerimaan Barang</h1>
+                    <p class="text-xs text-gray-500 mt-1">Kelola penerimaan obat dari kreditur dan input detail faktur</p>
+                </div>
+                <span
+                    class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">
+                    Penerimaan Baru
+                </span>
+            </div>
 
-                    <div class="overflow-x-auto p-3">
-                        <table id="table-data" class="min-w-full text-sm text-left text-gray-600">
-                            <thead class="bg-gray-100 text-gray-700 uppercase text-xs">
-                                <tr>
-                                    <th class="px-4 py-3">#</th>
-                                    <th class="px-4 py-3">Tanggal</th>
-                                    <th class="px-4 py-3">Nomor</th>
-                                    <th class="px-4 py-3">Nama Pelanggan/Pasien</th>
-                                    <th class="px-4 py-3">Harga</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-100"></tbody>
-                        </table>
-                    </div>
+            <!-- BLOK 1: INFORMASI FAKTUR & SUPPLIER -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 space-y-4">
+                <div class="flex items-center justify-between border-b border-gray-100 pb-3">
+                    <h2 class="text-base font-semibold text-gray-800 flex items-center gap-2">
+                        <span
+                            class="flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-600 text-xs font-bold">1</span>
+                        Informasi Faktur & Supplier
+                    </h2>
+                    <span class="text-xs text-gray-400">* Wajib diisi sebelum konfirmasi item</span>
                 </div>
 
-                <div class="bg-white p-6 rounded-2xl shadow-md w-full md:w-[50%] mx-auto">
-                    <table id="items-table" class="table table-bordered w-full mt-4">
-                        <thead>
-                            <tr>
-                                <th>No</th>
-                                <th>Medicine</th>
-                                <th>Qty</th>
-                                <th>Harga</th>
-                                <th>Disc</th>
-                                <th>Total</th>
-                            </tr>
-                        </thead>
-                    </table>
+                <!-- Grid Form Informasi Utama -->
+                <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
 
-                </div>
+                    <!-- Cari Kreditur -->
+                    <div class="lg:col-span-2">
+                        <label for="creditor" class="block text-xs font-semibold text-gray-700 mb-1">
+                            Cari Kreditur <span class="text-red-500">*</span>
+                        </label>
+                        <select autofocus id="creditor" name="creditor_id"
+                            class="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all">
+                            <option value="" required>---- Pilih Kreditur ----</option>
+                            @foreach ($creditorOption as $creditor)
+                                <option value="{{ $creditor->code }}" required>{{ $creditor->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
 
-            </div> --}}
-            <div class="relative w-full p-[24px] bg-[#ffffff] rounded-[22px]">
-                <div id="searchWrapper" class="flex gap-5" style="position: relative; width: 100%;">
-                    <div class="w-11/12">
-                        <div class="flex items-end justify-between md:block">
-                            <h1 class="text-2xl font-semibold tracking-tight font-poppins text-[#1c1c1c]">Penerimaan
-                            </h1>
-                        </div>
-                        <div class="flex flex-wrap py-2 gap-1">
+                    <!-- Tanggal Terima (Readonly) -->
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 mb-1">Tanggal Terima</label>
+                        <input type="text" id="returdate" readonly value="{{ $now }}"
+                            onkeyup="SearchBPBA(this.value)" autocomplete="off"
+                            class="w-full rounded-xl border border-gray-200 bg-gray-100 px-3.5 py-2.5 text-xs text-gray-500 cursor-not-allowed">
+                    </div>
 
-                            <div>
-                                <div class="py-1 text-[13px] font-bold" for="returnumber">Cari Kreditur</div>
-                                <select autofocus id="creditor" name="creditor_id"
-                                    class="w-full rounded-lg border border-gray-300  text-center py-[12.4px] !px-20 text-[13px] focus:ring-2 focus:ring-blue-200"
-                                    placeholder="Jumlah">
-                                    <option value="" required>---- Pilih Kreditur ----</option>
-                                    @foreach ($creditorOption as $creditor)
-                                        <option value="{{ $creditor->code }}" required>{{ $creditor->name }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
+                    <!-- Nomor Terima (Readonly) -->
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 mb-1">Nomor Terima</label>
+                        <input type="text" id="returnumber" name="receiving_number" readonly
+                            value="(Otomatis saat simpan faktur)" autocomplete="off"
+                            class="w-full rounded-xl border border-gray-200 bg-gray-100 px-3.5 py-2.5 text-xs text-gray-500 cursor-not-allowed font-mono italic">
+                    </div>
 
-                            <div>
-                                <div class="py-1 text-[13px] font-bold">Tanggal Terima</div>
-                                <input type="text" id="returdate"
-                                    class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
-                                    placeholder="" value="{{ $now }}" readonly onkeyup="SearchBPBA(this.value)"
-                                    autocomplete="off">
-                            </div>
-                            <div>
-                                <div class="py-1 text-[13px] font-bold" for="returnumber">Nomor Terima</div>
-                                <input type="text" id="returnumber" name="receiving_number"
-                                    class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
-                                    placeholder="" value="{{ $receiving_code }}" readonly onkeyup="SearchBPBA(this.value)"
-                                    autocomplete="off">
-                            </div>
+                    <!-- Nomor BPBA -->
+                    <div class="relative">
+                        <label for="searchInput" class="block text-xs font-semibold text-gray-700 mb-1">Cari Nomor
+                            BPBA</label>
+                        <input type="text" id="searchInput" autofocus readonly placeholder="Cari Nomor BPBA..."
+                            oninput="SearchBPBA(this.value)" autocomplete="off"
+                            class="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
 
-                            <div>
-                                <div class="py-1 text-[13px] font-bold" for="returnumber">Nomor BPBA</div>
-                                <input type="text" id="searchInput" autofocus
-                                    class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
-                                    placeholder="Cari Nomor BPBA..." oninput="SearchBPBA(this.value)" readonly
-                                    autocomplete="off">
-                            </div>
-                            <div class="">
-                                <div class="py-1 text-[13px] font-bold">Jenis Bayar</div>
-                                <select id="invoice_payment" name="invoice_payment"
-                                    class="select2 w-full rounded-lg border border-gray-300 px-12 py-2.5 text-[13px]">
-                                    <option value="">-- Pilih Pembayaran --</option>
-                                    <option value="KREDIT">Kredit</option>
-                                    <option value="TUNAI">Tunai</option>
-                                    <option value="KONSINYASI">Konsinyasi</option>
-
-                                </select>
-                            </div>
-
-                        </div>
-
-
-                        <div id="searchDropdown" class="dropdown-table" style="display:none;">
-                            <table class="table table-sm table-bordered mb-0">
-                                <thead>
+                        <!-- Search Dropdown Table -->
+                        <div id="searchDropdown"
+                            class="dropdown-table absolute left-0 top-full mt-1 w-full z-50 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden"
+                            style="display:none;">
+                            <table class="table table-sm table-bordered mb-0 w-full text-xs">
+                                <thead class="bg-gray-50">
                                     <tr>
-                                        <th>#</th>
-                                        <th>Code</th>
+                                        <th class="p-2 border-b text-left">#</th>
+                                        <th class="p-2 border-b text-left">Code</th>
                                     </tr>
                                 </thead>
                             </table>
-                            <!-- scroll container -->
-                            <div id="tableScroll" style="max-height: 250px; overflow-y: auto;" onscroll="handleScroll()">
-                                <table class="table table-sm table-bordered mb-0">
+                            <div id="tableScroll" style="max-height: 200px; overflow-y: auto;" onscroll="handleScroll()">
+                                <table class="table table-sm table-bordered mb-0 w-full text-xs">
                                     <tbody id="searchResults"></tbody>
                                 </table>
                             </div>
                         </div>
-                        <div class="flex flex-wrap items-center gap-3 py-2 w-full">
-                            <div class="flex-1 min-w-[200px]">
-                                <div class="py-1 text-[13px] font-bold">Nomor Faktur</div>
-                                <input id="invoice_number" value="{{ $transaction->invoice_number }}" name="invoice_number"
-                                    class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
-                                    placeholder="Jumlah">
-                            </div>
-                            <div class="w-full sm:w-40">
-                                <div class="py-1 text-[13px] font-bold">Tanggal Faktur</div>
-                                <input id="invoice_date" type="date" name="invoice_date"
-                                    value="{{ $transaction->invoice_date ? \Carbon\Carbon::createFromFormat('d/m/Y', $transaction->invoice_date)->format('Y-m-d') : \Carbon\Carbon::now()->format('Y-m-d') }}"
-                                    class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
-                                    placeholder="Tanggal Faktur">
-                            </div>
-                            <div class="flex-1 min-w-[200px]">
-                                <div class="py-1 text-[13px] font-bold">Waktu Kredit (Hari)</div>
-                                <input id="invoice_times" type="number" value="{{ $transaction->invoice_times }}"
-                                    oninput="count_due()" name="invoice_times"
-                                    class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
-                                    placeholder="Jumlah">
-                            </div>
-                            <div class="flex-1 min-w-[200px]">
-                                <div class="py-1 text-[13px] font-bold">Jatuh Tempo</div>
-                                <input id="invoice_due" readonly name="invoice_due" value="{{ $transaction->invoice_due }}"
-                                    type="date"
-                                    class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
-                                    placeholder="Jumlah">
-                            </div>
-                            <div class="w-full sm:w-40">
-                                <div class="py-1 text-[13px] font-bold">Jenis PPN</div>
-                                <select id="invoice_ppn" name="invoice_ppn"
-                                    class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
-                                    placeholder="PPN">
-
-                                    <option value="INCLUDE">Include
-                                    </option>
-                                    <option value="EXCLUDE">Exclude
-                                    </option>
-                                    <option value="TANPA">Tanpa
-                                    </option>
-                                </select>
-                            </div>
-                        </div>
-                        <form method="post" id="checkout_detail" action="{{ route('orders.addItemOrder') }}">
-                            @csrf
-
-                            <div class="flex flex-wrap gap-3 py-2 w-full">
-                                {{-- <input type="hidden" name="medicine_id">
-                                <input type="hidden" name="order_id">
-                                <input type="hidden" name="transaction_id">
-                                <input type="hidden" name="total_price">
-                                <input type="hidden" name="total_qty"> --}}
-                                <div class="hidden">
-                                    <input type="text" id="receiving_items_id">
-                                </div>
-                                <div class="hidden">
-                                    <input type="text" id="receiving_details_id">
-                                </div>
-                                <div class="w-full sm:w-40">
-                                    <div class="py-1 text-[13px] font-bold">Kode Obat</div>
-                                    <input id="medicine_code" type="text" readonly
-                                        class="w-full rounded-lg border bg-[#eaeaea] border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
-                                        placeholder="Kode Obat">
-                                </div>
-
-                                <div class="flex-1 min-w-[200px]">
-                                    <div class="py-1 text-[13px] font-bold">Nama Obat</div>
-                                    <input id="medicine_name" type="text" readonly
-                                        class="w-full rounded-lg border bg-[#eaeaea] border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
-                                        placeholder="Nama Obat">
-                                </div>
-
-                                <div class="w-full sm:w-32">
-                                    <div class="py-1 text-[13px] font-bold">Satuan</div>
-                                    <input id="unit" type="text" readonly
-                                        class="w-full rounded-lg border bg-[#eaeaea] border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
-                                        placeholder="Satuan">
-                                </div>
-                            </div>
-
-                            <div class="flex flex-wrap items-center gap-3 py-2 w-full">
-                                <div class="w-full sm:w-32">
-                                    <div class="py-1 text-[13px] font-bold">Kemasan</div>
-                                    <label class="flex items-center gap-2 mt-2">
-                                        <input type="checkbox" disabled id="pack" name="is_active"
-                                            class="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                                        <span class="text-sm">Utuh</span>
-                                    </label>
-                                </div>
-
-                                <div class="w-full sm:w-40">
-                                    <div class="py-1 text-[13px] font-bold">QTY Beli</div>
-                                    <input id="qty" type="number" readonly name="qty"
-                                        class="w-full rounded-lg border bg-[#eaeaea] border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
-                                        placeholder="QTY Retur" oninput="counttotal()">
-                                </div>
-                                <div class="w-full sm:w-40">
-                                    <div class="py-1 text-[13px] font-bold">QTY Diterima</div>
-                                    <input id="qty_received" type="number" name="qty_received"
-                                        class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
-                                        placeholder="QTY Diterima" oninput="counttotalreceived()">
-                                </div>
-                                <div class="w-full sm:w-40">
-                                    <div class="py-1 text-[13px] font-bold">Isi Obat</div>
-                                    <input id="content" type="text" readonly
-                                        class="w-full rounded-lg border bg-[#eaeaea] border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
-                                        placeholder="Isi Obat">
-                                </div>
-
-                                <div class="w-full sm:w-40">
-                                    <div class="py-1 text-[13px] font-bold">Hrg HNA</div>
-                                    <input id="item_price" type="text" readonly
-                                        class="w-full rounded-lg border bg-[#eaeaea] border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
-                                        placeholder="Harga Satuan">
-                                </div>
-
-                                <div class="w-full sm:w-40">
-                                    <div class="py-1 text-[13px] font-bold">Batch</div>
-                                    <input id="batch" name="batch" type="text"
-                                        class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
-                                        placeholder="Batch">
-                                </div>
-
-                                <div class="w-full sm:w-40">
-                                    <div class="py-1 text-[13px] font-bold">Diskon</div>
-                                    <input id="discount" value="0" type="number"
-                                        class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
-                                        placeholder="Diskon">
-                                </div>
-                                <div class="w-full sm:w-40">
-                                    <div class="py-1 text-[13px] font-bold">Ekstra Diskon</div>
-                                    <input id="extra_discount" value="0" type="number" required value="0"
-                                        class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
-                                        placeholder="Extra Diskon">
-                                </div>
-                                <div class="w-[10%]">
-                                    <div class="py-1 text-[13px] font-bold">Exp Date</div>
-                                    <input id="expired_date" type="date" name="expired_date"
-                                        class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
-                                        placeholder="Tanggal Faktur">
-                                </div>
-                                <div class="flex-1 w-[40%] min-w-[200px]">
-                                    <div class="py-1 text-[13px] font-bold">Jumlah</div>
-                                    <input id="total_price" type="text" readonly name="total_price"
-                                        class="w-full rounded-lg border bg-[#eaeaea] border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
-                                        placeholder="Jumlah">
-                                </div>
-                                <div class="w-[20%]">
-                                    <div class="py-1 text-[13px] font-bold">Status Barang</div>
-                                    <input id="status" name="status" type="text"
-                                        class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
-                                        placeholder="Status Barang">
-                                </div>
-                                <div class="flex flex-wrap w-full gap-3">
-
-                                    <div class="w-[20%] hidden">
-                                        <div class="py-1 text-[13px] font-bold">Etalase</div>
-                                        <select id="items" name="etalase" required
-                                            class="select2 w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px]">
-                                            <option value="">-- Pilih Etalase --</option>
-
-                                        </select>
-                                    </div>
-
-                                    <div class="w-[20%] hidden">
-                                        <div class="py-1 text-[13px] font-bold">Lokasi</div>
-                                        <select name="location"
-                                            class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px"
-                                            id="location">
-                                            <option value="">-- Pilih Lokasi --</option>
-
-                                        </select>
-                                    </div>
-
-
-                                </div>
-
-
-                                <div class="flex gap-3 mt-4">
-                                    <button onclick="addItem()" type="button"
-                                        class="btn btn-pharma !bg-[#2196F3] btn-lg">Konfirmasi
-                                    </button>
-                                    <button onclick="resetInputs()" type="button" id="back"
-                                        class="btn btn-pharma !bg-[#b72929] btn-lg">
-                                        Reset
-                                    </button>
-                                </div>
-                            </div>
-                        </form>
-
                     </div>
+
+                    <!-- Nomor Faktur -->
+                    <div>
+                        <label for="invoice_number" class="block text-xs font-semibold text-gray-700 mb-1">Nomor Faktur
+                            <span class="text-red-500">*</span></label>
+                        <input id="invoice_number" name="invoice_number" value="{{ $transaction->invoice_number }}"
+                            placeholder="Nomor Faktur"
+                            class="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+
+                    <!-- Tanggal Faktur -->
+                    <div>
+                        <label for="invoice_date" class="block text-xs font-semibold text-gray-700 mb-1">Tanggal
+                            Faktur</label>
+                        <input id="invoice_date" type="date" name="invoice_date"
+                            value="{{ $transaction->invoice_date ? \Carbon\Carbon::createFromFormat('d/m/Y', $transaction->invoice_date)->format('Y-m-d') : \Carbon\Carbon::now()->format('Y-m-d') }}"
+                            class="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+
+                    <!-- Jenis Bayar -->
+                    <div>
+                        <label for="invoice_payment" class="block text-xs font-semibold text-gray-700 mb-1">Jenis
+                            Bayar</label>
+                        <select id="invoice_payment" name="invoice_payment"
+                            class="select2 w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            <option value="">-- Pilih --</option>
+                            <option value="KREDIT">Kredit</option>
+                            <option value="TUNAI">Tunai</option>
+                            <option value="KONSINYASI">Konsinyasi</option>
+                        </select>
+                    </div>
+
+                    <!-- Waktu Kredit (Hari) -->
+                    <div>
+                        <label for="invoice_times" class="block text-xs font-semibold text-gray-700 mb-1">Tempo
+                            (Hari)</label>
+                        <input id="invoice_times" type="number" value="{{ $transaction->invoice_times }}"
+                            oninput="count_due()" name="invoice_times" placeholder="0"
+                            class="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+
+                    <!-- Jatuh Tempo (Readonly) -->
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 mb-1">Tgl Jatuh Tempo</label>
+                        <input id="invoice_due" readonly name="invoice_due" value="{{ $transaction->invoice_due }}"
+                            type="date"
+                            class="w-full rounded-xl border border-gray-200 bg-gray-100 px-3.5 py-2.5 text-xs text-gray-500 cursor-not-allowed">
+                    </div>
+
+                    <!-- Jenis PPN -->
+                    <div>
+                        <label for="invoice_ppn" class="block text-xs font-semibold text-gray-700 mb-1">Jenis PPN</label>
+                        <select id="invoice_ppn" name="invoice_ppn"
+                            class="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            <option value="INCLUDE">Include</option>
+                            <option value="EXCLUDE">Exclude</option>
+                            <option value="TANPA">Tanpa</option>
+                        </select>
+                    </div>
+
+                    <!-- Cetak SP PBF Ini -->
+                    <div class="flex items-end">
+                        <button type="button" onclick="printSPBCreditor()"
+                            class="inline-flex items-center gap-1.5 px-4 py-2.5 text-[12px] font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm transition-all duration-150">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                            Cetak SP PBF Ini
+                        </button>
+                    </div>
+
                 </div>
             </div>
-            <div class="mt-3 relative w-full p-[24px] bg-[#ffffff] rounded-[22px]">
-                <div class="flex flex-wrap items-center gap-3">
-                    <button onclick="completeOrder()"
-                        class="inline-flex items-center gap-2 rounded-lg btn-pharma !bg-blue-600 !shadow-[0_2px_6px_#2563eb] px-6 py-4 text-sm font-xl text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            class="w-5 h-5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-                            <polyline points="17 21 17 13 7 13 7 21" />
-                            <polyline points="7 3 7 8 15 8" />
-                        </svg>
-                        Simpan
-                    </button>
 
-                    <button onclick="printReceiving()"
-                        class="inline-flex items-center gap-2 rounded-lg btn-pharma !bg-gray-700 !shadow-[0_2px_6px_#374151] px-6 py-4 text-sm font-xl text-white hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 space-y-4">
+
+                <!-- Baris Tombol Aksi Utama -->
+                <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-4">
+                    <h2 class="text-base font-semibold text-gray-800 flex items-center gap-2">
+                        Pilih Item Yang Diterima
+                    </h2>
+                </div>
+
+                <!-- Tabel Produk Responsive -->
+                <div class="overflow-x-auto rounded-xl border border-gray-200">
+                    <table id="orderItemsTable" class="w-full text-left text-xs text-gray-700">
+                        <thead
+                            class="bg-gray-50 text-[11px] uppercase font-semibold text-gray-600 border-b border-gray-200">
+                            <tr>
+                                <th class="px-4 py-3">Nama Obat</th>
+                                <th class="px-3 py-3 text-center">QTY Beli</th>
+                                <th class="px-3 py-3 text-center">QTY Diterima</th>
+                                <th class="px-4 py-3 text-right">HNA</th>
+                                <th class="px-4 py-3 text-right">Harga PPN</th>
+                                <th class="px-3 py-3 text-center">Diskon</th>
+                                <th class="px-3 py-3 text-center">Extra Diskon</th>
+                                <th class="px-3 py-3">Lokasi</th>
+                                <th class="px-4 py-3 text-right">Total</th>
+                                <th class="px-3 py-3 text-center">Status</th>
+                                <th class="px-3 py-3 text-center">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 bg-white text-[12px]">
+                            <!-- Content via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <!-- BLOK 2: INPUT ITEM OBAT (ZONA INPUT AKTIF) -->
+            <div class="bg-blue-50/40 p-6 rounded-2xl shadow-sm border border-blue-200 space-y-4">
+                <div class="flex items-center justify-between border-b border-blue-100 pb-3">
+                    <h2 class="text-base font-semibold text-blue-900 flex items-center gap-2">
+                        <span
+                            class="flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">2</span>
+                        Input Detail Item Obat
+                    </h2>
+                    <span class="text-xs bg-blue-100 text-blue-800 font-medium px-2.5 py-1 rounded-md">Isi parameter item
+                        lalu klik Konfirmasi</span>
+                </div>
+
+                <form method="post" id="checkout_detail" action="{{ route('orders.addItemOrder') }}" class="space-y-4">
+                    @csrf
+                    <div class="hidden">
+                        <input type="text" id="receiving_items_id">
+                        <input type="text" id="receiving_details_id">
+                    </div>
+
+                    <!-- Sub-bagian A: Informasi Referensi Obat (Auto-filled / Readonly) -->
+                    <div class="bg-white p-4 rounded-xl border border-blue-100 space-y-2">
+                        <span class="text-[11px] font-bold tracking-wider uppercase text-gray-400">Data Referensi Obat
+                            (Otomatis)</span>
+                        <div class="grid grid-cols-1 md:grid-cols-6 gap-3">
+                            <div>
+                                <label class="block text-[11px] text-gray-500 mb-1">Kode Obat</label>
+                                <input id="medicine_code" type="text" readonly placeholder="-"
+                                    class="w-full rounded-lg bg-gray-100 border border-gray-200 px-3 py-2 text-xs text-gray-600 font-mono">
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="block text-[11px] text-gray-500 mb-1">Nama Obat</label>
+                                <input id="medicine_name" type="text" readonly placeholder="Pilih obat dari daftar..."
+                                    class="w-full rounded-lg bg-gray-100 border border-gray-200 px-3 py-2 text-xs text-gray-700 font-medium">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] text-gray-500 mb-1">Satuan</label>
+                                <input id="unit" type="text" readonly placeholder="-"
+                                    class="w-full rounded-lg bg-gray-100 border border-gray-200 px-3 py-2 text-xs text-gray-600">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] text-gray-500 mb-1">Isi Obat</label>
+                                <input id="content" type="text" readonly placeholder="-"
+                                    class="w-full rounded-lg bg-gray-100 border border-gray-200 px-3 py-2 text-xs text-gray-600">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] text-gray-500 mb-1">QTY Beli</label>
+                                <input id="qty" type="number" readonly name="qty" placeholder="0"
+                                    oninput="counttotal()"
+                                    class="w-full rounded-lg bg-gray-100 border border-gray-200 px-3 py-2 text-xs text-gray-700 font-bold">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sub-bagian B: Input Penerimaan Real (Active Fields) -->
+                    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+
+                        <!-- Kemasan -->
+                        <div class="flex flex-col justify-end">
+                            <label class="block text-xs font-semibold text-gray-700 mb-2">Kemasan Utuh</label>
+                            <label
+                                class="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border border-gray-300 cursor-pointer hover:bg-gray-50">
+                                <input type="checkbox" disabled id="pack" name="is_active"
+                                    class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                <span class="text-xs font-medium text-gray-700">Utuh</span>
+                            </label>
+                        </div>
+
+                        <!-- QTY Diterima -->
+                        <div>
+                            <label for="qty_received" class="block text-xs font-semibold text-blue-900 mb-1">QTY Diterima
+                                <span class="text-red-500">*</span></label>
+                            <input id="qty_received" type="number" name="qty_received" placeholder="0"
+                                oninput="counttotalreceived()"
+                                class="w-full rounded-xl border border-blue-400 bg-white px-3.5 py-2.5 text-xs text-gray-900 font-bold focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+
+                        <!-- Hrg HNA -->
+                        <div>
+                            <label for="item_price" class="block text-xs font-semibold text-blue-900 mb-1">Harga HNA <span
+                                    class="text-red-500">*</span></label>
+                            <input id="item_price" type="text" placeholder="Rp 0"
+                                class="w-full rounded-xl border border-blue-400 bg-white px-3.5 py-2.5 text-xs text-gray-900 font-bold focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+
+                        <!-- Batch -->
+                        <div>
+                            <label for="batch" class="block text-xs font-semibold text-gray-700 mb-1">No. Batch <span
+                                    class="text-red-500">*</span></label>
+                            <input id="batch" name="batch" type="text" placeholder="Masukkan Batch"
+                                class="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-xs text-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+
+
+                        <!-- Diskon -->
+                        <div>
+                            <label for="discount" class="block text-xs font-semibold text-gray-700 mb-1">Diskon
+                                (%)</label>
+                            <input id="discount" value="0" type="number" placeholder="0"
+                                class="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-xs text-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+
+                        <!-- Ekstra Diskon -->
+                        <div>
+                            <label for="extra_discount" class="block text-xs font-semibold text-gray-700 mb-1">Ex. Diskon
+                                (%)</label>
+                            <input id="extra_discount" value="0" type="number" required
+                                class="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-xs text-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+
+                        <!-- Exp Date -->
+                        <div>
+                            <label for="expired_date" class="block text-xs font-semibold text-gray-700 mb-1">Exp Date
+                                <span class="text-red-500">*</span></label>
+                            <input id="expired_date" type="date" name="expired_date"
+                                class="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-xs text-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+
+                        <!-- Status Barang -->
+                        <div>
+                            <label for="status" class="block text-xs font-semibold text-gray-700 mb-1">Status
+                                Barang</label>
+                            <input id="status" name="status" type="text" placeholder="Baik / Rusak"
+                                class="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-xs text-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+
+                        <!-- Total Price (Calculated) -->
+                        <div class="col-span-2 sm:col-span-2">
+                            <label class="block text-xs font-semibold text-gray-500 mb-1">Subtotal Item</label>
+                            <input id="total_price" type="text" readonly name="total_price" placeholder="Rp 0"
+                                class="w-full rounded-xl border border-gray-200 bg-gray-100 px-3.5 py-2.5 text-xs text-emerald-700 font-bold cursor-not-allowed">
+                        </div>
+
+                        <!-- Hidden Fields (Etalase & Lokasi) -->
+                        <div class="hidden">
+                            <select id="items" name="etalase" required class="select2">
+                                <option value="">-- Pilih Etalase --</option>
+                            </select>
+                            <select name="location" id="location">
+                                <option value="">-- Pilih Lokasi --</option>
+                            </select>
+                        </div>
+                        <div class="col-span-2 sm:col-span-2 flex items-end gap-2">
+
+
+                            <button onclick="addNewBatch()" type="button"
+                                class="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-[#2c3862] font-['Poppins'] px-4 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-blue-700 transition-all focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24"
+                                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    class="icon icon-tabler icons-tabler-outline icon-tabler-package-export">
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                    <path d="M12 21l-8 -4.5v-9l8 -4.5l8 4.5v4.5" />
+                                    <path d="M12 12l8 -4.5" />
+                                    <path d="M12 12v9" />
+                                    <path d="M12 12l-8 -4.5" />
+                                    <path d="M15 18h7" />
+                                    <path d="M19 15l3 3l-3 3" />
+                                </svg>
+                                Tambah Batch
+                            </button>
+                            <button onclick="resetInputs()" type="button" id="back"
+                                class="flex-1 inline-flex items-center justify-center gap-2 rounded-xl text-center !text-[#000] bg-[#f6d448] px-4 py-2.5 text-xs font-semibold text-gray-700 hover:bg-gray-300 transition-all">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24"
+                                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    class="icon icon-tabler icons-tabler-outline icon-tabler-restore">
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                    <path d="M3.06 13a9 9 0 1 0 .49 -4.087" />
+                                    <path d="M3 4.001v5h5" />
+                                    <path d="M11 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" />
+                                </svg>
+                                Reset
+                            </button>
+                        </div>
+                    </div>
+                    <!-- Tombol Aksi Form Item -->
+                    <div class="col-span-2 sm:col-span-2 flex items-end gap-2">
+                        <button onclick="addItem()" type="button"
+                            class="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-blue-700 transition-all focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 4v16m8-8H4" />
+                            </svg>
+                            Konfirmasi Item
+                        </button>
+
+                    </div>
+                </form>
+            </div>
+        </div>
+        <div class="bg-blue-50/40 p-6 my-3 rounded-2xl shadow-sm border border-blue-200 space-y-4">
+            <div class="flex items-center justify-between border-b border-blue-100 pb-3">
+                <h2 class="text-base font-semibold text-blue-900 flex items-center gap-2">
+                    <span
+                        class="flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">3</span>
+                    Finalisasi Penerimaan
+                </h2>
+                <span class="text-xs bg-blue-100 text-blue-800 font-medium px-2.5 py-1 rounded-md">Konfirmasi
+                    Penerimaan</span>
+            </div>
+            <div class="flex flex-wrap py-3 px-2 items-center justify-between gap-3 border-b border-gray-100 pb-4">
+
+                <div class="flex flex-wrap items-center gap-2">
+                    <button onclick="saveOrder()" type="button"
+                        class="inline-flex items-center gap-1.5 rounded-xl bg-blue-50 border border-blue-200 px-4 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100 transition-all">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round"
-                                d="M6 9V4h12v5M6 18h12v-5H6v5zM6 14h12" />
+                                d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                        </svg>
+                        Simpan Draft
+                    </button>
+                    <button onclick="printReceiving()" type="button"
+                        class="inline-flex items-center gap-1.5 rounded-xl bg-gray-50 border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-100 transition-all">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                         </svg>
                         Cetak
                     </button>
-
-                    <button onclick="printSPB()"
-                        class="inline-flex items-center gap-2 rounded-lg  btn-pharma !bg-purple-600 !shadow-[0_2px_6px_#9333ea] px-6 py-4 text-sm font-xl text-white hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M7 3h10v18l-2-1-2 1-2-1-2 1-2-1V3z" />
+                    <button onclick="printSPB()" type="button"
+                        class="inline-flex items-center gap-1.5 rounded-xl bg-purple-50 border border-purple-200 px-4 py-2 text-xs font-semibold text-purple-700 hover:bg-purple-100 transition-all">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
                         SPB
                     </button>
+                    <button onclick="completeOrder()" type="button"
+                        class="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 transition-all focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2">
+                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                            <path
+                                d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
+                        </svg>
+                        Selesaikan Pesanan
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- FIXED BOTTOM BAR (TOTAL SUDAH DIBERSIHKAN) -->
+        <div
+            class="fixed right-0 bottom-0 md:w-[70%] w-full rounded-tl-2xl bg-white border-t border-gray-200 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] z-40">
+            <div class="max-w-7xl mx-auto px-6 py-3 flex flex-wrap items-center justify-between gap-4">
+                <div class="text-xs text-gray-500 font-medium">
+                    Ringkasan Transaksi Penerimaan
                 </div>
 
-                <table id="orderItemsTable" class="w-full">
-                    <thead>
-                        <tr>
-                            <th>Nama Obat</th>
-                            <th>QTY Beli</th>
-                            <th>QTY Diterima</th>
-                            <th>HNA</th>
-                            <th>Harga PPN</th>
-                            <th>Diskon</th>
-                            <th>Extra Diskon</th>
-                            <th>Lokasi</th>
-                            <th>Total</th>
-                            <th>Status Barang</th>
-
-                        </tr>
-                    </thead>
-                    <tbody class="text-[12px]"></tbody>
-                </table>
-            </div>
-            <div class="flex justify-end w-full shadow-[0_0_20px_rgba(0,0,0,0.2)] bg-white fixed left-0 bottom-0">
-                <div class="p-4 rounded-t-2xl gap-2 flex">
-                    <div class="flex items-center">
-                        <p class="font-bold pr-2 font-poppins">HARGA HNA</p>
-                        <input id="d_price" readonly
-                            class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
-                            placeholder="Input">
+                <div class="flex items-center gap-6">
+                    <!-- HARGA HNA -->
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-semibold text-gray-500 uppercase">Harga (HNA):</span>
+                        <input id="d_price" readonly placeholder="Rp 0"
+                            class="w-32 rounded-lg bg-gray-50 border border-gray-200 px-3 py-1.5 text-xs text-gray-800 font-semibold text-right cursor-default focus:outline-none">
                     </div>
-                    <div class="flex items-center">
-                        <p class="font-bold pr-2 font-poppins">PPN</p>
-                        <input id="d_ppn" readonly
-                            class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
-                            placeholder="Input">
-                    </div>
-                    <div class="flex items-center">
-                        <p class="font-bold pr-2 font-poppins">TOTAL</p>
 
-                        <input id="d_total" readonly
-                            class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
-                            placeholder="Input">
+                    <!-- PPN -->
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-semibold text-gray-500 uppercase">PPN:</span>
+                        <input id="d_ppn" readonly placeholder="Rp 0"
+                            class="w-32 rounded-lg bg-gray-50 border border-gray-200 px-3 py-1.5 text-xs text-gray-800 font-semibold text-right cursor-default focus:outline-none">
+                    </div>
+
+                    <!-- TOTAL GRAND -->
+                    <div class="flex items-center gap-2 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-100">
+                        <span class="text-xs font-bold text-emerald-800 uppercase">Total:</span>
+                        <input id="d_total" readonly placeholder="Rp 0"
+                            class="w-36 bg-transparent border-none text-sm text-emerald-700 font-extrabold text-right focus:outline-none cursor-default">
                     </div>
                 </div>
             </div>
@@ -590,6 +666,7 @@
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
     <script>
+        let isEditMode = false;
         let page = 1;
         let keyword = '';
         let loading = false;
@@ -615,7 +692,7 @@
         let d_price = {{ $d_price }};
         let d_ppn = {{ $d_ppn }};
         let d_total = {{ $d_total }};
-
+        let total_received = '';
         // Setting Initial Transaction Value
         $('#d_price').val(formatRupiah(d_price));
         $('#d_ppn').val(formatRupiah(d_ppn));
@@ -669,6 +746,28 @@
             };
         }
 
+        function addNewBatch() {
+            isEditMode = false;
+            document.getElementById('receiving_items_id').value = '';
+
+            // Clear batch-specific fields only
+            document.getElementById('qty_received').value = '';
+            document.getElementById('batch').value = '';
+            document.getElementById('discount').value = '0';
+            document.getElementById('extra_discount').value = '0';
+            document.getElementById('expired_date').value = '';
+            document.getElementById('total_price').value = '';
+            document.getElementById('status').value = '';
+
+            // Keep medicine details filled
+            document.getElementById('qty_received').focus();
+
+            iziToast.info({
+                title: 'Tambah Batch Baru',
+                message: 'Siap memasukkan batch baru untuk obat ini',
+                position: 'topRight'
+            });
+        }
         // Event listeners
         discountInput.addEventListener('input', () => handleDiscount(discountInput));
         extraDiscountInput.addEventListener('input', () => handleDiscount(extraDiscountInput));
@@ -681,7 +780,6 @@
 
         // Functions
         function resetInputs() {
-
             $('#searchWrapper')
                 .find('input:not([type="hidden"]):not([readonly]):not([disabled])')
                 .val('');
@@ -698,26 +796,51 @@
             $('#searchWrapper')
                 .find('input[type="checkbox"]')
                 .prop('checked', false);
+
             $('#checkout_detail')
                 .find('input[type="text"]')
                 .val('')
                 .trigger('change');
+
             $('#total_price').val('');
             $('#qty_received').val('');
 
             $('#items').val(null).trigger('change');
             $('#location').val(null).trigger('change');
             $('#invoice_due').val('');
+
+            document.getElementById('receiving_items_id').value = '';
+
             itemcode = null;
             itemprice = null;
             itemqty = null;
             itemcontent = null;
             document.getElementById('creditor').focus();
-
         }
 
         function printSPB() {
             window.open(`/orders/${ordersid}/printspb`, "_blank");
+        }
+
+        function printSPBCreditor() {
+            const creditorCode = $('#creditor').val();
+            if (!creditorCode) {
+                iziToast.warning({ title: 'Peringatan', message: 'Pilih kreditur terlebih dahulu!', position: 'topRight' });
+                return;
+            }
+            if (!ordersid) {
+                iziToast.warning({ title: 'Peringatan', message: 'Pilih BPBA terlebih dahulu!', position: 'topRight' });
+                return;
+            }
+            window.open(`/receiving/${ordersid}/printspbfinal/creditor/${encodeURIComponent(creditorCode)}`, "_blank");
+        }
+
+        function printSPBItem(orderItemId) {
+            if (!ordersid) {
+                iziToast.warning({ title: 'Peringatan', message: 'Data order belum tersedia!', position: 'topRight' });
+                return;
+            }
+            window.open(`/receiving/${ordersid}/printspbfinal/item/${orderItemId}`, "_blank");
         }
 
         function setSelect2AjaxValue(selector, id, text) {
@@ -801,35 +924,56 @@
                     }
                 },
                 columns: [{
-                        data: 'medicines.name'
+                        data: 'medicines.name',
+                        defaultContent: '-'
                     },
                     {
-                        data: 'quantity'
+                        data: 'quantity',
+                        defaultContent: '0'
                     },
                     {
-                        data: 'qty_received'
+                        data: 'qty_received',
+                        defaultContent: '0'
                     },
                     {
-                        data: 'price'
+                        data: 'price',
+                        defaultContent: 'Rp 0'
                     },
                     {
-                        data: 'price_ppn'
+                        data: 'price_ppn',
+                        defaultContent: 'Rp 0'
                     },
                     {
-                        data: 'receiving_items.discount'
+                        data: 'receiving_items.discount',
+                        defaultContent: '0'
                     },
                     {
-                        data: 'receiving_items.extra_discount'
+                        data: 'receiving_items.extra_discount',
+                        defaultContent: '0'
                     },
                     {
-                        data: 'receiving_items.locations.name'
-                    },
-
-                    {
-                        data: 'total'
+                        data: 'receiving_items.locations.name',
+                        defaultContent: '-'
                     },
                     {
-                        data: 'receiving_items.status'
+                        data: 'total',
+                        defaultContent: 'Rp 0'
+                    },
+                    {
+                        data: 'receiving_items.status',
+                        defaultContent: '-'
+                    },
+                    {
+                        data: null,
+                        orderable: false,
+                        searchable: false,
+                        defaultContent: '',
+                        render: function(data, type, row) {
+                            if (row.receiving_items && row.receiving_items.id) {
+                                return `<button type="button" onclick="printSPBItem(${row.id})" class="inline-flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-all" title="Cetak SP item ini"><svg xmlns='http://www.w3.org/2000/svg' class='w-3 h-3' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9V2h12v7'/><path d='M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2'/><rect x='6' y='14' width='12' height='8'/></svg>SP</button>`;
+                            }
+                            return '-';
+                        }
                     },
                 ],
                 paging: false,
@@ -875,84 +1019,70 @@
         });
 
         $('#orderItemsTable tbody').on('dblclick', 'tr', function() {
-
             const data = orderItemsTable.row(this).data();
             if (!data) return;
-            console.log(data.receiving_items?.locations?.name);
-            console.log(data.receiving_items?.etalases?.name);
-            document.getElementById('medicine_name').value = data.medicines.name ?? '';
-            document.getElementById('unit').value = data.medicines.unit ?? '';
-            document.getElementById('content').value = data.medicines.content ?? '';
-            document.getElementById('item_price').value = formatRupiah(data.medicines.raw_price);
-            document.getElementById('qty').value = data.quantity;
-            document.getElementById('medicine_code').value = data.medicines.code;
-            document.getElementById('total_price').value = data.total;
-            document.getElementById('qty_received').focus();
-            document.getElementById('qty_received').value = data.qty_received ?? '';
-            document.getElementById('batch').value = data.receiving_items?.batch ?? '';
 
+            isEditMode = !!data.receiving_items?.id;
+
+            // Correctly map IDs without duplicating overwrites
+            document.getElementById('receiving_items_id').value = data.receiving_items?.id ?? '';
+            document.getElementById('receiving_details_id').value = data.receiving_items?.receiving_details_id ??
+                '';
+
+            // Safely map medicine data
+            document.getElementById('medicine_name').value = data.medicines?.name ?? '';
+            document.getElementById('unit').value = data.medicines?.unit ?? '';
+            document.getElementById('content').value = data.medicines?.content ?? '';
+            document.getElementById('medicine_code').value = data.medicines?.code ?? '';
+
+            document.getElementById('qty').value = data.quantity ?? 0;
+            document.getElementById('qty_received').value = data.receiving_items?.qty_received ?? '';
+            document.getElementById('item_price').value = formatRupiah(data.raw_price ?? data.medicines
+                ?.raw_price ?? 0);
+            document.getElementById('total_price').value = data.total ?? '';
+
+            document.getElementById('batch').value = data.receiving_items?.batch ?? '';
             document.getElementById('discount').value = data.receiving_items?.discount ?? 0;
             document.getElementById('extra_discount').value = data.receiving_items?.extra_discount ?? 0;
             document.getElementById('status').value = data.receiving_items?.status ?? '';
             document.getElementById('expired_date').value = data.receiving_items?.expired_date ?? '';
-            document.getElementById('receiving_items_id').value = data.receiving_items?.id ?? '';
-            document.getElementById('receiving_details_id').value = data.receiving_items?.id ?? '';
-            setSelect2AjaxValue(
-                "#location",
-                data.receiving_items?.locations?.id,
-                data.receiving_items?.locations?.name
-            );
-            setSelect2AjaxValue(
-                "#items",
-                data.receiving_items?.etalases?.id,
-                data.receiving_items?.etalases?.name
-            );
+
+            setSelect2AjaxValue("#location", data.receiving_items?.locations?.id, data.receiving_items?.locations
+                ?.name);
+            setSelect2AjaxValue("#items", data.receiving_items?.etalases?.id, data.receiving_items?.etalases?.name);
+
             if (data.pack == "1") {
                 pack.checked = true;
             }
-            axios.get('/searchreceivingdetails', {
-                    params: {
-                        detail_id: data.receiving_items?.receiving_details_id ?? '',
-                    }
-                })
-                .then(function(response) {
-                    // console.log(response);
-                    // console.log(invoice_times);
-                    // console.log(response.data.creditor.credit_time);
 
-                    // invoice_times.value = 30;
+            // Only fire the Axios request if a detail_id actually exists
+            const detail_id = data.receiving_items?.receiving_details_id;
+            if (detail_id) {
+                axios.get('/searchreceivingdetails', {
+                        params: {
+                            detail_id: detail_id
+                        }
+                    })
+                    .then(function(response) {
+                        invoice_number.value = response.data.query?.invoice_number || '';
+                        invoice_times.value = response.data.query?.invoice_times || response.data.creditor
+                            ?.credit_time || '';
+                        $('#invoice_payment').val(response.data.query?.invoice_payment || '').trigger('change');
+                        invoice_due.value = response.data.query?.invoice_due || '';
+                        invoice_date.value = response.data.query?.invoice_date ?? invoice_date.value;
+                        document.getElementById('invoice_ppn').value = response.data.query?.invoice_ppn
+                            ?.trim() || response.data.creditor?.ppn_type?.trim() || 'TANPA';
+                        count_due();
+                    })
+                    .catch(console.error);
+            }
 
-                    // console.log(invoice_times.value);
-
-                    invoice_number.value = response.data.query?.invoice_number || '';
-                    invoice_times.value = response.data.query?.invoice_times || response.data.creditor
-                        .credit_time || '';
-                    $('#invoice_payment')
-                        .val(response.data.query?.invoice_payment || '')
-                        .trigger('change');
-                    invoice_due.value = response.data.query?.invoice_due || '';
-                    invoice_date.value = response.data.query?.invoice_date ?? invoice_date.value;
-
-                    const ppn =
-                        response.data.query?.invoice_ppn?.trim() ||
-                        response.data.creditor?.ppn_type?.trim() ||
-                        'TANPA';
-
-                    document.getElementById('invoice_ppn').value = ppn;
-
-                    count_due();
-                    // invoice_number.value = response.data.query?.invoice_number || '';
-
-                })
-                .catch(function(error) {
-                    console.error(error);
-                });
-            console.log(data.receiving_items?.receiving_details_id ?? '');
             itemcode = data.medicine_id;
-            itemprice = data.medicines.raw_price;
+            itemprice = data.raw_price ?? data.medicines?.raw_price ?? 0;
             itemqty = data.quantity;
-            itemcontent = data.medicines.content;
-            // totalprice = data.total;
+            itemcontent = data.medicines?.content;
+
+            document.getElementById('qty_received').focus();
         });
         document.getElementById('qty').addEventListener('keydown', function(e) {
             if (e.key !== 'Enter') return;
@@ -1321,14 +1451,14 @@
 
 
         function addItem() {
-
             const payload = {
                 creditor_code: creditor.value,
-                receiving_items_id: receiving_items_id.value,
+                receiving_items_id: document.getElementById('receiving_items_id').value,
                 receiving_id: receiving_id,
                 order_items_id: order_items_id,
                 order_id: order_id,
                 qty_received: qty_received.value,
+                raw_price: document.getElementById('item_price').value.replace(/[.,]/g, '').replace(/[^\d-]/g, '') || 0,
                 discount: discount.value,
                 extra_discount: extra_discount.value,
                 expired_date: expired_date.value,
@@ -1345,6 +1475,8 @@
                 invoice_ppn: invoice_ppn.value,
             };
 
+            console.log('Sending receiving_items_id:', payload.receiving_items_id);
+
             axios.post("{{ route('receiving.addreceivingitem') }}", payload, {
                     headers: {
                         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
@@ -1354,7 +1486,7 @@
                     if (res.data.success) {
                         iziToast.success({
                             title: 'Berhasil',
-                            message: res.message ?? 'Item Berhasil di-Update!',
+                            message: res.message ?? 'Item Berhasil Disimpan!',
                             position: 'topRight'
                         });
 
@@ -1364,10 +1496,14 @@
                         $('#d_total').val(formatRupiah(item.price_total));
 
                         orderItemsTable.ajax.reload(null, false);
-                        document.getElementById("searchInput").readOnly = true;
 
-                        // Reset hanya jika sukses
-                        resetInputs();
+                        isEditMode = false;
+                        // Don't reset — keep medicine selected so user can add more batches easily
+                        document.getElementById('receiving_items_id').value = '';
+                        document.getElementById('qty_received').value = '';
+                        document.getElementById('batch').value = '';
+                        document.getElementById('expired_date').value = '';
+                        document.getElementById('qty_received').focus();
                     }
                 })
                 .catch(err => {
@@ -1387,14 +1523,98 @@
                         message: message,
                         position: 'topRight'
                     });
+                });
+        }
+        // NEW: "Simpan" button — posts items to batches, status → 2
+        function saveOrder() {
+            axios.post("{{ route('receiving.saveOrder') }}", {
+                    receivingid: receiving_id,
+                    orderid: ordersid,
+                }, {
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                    }
+                })
+                .then(res => {
+                    if (res.data.success) {
+                        iziToast.success({
+                            title: 'Berhasil',
+                            message: res.data.message ?? 'Item Tersimpan',
+                            position: 'topRight'
+                        });
 
-                    // Jangan reset input jika gagal
+                        orderItemsTable.ajax.reload(null, false);
+                        resetInputs();
+                        selectedRowData = null;
+                        selectedRowIndex = null;
+                    }
+                })
+                .catch(err => {
+                    let message = 'Gagal menyimpan';
+                    if (err.response?.data?.message) {
+                        message = err.response.data.message;
+                    }
+                    iziToast.error({
+                        title: 'Gagal',
+                        message: message,
+                        position: 'topRight'
+                    });
                 });
         }
 
+        // UPDATED: "Selesaikan Pesanan" button — now just locks (status → 3)
         function completeOrder() {
-
             axios.post("{{ route('receiving.completeOrder') }}", {
+                    receivingid: receiving_id,
+                    orderid: ordersid,
+                }, {
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                    }
+                })
+                .then(res => {
+                    if (res.data.success) {
+                        iziToast.success({
+                            title: 'Berhasil',
+                            message: res.data.message ?? 'Pesanan Berhasil Diselesaikan',
+                            position: 'topRight'
+                        });
+
+                        // Redirect back to the receiving index after a short delay
+                        // so the user sees the success toast first
+                        setTimeout(() => {
+                            window.location.href = "{{ route('receiving.index') }}";
+                        }, 800);
+                    }
+                })
+                .catch(err => {
+                    let message = 'Gagal menyelesaikan pesanan';
+                    if (err.response?.data?.message) {
+                        message = err.response.data.message;
+                    }
+                    iziToast.error({
+                        title: 'Gagal',
+                        message: message,
+                        position: 'topRight'
+                    });
+                });
+        }
+
+        // Helper: disable inputs when order is locked (status = 3)
+        function disableFormForLockedOrder() {
+            const inputs = document.querySelectorAll(
+                '#searchWrapper input, #searchWrapper select, #searchWrapper textarea, #checkout_detail input');
+            inputs.forEach(input => {
+                input.disabled = true;
+            });
+
+            // Disable buttons
+            document.querySelector('[onclick="addItem()"]').disabled = true;
+            document.querySelector('[onclick="saveOrder()"]').disabled = true;
+        }
+
+        function saveOrder() {
+            axios.post("{{ route('receiving.saveOrder') }}", {
                 receivingid: receiving_id,
                 orderid: ordersid,
             }, {
@@ -1431,6 +1651,7 @@
 
             document.getElementById('searchDropdown').style.display = 'none';
             document.getElementById('searchInput').value = orderscode;
+            
 
             orderItemsTable.ajax.reload(null, false);
         }

@@ -107,11 +107,13 @@ Route::middleware(['auth', 'role:administrator'])->group(function () {
 
     Route::resource('users', UserController::class);
     Route::patch('permissions/sort-module', [PermissionsController::class, 'sortModule'])->name('permissions.sort-module');
-    Route::resource('permissions', PermissionsController::class, ['except' => [
-        'create',
-        'show',
-        'edit'
-    ]]);
+    Route::resource('permissions', PermissionsController::class, [
+        'except' => [
+            'create',
+            'show',
+            'edit'
+        ]
+    ]);
 
     // Route::get('')
     Route::resource('teams.squadofficials', SquadOffcicialController::class);
@@ -204,11 +206,11 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     Route::resource('factories', FactoriesController::class)->except(['show']);
     Route::resource('categories', CategoriesController::class)->except(['show']);
     Route::prefix('medicines')->name('medicines.')->group(function () {
-        Route::get('/',                     [MedicineController::class, 'index'])->name('index');
-        Route::post('/',                    [MedicineController::class, 'store'])->name('store');
-        Route::put('/{id}',                 [MedicineController::class, 'update'])->name('update');
-        Route::delete('/{id}',              [MedicineController::class, 'destroy'])->name('destroy');
-        Route::get('/{id}/edit-creditor',   [MedicineController::class, 'editCreditor'])->name('editCreditor');
+        Route::get('/', [MedicineController::class, 'index'])->name('index');
+        Route::post('/', [MedicineController::class, 'store'])->name('store');
+        Route::put('/{id}', [MedicineController::class, 'update'])->name('update');
+        Route::delete('/{id}', [MedicineController::class, 'destroy'])->name('destroy');
+        Route::get('/{id}/edit-creditor', [MedicineController::class, 'editCreditor'])->name('editCreditor');
     });
 
     Route::resource('parameters', ParametersController::class)->except(['show']);
@@ -262,8 +264,8 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     Route::get('/supplies', [SuppliesController::class, 'supplies'])->name('supplies.index');
     Route::get('/getsupplies', [SuppliesController::class, 'getSupplies'])->name('supplies.getSupplies');
     // Stock Data
-    Route::get('/stock-data',        [SuppliesController::class, 'stockData'])->name('supplies.stockData');
-    Route::get('/stock-data/get',    [SuppliesController::class, 'getStockData'])->name('supplies.getStockData');
+    Route::get('/stock-data', [SuppliesController::class, 'stockData'])->name('supplies.stockData');
+    Route::get('/stock-data/get', [SuppliesController::class, 'getStockData'])->name('supplies.getStockData');
     Route::get('/stock-data/export', [SuppliesController::class, 'exportStock'])->name('supplies.exportStockData');
 
     // Stock Opname
@@ -275,7 +277,7 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     Route::get('/export-stockopname', [SuppliesController::class, 'printStockOpname'])->name('supplies.printstockopname');
     Route::get('supplies/batches', [SuppliesController::class, 'getBatchesByMedicine'])->name('supplies.batches');
     Route::get('/supplies/scanner', [SuppliesController::class, 'scannerPage'])->name('supplies.scanner');
-    Route::get('/supplies/scan',    [SuppliesController::class, 'scanBarcode'])->name('supplies.scan');
+    Route::get('/supplies/scan', [SuppliesController::class, 'scanBarcode'])->name('supplies.scan');
 
     // Stock Detail
     Route::get('/stock-detail', [SuppliesController::class, 'stockDetail'])->name('supplies.stockDetail');
@@ -290,14 +292,16 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     Route::get('/transfers/create', [TransfersController::class, 'transfersCreate'])->name('transfers.create');
     Route::post('/transfer', [TransfersController::class, 'transfer'])->name('transfer');
     Route::get('/search/getbatches', [TransfersController::class, 'searchBatches'])->name('search.getbatches');
-    Route::get('/etalases',        [TransfersController::class, 'index'])->name('etalases.index');
-    Route::post('/etalases',       [TransfersController::class, 'store'])->name('etalases.store');
+    Route::get('/etalases', [TransfersController::class, 'index'])->name('etalases.index');
+    Route::post('/etalases', [TransfersController::class, 'store'])->name('etalases.store');
     Route::put('/etalases/{etalase}', [TransfersController::class, 'update']);
     Route::get('/transfers/incoming', [TransfersController::class, 'incomingTransfers'])->name('transfers.incoming');
     Route::post('/transfers/{transfer}/accept', [TransfersController::class, 'acceptTransfer'])->name('transfers.accept');
     Route::post('/transfers/{transfer}/deny', [TransfersController::class, 'denyTransfer'])->name('transfers.deny');
     Route::get('/transfers/{id}/print', [TransfersController::class, 'printReceipt'])
         ->name('transfers.print');
+    Route::post('/transfers/{item}/accept-item', [TransfersController::class, 'acceptItem'])->name('transfers.acceptItem');
+    Route::post('/transfers/{item}/deny-item', [TransfersController::class, 'denyItem'])->name('transfers.denyItem');
     // Reports  
     Route::get('/reports/transactions', [ReportsController::class, 'transactions'])->name('reports.transactions');
     Route::get('/reports/medicines', [ReportsController::class, 'medicines'])->name('reports.medicines');
@@ -380,9 +384,20 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     Route::post('/receiving/addreceivingitem', [ReceivingController::class, 'addReceivingItem'])->name('receiving.addreceivingitem');
     Route::get('/receiving/print/{id}', [ReceivingController::class, 'printReceiving']);
     Route::get('/invoice/print/{id}', [ReceivingController::class, 'printInvoice']);
+    Route::put('/receiving-items/{id}', [ReceivingController::class, 'updateReceivingItem'])->name('receiving.updateItem');
+    Route::delete('/receiving-items/{id}', [ReceivingController::class, 'deleteReceivingItem'])->name('receiving.deleteItem');
+    Route::get('/orders/{orderId}/revision', [ReceivingController::class, 'invoiceRevision'])->name('receiving.revision');
 
+    // Save Order
     Route::post('/receiving/completeorder', [ReceivingController::class, 'completeOrder'])
         ->name('receiving.completeOrder');
+
+    // Resolve Order
+    Route::post('/receiving/saveOrder', [ReceivingController::class, 'saveOrder'])
+        ->name('receiving.saveOrder');
+
+
+
     Route::get('/receiving/orderlist', [ReceivingController::class, 'orderList'])->name('receiving.orderlist');
     Route::get('/searchreceivingdetails', [ReceivingController::class, 'searchReceivingDetails'])->name('receiving.searchreceivingdetails');
     Route::get('/searchselectcreditors', [ReceivingController::class, 'selectCreditors'])->name('receiving.selectCreditors');
@@ -395,6 +410,10 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     Route::get('/receiving/orders', [ReceivingController::class, 'orders'])->name('receiving.orders');
     Route::get('/receiving/{order}/printspbfinal', [ReceivingController::class, 'printSPBFinal'])
         ->name('orderfinal.print');
+    Route::get('/receiving/{order}/printspbfinal/creditor/{creditorCode}', [ReceivingController::class, 'printSPBFinalByCreditor'])
+        ->name('orderfinal.print.creditor');
+    Route::get('/receiving/{order}/printspbfinal/item/{orderItem}', [ReceivingController::class, 'printSPBFinalByItem'])
+        ->name('orderfinal.print.item');
     Route::get('/receiving/{order}/printorders', [ReceivingController::class, 'printOrders'])
         ->name('orderfinal.printorders');
     Route::get('/orders-tracking', [OrdersTrackingController::class, 'index'])->name('orders-tracking.index');
@@ -403,16 +422,16 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
 
     // INVOICES (Tagihan)
     Route::prefix('invoices')->name('invoices.')->group(function () {
-        Route::get('/',              [InvoicesController::class, 'index'])->name('index');
-        Route::get('/get',           [InvoicesController::class, 'getInvoices'])->name('get');
-        Route::get('/getall',        [InvoicesController::class, 'getAllInvoices'])->name('getall');
-        Route::post('/klaim/{id}',   [InvoicesController::class, 'klaim'])->name('klaim');
+        Route::get('/', [InvoicesController::class, 'index'])->name('index');
+        Route::get('/get', [InvoicesController::class, 'getInvoices'])->name('get');
+        Route::get('/getall', [InvoicesController::class, 'getAllInvoices'])->name('getall');
+        Route::post('/klaim/{id}', [InvoicesController::class, 'klaim'])->name('klaim');
     });
 
     // Hutang Dagang
     Route::prefix('orders-payment')->name('orders-payment.')->group(function () {
-        Route::get('/',             [OrdersPayment::class, 'index'])->name('index');
-        Route::get('/get',          [OrdersPayment::class, 'getOrdersPayment'])->name('get');
+        Route::get('/', [OrdersPayment::class, 'index'])->name('index');
+        Route::get('/get', [OrdersPayment::class, 'getOrdersPayment'])->name('get');
         Route::post('/selesai/{id}', [OrdersPayment::class, 'selesai'])->name('selesai');
     });
 

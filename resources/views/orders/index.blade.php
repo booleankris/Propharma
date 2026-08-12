@@ -195,7 +195,7 @@
                             SPB</label>
                         <input type="text" id="searchInput"
                             class="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="Ketik nomor SPB..." oninput="searchOrderCode(this.value)" autocomplete="off">
+                            placeholder="Ketik nomor SPB / Nomor Terima..." oninput="searchOrderCode(this.value)" autocomplete="off">
                     </div>
                     <div>
                         <label class="block mb-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Filter
@@ -213,7 +213,7 @@
                         <tr class="border-b border-gray-200 text-xs text-gray-500 uppercase tracking-wider">
                             <th class="pb-3 font-semibold">#</th>
                             <th class="pb-3 font-semibold">Date</th>
-                            <th class="pb-3 font-semibold">SPB</th>
+                            <th class="pb-3 font-semibold">SPB & NOMOR TERIMA</th>
                             <th class="pb-3 font-semibold text-center">Status</th>
                             <th class="pb-3 font-semibold">Total</th>
                             <th class="pb-3 font-semibold">Total PPN</th>

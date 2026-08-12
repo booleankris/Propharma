@@ -3,912 +3,433 @@
 @section('title', 'Transfer Stok')
 
 @section('style')
+    <link rel="stylesheet" href="{{ asset('templates/library/izitoast/dist/css/iziToast.min.css') }}">
+    <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link
-        href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
         rel="stylesheet">
     <style>
-        * {
-            box-sizing: border-box;
-        }
-
         body {
-            font-family: 'DM Sans', sans-serif;
+            font-family: 'Inter', sans-serif;
         }
 
-        .shell {
-            min-height: 100vh;
-            background: #f0f2f5;
-            padding: 28px 20px;
-        }
-
-        .card {
-            margin: 0 auto;
-            background: #fff;
-            border-radius: 18px;
-            box-shadow: 0 2px 16px rgba(0, 0, 0, .07);
-            overflow: hidden;
-        }
-
-        /* Header */
-        .card-header {
-            background: #0f172a;
-            padding: 22px 28px;
-            display: flex;
-            align-items: center;
-            gap: 14px;
-        }
-
-        .header-icon {
-            width: 38px;
-            height: 38px;
-            background: rgba(59, 130, 246, .2);
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-        }
-
-        .card-header h1 {
-            color: #f8fafc;
-            font-size: 15px;
-            font-weight: 600;
-            margin: 0;
-        }
-
-        .card-header span {
-            font-family: 'DM Mono', monospace;
-            font-size: 12px;
-            color: #64748b;
-            margin-top: 2px;
-            display: block;
-        }
-
-        /* Tabs */
-        .tabs {
-            display: flex;
-            border-bottom: 1px solid #f1f5f9;
-            background: #fff;
-        }
-
-        .tab-btn {
-            flex: 1;
-            padding: 14px 10px;
-            font-size: 13px;
-            font-weight: 500;
-            color: #94a3b8;
-            background: none;
-            border: none;
-            cursor: pointer;
-            border-bottom: 2px solid transparent;
-            transition: all .15s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 7px;
-        }
-
-        .tab-btn:hover {
-            color: #475569;
-        }
-
-        .tab-btn.active {
-            color: #0f172a;
-            border-bottom-color: #0f172a;
-            font-weight: 600;
-        }
-
-        .tab-badge {
-            font-size: 10px;
-            font-weight: 700;
-            padding: 2px 7px;
-            border-radius: 99px;
-            font-family: 'DM Mono', monospace;
-        }
-
-        .badge-pending {
-            background: #fff7ed;
-            color: #ea580c;
-        }
-
-        .badge-accepted {
-            background: #f0fdf4;
-            color: #16a34a;
-        }
-
-        .badge-denied {
-            background: #fff1f1;
-            color: #ef4444;
-        }
-
-        /* Tab panels */
-        .tab-panel {
-            display: none;
-        }
-
-        .tab-panel.active {
-            display: block;
-        }
-
-        /* Flash */
-        .alert {
-            padding: 12px 28px;
-            font-size: 13px;
-        }
-
-        .alert-success {
-            background: #f0fdf4;
-            color: #16a34a;
-            border-left: 3px solid #16a34a;
-        }
-
-        .alert-danger {
-            background: #fff1f1;
-            color: #ef4444;
-            border-left: 3px solid #ef4444;
-        }
-
-        /* Transfer row */
-        .transfer-row {
-            padding: 16px 28px;
-            border-bottom: 1px solid #f1f5f9;
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            cursor: pointer;
-            transition: background .12s;
-        }
-
-        .transfer-row:last-child {
-            border-bottom: none;
-        }
-
-        .transfer-row:hover {
-            background: #f8fafc;
-        }
-
-        .tr-info {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .tr-code {
-            font-family: 'DM Mono', monospace;
-            font-size: 11px;
-            color: #64748b;
-            background: #f1f5f9;
-            padding: 2px 8px;
-            border-radius: 5px;
-            display: inline-block;
-            margin-bottom: 5px;
-        }
-
-        .tr-name {
-            font-size: 14px;
-            font-weight: 600;
-            color: #1e293b;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .tr-meta {
-            font-size: 12px;
-            color: #94a3b8;
-            margin-top: 3px;
-        }
-
-        .tr-stock {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            background: #f0fdf4;
-            color: #16a34a;
-            font-size: 12px;
-            font-weight: bold;
-            font-family: "Poppins";
-            padding: 4px 10px;
-            border-radius: 7px;
-            white-space: nowrap;
-            flex-shrink: 0;
-        }
-
-        .status-pill {
-            font-size: 11px;
-            font-weight: 600;
-            padding: 3px 10px;
-            border-radius: 99px;
-            flex-shrink: 0;
-        }
-
-        .pill-accepted {
-            background: #f0fdf4;
-            color: #16a34a;
-        }
-
-        .pill-denied {
-            background: #fff1f1;
-            color: #ef4444;
-        }
-
-        /* Action buttons */
-        .tr-actions {
-            display: flex;
-            gap: 8px;
-            flex-shrink: 0;
-        }
-
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 8px 16px;
-            border-radius: 8px;
-            font-size: 12px;
-            font-weight: 600;
-            font-family: 'DM Sans', sans-serif;
-            cursor: pointer;
-            border: none;
-            transition: opacity .15s, transform .1s;
-        }
-
-        .btn:active {
-            transform: scale(.96);
-        }
-
-        .btn-accept {
-            background: #0f172a;
-            color: #fff;
-        }
-
-        .btn-accept:hover {
-            opacity: .85;
-        }
-
-
-        .btn-pending {
-            background: #f49108;
-            color: #fff;
-        }
-
-        .btn-pending:hover {
-            opacity: .85;
-        }
-
-        .btn-confirmed {
-            background: #16a34a;
-            color: #fff;
-        }
-
-        .btn-confirmed:hover {
-            opacity: .85;
-        }
-
-        .btn-deny {
-            background: #fff;
-            color: #ef4444;
-            border: 1.5px solid #fecaca;
-        }
-
-        .btn-deny:hover {
-            background: #fff1f1;
-        }
-
-        /* Empty state */
-        .empty-state {
-            padding: 48px 28px;
-            text-align: center;
-            color: #94a3b8;
-            font-size: 13px;
-        }
-
-        .empty-state svg {
-            margin-bottom: 12px;
-            opacity: .35;
-        }
-
-        /* ── Detail Modal ── */
-        .modal-overlay {
-            display: none;
-            position: fixed;
-            inset: 0;
-            z-index: 99999;
-            align-items: center;
-            justify-content: center;
-            background: rgba(0, 0, 0, .45);
-        }
-
-        .modal-overlay.open {
-            display: flex;
-        }
-
-        .modal-box {
-            position: relative;
-            background: #fff;
-            border-radius: 18px;
-            width: 100%;
-            max-width: 460px;
-            box-shadow: 0 20px 50px rgba(0, 0, 0, .18);
-            overflow: hidden;
-            animation: slideUp .2s ease;
-        }
-
-        @keyframes slideUp {
-            from {
-                opacity: 0;
-                transform: translateY(12px);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .modal-header {
-            background: #0f172a;
-            padding: 18px 22px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .modal-header h3 {
-            color: #f8fafc;
-            font-size: 14px;
-            font-weight: 600;
-            margin: 0;
-        }
-
-        .modal-header .modal-code {
-            font-family: 'DM Mono', monospace;
-            font-size: 11px;
-            color: #64748b;
-        }
-
-        .modal-close {
-            background: none;
-            border: none;
-            cursor: pointer;
-            color: #64748b;
-            display: flex;
-            align-items: center;
-            padding: 2px;
-        }
-
-        .modal-close:hover {
-            color: #f8fafc;
-        }
-
-        .modal-body {
-            padding: 22px;
-        }
-
-        .detail-section-label {
-            font-size: 10px;
-            font-weight: 700;
-            color: #94a3b8;
-            text-transform: uppercase;
-            letter-spacing: .08em;
-            margin-bottom: 12px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .detail-section-label::after {
-            content: '';
-            flex: 1;
-            height: 1px;
-            background: #f1f5f9;
-        }
-
-        .detail-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin-bottom: 18px;
-        }
-
-        .detail-item {
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 10px;
-            padding: 10px 12px;
-        }
-
-        .detail-item .lbl {
-            font-size: 10px;
-            color: #94a3b8;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: .05em;
-            margin-bottom: 4px;
-        }
-
-        .detail-item .val {
-            font-size: 13px;
-            color: #1e293b;
-            font-weight: 500;
-            font-family: 'DM Mono', monospace;
-        }
-
-        .detail-item .val.green {
-            color: #16a34a;
-        }
-
-        .detail-item.full {
-            grid-column: span 2;
-        }
-
-        .modal-status {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 12px;
-            font-weight: 600;
-            padding: 5px 12px;
-            border-radius: 8px;
-            margin-top: 4px;
-        }
-
-        /* Navigation */
-        .pagination-bar {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 14px;
-            padding: 16px 28px;
-            border-top: 1px solid #f1f5f9;
-        }
-
-        .page-btn {
-            font-size: 12px;
-            font-weight: 600;
-            color: #0f172a;
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
-            padding: 6px 14px;
-            border-radius: 8px;
-            text-decoration: none;
-            transition: background .15s;
-        }
-
-        .page-btn:hover {
-            background: #f1f5f9;
-        }
-
-        .page-btn.disabled {
-            color: #cbd5e1;
-            pointer-events: none;
-        }
-
-        .page-info {
-            font-size: 12px;
-            color: #94a3b8;
-            font-family: 'DM Mono', monospace;
+        .font-mono {
+            font-family: 'JetBrains Mono', monospace;
         }
     </style>
 @endsection
 
 @section('content')
-    <section class="shell">
-        <div class="card">
+    <div class="p-6 md:p-8 text-slate-800">
 
-            {{-- Header --}}
-            <div class="card-header">
-                <div class="header-icon">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2"
-                        stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
-                        <polyline points="17 6 23 6 23 12" />
+        {{-- Page Header --}}
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 mb-6 border-b border-slate-200">
+            <div>
+                <div class="flex items-center gap-2 text-xs font-medium text-slate-400 mb-1">
+                    <span>Mutasi</span>
+                    <svg class="w-3 h-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                     </svg>
+                    <span class="text-sky-600 font-semibold">Daftar Transfer</span>
                 </div>
-                <div>
-                    <h1>Riwayat Mutasi</h1>
-                    <span>Kelola permintaan transfer masuk</span>
-                </div>
+                <h1 class="text-xl font-bold tracking-tight">Transfer Stok Obat</h1>
             </div>
+            <a href="{{ route('transfers.create') }}"
+                class="inline-flex items-center gap-2 px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold rounded-lg shadow-sm transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"
+                    stroke-linecap="round">
+                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+                Buat Transfer Baru
+            </a>
+        </div>
 
-            {{-- Flash --}}
-            @if (session('success'))
-                <div class="alert alert-success">{{ session('success') }}</div>
-            @endif
-            @if (session('message'))
-                <div class="alert alert-danger">{{ session('message') }}</div>
-            @endif
-
-            <div class="tabs">
-                <button class="tab-btn active" data-tab="pending" onclick="switchTab('pending', this)">
-                    Mutasi Keluar
-                    <span class="tab-badge badge-pending">{{ $pending->total() }}</span>
-                </button>
-                <button class="tab-btn" data-tab="accepted" onclick="switchTab('accepted', this)">
-                    Mutasi Masuk
-                    <span class="tab-badge badge-accepted">{{ $accepted->total() }}</span>
-                </button>
-                <button class="tab-btn" data-tab="denied" onclick="switchTab('denied', this)">
-                    Ditolak
-                    <span class="tab-badge badge-denied">{{ $denied->total() }}</span>
-                </button>
+        {{-- Flash --}}
+        @if (session('success'))
+            <div
+                class="mb-4 px-4 py-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm font-medium">
+                {{ session('success') }}
             </div>
+        @endif
+        @if (session('message'))
+            <div class="mb-4 px-4 py-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-sm font-medium">
+                {{ session('message') }}
+            </div>
+        @endif
 
-            {{-- ── Outgoing Transfer ── --}}
-            <div id="tab-pending" class="tab-panel active">
-                @forelse($pending as $t)
-                    <div class="transfer-row" onclick="openDetail({{ $t->id }})">
-                        <div class="tr-info">
-                            <div class="tr-code">{{ $t->code }}</div>
-                            <div class="tr-name">{{ $t->batches?->medicines?->name ?? '—' }}</div>
-                            <div class="tr-meta">
-                                Batch: {{ $t->batches?->name ?? '—' }}
-                                &nbsp;·&nbsp; Etalase: {{ $t->etalases?->name ?? '—' }}
-                                &nbsp;·&nbsp; {{ $t->created_at->format('d M Y, H:i') }}
-                            </div>
-                            <div class="tr-meta flex items-center gap-1 !text-[10px]">
-                                <span>
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12"
-                                        viewBox="0 0 24 24" fill="currentColor"
-                                        class="icon icon-tabler icons-tabler-filled icon-tabler-send">
-                                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                                        <path
-                                            d="M21.864 3.549l-6.454 17.868a1.55 1.55 0 0 1 -1.41 .903a1.54 1.54 0 0 1 -1.394 -.874l-2.88 -5.759zm-1.414 -1.414l-12.139 12.138l-5.728 -2.864a1.55 1.55 0 0 1 -.903 -1.409c0 -.606 .353 -1.157 .981 -1.44z" />
-                                    </svg>
+        {{-- Tabs --}}
+        <div class="flex gap-1 mb-6 bg-slate-100 p-1 rounded-xl w-fit">
+            @foreach ([['pending', 'Mutasi Keluar', count($pending)], ['accepted', 'Mutasi Masuk', count($accepted)], ['denied', 'Ditolak', count($denied)]] as [$key, $label, $count])
+                <button onclick="switchTab('{{ $key }}')" id="tab-btn-{{ $key }}"
+                    class="tab-btn px-4 py-2 rounded-lg text-xs font-semibold transition flex items-center gap-2
+                {{ $key === 'pending' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700' }}">
+                    {{ $label }}
+                    <span
+                        class="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold
+                {{ $key === 'pending' ? 'bg-sky-100 text-sky-700' : 'bg-slate-200 text-slate-500' }}">
+                        {{ $count }}
+                    </span>
+                </button>
+            @endforeach
+        </div>
 
-                                </span>
-                                <span>
-                                    Apotek Asal: {{ $t->users?->pharmacy?->name ?? '—' }}
-                                </span>
-                            </div>
-                            <div class="tr-meta flex items-center gap-1 !text-[10px]">
-                                <span>
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12"
-                                        viewBox="0 0 24 24" fill="currentColor"
-                                        class="icon icon-tabler icons-tabler-filled icon-tabler-map-pin">
-                                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                                        <path
-                                            d="M18.364 4.636a9 9 0 0 1 .203 12.519l-.203 .21l-4.243 4.242a3 3 0 0 1 -4.097 .135l-.144 -.135l-4.244 -4.243a9 9 0 0 1 12.728 -12.728zm-6.364 3.364a3 3 0 1 0 0 6a3 3 0 0 0 0 -6" />
-                                    </svg>
+        {{-- TAB: Mutasi Keluar (Pending) --}}
+        <div id="tab-pending" class="tab-panel space-y-4">
+            @forelse($pending as $transfer)
+                <div class="bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden">
 
-                                </span>
-                                <span>
-                                    Apotek Tujuan: {{ $t->batches?->pharmacy?->name ?? '—' }}
-                                </span>
-                            </div>
+                    {{-- Transfer Header --}}
+                    <div class="flex items-center justify-between px-5 py-3.5 bg-slate-50 border-b border-slate-100">
+                        <div class="flex items-center gap-3">
+                            <span
+                                class="font-mono text-xs px-2.5 py-1 bg-white border border-slate-200 rounded-md text-slate-700 font-semibold">
+                                {{ $transfer->code }}
+                            </span>
+                            <span class="text-xs text-slate-400">{{ $transfer->created_at->format('d M Y, H:i') }}</span>
                         </div>
-                        <div class="tr-stock">{{ $t->stock }}</div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs text-slate-500">Oleh: <span
+                                    class="font-semibold text-slate-700">{{ $transfer->users?->name ?? '—' }}</span></span>
+                            @php
+                                $statusMap = [
+                                    0 => ['Pending', 'bg-amber-50 text-amber-700 border-amber-200'],
+                                    1 => ['Diterima', 'bg-emerald-50 text-emerald-700 border-emerald-200'],
+                                    2 => ['Ditolak', 'bg-rose-50 text-rose-700 border-rose-200'],
+                                ];
+                                [$statusLabel, $statusClass] = $statusMap[$transfer->status] ?? ['—', ''];
+                            @endphp
+                            <span class="text-[11px] font-semibold px-2.5 py-1 rounded-full border {{ $statusClass }}">
+                                {{ $statusLabel }}
+                            </span>
+                        </div>
+                    </div>
 
-                        <div class="tr-actions" onclick="event.stopPropagation()">
-                            @if ($t->status == 0)
-                                <button type="button" class="btn btn-pending">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12"
-                                        viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                                        stroke-linecap="round" stroke-linejoin="round"
-                                        class="icon icon-tabler icons-tabler-outline icon-tabler-refresh">
-                                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                                        <path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4" />
-                                        <path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4" />
-                                    </svg>
-                                    Pending
-                                </button>
-                            @elseif($t->status == 1)
-                                <button type="submit" class="btn btn-confirmed">
-                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
-                                        stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-                                        <polyline points="20 6 9 17 4 12" />
-                                    </svg>
-                                    Diterima
-                                </button>
-                                <button type="button" class="btn !bg-[#5085ff] btn-confirmed"
-                                    onclick="window.open('{{ route('transfers.print', $t->id) }}', '_blank')">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" viewBox="0 0 24 24"
-                                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                        stroke-linejoin="round">
-                                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                                        <path
-                                            d="M17 17h2a2 2 0 0 0 2 -2v-4a2 2 0 0 0 -2 -2h-14a2 2 0 0 0 -2 2v4a2 2 0 0 0 2 2h2" />
-                                        <path d="M17 9v-4a2 2 0 0 0 -2 -2h-6a2 2 0 0 0 -2 2v4" />
-                                        <path
-                                            d="M7 15a2 2 0 0 1 2 -2h6a2 2 0 0 1 2 2v4a2 2 0 0 1 -2 2h-6a2 2 0 0 1 -2 -2l0 -4" />
-                                    </svg>
-                                    Print
-                                </button>
+                    {{-- Items Table --}}
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-xs">
+                            <thead
+                                class="bg-slate-50/50 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                <tr>
+                                    <th class="py-2.5 px-5 text-left">Obat</th>
+                                    <th class="py-2.5 px-4 text-left">Batch</th>
+                                    <th class="py-2.5 px-4 text-left">Etalase</th>
+                                    <th class="py-2.5 px-4 text-center">Qty</th>
+                                    <th class="py-2.5 px-4 text-center">Status</th>
+                                    <th class="py-2.5 px-4 text-center w-40">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-50">
+                                @forelse($transfer->items as $item)
+                                    <tr class="hover:bg-slate-50/50 transition">
+                                        <td class="py-3 px-5">
+                                            <div class="font-semibold text-slate-800">
+                                                {{ $item->batches?->medicines?->name ?? '—' }}</div>
+                                            <div class="text-[10px] text-slate-400 font-mono mt-0.5">
+                                                {{ $item->batches?->medicines?->code ?? '—' }}</div>
+                                        </td>
+                                        <td class="py-3 px-4 text-slate-600">{{ $item->batches?->name ?? '—' }}</td>
+                                        <td class="py-3 px-4 text-slate-600">{{ $item->etalases?->name ?? '—' }}</td>
+                                        <td class="py-3 px-4 text-center">
+                                            <span
+                                                class="inline-flex items-center px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 font-mono text-[11px] font-semibold">
+                                                {{ $item->qty }}
+                                            </span>
+                                        </td>
+                                        <td class="py-3 px-4 text-center">
+                                            @php
+                                                [$iLabel, $iClass] = $statusMap[$item->status] ?? ['—', ''];
+                                            @endphp
+                                            <span
+                                                class="text-[10px] font-semibold px-2 py-0.5 rounded-full border {{ $iClass }}">
+                                                {{ $iLabel }}
+                                            </span>
+                                        </td>
+                                        <td class="py-3 px-4 text-center">
+                                            {{-- No actions for outgoing --}}
+                                            <span class="text-[10px] text-slate-300">—</span>
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="6" class="py-6 text-center text-slate-400 text-xs">Tidak ada item
+                                        </td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {{-- Pagination placeholder --}}
+                    <div class="px-5 py-3 border-t border-slate-100 text-xs text-slate-400">
+                        {{ $pending->links() }}
+                    </div>
+
+                </div>
+            @empty
+                <div class="bg-white rounded-xl border border-slate-200/80 shadow-sm py-16 text-center">
+                    <div class="text-slate-300 mb-3">
+                        <svg class="w-10 h-10 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                            stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M12 5l7 7-7 7" />
+                        </svg>
+                    </div>
+                    <p class="text-sm text-slate-400">Tidak ada transfer keluar</p>
+                </div>
+            @endforelse
+        </div>
+
+        {{-- TAB: Mutasi Masuk (Accepted) --}}
+        <div id="tab-accepted" class="tab-panel hidden space-y-4">
+            @forelse($accepted as $transfer)
+                <div class="bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden">
+
+                    <div class="flex items-center justify-between px-5 py-3.5 bg-slate-50 border-b border-slate-100">
+                        <div class="flex items-center gap-3">
+                            <span
+                                class="font-mono text-xs px-2.5 py-1 bg-white border border-slate-200 rounded-md text-slate-700 font-semibold">
+                                {{ $transfer->code }}
+                            </span>
+                            <span class="text-xs text-slate-400">{{ $transfer->created_at->format('d M Y, H:i') }}</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs text-slate-500">Dari: <span
+                                    class="font-semibold text-slate-700">{{ $transfer->users?->pharmacy?->name ?? '—' }}</span></span>
+                            @php [$statusLabel, $statusClass] = $statusMap[$transfer->status] ?? ['—', '']; @endphp
+                            <span class="text-[11px] font-semibold px-2.5 py-1 rounded-full border {{ $statusClass }}">
+                                {{ $statusLabel }}
+                            </span>
+                            @if ($transfer->items->contains('status', 0))
+                                <form method="POST" action="{{ route('transfers.accept', $transfer) }}" class="ml-2">
+                                    @csrf
+                                    <button type="submit" class="inline-flex items-center gap-1 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-semibold rounded-lg transition shadow-sm" onclick="return confirm('Apakah Anda yakin ingin menerima semua obat yang masih pending pada mutasi ini?')">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                        Terima Semua Obat
+                                    </button>
+                                </form>
                             @endif
                         </div>
                     </div>
-                @empty
-                    <div class="empty-state">
-                        <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#94a3b8"
-                            stroke-width="1.5" stroke-linecap="round">
-                            <path d="M5 12h14M12 5l7 7-7 7" />
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-xs">
+                            <thead
+                                class="bg-slate-50/50 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                <tr>
+                                    <th class="py-2.5 px-5 text-left">Obat</th>
+                                    <th class="py-2.5 px-4 text-left">Batch</th>
+                                    <th class="py-2.5 px-4 text-left">Etalase</th>
+                                    <th class="py-2.5 px-4 text-center">Qty</th>
+                                    <th class="py-2.5 px-4 text-center">Status</th>
+                                    <th class="py-2.5 px-4 text-center w-44">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-50">
+                                @forelse($transfer->items as $item)
+                                    <tr class="hover:bg-slate-50/50 transition">
+                                        <td class="py-3 px-5">
+                                            <div class="font-semibold text-slate-800">
+                                                {{ $item->batches?->medicines?->name ?? '—' }}</div>
+                                            <div class="text-[10px] text-slate-400 font-mono mt-0.5">
+                                                {{ $item->batches?->medicines?->code ?? '—' }}</div>
+                                        </td>
+                                        <td class="py-3 px-4 text-slate-600">{{ $item->batches?->name ?? '—' }}</td>
+                                        <td class="py-3 px-4 text-slate-600">{{ $item->etalases?->name ?? '—' }}</td>
+                                        <td class="py-3 px-4 text-center">
+                                            <span
+                                                class="inline-flex items-center px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 font-mono text-[11px] font-semibold">
+                                                {{ $item->qty }}
+                                            </span>
+                                        </td>
+                                        <td class="py-3 px-4 text-center">
+                                            @php [$iLabel, $iClass] = $statusMap[$item->status] ?? ['—', '']; @endphp
+                                            <span
+                                                class="text-[10px] font-semibold px-2 py-0.5 rounded-full border {{ $iClass }}">
+                                                {{ $iLabel }}
+                                            </span>
+                                        </td>
+                                        <td class="py-3 px-4">
+                                            @if ($item->status === 0)
+                                                <div class="flex items-center justify-center gap-2">
+                                                    <form method="POST"
+                                                        action="{{ route('transfers.acceptItem', $item) }}">
+                                                        @csrf
+                                                        <button type="submit"
+                                                            class="inline-flex items-center gap-1 px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white text-[11px] font-semibold rounded-lg transition"
+                                                            onclick="return confirm('Terima item ini?')">
+                                                            <svg class="w-3 h-3" fill="none" stroke="currentColor"
+                                                                viewBox="0 0 24 24" stroke-width="2.5"
+                                                                stroke-linecap="round">
+                                                                <polyline points="20 6 9 17 4 12" />
+                                                            </svg>
+                                                            Terima
+                                                        </button>
+                                                    </form>
+                                                    <form method="POST"
+                                                        action="{{ route('transfers.denyItem', $item) }}">
+                                                        @csrf
+                                                        <button type="submit"
+                                                            class="inline-flex items-center gap-1 px-3 py-1.5 bg-white hover:bg-rose-50 text-rose-500 border border-rose-200 text-[11px] font-semibold rounded-lg transition"
+                                                            onclick="return confirm('Tolak item ini?')">
+                                                            <svg class="w-3 h-3" fill="none" stroke="currentColor"
+                                                                viewBox="0 0 24 24" stroke-width="2.5"
+                                                                stroke-linecap="round">
+                                                                <line x1="18" y1="6" x2="6"
+                                                                    y2="18" />
+                                                                <line x1="6" y1="6" x2="18"
+                                                                    y2="18" />
+                                                            </svg>
+                                                            Tolak
+                                                        </button>
+                                                    </form>
+                                                </div>
+                                            @else
+                                                <div class="text-center text-[10px] text-slate-300">—</div>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="6" class="py-6 text-center text-slate-400 text-xs">Tidak ada item
+                                        </td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="px-5 py-3 border-t border-slate-100 text-xs text-slate-400">
+                        {{ $accepted->links() }}
+                    </div>
+
+                </div>
+            @empty
+                <div class="bg-white rounded-xl border border-slate-200/80 shadow-sm py-16 text-center">
+                    <div class="text-slate-300 mb-3">
+                        <svg class="w-10 h-10 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                            stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M12 5l7 7-7 7" />
                         </svg>
-                        <p>Tidak ada transfer yang menunggu.</p>
                     </div>
-                @endforelse
-                @if ($pending->hasPages())
-                    <div class="pagination-bar">
-                        <a href="{{ $pending->previousPageUrl() ? $pending->previousPageUrl() . '#tab-pending' : '#' }}"
-                            class="page-btn {{ $pending->onFirstPage() ? 'disabled' : '' }}">‹ Sebelumnya</a>
-                        <span class="page-info">Hal {{ $pending->currentPage() }} / {{ $pending->lastPage() }}</span>
-                        <a href="{{ $pending->hasMorePages() ? $pending->nextPageUrl() . '#tab-pending' : '#' }}"
-                            class="page-btn {{ $pending->hasMorePages() ? '' : 'disabled' }}">Berikutnya ›</a>
-                    </div>
-                @endif
-            </div>
-
-            {{-- ── Ingoing Transfer ── --}}
-            <div id="tab-accepted" class="tab-panel">
-                @forelse($accepted as $t)
-                    <div class="transfer-row" onclick="openDetail({{ $t->id }})">
-                        <div class="tr-info">
-                            <div class="tr-code">{{ $t->code }}</div>
-                            <div class="tr-name">{{ $t->batches?->medicines?->name ?? '—' }}</div>
-                            <div class="tr-meta">
-                                Batch: {{ $t->batches?->name ?? '—' }}
-                                &nbsp;·&nbsp; Etalase: {{ $t->etalases?->name ?? '—' }}
-                                &nbsp;·&nbsp; {{ $t->created_at->format('d M Y, H:i') }}
-                            </div>
-                            <div class="tr-meta flex items-center gap-1 !text-[10px]">
-                                <span>
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12"
-                                        viewBox="0 0 24 24" fill="currentColor"
-                                        class="icon icon-tabler icons-tabler-filled icon-tabler-send">
-                                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                                        <path
-                                            d="M21.864 3.549l-6.454 17.868a1.55 1.55 0 0 1 -1.41 .903a1.54 1.54 0 0 1 -1.394 -.874l-2.88 -5.759zm-1.414 -1.414l-12.139 12.138l-5.728 -2.864a1.55 1.55 0 0 1 -.903 -1.409c0 -.606 .353 -1.157 .981 -1.44z" />
-                                    </svg>
-
-                                </span>
-                                <span>
-                                    Apotek Asal: {{ $t->users?->pharmacy?->name ?? '—' }}
-                                </span>
-                            </div>
-                            <div class="tr-meta flex items-center gap-1 !text-[10px]">
-                                <span>
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12"
-                                        viewBox="0 0 24 24" fill="currentColor"
-                                        class="icon icon-tabler icons-tabler-filled icon-tabler-map-pin">
-                                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                                        <path
-                                            d="M18.364 4.636a9 9 0 0 1 .203 12.519l-.203 .21l-4.243 4.242a3 3 0 0 1 -4.097 .135l-.144 -.135l-4.244 -4.243a9 9 0 0 1 12.728 -12.728zm-6.364 3.364a3 3 0 1 0 0 6a3 3 0 0 0 0 -6" />
-                                    </svg>
-
-                                </span>
-                                <span>
-                                    Apotek Tujuan: {{ $t->batches?->pharmacy?->name ?? '—' }}
-                                </span>
-                            </div>
-                        </div>
-                        <div class="tr-stock">{{ $t->stock }}</div>
-                        @if ($t->status == 1)
-                            <div class="tr-actions" onclick="event.stopPropagation()">
-
-                                <button type="submit" class="btn btn-confirmed">
-                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
-                                        stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-                                        <polyline points="20 6 9 17 4 12" />
-                                    </svg>
-                                    Diterima
-                                </button>
-                                <button type="button" class="btn !bg-[#5085ff] btn-confirmed"
-                                    onclick="window.open('{{ route('transfers.print', $t->id) }}', '_blank')">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" viewBox="0 0 24 24"
-                                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                        stroke-linejoin="round">
-                                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                                        <path
-                                            d="M17 17h2a2 2 0 0 0 2 -2v-4a2 2 0 0 0 -2 -2h-14a2 2 0 0 0 -2 2v4a2 2 0 0 0 2 2h2" />
-                                        <path d="M17 9v-4a2 2 0 0 0 -2 -2h-6a2 2 0 0 0 -2 2v4" />
-                                        <path
-                                            d="M7 15a2 2 0 0 1 2 -2h6a2 2 0 0 1 2 2v4a2 2 0 0 1 -2 2h-6a2 2 0 0 1 -2 -2l0 -4" />
-                                    </svg>
-                                    Print
-                                </button>
-                            </div>
-                        @else
-                            <div class="tr-actions" onclick="event.stopPropagation()">
-                                <form method="POST" action="{{ route('transfers.accept', $t) }}">
-                                    @csrf
-                                    <button type="submit" class="btn btn-accept"
-                                        onclick="return confirm('Terima transfer ini?')">
-                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
-                                            stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-                                            <polyline points="20 6 9 17 4 12" />
-                                        </svg>
-                                        Terima
-                                    </button>
-                                </form>
-                                <form method="POST" action="{{ route('transfers.deny', $t) }}">
-                                    @csrf
-                                    <button type="submit" class="btn btn-deny"
-                                        onclick="return confirm('Tolak transfer ini?')">
-                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
-                                            stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-                                            <line x1="18" y1="6" x2="6" y2="18" />
-                                            <line x1="6" y1="6" x2="18" y2="18" />
-                                        </svg>
-                                        Tolak
-                                    </button>
-                                </form>
-                            </div>
-                        @endif
-                    </div>
-                @empty
-                    <div class="empty-state">
-                        <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#94a3b8"
-                            stroke-width="1.5" stroke-linecap="round">
-                            <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                        <p>Belum ada transfer yang diterima.</p>
-                    </div>
-                @endforelse
-                @if ($accepted->hasPages())
-                    <div class="pagination-bar">
-                        <a href="{{ $accepted->previousPageUrl() ? $accepted->previousPageUrl() . '#tab-accepted' : '#' }}"
-                            class="page-btn {{ $accepted->onFirstPage() ? 'disabled' : '' }}">‹ Sebelumnya</a>
-                        <span class="page-info">Hal {{ $accepted->currentPage() }} / {{ $accepted->lastPage() }}</span>
-                        <a href="{{ $accepted->hasMorePages() ? $accepted->nextPageUrl() . '#tab-accepted' : '#' }}"
-                            class="page-btn {{ $accepted->hasMorePages() ? '' : 'disabled' }}">Berikutnya ›</a>
-                    </div>
-                @endif
-            </div>
-
-            {{-- ── DENIED ── --}}
-            <div id="tab-denied" class="tab-panel">
-                @forelse($denied as $t)
-                    <div class="transfer-row" onclick="openDetail({{ $t->id }})">
-                        <div class="tr-info">
-                            <div class="tr-code">{{ $t->code }}</div>
-                            <div class="tr-name">{{ $t->batches?->medicines?->name ?? '—' }}</div>
-                            <div class="tr-meta">
-                                Batch: {{ $t->batches?->name ?? '—' }}
-                                &nbsp;·&nbsp; Etalase: {{ $t->etalases?->name ?? '—' }}
-                                &nbsp;·&nbsp; {{ $t->created_at->format('d M Y, H:i') }}
-                            </div>
-                        </div>
-                        <div class="tr-stock">{{ $t->stock }}</div>
-                        <span class="status-pill pill-denied">✕ Ditolak</span>
-                    </div>
-                @empty
-                    <div class="empty-state">
-                        <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#94a3b8"
-                            stroke-width="1.5" stroke-linecap="round">
-                            <line x1="18" y1="6" x2="6" y2="18" />
-                            <line x1="6" y1="6" x2="18" y2="18" />
-                        </svg>
-                        <p>Belum ada transfer yang ditolak.</p>
-                    </div>
-                @endforelse
-                @if ($denied->hasPages())
-                    <div class="pagination-bar">
-                        <a href="{{ $denied->previousPageUrl() ? $denied->previousPageUrl() . '#tab-denied' : '#' }}"
-                            class="page-btn {{ $denied->onFirstPage() ? 'disabled' : '' }}">‹ Sebelumnya</a>
-                        <span class="page-info">Hal {{ $denied->currentPage() }} / {{ $denied->lastPage() }}</span>
-                        <a href="{{ $denied->hasMorePages() ? $denied->nextPageUrl() . '#tab-denied' : '#' }}"
-                            class="page-btn {{ $denied->hasMorePages() ? '' : 'disabled' }}">Berikutnya ›</a>
-                    </div>
-                @endif
-            </div>
-
+                    <p class="text-sm text-slate-400">Tidak ada transfer masuk</p>
+                </div>
+            @endforelse
         </div>
-    </section>
 
-    {{-- ── Detail Modal ── --}}
-    <div class="modal-overlay" id="detailModal" onclick="closeDetail(event)">
-        <div class="modal-box">
-            <div class="modal-header">
-                <div>
-                    <h3>Detail Transfer</h3>
-                    <div class="modal-code" id="modal-code">—</div>
+        {{-- TAB: Ditolak --}}
+        <div id="tab-denied" class="tab-panel hidden space-y-4">
+            @forelse($denied as $transfer)
+                <div class="bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden">
+
+                    <div class="flex items-center justify-between px-5 py-3.5 bg-slate-50 border-b border-slate-100">
+                        <div class="flex items-center gap-3">
+                            <span
+                                class="font-mono text-xs px-2.5 py-1 bg-white border border-slate-200 rounded-md text-slate-700 font-semibold">
+                                {{ $transfer->code }}
+                            </span>
+                            <span class="text-xs text-slate-400">{{ $transfer->created_at->format('d M Y, H:i') }}</span>
+                        </div>
+                        <span
+                            class="text-[11px] font-semibold px-2.5 py-1 rounded-full border bg-rose-50 text-rose-700 border-rose-200">
+                            Ditolak
+                        </span>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-xs">
+                            <thead
+                                class="bg-slate-50/50 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                <tr>
+                                    <th class="py-2.5 px-5 text-left">Obat</th>
+                                    <th class="py-2.5 px-4 text-left">Batch</th>
+                                    <th class="py-2.5 px-4 text-left">Etalase</th>
+                                    <th class="py-2.5 px-4 text-center">Qty</th>
+                                    <th class="py-2.5 px-4 text-center">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-50">
+                                @forelse($transfer->items as $item)
+                                    <tr class="hover:bg-slate-50/50 transition">
+                                        <td class="py-3 px-5">
+                                            <div class="font-semibold text-slate-800">
+                                                {{ $item->batches?->medicines?->name ?? '—' }}</div>
+                                            <div class="text-[10px] text-slate-400 font-mono mt-0.5">
+                                                {{ $item->batches?->medicines?->code ?? '—' }}</div>
+                                        </td>
+                                        <td class="py-3 px-4 text-slate-600">{{ $item->batches?->name ?? '—' }}</td>
+                                        <td class="py-3 px-4 text-slate-600">{{ $item->etalases?->name ?? '—' }}</td>
+                                        <td class="py-3 px-4 text-center">
+                                            <span
+                                                class="inline-flex items-center px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 font-mono text-[11px] font-semibold">
+                                                {{ $item->qty }}
+                                            </span>
+                                        </td>
+                                        <td class="py-3 px-4 text-center">
+                                            @php [$iLabel, $iClass] = $statusMap[$item->status] ?? ['—', '']; @endphp
+                                            <span
+                                                class="text-[10px] font-semibold px-2 py-0.5 rounded-full border {{ $iClass }}">
+                                                {{ $iLabel }}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="5" class="py-6 text-center text-slate-400 text-xs">Tidak ada item
+                                        </td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="px-5 py-3 border-t border-slate-100 text-xs text-slate-400">
+                        {{ $denied->links() }}
+                    </div>
+
                 </div>
-                <button class="modal-close" onclick="closeModal()">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                        stroke-width="2.5" stroke-linecap="round">
-                        <line x1="18" y1="6" x2="6" y2="18" />
-                        <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
-                </button>
-            </div>
-            <div class="modal-body">
-
-                <div class="detail-section-label">Informasi Obat</div>
-                <div class="detail-grid">
-                    <div class="detail-item">
-                        <div class="lbl">Nama Obat</div>
-                        <div class="val" id="modal-med-name">—</div>
+            @empty
+                <div class="bg-white rounded-xl border border-slate-200/80 shadow-sm py-16 text-center">
+                    <div class="text-slate-300 mb-3">
+                        <svg class="w-10 h-10 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                            stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M12 5l7 7-7 7" />
+                        </svg>
                     </div>
-                    <div class="detail-item">
-                        <div class="lbl">Kode Obat</div>
-                        <div class="val" id="modal-med-code">—</div>
-                    </div>
-                    <div class="detail-item full">
-                        <div class="lbl">Nama Batch</div>
-                        <div class="val" id="modal-batch-name">—</div>
-                    </div>
+                    <p class="text-sm text-slate-400">Tidak ada transfer ditolak</p>
                 </div>
-
-                <div class="detail-section-label">Informasi Transfer</div>
-                <div class="detail-grid">
-                    <div class="detail-item">
-                        <div class="lbl">Qty Transfer</div>
-                        <div class="val green" id="modal-stock">—</div>
-                    </div>
-                    <div class="detail-item">
-                        <div class="lbl">Etalase Tujuan</div>
-                        <div class="val" id="modal-etalase">—</div>
-                    </div>
-                    <div class="detail-item">
-                        <div class="lbl">Tanggal</div>
-                        <div class="val" id="modal-date">—</div>
-                    </div>
-                    <div class="detail-item">
-                        <div class="lbl">Status</div>
-                        <div id="modal-status">—</div>
-                    </div>
-                </div>
-
-            </div>
+            @endforelse
         </div>
+
     </div>
+@endsection
 
-    {{-- Embed transfer data for JS --}}
+@section('scripts')
+    <script src="{{ asset('templates/library/izitoast/dist/js/iziToast.min.js') }}"></script>
     <script>
-        const transferData = @json($transferData);
+        function switchTab(key) {
+            document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(b => {
+                b.classList.remove('bg-white', 'text-slate-800', 'shadow-sm');
+                b.classList.add('text-slate-500');
+            });
 
+            document.getElementById('tab-' + key).classList.remove('hidden');
+            const activeBtn = document.getElementById('tab-btn-' + key);
+            activeBtn.classList.add('bg-white', 'text-slate-800', 'shadow-sm');
+            activeBtn.classList.remove('text-slate-500');
 
-        const statusLabel = {
-            0: ['⏳ Menunggu', '#fff7ed', '#ea580c'],
-            1: ['✓ Diterima', '#f0fdf4', '#16a34a'],
-            2: ['✕ Ditolak', '#fff1f1', '#ef4444'],
-        };
-
-        function switchTab(name, btn) {
-            document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            document.getElementById('tab-' + name).classList.add('active');
-            btn.classList.add('active');
-            history.replaceState(null, '', '#tab-' + name);
+            // Save active tab to URL hash
+            window.location.hash = key;
         }
 
-        function activateTabFromHash() {
-            const raw = window.location.hash.replace('#tab-', '');
-            const name = ['pending', 'accepted', 'denied'].includes(raw) ? raw : 'pending';
-            const btn = document.querySelector(`.tab-btn[data-tab="${name}"]`);
-            if (btn) switchTab(name, btn);
-        }
-
-        document.addEventListener('DOMContentLoaded', activateTabFromHash);
-
-        function openDetail(id) {
-            const t = transferData[id];
-            if (!t) return;
-
-            document.getElementById('modal-code').textContent = t.code;
-            document.getElementById('modal-med-name').textContent = t.med_name;
-            document.getElementById('modal-med-code').textContent = t.med_code;
-            document.getElementById('modal-batch-name').textContent = t.batch_name;
-            document.getElementById('modal-stock').textContent = t.stock;
-            document.getElementById('modal-etalase').textContent = t.etalase;
-            document.getElementById('modal-date').textContent = t.date;
-
-            const [label, bg, color] = statusLabel[t.status] ?? ['—', '#f1f5f9', '#64748b'];
-            const statusEl = document.getElementById('modal-status');
-            statusEl.innerHTML = `<span class="modal-status" style="background:${bg};color:${color}">${label}</span>`;
-
-            document.getElementById('detailModal').classList.add('open');
-        }
-
-        function closeDetail(e) {
-            if (e.target === document.getElementById('detailModal')) closeModal();
-        }
-
-        function closeModal() {
-            document.getElementById('detailModal').classList.remove('open');
-        }
-
-        document.addEventListener('keydown', e => {
-            if (e.key === 'Escape') closeModal();
+        // Restore active tab on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            const hash = window.location.hash.replace('#', '');
+            const validTabs = ['pending', 'accepted', 'denied'];
+            switchTab(validTabs.includes(hash) ? hash : 'pending');
         });
     </script>
 @endsection

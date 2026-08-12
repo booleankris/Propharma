@@ -292,10 +292,9 @@
                             <label class="block mb-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Hrg
                                 HNA</label>
                             <div class="relative">
-                                <span
-                                    class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500 text-sm">Rp</span>
+                                
                                 <input id="item_price" readonly
-                                    class="w-full rounded-lg border border-gray-200 bg-gray-50 pl-9 pr-4 py-2.5 text-sm text-gray-600 focus:outline-none"
+                                    class="w-full rounded-lg border border-gray-200 bg-gray-50 pl-4 pr-4 py-2.5 text-sm text-gray-600 focus:outline-none"
                                     placeholder="0">
                             </div>
                         </div>
@@ -303,10 +302,9 @@
                             <label
                                 class="block mb-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Jumlah</label>
                             <div class="relative">
-                                <span
-                                    class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500 text-sm font-medium">Rp</span>
+                                
                                 <input id="total_price" readonly name="total_price"
-                                    class="w-full rounded-lg border border-gray-200 bg-gray-50 pl-9 pr-4 py-2.5 text-sm font-semibold text-gray-800 focus:outline-none"
+                                    class="w-full rounded-lg border border-gray-200 bg-gray-50 pl-4 pr-4 py-2.5 text-sm font-semibold text-gray-800 focus:outline-none"
                                     placeholder="0">
                             </div>
                         </div>

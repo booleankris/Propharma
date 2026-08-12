@@ -93,8 +93,8 @@ class OrdersController extends Controller
             return view('orders.order', compact('order_code', 'now', 'd_price', 'd_ppn', 'd_total', 'order_id'));
         } else {
             // Generate Order COde
-            $year   = now()->format('y');
-            $month  = now()->format('m');
+            $year = now()->format('y');
+            $month = now()->format('m');
             $prefix = $year . $month . 'OR';
 
             $last = Order::where('code', 'like', $prefix . '%')
@@ -116,11 +116,11 @@ class OrdersController extends Controller
                 DB::beginTransaction();
 
                 $transaction = Order::create([
-                    'pharmacy_id'       => Auth()->user()->pharmacy_id,
-                    'user_id'           => Auth()->user()->id,
-                    'code'              => $transactionCode,
-                    'date'              => $now,
-                    'status'            => 0,
+                    'pharmacy_id' => Auth()->user()->pharmacy_id,
+                    'user_id' => Auth()->user()->id,
+                    'code' => $transactionCode,
+                    'date' => $now,
+                    'status' => 0,
                 ]);
                 DB::commit();
                 return redirect()->back()->with('message', "Berhasil Menyimpan! ");
@@ -188,27 +188,73 @@ class OrdersController extends Controller
             $order->code . '.xlsx'
         );
     }
+    public function getOrdersCode($medicineId, $orderId)
+    {
+        $medicine = \App\Models\Medicines::findOrFail($medicineId);
+        $order = \App\Models\Order::findOrFail($orderId);
+        $pharmacyId = $order->pharmacy_id;
+
+        $type = strtoupper($medicine->type);
+        $code = '';
+        if ($type == "NARKOTIKA") {
+            $code = "N";
+        } else if ($type == "PSIKOTROPIKA") {
+            $code = "P";
+        } else if ($type == "PREKURSOR") {
+            $code = "PR";
+        } else if ($type == "OBAT-OBAT TERTENTU (OOT)" || $type == "OBAT TERTENTU") {
+            $code = "O";
+        } else if ($type == "REGULER") {
+            $code = "R";
+        } else {
+            $code = "R";
+        }
+
+        $year = now()->format('y');
+        $month = now()->format('m');
+        $prefix = "SP-{$code}-{$year}{$month}/";
+
+        $lastItem = \App\Models\OrderItems::where('order_items_code', 'like', $prefix . '%')
+            ->whereHas('orders', function ($query) use ($pharmacyId) {
+                $query->where('pharmacy_id', $pharmacyId);
+            })
+            ->orderBy('order_items_code', 'desc')
+            ->first();
+
+        if ($lastItem && $lastItem->order_items_code) {
+            $parts = explode('/', $lastItem->order_items_code);
+            $lastSerial = intval(end($parts));
+            $nextSerial = $lastSerial + 1;
+        } else {
+            $nextSerial = 1;
+        }
+
+        return $prefix . str_pad($nextSerial, 4, '0', STR_PAD_LEFT);
+    }
     public function addItemOrder(Request $request)
     {
         $validated = $request->validate([
-            'order_id'      => 'required',
-            'medicine_id'   => 'required',
+            'order_id' => 'required',
+            'medicine_id' => 'required',
             'creditor_code' => 'nullable',
-            'pack'          => 'required',
-            'price'         => 'required',
-            'quantity'      => 'required',
-            'total'         => 'required',
+            'pack' => 'required',
+            'price' => 'required',
+            'quantity' => 'required',
+            'total' => 'required',
         ]);
 
+        $itemCode = $this->getOrdersCode($validated['medicine_id'], $validated['order_id']);
+
         $item = OrderItems::create([
-            'order_id'      => $validated['order_id'],
-            'medicine_id'   => $validated['medicine_id'],
+            'order_items_code' => $itemCode,
+            'order_id' => $validated['order_id'],
+            'medicine_id' => $validated['medicine_id'],
             'creditor_code' => $validated['creditor_code'] ?? null,
-            'pack'          => $validated['pack'],
-            'price'         => $validated['price'],
-            'quantity'      => $validated['quantity'],
-            'total'         => $validated['total'],
-            'status'        => 0,
+            'pack' => $validated['pack'],
+            'price' => $validated['price'],
+            'quantity' => $validated['quantity'],
+            'total' => $validated['total'],
+            'status' => 0,
         ]);
 
         $price_total = OrderItems::where('order_id', $item->order_id)->where('status', '0')->sum('total') ?? '';
@@ -228,21 +274,28 @@ class OrdersController extends Controller
     {
         $request->validate([
             'medicine_id' => 'required|exists:medicines,id',
-            'pack'        => 'required|',
-            'price'       => 'required|',
-            'quantity'    => 'required|',
-            'total'       => 'required|',
+            'pack' => 'required|',
+            'price' => 'required|',
+            'quantity' => 'required|',
+            'total' => 'required|',
         ]);
 
         $item = OrderItems::findOrFail($request->order_id);
-        $item->update([
+
+        $data = [
             'medicine_id' => $request->medicine_id,
             'creditor_code' => $request->creditor_code,
-            'pack'        => $request->pack,
-            'price'       => $request->price,
+            'pack' => $request->pack,
+            'price' => $request->price,
             'quantity' => $request->quantity,
             'total' => $request->total,
-        ]);
+        ];
+
+        if ($item->medicine_id != $request->medicine_id) {
+            $data['order_items_code'] = $this->getOrdersCode($request->medicine_id, $item->order_id);
+        }
+
+        $item->update($data);
 
         $price_total = OrderItems::where('order_id', $item->order_id)->where('status', '0')->sum('total') ?? '';
 
@@ -301,14 +354,14 @@ class OrdersController extends Controller
         // format response for frontend
         $data->getCollection()->transform(function ($item) {
             return [
-                'id'           => $item->id,
-                'code'         => $item->code,
-                'name'         => $item->name,
-                'factory_id'   => $item->factory?->id,
+                'id' => $item->id,
+                'code' => $item->code,
+                'name' => $item->name,
+                'factory_id' => $item->factory?->id,
                 'factory_name' => $item->factory?->name,
-                'packaging'    => $item->packaging,
-                'content'      => $item->content,
-                'raw_price'    => $item->raw_price,
+                'packaging' => $item->packaging,
+                'content' => $item->content,
+                'raw_price' => $item->raw_price,
             ];
         });
         return response()->json($data);
@@ -318,7 +371,7 @@ class OrdersController extends Controller
     {
         $now = Carbon::now();
 
-        $year  = $now->format('y'); // 25
+        $year = $now->format('y'); // 25
         $month = $now->format('m'); // 11
         $prefix = "{$year}{$month}OI";
 
@@ -364,9 +417,9 @@ class OrdersController extends Controller
                 'status' => 1,
             ]);
 
-            $now    = now()->format('d/m/Y');
-            $year   = now()->format('y');
-            $month  = now()->format('m');
+            $now = now()->format('d/m/Y');
+            $year = now()->format('y');
+            $month = now()->format('m');
             $prefix = $year . $month . 'RE';
 
             $last = Receiving::where('code', 'like', $prefix . '%')
@@ -381,10 +434,10 @@ class OrdersController extends Controller
             $receiving_code = $prefix . $serial;
 
             $transaction = Receiving::create([
-                'pharmacy_id'  => auth()->user()->pharmacy_id,
-                'code'         => $receiving_code,
-                'date'         => $now,
-                'status'       => 0,
+                'pharmacy_id' => auth()->user()->pharmacy_id,
+                'code' => $receiving_code,
+                'date' => $now,
+                'status' => 0,
             ]);
 
             // 26 Juli 2026 - Edit receiving_id from orders
@@ -416,9 +469,9 @@ class OrdersController extends Controller
             'medicine' => $medicine,
             'creditors' => $medicine->creditors->map(function ($c) {
                 return [
-                    'id'       => $c->id,
-                    'name'     => $c->name,
-                    'code'     => $c->code,
+                    'id' => $c->id,
+                    'name' => $c->name,
+                    'code' => $c->code,
                     'discount' => $c->pivot->discount ?? 0,
                 ];
             })
@@ -427,10 +480,12 @@ class OrdersController extends Controller
     public function printSPB($orderId)
     {
         try {
+            ini_set('memory_limit', '512M');
             $date = Carbon::now()->translatedFormat('d F Y');
             $order = Order::with([
                 'pharmacy',
                 'order_items.medicines',
+                'order_items.medicines.creditors',
                 'order_items.creditors',
                 'order_items.medicines.factory',
                 'order_items.medicines.category',
@@ -440,7 +495,11 @@ class OrdersController extends Controller
             $pharmacy = $order->pharmacy;
 
             $grouped = $order->order_items->groupBy(function ($item) {
-                return $item->medicines->type ?? "Kosong";
+                $type = $item->medicines->type ?? "Kosong";
+                if (strtoupper($type) === 'NARKOTIKA') {
+                    return 'NARKOTIKA_' . $item->id;
+                }
+                return $type;
             })->map(function ($perCreditor) {
                 return $perCreditor->groupBy('creditor_code') ?? "Kosong";
             });
@@ -465,9 +524,9 @@ class OrdersController extends Controller
     public function smartMedicines(Request $request)
     {
         $dateFrom = $request->date_from ?? now()->subDays(30)->format('Y-m-d');
-        $dateTo   = $request->date_to ?? now()->format('Y-m-d');
-        $search   = $request->search;
-        $orderId  = $request->order_id;
+        $dateTo = $request->date_to ?? now()->format('Y-m-d');
+        $search = $request->search;
+        $orderId = $request->order_id;
 
         // exclude medicines already in this order, so Smart Order doesn't duplicate rows
         $existingIds = OrderItems::where('order_id', $orderId)->pluck('medicine_id');
@@ -488,11 +547,11 @@ class OrdersController extends Controller
             $medicine = Medicines::find($row->medicine_id);
             return [
                 'medicine_id' => $row->medicine_id,
-                'code'        => $medicine->code,
-                'name'        => $medicine->name,
-                'packaging'   => $medicine->packaging,
-                'raw_price'   => $medicine->raw_price,
-                'total_sold'  => (int) $row->total_sold,
+                'code' => $medicine->code,
+                'name' => $medicine->name,
+                'packaging' => $medicine->packaging,
+                'raw_price' => $medicine->raw_price,
+                'total_sold' => (int) $row->total_sold,
             ];
         });
 
@@ -502,10 +561,10 @@ class OrdersController extends Controller
     public function addItemsBulk(Request $request)
     {
         $request->validate([
-            'order_id'              => 'required|exists:orders,id',
-            'items'                 => 'required|array|min:1',
-            'items.*.medicine_id'   => 'required|exists:medicines,id',
-            'items.*.quantity'      => 'required|integer|min:1',
+            'order_id' => 'required|exists:orders,id',
+            'items' => 'required|array|min:1',
+            'items.*.medicine_id' => 'required|exists:medicines,id',
+            'items.*.quantity' => 'required|integer|min:1',
         ]);
 
         try {
@@ -513,18 +572,21 @@ class OrdersController extends Controller
 
             foreach ($request->items as $item) {
                 $medicine = Medicines::find($item['medicine_id']);
-                $qty   = $item['quantity'];
+                $qty = $item['quantity'];
                 $price = $medicine->raw_price;
 
+                $itemCode = $this->getOrdersCode($item['medicine_id'], $request->order_id);
+
                 OrderItems::create([
-                    'order_id'      => $request->order_id,
-                    'medicine_id'   => $item['medicine_id'],
+                    'order_items_code' => $itemCode,
+                    'order_id' => $request->order_id,
+                    'medicine_id' => $item['medicine_id'],
                     'creditor_code' => null,
-                    'pack'          => 0,
-                    'price'         => $price,
-                    'quantity'      => $qty,
-                    'total'         => $qty * $price,
-                    'status'        => 0,
+                    'pack' => 0,
+                    'price' => $price,
+                    'quantity' => $qty,
+                    'total' => $qty * $price,
+                    'status' => 0,
                 ]);
             }
 
@@ -543,8 +605,8 @@ class OrdersController extends Controller
         return response()->json([
             'success' => true,
             'summary' => [
-                'price_item'  => $price_total,
-                'price_ppn'   => $ppn,
+                'price_item' => $price_total,
+                'price_ppn' => $ppn,
                 'price_total' => $price_total + $ppn,
             ]
         ]);

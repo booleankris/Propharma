@@ -117,8 +117,8 @@
         @endif
 
         {{-- =========================================================
-         1) REGULER
-    ========================================================== --}}
+        1) REGULER
+        ========================================================== --}}
         @if ($type == 'REGULER')
             @foreach ($items as $creditorCode => $items)
                 <table style="width:100%; border-collapse:collapse;">
@@ -151,7 +151,7 @@
                 <table style="width:100%; margin-top:2px;">
                     <tr>
                         <td style="width:50%; vertical-align:top;">
-                            <b>No :</b> SP-00{{ $items->first()->id }}
+                            <b>No :</b> {{ $items->first()->order_items_code }}
                         </td>
                         <td style="width:50%; text-align:right; vertical-align:top;">
                             <b>Kepada Yth :</b> {{ optional($items->first()->creditors)->name ?? '-' }}
@@ -176,22 +176,28 @@
                 <table class="form-table">
                     <thead>
                         <tr>
-                            <th style="width:15%;">Jumlah</th>
+                            <th style="width:20%;">Jumlah</th>
                             <th style="width:55%;">Nama Obat</th>
-                            <th style="width:30%;">Keterangan</th>
+                            <th style="width:25%;">Keterangan</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach ($items as $row)
                             <tr>
                                 <td style="text-align:center;">
-                                    {{ optional($row->receiving_items)->qty_received ?? 0 }}
+                                    {{ $row->receivingItems->sum('qty_received') }}
+                                    ({{ ucfirst(terbilang($row->receivingItems->sum('qty_received'))) }}) {{ $row->medicines->unit ?? '-' }}
                                 </td>
                                 <td>
                                     {{ $row->medicines->name ?? '-' }}
                                 </td>
                                 <td>
-                                    {{-- optional --}}
+                                    @php
+                                        $credCode = $row->creditor_code ?? optional($row->creditors)->code;
+                                        $medCred = $row->medicines->creditors->firstWhere('code', $credCode) ?? $row->medicines->creditors->first();
+                                        $disc = $medCred?->pivot?->discount;
+                                    @endphp
+                                    {{ $disc ? ($disc == (int)$disc ? (int)$disc : $disc) . '%' : '-' }}
                                 </td>
                             </tr>
                         @endforeach
@@ -217,14 +223,8 @@
                             {{ $pharmacy->city }}, {{ $date }}
                             <br>
                             Penanggung Jawab,
-                            @if ($pharmacy->signature && file_exists(public_path('img/' . $pharmacy->signature)))
-                                <div style="margin: 1px 0;">
-                                    <img src="{{ public_path('img/' . $pharmacy->signature) }}"
-                                        style="height:35px; width:auto;">
-                                </div>
-                            @else
-                                <div style="height:35px;"></div> {{-- blank space to sign by hand --}}
-                            @endif
+
+                            <div style="height:35px;"></div> {{-- blank space to sign by hand --}}
                             <b><u>{{ $pharmacy->pharmacist }}</u></b><br>
                             SIPA : {{ $pharmacy->pharmacist_permit }}
                         </td>
@@ -237,15 +237,15 @@
             @endforeach
 
             {{-- =========================================================
-         2) PREKURSOR
-    ========================================================== --}}
+            2) PREKURSOR
+            ========================================================== --}}
         @elseif ($type == 'PREKURSOR')
             @foreach ($items as $creditorCode => $items)
                 <div class="title-main">
                     SURAT PESANAN OBAT MENGANDUNG PREKURSOR FARMASI
                 </div>
                 <div class="subtitle">
-                    Nomor SP : SP-00{{ $items->first()->id }}
+                    Nomor SP : {{ $items->first()->order_items_code }}
                 </div>
 
                 <div class="section-gap">Yang bertanda tangan dibawah ini :</div>
@@ -318,9 +318,11 @@
                                 <td style="text-align:center;">{{ $index + 1 }}</td>
                                 <td style="text-align:left;">{{ $row->medicines->name ?? '-' }}</td>
                                 <td style="text-align:center;">
-                                    {{ optional($row->medicines->composition)->name ?? '-' }}</td>
+                                    {{ optional($row->medicines->composition)->name ?? '-' }}
+                                </td>
                                 <td style="text-align:center;">{{ $row->medicines->packaging ?? '-' }}</td>
-                                <td style="text-align:center;">{{ optional($row->receiving_items)->qty_received ?? 0 }}</td>
+                                <td style="text-align:center;">{{ $row->receivingItems->sum('qty_received') }}
+                                    ({{ ucfirst(terbilang($row->receivingItems->sum('qty_received'))) }})</td>
                                 <td></td>
                             </tr>
                         @endforeach
@@ -376,14 +378,9 @@
                             {{ $pharmacy->city }}, {{ $date }}
                             <br>
                             Pemesan,
-                            @if ($pharmacy->signature && file_exists(public_path('img/' . $pharmacy->signature)))
-                                <div style="margin: 4px 0;">
-                                    <img src="{{ public_path('img/' . $pharmacy->signature) }}"
-                                        style="height:35px; width:auto;">
-                                </div>
-                            @else
-                                <div style="height:35px;"></div> {{-- blank space to sign by hand --}}
-                            @endif
+
+                            <div style="height:35px;"></div> {{-- blank space to sign by hand --}}
+
                             <b><u>{{ $pharmacy->pharmacist }}</u></b><br>
                             SIPA : {{ $pharmacy->pharmacist_permit }}
                         </td>
@@ -396,8 +393,8 @@
             @endforeach
 
             {{-- =========================================================
-         3) OBAT-OBAT TERTENTU (OOT)
-    ========================================================== --}}
+            3) OBAT-OBAT TERTENTU (OOT)
+            ========================================================== --}}
         @elseif ($type == 'Obat Tertentu' || $type == 'OBAT-OBAT TERTENTU (OOT)')
             @foreach ($items as $creditorCode => $items)
                 <div class="title-main">
@@ -405,7 +402,7 @@
                 </div>
 
                 <div class="subtitle">
-                    Nomor : SP-00{{ $items->first()->id }}
+                    Nomor : {{ $items->first()->order_items_code }}
                 </div>
 
                 <div class="section-gap">Yang bertanda tangan dibawah ini :</div>
@@ -455,24 +452,35 @@
 
                 <div class="section-gap">Dengan Obat-Obat Tertentu yang dipesan adalah :</div>
 
-                <table style="width:100%; border-collapse:collapse;">
-                    @php $no = 1; @endphp
-                    @foreach ($items as $row)
+                <table class="form-table">
+                    <thead>
                         <tr>
-                            <td style="width:14px; padding:1px 0;">{{ $no++ }})</td>
-                            <td style="border-bottom:1px dotted #000; padding:1px 0;">
-                                <b>{{ $row->medicines->name ?? '-' }}</b>
-                                ({{ optional($row->receiving_items)->qty_received ?? 0 }})
-                            </td>
+                            <th style="width:5%;">No.</th>
+                            <th style="width:35%;">NAMA OBAT</th>
+                            <th style="width:20%;">KOMPONEN</th>
+                            <th style="width:20%;">JUMLAH</th>
                         </tr>
-                    @endforeach
+                    </thead>
+                    <tbody>
+                        @foreach ($items as $index => $row)
+                            <tr>
+                                <td style="text-align:center;">{{ $index + 1 }}</td>
+                                <td style="text-align:left;">{{ $row->medicines->name ?? '-' }}</td>
+                                <td style="text-align:center;">{{ $row->medicines->composition->name ?? '-' }}</td>
+                                <td style="text-align:center;">{{ $row->receivingItems->sum('qty_received') }}
+                                    ({{ ucfirst(terbilang($row->receivingItems->sum('qty_received'))) }})</td>
+                            </tr>
+                        @endforeach
 
-                    @for ($i = count($items); $i < 2; $i++)
-                        <tr>
-                            <td style="padding:1px 0;">{{ $i + 1 }})</td>
-                            <td style="border-bottom:1px dotted #000; padding:1px 0;">&nbsp;</td>
-                        </tr>
-                    @endfor
+                        @for ($i = count($items); $i < 3; $i++)
+                            <tr>
+                                <td>&nbsp;</td>
+                                <td></td>
+                                <td></td>
+                                <td></td>
+                            </tr>
+                        @endfor
+                    </tbody>
                 </table>
 
                 <div class="section-gap">Obat-Obat Tertentu tersebut akan dipergunakan untuk :</div>
@@ -501,14 +509,9 @@
                             {{ $pharmacy->city }}, {{ $date }}
                             <br>
                             Pemesan,
-                            @if ($pharmacy->signature && file_exists(public_path('img/' . $pharmacy->signature)))
-                                <div style="margin: 4px 0;">
-                                    <img src="{{ public_path('img/' . $pharmacy->signature) }}"
-                                        style="height:35px; width:auto;">
-                                </div>
-                            @else
-                                <div style="height:35px;"></div> {{-- blank space to sign by hand --}}
-                            @endif
+
+                            <div style="height:35px;"></div> {{-- blank space to sign by hand --}}
+
                             <b>( {{ $pharmacy->pharmacist }} )</b><br>
                             SIPA : {{ $pharmacy->pharmacist_permit }}
                         </td>
@@ -527,15 +530,15 @@
             @endforeach
 
             {{-- =========================================================
-         4) NARKOTIKA
-    ========================================================== --}}
-        @elseif ($type == 'NARKOTIKA')
+            4) NARKOTIKA
+            ========================================================== --}}
+        @elseif (str_starts_with($type, 'NARKOTIKA'))
             @foreach ($items as $creditorCode => $items)
                 <div class="title-main">
                     SURAT PESANAN NARKOTIKA
                 </div>
                 <div class="subtitle">
-                    Nomor : SP-00{{ $items->first()->id }}
+                    Nomor : {{ $items->first()->order_items_code }}
                 </div>
 
                 {{-- IDENTITAS --}}
@@ -595,7 +598,8 @@
                                 <td style="text-align:left;">{{ $row->medicines->name ?? '-' }}</td>
                                 <td style="text-align:center;">{{ $row->medicines->form ?? '' }}</td>
                                 <td style="text-align:center;">{{ $row->medicines->strength ?? '' }}</td>
-                                <td style="text-align:center;">{{ optional($row->receiving_items)->qty_received ?? 0 }}</td>
+                                <td style="text-align:center;">{{ $row->receivingItems->sum('qty_received') }}
+                                    ({{ ucfirst(terbilang($row->receivingItems->sum('qty_received'))) }})</td>
                             </tr>
                         @endforeach
 
@@ -609,7 +613,7 @@
                             </tr>
                         @endfor
                     </tbody>
-                  
+
                 </table>
 
                 {{-- SARANA --}}
@@ -635,14 +639,9 @@
                             {{ $pharmacy->city }}, {{ $date }}
                             <br>
                             Pemesan,
-                            @if ($pharmacy->signature && file_exists(public_path('img/' . $pharmacy->signature)))
-                                <div style="margin: 4px 0;">
-                                    <img src="{{ public_path('img/' . $pharmacy->signature) }}"
-                                        style="height:35px; width:auto;">
-                                </div>
-                            @else
-                                <div style="height:35px;"></div> {{-- blank space to sign by hand --}}
-                            @endif
+
+                            <div style="height:35px;"></div> {{-- blank space to sign by hand --}}
+
                             <b><u>{{ $pharmacy->pharmacist }}</u></b><br>
                             SIPA : {{ $pharmacy->pharmacist_permit }}
                         </td>
@@ -662,15 +661,15 @@
             @endforeach
 
             {{-- =========================================================
-         5) PSIKOTROPIKA
-    ========================================================== --}}
+            5) PSIKOTROPIKA
+            ========================================================== --}}
         @elseif ($type == 'Psikotropika' || $type == 'PSIKOTROPIKA')
             @foreach ($items as $creditorCode => $items)
                 <div class="title-main">
                     SURAT PESANAN PSIKOTROPIKA
                 </div>
                 <div class="subtitle">
-                    Nomor : SP-00{{ $items->first()->id }}
+                    Nomor : {{ $items->first()->order_items_code }}
                 </div>
 
                 {{-- IDENTITAS --}}
@@ -730,7 +729,8 @@
                                 <td style="text-align:left;">{{ $row->medicines->name ?? '-' }}</td>
                                 <td style="text-align:center;">{{ $row->medicines->form ?? '-' }}</td>
                                 <td style="text-align:center;">{{ $row->medicines->strength ?? '-' }}</td>
-                                <td style="text-align:center;">{{ optional($row->receiving_items)->qty_received ?? 0 }}</td>
+                                <td style="text-align:center;">{{ $row->receivingItems->sum('qty_received') }}
+                                    ({{ ucfirst(terbilang($row->receivingItems->sum('qty_received'))) }})</td>
                             </tr>
                         @endforeach
 
@@ -769,14 +769,9 @@
                             {{ $pharmacy->city }}, {{ $date }}
                             <br>
                             Pemesan,
-                            @if ($pharmacy->signature && file_exists(public_path('img/' . $pharmacy->signature)))
-                                <div style="margin: 4px 0;">
-                                    <img src="{{ public_path('img/' . $pharmacy->signature) }}"
-                                        style="height:35px; width:auto;">
-                                </div>
-                            @else
-                                <div style="height:35px;"></div> {{-- blank space to sign by hand --}}
-                            @endif
+
+                            <div style="height:35px;"></div> {{-- blank space to sign by hand --}}
+
                             <b><u>{{ $pharmacy->pharmacist }}</u></b><br>
                             SIPA : {{ $pharmacy->pharmacist_permit }}
                         </td>

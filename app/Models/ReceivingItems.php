@@ -10,6 +10,7 @@ class ReceivingItems extends Model
     use HasFactory;
     protected $table = 'receiving_items';
     protected $fillable = [
+        'raw_price',
         'receiving_details_id',
         'order_items_id',
         'qty_received',

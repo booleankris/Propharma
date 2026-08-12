@@ -327,6 +327,13 @@
                                     </option>
                                 </select>
                             </div>
+                            <div class="flex items-end pb-0.5">
+                                <button type="button" onclick="printSPBCreditor()"
+                                    class="inline-flex items-center gap-1.5 px-4 py-2.5 text-[12px] font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm transition-all duration-150">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                                    Cetak SP PBF Ini
+                                </button>
+                            </div>
                         </div>
                         <form method="post" action="{{ route('orders.addItemOrder') }}">
                             @csrf

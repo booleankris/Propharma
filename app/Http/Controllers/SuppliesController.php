@@ -9,6 +9,7 @@ use App\Models\ItemsLog;
 use App\Models\MedicineCart;
 use App\Models\Medicines;
 use App\Models\MedicineTransfers;
+use App\Models\MedicineTransferItems;
 use App\Models\ReceivingItems;
 use App\Models\StockOpname;
 use Carbon\Carbon;
@@ -32,18 +33,15 @@ class SuppliesController extends Controller
 
             $pharmacyId = auth()->user()->pharmacy_id;
 
-            // 1. BASE QUERY: Apply filters without eager load
             $baseQuery = ItemsLog::query();
 
-            // Restrict to the logged-in user's pharmacy:
-            // - Purchases (status 2) are scoped via receiving.pharmacy_id
-            // - Everything else is scoped via itemslog.user_id -> users.pharmacy_id
+
             $baseQuery->where(function ($q) use ($pharmacyId) {
                 $q->where(function ($sub) use ($pharmacyId) {
                     $sub->where('status', 2)
                         ->whereHas('receiving', function ($r) use ($pharmacyId) {
                             $r->where('pharmacy_id', $pharmacyId)
-                            ->where('status', 1);
+                                ->whereIn('status', [1, 2, 3]);
                         });
                 })->orWhere(function ($sub) use ($pharmacyId) {
                     $sub->where('status', '!=', 2)
@@ -98,12 +96,26 @@ class SuppliesController extends Controller
                 ->addIndexColumn()
                 ->addColumn('date', function ($row) {
                     return $row->date;
-                })
-                ->addColumn('medicine_name', function ($row) {
+                })->addColumn('medicine_name', function ($row) {
                     return $row->medicines->name;
                 })
                 ->addColumn('transaction_code', function ($row) {
-                    return $row->transaction_code;
+                    if ($row->status == 2) {
+                        $codeStr = $row->receiving?->receiving_details?->first()?->receiving_details_code ?? $row->transaction_code;
+                    } else {
+                        $codeStr = $row->transaction_code;
+                    }
+
+                    if (!$codeStr)
+                        return '-';
+                    $code = e($codeStr);
+                    return '
+                    <div class="flex items-center gap-1.5">
+                        <span class="font-mono text-[10px] font-medium text-slate-700 bg-slate-50 px-2 py-0.5 rounded border border-slate-200">' . $code . '</span>
+                        <button type="button" onclick="navigator.clipboard.writeText(\'' . $code . '\'); iziToast.success({title: \'Tersalin\', message: \'Kode berhasil disalin\', position: \'topRight\'})" class="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Salin kode">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                        </button>
+                    </div>';
                 })
                 ->addColumn('code', function ($row) {
                     return $row->code;
@@ -131,6 +143,7 @@ class SuppliesController extends Controller
                     if ($row->status == 1) {
                         return "<div style='color:#16a34a;font-weight:bold;'><span>-</span><b>" . $row->qty . "</b></div>";
                     } else if ($row->status == 2) {
+
                         return "<div style='color:#4173d3;font-weight:bold;'><span>+</span><b>" . $row->qty . "</b></div>";
                     } else if ($row->status == 3) {
                         return "<div style='color:#d34163;font-weight:bold;'><span>+</span><b>" . $row->qty . "</b></div>";
@@ -180,15 +193,15 @@ class SuppliesController extends Controller
                     }
                     return "-";
                 })
-                ->rawColumns(['status', 'stock', 'qty_before', 'qty_after'])
+                ->rawColumns(['status', 'stock', 'qty_before', 'qty_after', 'transaction_code'])
                 ->with([
                     'stats' => [
-                        'stat_before'    => $firstRecord ? $firstRecord->qty_before : 0,
-                        'stat_bought'    => $stats->qty_bought ?? 0,
+                        'stat_before' => $firstRecord ? $firstRecord->qty_before : 0,
+                        'stat_bought' => $stats->qty_bought ?? 0,
                         'stat_bought_rt' => $stats->qty_bought_rt ?? 0,
-                        'stat_sold'      => $stats->qty_sold ?? 0,
-                        'stat_sold_rt'   => $stats->qty_sold_rt ?? 0,
-                        'stat_balance'   => $lastRecord ? $lastRecord->qty_after : 0,
+                        'stat_sold' => $stats->qty_sold ?? 0,
+                        'stat_sold_rt' => $stats->qty_sold_rt ?? 0,
+                        'stat_balance' => $lastRecord ? $lastRecord->qty_after : 0,
                     ]
                 ])
                 ->make(true);
@@ -224,21 +237,21 @@ class SuppliesController extends Controller
 
             return DataTables::eloquent($items)
                 ->addIndexColumn()
-                ->addColumn('date',             fn($r) => $r->date)
-                ->addColumn('code',             fn($r) => $r->code)
-                ->addColumn('type',             fn($r) => $r->type)
-                ->addColumn('name',             fn($r) => $r->medicines->name)
+                ->addColumn('date', fn($r) => $r->date)
+                ->addColumn('code', fn($r) => $r->code)
+                ->addColumn('type', fn($r) => $r->type)
+                ->addColumn('name', fn($r) => $r->medicines->name)
                 ->addColumn('stock', function ($row) {
 
                     // status 2 — Pembelian ( Stok masuk gudang)
                     if ($row->status == 2) {
-                        $sign  = $row->qty > 0 ? '+' : '';
+                        $sign = $row->qty > 0 ? '+' : '';
                         $color = $row->qty >= 0 ? '#854F0B' : '#A32D2D';
                         return "<div style='color:{$color};font-weight:600;'>{$sign}{$row->qty}</div>";
                     }
                     // status 5 — Stock Opname
                     if ($row->status == 5) {
-                        $sign  = $row->qty > 0 ? '+' : '';
+                        $sign = $row->qty > 0 ? '+' : '';
                         $color = $row->qty >= 0 ? '#854F0B' : '#A32D2D';
                         return "<div style='color:{$color};font-weight:600;'>{$sign}{$row->qty}</div>";
                     }
@@ -252,17 +265,17 @@ class SuppliesController extends Controller
                     }
                 })
                 ->addColumn('qty_before', fn($r) => "<b>{$r->qty_before}</b>")
-                ->addColumn('qty_after',  fn($r) => "<b>{$r->qty_after}</b>")
+                ->addColumn('qty_after', fn($r) => "<b>{$r->qty_after}</b>")
                 // Fixed: these two were both returning qty_after
                 ->addColumn('qty_before_number', fn($r) => $r->qty_before)
-                ->addColumn('qty_after_number',  fn($r) => $r->qty_after)
+                ->addColumn('qty_after_number', fn($r) => $r->qty_after)
                 ->addColumn('supply', fn($r) => $r->medicines->stock)
                 ->addColumn('status', function ($row) {
                     $map = [
                         2 => ['label' => 'Pembelian', 'bg' => '#caffc5', 'color' => '#457b00'],
                         5 => ['label' => 'Stock Opname', 'bg' => '#FAEEDA', 'color' => '#633806'],
-                        6 => ['label' => 'Adjustment',   'bg' => '#E6F1FB', 'color' => '#0C447C'],
-                        7 => ['label' => 'Mutasi Stok',  'bg' => '#E1F5EE', 'color' => '#085041'],
+                        6 => ['label' => 'Adjustment', 'bg' => '#E6F1FB', 'color' => '#0C447C'],
+                        7 => ['label' => 'Mutasi Stok', 'bg' => '#E1F5EE', 'color' => '#085041'],
                     ];
                     $s = $map[$row->status] ?? ['label' => '—', 'bg' => '#F1EFE8', 'color' => '#5F5E5A'];
                     return "
@@ -288,12 +301,16 @@ class SuppliesController extends Controller
     {
         if ($request->ajax()) {
             $medicines = Medicines::query()
-                ->withSum(['items_log as qty_orders' => function ($q) {
-                    $q->where('status', 2);
-                }], 'qty')
-                ->withSum(['items_log as qty_sales' => function ($q) {
-                    $q->where('status', 1);
-                }], 'qty')
+                ->withSum([
+                    'items_log as qty_orders' => function ($q) {
+                        $q->where('status', 2);
+                    }
+                ], 'qty')
+                ->withSum([
+                    'items_log as qty_sales' => function ($q) {
+                        $q->where('status', 1);
+                    }
+                ], 'qty')
                 ->addSelect([
                     'qty_start' => ItemsLog::select('qty_before')
                         ->whereColumn('medicine_id', 'medicines.id')
@@ -530,7 +547,16 @@ class SuppliesController extends Controller
                     return $row->date;
                 })
                 ->addColumn('transaction_code', function ($row) {
-                    return $row->transaction_code;
+                    if (!$row->transaction_code)
+                        return '-';
+                    $code = e($row->transaction_code);
+                    return '
+                    <div class="flex items-center gap-1.5">
+                        <span class="font-mono text-xs font-medium text-slate-700 bg-slate-50 px-2 py-0.5 rounded border border-slate-200">' . $code . '</span>
+                        <button type="button" onclick="navigator.clipboard.writeText(\'' . $code . '\'); iziToast.success({title: \'Tersalin\', message: \'Kode berhasil disalin\', position: \'topRight\'})" class="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Salin kode">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                        </button>
+                    </div>';
                 })
                 ->addColumn('code', function ($row) {
                     return $row->code;
@@ -604,16 +630,16 @@ class SuppliesController extends Controller
                     </div>";
                 })
                 ->addColumn('total_sales', function ($row) use ($total_sales) {
-                    return  $total_sales;
+                    return $total_sales;
                 })
                 ->addColumn('total_orders', function ($row) use ($total_orders) {
-                    return  $total_orders;
+                    return $total_orders;
                 })
                 ->addColumn('stock_start', function ($row) use ($stock_start) {
                     return $stock_start;
                 })
                 ->addColumn('qty_after_number', function ($row) {
-                    return  $row->qty_after;
+                    return $row->qty_after;
                 })
                 ->addColumn('supply', function ($row) {
                     return $row->medicines->stock;
@@ -701,7 +727,7 @@ class SuppliesController extends Controller
                         </div";
                     }
                 })
-                ->rawColumns(['status', 'stock', 'qty_before', 'qty_after'])
+                ->rawColumns(['status', 'stock', 'qty_before', 'qty_after', 'transaction_code'])
                 ->make(true);
         }
     }
@@ -717,7 +743,7 @@ class SuppliesController extends Controller
     {
         $now = Carbon::now();
 
-        $year  = $now->format('y');
+        $year = $now->format('y');
         $month = $now->format('m');
         $prefix = "SO-{$year}{$month}";
 
@@ -739,7 +765,7 @@ class SuppliesController extends Controller
     {
         $now = Carbon::now();
 
-        $year  = $now->format('y');
+        $year = $now->format('y');
         $month = $now->format('m');
         $prefix = "{$year}{$month}LOG-";
 
@@ -769,7 +795,7 @@ class SuppliesController extends Controller
     {
         $barcode = $request->query('barcode');
 
-        $transfer = MedicineTransfers::with(['batches.medicines'])
+        $transfer = MedicineTransferItems::with(['batches.medicines'])
             ->whereHas('batches.medicines', function ($q) use ($barcode) {
                 $q->where('barcode', $barcode);
             })
@@ -782,12 +808,12 @@ class SuppliesController extends Controller
         $medicine = $transfer->batches->medicines;
 
         return response()->json([
-            'found'     => true,
-            'code'      => $medicine->code,
-            'name'      => $medicine->name,
-            'unit'      => $medicine->unit,
+            'found' => true,
+            'code' => $medicine->code,
+            'name' => $medicine->name,
+            'unit' => $medicine->unit,
             'raw_price' => $medicine->raw_price,
-            'stock'     => $transfer->stock,  // counter stock from medicine_transfers
+            'stock' => $transfer->qty,  // counter stock from medicine_transfer_items
         ]);
     }
     public function scannerPage()
@@ -873,10 +899,10 @@ class SuppliesController extends Controller
     public function opname(Request $request)
     {
         $request->validate([
-            'medicine_id'          => 'required|exists:medicines,id',
-            'stock_physic'         => 'required|integer',
+            'medicine_id' => 'required|exists:medicines,id',
+            'stock_physic' => 'required|integer',
             'counter_stock_physic' => 'nullable|integer',
-            'batches_id'           => 'nullable|exists:batches,id',
+            'batches_id' => 'nullable|exists:batches,id',
         ]);
 
         DB::beginTransaction();
@@ -893,9 +919,9 @@ class SuppliesController extends Controller
                     ->firstOrFail();
             }
 
-            $stockBefore  = (int) $batch->stock;
-            $stockPhysic  = (int) $request->stock_physic;
-            $discrepancy  = $stockPhysic - $stockBefore;
+            $stockBefore = (int) $batch->stock;
+            $stockPhysic = (int) $request->stock_physic;
+            $discrepancy = $stockPhysic - $stockBefore;
 
             // status 5 = surplus or equal, status 6 = deficit
             $status = $discrepancy >= 0 ? 5 : 6;
@@ -907,10 +933,10 @@ class SuppliesController extends Controller
             if ($request->filled('counter_stock_physic')) {
                 $counterPhysic = (int) $request->counter_stock_physic;
 
-                $transfer = MedicineTransfers::where('batches_id', $batch->id)->first();
+                $transfer = MedicineTransferItems::where('batches_id', $batch->id)->first();
 
                 if ($transfer) {
-                    $transfer->stock = $counterPhysic;
+                    $transfer->qty = $counterPhysic;
                     $transfer->save();
                 }
                 // If no transfer record exists for this batch, skip silently
@@ -919,28 +945,28 @@ class SuppliesController extends Controller
             // 3. Write to items_log
             // Generate a transaction code — adjust the format to your convention
             StockOpname::create([
-                'users_id'          => auth()->id(),
-                'batches_id'        => $batch->id,
-                'stock_physical'    => $stockPhysic,
+                'users_id' => auth()->id(),
+                'batches_id' => $batch->id,
+                'stock_physical' => $stockPhysic,
                 'stock_discrepancy' => $discrepancy,          // signed: positive = surplus, negative = deficit
-                'stock_total'       => $stockPhysic,          // final stock after correction
-                'date'              => now()->toDateString(),
-                'status'            => $status,               // 5 = surplus/sama, 6 = defisit
+                'stock_total' => $stockPhysic,          // final stock after correction
+                'date' => now()->toDateString(),
+                'status' => $status,               // 5 = surplus/sama, 6 = defisit
             ]);
 
             ItemsLog::create([
-                'batches_id'       => $batch->id,
+                'batches_id' => $batch->id,
                 'transaction_code' => $this->generateOpnameCode(),
-                'code'             => $this->generateItemsLogCode(),
-                'type'             => "SO",
-                'medicine_id'      => $request->medicine_id,
-                'qty'              => abs($discrepancy),
-                'qty_before'       => $stockBefore,
-                'qty_after'        => $stockPhysic,
-                'total'            => $discrepancy,
-                'date'             => now()->toDateString(),
-                'status'           => $status,
-                'user_id'          => auth()->user()->id,
+                'code' => $this->generateItemsLogCode(),
+                'type' => "SO",
+                'medicine_id' => $request->medicine_id,
+                'qty' => abs($discrepancy),
+                'qty_before' => $stockBefore,
+                'qty_after' => $stockPhysic,
+                'total' => $discrepancy,
+                'date' => now()->toDateString(),
+                'status' => $status,
+                'user_id' => auth()->user()->id,
             ]);
 
 
@@ -948,12 +974,12 @@ class SuppliesController extends Controller
             DB::commit();
 
             return response()->json([
-                'message'      => 'Stock opname berhasil disimpan.',
-                'batch'        => $batch->fresh(),
-                'qty_before'   => $stockBefore,
-                'qty_after'    => $stockPhysic,
-                'discrepancy'  => $discrepancy,
-                'status'       => $status,
+                'message' => 'Stock opname berhasil disimpan.',
+                'batch' => $batch->fresh(),
+                'qty_before' => $stockBefore,
+                'qty_after' => $stockPhysic,
+                'discrepancy' => $discrepancy,
+                'status' => $status,
             ]);
         } catch (\Throwable $e) {
             DB::rollBack();
@@ -968,7 +994,7 @@ class SuppliesController extends Controller
 
     public function getStockDetail(Request $request)
     {
-        $query = MedicineTransfers::with([
+        $query = MedicineTransferItems::with([
             'batches.medicines',
             'batches.pharmacy',
             'etalases'
@@ -976,7 +1002,7 @@ class SuppliesController extends Controller
             ->whereHas('batches', function ($q) {
                 $q->where('pharmacy_id', auth()->user()->pharmacy_id);
             })
-            ->select('medicine_transfers.*');
+            ->select('medicine_transfer_items.*');
 
         return DataTables::of($query)
 
