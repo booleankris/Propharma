@@ -180,8 +180,8 @@
                                 <div class="py-1 text-[13px] font-bold">Tanggal Penolakan</div>
                                 <input type="text" id="reject_date"
                                     class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
-                                    placeholder="" value="{{ $now }}" readonly
-                                    onkeyup="searchMedicineData(this.value)" autocomplete="off">
+                                    placeholder="" value="{{ $now }}" readonly onkeyup="searchMedicineData(this.value)"
+                                    autocomplete="off">
                             </div>
                             <div>
                                 <div class="py-1 text-[13px] font-bold" for="reject_number">Nomor Penolakan</div>
@@ -272,6 +272,10 @@
                                     <option value="Stok Kurang">Stok Kurang</option>
                                     <option value="⁠Kosong Distributor">⁠Kosong Distributor</option>
                                     <option value="Tidak Ada / Habis">Tidak Ada / Habis</option>
+                                    <option value="Belum pernah tersedia">Belum pernah tersedia</option>
+                                    <option value="Harga">Harga</option>
+                                    <option value="Pelayanan">Pelayanan</option>
+                                    <option value="Hanya Bertanya">Hanya Bertanya</option>
                                     <option value="Lain-lain">Lain-lain</option>
                                 </select>
                             </div>
@@ -309,8 +313,8 @@
                                     <div>
                                         <button id="back"
                                             class="inline-flex items-center gap-2 rounded-lg font-poppins 
-                                                   px-6 py-4 text-sm font-semibold 
-                                                   transition-all hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:ring-offset-2"
+                                                               px-6 py-4 text-sm font-semibold 
+                                                               transition-all hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:ring-offset-2"
                                             style="box-shadow: 0 0px 7px -1px #1770ec; background: transparent; color: #2aa0ff;">
 
                                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
@@ -421,7 +425,7 @@
 
 
         // Datatable
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             exitCustomMode();
 
             orderItemsTable = $('#orderItemsTable').DataTable({
@@ -431,49 +435,49 @@
                     url: "{{ route('sales.getreject') }}",
                 },
                 columns: [{
-                        data: 'code',
-                        name: 'code'
-                    },
-                    {
-                        data: 'date',
-                        name: 'date',
-                        defaultContent: '-'
-                    },
-                    {
-                        data: null,
-                        name: 'medicine_name',
-                        render: function(data, type, row) {
-                            // If standard medicine exists, show it. Otherwise, show custom name.
-                            return row.medicines ? row.medicines.name : (row.medicine_name || '-');
-                        }
-                    },
-                    {
-                        data: 'quantity',
-                        name: 'quantity'
-                    },
-                    {
-                        data: 'total',
-                        name: 'total',
-                        render: function(data, type, row) {
-                            return data ? data : 'Rp. 0'; // Handle visual for 0/null
-                        }
-                    },
-                    {
-                        data: 'reason',
-                        name: 'reason'
-                    },
+                    data: 'code',
+                    name: 'code'
+                },
+                {
+                    data: 'date',
+                    name: 'date',
+                    defaultContent: '-'
+                },
+                {
+                    data: null,
+                    name: 'medicine_name',
+                    render: function (data, type, row) {
+                        // If standard medicine exists, show it. Otherwise, show custom name.
+                        return row.medicines ? row.medicines.name : (row.medicine_name || '-');
+                    }
+                },
+                {
+                    data: 'quantity',
+                    name: 'quantity'
+                },
+                {
+                    data: 'total',
+                    name: 'total',
+                    render: function (data, type, row) {
+                        return data ? data : 'Rp. 0'; // Handle visual for 0/null
+                    }
+                },
+                {
+                    data: 'reason',
+                    name: 'reason'
+                },
                 ],
                 paging: false,
                 searching: false,
                 info: false,
             });
         });
-        document.getElementById('qty').addEventListener('keydown', function(e) {
+        document.getElementById('qty').addEventListener('keydown', function (e) {
             if (e.key !== 'Enter') return;
             e.preventDefault();
             document.getElementById('reason').focus();
         });
-        document.getElementById('reason').addEventListener('keydown', function(e) {
+        document.getElementById('reason').addEventListener('keydown', function (e) {
             if (e.key !== 'Enter') return;
             e.preventDefault();
             addItem();
@@ -531,23 +535,23 @@
 
                     if (page === 1 && res.data.length === 0) {
                         tbody.innerHTML = `
-                            <tr>
-                                <td colspan="4" class="text-center">No data found</td>
-                            </tr>`;
+                                        <tr>
+                                            <td colspan="4" class="text-center">No data found</td>
+                                        </tr>`;
                         hasMore = false;
                         return;
                     }
 
                     res.data.forEach((item, index) => {
                         tbody.insertAdjacentHTML('beforeend', `
-                            <tr 
-                                data-item='${JSON.stringify(item)}'
-                                tabindex="0"
-                            >
-                                <td>${((page - 1) * res.per_page) + index + 1}</td>
-                                <td>${item.name}</td>
-                            </tr>
-                        `);
+                                        <tr 
+                                            data-item='${JSON.stringify(item)}'
+                                            tabindex="0"
+                                        >
+                                            <td>${((page - 1) * res.per_page) + index + 1}</td>
+                                            <td>${item.name}</td>
+                                        </tr>
+                                    `);
                     });
 
                     hasMore = res.current_page < res.last_page;
@@ -600,7 +604,7 @@
                 .catch(err => console.log(err));
         }
         // Nav
-        document.addEventListener('keydown', function(e) {
+        document.addEventListener('keydown', function (e) {
             const dropdown = document.getElementById('searchDropdown');
             if (!dropdown || dropdown.offsetParent === null) return;
 
@@ -636,7 +640,7 @@
                 });
             }
         }
-        document.addEventListener('click', function(e) {
+        document.addEventListener('click', function (e) {
             const wrapper = document.getElementById('searchWrapper');
             if (!wrapper.contains(e.target)) {
                 document.getElementById('searchDropdown').style.display = 'none';
@@ -659,7 +663,7 @@
             document.getElementById('total_retur').value = total.toFixed(0);
         }
         // Hover
-        document.getElementById('searchResults').addEventListener('mouseover', function(e) {
+        document.getElementById('searchResults').addEventListener('mouseover', function (e) {
             const row = e.target.closest('tr');
             if (!row) return;
 
@@ -671,7 +675,7 @@
         });
 
         // Click
-        document.getElementById('searchResults').addEventListener('click', function(e) {
+        document.getElementById('searchResults').addEventListener('click', function (e) {
             const row = e.target.closest('tr');
             if (row) {
                 selectRow(row);
@@ -681,7 +685,7 @@
 
         // Select
 
-        document.addEventListener('click', function(e) {
+        document.addEventListener('click', function (e) {
             const wrapper = document.getElementById('searchWrapper');
             if (!wrapper.contains(e.target)) {
                 document.getElementById('searchDropdown').style.display = 'none';
@@ -733,20 +737,20 @@
             if (active) {
                 // Tabler "x" icon — cancel custom mode
                 icon.innerHTML = `
-            <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-            <path d="M18 6l-12 12" />
-            <path d="M6 6l12 12" />
-        `;
+                        <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                        <path d="M18 6l-12 12" />
+                        <path d="M6 6l12 12" />
+                    `;
                 btn.title = 'Batal Mode Custom';
                 btn.classList.remove('bg-[#1678df]', 'hover:bg-blue-600');
                 btn.classList.add('bg-red-500', 'hover:bg-red-600');
             } else {
                 // Tabler "plus" icon — enter custom mode
                 icon.innerHTML = `
-            <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-            <path d="M12 5l0 14" />
-            <path d="M5 12l14 0" />
-        `;
+                        <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                        <path d="M12 5l0 14" />
+                        <path d="M5 12l14 0" />
+                    `;
                 btn.title = 'Tambah Obat Custom';
                 btn.classList.remove('bg-red-500', 'hover:bg-red-600');
                 btn.classList.add('bg-[#1678df]', 'hover:bg-blue-600');
@@ -816,10 +820,10 @@
             };
 
             axios.post("{{ route('sales.addItemReject') }}", payload, {
-                    headers: {
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-                    }
-                })
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                }
+            })
                 .then(res => {
                     if (res.data.success) {
                         let item = res.data.summary;
@@ -899,12 +903,12 @@
                 btn.disabled = false;
             }, 4000);
         }
-        document.getElementById('medicine_name').addEventListener('keydown', function(e) {
+        document.getElementById('medicine_name').addEventListener('keydown', function (e) {
             if (e.key !== 'Enter') return;
             e.preventDefault();
             document.getElementById('qty').focus();
         });
-        $('#back').click(function() {
+        $('#back').click(function () {
             window.location.href = "{{ route('home') }}";
         });
     </script>
