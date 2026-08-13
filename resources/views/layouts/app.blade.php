@@ -31,12 +31,12 @@
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
     <script>
-        $(document).ready(function() {
+        $(document).ready(function () {
             initFactorySelect();
             initDoctorSelect();
         });
         // Sales Report Onpage load (Starting point)
-        document.addEventListener("DOMContentLoaded", function() {
+        document.addEventListener("DOMContentLoaded", function () {
 
             const activeBtn = document.querySelector('.report-btn[data-active="true"]');
 
@@ -55,10 +55,10 @@
 
 
         });
-        $('#factory').on('change', function() {
+        $('#factory').on('change', function () {
             console.log('Selected factory:', $(this).val());
         });
-        $('#doctor').on('change', function() {
+        $('#doctor').on('change', function () {
             console.log('Selected doctor:', $(this).val());
         });
         var selectedReport = "LIPH";
@@ -113,7 +113,7 @@
             });
         });
         const backdrop = document.getElementById('modalBackdrop');
-        window.openModal = function(id) {
+        window.openModal = function (id) {
             const modal = document.getElementById(id);
             if (!modal) return;
             modal.classList.remove('modal-hide');
@@ -128,7 +128,7 @@
                 setTimeout(() => initOrderSupplierSelect(), 100);
             }
         };
-        window.closeModals = function() {
+        window.closeModals = function () {
             document.querySelectorAll('.modal-show').forEach(modal => {
                 modal.classList.remove('modal-show');
                 modal.classList.add('modal-hide');
@@ -151,7 +151,7 @@
             target.classList.toggle('hidden');
         }
 
-        document.addEventListener('click', function(e) {
+        document.addEventListener('click', function (e) {
             ['notif-modal', 'expiry-modal'].forEach(id => {
                 const modal = document.getElementById(id);
                 if (!modal) return;
@@ -265,7 +265,7 @@
             selectedShiftType = type;
         }
 
-        function getReport() {
+        function getReport(mode = 'download') {
             const start_date = document.getElementById('start_date').value;
             const end_date = document.getElementById('end_date').value;
             const shift = document.getElementById('shift').value;
@@ -285,21 +285,41 @@
                 selectedType: selectedType,
                 factory: factory,
                 doctor: doctor,
+                mode: mode
             }, {
-                responseType: 'blob'
+                responseType: mode === 'download' ? 'blob' : 'text'
             }).then((result) => {
-                const url = window.URL.createObjectURL(new Blob([result.data]));
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `LIPH_${start_date}_${end_date}.xlsx`;
-                a.click();
-                window.URL.revokeObjectURL(url);
+                if (mode === 'download') {
+                    const url = window.URL.createObjectURL(new Blob([result.data]));
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `Laporan_Jual_${selectedReport}_${start_date}_${end_date}.xlsx`;
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                } else {
+                    // Preview mode
+                    const previewContent = document.getElementById('previewModalContent');
+                    previewContent.innerHTML = result.data;
+                    document.getElementById('previewModal').classList.remove('modal-hide');
+                    document.getElementById('previewModal').classList.add('modal-show');
+
+                    // Update download button inside modal to trigger the sales report download instead
+                    const modalDownloadBtn = document.querySelector('#previewModal button[onclick="getOrderReport(\\\'download\\\')"]');
+                    if (modalDownloadBtn) {
+                        // Change it to use getReport for sales reports
+                        modalDownloadBtn.setAttribute('onclick', "getReport('download')");
+                    }
+                }
             }).catch((err) => {
-                console.log(err);
+                if (err.response && err.response.data && err.response.data.message) {
+                    iziToast.error({ title: 'Error', message: err.response.data.message, position: 'topRight' });
+                } else {
+                    console.log(err);
+                }
             }).finally(() => {
                 // Hide loading
                 overlay.style.display = 'none';
-            });;
+            });
         }
 
         const active = {
@@ -390,7 +410,7 @@
             },
         };
         // Order Initial Setup
-        document.addEventListener("DOMContentLoaded", function() {
+        document.addEventListener("DOMContentLoaded", function () {
             initOrderSupplierSelect();
 
             // Set initial state based on data-active button
@@ -413,7 +433,7 @@
                 placeholder: 'Pilih supplier...',
                 allowClear: true,
                 width: '100%',
-             
+
             });
         }
 
@@ -512,7 +532,7 @@
             console.log('Order type:', selectedOrderType);
         }
 
-        function getOrderReport() {
+        function getOrderReport(mode = 'download') {
             const start_date = document.getElementById('order_start_date').value;
             const end_date = document.getElementById('order_end_date').value;
             const supplier = document.getElementById('order_supplier').value;
@@ -526,22 +546,69 @@
                 selectedReport: selectedOrderReport,
                 selectedType: selectedOrderType,
                 supplier: supplier,
+                mode: mode
             }, {
-                responseType: 'blob'
+                responseType: mode === 'download' ? 'blob' : 'text'
             }).then((result) => {
-                const url = window.URL.createObjectURL(new Blob([result.data]));
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `Laporan_Beli_${selectedOrderReport}_${start_date}_${end_date}.xlsx`;
-                a.click();
-                window.URL.revokeObjectURL(url);
+                if (mode === 'download') {
+                    const url = window.URL.createObjectURL(new Blob([result.data]));
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `Laporan_Beli_${selectedOrderReport}_${start_date}_${end_date}.xlsx`;
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                } else {
+                    // Preview mode
+                    const previewContent = document.getElementById('previewModalContent');
+                    previewContent.innerHTML = result.data;
+                    document.getElementById('previewModal').classList.remove('modal-hide');
+                    document.getElementById('previewModal').classList.add('modal-show');
+                }
             }).catch((err) => {
-                console.error(err);
+                if (err.response && err.response.data && err.response.data.message) {
+                    iziToast.error({ title: 'Error', message: err.response.data.message, position: 'topRight' });
+                } else {
+                    console.error(err);
+                }
             }).finally(() => {
                 overlay.style.display = 'none';
             });
         }
+
+        function closePreviewModal() {
+            document.getElementById('previewModal').classList.remove('modal-show');
+            document.getElementById('previewModal').classList.add('modal-hide');
+        }
     </script>
+
+    {{-- Preview Report Modal --}}
+    <div id="previewModal"
+        class="modal-hide modal-transition fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] bg-white rounded-3xl shadow-2xl z-[9999] overflow-hidden flex flex-col max-h-[90vh]">
+        <div class="bg-slate-800 px-6 py-5 flex items-center justify-between flex-shrink-0">
+            <div>
+                <p class="text-slate-400 text-xs font-semibold tracking-widest uppercase mb-1">Preview</p>
+                <h2 class="text-white text-xl font-semibold">Laporan</h2>
+            </div>
+            <button onclick="closePreviewModal()"
+                class="w-10 h-10 bg-white/10 hover:bg-white/20 rounded-2xl flex items-center justify-center transition-colors">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+        </div>
+        <div id="previewModalContent" class="p-6 overflow-y-auto flex-1 bg-slate-50">
+            {{-- Table preview goes here --}}
+        </div>
+        <div class="p-5 border-t border-slate-100 flex justify-end gap-3 bg-white flex-shrink-0">
+            <button onclick="closePreviewModal()"
+                class="px-5 py-2.5 rounded-xl font-semibold text-slate-500 bg-slate-100 hover:bg-slate-200 transition-colors">Tutup</button>
+            <button onclick="getOrderReport('download')"
+                class="px-5 py-2.5 rounded-xl font-semibold text-white bg-[linear-gradient(45deg,_#41a8f4,_#7cd086)] hover:opacity-90 transition-all">Download
+                Excel</button>
+        </div>
+    </div>
     {{-- =========== --}}
     <script>
         let quantitySubmitting = false;
@@ -612,7 +679,7 @@
         }
 
         // Attach once DOM is ready
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             const searchInput = document.getElementById('searchInput');
             if (searchInput) {
                 searchInput.addEventListener('keyup', filterItems);
@@ -667,7 +734,7 @@
     @endif
 
     <script>
-        $(document).ready(function() {
+        $(document).ready(function () {
 
             // JS
             new Swiper('.productSwiper', {

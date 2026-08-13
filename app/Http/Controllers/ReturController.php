@@ -357,6 +357,10 @@ class ReturController extends Controller
     {
         $transactionCode = $request->transaction_code;
 
+        if (empty($transactionCode)) {
+            return response()->json([]);
+        }
+
         $transactionCart = ReceivingItems::with([
             'receiving_details.receiving',
             'order_items.medicines',
@@ -402,7 +406,7 @@ class ReturController extends Controller
             })
             ->whereHas('receiving', function ($q) {
                 $q->where('status', '>=', 1)
-                  ->where('pharmacy_id', auth()->user()->pharmacy_id);
+                    ->where('pharmacy_id', auth()->user()->pharmacy_id);
             })
             ->paginate(10);
 

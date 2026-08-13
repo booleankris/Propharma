@@ -28,7 +28,7 @@ class ReportsController extends Controller
     public function reports(Request $request)
     {
         $pharmacy = Pharmacies::findOrFail(auth()->user()->pharmacy_id);
-        $report   = $request->selectedReport;
+        $report = $request->selectedReport;
 
         [$export, $filename] = $this->resolveReportExport($report, $request, $pharmacy);
 
@@ -43,12 +43,12 @@ class ReportsController extends Controller
             }
 
             return view('reports.preview', [
-                'rows'        => $export->array(),
+                'rows' => $export->array(),
                 'reportTitle' => method_exists($export, 'title') ? $export->title() : $report,
                 'queryParams' => $request->except('mode'),
             ]);
         }
-        
+
         return Excel::download($export, $filename);
     }
 
@@ -56,7 +56,7 @@ class ReportsController extends Controller
     {
         $request->validate([
             'start_date' => 'required_if:selectedReport,LIPH,Obat,Golongan,Pabrik,Dokter,Daftar Resep,Retur Jual|date',
-            'end_date'   => 'required_if:selectedReport,LIPH,Obat,Golongan,Pabrik,Dokter,Daftar Resep,Retur Jual|date|after_or_equal:start_date',
+            'end_date' => 'required_if:selectedReport,LIPH,Obat,Golongan,Pabrik,Dokter,Daftar Resep,Retur Jual|date|after_or_equal:start_date',
         ]);
 
         return match ($report) {
@@ -177,20 +177,20 @@ class ReportsController extends Controller
     {
         $filters = [
             'start_date' => $request->start_date ?? null,
-            'end_date'   => $request->end_date ?? null
+            'end_date' => $request->end_date ?? null
         ];
 
         $job = ExportJob::create([
-            'type'     => 'patients',
-            'status'   => 'pending',
+            'type' => 'patients',
+            'status' => 'pending',
             'progress' => 0
         ]);
 
         dispatch(new ProcessPatientsExport($job->id, $filters));
 
         return response()->json([
-            'job_id'   => $job->id,
-            'message'  => 'Export started.'
+            'job_id' => $job->id,
+            'message' => 'Export started.'
         ]);
     }
 
@@ -199,9 +199,9 @@ class ReportsController extends Controller
         $job = ExportJob::findOrFail($id);
 
         return response()->json([
-            'status'   => $job->status,
+            'status' => $job->status,
             'progress' => $job->progress,
-            'file'     => $job->file_path ? asset('storage/' . $job->file_path) : null
+            'file' => $job->file_path ? asset('storage/' . $job->file_path) : null
         ]);
     }
 
@@ -209,19 +209,19 @@ class ReportsController extends Controller
     public function exportTransactions(Request $request)
     {
         $start = $request->start ?? null;
-        $end   = $request->end ?? null;
+        $end = $request->end ?? null;
 
         $job = ExportJob::create([
-            'type'      => 'transactions',
-            'status'    => 'queued',
-            'progress'  => 0,
+            'type' => 'transactions',
+            'status' => 'queued',
+            'progress' => 0,
             'file_path' => null
         ]);
 
         dispatch(new TransactionExportJob($job, $start, $end));
 
         return response()->json([
-            'job_id'  => $job->id,
+            'job_id' => $job->id,
             'message' => 'Export started'
         ]);
     }
@@ -231,9 +231,9 @@ class ReportsController extends Controller
         $job = ExportJob::findOrFail($id);
 
         return response()->json([
-            'status'    => $job->status,
-            'progress'  => $job->progress,
-            'file'      => $job->file_path
+            'status' => $job->status,
+            'progress' => $job->progress,
+            'file' => $job->file_path
                 ? route('reports.export.transactions.download', $id)
                 : null
         ]);
