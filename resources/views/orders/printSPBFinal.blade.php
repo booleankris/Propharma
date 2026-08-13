@@ -153,7 +153,7 @@
                         <td style="width:50%; vertical-align:top;">
                             <b>No :</b> {{ $items->first()->order_items_code }}
                         </td>
-                        <td style="width:50%; text-align:right; vertical-align:top;">
+                        <td style="width:50%; text-align:right; font-size: 6px; vertical-align:top;">
                             <b>Kepada Yth :</b> {{ optional($items->first()->creditors)->name ?? '-' }}
                         </td>
                     </tr>
@@ -186,7 +186,8 @@
                             <tr>
                                 <td style="text-align:center;">
                                     {{ $row->receivingItems->sum('qty_received') }}
-                                    ({{ ucfirst(terbilang($row->receivingItems->sum('qty_received'))) }}) {{ $row->medicines->unit ?? '-' }}
+                                    ({{ ucfirst(terbilang($row->receivingItems->sum('qty_received'))) }})
+                                    {{ $row->medicines->unit ?? '-' }}
                                 </td>
                                 <td>
                                     {{ $row->medicines->name ?? '-' }}
@@ -197,7 +198,7 @@
                                         $medCred = $row->medicines->creditors->firstWhere('code', $credCode) ?? $row->medicines->creditors->first();
                                         $disc = $medCred?->pivot?->discount;
                                     @endphp
-                                    {{ $disc ? ($disc == (int)$disc ? (int)$disc : $disc) . '%' : '-' }}
+                                    {{ $disc ? ($disc == (int) $disc ? (int) $disc : $disc) . '%' : '-' }}
                                 </td>
                             </tr>
                         @endforeach

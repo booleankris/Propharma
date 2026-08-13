@@ -153,7 +153,7 @@
                         <td style="width:50%; vertical-align:top;">
                             <b>No :</b>{{ $items->first()->order_items_code }}
                         </td>
-                        <td style="width:50%; text-align:right; vertical-align:top;">
+                        <td style="width:50%; text-align:right; font-size: 6px; vertical-align:top;">
                             <b>Kepada Yth :</b> {{ optional($items->first()->creditors)->name ?? '-' }}
                         </td>
                     </tr>
