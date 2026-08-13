@@ -14,10 +14,10 @@ class ReturDataController extends Controller
     {
         if ($request->ajax()) {
 
-            $search     = trim($request->input('search.value'));
+            $search = trim($request->input('search.value'));
             $parsedDate = $this->parseDate($search);
-            $startDate  = $request->input('start_date');
-            $endDate    = $request->input('end_date');
+            $startDate = $request->input('start_date');
+            $endDate = $request->input('end_date');
             $pharmacyId = $request->input('pharmacy_id'); // 1. Capture pharmacy_id from request
 
 
@@ -36,7 +36,7 @@ class ReturDataController extends Controller
                     'items_log.qty',
                     'items_log.total',
                     'items_log.created_at',
-                    'medicine_transactions.pharmacy_id', 
+                    'medicine_transactions.pharmacy_id',
                     'medicines.name  as medicine_name',
                     'patients.name   as patient_name',
 
@@ -78,9 +78,9 @@ class ReturDataController extends Controller
 
                     // Filter umum
                     $q->orWhere('transaction_code', 'like', "%{$search}%")
-                        ->orWhere('medicine_name',    'like', "%{$search}%")
-                        ->orWhere('patient_name',     'like', "%{$search}%")
-                        ->orWhere('jenis',            'like', "%{$search}%");
+                        ->orWhere('medicine_name', 'like', "%{$search}%")
+                        ->orWhere('patient_name', 'like', "%{$search}%")
+                        ->orWhere('jenis', 'like', "%{$search}%");
                 });
             }
 

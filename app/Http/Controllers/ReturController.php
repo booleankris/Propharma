@@ -12,6 +12,7 @@ use App\Models\MedicineTransferItems;
 use App\Models\MedicineTransactions;
 use App\Models\Receiving;
 use App\Models\ReceivingItems;
+use App\Models\ReceivingDetails;
 use App\Models\Retur;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -46,7 +47,7 @@ class ReturController extends Controller
         $number = (int) substr($last->code, 4);
 
         if ($number >= 99999) {
-            $prefix = str_pad(((int)$prefix) + 1, 4, '0', STR_PAD_LEFT);
+            $prefix = str_pad(((int) $prefix) + 1, 4, '0', STR_PAD_LEFT);
             $number = 0;
         } else {
             $number++;
@@ -82,8 +83,8 @@ class ReturController extends Controller
         $data->getCollection()->transform(function ($item) {
             return [
                 'transaction_code' => $item->transactions->transaction_code,
-                'name'             => $item->transactions->patients->name,
-                'final_price'      => $item->final_price,
+                'name' => $item->transactions->patients->name,
+                'final_price' => $item->final_price,
             ];
         });
 
@@ -104,14 +105,14 @@ class ReturController extends Controller
             ->get()
             ->map(function ($item) {
                 return [
-                    'id'            => $item->id,
-                    'medicine_id'   => $item->medicine_id,
+                    'id' => $item->id,
+                    'medicine_id' => $item->medicine_id,
                     'transaction_id' => $item->transaction_id ?? null,
-                    'quantity'      => $item->quantity,
-                    'final_price'   => $item->final_price,
-                    'item_price'    => $item->item_price ?? 0,
-                    'medicine'      => [
-                        'id'   => $item->medicine->id ?? null,
+                    'quantity' => $item->quantity,
+                    'final_price' => $item->final_price,
+                    'item_price' => $item->item_price ?? 0,
+                    'medicine' => [
+                        'id' => $item->medicine->id ?? null,
                         'code' => $item->medicine->code ?? '',
                         'name' => $item->medicine->name ?? '',
                         'unit' => $item->medicine->unit ?? '',
@@ -125,7 +126,7 @@ class ReturController extends Controller
     {
         $now = Carbon::now();
 
-        $year  = $now->format('y');
+        $year = $now->format('y');
         $month = $now->format('m');
         $prefix = "{$year}{$month}R";
 
@@ -146,7 +147,7 @@ class ReturController extends Controller
     {
         $now = Carbon::now();
 
-        $year  = $now->format('y');
+        $year = $now->format('y');
         $month = $now->format('m');
         $prefix = "{$year}{$month}R";
 
@@ -167,7 +168,7 @@ class ReturController extends Controller
     {
         $now = Carbon::now();
 
-        $year  = $now->format('y');
+        $year = $now->format('y');
         $month = $now->format('m');
         $prefix = "{$year}{$month}LOG-";
 
@@ -189,10 +190,10 @@ class ReturController extends Controller
 
         $request->validate([
             'transaction_id' => 'required|integer',
-            'medicine_id'    => 'required|integer',
-            'qty_retur'      => 'required|numeric|min:1',
-            'total_retur'    => 'required',
-            'old_qty'        => 'required',
+            'medicine_id' => 'required|integer',
+            'qty_retur' => 'required|numeric|min:1',
+            'total_retur' => 'required',
+            'old_qty' => 'required',
 
         ]);
         DB::beginTransaction();
@@ -225,17 +226,17 @@ class ReturController extends Controller
             // Create Retur (Retur Sales = 3)
             $itemsLog = ItemsLog::create([
                 'transaction_code' => $findcode->transaction_code,
-                'code'             => $this->generateItemsLogCode(),
-                'type'             => "RT",
-                'medicine_id'      => $request->medicine_id,
-                'qty'              => $request->qty_retur,
-                'qty_before'       => $qty_before,
-                'qty_after'        => $medicine->stock + $request->qty_retur,
-                'total'            => $request->total_retur,
-                'date'             => $now,
-                'status'           => 3,
-                'batches_id'       => $transfer->batches_id,
-                'user_id'          => auth()->user()->id,
+                'code' => $this->generateItemsLogCode(),
+                'type' => "RT",
+                'medicine_id' => $request->medicine_id,
+                'qty' => $request->qty_retur,
+                'qty_before' => $qty_before,
+                'qty_after' => $medicine->stock + $request->qty_retur,
+                'total' => $request->total_retur,
+                'date' => $now,
+                'status' => 3,
+                'batches_id' => $transfer->batches_id,
+                'user_id' => auth()->user()->id,
             ]);
 
             $activeshift = activeShift();
@@ -243,20 +244,20 @@ class ReturController extends Controller
             // Create New Retur Transaction
             $getTransactiondata = MedicineTransactions::findOrFail($request->transaction_id);
             $transaction = MedicineTransactions::create([
-                'pharmacy_id'           => $getTransactiondata->pharmacy_id,
-                "debtor_id"             => $getTransactiondata->debtor_id,
-                "doctor_id"             => $getTransactiondata->doctor_id,
-                "patient_id"            => $getTransactiondata->patient_id,
-                "transaction_type"      => "RETUR JUAL",
-                "transaction_code"      => "RT",
-                "paid"                  => "-",
-                "changes"               => "-",
-                "subtotal"              => $request->total_retur,
-                "discount"              => "-",
-                "shift_logs_id"         => $activeshift->id,
-                "status"                => $getTransactiondata->status,
-                "created_at"            => $getTransactiondata->created_at,
-                "updated_at"            => $getTransactiondata->updated_at,
+                'pharmacy_id' => $getTransactiondata->pharmacy_id,
+                "debtor_id" => $getTransactiondata->debtor_id,
+                "doctor_id" => $getTransactiondata->doctor_id,
+                "patient_id" => $getTransactiondata->patient_id,
+                "transaction_type" => "RETUR JUAL",
+                "transaction_code" => "RT",
+                "paid" => "-",
+                "changes" => "-",
+                "subtotal" => $request->total_retur,
+                "discount" => "-",
+                "shift_logs_id" => $activeshift->id,
+                "status" => $getTransactiondata->status,
+                "created_at" => $getTransactiondata->created_at,
+                "updated_at" => $getTransactiondata->updated_at,
             ]);
 
 
@@ -293,8 +294,8 @@ class ReturController extends Controller
             DB::commit();
 
             return response()->json([
-                'success'    => true,
-                'message'    => 'Retur berhasil disimpan.',
+                'success' => true,
+                'message' => 'Retur berhasil disimpan.',
                 'retur_code' => $this->generateReturCode(), // next retur code
             ]);
         } catch (\Throwable $e) {
@@ -360,8 +361,9 @@ class ReturController extends Controller
             'receiving_details.receiving',
             'order_items.medicines',
         ])
-            ->whereHas('receiving_details.receiving', function ($q) use ($transactionCode) {
-                $q->where('code', $transactionCode);
+            ->whereHas('receiving_details', function ($q) use ($transactionCode) {
+                $q->where('receiving_details_code', $transactionCode)
+                    ->orWhere('invoice_number', $transactionCode);
             })
             ->get();
 
@@ -371,16 +373,16 @@ class ReturController extends Controller
             $receiving = $item->receiving_details->receiving ?? null;
 
             return [
-                'id'             => $item->id,
-                'medicine_id'    => $medicine?->id,
-                'code'           => $medicine?->code,
-                'name'           => $medicine?->name,
-                'unit'           => $medicine?->unit,
-                'content'        => $medicine?->content,
-                'raw_price'      => $medicine?->raw_price,
-                'qty_received'   => $item->qty_received,
-                'total'          => $item->total,
-                'receiving_id'   => $receiving?->id,
+                'id' => $item->id,
+                'medicine_id' => $medicine?->id,
+                'code' => $medicine?->code,
+                'name' => $medicine?->name,
+                'unit' => $medicine?->unit,
+                'content' => $medicine?->content,
+                'raw_price' => $medicine?->raw_price,
+                'qty_received' => $item->qty_received,
+                'total' => $item->total,
+                'receiving_id' => $receiving?->id,
             ];
         });
 
@@ -392,33 +394,25 @@ class ReturController extends Controller
     {
         $search = $request->search;
 
-        $data = Receiving::query()
-            ->with(['receiving_details.receiving_items.order_items.medicines'])
+        $data = ReceivingDetails::query()
+            ->with(['receiving', 'receiving_items.order_items.medicines'])
             ->where(function ($q) use ($search) {
-                $q->where('code', 'LIKE', "%{$search}%")
-                    ->orWhereHas(
-                        'receiving_details',
-                        fn($q_invoice) =>
-                        $q_invoice->where('invoice_number', 'LIKE', "%{$search}%")
-                    )
-                    ->orWhereHas(
-                        'receiving_details.receiving_items.order_items.medicines',
-                        fn($q_med) =>
-                        $q_med->where('name', 'LIKE', "%{$search}%")
-                    );
+                $q->where('receiving_details_code', 'LIKE', "%{$search}%")
+                    ->orWhere('invoice_number', 'LIKE', "%{$search}%");
             })
-            ->where('status', 1)
+            ->whereHas('receiving', function ($q) {
+                $q->where('status', '>=', 1)
+                  ->where('pharmacy_id', auth()->user()->pharmacy_id);
+            })
             ->paginate(10);
 
         $data->getCollection()->transform(function ($item) {
-            $finalPrice = $item->receiving_details
-                ->flatMap(fn($detail) => $detail->receiving_items)
-                ->sum('total');
+            $finalPrice = $item->receiving_items->sum('total');
 
             return [
-                'transaction_code' => $item->code,
-                'name'             => optional($item->receiving_details->first())->invoice_number,
-                'final_price'      => $finalPrice,
+                'transaction_code' => $item->receiving_details_code ?? $item->invoice_number,
+                'name' => $item->invoice_number,
+                'final_price' => $finalPrice,
             ];
         });
 
@@ -430,18 +424,18 @@ class ReturController extends Controller
     {
         $request->validate([
             'transaction_id' => 'required|integer',
-            'medicine_id'    => 'required|integer',
-            'batch_id'       => 'required|integer|exists:batches,id',
-            'qty_retur'      => 'required|numeric|min:1',
-            'total_retur'    => 'required|numeric',
-            'old_qty'        => 'required|numeric',
+            'medicine_id' => 'required|integer',
+            'batch_id' => 'required|integer|exists:batches,id',
+            'qty_retur' => 'required|numeric|min:1',
+            'total_retur' => 'required|numeric',
+            'old_qty' => 'required|numeric',
         ]);
 
         DB::beginTransaction();
 
         try {
             $findcode = Receiving::findOrFail($request->transaction_id);
-            $now      = Carbon::now()->format('Y-m-d');
+            $now = Carbon::now()->format('Y-m-d');
 
             // Lock medicine and batch rows to prevent race conditions
             $medicine = Medicines::where('id', $request->medicine_id)
@@ -456,7 +450,7 @@ class ReturController extends Controller
             if ($medicine->stock < $request->qty_retur) {
                 DB::rollBack();
                 return response()->json([
-                    'status'  => 'error',
+                    'status' => 'error',
                     'message' => 'Stok obat tidak mencukupi untuk diretur.',
                 ], 422);
             }
@@ -464,7 +458,7 @@ class ReturController extends Controller
             if ($batch->stock < $request->qty_retur) {
                 DB::rollBack();
                 return response()->json([
-                    'status'  => 'error',
+                    'status' => 'error',
                     'message' => 'Stok batch tidak mencukupi untuk diretur.',
                 ], 422);
             }
@@ -478,31 +472,31 @@ class ReturController extends Controller
             // Write items log
             ItemsLog::create([
                 'transaction_code' => $findcode->code,
-                'code'             => $this->generateItemsLogCode(),
-                'type'             => 'RT',
-                'medicine_id'      => $request->medicine_id,
-                'qty'              => $request->qty_retur,
-                'qty_before'       => $qty_before,
-                'qty_after'        => $qty_before - $request->qty_retur,
-                'total'            => $request->total_retur,
-                'date'             => $now,
-                'status'           => 4,
-                'batches_id'       => $batch->id,
-                'user_id'          => auth()->user()->id,
+                'code' => $this->generateItemsLogCode(),
+                'type' => 'RT',
+                'medicine_id' => $request->medicine_id,
+                'qty' => $request->qty_retur,
+                'qty_before' => $qty_before,
+                'qty_after' => $qty_before - $request->qty_retur,
+                'total' => $request->total_retur,
+                'date' => $now,
+                'status' => 4,
+                'batches_id' => $batch->id,
+                'user_id' => auth()->user()->id,
 
             ]);
 
             DB::commit();
 
             return response()->json([
-                'status'  => 'success',
+                'status' => 'success',
                 'message' => 'Retur berhasil disimpan.',
             ]);
         } catch (\Throwable $e) {
             DB::rollBack();
 
             return response()->json([
-                'status'  => 'error',
+                'status' => 'error',
                 'message' => 'Gagal menyimpan retur: ' . $e->getMessage(),
             ], 500);
         }

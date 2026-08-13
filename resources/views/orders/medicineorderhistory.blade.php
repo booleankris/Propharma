@@ -294,11 +294,11 @@
         let searchRequestId = 0;
         let searchAbortController = null;
 
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             flatpickr("#dateRange", {
                 mode: "range",
                 dateFormat: "Y-m-d",
-                onClose: function(selectedDates) {
+                onClose: function (selectedDates) {
                     if (selectedDates.length === 2) {
                         startDate = flatpickr.formatDate(selectedDates[0], "Y-m-d");
                         endDate = flatpickr.formatDate(selectedDates[1], "Y-m-d");
@@ -315,38 +315,38 @@
                 serverSide: true,
                 ajax: {
                     url: "{{ route('medicine-order-history.data') }}",
-                    data: function(d) {
+                    data: function (d) {
                         d.searchMedicine = searchMedicine;
                         d.start_date = startDate;
                         d.end_date = endDate;
                     }
                 },
                 columns: [{
-                        data: 'DT_RowIndex',
-                        orderable: false,
-                        searchable: false
-                    },
-                    {
-                        data: 'date'
-                    },
-                    {
-                        data: 'receiving_code'
-                    },
-                    {
-                        data: 'invoice_number'
-                    },
-                    {
-                        data: 'medicine_name'
-                    },
-                    {
-                        data: 'qty_received'
-                    },
-                    {
-                        data: 'total'
-                    },
-                    {
-                        data: 'creditor_name'
-                    },
+                    data: 'DT_RowIndex',
+                    orderable: false,
+                    searchable: false
+                },
+                {
+                    data: 'date'
+                },
+                {
+                    data: 'receiving_code'
+                },
+                {
+                    data: 'invoice_number'
+                },
+                {
+                    data: 'medicine_name'
+                },
+                {
+                    data: 'qty_received'
+                },
+                {
+                    data: 'harga'
+                },
+                {
+                    data: 'creditor_name'
+                },
                 ],
                 paging: true,
                 searching: false,
@@ -355,6 +355,7 @@
         });
 
         function searchMedicineData(value) {
+            searchMedicine = '';
             clearTimeout(searchDebounceTimer);
             const trimmed = value.trim();
 
@@ -389,8 +390,8 @@
             loading = true;
 
             fetch(`{{ route('medicine-order-history.searchmedicine') }}?search=${encodeURIComponent(thisKeyword)}&page=${thisPage}`, {
-                    signal: searchAbortController.signal
-                })
+                signal: searchAbortController.signal
+            })
                 .then(res => res.json())
                 .then(res => {
                     if (thisRequestId !== searchRequestId) return;
@@ -399,9 +400,9 @@
 
                     if (thisPage === 1 && res.data.length === 0) {
                         tbody.innerHTML = `
-                    <tr>
-                        <td colspan="3" class="empty-row">No data found</td>
-                    </tr>`;
+                        <tr>
+                            <td colspan="3" class="empty-row">No data found</td>
+                        </tr>`;
                         hasMore = false;
                         document.getElementById('searchDropdown').style.display = 'block';
                         return;
@@ -409,12 +410,12 @@
 
                     res.data.forEach((item, index) => {
                         tbody.insertAdjacentHTML('beforeend', `
-                    <tr data-item='${JSON.stringify(item)}' tabindex="0">
-                        <td>${((thisPage - 1) * res.per_page) + index + 1}</td>
-                        <td>${item.code ?? '-'}</td>
-                        <td>${item.name ?? '-'}</td>
-                    </tr>
-                `);
+                        <tr data-item='${JSON.stringify(item)}' tabindex="0">
+                            <td>${((thisPage - 1) * res.per_page) + index + 1}</td>
+                            <td>${item.code ?? '-'}</td>
+                            <td>${item.name ?? '-'}</td>
+                        </tr>
+                    `);
                     });
 
                     hasMore = res.current_page < res.last_page;
@@ -450,7 +451,7 @@
         }
 
         // --- NAVIGATION & ENTER KEY LOGIC ---
-        document.addEventListener('keydown', function(e) {
+        document.addEventListener('keydown', function (e) {
             const dropdown = document.getElementById('searchDropdown');
             const isDropdownVisible = dropdown && dropdown.style.display === 'block';
 
@@ -463,9 +464,8 @@
                 } else {
                     searchMedicine = document.getElementById('searchInput').value;
                     if (dropdown) dropdown.style.display = 'none';
-
-                    document.getElementById('searchButton').focus();
                 }
+                document.getElementById('searchButton').click();
                 return;
             }
 
@@ -500,7 +500,7 @@
         }
 
         // --- MOUSE EVENTS FOR DROPDOWN ---
-        document.getElementById('searchResults').addEventListener('mouseover', function(e) {
+        document.getElementById('searchResults').addEventListener('mouseover', function (e) {
             const row = e.target.closest('tr');
             if (!row) return;
 
@@ -511,7 +511,7 @@
             activeIndex = rows.indexOf(row);
         });
 
-        document.getElementById('searchResults').addEventListener('click', function(e) {
+        document.getElementById('searchResults').addEventListener('click', function (e) {
             const row = e.target.closest('tr');
             if (row) {
                 selectRow(row);
@@ -519,7 +519,7 @@
             }
         });
 
-        document.addEventListener('click', function(event) {
+        document.addEventListener('click', function (event) {
             const dropdown = document.getElementById('searchDropdown');
             const searchInput = document.getElementById('searchInput');
 
@@ -533,7 +533,7 @@
         // --- THE ONLY PLACE THE TABLE RELOADS ---
         const searchBtn = document.getElementById('searchButton');
 
-        searchBtn.addEventListener('click', function() {
+        searchBtn.addEventListener('click', function () {
             const searchInputVal = document.getElementById('searchInput').value.trim();
 
             if (!searchInputVal) {
@@ -546,7 +546,7 @@
             document.getElementById('searchDropdown').style.display = 'none';
         });
 
-        searchBtn.addEventListener('keydown', function(e) {
+        searchBtn.addEventListener('keydown', function (e) {
             if (e.key === 'Enter') {
                 e.preventDefault();
 
