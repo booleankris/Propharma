@@ -8,9 +8,18 @@ return new class extends Migration
 {
     private function indexExists(string $table, string $indexName): bool
     {
-        return collect(DB::select("SHOW INDEX FROM `{$table}`"))
-            ->pluck('Key_name')
-            ->contains($indexName);
+        try {
+            if (DB::getDriverName() === 'sqlite') {
+                return collect(DB::select("PRAGMA index_list('{$table}')"))
+                    ->pluck('name')
+                    ->contains($indexName);
+            }
+            return collect(DB::select("SHOW INDEX FROM `{$table}`"))
+                ->pluck('Key_name')
+                ->contains($indexName);
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 
     public function up(): void

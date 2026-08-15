@@ -117,73 +117,78 @@
 
 <body>
 
-    <h1>Tanda Penerimaan Barang</h1>
-    <div class="divider"></div>
+    @foreach ($groupedByPBF as $pbfName => $detailsList)
+        @if (!$loop->first)
+            <div style="page-break-before: always;"></div>
+        @endif
 
-    <table class="header-info">
-        <tr>
-            <td width="70%">
-                <div><span class="label">Nomor Terima</span>: {{ $receiving->code }}</div>
-                <div><span class="label">Apotek Penerima</span>: {{ $receiving->pharmacy?->name ?? '—' }}</div>
-            </td>
-            <td width="30%" class="date-box">
-                <div>Date:</div>
-                <div class="date-value">{{ $receiving->updated_at?->format('d F Y') ?? '—' }}</div>
-            </td>
-        </tr>
-    </table>
+        <h1>Tanda Penerimaan Barang</h1>
+        <div class="divider"></div>
 
-    <h2 class="section-title">Deskripsi Item</h2>
-
-    @php $grandTotal = 0; @endphp
-
-    @foreach ($receiving->receiving_details as $details)
-        <div class="invoice-label">
-            Invoice: {{ $details->invoice_number }} &nbsp;·&nbsp; PBF: {{ $details->creditor?->name ?? '—' }}
-        </div>
-
-        <table class="items">
-            <thead>
-                <tr>
-                    <th>Item</th>
-                    <th class="qty-col">Qty Pesan</th>
-                    <th class="qty-col">Qty Diterima</th>
-                    <th class="total-col">Total</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach ($details->receiving_items as $item)
-                    @php $grandTotal += $item->total; @endphp
-                    <tr>
-                        <td>{{ $item->order_items?->medicines?->name ?? '—' }}</td>
-                        <td class="qty-col">{{ $item->order_items?->quantity ?? '—' }}</td>
-                        <td class="qty-col">{{ $item->qty_received }}</td>
-                        <td class="total-col">Rp. {{ number_format($item->total, 0, ',', '.') }}</td>
-                    </tr>
-                @endforeach
-            </tbody>
+        <table class="header-info">
+            <tr>
+                <td width="70%">
+                    <div><span class="label">Nomor Pemesanan</span>: {{ $order->code }}</div>
+                    <div><span class="label">Nama PBF</span>: {{ $pbfName }}</div>
+                </td>
+                <td width="30%" class="date-box">
+                    <div>Date:</div>
+                    <div class="date-value">{{ $receiving->updated_at?->format('d F Y') ?? '—' }}</div>
+                </td>
+            </tr>
         </table>
+
+        <h2 class="section-title">Deskripsi Item</h2>
+
+        @foreach ($detailsList as $details)
+            <div class="invoice-label">
+                Nama Faktur: {{ $details->invoice_number }}
+            </div>
+
+            <table class="items">
+                <thead>
+                    <tr>
+                        <th>Item</th>
+                        <th class="qty-col">Qty Pesan</th>
+                        <th class="qty-col">Qty Diterima</th>
+                        <th class="total-col">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @php $fakturTotal = 0; @endphp
+                    @foreach ($details->receiving_items as $item)
+                        @php $fakturTotal += $item->total; @endphp
+                        <tr>
+                            <td>{{ $item->order_items?->medicines?->name ?? '—' }}</td>
+                            <td class="qty-col">{{ $item->order_items?->quantity ?? '—' }}</td>
+                            <td class="qty-col">{{ $item->qty_received }}</td>
+                            <td class="total-col">Rp. {{ number_format($item->total, 0, ',', '.') }}</td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+
+            @php
+                $ppn = $fakturTotal * 0.11;
+                $finalTotal = $fakturTotal + $ppn;
+            @endphp
+
+            <table class="grand-total">
+                <tr>
+                    <td class="gt-label">Subtotal</td>
+                    <td class="gt-value">Rp. {{ number_format($fakturTotal, 0, ',', '.') }}</td>
+                </tr>
+                <tr>
+                    <td class="gt-label">PPN (11%)</td>
+                    <td class="gt-value">Rp. {{ number_format($ppn, 0, ',', '.') }}</td>
+                </tr>
+                <tr class="gt-final">
+                    <td class="gt-label">Total</td>
+                    <td class="gt-value">Rp. {{ number_format($finalTotal, 0, ',', '.') }}</td>
+                </tr>
+            </table>
+        @endforeach
     @endforeach
-
-    @php
-        $ppn = $grandTotal * 0.11;
-        $finalTotal = $grandTotal + $ppn;
-    @endphp
-
-    <table class="grand-total">
-        <tr>
-            <td class="gt-label">Subtotal</td>
-            <td class="gt-value">Rp. {{ number_format($grandTotal, 0, ',', '.') }}</td>
-        </tr>
-        <tr>
-            <td class="gt-label">PPN (11%)</td>
-            <td class="gt-value">Rp. {{ number_format($ppn, 0, ',', '.') }}</td>
-        </tr>
-        <tr class="gt-final">
-            <td class="gt-label">Total</td>
-            <td class="gt-value">Rp. {{ number_format($finalTotal, 0, ',', '.') }}</td>
-        </tr>
-    </table>
 
 </body>
 

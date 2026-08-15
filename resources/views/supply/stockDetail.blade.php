@@ -267,7 +267,8 @@
                         width: '40px'
                     },
                     {
-                        data: 'code'
+                        data: 'code',
+                        orderable: false
                     },
                     {
                         data: 'medicine_name',
@@ -302,7 +303,7 @@
                 ],
 
                 order: [
-                    [1, 'desc']
+                    [0, 'desc']
                 ], // safer
 
                 searching: false,

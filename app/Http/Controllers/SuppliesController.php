@@ -87,6 +87,7 @@ class SuppliesController extends Controller
             // 4. TABLE QUERY: Eager load relations nested deep to prevent performance issues
             $items = (clone $baseQuery)->with([
                 'medicines',
+                'batches',                              // Fetch batches for batch name display
                 'receiving.receiving_details.creditor', // Fetch creditor through receiving details
                 'medicine_transaction.user'             // Fetch cashier user through transactions
             ])->whereNotIn('status', [5, 6, 7]);
@@ -96,8 +97,15 @@ class SuppliesController extends Controller
                 ->addIndexColumn()
                 ->addColumn('date', function ($row) {
                     return $row->date;
-                })->addColumn('medicine_name', function ($row) {
+                })
+                ->addColumn('medicine_name', function ($row) {
                     return $row->medicines->name;
+                })
+                ->addColumn('batch_name', function ($row) {
+                    if ($row->status == 2 && $row->batches) {
+                        return $row->batches->name;
+                    }
+                    return '-';
                 })
                 ->addColumn('transaction_code', function ($row) {
                     if ($row->status == 2) {
@@ -994,17 +1002,20 @@ class SuppliesController extends Controller
 
     public function getStockDetail(Request $request)
     {
-        $query = MedicineTransferItems::with([
-            'batches.medicines',
-            'batches.pharmacy',
-            'etalases'
-        ])
+        ini_set('memory_limit', '512M');
+
+        $query = MedicineTransferItems::query()
+            ->with([
+                'transfer:id,code',
+                'batches.medicines:id,name,code',
+                'batches.pharmacy:id,name',
+                'etalases:id,name'
+            ])
             ->whereHas('batches', function ($q) {
                 $q->where('pharmacy_id', auth()->user()->pharmacy_id);
-            })
-            ->select('medicine_transfer_items.*');
+            });
 
-        return DataTables::of($query)
+        return DataTables::eloquent($query)
 
             ->addIndexColumn()
 
@@ -1019,13 +1030,21 @@ class SuppliesController extends Controller
                 if ($request->search) {
                     $search = $request->search;
 
-                    $query->whereHas('batches.medicines', function ($q) use ($search) {
-                        $q->where(function ($q2) use ($search) {
-                            $q2->where('name', 'like', "%{$search}%")
+                    $query->where(function ($sub) use ($search) {
+                        $sub->whereHas('batches.medicines', function ($q) use ($search) {
+                            $q->where('name', 'like', "%{$search}%")
                                 ->orWhere('code', 'like', "%{$search}%");
+                        })->orWhereHas('transfer', function ($q) use ($search) {
+                            $q->where('code', 'like', "%{$search}%");
+                        })->orWhereHas('batches', function ($q) use ($search) {
+                            $q->where('name', 'like', "%{$search}%");
                         });
                     });
                 }
+            })
+
+            ->addColumn('code', function ($item) {
+                return $item->transfer->code ?? '-';
             })
 
             ->addColumn('medicine_name', function ($item) {
@@ -1049,7 +1068,7 @@ class SuppliesController extends Controller
             })
 
             ->editColumn('stock', function ($item) {
-                return $item->stock ?? 0;
+                return $item->qty ?? 0;
             })
 
             ->editColumn('status', function ($item) {

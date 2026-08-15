@@ -399,7 +399,7 @@ class ReturController extends Controller
         $search = $request->search;
 
         $data = ReceivingDetails::query()
-            ->with(['receiving', 'receiving_items.order_items.medicines'])
+            ->with(['receiving', 'receiving_items.order_items.medicines', 'creditor'])
             ->where(function ($q) use ($search) {
                 $q->where('receiving_details_code', 'LIKE', "%{$search}%")
                     ->orWhere('invoice_number', 'LIKE', "%{$search}%");
@@ -414,8 +414,9 @@ class ReturController extends Controller
             $finalPrice = $item->receiving_items->sum('total');
 
             return [
-                'transaction_code' => $item->receiving_details_code ?? $item->invoice_number,
-                'name' => $item->invoice_number,
+                'transaction_code' => $item->receiving_details_code,
+                'invoice_number' => $item->invoice_number,
+                'name' => $item->creditor->name ?? '-',
                 'final_price' => $finalPrice,
             ];
         });

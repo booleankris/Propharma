@@ -185,7 +185,8 @@
                         @foreach ($items as $row)
                             <tr>
                                 <td style="text-align:center;">
-                                    {{ $row->quantity }} ({{ ucfirst(terbilang($row->quantity)) }}) {{ $row->medicines->unit ?? '-' }}
+                                    {{ $row->quantity }} ({{ ucfirst(terbilang($row->quantity)) }})
+                                    {{ $row->medicines->packaging ?? '-' }}
                                 </td>
                                 <td>
                                     {{ $row->medicines->name ?? '-' }}
@@ -356,7 +357,8 @@
                     <tr>
                         <td>
                             @if ($pharmacy->permit)
-                                SIA
+                                No. SIA : {{ $pharmacy->permit }}
+
                             @elseif ($pharmacy->pharmacy_registration)
                                 STR
                             @endif
@@ -497,6 +499,13 @@
                         <td style="vertical-align:top;">:</td>
                         <td>{{ $pharmacy->address }}</td>
                     </tr>
+                    <tr>
+                        <td style="vertical-align:top;">No. SIA : </td>
+                        <td style="vertical-align:top;">:</td>
+                        <td>
+                            {{ $pharmacy->permit }}
+                        </td>
+                    </tr>
                 </table>
 
                 <table class="signature-block" style="width:100%;">
@@ -593,8 +602,8 @@
                             <tr>
                                 <td style="text-align:center;">{{ $index + 1 }}</td>
                                 <td style="text-align:left;">{{ $row->medicines->name ?? '-' }}</td>
-                                <td style="text-align:center;">{{ $row->medicines->form ?? '-' }}</td>
-                                <td style="text-align:center;">{{ $row->medicines->strength ?? '-' }}</td>
+                                <td style="text-align:center;">{{ $row->medicines->composition->name ?? '-' }}</td>
+                                <td style="text-align:center;">{{ $row->medicines->dosage ?? '-' }}</td>
                                 <td style="text-align:center;">{{ $row->quantity }} ({{ ucfirst(terbilang($row->quantity)) }})</td>
                             </tr>
                         @endforeach
@@ -624,6 +633,13 @@
                         <td>Alamat Sarana</td>
                         <td>:</td>
                         <td>{{ $pharmacy->address }}</td>
+                    </tr>
+                    <tr>
+                        <td style="vertical-align:top;">No. SIA : </td>
+                        <td style="vertical-align:top;">:</td>
+                        <td>
+                            {{ $pharmacy->permit }}
+                        </td>
                     </tr>
                 </table>
 
@@ -723,8 +739,8 @@
                             <tr>
                                 <td style="text-align:center;">{{ $index + 1 }}</td>
                                 <td style="text-align:left;">{{ $row->medicines->name ?? '-' }}</td>
-                                <td style="text-align:center;">{{ $row->medicines->form ?? '-' }}</td>
-                                <td style="text-align:center;">{{ $row->medicines->strength ?? '-' }}</td>
+                                <td style="text-align:center;">{{ $row->medicines->composition->name ?? '-' }}</td>
+                                <td style="text-align:center;">{{ $row->medicines->dosage ?? '-' }}</td>
                                 <td style="text-align:center;">{{ $row->quantity }} ({{ ucfirst(terbilang($row->quantity)) }})</td>
                             </tr>
                         @endforeach
@@ -753,6 +769,13 @@
                         <td>Alamat Sarana</td>
                         <td>:</td>
                         <td>{{ $pharmacy->address }}</td>
+                    </tr>
+                    <tr>
+                        <td style="vertical-align:top;">No. SIA : </td>
+                        <td style="vertical-align:top;">:</td>
+                        <td>
+                            {{ $pharmacy->permit }}
+                        </td>
                     </tr>
                 </table>
 

@@ -42,21 +42,21 @@
             align-items: center !important; margin-bottom: 12px !important;
         }
         .dataTables_filter input {
-            width: 220px !important; padding: 6px 10px !important;
+            width: 220px !important; font-size: 12px !important; padding: 6px 10px !important;
             border-radius: 6px !important; border: 1px solid #d1d5db !important; outline: none !important;
         }
         .dataTables_length select {
-            padding: 4px 8px !important; border-radius: 6px !important; border: 1px solid #d1d5db !important;
+            padding: 6px 28px 6px 12px !important; border-radius: 6px !important; border: 1px solid #d1d5db !important;
         }
         #medicineTable thead th {
             background-color: #f8fafc !important; font-weight: 600 !important;
             font-size: 11px !important; text-transform: uppercase !important;
             border-bottom: 2px solid #e5e7eb !important; padding: 10px !important;
         }
-        #medicineTable tbody td { padding: 11px 10px !important; font-size: 13px !important; vertical-align: middle !important; }
-        #medicineTable tbody tr { cursor: pointer; }
-        #medicineTable tbody tr:hover { background-color: #f1f5f9 !important; }
-        #medicineTable tbody tr.active { background-color: #dbeafe !important; }
+        #medicineTable tbody td { padding: 12px 10px !important; font-size: 13px !important; vertical-align: middle !important; border-bottom: 1px solid #f1f5f9 !important; }
+        #medicineTable tbody tr { cursor: pointer; transition: background-color 0.15s; }
+        #medicineTable tbody tr:hover { background-color: #f8fafc !important; }
+        #medicineTable tbody tr.active { background-color: #eff6ff !important; border-left: 3px solid #3b82f6 !important; }
         #medicineTable tbody tr.keyboard-focus { background-color: #eff6ff !important; outline: 2px solid #93c5fd; outline-offset: -2px; }
         .dataTables_paginate .paginate_button { padding: 5px 10px !important; border-radius: 6px !important; }
         .text-end { text-align: right !important; }
@@ -108,7 +108,7 @@
                                 <table>
                                     <thead>
                                         <tr>
-                                            <th>#</th><th>Kode</th><th>Nama Supplier</th><th>Total</th>
+                                            <th>#</th><th>Kode & Faktur</th><th>Nama Supplier</th><th>Total</th>
                                         </tr>
                                     </thead>
                                 </table>
@@ -117,6 +117,12 @@
                                 </div>
                             </div>
                         </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="block text-[12px] font-medium text-gray-500 mb-1">Nomor faktur</label>
+                        <input id="invoice_number" type="text" readonly placeholder="—" tabindex="-1"
+                            class="w-full rounded-lg border border-gray-200 bg-gray-50 text-gray-500 px-3 py-2 text-[13px] focus:outline-none">
                     </div>
 
                     {{-- Hidden fields --}}
@@ -306,9 +312,11 @@
                     }
                     res.data.forEach((item, index) => {
                         const row = document.createElement('tr');
+                        row.dataset.code = item.transaction_code;
+                        row.dataset.invoice = item.invoice_number || '';
                         row.innerHTML = `
                             <td>${((page - 1) * res.per_page) + index + 1}</td>
-                            <td>${item.transaction_code}</td>
+                            <td>${item.transaction_code}<br><small style="color: #9ca3af; font-size: 11px;">Faktur: ${item.invoice_number || '-'}</small></td>
                             <td>${item.name ?? '-'}</td>
                             <td>${Number(item.final_price).toLocaleString('id-ID')}</td>`;
                         tbody.appendChild(row);
@@ -324,8 +332,9 @@
         function hideDropdown() { document.getElementById('searchDropdown').style.display = 'none'; }
 
         function selectRow(row) {
-            selectedTransactionCode = row.children[1].innerText.trim();
+            selectedTransactionCode = row.dataset.code;
             document.getElementById('searchInput').value = selectedTransactionCode;
+            document.getElementById('invoice_number').value = row.dataset.invoice || '—';
             hideDropdown();
             activeIndex   = -1;
             tableKeyIndex = -1;
@@ -502,7 +511,7 @@
 
         function resetReturForm() {
             ['medicine_id','cart_id','old_qty','content','medicine_code','unit',
-             'medicine_name','item_price','content_display','qty_in','qty','price','total_retur']
+             'medicine_name','item_price','content_display','qty_in','qty','price','total_retur', 'invoice_number']
                 .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
 
             const batchSelect        = document.getElementById('batch_select');
@@ -701,12 +710,22 @@
                     data:   d => { d.transaction_code = selectedTransactionCode; },
                     dataSrc: '',
                 },
+                
+                dom: '<"flex items-center justify-between mb-4"lf>rt<"flex items-center justify-between mt-4"ip>',
+                language: {
+                    search: "", 
+                    searchPlaceholder: "Cari item...",
+                    lengthMenu: "Show _MENU_ entries"
+                },
 
                 columns: [
                     { data: null, render: (d, t, r, m) => m.row + 1 },
-                    { data: 'name' },
-                    { data: 'qty_received', className: 'text-end' },
-                    { data: 'total', className: 'text-end', render: val => 'Rp ' + Number(val).toLocaleString('id-ID') },
+                    { data: 'name', render: function(data, type, row) {
+                        return `<div><div class="font-medium text-gray-800">${data}</div>
+                                <div class="text-[11px] text-gray-400 mt-0.5">Kode: ${row.code || '-'} &nbsp;&bull;&nbsp; Satuan: ${row.unit || '-'}</div></div>`;
+                    }},
+                    { data: 'qty_received', className: 'text-end', render: (data, type, row) => `<span class="font-medium text-gray-700">${data}</span> <span class="text-[11px] text-gray-400">${row.unit || ''}</span>` },
+                    { data: 'total', className: 'text-end', render: val => '<span class="font-medium text-gray-700">Rp ' + Number(val).toLocaleString('id-ID') + '</span>' },
                 ],
 
                 drawCallback: function () {

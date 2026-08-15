@@ -186,7 +186,7 @@ class ReceivingController extends Controller
                         'medicine_id' => $orderItem->medicine_id,
                         'medicines' => $orderItem->medicines,
                         'quantity' => $orderItem->quantity,
-                        'qty_received' => $qtyReceived,
+                        'qty_received' => $batch->qty_received,
                         'qty_remaining' => $qtyRemaining,
                         'raw_price' => $batch->raw_price ?? $orderItem->price, // Added
                         'pack' => $orderItem->pack,                       // Added
@@ -307,10 +307,58 @@ class ReceivingController extends Controller
             return $perCreditor->groupBy('creditor_code') ?? "Kosong";
         });
 
-        $pdf = Pdf::loadView('orders.printSPBFinal', compact('order', 'date', 'grouped', 'pharmacy'))
+        $receivingDetail = \App\Models\ReceivingDetails::where('sp_code', $order->order_items->first()->order_items_code)
+            ->first();
+
+        $pdf = Pdf::loadView('orders.printSPBFinal', compact('order', 'date', 'grouped', 'pharmacy', 'receivingDetail'))
             ->setPaper('A7', 'portrait');
 
         return $pdf->stream("SPBFINAL-{$order->code}-{$creditorCode}.pdf");
+    }
+
+    public function printSPBFinalByFaktur($orderId, $receivingDetailsId)
+    {
+        ini_set('memory_limit', '512M');
+        $date = Carbon::now()->translatedFormat('d F Y');
+        
+        $receivingDetail = \App\Models\ReceivingDetails::findOrFail($receivingDetailsId);
+        $creditorCode = $receivingDetail->creditor_code;
+
+        $order = Order::with([
+            'pharmacy',
+            'order_items' => function ($q) use ($creditorCode, $receivingDetailsId) {
+                $q->where('creditor_code', $creditorCode)
+                  ->whereHas('receivingItems', function($q2) use ($receivingDetailsId) {
+                      $q2->where('receiving_details_id', $receivingDetailsId);
+                  });
+            },
+            'order_items.receivingItems' => function ($q) use ($receivingDetailsId) {
+                $q->where('receiving_details_id', $receivingDetailsId);
+            },
+            'order_items.medicines',
+            'order_items.medicines.creditors',
+            'order_items.creditors',
+            'order_items.medicines.factory',
+            'order_items.medicines.category',
+            'order_items.medicines.composition',
+        ])->findOrFail($orderId);
+
+        $pharmacy = $order->pharmacy;
+
+        $grouped = $order->order_items->groupBy(function ($item) {
+            $type = $item->medicines->type ?? "Kosong";
+            if (strtoupper($type) === 'NARKOTIKA') {
+                return 'NARKOTIKA_' . $item->id;
+            }
+            return $type;
+        })->map(function ($perCreditor) {
+            return $perCreditor->groupBy('creditor_code') ?? "Kosong";
+        });
+
+        $pdf = Pdf::loadView('orders.printSPBFinal', compact('order', 'date', 'grouped', 'pharmacy', 'receivingDetail'))
+            ->setPaper('A7', 'portrait');
+
+        return $pdf->stream("SPBFINAL-{$order->code}-{$creditorCode}-FAKTUR.pdf");
     }
 
     public function printSPBFinalByItem($orderId, $orderItemId)
@@ -380,7 +428,11 @@ class ReceivingController extends Controller
         ])
             ->findOrFail($receivingId);
 
-        return \PDF::loadView('orders.printOrders', compact('receiving'))
+        $groupedByPBF = $receiving->receiving_details->groupBy(function($detail) {
+            return $detail->creditor ? $detail->creditor->name : 'Unknown PBF';
+        });
+
+        return \PDF::loadView('orders.printOrders', compact('receiving', 'order', 'groupedByPBF'))
             ->setPaper('a4', 'landscape')
             ->stream('tanda-penerimaan-barang-' . $receiving->code . '.pdf');
     }
@@ -903,13 +955,11 @@ class ReceivingController extends Controller
         $now = Carbon::now()->format('d/m/Y');
         $datenow = Carbon::now()->format('Y-m-d');
 
-        // FIX #1: Added order_id filter so we only get the receiving for THIS order
-        $transaction = Receiving::where('status', 0)->where(
+        $transaction = Receiving::with('receiving_details')->where('status', 0)->where(
             'pharmacy_id',
             auth()->user()->pharmacy_id
         )->first();
 
-        // FIX #2: Guard against null $check_order
         $check_order = OrderItems::with('orders')->whereHas('orders', function ($q) use ($id) {
             $q->where('id', $id);
         })->first();
@@ -932,6 +982,15 @@ class ReceivingController extends Controller
             ->unique('code')
             ->values();
 
+        $allFakturs = collect();
+        if ($transaction && $transaction->receiving_details) {
+            $allFakturs = $allFakturs->merge($transaction->receiving_details);
+        }
+        $historicalFakturs = \App\Models\ReceivingDetails::whereHas('receiving_items.order_items', function ($q) use ($id) {
+            $q->where('order_id', $id);
+        })->get();
+        $allFakturs = $allFakturs->merge($historicalFakturs)->unique('id')->values();
+
         if ($transaction) {
             $getOrder = Order::findOrFail($id);
 
@@ -949,7 +1008,7 @@ class ReceivingController extends Controller
             $d_ppn = $d_price * 0.11 ?? '0';
             $d_total = $d_price + $d_ppn ?? '0';
 
-            return view('orders.receiving', compact('order_id', 'd_price', 'd_ppn', 'd_total', 'order_code', 'creditorOption', 'receiving_code', 'transaction', 'now', 'datenow', 'receiving_id'));
+            return view('orders.receiving', compact('order_id', 'd_price', 'd_ppn', 'd_total', 'order_code', 'creditorOption', 'receiving_code', 'transaction', 'now', 'datenow', 'receiving_id', 'allFakturs'));
         } else {
             $year = now()->format('y');
             $month = now()->format('m');
@@ -1089,7 +1148,8 @@ class ReceivingController extends Controller
             DB::rollBack();
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => 'Gagal mengubah status',
+                'error' => $e->getMessage()
             ], 500);
         }
     }
@@ -1192,10 +1252,18 @@ class ReceivingController extends Controller
 
             $order = Order::findOrFail($request->orderid);
 
-            // Generate Nomor Terima (NT) for any ReceivingDetails that doesn't have one yet
+            // Generate Nomor Terima (NT) and SP Code for any ReceivingDetails that doesn't have one yet
             foreach ($receiving->receiving_details as $details) {
+                $needsSave = false;
                 if (empty($details->receiving_details_code)) {
                     $details->receiving_details_code = $this->generateReceivingDetailsCode($receiving->pharmacy_id);
+                    $needsSave = true;
+                }
+                if (empty($details->sp_code)) {
+                    $details->sp_code = $this->generateSPCode($receiving->pharmacy_id);
+                    $needsSave = true;
+                }
+                if ($needsSave) {
                     $details->save();
                 }
             }
@@ -1321,7 +1389,20 @@ class ReceivingController extends Controller
                 ->chunk(500)
                 ->each(fn($chunk) => ItemsLog::insert($chunk->values()->all()));
 
-            $order->update(['status' => 2]);
+            // Update status only for the order items that are actually received
+            $receivedOrderItemIds = $receivingItems->pluck('order_items.id')->unique()->filter()->values()->all();
+            if (!empty($receivedOrderItemIds)) {
+                OrderItems::whereIn('id', $receivedOrderItemIds)->update(['status' => 2]);
+            }
+
+            // Check if all order items for this order have been received (status 2)
+            $totalOrderItems = OrderItems::where('order_id', $order->id)->count();
+            $receivedOrderItems = OrderItems::where('order_id', $order->id)->where('status', 2)->count();
+            
+            if ($totalOrderItems > 0 && $totalOrderItems === $receivedOrderItems) {
+                $order->update(['status' => 2]);
+            }
+
             $receiving->update(['status' => 2]);
 
             DB::commit();
@@ -1411,5 +1492,31 @@ class ReceivingController extends Controller
                 'message' => 'Gagal menyelesaikan receiving',
             ], 500);
         }
+    }
+    private function generateSPCode($pharmacyId)
+    {
+        $code = "R";
+        $year = now()->format('y');
+        $month = now()->format('m');
+        $prefix = "SP-O-{$year}{$month}/";
+
+        $lastItem = \App\Models\ReceivingDetails::where('sp_code', 'like', $prefix . '%')
+            ->whereHas('receiving', function ($query) use ($pharmacyId) {
+                $query->where('pharmacy_id', $pharmacyId);
+            })
+            ->orderBy('sp_code', 'desc')
+            ->first();
+
+        if ($lastItem && $lastItem->sp_code) {
+            $parts = explode('/', $lastItem->sp_code);
+            $lastPart = end($parts);
+            $serialPart = explode('-', $lastPart)[0];
+            $lastSerial = intval($serialPart);
+            $nextSerial = $lastSerial + 1;
+        } else {
+            $nextSerial = 1;
+        }
+
+        return $prefix . str_pad($nextSerial, 6, '0', STR_PAD_LEFT) . '-' . $pharmacyId;
     }
 }

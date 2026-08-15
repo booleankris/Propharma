@@ -7,9 +7,11 @@ use App\Exports\Orders\OrdersExport;
 use App\Http\Controllers\Controller;
 use App\Models\MedicineCart;
 use App\Models\Medicines;
+use App\Models\MedicineTransfers;
 use App\Models\Order;
 use App\Models\OrderItems;
 use App\Models\Receiving;
+use App\Models\Transfers;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -67,6 +69,16 @@ class OrdersController extends Controller
                 'creditors',
                 fn($data) =>
                 $data->creditors->name ?? 'Belum Dipilih'
+            )
+
+            ->addColumn(
+                'discount',
+                function ($data) {
+                    $mc = \App\Models\MedicineCreditor::where('medicine_id', $data->medicine_id)
+                        ->where('creditor_code', $data->creditor_code)
+                        ->first();
+                    return $mc ? ($mc->discount ?? 0) . '%' : '0%';
+                }
             )
 
             ->escapeColumns([])
@@ -223,13 +235,15 @@ class OrdersController extends Controller
 
         if ($lastItem && $lastItem->order_items_code) {
             $parts = explode('/', $lastItem->order_items_code);
-            $lastSerial = intval(end($parts));
+            $lastPart = end($parts);
+            $serialPart = explode('-', $lastPart)[0];
+            $lastSerial = intval($serialPart);
             $nextSerial = $lastSerial + 1;
         } else {
             $nextSerial = 1;
         }
 
-        return $prefix . str_pad($nextSerial, 4, '0', STR_PAD_LEFT);
+        return $prefix . str_pad($nextSerial, 6, '0', STR_PAD_LEFT) . '-' . $pharmacyId;
     }
     public function addItemOrder(Request $request)
     {
@@ -528,30 +542,53 @@ class OrdersController extends Controller
         $search = $request->search;
         $orderId = $request->order_id;
 
-        // exclude medicines already in this order, so Smart Order doesn't duplicate rows
+        // Exclude medicines already in this order
         $existingIds = OrderItems::where('order_id', $orderId)->pluck('medicine_id');
 
-        $query = MedicineCart::select('medicine_cart.medicine_id')
+        $results = MedicineCart::select(
+            'medicine_cart.medicine_id',
+            'medicines.code',
+            'medicines.name',
+            'medicines.packaging',
+            'medicines.raw_price',
+            'medicines.minimal_stock'
+        )
             ->selectRaw('SUM(medicine_cart.quantity) as total_sold')
             ->join('medicine_transactions', 'medicine_transactions.id', '=', 'medicine_cart.transaction_id')
             ->join('medicines', 'medicines.id', '=', 'medicine_cart.medicine_id')
             ->whereBetween('medicine_transactions.created_at', ["{$dateFrom} 00:00:00", "{$dateTo} 23:59:59"])
             ->whereNotIn('medicine_cart.medicine_id', $existingIds)
             ->when($search, fn($q) => $q->where('medicines.name', 'like', "%{$search}%"))
-            ->groupBy('medicine_cart.medicine_id')
-            ->orderByDesc('total_sold');
-
-        $results = $query->paginate(20);
+            ->groupBy(
+                'medicine_cart.medicine_id',
+                'medicines.code',
+                'medicines.name',
+                'medicines.packaging',
+                'medicines.raw_price',
+                'medicines.minimal_stock'
+            )
+            ->orderByDesc('total_sold')
+            ->paginate(20);
 
         $results->getCollection()->transform(function ($row) {
-            $medicine = Medicines::find($row->medicine_id);
+
+            $batchStock = \App\Models\Batches::where('medicine_id', $row->medicine_id)->sum('stock');
+
+            $transferStock = \App\Models\MedicineTransferItems::whereHas('batches', function ($q) use ($row) {
+                $q->where('medicine_id', $row->medicine_id);
+            })->sum('qty');
+
+            $totalStocks = $batchStock + $transferStock;
+
             return [
                 'medicine_id' => $row->medicine_id,
-                'code' => $medicine->code,
-                'name' => $medicine->name,
-                'packaging' => $medicine->packaging,
-                'raw_price' => $medicine->raw_price,
+                'code' => $row->code,
+                'name' => $row->name,
+                'packaging' => $row->packaging,
+                'raw_price' => $row->raw_price,
                 'total_sold' => (int) $row->total_sold,
+                'min_stock' => $row->minimal_stock,
+                'stocks' => $totalStocks,
             ];
         });
 

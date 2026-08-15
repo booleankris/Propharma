@@ -14,15 +14,21 @@ return new class extends Migration
     public function up()
     {
         Schema::table('medicine_transactions', function (Blueprint $table) {
-            $table->foreignId('user_id')
-                ->nullable()
-                ->constrained('users')
-                ->nullOnDelete();
-            $table->foreignId('shift_logs_id')
-                ->nullable()
-                ->constrained('shift_logs')
-                ->nullOnDelete();
-            $table->string('payment_method')->nullable();
+            if (!Schema::hasColumn('medicine_transactions', 'user_id')) {
+                $table->foreignId('user_id')
+                    ->nullable()
+                    ->constrained('users')
+                    ->nullOnDelete();
+            }
+            if (!Schema::hasColumn('medicine_transactions', 'shift_logs_id')) {
+                $table->foreignId('shift_logs_id')
+                    ->nullable()
+                    ->constrained('shift_logs')
+                    ->nullOnDelete();
+            }
+            if (!Schema::hasColumn('medicine_transactions', 'payment_method')) {
+                $table->string('payment_method')->nullable();
+            }
         });
     }
 

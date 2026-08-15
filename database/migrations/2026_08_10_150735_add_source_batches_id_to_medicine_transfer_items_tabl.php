@@ -13,10 +13,12 @@ return new class extends Migration {
     public function up()
     {
         Schema::table('medicine_transfer_items', function (Blueprint $table) {
-            $table->foreignId('source_batches_id')
-                ->nullable()
-                ->after('batches_id')
-                ->constrained('batches');
+            if (!Schema::hasColumn('medicine_transfer_items', 'source_batches_id')) {
+                $table->foreignId('source_batches_id')
+                    ->nullable()
+                    ->after('batches_id')
+                    ->constrained('batches');
+            }
         });
     }
 
@@ -27,7 +29,7 @@ return new class extends Migration {
      */
     public function down()
     {
-        Schema::table('medicine_transfer_items_tabl', function (Blueprint $table) {
+        Schema::table('medicine_transfer_items', function (Blueprint $table) {
             //
         });
     }

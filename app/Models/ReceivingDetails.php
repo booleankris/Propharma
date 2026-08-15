@@ -10,6 +10,7 @@ class ReceivingDetails extends Model
     use HasFactory;
     protected $table = 'receiving_details';
     protected $fillable = [
+        'sp_code',
         'receiving_details_code',
         'receiving_id',
         'creditor_code',

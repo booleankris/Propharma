@@ -26,6 +26,10 @@ class Batches extends Model
     {
         return $this->hasMany(MedicineTransfers::class, 'batches_id', 'id'); 
     }
+    public function medicine_transfer_items()
+    {
+        return $this->hasMany(MedicineTransferItems::class, 'batches_id', 'id');
+    }
     public function receivingItems()
     {
         return $this->hasMany(ReceivingItems::class, 'batches_id', 'id');

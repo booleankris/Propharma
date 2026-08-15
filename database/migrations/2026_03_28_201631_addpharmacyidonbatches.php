@@ -14,10 +14,12 @@ return new class extends Migration
     public function up()
     {
         Schema::table('batches', function (Blueprint $table) {
-            $table->foreignId('pharmacy_id')
-                ->nullable()
-                ->constrained('pharmacies')
-                ->nullOnDelete();
+            if (!Schema::hasColumn('batches', 'pharmacy_id')) {
+                $table->foreignId('pharmacy_id')
+                    ->nullable()
+                    ->constrained('pharmacies')
+                    ->nullOnDelete();
+            }
         });
     }
 

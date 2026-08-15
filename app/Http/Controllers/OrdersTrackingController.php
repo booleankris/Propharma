@@ -10,16 +10,20 @@ class OrdersTrackingController extends Controller
 {
     public function index()
     {
-        return view('orders.tracking');
+        $creditors = \App\Models\Creditor::orderBy('name')->get();
+        return view('orders.tracking', compact('creditors'));
     }
 
     public function data(Request $request)
     {
-        $query = OrderItems::with(['medicines', 'creditors', 'orders'])
+        $query = OrderItems::with(['medicines', 'creditors', 'orders', 'receiving_items.receiving_details'])
             ->join('orders', 'orders.id', '=', 'order_items.order_id')
             ->select('order_items.*')
+            ->when($request->creditor_code, function ($q) use ($request) {
+                $q->where('order_items.creditor_code', $request->creditor_code);
+            })
             ->when($request->status, function ($q) use ($request) {
-                $q->where('orders.status', $request->status);
+                $q->where('order_items.status', $request->status);
             })
             ->when($request->date_from && $request->date_to, function ($q) use ($request) {
                 $q->whereBetween('orders.updated_at', [
@@ -27,15 +31,19 @@ class OrdersTrackingController extends Controller
                     $request->date_to . ' 23:59:59',
                 ]);
             })
+            ->whereHas('orders', function ($d) {
+                $d->where('pharmacy_id', Auth()->user()->pharmacy_id);
+            })
             ->orderBy('orders.updated_at', 'desc');
 
         return DataTables::of($query)
+            ->addColumn('sp_code', fn($row) => $row->receiving_items->receiving_details->sp_code ?? '-')
             ->addColumn('order_code', fn($row) => $row->orders->code)
             ->addColumn('order_date', fn($row) => $row->orders->date)
             ->addColumn('medicine_name', fn($row) => $row->medicines->name ?? '-')
             ->addColumn('creditor_name', fn($row) => $row->creditors->name ?? '-')
             ->addColumn('status_label', function ($row) {
-                return $row->orders->status == 2
+                return $row->status == 2
                     ? '<span class="tp-badge received"><span class="dot"></span>Diterima</span>'
                     : '<span class="tp-badge pending"><span class="dot"></span>Dipesan</span>';
             })

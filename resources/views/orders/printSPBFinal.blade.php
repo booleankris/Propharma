@@ -151,7 +151,7 @@
                 <table style="width:100%; margin-top:2px;">
                     <tr>
                         <td style="width:50%; vertical-align:top;">
-                            <b>No :</b> {{ $items->first()->order_items_code }}
+                            <b>No :</b> {{ $receivingDetail->sp_code ?? $items->first()->order_items_code }}
                         </td>
                         <td style="width:50%; text-align:right; font-size: 6px; vertical-align:top;">
                             <b>Kepada Yth :</b> {{ optional($items->first()->creditors)->name ?? '-' }}
@@ -187,7 +187,7 @@
                                 <td style="text-align:center;">
                                     {{ $row->receivingItems->sum('qty_received') }}
                                     ({{ ucfirst(terbilang($row->receivingItems->sum('qty_received'))) }})
-                                    {{ $row->medicines->unit ?? '-' }}
+                                    {{ $row->medicines->packaging ?? '-' }}
                                 </td>
                                 <td>
                                     {{ $row->medicines->name ?? '-' }}
@@ -195,7 +195,9 @@
                                 <td>
                                     @php
                                         $credCode = $row->creditor_code ?? optional($row->creditors)->code;
-                                        $medCred = $row->medicines->creditors->firstWhere('code', $credCode) ?? $row->medicines->creditors->first();
+                                        $medCred =
+                                            $row->medicines->creditors->firstWhere('code', $credCode) ??
+                                            $row->medicines->creditors->first();
                                         $disc = $medCred?->pivot?->discount;
                                     @endphp
                                     {{ $disc ? ($disc == (int) $disc ? (int) $disc : $disc) . '%' : '-' }}
@@ -246,7 +248,7 @@
                     SURAT PESANAN OBAT MENGANDUNG PREKURSOR FARMASI
                 </div>
                 <div class="subtitle">
-                    Nomor SP : {{ $items->first()->order_items_code }}
+                    Nomor SP : {{ $receivingDetail->sp_code ?? $items->first()->order_items_code }}
                 </div>
 
                 <div class="section-gap">Yang bertanda tangan dibawah ini :</div>
@@ -323,7 +325,8 @@
                                 </td>
                                 <td style="text-align:center;">{{ $row->medicines->packaging ?? '-' }}</td>
                                 <td style="text-align:center;">{{ $row->receivingItems->sum('qty_received') }}
-                                    ({{ ucfirst(terbilang($row->receivingItems->sum('qty_received'))) }})</td>
+                                    ({{ ucfirst(terbilang($row->receivingItems->sum('qty_received'))) }})
+                                </td>
                                 <td></td>
                             </tr>
                         @endforeach
@@ -403,7 +406,7 @@
                 </div>
 
                 <div class="subtitle">
-                    Nomor : {{ $items->first()->order_items_code }}
+                    Nomor : {{ $receivingDetail->sp_code ?? $items->first()->order_items_code }}
                 </div>
 
                 <div class="section-gap">Yang bertanda tangan dibawah ini :</div>
@@ -469,7 +472,8 @@
                                 <td style="text-align:left;">{{ $row->medicines->name ?? '-' }}</td>
                                 <td style="text-align:center;">{{ $row->medicines->composition->name ?? '-' }}</td>
                                 <td style="text-align:center;">{{ $row->receivingItems->sum('qty_received') }}
-                                    ({{ ucfirst(terbilang($row->receivingItems->sum('qty_received'))) }})</td>
+                                    ({{ ucfirst(terbilang($row->receivingItems->sum('qty_received'))) }})
+                                </td>
                             </tr>
                         @endforeach
 
@@ -500,6 +504,13 @@
                         <td style="vertical-align:top;">Alamat Sarana</td>
                         <td style="vertical-align:top;">:</td>
                         <td>{{ $pharmacy->address }}</td>
+                    </tr>
+                    <tr>
+                        <td style="vertical-align:top;">No. SIA : </td>
+                        <td style="vertical-align:top;">:</td>
+                        <td>
+                            {{ $pharmacy->permit }}
+                        </td>
                     </tr>
                 </table>
 
@@ -539,7 +550,7 @@
                     SURAT PESANAN NARKOTIKA
                 </div>
                 <div class="subtitle">
-                    Nomor : {{ $items->first()->order_items_code }}
+                    Nomor : {{ $receivingDetail->sp_code ?? $items->first()->order_items_code }}
                 </div>
 
                 {{-- IDENTITAS --}}
@@ -597,10 +608,11 @@
                             <tr>
                                 <td style="text-align:center;">{{ $index + 1 }}</td>
                                 <td style="text-align:left;">{{ $row->medicines->name ?? '-' }}</td>
-                                <td style="text-align:center;">{{ $row->medicines->form ?? '' }}</td>
-                                <td style="text-align:center;">{{ $row->medicines->strength ?? '' }}</td>
+                                <td style="text-align:center;">{{ $row->medicines->composition->name ?? '' }}</td>
+                                <td style="text-align:center;">{{ $row->medicines->dosage ?? '' }}</td>
                                 <td style="text-align:center;">{{ $row->receivingItems->sum('qty_received') }}
-                                    ({{ ucfirst(terbilang($row->receivingItems->sum('qty_received'))) }})</td>
+                                    ({{ ucfirst(terbilang($row->receivingItems->sum('qty_received'))) }})
+                                </td>
                             </tr>
                         @endforeach
 
@@ -629,6 +641,13 @@
                         <td>Alamat Sarana</td>
                         <td>:</td>
                         <td>{{ $pharmacy->address }}</td>
+                    </tr>
+                    <tr>
+                        <td style="vertical-align:top;">No. SIA : </td>
+                        <td style="vertical-align:top;">:</td>
+                        <td>
+                            {{ $pharmacy->permit }}
+                        </td>
                     </tr>
                 </table>
 
@@ -670,7 +689,7 @@
                     SURAT PESANAN PSIKOTROPIKA
                 </div>
                 <div class="subtitle">
-                    Nomor : {{ $items->first()->order_items_code }}
+                    Nomor : {{ $receivingDetail->sp_code ?? $items->first()->order_items_code }}
                 </div>
 
                 {{-- IDENTITAS --}}
@@ -728,10 +747,11 @@
                             <tr>
                                 <td style="text-align:center;">{{ $index + 1 }}</td>
                                 <td style="text-align:left;">{{ $row->medicines->name ?? '-' }}</td>
-                                <td style="text-align:center;">{{ $row->medicines->form ?? '-' }}</td>
-                                <td style="text-align:center;">{{ $row->medicines->strength ?? '-' }}</td>
+                                <td style="text-align:center;">{{ $row->medicines->composition->name ?? '-' }}</td>
+                                <td style="text-align:center;">{{ $row->medicines->dosage ?? '-' }}</td>
                                 <td style="text-align:center;">{{ $row->receivingItems->sum('qty_received') }}
-                                    ({{ ucfirst(terbilang($row->receivingItems->sum('qty_received'))) }})</td>
+                                    ({{ ucfirst(terbilang($row->receivingItems->sum('qty_received'))) }})
+                                </td>
                             </tr>
                         @endforeach
 
@@ -759,6 +779,13 @@
                         <td>Alamat Sarana</td>
                         <td>:</td>
                         <td>{{ $pharmacy->address }}</td>
+                    </tr>
+                    <tr>
+                        <td style="vertical-align:top;">No. SIA : </td>
+                        <td style="vertical-align:top;">:</td>
+                        <td>
+                            {{ $pharmacy->permit }}
+                        </td>
                     </tr>
                 </table>
 

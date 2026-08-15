@@ -235,8 +235,8 @@
                     <!-- Tanggal Terima (Readonly) -->
                     <div>
                         <label class="block text-xs font-semibold text-gray-500 mb-1">Tanggal Terima</label>
-                        <input type="text" id="returdate" readonly value="{{ $now }}"
-                            onkeyup="SearchBPBA(this.value)" autocomplete="off"
+                        <input type="text" id="returdate" readonly value="{{ $now }}" onkeyup="SearchBPBA(this.value)"
+                            autocomplete="off"
                             class="w-full rounded-xl border border-gray-200 bg-gray-100 px-3.5 py-2.5 text-xs text-gray-500 cursor-not-allowed">
                     </div>
 
@@ -335,12 +335,34 @@
                         </select>
                     </div>
 
-                    <!-- Cetak SP PBF Ini -->
+                    <!-- Pilih Faktur untuk dicetak SP -->
+                    <div>
+                        <label for="print_faktur" class="block text-xs font-semibold text-gray-700 mb-1">Pilih Faktur (Cetak
+                            SP)</label>
+                        <select id="print_faktur" name="print_faktur"
+                            class="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all">
+                            <option value="">-- Pilih Faktur --</option>
+                            @if(isset($allFakturs) && $allFakturs->count() > 0)
+                                @foreach($allFakturs as $detail)
+                                    <option value="{{ $detail->id }}" data-creditor="{{ $detail->creditor_code }}">Faktur:
+                                        {{ $detail->invoice_number ?: $detail->receiving_details_code }}
+                                        ({{ $detail->sp_code ?? 'Belum Disimpan' }})</option>
+                                @endforeach
+                            @endif
+                        </select>
+                    </div>
+
+                    <!-- Cetak SP Faktur Ini -->
                     <div class="flex items-end">
-                        <button type="button" onclick="printSPBCreditor()"
+                        <button type="button" onclick="printSPBSelectedFaktur()"
                             class="inline-flex items-center gap-1.5 px-4 py-2.5 text-[12px] font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm transition-all duration-150">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-                            Cetak SP PBF Ini
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M6 9V2h12v7" />
+                                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                                <rect x="6" y="14" width="12" height="8" />
+                            </svg>
+                            Cetak SP Faktur Ini
                         </button>
                     </div>
 
@@ -369,6 +391,7 @@
                                 <th class="px-4 py-3 text-right">Harga PPN</th>
                                 <th class="px-3 py-3 text-center">Diskon</th>
                                 <th class="px-3 py-3 text-center">Extra Diskon</th>
+                                <th class="px-3 py-3 text-center">Diskon Diterima</th>
                                 <th class="px-3 py-3">Lokasi</th>
                                 <th class="px-4 py-3 text-right">Total</th>
                                 <th class="px-3 py-3 text-center">Status</th>
@@ -427,8 +450,7 @@
                             </div>
                             <div>
                                 <label class="block text-[11px] text-gray-500 mb-1">QTY Beli</label>
-                                <input id="qty" type="number" readonly name="qty" placeholder="0"
-                                    oninput="counttotal()"
+                                <input id="qty" type="number" readonly name="qty" placeholder="0" oninput="counttotal()"
                                     class="w-full rounded-lg bg-gray-100 border border-gray-200 px-3 py-2 text-xs text-gray-700 font-bold">
                             </div>
                         </div>
@@ -527,9 +549,8 @@
 
                             <button onclick="addNewBatch()" type="button"
                                 class="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-[#2c3862] font-['Poppins'] px-4 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-blue-700 transition-all focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24"
-                                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                    stroke-linejoin="round"
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
                                     class="icon icon-tabler icons-tabler-outline icon-tabler-package-export">
                                     <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                                     <path d="M12 21l-8 -4.5v-9l8 -4.5l8 4.5v4.5" />
@@ -543,9 +564,8 @@
                             </button>
                             <button onclick="resetInputs()" type="button" id="back"
                                 class="flex-1 inline-flex items-center justify-center gap-2 rounded-xl text-center !text-[#000] bg-[#f6d448] px-4 py-2.5 text-xs font-semibold text-gray-700 hover:bg-gray-300 transition-all">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24"
-                                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                    stroke-linejoin="round"
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
                                     class="icon icon-tabler icons-tabler-outline icon-tabler-restore">
                                     <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                                     <path d="M3.06 13a9 9 0 1 0 .49 -4.087" />
@@ -561,8 +581,7 @@
                         <button onclick="addItem()" type="button"
                             class="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-blue-700 transition-all focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M12 4v16m8-8H4" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                             </svg>
                             Konfirmasi Item
                         </button>
@@ -822,18 +841,37 @@
             window.open(`/orders/${ordersid}/printspb`, "_blank");
         }
 
-        function printSPBCreditor() {
-            const creditorCode = $('#creditor').val();
-            if (!creditorCode) {
-                iziToast.warning({ title: 'Peringatan', message: 'Pilih kreditur terlebih dahulu!', position: 'topRight' });
+        function printSPBSelectedFaktur() {
+            const selectedFaktur = $('#print_faktur').val();
+            if (!selectedFaktur) {
+                iziToast.warning({ title: 'Peringatan', message: 'Pilih faktur terlebih dahulu!', position: 'topRight' });
                 return;
             }
             if (!ordersid) {
-                iziToast.warning({ title: 'Peringatan', message: 'Pilih BPBA terlebih dahulu!', position: 'topRight' });
+                iziToast.warning({ title: 'Peringatan', message: 'Pilih order terlebih dahulu!', position: 'topRight' });
                 return;
             }
-            window.open(`/receiving/${ordersid}/printspbfinal/creditor/${encodeURIComponent(creditorCode)}`, "_blank");
+            window.open(`/receiving/${ordersid}/printspbfinal/faktur/${selectedFaktur}`, "_blank");
         }
+
+        $('#creditor').on('change', function () {
+            const selectedCreditor = $(this).val();
+            const $printFaktur = $('#print_faktur');
+            $printFaktur.val(''); // reset selection
+            let lastVisibleOptionVal = '';
+            $printFaktur.find('option').each(function () {
+                if ($(this).val() === "") return; // keep default
+                if ($(this).data('creditor') === selectedCreditor) {
+                    $(this).removeAttr('disabled').show();
+                    lastVisibleOptionVal = $(this).val();
+                } else {
+                    $(this).attr('disabled', 'disabled').hide();
+                }
+            });
+            if (lastVisibleOptionVal !== '') {
+                $printFaktur.val(lastVisibleOptionVal);
+            }
+        });
 
         function printSPBItem(orderItemId) {
             if (!ordersid) {
@@ -841,6 +879,14 @@
                 return;
             }
             window.open(`/receiving/${ordersid}/printspbfinal/item/${orderItemId}`, "_blank");
+        }
+
+        function printSPBFaktur(receivingDetailsId, creditorCode) {
+            if (!ordersid) {
+                iziToast.warning({ title: 'Peringatan', message: 'Data order belum tersedia!', position: 'topRight' });
+                return;
+            }
+            window.open(`/receiving/${ordersid}/printspbfinal/faktur/${receivingDetailsId}`, "_blank");
         }
 
         function setSelect2AjaxValue(selector, id, text) {
@@ -858,7 +904,7 @@
                 $select.append(option).trigger("change");
             }
         }
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             const factorDateInput = document.getElementById('invoice_date');
             // if (factorDateInput && !factorDateInput.value) {
             //     const today = new Date();
@@ -918,63 +964,67 @@
                 deferLoading: 0,
                 ajax: {
                     url: "{{ route('receiving.getorderitems') }}",
-                    data: function(d) {
+                    data: function (d) {
                         d.order_id = ordersid;
                         d.creditor_code = $('#creditor').val();
                     }
                 },
                 columns: [{
-                        data: 'medicines.name',
-                        defaultContent: '-'
-                    },
-                    {
-                        data: 'quantity',
-                        defaultContent: '0'
-                    },
-                    {
-                        data: 'qty_received',
-                        defaultContent: '0'
-                    },
-                    {
-                        data: 'price',
-                        defaultContent: 'Rp 0'
-                    },
-                    {
-                        data: 'price_ppn',
-                        defaultContent: 'Rp 0'
-                    },
-                    {
-                        data: 'receiving_items.discount',
-                        defaultContent: '0'
-                    },
-                    {
-                        data: 'receiving_items.extra_discount',
-                        defaultContent: '0'
-                    },
-                    {
-                        data: 'receiving_items.locations.name',
-                        defaultContent: '-'
-                    },
-                    {
-                        data: 'total',
-                        defaultContent: 'Rp 0'
-                    },
-                    {
-                        data: 'receiving_items.status',
-                        defaultContent: '-'
-                    },
-                    {
-                        data: null,
-                        orderable: false,
-                        searchable: false,
-                        defaultContent: '',
-                        render: function(data, type, row) {
-                            if (row.receiving_items && row.receiving_items.id) {
-                                return `<button type="button" onclick="printSPBItem(${row.id})" class="inline-flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-all" title="Cetak SP item ini"><svg xmlns='http://www.w3.org/2000/svg' class='w-3 h-3' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9V2h12v7'/><path d='M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2'/><rect x='6' y='14' width='12' height='8'/></svg>SP</button>`;
-                            }
-                            return '-';
+                    data: 'medicines.name',
+                    defaultContent: '-'
+                },
+                {
+                    data: 'quantity',
+                    defaultContent: '0'
+                },
+                {
+                    data: 'qty_received',
+                    defaultContent: '0'
+                },
+                {
+                    data: 'price',
+                    defaultContent: 'Rp 0'
+                },
+                {
+                    data: 'price_ppn',
+                    defaultContent: 'Rp 0'
+                },
+                {
+                    data: 'receiving_items.discount',
+                    defaultContent: '0'
+                },
+                {
+                    data: 'receiving_items.extra_discount',
+                    defaultContent: '0'
+                },
+                {
+                    data: 'creditor_discount',
+                    defaultContent: '0%'
+                },
+                {
+                    data: 'receiving_items.locations.name',
+                    defaultContent: '-'
+                },
+                {
+                    data: 'total',
+                    defaultContent: 'Rp 0'
+                },
+                {
+                    data: 'receiving_items.status',
+                    defaultContent: '-'
+                },
+                {
+                    data: null,
+                    orderable: false,
+                    searchable: false,
+                    defaultContent: '',
+                    render: function (data, type, row) {
+                        if (row.receiving_items && row.receiving_items.id && row.receiving_items.receiving_details_id) {
+                            return `<button type="button" onclick="printSPBFaktur(${row.receiving_items.receiving_details_id}, '${row.creditor_code}')" class="inline-flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-all" title="Cetak SP Faktur Ini"><svg xmlns='http://www.w3.org/2000/svg' class='w-3 h-3' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9V2h12v7'/><path d='M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2'/><rect x='6' y='14' width='12' height='8'/></svg>SP Faktur</button>`;
                         }
-                    },
+                        return '-';
+                    }
+                },
                 ],
                 paging: false,
                 searching: false,
@@ -988,7 +1038,7 @@
             loadItems(ordersid);
 
 
-            qty_received.addEventListener('keyup', function(e) {
+            qty_received.addEventListener('keyup', function (e) {
 
                 if (e.key === 'Enter') {
                     batch.focus();
@@ -1008,17 +1058,20 @@
             });
 
         });
-        $('#orderItemsTable').on('click', 'tbody tr', function() {
+        $('#orderItemsTable').on('click', 'tbody tr', function () {
             $('#orderItemsTable tbody tr').removeClass('selected');
             $(this).addClass('selected');
 
             selectedRowData = orderItemsTable.row(this).data();
             order_items_id = selectedRowData.id;
             order_id = selectedRowData.order_id;
-
+            
+            if (selectedRowData.receiving_items && selectedRowData.receiving_items.receiving_details_id) {
+                $('#print_faktur').val(selectedRowData.receiving_items.receiving_details_id);
+            }
         });
 
-        $('#orderItemsTable tbody').on('dblclick', 'tr', function() {
+        $('#orderItemsTable tbody').on('dblclick', 'tr', function () {
             const data = orderItemsTable.row(this).data();
             if (!data) return;
 
@@ -1059,11 +1112,11 @@
             const detail_id = data.receiving_items?.receiving_details_id;
             if (detail_id) {
                 axios.get('/searchreceivingdetails', {
-                        params: {
-                            detail_id: detail_id
-                        }
-                    })
-                    .then(function(response) {
+                    params: {
+                        detail_id: detail_id
+                    }
+                })
+                    .then(function (response) {
                         invoice_number.value = response.data.query?.invoice_number || '';
                         invoice_times.value = response.data.query?.invoice_times || response.data.creditor
                             ?.credit_time || '';
@@ -1084,7 +1137,7 @@
 
             document.getElementById('qty_received').focus();
         });
-        document.getElementById('qty').addEventListener('keydown', function(e) {
+        document.getElementById('qty').addEventListener('keydown', function (e) {
             if (e.key !== 'Enter') return;
             e.preventDefault();
 
@@ -1096,18 +1149,18 @@
         });
 
         // Creditor select
-        $('#creditor').on('change', function() {
+        $('#creditor').on('change', function () {
             console.log(document.getElementById('invoice_ppn'));
 
             let creditor = $(this).val();
             if (creditor) {
                 axios.get('/searchselectcreditors', {
-                        params: {
-                            creditor_code: creditor,
-                            orderid: ordersid
-                        }
-                    })
-                    .then(function(response) {
+                    params: {
+                        creditor_code: creditor,
+                        orderid: ordersid
+                    }
+                })
+                    .then(function (response) {
                         console.log(response);
                         // console.log(invoice_times);
                         // console.log(response.data.creditor.credit_time);
@@ -1135,7 +1188,7 @@
                         // invoice_number.value = response.data.query?.invoice_number || '';
 
                     })
-                    .catch(function(error) {
+                    .catch(function (error) {
                         console.error(error);
                     });
                 $('#invoice_payment').select2('open');
@@ -1173,7 +1226,7 @@
         //     });
         // }
 
-        document.addEventListener('keydown', function(e) {
+        document.addEventListener('keydown', function (e) {
             const isDeleteKey =
                 e.key === 'Delete' ||
                 e.key === 'Del' ||
@@ -1254,23 +1307,23 @@
 
                     if (page === 1 && res.data.length === 0) {
                         tbody.innerHTML = `
-                            <tr>
-                                <td colspan="4" class="text-center">No data found</td>
-                            </tr>`;
+                                    <tr>
+                                        <td colspan="4" class="text-center">No data found</td>
+                                    </tr>`;
                         hasMore = false;
                         return;
                     }
 
                     res.data.forEach((item, index) => {
                         tbody.insertAdjacentHTML('beforeend', `
-                            <tr 
-                                data-item='${JSON.stringify(item)}'
-                                tabindex="0"
-                            >
-                                <td>${((page - 1) * res.per_page) + index + 1}</td>
-                                <td>${item.code}</td>
-                            </tr>
-                        `);
+                                    <tr 
+                                        data-item='${JSON.stringify(item)}'
+                                        tabindex="0"
+                                    >
+                                        <td>${((page - 1) * res.per_page) + index + 1}</td>
+                                        <td>${item.code}</td>
+                                    </tr>
+                                `);
                     });
 
                     hasMore = res.current_page < res.last_page;
@@ -1290,7 +1343,7 @@
         }
 
         // Nav
-        document.addEventListener('keydown', function(e) {
+        document.addEventListener('keydown', function (e) {
             const dropdown = document.getElementById('searchDropdown');
             if (!dropdown || dropdown.offsetParent === null) return;
 
@@ -1332,7 +1385,7 @@
             document.getElementById('total_retur').value = total.toFixed(0);
         }
         // Hover
-        document.getElementById('searchResults').addEventListener('mouseover', function(e) {
+        document.getElementById('searchResults').addEventListener('mouseover', function (e) {
             const row = e.target.closest('tr');
             if (!row) return;
 
@@ -1344,7 +1397,7 @@
         });
 
         // Click
-        document.getElementById('searchResults').addEventListener('click', function(e) {
+        document.getElementById('searchResults').addEventListener('click', function (e) {
             const row = e.target.closest('tr');
             if (row) {
                 selectRow(row);
@@ -1372,14 +1425,14 @@
                 });
             }
         }
-        document.addEventListener('click', function(e) {
+        document.addEventListener('click', function (e) {
             const wrapper = document.getElementById('searchWrapper');
-            if (!wrapper.contains(e.target)) {
+            if (wrapper && !wrapper.contains(e.target)) {
                 document.getElementById('searchDropdown').style.display = 'none';
             }
         }, true);
 
-        pack.addEventListener('change', function() {
+        pack.addEventListener('change', function () {
             if (this.checked) {
                 itempack = 1;
             } else {
@@ -1389,12 +1442,12 @@
             counttotal();
         });
 
-        pack.addEventListener('keydown', function(e) {
+        pack.addEventListener('keydown', function (e) {
             if (e.key === 'Enter') {
                 document.getElementById('qty').focus();
             }
         });
-        invoice_ppn.addEventListener('keydown', function(e) {
+        invoice_ppn.addEventListener('keydown', function (e) {
             if (e.key === 'Enter') {
                 addItem();
             }
@@ -1478,10 +1531,10 @@
             console.log('Sending receiving_items_id:', payload.receiving_items_id);
 
             axios.post("{{ route('receiving.addreceivingitem') }}", payload, {
-                    headers: {
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-                    }
-                })
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                }
+            })
                 .then(res => {
                     if (res.data.success) {
                         iziToast.success({
@@ -1528,13 +1581,13 @@
         // NEW: "Simpan" button — posts items to batches, status → 2
         function saveOrder() {
             axios.post("{{ route('receiving.saveOrder') }}", {
-                    receivingid: receiving_id,
-                    orderid: ordersid,
-                }, {
-                    headers: {
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-                    }
-                })
+                receivingid: receiving_id,
+                orderid: ordersid,
+            }, {
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                }
+            })
                 .then(res => {
                     if (res.data.success) {
                         iziToast.success({
@@ -1565,13 +1618,13 @@
         // UPDATED: "Selesaikan Pesanan" button — now just locks (status → 3)
         function completeOrder() {
             axios.post("{{ route('receiving.completeOrder') }}", {
-                    receivingid: receiving_id,
-                    orderid: ordersid,
-                }, {
-                    headers: {
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-                    }
-                })
+                receivingid: receiving_id,
+                orderid: ordersid,
+            }, {
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                }
+            })
                 .then(res => {
                     if (res.data.success) {
                         iziToast.success({
@@ -1651,7 +1704,7 @@
 
             document.getElementById('searchDropdown').style.display = 'none';
             document.getElementById('searchInput').value = orderscode;
-            
+
 
             orderItemsTable.ajax.reload(null, false);
         }
@@ -1693,7 +1746,7 @@
         // }
 
         // ENTER REDIRECTION AND SUBMIT
-        document.getElementById('qty_received').addEventListener('keydown', function(e) {
+        document.getElementById('qty_received').addEventListener('keydown', function (e) {
             if (e.key == 'Enter') {
                 batch.focus();
             }
@@ -1722,62 +1775,62 @@
         $("#location").on("select2:select", () => {
             setTimeout(() => $("#status").focus(), 100);
         });
-        discount.addEventListener('keydown', function(e) {
+        discount.addEventListener('keydown', function (e) {
             if (e.key == 'Enter') {
                 etalase.focus();
             }
         });
-        etalase.addEventListener('keydown', function(e) {
+        etalase.addEventListener('keydown', function (e) {
             if (e.key == 'Enter') {
                 itemlocation.focus();
             }
         });
-        itemlocation.addEventListener('keydown', function(e) {
+        itemlocation.addEventListener('keydown', function (e) {
             if (e.key == 'Enter') {
                 itemstatus.focus();
             }
         });
-        itemstatus.addEventListener('keydown', function(e) {
+        itemstatus.addEventListener('keydown', function (e) {
             if (e.key == 'Enter') {
                 addItem();
             }
         });
-        invoice_number.addEventListener('keydown', function(e) {
+        invoice_number.addEventListener('keydown', function (e) {
             if (e.key == 'Enter') {
                 invoice_date.focus();
             }
         });
-        invoice_date.addEventListener('keydown', function(e) {
+        invoice_date.addEventListener('keydown', function (e) {
             if (e.key == 'Enter') {
                 invoice_times.focus();
             }
         });
-        invoice_times.addEventListener('keydown', function(e) {
+        invoice_times.addEventListener('keydown', function (e) {
             if (e.key == 'Enter') {
                 invoice_ppn.focus();
             }
         });
-        batch.addEventListener('keydown', function(e) {
+        batch.addEventListener('keydown', function (e) {
             if (e.key == 'Enter') {
                 discount.focus();
             }
         });
-        discount.addEventListener('keydown', function(e) {
+        discount.addEventListener('keydown', function (e) {
             if (e.key == 'Enter') {
                 extra_discount.focus();
             }
         });
-        extra_discount.addEventListener('keydown', function(e) {
+        extra_discount.addEventListener('keydown', function (e) {
             if (e.key == 'Enter') {
                 expired_date.focus();
             }
         });
-        expired_date.addEventListener('keydown', function(e) {
+        expired_date.addEventListener('keydown', function (e) {
             if (e.key == 'Enter') {
                 itemstatus.focus();
             }
         });
-        etalase.addEventListener('keydown', function(e) {
+        etalase.addEventListener('keydown', function (e) {
             if (e.key == 'Enter') {
                 location.focus();
             }

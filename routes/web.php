@@ -412,6 +412,8 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
         ->name('orderfinal.print');
     Route::get('/receiving/{order}/printspbfinal/creditor/{creditorCode}', [ReceivingController::class, 'printSPBFinalByCreditor'])
         ->name('orderfinal.print.creditor');
+    Route::get('/receiving/{order}/printspbfinal/faktur/{receivingDetailsId}', [ReceivingController::class, 'printSPBFinalByFaktur'])
+        ->name('orderfinal.print.faktur');
     Route::get('/receiving/{order}/printspbfinal/item/{orderItem}', [ReceivingController::class, 'printSPBFinalByItem'])
         ->name('orderfinal.print.item');
     Route::get('/receiving/{order}/printorders', [ReceivingController::class, 'printOrders'])

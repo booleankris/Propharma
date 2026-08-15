@@ -334,6 +334,12 @@
                 </div>
 
                 <div style="display:flex; align-items:center; gap:8px;">
+                    <select id="filterCreditor" class="select2" style="width: 220px;">
+                        <option value="">Semua PBF</option>
+                        @foreach($creditors as $creditor)
+                            <option value="{{ $creditor->code }}">{{ $creditor->name }}</option>
+                        @endforeach
+                    </select>
                     <input type="text" id="filterDateRange" class="tp-date-input" placeholder="Pilih rentang tanggal">
                     <button type="button" class="tp-reset" id="filterReset">Reset</button>
                 </div>
@@ -342,6 +348,7 @@
             <table id="ordersTrackingTable">
                 <thead>
                     <tr>
+                        <th>No. SP</th>
                         <th>Kode Order</th>
                         <th>Tanggal</th>
                         <th>Obat</th>
@@ -406,6 +413,7 @@
             let activeStatus = '';
             let dateFrom = '';
             let dateTo = '';
+            let activeCreditor = '';
 
             let dateRange = flatpickr("#filterDateRange", {
                 mode: "range",
@@ -446,12 +454,18 @@
                         d.status = activeStatus;
                         d.date_from = dateFrom;
                         d.date_to = dateTo;
+                        d.creditor_code = activeCreditor;
                     }
                 },
                 order: [
                     [1, 'desc']
                 ],
                 columns: [{
+                        data: 'sp_code',
+                        name: 'sp_code', // Just to make sure it doesn't break search if relation is complex, though Yajra handles some
+                        className: 'col-code'
+                    },
+                    {
                         data: 'order_code',
                         name: 'orders.code',
                         className: 'col-code'
@@ -494,12 +508,22 @@
                 table.ajax.reload();
             });
 
+            $('#filterCreditor').select2({
+                placeholder: "Semua PBF",
+                allowClear: true
+            }).on('change', function() {
+                activeCreditor = $(this).val();
+                table.ajax.reload();
+            });
+
             $('#filterReset').on('click', function() {
                 $('#filterStatusGroup .tp-status-btn').removeClass('active');
                 $('#filterStatusGroup .tp-status-btn[data-status=""]').addClass('active');
+                $('#filterCreditor').val(null).trigger('change.select2');
                 activeStatus = '';
                 dateFrom = '';
                 dateTo = '';
+                activeCreditor = '';
                 dateRange.clear();
                 table.ajax.reload();
             });
