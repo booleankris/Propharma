@@ -35,7 +35,9 @@ return new class extends Migration
         });
 
         Schema::table('medicine_transfers', function (Blueprint $table) {
-            if (!$this->indexExists('medicine_transfers', 'medicine_transfers_batch_id_status_index')) $table->index(['batches_id', 'status']);
+            if (Schema::hasColumn('medicine_transfers', 'batches_id') && !$this->indexExists('medicine_transfers', 'medicine_transfers_batch_id_status_index')) {
+                $table->index(['batches_id', 'status']);
+            }
         });
     }
 
