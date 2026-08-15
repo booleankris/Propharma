@@ -185,7 +185,10 @@
                 document.getElementById('type_filter').style.display = 'none';
                 document.getElementById('factory-select').style.display = 'none';
                 document.getElementById('doctor-select').style.display = 'none';
-
+                
+                if (document.getElementById('btn-online')) {
+                    document.getElementById('btn-online').style.display = 'flex';
+                }
 
             } else if (selectedReport == "Obat") {
                 document.getElementById('date_filter').style.display = 'block';
@@ -242,7 +245,14 @@
 
             } else {
                 document.getElementById('type_filter').style.display = 'none';
-
+            }
+            
+            if (selectedReport !== "LIPH" && document.getElementById('btn-online')) {
+                document.getElementById('btn-online').style.display = 'none';
+                if (selectedShiftType === 'online') {
+                    // reset to semua if online was selected
+                    setFilter('semua', document.getElementById('btn-semua'));
+                }
             }
             console.log('Selected report:', selectedReport);
         }
@@ -250,11 +260,14 @@
         function setFilter(type, el) {
             const btnSemua = document.getElementById('btn-semua');
             const btnShift = document.getElementById('btn-shift');
+            const btnOnline = document.getElementById('btn-online');
             const shiftSel = document.getElementById('shift-select');
 
-            [btnSemua, btnShift].forEach(btn => {
-                btn.classList.remove('border-slate-800', 'bg-slate-800', 'text-white');
-                btn.classList.add('border-slate-200', 'bg-slate-50', 'text-slate-600');
+            [btnSemua, btnShift, btnOnline].forEach(btn => {
+                if(btn) {
+                    btn.classList.remove('border-slate-800', 'bg-slate-800', 'text-white');
+                    btn.classList.add('border-slate-200', 'bg-slate-50', 'text-slate-600');
+                }
             });
 
             el.classList.remove('border-slate-200', 'bg-slate-50', 'text-slate-600');

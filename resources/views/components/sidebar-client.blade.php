@@ -1091,7 +1091,7 @@
 
             <div>
                 <div id="date_filter">
-                    <p class="text-xs font-semibold tracking-widest uppercase text-slate-400 mb-3">Filter Harian</p>
+                    <p class="text-xs font-semibold tracking-widest uppercase text-slate-400 mb-3">Filter</p>
                     <div class="flex gap-2 mb-3">
                         <button onclick="setFilter('semua', this)" id="btn-semua"
                             class="flex-1 flex items-center gap-2 px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-600 text-sm font-semibold transition-all">
@@ -1102,6 +1102,11 @@
                             class="flex-1 flex items-center gap-2 px-3 py-2.5 rounded-xl border border-slate-800 bg-slate-800 text-white text-sm font-semibold transition-all">
                             <span class="w-3.5 h-3.5 rounded-full border-2 border-slate-300 flex-shrink-0"></span>
                             Per Shift
+                        </button>
+                        <button onclick="setFilter('online', this)" id="btn-online" 
+                            class="flex-1 flex items-center gap-2 px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-600 text-sm font-semibold transition-all">
+                            <span class="w-3.5 h-3.5 rounded-full border-2 border-slate-300 flex-shrink-0"></span>
+                            Online
                         </button>
                     </div>
                 </div>
