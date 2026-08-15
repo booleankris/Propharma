@@ -14,7 +14,9 @@ return new class extends Migration
     public function up()
     {
         Schema::table('medicine_creditors', function (Blueprint $table) {
-            $table->decimal('discount', 5, 2)->default(0)->after('creditor_code');
+            if (!Schema::hasColumn('medicine_creditors', 'discount')) {
+                $table->decimal('discount', 5, 2)->default(0)->after('creditor_code');
+            }
         });
     }
 
