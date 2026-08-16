@@ -64,7 +64,7 @@ class ReturController extends Controller
             ->whereHas('transactions', function ($q) use ($search) {
                 $q->where('transaction_type', '!=', 'RETUR')
                     // 1. Pastikan pharmacy_id selalu terfilter
-                    ->where('pharmacy_id', auth()->user()->pharmacy_id)
+                    ->where('pharmacy_id', getActivePharmacyId())
                     // 2. Grup terpisah khusus untuk logic pencarian (OR)
                     ->where(function ($q2) use ($search) {
                         $q2->where('transaction_code', 'LIKE', "%{$search}%")
@@ -314,7 +314,7 @@ class ReturController extends Controller
         $transfers = MedicineTransferItems::join('batches', 'medicine_transfer_items.batches_id', '=', 'batches.id')
             ->join('etalases', 'medicine_transfer_items.etalases_id', '=', 'etalases.id')
             ->where('batches.medicine_id', $medicine_id)
-            ->where('pharmacy_id', auth()->user()->pharmacy_id)
+            ->where('pharmacy_id', getActivePharmacyId())
             ->orderBy('batches.expired_date', 'asc') // FEFO
             ->select(
                 'medicine_transfer_items.id as transfer_id',
@@ -406,7 +406,7 @@ class ReturController extends Controller
             })
             ->whereHas('receiving', function ($q) {
                 $q->where('status', '>=', 1)
-                    ->where('pharmacy_id', auth()->user()->pharmacy_id);
+                    ->where('pharmacy_id', getActivePharmacyId());
             })
             ->paginate(10);
 

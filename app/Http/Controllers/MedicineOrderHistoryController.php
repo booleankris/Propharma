@@ -22,7 +22,7 @@ class MedicineOrderHistoryController extends Controller
         $page = (int) $request->get('page', 1);
         $perPage = 10;
 
-        $pharmacyId = auth()->user()->pharmacy_id;
+        $pharmacyId = getActivePharmacyId();
 
         $query = Medicines::query()
             ->whereHas('order_items.receivingItems.receiving_details.receiving', function ($q) use ($pharmacyId) {
@@ -57,7 +57,7 @@ class MedicineOrderHistoryController extends Controller
                 'receiving_details.receiving',
             ])
             ->whereHas('receiving_details.receiving', function ($q) {
-                $q->where('pharmacy_id', auth()->user()->pharmacy_id);
+                $q->where('pharmacy_id', getActivePharmacyId());
             });
 
         // searchMedicine can be either a medicine id (selected from dropdown)

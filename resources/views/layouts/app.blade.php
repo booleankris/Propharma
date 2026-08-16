@@ -48,9 +48,14 @@
                 document.getElementById('type_filter').style.display = 'none';
                 document.getElementById('factory-select').style.display = 'none';
                 document.getElementById('doctor-select').style.display = 'none';
-
+                if (document.getElementById('btn-online')) {
+                    document.getElementById('btn-online').style.display = 'flex';
+                }
             } else {
                 document.getElementById('type_filter').style.display = 'block';
+                if (document.getElementById('btn-online')) {
+                    document.getElementById('btn-online').style.display = 'none';
+                }
             }
 
 

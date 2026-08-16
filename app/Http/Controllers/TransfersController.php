@@ -80,7 +80,7 @@ class TransfersController extends Controller
                     );
             })
             ->where('stock', '>', 0)
-            ->where('pharmacy_id', auth()->user()->pharmacy_id)
+            ->where('pharmacy_id', getActivePharmacyId())
             ->paginate(10);
 
         $data->getCollection()->transform(function ($item) {
@@ -203,7 +203,7 @@ class TransfersController extends Controller
     }
     public function incomingTransfers()
     {
-        $pharmacyId = auth()->user()->pharmacy_id;
+        $pharmacyId = getActivePharmacyId();
 
         $pending = MedicineTransfers::with([
             'items.batches.medicines',

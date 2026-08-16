@@ -133,6 +133,10 @@ Route::middleware(['auth', 'role:administrator'])->group(function () {
     Route::resource('report', TransactionReportController::class);
     Route::post('searchreport/', [TransactionReportController::class, 'searchreport'])->name('searchreport');
 });
+
+Route::middleware(['auth', 'role:HO'])->group(function () {
+    Route::post('/pharmacy/switch', [\App\Http\Controllers\PharmacySelectorController::class, 'switch'])->name('pharmacy.switch');
+});
 Route::middleware(['auth', 'role:Kasir'])->group(function () {
     Route::get('/home', [HomeController::class, 'index'])->name('home');
 

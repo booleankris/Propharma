@@ -19,7 +19,7 @@ class ParetoController extends Controller
     }
     public function salesPareto(Request $request)
     {
-        $pharmacyId = auth()->user()->pharmacy_id;
+        $pharmacyId = getActivePharmacyId();
 
         $query = DB::table('medicine_cart')
             ->join('medicine_transactions', 'medicine_transactions.id', '=', 'medicine_cart.transaction_id')
@@ -90,7 +90,7 @@ class ParetoController extends Controller
     }
     public function ordersPareto(Request $request)
     {
-        $pharmacyId = auth()->user()->pharmacy_id;
+        $pharmacyId = getActivePharmacyId();
 
         $query = DB::table('receiving_items')
             ->join('order_items', 'order_items.id', '=', 'receiving_items.order_items_id')
@@ -161,7 +161,7 @@ class ParetoController extends Controller
     // =============================== Pareto Penjualan & Pembelian ==========================
     public function export(Request $request)
     {
-        $pharmacy = Pharmacies::findOrFail(auth()->user()->pharmacy_id);
+        $pharmacy = Pharmacies::findOrFail(getActivePharmacyId());
         return Excel::download(
             new ParetoExport(
                 $pharmacy->id,

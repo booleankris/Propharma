@@ -34,7 +34,7 @@ class StaffStatsController extends Controller
         $lastMonthStart = Carbon::now()->subMonth()->startOfMonth();
         $lastMonthEnd   = Carbon::now()->subMonth()->endOfMonth();
 
-        $pharmacyid = auth()->user()->pharmacy_id;
+        $pharmacyid = getActivePharmacyId();
 
         $users = User::query()
             ->where('users.pharmacy_id', $pharmacyid)

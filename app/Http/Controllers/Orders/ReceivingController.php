@@ -30,7 +30,7 @@ class ReceivingController extends Controller
     {
         $now = Carbon::now()->format('d/m/Y');
 
-        $transaction = Receiving::where('pharmacy_id', auth()->user()->pharmacy_id)
+        $transaction = Receiving::where('pharmacy_id', getActivePharmacyId())
             ->where('status', 0)
             ->first();
 
@@ -55,7 +55,7 @@ class ReceivingController extends Controller
             $month = now()->format('m');
             $prefix = $year . $month . 'RE';
 
-            $last = Receiving::where('pharmacy_id', auth()->user()->pharmacy_id)
+            $last = Receiving::where('pharmacy_id', getActivePharmacyId())
                 ->where('code', 'like', $prefix . '%')
                 ->orderBy('code', 'desc')
                 ->first();
@@ -67,7 +67,7 @@ class ReceivingController extends Controller
                 DB::beginTransaction();
 
                 $transaction = Receiving::create([
-                    'pharmacy_id' => auth()->user()->pharmacy_id,
+                    'pharmacy_id' => getActivePharmacyId(),
                     'code' => $prefix . $serial,
                     'date' => $now,
                     'status' => 0,
@@ -555,7 +555,7 @@ class ReceivingController extends Controller
     public function orderList(Request $request)
     {
         $items = Order::query()
-            ->where('pharmacy_id', auth()->user()->pharmacy_id)
+            ->where('pharmacy_id', getActivePharmacyId())
             ->with(['order_items.receivingItems.receiving_details'])
             ->withSum('order_items', 'total')
             ->orderByDesc('id');
@@ -739,7 +739,7 @@ class ReceivingController extends Controller
             $item = ReceivingItems::with('order_items')->findOrFail($id);
 
             $medicineId = $item->order_items->medicine_id;
-            $pharmacyId = auth()->user()->pharmacy_id;
+            $pharmacyId = getActivePharmacyId();
             $oldQty = $item->qty_received;
             $newQty = $request->qty_received;
             $oldBatchKey = "{$medicineId}|{$item->batch}|{$item->expired_date}";
@@ -880,7 +880,7 @@ class ReceivingController extends Controller
 
             $item = ReceivingItems::with('order_items')->findOrFail($id);
             $medicineId = $item->order_items->medicine_id;
-            $pharmacyId = auth()->user()->pharmacy_id;
+            $pharmacyId = getActivePharmacyId();
             $medicine = Medicines::findOrFail($medicineId);
 
             $qtyBefore = $medicine->stock;
@@ -957,7 +957,7 @@ class ReceivingController extends Controller
 
         $transaction = Receiving::with('receiving_details')->where('status', 0)->where(
             'pharmacy_id',
-            auth()->user()->pharmacy_id
+            getActivePharmacyId()
         )->first();
 
         $check_order = OrderItems::with('orders')->whereHas('orders', function ($q) use ($id) {
@@ -1013,7 +1013,7 @@ class ReceivingController extends Controller
             $year = now()->format('y');
             $month = now()->format('m');
             $prefix = $year . $month . 'RE';
-            $last = Receiving::where('pharmacy_id', Auth()->user()->pharmacy_id)
+            $last = Receiving::where('pharmacy_id', getActivePharmacyId())
                 ->where('code', 'like', $prefix . '%')
                 ->orderBy('code', 'desc')
                 ->first();
@@ -1034,7 +1034,7 @@ class ReceivingController extends Controller
                 $transaction = Receiving::create([
                     'order_id' => $id,
                     'creditors_id' => NULL,
-                    'pharmacy_id' => Auth()->user()->pharmacy_id,
+                    'pharmacy_id' => getActivePharmacyId(),
                     'code' => $receiving_code,
                     'date' => $now,
                     'status' => 0,
@@ -1283,7 +1283,7 @@ class ReceivingController extends Controller
             }
 
             $now = Carbon::now()->format('Y-m-d');
-            $pharmacyId = auth()->user()->pharmacy_id;
+            $pharmacyId = getActivePharmacyId();
 
             $medicineIds = $receivingItems->pluck('order_items.medicine_id')->unique()->values();
             $medicines = Medicines::whereIn('id', $medicineIds)->get()->keyBy('id');

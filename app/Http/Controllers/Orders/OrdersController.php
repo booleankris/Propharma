@@ -44,7 +44,7 @@ class OrdersController extends Controller
                 'creditors'
             ])
             ->whereHas('orders', function ($q) {
-                $q->where('status', 0)->where('pharmacy_id', auth()->user()->pharmacy_id);
+                $q->where('status', 0)->where('pharmacy_id', getActivePharmacyId());
             })
 
             ->when($creditorId, function ($q) use ($creditorId) {
@@ -87,12 +87,12 @@ class OrdersController extends Controller
     public function createOrder(Request $request)
     {
         $now = Carbon::now()->format('d/m/Y');
-        $check_transaction = Order::where('pharmacy_id', Auth()->user()->pharmacy_id)
+        $check_transaction = Order::where('pharmacy_id', getActivePharmacyId())
             ->where('status', '0')->first();
 
         if ($check_transaction) {
 
-            $last = Order::where('pharmacy_id', Auth()->user()->pharmacy_id)
+            $last = Order::where('pharmacy_id', getActivePharmacyId())
                 ->where('status', '0')
                 ->first();
             $d_price = OrderItems::where('order_id', $last->id)->where('status', '0')->sum('total') ?? '';
@@ -128,8 +128,8 @@ class OrdersController extends Controller
                 DB::beginTransaction();
 
                 $transaction = Order::create([
-                    'pharmacy_id' => Auth()->user()->pharmacy_id,
-                    'user_id' => Auth()->user()->id,
+                    'pharmacy_id' => getActivePharmacyId(),
+                    'user_id' => auth()->user()->id,
                     'code' => $transactionCode,
                     'date' => $now,
                     'status' => 0,
@@ -448,7 +448,7 @@ class OrdersController extends Controller
             $receiving_code = $prefix . $serial;
 
             $transaction = Receiving::create([
-                'pharmacy_id' => auth()->user()->pharmacy_id,
+                'pharmacy_id' => getActivePharmacyId(),
                 'code' => $receiving_code,
                 'date' => $now,
                 'status' => 0,

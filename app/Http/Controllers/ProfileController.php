@@ -16,8 +16,8 @@ class ProfileController extends Controller
         $startMonth = Carbon::now()->startOfMonth();
         $lastMonth  = Carbon::now()->subMonth();
         $userid = auth()->user()->id;
-        $pharmacyid = auth()->user()->pharmacy_id;
-        $pharmacy = Pharmacies::where('id', $pharmacyid)->first();
+        $pharmacyid = getActivePharmacyId();
+        $pharmacy = Pharmacies::findOrFail($pharmacyid);
 
         $todaySales = MedicineTransactions::where('pharmacy_id', $pharmacyid)
             ->whereDate('updated_at', $today)->sum('subtotal');

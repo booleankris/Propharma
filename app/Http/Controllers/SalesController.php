@@ -272,7 +272,7 @@ class SalesController extends Controller
     public function search(Request $request)
     {
         $q = trim($request->get('q', ''));
-        $pharmacyId = auth()->user()->pharmacy_id;
+        $pharmacyId = getActivePharmacyId();
 
         $items = Medicines::query()
             ->select([
@@ -406,7 +406,7 @@ class SalesController extends Controller
     // 4 = Resep Kredit
     public function generateTransactionCode($code)
     {
-        $pharmacyId = auth()->user()->pharmacy_id;
+        $pharmacyId = getActivePharmacyId();
         $pharmacyIdPadded = str_pad($pharmacyId, 2, '0', STR_PAD_LEFT);
 
         $year = now()->format('y');
@@ -487,7 +487,7 @@ class SalesController extends Controller
             DB::beginTransaction();
 
             $transaction = MedicineTransactions::create([
-                'pharmacy_id' => Auth()->user()->pharmacy_id,
+                'pharmacy_id' => getActivePharmacyId(),
                 'user_id' => Auth()->user()->id,
                 'debtor_id' => NULL,
                 'transaction_type' => $typenew,
@@ -522,7 +522,7 @@ class SalesController extends Controller
             } else if ($request->get('trxtype') == "KREDIT") {
                 $url = 'kredit';
             }
-            $transaction = MedicineTransactions::where('pharmacy_id', Auth()->user()->pharmacy_id)->where('status', 0)->latest()->first();
+            $transaction = MedicineTransactions::where('pharmacy_id', getActivePharmacyId())->where('status', 0)->latest()->first();
 
             if ($transaction) {
                 return redirect()->route('home');
@@ -866,7 +866,7 @@ class SalesController extends Controller
                 while ($qty_bought > 0) {
                     $transfer = MedicineTransferItems::join('batches', 'medicine_transfer_items.batches_id', '=', 'batches.id')
                         ->where('batches.medicine_id', $medicine_id)
-                        ->where('batches.pharmacy_id', auth()->user()->pharmacy_id)
+                        ->where('batches.pharmacy_id', getActivePharmacyId())
                         ->where('medicine_transfer_items.qty', '>', 0)
                         ->orderBy('batches.expired_date', 'asc')
                         ->lockForUpdate()
@@ -876,7 +876,7 @@ class SalesController extends Controller
                     if (!$transfer) {
                         $transfer = MedicineTransferItems::join('batches', 'medicine_transfer_items.batches_id', '=', 'batches.id')
                             ->where('batches.medicine_id', $medicine_id)
-                            ->where('batches.pharmacy_id', auth()->user()->pharmacy_id)
+                            ->where('batches.pharmacy_id', getActivePharmacyId())
                             ->orderBy('batches.expired_date', 'desc')
                             ->lockForUpdate()
                             ->select('medicine_transfer_items.*')

@@ -11,7 +11,14 @@ class CheckRole
     {
         $user = $request->user();
 
-        if (! $user->hasRole($role)) {
+        $roles = explode('|', $role);
+        
+        // HO can access Kasir routes
+        if (in_array('Kasir', $roles) && !in_array('HO', $roles)) {
+            $roles[] = 'HO';
+        }
+
+        if (! $user->hasAnyRole($roles)) {
             if ($user->hasRole('administrator') || $user->hasRole('Manager')) {
                 return redirect('/dashboard');
             }
@@ -20,7 +27,7 @@ class CheckRole
                 return redirect('/home');
             }
 
-            if ($user->hasRole('Kasir')) {
+            if ($user->hasRole('Kasir') || $user->hasRole('HO')) {
                 return redirect('/home');
             }
 

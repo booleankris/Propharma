@@ -24,7 +24,7 @@ class RedirectIfAuthenticated
                     return redirect()->route('dashboard');
                 }
 
-                if ($user->hasRole('Kasir')) {
+                if ($user->hasRole('Kasir') || $user->hasRole('HO')) {
                     return redirect()->route('home');
                 }
                 // if ($user->hasRole('APJ')) {

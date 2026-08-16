@@ -27,7 +27,7 @@ class SalesDataController extends Controller
                 ->with(['transactions.patients', 'transactions'])
                 ->where('medicine_transactions.status', 1)
                 ->whereHas('transactions', function ($transaction) {
-                    $transaction->where('pharmacy_id', auth()->user()->pharmacy_id);
+                    $transaction->where('pharmacy_id', getActivePharmacyId());
                 })
                 ->selectRaw('
                 transaction_id,
@@ -137,7 +137,7 @@ class SalesDataController extends Controller
                 ->join('medicine_transactions', 'medicine_transactions.id', '=', 'medicine_cart.transaction_id')
                 ->with(['transactions.patients', 'transactions'])
                 ->whereHas('transactions', function ($transaction) {
-                    $transaction->where('pharmacy_id', auth()->user()->pharmacy_id)
+                    $transaction->where('pharmacy_id', getActivePharmacyId())
                         ->where('status', 0);
                 })
                 ->selectRaw('

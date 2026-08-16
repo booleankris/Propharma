@@ -516,7 +516,7 @@
             </div>
             <div>
                 @php
-                    $pharmacy = \App\Models\Pharmacies::where('id', auth()->user()->pharmacy_id)->first();
+                    $pharmacy = \App\Models\Pharmacies::where('id', getActivePharmacyId())->first();
                 @endphp
                 <div class="brand-name font-poppins">{{ $pharmacy->name }}</div>
                 <div class="brand-sub"></div>
@@ -733,6 +733,30 @@
         </button>
 
         <div class="topbar-right flex items-center gap-4">
+
+            @role('HO')
+            <!-- Pharmacy Selector for HO -->
+            <div class="flex items-center gap-2">
+                <form action="{{ route('pharmacy.switch') }}" method="POST" class="m-0 flex items-center gap-2">
+                    @csrf
+                    <select name="pharmacy_id" onchange="this.form.submit()" class="text-sm border-gray-200 rounded-lg focus:ring-violet-500 focus:border-violet-500 font-medium text-gray-700 py-1.5 pl-3 pr-8">
+                        @php
+                            // Fetch all active pharmacies excluding "Logistik", "ONLINE", "HO" if we only want 5 branches
+                            // According to user: SAHABAT PMI, SAHABAT MULAWARMAN, SAHABAT MIM, SAHABAT SUTOMO, SAHABAT ANTASARI
+                            $branches = \App\Models\Pharmacies::whereIn('id', [1,2,3,4,5])->get();
+                            $activeId = getActivePharmacyId();
+                        @endphp
+                        @foreach($branches as $branch)
+                            <option value="{{ $branch->id }}" {{ $activeId == $branch->id ? 'selected' : '' }}>
+                                {{ $branch->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                </form>
+            </div>
+            
+            <div class="hidden sm:block h-5 w-px bg-gray-200"></div>
+            @endrole
 
             <!-- Tanggal -->
             <div class="topbar-date text-sm font-medium text-gray-600">

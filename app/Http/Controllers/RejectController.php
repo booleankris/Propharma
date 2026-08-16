@@ -65,7 +65,7 @@ class RejectController extends Controller
     {
         $now = Carbon::now()->format('d/m/Y');
         $rejection_code = $this->generateRejectionCode();
-        $d_total = Reject::where('pharmacy_id', Auth()->user()->pharmacy_id)->sum('total');
+        $d_total = Reject::where('pharmacy_id', getActivePharmacyId())->sum('total');
 
         return view('kasir.reject.reject_sales', compact('rejection_code', 'now', 'd_total'));
     }
@@ -87,7 +87,7 @@ class RejectController extends Controller
         $item = Reject::create([
             'code'          => $validated['code'],
             'date'          => $rejectDate,
-            'pharmacy_id'   => Auth()->user()->pharmacy_id,
+            'pharmacy_id'   => getActivePharmacyId(),
             'medicine_id'   => $validated['medicine_id'],
             'medicine_name' => $validated['medicine_name'] ?? null,
             'quantity'      => $validated['quantity'],
@@ -111,7 +111,7 @@ class RejectController extends Controller
     }
     public function getReject()
     {
-        $query = Reject::with('medicines')->where('pharmacy_id', Auth()->user()->pharmacy_id);
+        $query = Reject::with('medicines')->where('pharmacy_id', getActivePharmacyId());
 
         return DataTables::of($query)
             ->addColumn(

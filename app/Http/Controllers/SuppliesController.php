@@ -31,7 +31,7 @@ class SuppliesController extends Controller
 
         if ($request->ajax()) {
 
-            $pharmacyId = auth()->user()->pharmacy_id;
+            $pharmacyId = getActivePharmacyId();
 
             $baseQuery = ItemsLog::query();
 
@@ -530,7 +530,7 @@ class SuppliesController extends Controller
     {
         if ($request->ajax()) {
             $items = ItemsLog::with(['medicines', 'batches'])->whereHas('batches', function ($batch) {
-                $batch->where('pharmacy_id', auth()->user()->pharmacy_id);
+                $batch->where('pharmacy_id', getActivePharmacyId());
             });
             if ($request->filled('searchMedicine')) {
                 $items->whereHas('medicines', function ($q) use ($request) {
@@ -897,7 +897,7 @@ class SuppliesController extends Controller
     public function batches(Request $request)
     {
         $batches = Batches::where('medicine_id', $request->medicine_id)
-            ->where('pharmacy_id', auth()->user()->pharmacy_id)
+            ->where('pharmacy_id', getActivePharmacyId())
             ->orderBy('expired_date', 'asc')                    // FEFO
             ->get(['id', 'name', 'expired_date', 'stock']);
 
@@ -922,7 +922,7 @@ class SuppliesController extends Controller
             } else {
                 $batch = Batches::lockForUpdate()
                     ->where('medicine_id', $request->medicine_id)
-                    ->where('pharmacy_id', auth()->user()->pharmacy_id)
+                    ->where('pharmacy_id', getActivePharmacyId())
                     ->orderBy('expired_date', 'asc')
                     ->firstOrFail();
             }
@@ -1012,7 +1012,7 @@ class SuppliesController extends Controller
                 'etalases:id,name'
             ])
             ->whereHas('batches', function ($q) {
-                $q->where('pharmacy_id', auth()->user()->pharmacy_id);
+                $q->where('pharmacy_id', getActivePharmacyId());
             });
 
         return DataTables::eloquent($query)
