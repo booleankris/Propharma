@@ -114,7 +114,7 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                 ->whereDate('updated_at', '<=', $this->endDate->toDateString())
                 ->whereIn('transaction_type', array_keys(self::TYPE_MAP))
                 ->whereHas('user', function ($q) {
-                    $q->where('position', 'ONLINE');
+                    $q->role('Online');
                 })
                 ->get();
 
