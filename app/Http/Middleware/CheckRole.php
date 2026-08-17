@@ -13,9 +13,14 @@ class CheckRole
 
         $roles = explode('|', $role);
         
-        // HO can access Kasir routes
-        if (in_array('Kasir', $roles) && !in_array('HO', $roles)) {
-            $roles[] = 'HO';
+        // HO and Online can access Kasir routes
+        if (in_array('Kasir', $roles)) {
+            if (!in_array('HO', $roles)) {
+                $roles[] = 'HO';
+            }
+            if (!in_array('Online', $roles)) {
+                $roles[] = 'Online';
+            }
         }
 
         if (! $user->hasAnyRole($roles)) {
@@ -27,7 +32,7 @@ class CheckRole
                 return redirect('/home');
             }
 
-            if ($user->hasRole('Kasir') || $user->hasRole('HO')) {
+            if ($user->hasRole('Kasir') || $user->hasRole('HO') || $user->hasRole('Online')) {
                 return redirect('/home');
             }
 
