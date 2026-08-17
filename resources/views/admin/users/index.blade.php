@@ -25,32 +25,6 @@
         </div>
 
         <div class="section-body">
-            <div class="collapse" id="advanced-search">
-                <div class="row">
-                    <div class="col-12">
-                        <div class="card">
-                            <div class="card-body">
-                                <div class="form-row">
-                                    <div class="form-group col-md-6 mb-0">
-                                        <label for="name">Cari Nama</label>
-                                        <input type="text" class="form-control" id="name" autocomplete="off">
-                                    </div>
-                                    <div class="form-group col-md-6 mb-0">
-                                        <label for="username">Cari Username</label>
-                                        <input type="text" class="form-control" id="username" autocomplete="off">
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="card-footer text-right">
-                                <button type="button" id="reset-form" class="btn btn-icon btn-sm btn-default"><i
-                                        class="fas fa-fw fa-redo"></i> Reset</button>
-                                <button type="button" id="search-form" class="btn btn-icon btn-sm btn-primary"><i
-                                        class="fas fa-fw fa-search"></i> Cari</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
 
             <div class="row">
                 <div class="col-12">
@@ -101,17 +75,10 @@
             @endif
 
             tableData = $('#table-data').DataTable({
-                dom: "<'row align-items-center'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6 search-button-collapse'>><'row'<'col-sm-12'tr>><'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
                 processing: true,
                 serverSide: true,
                 pageLength: 10,
-                ajax: {
-                    url: '{{ route('users.index') }}',
-                    data: function(f) {
-                        f.name = $('#name').val();
-                        f.username = $('#username').val();
-                    }
-                },
+                ajax: '{{ route('users.index') }}',
                 order: [],
                 columns: [{
                         data: 'DT_RowIndex',
@@ -147,19 +114,7 @@
                     }
                 ],
             });
-            $('.search-button-collapse').addClass('text-right').html(
-                '<a data-toggle="collapse" href="#advanced-search" class="btn btn-icon"><i class="fas fa-fw fa-search"></i> Cari</a>'
-            )
-            $('#search-form').on('click', function(e) {
-                e.preventDefault();
-                tableData.draw();
-            });
-            $('#reset-form').on('click', function(e) {
-                e.preventDefault();
-                $('#name').val('');
-                $('#username').val('');
-                tableData.draw();
-            })
+
         });
 
         function delete_data(id) {

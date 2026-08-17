@@ -27,7 +27,8 @@ class ReportsController extends Controller
     // Report Data
     public function reports(Request $request)
     {
-        $pharmacy = Pharmacies::findOrFail(getActivePharmacyId());
+        $activeId = getActivePharmacyId();
+        $pharmacy = Pharmacies::findOrFail($activeId);
         $report = $request->selectedReport;
 
         [$export, $filename] = $this->resolveReportExport($report, $request, $pharmacy);

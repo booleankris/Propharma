@@ -739,7 +739,7 @@
             <div class="flex items-center gap-2">
                 <form action="{{ route('pharmacy.switch') }}" method="POST" class="m-0 flex items-center gap-2">
                     @csrf
-                    <select name="pharmacy_id" onchange="this.form.submit()" class="text-sm border-gray-200 rounded-lg focus:ring-violet-500 focus:border-violet-500 font-medium text-gray-700 py-1.5 pl-3 pr-8">
+                    <select name="pharmacy_id" onchange="this.form.submit()" class="text-xs sm:text-sm w-[110px] sm:w-auto border-gray-200 rounded-lg focus:ring-violet-500 focus:border-violet-500 font-medium text-gray-700 py-1.5 pl-2 pr-6 sm:pl-3 sm:pr-8 text-ellipsis overflow-hidden">
                         @php
                             // Fetch all active pharmacies excluding "Logistik", "ONLINE", "HO" if we only want 5 branches
                             // According to user: SAHABAT PMI, SAHABAT MULAWARMAN, SAHABAT MIM, SAHABAT SUTOMO, SAHABAT ANTASARI
@@ -759,7 +759,7 @@
             @endrole
 
             <!-- Tanggal -->
-            <div class="topbar-date text-sm font-medium text-gray-600">
+            <div class="hidden sm:block topbar-date text-sm font-medium text-gray-600">
                 {{ \Carbon\Carbon::now()->locale('id')->isoFormat('dddd, D MMMM YYYY') }}
             </div>
 

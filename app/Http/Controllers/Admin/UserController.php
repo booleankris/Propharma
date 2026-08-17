@@ -31,6 +31,7 @@ class UserController extends Controller
     {
         if ($request->ajax()) {
             $users = User::select(['id', 'pharmacy_id', 'username', 'name', 'secret_pin' ,'is_fixed']);
+            
             if ($request->has('order') == false) {
                 $users = $users->orderBy('is_fixed', 'DESC')
                     ->orderBy('name', 'ASC');
@@ -38,15 +39,6 @@ class UserController extends Controller
 
             return DataTables::of($users)
                 ->addIndexColumn()
-                ->filter(function ($query) use ($request) {
-                    if ($request->has('name')) {
-                        $query->where('name', 'like', "%{$request->get('name')}%");
-                    }
-
-                    if ($request->has('username')) {
-                        $query->where('username', 'like', "%{$request->get('username')}%");
-                    }
-                })
                 ->addColumn('pharmacy', function ($user) {
                     return $user->pharmacy
                         ? '<span class="badge badge-outline-info px-2 py-1">'
@@ -151,10 +143,9 @@ class UserController extends Controller
         $input = $request->all();
         if (! empty($input['password'])) {
             $input['secret_pin'] =  $input['password'];
-            $input['password'] = Hash::make($input['password']);
+            $input['password'] = FacadesHash::make($input['password']);
         } else {
-            $input['secret_pin'] =  $input['password'];
-            $input = Arr::except($input, ['password']);
+            $input = Arr::except($input, ['password', 'secret_pin']);
         }
 
         $user = User::find($id);

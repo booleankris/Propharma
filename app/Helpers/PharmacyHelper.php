@@ -14,8 +14,12 @@ if (!function_exists('getActivePharmacyId')) {
         }
 
         // Jika user HO dan ada session pharmacy terpilih
-        if ($user->hasRole('HO') && session()->has('ho_pharmacy_id')) {
-            return (int) session('ho_pharmacy_id');
+        if ($user->hasRole('HO')) {
+            if (session()->has('ho_pharmacy_id')) {
+                return (int) session('ho_pharmacy_id');
+            }
+            // Default ke cabang pertama (SAHABAT PMI = 1) jika belum memilih
+            return 1;
         }
 
         return (int) $user->pharmacy_id;
