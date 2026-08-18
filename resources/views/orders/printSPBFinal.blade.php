@@ -120,123 +120,125 @@
         1) REGULER
         ========================================================== --}}
         @if ($type == 'REGULER')
-            @foreach ($items as $creditorCode => $items)
-                <table style="width:100%; border-collapse:collapse;">
-                    <tr>
-                        <td style="width:38px; vertical-align:middle;">
-                            @if ($pharmacy->logo && file_exists(public_path('img/' . $pharmacy->logo)))
-                                <img src="{{ public_path('img/' . $pharmacy->logo) }}" style="width:40px; height:auto;">
-                            @else
-                                <img src="{{ public_path('img/logo-shb.png') }}" style="width:40px; height:auto;">
-                            @endif
-                        </td>
-                        <td style="vertical-align:top; padding-left:3px;">
-                            <h2 style="margin:0; font-size:8px;">{{ strtoupper($pharmacy->name) }}</h2>
-                            <div>{{ $pharmacy->address }}</div>
-                            <div>HP. {{ $pharmacy->phone }}</div>
-                            <div>Apoteker : {{ $pharmacy->pharmacist }}</div>
-                            <div>No. SIPA : {{ $pharmacy->pharmacist_permit }}</div>
-                            @if ($pharmacy->permit)
-                                <div>No. SIA : {{ $pharmacy->permit }}</div>
-                            @elseif ($pharmacy->pharmacy_registration)
-                                <div>No. STR : {{ $pharmacy->pharmacy_registration }}</div>
-                            @endif
-                        </td>
-                    </tr>
-                </table>
-
-                <div class="line"></div>
-
-                {{-- NO & KEPADA --}}
-                <table style="width:100%; margin-top:2px;">
-                    <tr>
-                        <td style="width:50%; vertical-align:top;">
-                            <b>No :</b> {{ $receivingDetail->sp_code ?? $items->first()->order_items_code }}
-                        </td>
-                        <td style="width:50%; text-align:right; font-size: 6px; vertical-align:top;">
-                            <b>Kepada Yth :</b> {{ optional($items->first()->creditors)->name ?? '-' }}
-                        </td>
-                    </tr>
-                    <tr>
-                        <td></td>
-                        <td style="text-align:right;font-size:6px;">
-                            Di- {{ optional($items->first()->creditors)->address ?? '-' }}
-                        </td>
-                    </tr>
-                </table>
-
-                {{-- TITLE --}}
-                <div class="title-main">
-                    SURAT PESANAN
-                </div>
-
-                <div class="section-gap">Mohon dikirim obat-obatan untuk keperluan apotek :</div>
-
-                {{-- TABLE --}}
-                <table class="form-table">
-                    <thead>
+            @foreach ($items as $creditorCode => $creditorItems)
+                @foreach ($creditorItems->chunk(15) as $chunkIndex => $chunkItems)
+                    <table style="width:100%; border-collapse:collapse;">
                         <tr>
-                            <th style="width:20%;">Jumlah</th>
-                            <th style="width:55%;">Nama Obat</th>
-                            <th style="width:25%;">Keterangan</th>
+                            <td style="width:38px; vertical-align:middle;">
+                                @if ($pharmacy->logo && file_exists(public_path('img/' . $pharmacy->logo)))
+                                    <img src="{{ public_path('img/' . $pharmacy->logo) }}" style="width:40px; height:auto;">
+                                @else
+                                    <img src="{{ public_path('img/logo-shb.png') }}" style="width:40px; height:auto;">
+                                @endif
+                            </td>
+                            <td style="vertical-align:top; padding-left:3px;">
+                                <h2 style="margin:0; font-size:8px;">{{ strtoupper($pharmacy->name) }}</h2>
+                                <div>{{ $pharmacy->address }}</div>
+                                <div>HP. {{ $pharmacy->phone }}</div>
+                                <div>Apoteker : {{ $pharmacy->pharmacist }}</div>
+                                <div>No. SIPA : {{ $pharmacy->pharmacist_permit }}</div>
+                                @if ($pharmacy->permit)
+                                    <div>No. SIA : {{ $pharmacy->permit }}</div>
+                                @elseif ($pharmacy->pharmacy_registration)
+                                    <div>No. STR : {{ $pharmacy->pharmacy_registration }}</div>
+                                @endif
+                            </td>
                         </tr>
-                    </thead>
-                    <tbody>
-                        @foreach ($items as $row)
+                    </table>
+
+                    <div class="line"></div>
+
+                    {{-- NO & KEPADA --}}
+                    <table style="width:100%; margin-top:2px;">
+                        <tr>
+                            <td style="width:50%; vertical-align:top;">
+                                <b>No :</b> {{ $receivingDetail->sp_code ?? $creditorItems->first()->order_items_code }}{{ $chunkIndex > 0 ? ' (Hal '.($chunkIndex+1).')' : '' }}
+                            </td>
+                            <td style="width:50%; text-align:right; font-size: 6px; vertical-align:top;">
+                                <b>Kepada Yth :</b> {{ optional($creditorItems->first()->creditors)->name ?? '-' }}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td></td>
+                            <td style="text-align:right;font-size:6px;">
+                                Di- {{ optional($creditorItems->first()->creditors)->address ?? '-' }}
+                            </td>
+                        </tr>
+                    </table>
+
+                    {{-- TITLE --}}
+                    <div class="title-main">
+                        SURAT PESANAN
+                    </div>
+
+                    <div class="section-gap">Mohon dikirim obat-obatan untuk keperluan apotek :</div>
+
+                    {{-- TABLE --}}
+                    <table class="form-table">
+                        <thead>
                             <tr>
-                                <td style="text-align:center;">
-                                    {{ $row->receivingItems->sum('qty_received') }}
-                                    ({{ ucfirst(terbilang($row->receivingItems->sum('qty_received'))) }})
-                                    {{ $row->medicines->packaging ?? '-' }}
-                                </td>
-                                <td>
-                                    {{ $row->medicines->name ?? '-' }}
-                                </td>
-                                <td>
-                                    @php
-                                        $credCode = $row->creditor_code ?? optional($row->creditors)->code;
-                                        $medCred =
-                                            $row->medicines->creditors->firstWhere('code', $credCode) ??
-                                            $row->medicines->creditors->first();
-                                        $disc = $medCred?->pivot?->discount;
-                                    @endphp
-                                    {{ $disc ? ($disc == (int) $disc ? (int) $disc : $disc) . '%' : '-' }}
-                                </td>
+                                <th style="width:20%;">Jumlah</th>
+                                <th style="width:55%;">Nama Obat</th>
+                                <th style="width:25%;">Keterangan</th>
                             </tr>
-                        @endforeach
+                        </thead>
+                        <tbody>
+                            @foreach ($chunkItems as $row)
+                                <tr>
+                                    <td style="text-align:center;">
+                                        {{ $row->receivingItems->sum('qty_received') }}
+                                        ({{ ucfirst(terbilang($row->receivingItems->sum('qty_received'))) }})
+                                        {{ $row->medicines->packaging ?? '-' }}
+                                    </td>
+                                    <td>
+                                        {{ $row->medicines->name ?? '-' }}
+                                    </td>
+                                    <td>
+                                        @php
+                                            $credCode = $row->creditor_code ?? optional($row->creditors)->code;
+                                            $medCred =
+                                                $row->medicines->creditors->firstWhere('code', $credCode) ??
+                                                $row->medicines->creditors->first();
+                                            $disc = $medCred?->pivot?->discount;
+                                        @endphp
+                                        {{ $disc ? ($disc == (int) $disc ? (int) $disc : $disc) . '%' : '-' }}
+                                    </td>
+                                </tr>
+                            @endforeach
 
-                        @for ($i = count($items); $i < 15; $i++)
-                            <tr>
-                                <td>&nbsp;</td>
-                                <td></td>
-                                <td></td>
-                            </tr>
-                        @endfor
-                    </tbody>
-                </table>
+                            @for ($i = count($chunkItems); $i < 15; $i++)
+                                <tr>
+                                    <td>&nbsp;</td>
+                                    <td></td>
+                                    <td></td>
+                                </tr>
+                            @endfor
+                        </tbody>
+                    </table>
 
-                {{-- FOOTER --}}
-                <table class="signature-block" style="width:100%;">
-                    <tr>
-                        <td style="width:45%; vertical-align:top; color:#444;">
-                            Asli : Arsip PBF <br>
-                            Copy : Arsip Apotek
-                        </td>
-                        <td style="width:55%; text-align:right; vertical-align:top;">
-                            {{ $pharmacy->city }}, {{ $date }}
-                            <br>
-                            Penanggung Jawab,
+                    {{-- FOOTER --}}
+                    <table class="signature-block" style="width:100%;">
+                        <tr>
+                            <td style="width:45%; vertical-align:top; color:#444;">
+                                Asli : Arsip PBF <br>
+                                Copy : Arsip Apotek
+                            </td>
+                            <td style="width:55%; text-align:right; vertical-align:top;">
+                                {{ $pharmacy->city }}, {{ $date }}
+                                <br>
+                                Penanggung Jawab,
 
-                            <div style="height:35px;"></div> {{-- blank space to sign by hand --}}
-                            <b><u>{{ $pharmacy->pharmacist }}</u></b><br>
-                            SIPA : {{ $pharmacy->pharmacist_permit }}
-                        </td>
-                    </tr>
-                </table>
+                                <div style="height:35px;"></div> {{-- blank space to sign by hand --}}
+                                <b><u>{{ $pharmacy->pharmacist }}</u></b><br>
+                                SIPA : {{ $pharmacy->pharmacist_permit }}
+                            </td>
+                        </tr>
+                    </table>
 
-                @if (!$loop->last)
-                    <div style="page-break-after: always;"></div>
-                @endif
+                    @if (!$loop->parent->last || !$loop->last)
+                        <div style="page-break-after: always;"></div>
+                    @endif
+                @endforeach
             @endforeach
 
             {{-- =========================================================
