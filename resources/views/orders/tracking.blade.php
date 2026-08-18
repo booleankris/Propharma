@@ -329,7 +329,7 @@
                 <div class="tp-status-group" id="filterStatusGroup">
                     <div class="tp-status-glider"></div>
                     <button type="button" class="tp-status-btn active" data-status="">Semua</button>
-                    <button type="button" class="tp-status-btn" data-status="1">Dipesan</button>
+                    <button type="button" class="tp-status-btn" data-status="0">Dipesan</button>
                     <button type="button" class="tp-status-btn" data-status="2">Diterima</button>
                 </div>
 

@@ -22,7 +22,7 @@ class OrdersTrackingController extends Controller
             ->when($request->creditor_code, function ($q) use ($request) {
                 $q->where('order_items.creditor_code', $request->creditor_code);
             })
-            ->when($request->status, function ($q) use ($request) {
+            ->when($request->filled('status'), function ($q) use ($request) {
                 $q->where('order_items.status', $request->status);
             })
             ->when($request->date_from && $request->date_to, function ($q) use ($request) {
