@@ -41,10 +41,15 @@ class SuppliesController extends Controller
                     $sub->where('status', 2)
                         ->whereHas('receiving', function ($r) use ($pharmacyId) {
                             $r->where('pharmacy_id', $pharmacyId)
-                                ->whereIn('status', [1, 2, 3]);
+                                ->whereIn('status', [1, 2, 3, 4]);
                         });
                 })->orWhere(function ($sub) use ($pharmacyId) {
-                    $sub->where('status', '!=', 2)
+                    $sub->where('status', 7)
+                        ->whereHas('batches', function ($b) use ($pharmacyId) {
+                            $b->where('pharmacy_id', $pharmacyId);
+                        });
+                })->orWhere(function ($sub) use ($pharmacyId) {
+                    $sub->whereNotIn('status', [2, 7])
                         ->whereHas('users', function ($u) use ($pharmacyId) {
                             $u->where('pharmacy_id', $pharmacyId);
                         });
@@ -102,7 +107,7 @@ class SuppliesController extends Controller
                     return $row->medicines->name;
                 })
                 ->addColumn('batch_name', function ($row) {
-                    if ($row->status == 2 && $row->batches) {
+                    if (in_array($row->status, [2, 7]) && $row->batches) {
                         return $row->batches->name;
                     }
                     return '-';
@@ -138,12 +143,17 @@ class SuppliesController extends Controller
                         return $row->receiving?->receiving_details?->first()?->creditor?->name ?? '-';
                     }
 
-                    // Case 2: Any other status -> Show Cashier User Name (from medicine transactions)
+                    // Case 2: From medicine transaction cashier user
                     if ($row->medicine_transaction?->user) {
                         return $row->medicine_transaction->user->name;
                     }
 
-                    // Fallback: If no cashier is found, display the Medicine Name as a safety net
+                    // Case 3: From users relation directly on items_log
+                    if ($row->users) {
+                        return $row->users->name;
+                    }
+
+                    // Fallback
                     return '-';
                 })
                 // ----------------------------------------
@@ -166,7 +176,7 @@ class SuppliesController extends Controller
                             return "<div style='color:#d34163;font-weight:bold;'><span></span><b>" . $row->qty . "</b></div>";
                         }
                     } else if ($row->status == 7) {
-                        return "<div style='color:#248787;font-weight:bold;'><span></span><b>-" . $row->qty . "</b></div>";
+                        return "<div style='color:#248787;font-weight:bold;'><span></span><b>+" . $row->qty . "</b></div>";
                     }
                     return "";
                 })
