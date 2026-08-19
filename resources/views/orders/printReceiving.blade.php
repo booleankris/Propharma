@@ -63,9 +63,9 @@
             <div class="header">
 
                 <div>
-                    <strong>GUDANG SAHABAT</strong><br>
-                    Jl. Palang Merah Ind No. 16 A-B-C<br>
-                    SAMARINDA
+                    <strong> {{ $receiving->pharmacy->name }}</strong><br>
+                    {{ $receiving->pharmacy->address }}<br>
+
                 </div>
 
                 <div>
@@ -110,12 +110,21 @@
                 </thead>
 
                 <tbody>
-                    @php $grandTotal = 0; @endphp
+                    @php
+                        $detailSubtotal = 0;
+                        $detailDiscount = 0;
+                    @endphp
 
                     @foreach ($detail->receiving_items as $i => $item)
                         @php
-                            $subtotal = $item->qty_received * $item->order_items->price * $item->order_items->medicines->content;
-                            $grandTotal += $subtotal;
+                            $activePrice = $item->raw_price ?? $item->order_items->price;
+                            $isPack = ($item->order_items->pack == 1);
+                            $content = $isPack ? ($item->order_items->medicines->content ?? 1) : 1;
+                            $itemSubtotal = $item->total ?? ($item->qty_received * $activePrice * $content);
+                            $itemDiscount = ($item->discount ?? 0) + ($item->extra_discount ?? 0);
+
+                            $detailSubtotal += $itemSubtotal;
+                            $detailDiscount += $itemDiscount;
                         @endphp
 
                         <tr>
@@ -130,11 +139,15 @@
                             </td>
 
                             <td class="text-center">
-                                {{ $item->order_items->medicines->unit }}
+                                @if ($item->order_items->pack == 1)
+                                    {{ $item->order_items->medicines->packaging }}
+                                @else
+                                    {{ $item->order_items->medicines->unit }}
+                                @endif
                             </td>
 
                             <td class="text-right">
-                                {{ number_format($item->order_items->price, 0, ',', '.') }}
+                                {{ number_format($activePrice, 0, ',', '.') }}
                             </td>
 
                             <td class="text-center">
@@ -144,7 +157,7 @@
                                 {{ $item->extra_discount ?? 0 }}
                             </td>
                             <td class="text-right">
-                                {{ number_format($subtotal, 0, ',', '.') }}
+                                {{ number_format($itemSubtotal, 0, ',', '.') }}
                             </td>
                         </tr>
                     @endforeach
@@ -152,34 +165,36 @@
 
                 <tfoot>
                     @php
-                        $ppn = floor($grandTotal * 0.11); // 11% PPN
-                        $grandTotalWithPpn = $grandTotal + $ppn;
+                        $detailNet = max(0, $detailSubtotal - $detailDiscount);
+                        $detailPpn = floor($detailNet * 0.11);
+                        $detailGrandTotal = $detailNet + $detailPpn;
                     @endphp
 
                     <tr>
-                        <th colspan="7" class="text-right">TOTAL</th>
+                        <th colspan="7" class="text-right">SUBTOTAL</th>
                         <th class="text-right">
-                            {{ number_format($grandTotal, 0, ',', '.') }}
-                        </th>
-                    </tr>
-
-                    <tr>
-                        <th colspan="7" class="text-right">TOTAL PPN (11%)</th>
-                        <th class="text-right">
-                            {{ number_format($ppn, 0, ',', '.') }}
+                            {{ number_format($detailSubtotal, 0, ',', '.') }}
                         </th>
                     </tr>
 
                     <tr>
                         <th colspan="7" class="text-right">TOTAL DISKON</th>
                         <th class="text-right">
-                            {{ number_format($totaldiscount, 0, ',', '.') }}
+                            {{ number_format($detailDiscount, 0, ',', '.') }}
                         </th>
                     </tr>
+
                     <tr>
-                        <th colspan="7" class="text-right">TOTAL</th>
+                        <th colspan="7" class="text-right">TOTAL PPN (11%)</th>
                         <th class="text-right">
-                            {{ number_format($total_receiving + $ppn, 0, ',', '.') }}
+                            {{ number_format($detailPpn, 0, ',', '.') }}
+                        </th>
+                    </tr>
+
+                    <tr>
+                        <th colspan="7" class="text-right">TOTAL AKHIR</th>
+                        <th class="text-right">
+                            {{ number_format($detailGrandTotal, 0, ',', '.') }}
                         </th>
                     </tr>
                 </tfoot>

@@ -737,6 +737,18 @@
         let date_now = "{{ \Carbon\Carbon::now()->format('Y-m-d') }}";
 
         const itemPriceInput = document.getElementById('item_price');
+        itemPriceInput.addEventListener('keyup', function (e) {
+            let rawVal = this.value.replace(/[^\d-]/g, '');
+            itemprice = parseFloat(rawVal) || 0;
+            this.value = formatRupiah(rawVal);
+            counttotalreceived();
+        });
+        itemPriceInput.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                batch.focus();
+            }
+        });
         const discountInput = document.getElementById('discount');
         const extraDiscountInput = document.getElementById('extra_discount');
 
@@ -1716,7 +1728,7 @@
             const days = parseInt(invoice_times.value);
             const baseDateValue = invoice_date.value;
 
-            if (!days || days <= 0 || !baseDateValue) {
+            if (isNaN(days) || days < 0 || !baseDateValue) {
                 invoice_due.value = '';
                 return;
             }
@@ -1748,7 +1760,7 @@
         // ENTER REDIRECTION AND SUBMIT
         document.getElementById('qty_received').addEventListener('keydown', function (e) {
             if (e.key == 'Enter') {
-                batch.focus();
+                itemPriceInput.focus();
             }
             const qtyOrder = parseFloat(document.getElementById('qty').value) || 0;
             const input = document.getElementById('qty_received');

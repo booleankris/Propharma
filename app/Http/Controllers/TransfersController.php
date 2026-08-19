@@ -68,8 +68,11 @@ class TransfersController extends Controller
             return response()->json(['data' => []]);
         }
 
-        $data = Batches::query()
-            ->with('medicines')
+        $pharmacyId = getActivePharmacyId();
+
+        $query = Batches::query()
+            ->with(['medicines', 'medicine_transfer_items'])
+            ->where('pharmacy_id', $pharmacyId)
             ->where(function ($query) use ($search) {
                 $query->where('name', 'LIKE', "%{$search}%")
                     ->orWhereHas(
@@ -78,19 +81,33 @@ class TransfersController extends Controller
                         $qMed->where('name', 'LIKE', "%{$search}%")
                             ->orWhere('code', 'LIKE', "%{$search}%")
                     );
-            })
-            ->where('stock', '>', 0)
-            ->where('pharmacy_id', getActivePharmacyId())
-            ->paginate(10);
+            });
 
-        $data->getCollection()->transform(function ($item) {
+        if ($pharmacyId == 1) {
+            $query->where('stock', '>', 0);
+        } else {
+            $query->where(function ($q) {
+                $q->where('stock', '>', 0)
+                    ->orWhereHas('medicine_transfer_items', function ($qMti) {
+                        $qMti->where('qty', '>', 0);
+                    });
+            });
+        }
+
+        $data = $query->paginate(10);
+
+        $data->getCollection()->transform(function ($item) use ($pharmacyId) {
+            $counterStock = (int) $item->medicine_transfer_items?->sum('qty');
+            $calcStock = ($pharmacyId == 1)
+                ? (int) $item->stock
+                : ((int) $item->stock > 0 ? (int) $item->stock : $counterStock);
+
             return [
                 'id' => $item->id,
                 'batches_name' => $item->name,
                 'name' => $item->medicines?->name ?? "??",
-                'stock' => $item?->stock ?? "??",
-                'unit' => $item?->medicines?->unit ?? "??",
-
+                'stock' => $calcStock,
+                'unit' => $item->medicines?->unit ?? "??",
             ];
         });
 
@@ -123,11 +140,17 @@ class TransfersController extends Controller
                     'status' => 0,
                 ]);
 
+                $pharmacyId = getActivePharmacyId();
+
                 foreach ($request->items as $line) {
                     $sourceBatch = Batches::findOrFail($line['batches_id']);
 
-                    if ((int) $line['qty'] > $sourceBatch->stock) {
-                        throw new \Exception("Qty untuk {$sourceBatch->name} melebihi stok.");
+                    $availStock = ($pharmacyId == 1)
+                        ? (int) $sourceBatch->stock
+                        : max((int) $sourceBatch->stock, (int) $sourceBatch->medicine_transfer_items()->sum('qty'));
+
+                    if ((int) $line['qty'] > $availStock) {
+                        throw new \Exception("Qty untuk {$sourceBatch->name} ({$sourceBatch->medicines?->name}) melebihi stok tersedia ({$availStock}).");
                     }
 
                     // Find or create destination batch
@@ -239,6 +262,114 @@ class TransfersController extends Controller
 
         return view('kasir.transfers.transfers', compact('pending', 'accepted', 'denied'));
     }
+    private function processItemTransferStock($item, $transfer, $now)
+    {
+        $destBatch = $item->batches;
+        $srcBatch = $item->sourceBatch;
+        $medicine = Medicines::findOrFail($destBatch->medicine_id);
+
+        $srcPharmacyId = $srcBatch->pharmacy_id;
+        $destPharmacyId = $destBatch->pharmacy_id;
+
+        // ── Decrement source ──────────────────────────────────────
+        if ($srcPharmacyId == 1) {
+            if ($srcBatch->stock < $item->qty) {
+                throw new \Exception("Stok sumber tidak mencukupi untuk item " . $medicine->name . ".");
+            }
+            $srcQtyBefore = $srcBatch->stock;
+            $srcBatch->decrement('stock', $item->qty);
+            $srcQtyAfter = $srcBatch->stock;
+        } else {
+            // Cabang: decrement from medicine_transfer_items
+            $mtiList = MedicineTransferItems::where('batches_id', $srcBatch->id)
+                ->where('qty', '>', 0)
+                ->get();
+            $totalMtiQty = $mtiList->sum('qty');
+            $availSrc = max((int) $srcBatch->stock, (int) $totalMtiQty);
+
+            if ($availSrc < $item->qty) {
+                throw new \Exception("Stok etalase sumber tidak mencukupi untuk item " . $medicine->name . ".");
+            }
+
+            $srcQtyBefore = $availSrc;
+            if ($srcBatch->stock > 0) {
+                $srcBatch->decrement('stock', min($srcBatch->stock, $item->qty));
+            }
+
+            $toDeduct = $item->qty;
+            foreach ($mtiList as $mtiRow) {
+                if ($toDeduct <= 0) break;
+                $deduct = min($mtiRow->qty, $toDeduct);
+                $mtiRow->decrement('qty', $deduct);
+                $toDeduct -= $deduct;
+            }
+
+            $srcQtyAfter = max(0, $srcQtyBefore - $item->qty);
+        }
+
+        // ── Increment destination ─────────────────────────────────
+        if ($destPharmacyId == 1) {
+            $destQtyBefore = $destBatch->stock;
+            $destBatch->increment('stock', $item->qty);
+            $destQtyAfter = $destBatch->stock;
+        } else {
+            // Cabang destination: add to medicine_transfer_items
+            $destQtyBefore = (int) MedicineTransferItems::where('batches_id', $destBatch->id)->sum('qty');
+
+            $destMti = MedicineTransferItems::where('batches_id', $destBatch->id)
+                ->where('etalases_id', $item->etalases_id ?? 99)
+                ->first();
+
+            if (!$destMti) {
+                $destMti = MedicineTransferItems::create([
+                    'medicine_transfer_id' => $transfer->id,
+                    'batches_id' => $destBatch->id,
+                    'etalases_id' => $item->etalases_id ?? 99,
+                    'qty' => $item->qty,
+                    'status' => 1,
+                ]);
+            } else {
+                $destMti->increment('qty', $item->qty);
+            }
+
+            $destQtyAfter = $destQtyBefore + $item->qty;
+        }
+
+        $item->update(['status' => 1]);
+
+        // ── Log source (outgoing) ─────────────────────────────────
+        ItemsLog::create([
+            'transaction_code' => $transfer->code,
+            'code' => $this->generateItemsLogCode(),
+            'type' => 'MU',
+            'medicine_id' => $medicine->id,
+            'qty' => $item->qty,
+            'qty_before' => $srcQtyBefore,
+            'qty_after' => $srcQtyAfter,
+            'total' => 0,
+            'date' => $now,
+            'status' => 7,
+            'batches_id' => $srcBatch->id,
+            'user_id' => auth()->id(),
+        ]);
+
+        // ── Log destination (incoming) ────────────────────────────
+        ItemsLog::create([
+            'transaction_code' => $transfer->code,
+            'code' => $this->generateItemsLogCode(),
+            'type' => 'MU',
+            'medicine_id' => $medicine->id,
+            'qty' => $item->qty,
+            'qty_before' => $destQtyBefore,
+            'qty_after' => $destQtyAfter,
+            'total' => 0,
+            'date' => $now,
+            'status' => 7,
+            'batches_id' => $destBatch->id,
+            'user_id' => auth()->id(),
+        ]);
+    }
+
     public function acceptTransfer(MedicineTransfers $transfer)
     {
         try {
@@ -247,54 +378,7 @@ class TransfersController extends Controller
                 $pendingItems = $transfer->items()->where('status', 0)->get();
 
                 foreach ($pendingItems as $item) {
-                    $destBatch = $item->batches;
-                    $srcBatch = $item->sourceBatch;
-                    $medicine = Medicines::findOrFail($destBatch->medicine_id);
-
-                    // ── Decrement source ──────────────────────────────────────
-                    if ($srcBatch->stock < $item->qty) {
-                        throw new \Exception("Stok sumber tidak mencukupi untuk item " . $medicine->name . ".");
-                    }
-                    $srcQtyBefore = $srcBatch->stock;
-                    $srcBatch->decrement('stock', $item->qty);
-
-                    // ── Increment destination ─────────────────────────────────
-                    $destQtyBefore = $destBatch->stock;
-                    $destBatch->increment('stock', $item->qty);
-
-                    $item->update(['status' => 1]);
-
-                    // ── Log source (outgoing) ─────────────────────────────────
-                    ItemsLog::create([
-                        'transaction_code' => $transfer->code,
-                        'code' => $this->generateItemsLogCode(),
-                        'type' => 'MU',
-                        'medicine_id' => $medicine->id,
-                        'qty' => $item->qty,
-                        'qty_before' => $srcQtyBefore,
-                        'qty_after' => $srcBatch->stock,
-                        'total' => 0,
-                        'date' => $now,
-                        'status' => 7,
-                        'batches_id' => $srcBatch->id,
-                        'user_id' => auth()->id(),
-                    ]);
-
-                    // ── Log destination (incoming) ────────────────────────────
-                    ItemsLog::create([
-                        'transaction_code' => $transfer->code,
-                        'code' => $this->generateItemsLogCode(),
-                        'type' => 'MU',
-                        'medicine_id' => $medicine->id,
-                        'qty' => $item->qty,
-                        'qty_before' => $destQtyBefore,
-                        'qty_after' => $destBatch->stock,
-                        'total' => 0,
-                        'date' => $now,
-                        'status' => 7,
-                        'batches_id' => $destBatch->id,
-                        'user_id' => auth()->id(),
-                    ]);
+                    $this->processItemTransferStock($item, $transfer, $now);
                 }
 
                 // ── Update parent transfer status ─────────────────────────
@@ -309,65 +393,21 @@ class TransfersController extends Controller
             return redirect(url()->previous() . '#accepted')->with('message', 'Gagal: ' . $e->getMessage());
         }
     }
+
     public function acceptItem(MedicineTransferItems $item)
     {
         try {
             DB::transaction(function () use ($item) {
                 $now = Carbon::now();
-                $destBatch = $item->batches;
-                $srcBatch = $item->sourceBatch;
-                $medicine = Medicines::findOrFail($destBatch->medicine_id);
-
-                // ───────────────────────────────── Decrement source ──────────────────────────────────────
-                if ($srcBatch->stock < $item->qty) {
-                    throw new \Exception("Stok sumber tidak mencukupi.");
-                }
-                $srcQtyBefore = $srcBatch->stock;
-                $srcBatch->decrement('stock', $item->qty);
-
-                // ───────────────────────────────── Increment destination ─────────────────────────────────
-                $destQtyBefore = $destBatch->stock;
-                $destBatch->increment('stock', $item->qty);
-
-                $item->update(['status' => 1]);
-
-                // ───────────────────────────────── Update parent transfer status ─────────────────────────
                 $transfer = $item->transfer;
+
+                $this->processItemTransferStock($item, $transfer, $now);
+
+                // ── Update parent transfer status ─────────────────────────
                 if ($transfer->items()->where('status', 0)->doesntExist()) {
                     $hasAccepted = $transfer->items()->where('status', 1)->exists();
                     $transfer->update(['status' => $hasAccepted ? 1 : 2]);
                 }
-
-                ItemsLog::create([
-                    'transaction_code' => $transfer->code,
-                    'code' => $this->generateItemsLogCode(),
-                    'type' => 'MU',
-                    'medicine_id' => $medicine->id,
-                    'qty' => $item->qty,
-                    'qty_before' => $srcQtyBefore,
-                    'qty_after' => $srcBatch->stock,
-                    'total' => 0,
-                    'date' => $now,
-                    'status' => 7,
-                    'batches_id' => $srcBatch->id,
-                    'user_id' => auth()->id(),
-                ]);
-
-                // ── Log destination (incoming) ────────────────────────────
-                ItemsLog::create([
-                    'transaction_code' => $transfer->code,
-                    'code' => $this->generateItemsLogCode(),
-                    'type' => 'MU',
-                    'medicine_id' => $medicine->id,
-                    'qty' => $item->qty,
-                    'qty_before' => $destQtyBefore,
-                    'qty_after' => $destBatch->stock,
-                    'total' => 0,
-                    'date' => $now,
-                    'status' => 7,
-                    'batches_id' => $destBatch->id,
-                    'user_id' => auth()->id(),
-                ]);
             });
 
             return redirect(url()->previous() . '#accepted')->with('success', 'Item diterima.');

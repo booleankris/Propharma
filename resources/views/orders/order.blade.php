@@ -1237,11 +1237,53 @@
 
         }
 
+        function validateOrderCreditorsBeforePrint() {
+            if (typeof orderItemsTable === 'undefined' || !orderItemsTable) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Gagal',
+                    text: 'Tabel order belum dimuat!'
+                });
+                return false;
+            }
+
+            const data = orderItemsTable.rows().data().toArray();
+
+            if (!data || data.length === 0) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Peringatan',
+                    text: 'Tidak ada item obat dalam order ini untuk dicetak.'
+                });
+                return false;
+            }
+
+            const invalidItems = data.filter(item => {
+                const code = item.creditor_code;
+                const creditorName = item.creditors;
+                return !code || String(code).trim() === '' || creditorName === 'Belum Dipilih' || !creditorName;
+            });
+
+            if (invalidItems.length > 0) {
+                const itemNames = invalidItems.map(item => item.medicines?.name || 'Obat').join(', ');
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'PBF Belum Dipilih',
+                    text: `Terdapat item obat yang PBF/Krediturnya belum dipilih (${itemNames}). Silakan pilih PBF terlebih dahulu sebelum mencetak.`
+                });
+                return false;
+            }
+
+            return true;
+        }
+
         function printSPB() {
+            if (!validateOrderCreditorsBeforePrint()) return;
             window.open(`/orders/${orderid}/printspb`, "_blank");
         }
 
         function printOrder() {
+            if (!validateOrderCreditorsBeforePrint()) return;
 
             const btn = document.getElementById('printorder');
             if (btn.disabled) return;

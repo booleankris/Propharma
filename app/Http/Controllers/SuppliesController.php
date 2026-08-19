@@ -230,10 +230,17 @@ class SuppliesController extends Controller
 
             if ($request->filled('searchMedicine')) {
                 $items->whereHas('medicines', function ($q) use ($request) {
-                    $q->where('name', 'like', "%{$request->searchMedicine}%")
-                        ->orWhere('code', 'like', "%{$request->searchMedicine}%");
+                    $q->where(function($sq) use ($request) {
+                        $sq->where('name', 'like', "%{$request->searchMedicine}%")
+                           ->orWhere('code', 'like', "%{$request->searchMedicine}%");
+                    });
                 });
             }
+
+            // Selalu filter berdasarkan apotek aktif
+            $items->whereHas('batches', function ($q) {
+                $q->where('pharmacy_id', getActivePharmacyId());
+            });
 
             if ($request->filled('start_date')) {
                 $items->whereDate('date', '>=', $request->start_date);
@@ -265,11 +272,16 @@ class SuppliesController extends Controller
                     }
                     // status 6 
                     if ($row->status == 6) {
-                        return "<div style='color:#185FA5;font-weight:600;'>{$row->qty}</div>";
+                        $diff = $row->qty_after - $row->qty_before;
+                        $sign = $diff > 0 ? '+' : '-';
+                        return "<div style='color:#185FA5;font-weight:600;'>{$sign}" . abs($diff) . "</div>";
                     }
                     // status 7 — Mutasi Stok
                     if ($row->status == 7) {
-                        return "<div style='color:#0F6E56;font-weight:600;'>-{$row->qty}</div>";
+                        $diff = $row->qty_after - $row->qty_before;
+                        $sign = $diff > 0 ? '+' : '-';
+                        $color = $diff > 0 ? '#854F0B' : '#0F6E56';
+                        return "<div style='color:{$color};font-weight:600;'>{$sign}" . abs($diff) . "</div>";
                     }
                 })
                 ->addColumn('qty_before', fn($r) => "<b>{$r->qty_before}</b>")

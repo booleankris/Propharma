@@ -180,6 +180,7 @@ class ReceivingController extends Controller
                 ]);
             } else {
                 foreach ($orderItem->receivingItems as $batch) {
+                    $activePrice = $batch->raw_price ?? $orderItem->price;
                     $rows->push([
                         'id' => $orderItem->id,
                         'order_id' => $orderItem->order_id,
@@ -188,10 +189,10 @@ class ReceivingController extends Controller
                         'quantity' => $orderItem->quantity,
                         'qty_received' => $batch->qty_received,
                         'qty_remaining' => $qtyRemaining,
-                        'raw_price' => $batch->raw_price ?? $orderItem->price, // Added
+                        'raw_price' => $activePrice, // Added
                         'pack' => $orderItem->pack,                       // Added
-                        'price' => 'Rp ' . number_format($orderItem->price, 0, ',', '.'),
-                        'price_ppn' => 'Rp ' . number_format(floor($orderItem->price * 1.11), 0, ',', '.'),
+                        'price' => 'Rp ' . number_format($activePrice, 0, ',', '.'),
+                        'price_ppn' => 'Rp ' . number_format(floor($activePrice * 1.11), 0, ',', '.'),
                         'total' => 'Rp ' . number_format($batch->total, 0, ',', '.'),
                         'receiving_items' => $batch,
                     ]);
@@ -259,7 +260,7 @@ class ReceivingController extends Controller
             'order_items.medicines.composition',
         ])->findOrFail($orderId);
 
-        $pharmacy = $order->pharmacy;
+        $pharmacy = \App\Models\Pharmacies::find(getActivePharmacyId()) ?? $order->pharmacy;
 
         $grouped = $order->order_items->groupBy(function ($item) {
             $type = $item->medicines->type ?? "Kosong";
@@ -295,7 +296,7 @@ class ReceivingController extends Controller
             'order_items.medicines.composition',
         ])->findOrFail($orderId);
 
-        $pharmacy = $order->pharmacy;
+        $pharmacy = \App\Models\Pharmacies::find(getActivePharmacyId()) ?? $order->pharmacy;
 
         $grouped = $order->order_items->groupBy(function ($item) {
             $type = $item->medicines->type ?? "Kosong";
@@ -343,7 +344,7 @@ class ReceivingController extends Controller
             'order_items.medicines.composition',
         ])->findOrFail($orderId);
 
-        $pharmacy = $order->pharmacy;
+        $pharmacy = \App\Models\Pharmacies::find(getActivePharmacyId()) ?? $order->pharmacy;
 
         $grouped = $order->order_items->groupBy(function ($item) {
             $type = $item->medicines->type ?? "Kosong";
@@ -379,7 +380,7 @@ class ReceivingController extends Controller
             'order_items.medicines.composition',
         ])->findOrFail($orderId);
 
-        $pharmacy = $order->pharmacy;
+        $pharmacy = \App\Models\Pharmacies::find(getActivePharmacyId()) ?? $order->pharmacy;
 
         $grouped = $order->order_items->groupBy(function ($item) {
             $type = $item->medicines->type ?? "Kosong";
