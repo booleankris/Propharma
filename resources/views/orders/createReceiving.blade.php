@@ -381,6 +381,22 @@
 
                                 <div class="w-full sm:w-40">
                                     <div class="py-1 text-[13px] font-bold">QTY Beli</div>
+                                                                <!-- Diskon -->
+                                <div>
+                                    <label for="discount" class="block text-xs font-semibold text-gray-700 mb-1">Diskon
+                                        (%) <span id="discount_info" class="text-[10px] text-gray-500 font-normal"></span></label>
+                                    <input id="discount" value="0" type="number" placeholder="0" oninput="handleDiscount(this)"
+                                        class="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-xs text-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                </div>
+
+                                <!-- Ekstra Diskon -->
+                                <div>
+                                    <label for="extra_discount"
+                                        class="block text-xs font-semibold text-gray-700 mb-1">Ex. Diskon
+                                        (%) <span id="extra_discount_info" class="text-[10px] text-gray-500 font-normal"></span></label>
+                                    <input id="extra_discount" value="0" type="number" required oninput="handleDiscount(this)"
+                                        class="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-xs text-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                </div>
                                     <input id="qty" type="number" readonly name="qty"
                                         class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
                                         placeholder="QTY Retur" oninput="counttotal()">
@@ -412,12 +428,6 @@
                                         placeholder="Batch">
                                 </div>
 
-                                <div class="w-full sm:w-40">
-                                    <div class="py-1 text-[13px] font-bold">Diskon</div>
-                                    <input id="discount"
-                                        class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
-                                        placeholder="Diskon">
-                                </div>
                                 <div class="w-full sm:w-40">
                                     <div class="py-1 text-[13px] font-bold">Exp Date</div>
                                     <input id="expired_date" type="date" name="expired_date"
@@ -537,6 +547,7 @@
         const qty_received = document.getElementById('qty_received');
         const expired_date = document.getElementById('expired_date');
         const discount = document.getElementById('discount');
+        const extra_discount = document.getElementById('extra_discount');
         const itemlocation = document.getElementById('location');
         const etalase = document.getElementById('etalase');
         const batch = document.getElementById('batch');
@@ -623,6 +634,33 @@
                 }
 
                 const qtyOrder = parseFloat(document.getElementById('qty').value) || 0;
+                
+        function calculateVisualTotal() {
+            let grossTotal = parseFloat(total_transaction) || 0;
+            let discVal = parseFloat(discount.value.replace(',', '.')) || 0;
+            let extraDiscVal = parseFloat(extra_discount.value.replace(',', '.')) || 0;
+
+            let nomDisc = discVal <= 100 && discVal > 0 ? Math.round(grossTotal * discVal / 100) : discVal;
+            let nomExtraDisc = extraDiscVal <= 100 && extraDiscVal > 0 ? Math.round(grossTotal * extraDiscVal / 100) : extraDiscVal;
+
+            let discInfo = document.getElementById('discount_info');
+            let extraDiscInfo = document.getElementById('extra_discount_info');
+            
+            if (discInfo) {
+                discInfo.textContent = discVal <= 100 && discVal > 0 ? `(Rp ${formatRupiah(nomDisc)})` : '';
+            }
+            if (extraDiscInfo) {
+                extraDiscInfo.textContent = extraDiscVal <= 100 && extraDiscVal > 0 ? `(Rp ${formatRupiah(nomExtraDisc)})` : '';
+            }
+
+            let netTotal = grossTotal - nomDisc - nomExtraDisc;
+            document.getElementById('total_price').value = formatRupiah(Math.max(0, netTotal));
+        }
+
+        function handleDiscount(inputElement) {
+            calculateVisualTotal();
+        }
+
                 let value = parseFloat(this.value) || 0;
 
                 if (value > qtyOrder) {
@@ -679,7 +717,9 @@
             itemprice = data.medicines.raw_price;
             itemqty = data.quantity;
             itemcontent = data.medicines.content;
-            // totalprice = data.total;
+            
+            // Recalculate gross total and update visual total
+            counttotalreceived();
         });
         document.getElementById('qty').addEventListener('keydown', function(e) {
             if (e.key !== 'Enter') return;
@@ -955,15 +995,11 @@
             if (pack.checked) {
                 itemtotal = qty * itemcontent * itemprice;
                 total_transaction = itemtotal;
-                document.getElementById('total_price').value = formatRupiah(itemtotal);
-
             } else {
                 itemtotal = qty * itemprice;
                 total_transaction = itemtotal;
-                document.getElementById('total_price').value = formatRupiah(itemtotal);
-
-
             }
+            calculateVisualTotal();
         }
 
         function counttotalreceived() {
@@ -973,13 +1009,11 @@
             if (pack.checked) {
                 itemtotal = qty * itemcontent * itemprice;
                 total_transaction = itemtotal;
-                document.getElementById('total_price').value = formatRupiah(itemtotal);
-
             } else {
                 itemtotal = qty * itemprice;
                 total_transaction = itemtotal;
-                document.getElementById('total_price').value = formatRupiah(itemtotal);
             }
+            calculateVisualTotal();
         }
 
         function resetInputs() {

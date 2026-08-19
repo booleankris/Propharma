@@ -122,7 +122,14 @@
                         $isPack = ($item->order_items->pack == 1);
                         $content = $isPack ? ($item->order_items->medicines->content ?? 1) : 1;
                         $itemSubtotal = $item->total ?? ($item->qty_received * $activePrice * $content);
-                        $itemDiscount = ($item->discount ?? 0) + ($item->extra_discount ?? 0);
+                        
+                        $discVal = $item->discount ?? 0;
+                        $extraDiscVal = $item->extra_discount ?? 0;
+                        
+                        $nomDisc = $discVal <= 100 ? ($itemSubtotal * $discVal / 100) : $discVal;
+                        $nomExtraDisc = $extraDiscVal <= 100 ? ($itemSubtotal * $extraDiscVal / 100) : $extraDiscVal;
+
+                        $itemDiscount = $nomDisc + $nomExtraDisc;
 
                         $detailSubtotal += $itemSubtotal;
                         $detailDiscount += $itemDiscount;
@@ -152,10 +159,12 @@
                         </td>
 
                         <td class="text-center">
-                            {{ $item->discount ?? 0 }}
+                            {{ $discVal <= 100 && $discVal > 0 ? $discVal . '%' : number_format($discVal, 0, ',', '.') }}
+                            {{ $discVal <= 100 && $discVal > 0 ? ' (' . number_format($nomDisc, 0, ',', '.') . ')' : '' }}
                         </td>
                         <td class="text-center">
-                            {{ $item->extra_discount ?? 0 }}
+                            {{ $extraDiscVal <= 100 && $extraDiscVal > 0 ? $extraDiscVal . '%' : number_format($extraDiscVal, 0, ',', '.') }}
+                            {{ $extraDiscVal <= 100 && $extraDiscVal > 0 ? ' (' . number_format($nomExtraDisc, 0, ',', '.') . ')' : '' }}
                         </td>
                         <td class="text-right">
                             {{ number_format($itemSubtotal, 0, ',', '.') }}

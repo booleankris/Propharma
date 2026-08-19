@@ -499,7 +499,7 @@
                         <!-- Diskon -->
                         <div>
                             <label for="discount" class="block text-xs font-semibold text-gray-700 mb-1">Diskon
-                                (%)</label>
+                                (%) <span id="discount_info" class="text-[10px] text-gray-500 font-normal"></span></label>
                             <input id="discount" value="0" type="number" placeholder="0"
                                 class="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-xs text-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                         </div>
@@ -507,7 +507,7 @@
                         <!-- Ekstra Diskon -->
                         <div>
                             <label for="extra_discount" class="block text-xs font-semibold text-gray-700 mb-1">Ex. Diskon
-                                (%)</label>
+                                (%) <span id="extra_discount_info" class="text-[10px] text-gray-500 font-normal"></span></label>
                             <input id="extra_discount" value="0" type="number" required
                                 class="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-xs text-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                         </div>
@@ -752,29 +752,30 @@
         const discountInput = document.getElementById('discount');
         const extraDiscountInput = document.getElementById('extra_discount');
 
-        function handleDiscount(inputElement) {
-            const basePrice = parseFloat(total_transaction.value) || 0;
-            let value = parseFloat(inputElement.value.replace(',', '.')) || 0;
+        function calculateVisualTotal() {
+            let grossTotal = parseFloat(total_transaction) || 0;
+            let discVal = parseFloat(discountInput.value.replace(',', '.')) || 0;
+            let extraDiscVal = parseFloat(extraDiscountInput.value.replace(',', '.')) || 0;
 
-            let realDiscount = 0;
-            let percentage = 0;
+            let nomDisc = discVal <= 100 && discVal > 0 ? Math.round(grossTotal * discVal / 100) : discVal;
+            let nomExtraDisc = extraDiscVal <= 100 && extraDiscVal > 0 ? Math.round(grossTotal * extraDiscVal / 100) : extraDiscVal;
 
-            if (value > 100) {
-                realDiscount = value;
-                percentage = basePrice > 0 ? Math.round((value / basePrice) * 100) : 0;
-
-            } else {
-                percentage = value;
-                realDiscount = Math.round((basePrice * value) / 100);
-                document.getElementById('total_price').value = data.total
+            let discInfo = document.getElementById('discount_info');
+            let extraDiscInfo = document.getElementById('extra_discount_info');
+            
+            if (discInfo) {
+                discInfo.textContent = discVal <= 100 && discVal > 0 ? `(Rp ${formatRupiah(nomDisc)})` : '';
+            }
+            if (extraDiscInfo) {
+                extraDiscInfo.textContent = extraDiscVal <= 100 && extraDiscVal > 0 ? `(Rp ${formatRupiah(nomExtraDisc)})` : '';
             }
 
-            console.log(`Input: ${value}, Real Discount: ${realDiscount}, Percentage: ${percentage}%`);
+            let netTotal = grossTotal - nomDisc - nomExtraDisc;
+            document.getElementById('total_price').value = formatRupiah(Math.max(0, netTotal));
+        }
 
-            return {
-                realDiscount,
-                percentage
-            };
+        function handleDiscount(inputElement) {
+            calculateVisualTotal();
         }
 
         function addNewBatch() {
@@ -1147,6 +1148,8 @@
             itemqty = data.quantity;
             itemcontent = data.medicines?.content;
 
+            // Recalculate gross total and update visual total
+            counttotalreceived();
             document.getElementById('qty_received').focus();
         });
         document.getElementById('qty').addEventListener('keydown', function (e) {
@@ -1475,13 +1478,11 @@
             if (pack.checked) {
                 itemtotal = qty * itemcontent * itemprice;
                 total_transaction = itemtotal;
-                document.getElementById('total_price').value = formatRupiah(itemtotal);
             } else {
                 itemtotal = qty * itemprice;
                 total_transaction = itemtotal;
-                document.getElementById('total_price').value = formatRupiah(itemtotal);
-
             }
+            calculateVisualTotal();
         }
 
         function counttotalreceived() {
@@ -1502,15 +1503,11 @@
             if (pack.checked) {
                 itemtotal = qty * itemcontent * itemprice;
                 total_transaction = itemtotal;
-                document.getElementById('total_price').value = formatRupiah(itemtotal);
-
-
             } else {
                 itemtotal = qty * itemprice;
                 total_transaction = itemtotal;
-                document.getElementById('total_price').value = formatRupiah(itemtotal);
-
             }
+            calculateVisualTotal();
         }
 
 
