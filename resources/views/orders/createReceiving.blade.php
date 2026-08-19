@@ -427,7 +427,7 @@
                                 </div>
 
                                 <div class="w-full sm:w-40">
-                                    <div class="py-1 text-[13px] font-bold">Hrg HNA</div>
+                                    <div class="py-1 text-[13px] font-bold">Hrg HNA <span id="box_price_info" class="text-[10px] text-blue-600 font-normal"></span></div>
                                     <input id="item_price" readonly
                                         class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
                                         placeholder="Harga Satuan">
@@ -575,6 +575,50 @@
         let orderItemsTable;
         let selectedRowData = null;
         let selectedRowIndex = null;
+        let itemrawprice = 0;
+        let itemprice = 0;
+        let itemcontent = 1;
+        let itemqty = 0;
+        let itemtotal = 0;
+        let total_transaction = 0;
+        let itempack = 0;
+
+        function updateBoxPriceInfo() {
+            const boxInfo = document.getElementById('box_price_info');
+            if (!boxInfo) return;
+            if (pack.checked && itemcontent > 1 && itemrawprice > 0) {
+                const boxPrice = itemrawprice * itemcontent;
+                boxInfo.textContent = `(Box: Rp ${formatRupiah(boxPrice)})`;
+            } else {
+                boxInfo.textContent = '';
+            }
+        }
+
+        function calculateVisualTotal() {
+            let grossTotal = parseFloat(total_transaction) || 0;
+            let discVal = parseFloat(discount.value.replace(',', '.')) || 0;
+            let extraDiscVal = parseFloat(extra_discount.value.replace(',', '.')) || 0;
+
+            let nomDisc = discVal <= 100 && discVal > 0 ? Math.round(grossTotal * discVal / 100) : discVal;
+            let nomExtraDisc = extraDiscVal <= 100 && extraDiscVal > 0 ? Math.round(grossTotal * extraDiscVal / 100) : extraDiscVal;
+
+            let discInfo = document.getElementById('discount_info');
+            let extraDiscInfo = document.getElementById('extra_discount_info');
+
+            if (discInfo) {
+                discInfo.textContent = discVal <= 100 && discVal > 0 ? `(Rp ${formatRupiah(nomDisc)})` : '';
+            }
+            if (extraDiscInfo) {
+                extraDiscInfo.textContent = extraDiscVal <= 100 && extraDiscVal > 0 ? `(Rp ${formatRupiah(nomExtraDisc)})` : '';
+            }
+
+            let netTotal = grossTotal - nomDisc - nomExtraDisc;
+            document.getElementById('total_price').value = formatRupiah(Math.max(0, netTotal));
+        }
+
+        function handleDiscount(inputElement) {
+            calculateVisualTotal();
+        }
 
         document.addEventListener('DOMContentLoaded', function() {
 
@@ -646,47 +690,17 @@
                 }
 
                 const qtyOrder = parseFloat(document.getElementById('qty').value) || 0;
-
-                function calculateVisualTotal() {
-                    let grossTotal = parseFloat(total_transaction) || 0;
-                    let discVal = parseFloat(discount.value.replace(',', '.')) || 0;
-                    let extraDiscVal = parseFloat(extra_discount.value.replace(',', '.')) || 0;
-
-                    let nomDisc = discVal <= 100 && discVal > 0 ? Math.round(grossTotal * discVal / 100) :
-                        discVal;
-                    let nomExtraDisc = extraDiscVal <= 100 && extraDiscVal > 0 ? Math.round(grossTotal *
-                        extraDiscVal / 100) : extraDiscVal;
-
-                    let discInfo = document.getElementById('discount_info');
-                    let extraDiscInfo = document.getElementById('extra_discount_info');
-
-                    if (discInfo) {
-                        discInfo.textContent = discVal <= 100 && discVal > 0 ?
-                            `(Rp ${formatRupiah(nomDisc)})` : '';
-                    }
-                    if (extraDiscInfo) {
-                        extraDiscInfo.textContent = extraDiscVal <= 100 && extraDiscVal > 0 ?
-                            `(Rp ${formatRupiah(nomExtraDisc)})` : '';
-                    }
-
-                    let netTotal = grossTotal - nomDisc - nomExtraDisc;
-                    document.getElementById('total_price').value = formatRupiah(Math.max(0, netTotal));
-                }
-
-                function handleDiscount(inputElement) {
-                    calculateVisualTotal();
-                }
-
                 let value = parseFloat(this.value) || 0;
 
                 if (value > qtyOrder) {
                     this.value = qtyOrder;
-                    counttotal();
                 }
 
                 if (value < 0) {
                     this.value = 0;
                 }
+
+                counttotalreceived();
             });
 
         });
@@ -709,14 +723,18 @@
             selectedRowIndex = orderItemsTable.row(this).index();
             selectedRowData = data;
 
+            itemcode = data.medicine_id;
+            itemrawprice = parseFloat(data.medicines?.raw_price) || 0;
+            itemcontent = parseFloat(data.medicines?.content) || 1;
+            itemqty = data.quantity;
+
             document.getElementById('medicine_name').value = data.medicines.name ?? '';
             document.getElementById('unit').value = data.medicines.unit ?? '';
             document.getElementById('content').value = data.medicines.content ?? '';
-            document.getElementById('item_price').value = formatRupiah(data.medicines.raw_price);
+            document.getElementById('item_price').value = formatRupiah(itemrawprice);
             document.getElementById('qty').value = data.quantity;
             document.getElementById('medicine_code').value = data.medicines.code;
             document.getElementById('total_price').value = data.total;
-            document.getElementById('qty_received').focus();
             document.getElementById('qty_received').value = data.qty_received ?? '';
             document.getElementById('batch').value = data.receiving_items?.batch ?? '';
             document.getElementById('location').value = data.receiving_items?.location ?? '';
@@ -727,15 +745,15 @@
 
             if (data.pack == "1") {
                 pack.checked = true;
+                itempack = 1;
+            } else {
+                pack.checked = false;
+                itempack = 0;
             }
-            console.log(data.receiving_items?.id ?? '');
-            itemcode = data.medicine_id;
-            itemprice = data.medicines.raw_price;
-            itemqty = data.quantity;
-            itemcontent = data.medicines.content;
 
-            // Recalculate gross total and update visual total
+            updateBoxPriceInfo();
             counttotalreceived();
+            document.getElementById('qty_received').focus();
         });
         document.getElementById('qty').addEventListener('keydown', function(e) {
             if (e.key !== 'Enter') return;
@@ -1005,27 +1023,19 @@
         })
 
         function counttotal() {
-            let qty = parseInt(document.getElementById('qty_received').value) || 0;
-            itemqty = qty;
-
-            if (pack.checked) {
-                itemtotal = qty * itemcontent * itemprice;
-                total_transaction = itemtotal;
-            } else {
-                itemtotal = qty * itemprice;
-                total_transaction = itemtotal;
-            }
-            calculateVisualTotal();
+            counttotalreceived();
         }
 
         function counttotalreceived() {
-            let qty = parseInt(document.getElementById('qty_received').value) || 0;
+            let qty = parseFloat(document.getElementById('qty_received').value) || 0;
             itemqty = qty;
 
             if (pack.checked) {
-                itemtotal = qty * itemcontent * itemprice;
+                itemprice = itemrawprice * itemcontent;
+                itemtotal = qty * itemprice;
                 total_transaction = itemtotal;
             } else {
+                itemprice = itemrawprice;
                 itemtotal = qty * itemprice;
                 total_transaction = itemtotal;
             }
@@ -1042,6 +1052,7 @@
             document.getElementById('total_price').value = '';
             const isActive = document.getElementById('is_active');
             pack.checked = false;
+            itempack = 0;
 
             if (isActive && isActive.checked) {
                 isActive.checked = false;
@@ -1049,11 +1060,15 @@
 
             // reset JS
             itemcode = '';
-            itemprice = '';
-            itemqty = '';
-            itemtotal = '';
+            itemrawprice = 0;
+            itemprice = 0;
+            itemqty = 0;
+            itemcontent = 1;
+            itemtotal = 0;
+            total_transaction = 0;
             itemcreditor = null;
             selectedRowData = null;
+            updateBoxPriceInfo();
             document.getElementById('searchInput').focus();
         }
 
@@ -1137,11 +1152,14 @@
                 order_items_id: order_items_id,
                 order_id: order_id,
                 qty_received: qty_received.value,
+                raw_price: itemprice,
                 discount: discount.value,
+                extra_discount: extra_discount.value,
                 expired_date: expired_date.value,
                 batch: batch.value,
                 location: itemlocation.value,
                 etalase: etalase.value,
+                status: 'Diterima Lengkap',
                 total: total_transaction,
                 factor_payment: factor_payment.value,
                 factor_number: factor_number.value,
@@ -1149,6 +1167,12 @@
                 factor_times: factor_times.value,
                 factor_due: factor_due.value,
                 factor_ppn: factor_ppn.value,
+                invoice_payment: factor_payment.value,
+                invoice_number: factor_number.value,
+                invoice_date: factor_date.value,
+                invoice_times: factor_times.value,
+                invoice_due: factor_due.value,
+                invoice_ppn: factor_ppn.value,
             };
 
             axios.post("{{ route('receiving.addreceivingitem') }}", payload, {

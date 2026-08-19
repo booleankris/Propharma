@@ -608,6 +608,23 @@
             });
         }
 
+        function switchSheetTab(activeIdx) {
+            document.querySelectorAll('.sheet-tab-btn').forEach(function(btn) {
+                var idx = parseInt(btn.dataset.tabIndex);
+                btn.classList.remove('border-slate-800', 'bg-slate-800', 'text-white',
+                                     'border-slate-200', 'bg-slate-50', 'text-slate-600');
+                if (idx === activeIdx) {
+                    btn.classList.add('border-slate-800', 'bg-slate-800', 'text-white');
+                } else {
+                    btn.classList.add('border-slate-200', 'bg-slate-50', 'text-slate-600');
+                }
+            });
+            document.querySelectorAll('.sheet-panel').forEach(function(panel) {
+                var idx = parseInt(panel.dataset.panelIndex);
+                panel.classList.toggle('hidden', idx !== activeIdx);
+            });
+        }
+
         function closePreviewModal() {
             document.getElementById('previewModal').classList.remove('modal-show');
             document.getElementById('previewModal').classList.add('modal-hide');

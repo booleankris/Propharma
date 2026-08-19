@@ -22,6 +22,8 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
     protected $pharmacyAddress;
     protected $shift;
     protected $shiftType;
+    protected $onlineRole;
+    protected $customTitle;
 
     const TYPE_MAP = [
         'KREDIT'      => ['kredit', 'Resep Kredit'],
@@ -47,7 +49,7 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         return is_null($value) || $value === '' ? 0 : $value;
     }
 
-    public function __construct($pharmacyId, $startDate, $endDate, $pharmacyName = 'APOTEK SAHABAT', $pharmacyAddress = '', $shift, $shiftType)
+    public function __construct($pharmacyId, $startDate, $endDate, $pharmacyName = 'APOTEK SAHABAT', $pharmacyAddress = '', $shift = null, $shiftType = 'semua', $onlineRole = null, $customTitle = null)
     {
         $this->pharmacyId      = $pharmacyId;
         $this->startDate       = Carbon::parse($startDate)->startOfDay();
@@ -56,6 +58,8 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         $this->pharmacyAddress = $pharmacyAddress;
         $this->shift           = $shift;
         $this->shiftType       = $shiftType;
+        $this->onlineRole      = $onlineRole;
+        $this->customTitle     = $customTitle;
     }
 
     public function array(): array
@@ -107,14 +111,15 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
 
             $grouped = $this->groupTransactions($transactions);
         } else if ($this->shiftType == 'online') {
+            $roleName = $this->onlineRole ?? 'Online';
             $transactions = MedicineTransactions::with(['transactions', 'user'])
                 ->where('pharmacy_id', $this->pharmacyId)
                 ->where('status', 1)
                 ->whereDate('updated_at', '>=', $this->startDate->toDateString())
                 ->whereDate('updated_at', '<=', $this->endDate->toDateString())
                 ->whereIn('transaction_type', array_keys(self::TYPE_MAP))
-                ->whereHas('user', function ($q) {
-                    $q->role('Online');
+                ->whereHas('user', function ($q) use ($roleName) {
+                    $q->role($roleName);
                 })
                 ->get();
 
@@ -527,6 +532,6 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
 
     public function title(): string
     {
-        return 'LIPH';
+        return $this->customTitle ?? 'LIPH';
     }
 }

@@ -9,6 +9,7 @@ use App\Exports\Report\CategoryExport;
 use App\Exports\Report\DoctorExport;
 use App\Exports\Report\FactoryExport;
 use App\Exports\Report\LiphExport;
+use App\Exports\Report\LiphOnlineExport;
 use App\Exports\Report\MedicineExport;
 use App\Exports\Report\RecipeExport;
 use App\Exports\Report\ReturExport;
@@ -20,6 +21,7 @@ use App\Models\MedicineTransactions;
 use App\Models\Pharmacies;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 use Maatwebsite\Excel\Facades\Excel;
 
 class ReportsController extends Controller
@@ -39,6 +41,22 @@ class ReportsController extends Controller
 
         // mode=preview -> render HTML table, mode anything else (or absent) -> download
         if ($request->mode === 'preview') {
+            // Multi-sheet export (e.g. LiphOnlineExport): build tabs data
+            if ($export instanceof WithMultipleSheets) {
+                $sheets = [];
+                foreach ($export->sheets() as $sheet) {
+                    $title = method_exists($sheet, 'title') ? $sheet->title() : 'Sheet';
+                    $sheets[$title] = $sheet->array();
+                }
+
+                return view('reports.preview', [
+                    'sheets'      => $sheets,
+                    'rows'        => [],
+                    'reportTitle' => $report,
+                    'queryParams' => $request->except('mode'),
+                ]);
+            }
+
             if (!method_exists($export, 'array')) {
                 return response()->json(['status' => 'error', 'message' => 'Preview not supported for this report'], 422);
             }
@@ -61,18 +79,30 @@ class ReportsController extends Controller
         ]);
 
         return match ($report) {
-            'LIPH' => [
-                new LiphExport(
-                    $pharmacy->id,
-                    $request->start_date,
-                    $request->end_date,
-                    $pharmacy->name,
-                    $pharmacy->address,
-                    $request->shift,
-                    $request->shiftType,
-                ),
-                'LIPH_' . $pharmacy->name . '_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx',
-            ],
+            'LIPH' => $request->shiftType === 'online'
+                ? [
+                    new LiphOnlineExport(
+                        $pharmacy->id,
+                        $request->start_date,
+                        $request->end_date,
+                        $pharmacy->name,
+                        $pharmacy->address,
+                        $request->shift,
+                    ),
+                    'LIPH_Online_' . $pharmacy->name . '_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx',
+                ]
+                : [
+                    new LiphExport(
+                        $pharmacy->id,
+                        $request->start_date,
+                        $request->end_date,
+                        $pharmacy->name,
+                        $pharmacy->address,
+                        $request->shift,
+                        $request->shiftType,
+                    ),
+                    'LIPH_' . $pharmacy->name . '_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx',
+                ],
             'Obat' => [
                 new MedicineExport(
                     $pharmacy->id,

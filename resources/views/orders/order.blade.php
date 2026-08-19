@@ -290,7 +290,8 @@
                         </div>
                         <div class="md:col-span-3">
                             <label class="block mb-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Hrg
-                                HNA</label>
+                                HNA <span id="box_price_info"
+                                    class="text-[11px] text-blue-600 font-medium normal-case"></span></label>
                             <div class="relative">
 
                                 <input id="item_price" readonly
@@ -397,7 +398,8 @@
                     <button onclick="printOrder()" id='printorder'
                         class="inline-flex items-center gap-2 rounded-lg btn-pharma !bg-gray-700 !shadow-[0_2px_6px_#374151] px-6 py-4 text-sm font-xl text-white hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2">
                         <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 9V4h12v5M6 18h12v-5H6v5zM6 14h12" />
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M6 9V4h12v5M6 18h12v-5H6v5zM6 14h12" />
                         </svg>
                         Cetak
                     </button>
@@ -522,6 +524,7 @@
         var ordercode = @json($order_code);
         var orderid = @json($order_id);
         let itemcode = '';
+        let itemrawprice = 0;
         let itemprice = '';
         let itemcontent = '';
         let itemqty = '';
@@ -553,60 +556,60 @@
         $('#d_total').val(formatRupiah(d_total));
 
 
-        $('#back').click(function () {
+        $('#back').click(function() {
             window.location.href = "{{ route('receiving.index') }}";
         });
         // Datatable
-        document.addEventListener('DOMContentLoaded', function () {
+        document.addEventListener('DOMContentLoaded', function() {
             loadAllSystemCreditors();
             orderItemsTable = $('#orderItemsTable').DataTable({
                 processing: true,
                 serverSide: true,
                 ajax: {
                     url: "{{ route('orders.orderitems') }}",
-                    data: function (d) {
+                    data: function(d) {
                         d.order_id = orderid;
                     }
                 },
                 columns: [{
-                    data: 'medicines.name',
-                    name: 'medicines.name'
-                },
-                {
-                    data: 'medicines.factory.name',
-                    name: 'medicines.factory.name',
-                    defaultContent: '-'
+                        data: 'medicines.name',
+                        name: 'medicines.name'
+                    },
+                    {
+                        data: 'medicines.factory.name',
+                        name: 'medicines.factory.name',
+                        defaultContent: '-'
 
-                },
-                {
-                    data: 'creditors',
-                    name: 'creditors'
-                },
-                {
-                    data: 'discount',
-                    name: 'discount',
-                    defaultContent: '0%'
-                },
-                {
-                    data: 'medicines.packaging',
-                    name: 'medicines.packaging'
-                },
-                {
-                    data: 'item_price',
-                    name: 'item_price'
-                },
-                {
-                    data: 'quantity',
-                    name: 'quantity'
-                },
-                {
-                    data: 'medicines.stock',
-                    name: 'medicines.stock'
-                },
-                {
-                    data: 'item_total',
-                    name: 'item_total'
-                },
+                    },
+                    {
+                        data: 'creditors',
+                        name: 'creditors'
+                    },
+                    {
+                        data: 'discount',
+                        name: 'discount',
+                        defaultContent: '0%'
+                    },
+                    {
+                        data: 'medicines.packaging',
+                        name: 'medicines.packaging'
+                    },
+                    {
+                        data: 'item_price',
+                        name: 'item_price'
+                    },
+                    {
+                        data: 'quantity',
+                        name: 'quantity'
+                    },
+                    {
+                        data: 'medicines.stock',
+                        name: 'medicines.stock'
+                    },
+                    {
+                        data: 'item_total',
+                        name: 'item_total'
+                    },
                 ],
                 paging: false,
                 searching: false,
@@ -615,7 +618,7 @@
         });
 
         // Table click
-        $('#orderItemsTable').on('click', 'tbody tr', function () {
+        $('#orderItemsTable').on('click', 'tbody tr', function() {
             $('#orderItemsTable tbody tr').removeClass('selected');
             $(this).addClass('selected');
 
@@ -624,44 +627,46 @@
             console.log('ROW SELECTED:', selectedRowData);
         });
 
-        $('#orderItemsTable tbody').on('dblclick', 'tr', function () {
+        $('#orderItemsTable tbody').on('dblclick', 'tr', function() {
             const data = orderItemsTable.row(this).data();
             if (!data) return;
 
             selectedRowIndex = orderItemsTable.row(this).index();
             selectedRowData = data;
 
+            itemcode = data.medicine_id;
+            itemrawprice = parseFloat(data.medicines.raw_price) || 0;
+            itemcontent = parseFloat(data.medicines.content) || 1;
+            itemqty = data.quantity;
+
             // Fill inputs
             document.getElementById('medicine_name').value = data.medicines.name ?? '';
             document.getElementById('unit').value = data.medicines.packaging ?? '';
             document.getElementById('content').value = data.medicines.content ?? '';
-            document.getElementById('item_price').value = formatRupiah(data.medicines.raw_price);
+            document.getElementById('item_price').value = formatRupiah(itemrawprice);
             document.getElementById('qty').value = data.quantity;
             document.getElementById('medicine_code').value = data.medicines.code;
-            document.getElementById('total_price').value = formatRupiah(data.total);
-            console.log(data.creditor_code);
             loadMedicineCreditors(data.medicine_id, data.creditor_code);
 
             if (data.pack == "1") {
                 pack.checked = true;
+                itempack = 1;
+            } else {
+                pack.checked = false;
+                itempack = 0;
             }
-            console.log(data.creditor_code);
 
-            itemcode = data.medicine_id;
-            itemprice = data.medicines.raw_price;
-            itemqty = data.quantity;
-            itemcontent = data.medicines.content;
-            itemtotal = data.total;
-            totalprice = data.total;
+            updateBoxPriceInfo();
+            counttotal();
             document.getElementById('qty').focus();
         });
 
-        document.getElementById('qty').addEventListener('keydown', function (e) {
+        document.getElementById('qty').addEventListener('keydown', function(e) {
             if (e.key !== 'Enter') return;
             e.preventDefault();
             document.getElementById('creditor').focus();
         });
-        document.getElementById('creditor').addEventListener('keydown', function (e) {
+        document.getElementById('creditor').addEventListener('keydown', function(e) {
             if (e.key !== 'Enter') return;
             e.preventDefault();
             if (selectedRowData) {
@@ -685,8 +690,7 @@
         }
 
         function updateItem() {
-            const qty = parseInt(document.getElementById('qty').value);
-            const total = qty * itemprice;
+            counttotal();
             syncMedicineCreditors().then(() => {
 
                 axios.post("{{ route('orders.updateOrderItem') }}", {
@@ -733,7 +737,7 @@
             });
         }
 
-        document.addEventListener('keydown', function (e) {
+        document.addEventListener('keydown', function(e) {
             const isDeleteKey =
                 e.key === 'Delete' ||
                 e.key === 'Del' ||
@@ -823,7 +827,8 @@
                     const tbody = document.getElementById('searchResults');
 
                     if (page === 1 && res.data.length === 0) {
-                        tbody.innerHTML = `
+                        tbody.innerHTML =
+                            `
                                                                                                                                                 <tr>
                                                                                                                                                     <td colspan="4" class="text-center">No data found</td>
                                                                                                                                                 </tr>`;
@@ -832,7 +837,8 @@
                     }
 
                     res.data.forEach((item, index) => {
-                        tbody.insertAdjacentHTML('beforeend', `
+                        tbody.insertAdjacentHTML('beforeend',
+                            `
                                                                                                                                                 <tr 
                                                                                                                                                     data-item='${JSON.stringify(item)}'
                                                                                                                                                     tabindex="0"
@@ -860,7 +866,7 @@
         }
 
         // Nav
-        document.addEventListener('keydown', function (e) {
+        document.addEventListener('keydown', function(e) {
             const dropdown = document.getElementById('searchDropdown');
             if (!dropdown || dropdown.offsetParent === null) return;
 
@@ -918,7 +924,8 @@
                 const pill = document.createElement('span');
                 pill.className =
                     'flex items-center gap-1 bg-blue-100 text-blue-800 text-[12px] font-medium px-2.5 py-1 rounded-full';
-                pill.innerHTML = `
+                pill.innerHTML =
+                    `
                                                                                                                                 ${c.name}
                                                                                                                                 <span class="text-blue-600 font-semibold">${c.discount ?? 0}%</span>
                                                                                                                                 <button type="button" data-code="${c.code}" class="ml-1 text-blue-500 hover:text-red-500 font-bold">&times;</button>
@@ -942,7 +949,7 @@
             if (preselectedCode) select.value = preselectedCode;
         }
 
-        document.getElementById('creditorPillSearch').addEventListener('input', function () {
+        document.getElementById('creditorPillSearch').addEventListener('input', function() {
             const keyword = this.value.toLowerCase().trim();
             const ul = document.getElementById('creditorPillDropdown');
 
@@ -979,7 +986,7 @@
             ul.classList.remove('hidden');
         });
 
-        document.getElementById('creditorPillSearch').addEventListener('blur', function () {
+        document.getElementById('creditorPillSearch').addEventListener('blur', function() {
             setTimeout(() => document.getElementById('creditorPillDropdown').classList.add('hidden'), 150);
         });
 
@@ -1024,7 +1031,7 @@
             document.getElementById('total_retur').value = total.toFixed(0);
         }
         // Hover
-        document.getElementById('searchResults').addEventListener('mouseover', function (e) {
+        document.getElementById('searchResults').addEventListener('mouseover', function(e) {
             const row = e.target.closest('tr');
             if (!row) return;
 
@@ -1036,7 +1043,7 @@
         });
 
         // Click
-        document.getElementById('searchResults').addEventListener('click', function (e) {
+        document.getElementById('searchResults').addEventListener('click', function(e) {
             const row = e.target.closest('tr');
             if (row) {
                 selectRow(row);
@@ -1044,11 +1051,22 @@
             }
         });
 
+        function updateBoxPriceInfo() {
+            const boxInfo = document.getElementById('box_price_info');
+            if (!boxInfo) return;
+            if (pack.checked && itemcontent > 1 && itemrawprice > 0) {
+                const boxPrice = itemrawprice * itemcontent;
+                boxInfo.textContent = `(Hrg Box: ${formatRupiah(boxPrice)})`;
+            } else {
+                boxInfo.textContent = '';
+            }
+        }
+
         // Select
         function selectRow(row) {
             const item = JSON.parse(row.dataset.item);
-            itemprice = item.raw_price;
-            itemcontent = item.content;
+            itemrawprice = parseFloat(item.raw_price) || 0;
+            itemcontent = parseFloat(item.content) || 1;
             itemcreditor = item.creditors_id;
             itemcode = item.id;
 
@@ -1056,11 +1074,14 @@
             document.getElementById('medicine_name').value = item.name ?? '';
             document.getElementById('unit').value = item.packaging ?? '';
             document.getElementById('content').value = item.content ?? '';
-            document.getElementById('item_price').value = formatRupiah(item.raw_price ?? 0);
+            document.getElementById('item_price').value = formatRupiah(itemrawprice);
 
             document.getElementById('searchDropdown').style.display = 'none';
             document.getElementById('searchInput').value = "";
             document.getElementById('creditor').value = "";
+
+            updateBoxPriceInfo();
+            counttotal();
 
             document.getElementById('qty')?.focus();
             loadMedicineCreditors(item.id);
@@ -1076,45 +1097,42 @@
                 });
             }
         }
-        document.addEventListener('click', function (e) {
+        document.addEventListener('click', function(e) {
             const wrapper = document.getElementById('searchWrapper');
             if (!wrapper.contains(e.target)) {
                 document.getElementById('searchDropdown').style.display = 'none';
             }
         }, true);
 
-        pack.addEventListener('change', function () {
+        pack.addEventListener('change', function() {
             if (this.checked) {
                 itempack = 1;
             } else {
                 itempack = 0;
             }
 
+            updateBoxPriceInfo();
             counttotal();
         });
 
-        pack.addEventListener('keydown', function (e) {
+        pack.addEventListener('keydown', function(e) {
             if (e.key === 'Enter') {
                 document.getElementById('qty').focus();
             }
         })
 
         function counttotal() {
-            let qty = document.getElementById('qty').value;
+            let qty = parseFloat(document.getElementById('qty').value) || 0;
             itemqty = qty;
 
             if (pack.checked) {
-                itemtotal = qty * itemcontent * itemprice;
-                total_transaction += itemtotal;
-                document.getElementById('total_price').value = formatRupiah(itemtotal);
-
-            } else {
+                itemprice = itemrawprice * itemcontent;
                 itemtotal = qty * itemprice;
-                total_transaction += itemtotal;
-                document.getElementById('total_price').value = formatRupiah(itemtotal);
-
-
+            } else {
+                itemprice = itemrawprice;
+                itemtotal = qty * itemprice;
             }
+            document.getElementById('total_price').value = formatRupiah(itemtotal);
         }
 
         function resetInputs() {
@@ -1127,6 +1145,7 @@
             document.getElementById('total_price').value = '';
             const isActive = document.getElementById('is_active');
             pack.checked = false;
+            itempack = 0;
 
             if (isActive && isActive.checked) {
                 isActive.checked = false;
@@ -1134,11 +1153,14 @@
 
             // reset JS
             itemcode = '';
+            itemrawprice = 0;
             itemprice = '';
             itemqty = '';
+            itemcontent = 1;
             itemtotal = '';
             itemcreditor = null;
             selectedRowData = null;
+            updateBoxPriceInfo();
             document.getElementById('searchInput').focus();
             resetCreditorPills();
 
@@ -1186,37 +1208,37 @@
         function completeOrder() {
 
             axios.post("{{ route('orders.completeOrder') }}", {
-                order_id: orderid,
-            }, {
-                headers: {
-                    'X-CSRF-TOKEN': document
-                        .querySelector('meta[name="csrf-token"]')
-                        .content
-                }
-            }).then(res => {
-                const data = res.data;
-
-                // SweetAlert
-                Swal.fire({
-                    icon: data.status, // success or error
-                    title: data.status === 'success' ? 'Berhasil' : 'Gagal',
-                    text: data.message,
-                    confirmButtonText: 'OK'
-                }).then(() => {
-                    if (data.redirect) {
-                        window.location.href = data.redirect; // redirect after OK
-                    } else {
-                        // optional fallback: reload table
-                        orderItemsTable.ajax.reload(null, false);
+                    order_id: orderid,
+                }, {
+                    headers: {
+                        'X-CSRF-TOKEN': document
+                            .querySelector('meta[name="csrf-token"]')
+                            .content
                     }
+                }).then(res => {
+                    const data = res.data;
 
-                    // reset inputs only if needed
-                    resetInputs();
-                    selectedRowData = null;
-                    selectedRowIndex = null;
-                });
+                    // SweetAlert
+                    Swal.fire({
+                        icon: data.status, // success or error
+                        title: data.status === 'success' ? 'Berhasil' : 'Gagal',
+                        text: data.message,
+                        confirmButtonText: 'OK'
+                    }).then(() => {
+                        if (data.redirect) {
+                            window.location.href = data.redirect; // redirect after OK
+                        } else {
+                            // optional fallback: reload table
+                            orderItemsTable.ajax.reload(null, false);
+                        }
 
-            })
+                        // reset inputs only if needed
+                        resetInputs();
+                        selectedRowData = null;
+                        selectedRowIndex = null;
+                    });
+
+                })
                 .catch(err => {
                     let message = 'Terjadi kesalahan sistem!';
 
@@ -1340,7 +1362,7 @@
             fetchSmartMedicines(true);
         }, 300));
 
-        document.getElementById('smartList').addEventListener('scroll', function () {
+        document.getElementById('smartList').addEventListener('scroll', function() {
             if (this.scrollTop + this.clientHeight >= this.scrollHeight - 40) {
                 fetchSmartMedicines(false);
             }
@@ -1410,7 +1432,7 @@
                         const checkbox = row.querySelector('.smart-checkbox');
                         const qtyInput = row.querySelector('.smart-qty');
 
-                        checkbox.addEventListener('change', function () {
+                        checkbox.addEventListener('change', function() {
                             qtyInput.classList.toggle('hidden', !this.checked);
                             if (this.checked) {
                                 smartSelected[med.medicine_id] = {
@@ -1423,7 +1445,7 @@
                             updateSmartSelectedCount();
                         });
 
-                        qtyInput.addEventListener('input', function () {
+                        qtyInput.addEventListener('input', function() {
                             if (smartSelected[med.medicine_id]) {
                                 smartSelected[med.medicine_id].quantity = parseInt(this.value) || 1;
                             }

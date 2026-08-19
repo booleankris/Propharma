@@ -481,7 +481,7 @@
 
                         <!-- Hrg HNA -->
                         <div>
-                            <label for="item_price" class="block text-xs font-semibold text-blue-900 mb-1">Harga HNA <span
+                            <label for="item_price" class="block text-xs font-semibold text-blue-900 mb-1">Harga HNA <span id="box_price_info" class="text-[10px] text-blue-600 font-normal"></span> <span
                                     class="text-red-500">*</span></label>
                             <input id="item_price" type="text" placeholder="Rp 0"
                                 class="w-full rounded-xl border border-blue-400 bg-white px-3.5 py-2.5 text-xs text-gray-900 font-bold focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
@@ -699,6 +699,7 @@
         var orderid = @json($receiving_id);
         var order_id = '';
         let itemcode = '';
+        let itemrawprice = 0;
         let itemprice = '';
         let itemcontent = '';
         let itemqty = '';
@@ -712,6 +713,17 @@
         let d_ppn = {{ $d_ppn }};
         let d_total = {{ $d_total }};
         let total_received = '';
+
+        function updateBoxPriceInfo() {
+            const boxInfo = document.getElementById('box_price_info');
+            if (!boxInfo) return;
+            if (pack.checked && itemcontent > 1 && itemrawprice > 0) {
+                const boxPrice = itemrawprice * itemcontent;
+                boxInfo.textContent = `(Box: Rp ${formatRupiah(boxPrice)})`;
+            } else {
+                boxInfo.textContent = '';
+            }
+        }
         // Setting Initial Transaction Value
         $('#d_price').val(formatRupiah(d_price));
         $('#d_ppn').val(formatRupiah(d_ppn));
@@ -1095,6 +1107,11 @@
             document.getElementById('receiving_details_id').value = data.receiving_items?.receiving_details_id ??
                 '';
 
+            itemcode = data.medicine_id;
+            itemrawprice = parseFloat(data.medicines?.raw_price) || 0;
+            itemcontent = parseFloat(data.medicines?.content) || 1;
+            itemqty = data.quantity;
+
             // Safely map medicine data
             document.getElementById('medicine_name').value = data.medicines?.name ?? '';
             document.getElementById('unit').value = data.medicines?.unit ?? '';
@@ -1103,8 +1120,7 @@
 
             document.getElementById('qty').value = data.quantity ?? 0;
             document.getElementById('qty_received').value = data.receiving_items?.qty_received ?? '';
-            document.getElementById('item_price').value = formatRupiah(data.raw_price ?? data.medicines
-                ?.raw_price ?? 0);
+            document.getElementById('item_price').value = formatRupiah(itemrawprice);
             document.getElementById('total_price').value = data.total ?? '';
 
             document.getElementById('batch').value = data.receiving_items?.batch ?? '';
@@ -1119,6 +1135,10 @@
 
             if (data.pack == "1") {
                 pack.checked = true;
+                itempack = 1;
+            } else {
+                pack.checked = false;
+                itempack = 0;
             }
 
             // Only fire the Axios request if a detail_id actually exists
@@ -1143,11 +1163,7 @@
                     .catch(console.error);
             }
 
-            itemcode = data.medicine_id;
-            itemprice = data.raw_price ?? data.medicines?.raw_price ?? 0;
-            itemqty = data.quantity;
-            itemcontent = data.medicines?.content;
-
+            updateBoxPriceInfo();
             // Recalculate gross total and update visual total
             counttotalreceived();
             document.getElementById('qty_received').focus();
@@ -1469,24 +1485,11 @@
         });
 
         function counttotal() {
-            let qty = parseInt(document.getElementById('qty_received').value) || 0;
-            itemqty = qty;
-
-            const qtyOrder = parseFloat(document.getElementById('qty').value) || 0;
-            itemstatus.value = "Diterima Lengkap"
-
-            if (pack.checked) {
-                itemtotal = qty * itemcontent * itemprice;
-                total_transaction = itemtotal;
-            } else {
-                itemtotal = qty * itemprice;
-                total_transaction = itemtotal;
-            }
-            calculateVisualTotal();
+            counttotalreceived();
         }
 
         function counttotalreceived() {
-            let qty = parseInt(document.getElementById('qty_received').value) || 0;
+            let qty = parseFloat(document.getElementById('qty_received').value) || 0;
             itemqty = qty;
 
             const qtyOrder = parseFloat(document.getElementById('qty').value) || 0;
@@ -1501,16 +1504,16 @@
             }
 
             if (pack.checked) {
-                itemtotal = qty * itemcontent * itemprice;
+                itemprice = itemrawprice * itemcontent;
+                itemtotal = qty * itemprice;
                 total_transaction = itemtotal;
             } else {
+                itemprice = itemrawprice;
                 itemtotal = qty * itemprice;
                 total_transaction = itemtotal;
             }
             calculateVisualTotal();
         }
-
-
 
         function addItem() {
             const payload = {
@@ -1520,7 +1523,7 @@
                 order_items_id: order_items_id,
                 order_id: order_id,
                 qty_received: qty_received.value,
-                raw_price: document.getElementById('item_price').value.replace(/[.,]/g, '').replace(/[^\d-]/g, '') || 0,
+                raw_price: itemprice,
                 discount: discount.value,
                 extra_discount: extra_discount.value,
                 expired_date: expired_date.value,

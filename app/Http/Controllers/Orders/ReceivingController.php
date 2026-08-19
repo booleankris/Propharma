@@ -747,20 +747,24 @@ class ReceivingController extends Controller
             $newBatchKey = "{$medicineId}|{$request->batch}|{$request->expired_date}";
             $medicine = Medicines::findOrFail($medicineId);
 
-            if ($oldBatchKey === $newBatchKey) {
-                $delta = $newQty - $oldQty;
+            $isPack = ($item->order_items->pack == 1);
+            $content = $isPack ? (int) ($medicine->content ?? 1) : 1;
+            $oldActualQty = $oldQty * $content;
+            $newActualQty = $newQty * $content;
+            $deltaActual = $newActualQty - $oldActualQty;
 
-                if ($delta != 0) {
+            if ($oldBatchKey === $newBatchKey) {
+                if ($deltaActual != 0) {
                     $qtyBefore = $medicine->stock;
-                    $medicine->increment('stock', $delta);
+                    $medicine->increment('stock', $deltaActual);
 
                     if ($pharmacyId != 1) {
                         $transferItem = MedicineTransferItems::where('receiving_items_id', $item->id)->first();
                         if ($transferItem) {
-                            $transferItem->update(['qty' => $newQty]);
+                            $transferItem->update(['qty' => $newActualQty]);
                         }
                     } else {
-                        Batches::where('id', $item->batches_id)->increment('stock', $delta);
+                        Batches::where('id', $item->batches_id)->increment('stock', $deltaActual);
                     }
 
                     ItemsLog::create([
@@ -768,7 +772,7 @@ class ReceivingController extends Controller
                         'code' => $this->generateItemsLogCode(),
                         'type' => 'RV',
                         'medicine_id' => $medicineId,
-                        'qty' => $delta,
+                        'qty' => $deltaActual,
                         'qty_before' => $qtyBefore,
                         'qty_after' => $medicine->stock,
                         'total' => $request->total,
@@ -780,7 +784,7 @@ class ReceivingController extends Controller
                 }
             } else {
                 $qtyBeforeReverse = $medicine->stock;
-                $medicine->decrement('stock', $oldQty);
+                $medicine->decrement('stock', $oldActualQty);
 
                 $transferHeaderId = null;
                 if ($pharmacyId != 1) {
@@ -790,7 +794,7 @@ class ReceivingController extends Controller
                         $transferItem->delete();
                     }
                 } else {
-                    Batches::where('id', $item->batches_id)->decrement('stock', $oldQty);
+                    Batches::where('id', $item->batches_id)->decrement('stock', $oldActualQty);
                 }
 
                 $newBatch = Batches::firstOrCreate(
@@ -803,7 +807,7 @@ class ReceivingController extends Controller
                     ['status' => 0, 'stock' => 0]
                 );
 
-                $medicine->increment('stock', $newQty);
+                $medicine->increment('stock', $newActualQty);
 
                 if ($pharmacyId != 1) {
                     if (!$transferHeaderId) {
@@ -819,11 +823,11 @@ class ReceivingController extends Controller
                         'batches_id' => $newBatch->id,
                         'receiving_items_id' => $item->id,
                         'etalases_id' => 99,
-                        'qty' => $newQty,
+                        'qty' => $newActualQty,
                         'status' => 1,
                     ]);
                 } else {
-                    $newBatch->increment('stock', $newQty);
+                    $newBatch->increment('stock', $newActualQty);
                 }
 
                 ItemsLog::create([
@@ -831,7 +835,7 @@ class ReceivingController extends Controller
                     'code' => $this->generateItemsLogCode(),
                     'type' => 'RV',
                     'medicine_id' => $medicineId,
-                    'qty' => $newQty - $oldQty,
+                    'qty' => $deltaActual,
                     'qty_before' => $qtyBeforeReverse,
                     'qty_after' => $medicine->stock,
                     'total' => $request->total,
@@ -884,8 +888,12 @@ class ReceivingController extends Controller
             $pharmacyId = getActivePharmacyId();
             $medicine = Medicines::findOrFail($medicineId);
 
+            $isPack = ($item->order_items->pack == 1);
+            $content = $isPack ? (int) ($medicine->content ?? 1) : 1;
+            $actualQty = $item->qty_received * $content;
+
             $qtyBefore = $medicine->stock;
-            $medicine->decrement('stock', $item->qty_received);
+            $medicine->decrement('stock', $actualQty);
 
             if ($pharmacyId != 1) {
                 $transferItem = MedicineTransferItems::where('receiving_items_id', $item->id)->first();
@@ -898,7 +906,7 @@ class ReceivingController extends Controller
                     }
                 }
             } else {
-                Batches::where('id', $item->batches_id)->decrement('stock', $item->qty_received);
+                Batches::where('id', $item->batches_id)->decrement('stock', $actualQty);
             }
 
             ItemsLog::create([
@@ -906,7 +914,7 @@ class ReceivingController extends Controller
                 'code' => $this->generateItemsLogCode(),
                 'type' => 'RV',
                 'medicine_id' => $medicineId,
-                'qty' => -$item->qty_received,
+                'qty' => -$actualQty,
                 'qty_before' => $qtyBefore,
                 'qty_after' => $medicine->stock,
                 'total' => 0,
@@ -1339,9 +1347,14 @@ class ReceivingController extends Controller
 
                 $batch = $existingBatches[$batchKey];
                 $qtyBefore = $medicine->stock;
-                $medicine->stock += $item->qty_received;
 
-                $medicineIncrements[$medicineId] = ($medicineIncrements[$medicineId] ?? 0) + $item->qty_received;
+                $isPack = ($item->order_items->pack == 1);
+                $content = $isPack ? (int) ($medicine->content ?? 1) : 1;
+                $actualStockQty = $item->qty_received * $content;
+
+                $medicine->stock += $actualStockQty;
+
+                $medicineIncrements[$medicineId] = ($medicineIncrements[$medicineId] ?? 0) + $actualStockQty;
                 $receivingItemUpdates[$item->id] = $batch->id;
 
                 if ($pharmacyId != 1) {
@@ -1350,11 +1363,11 @@ class ReceivingController extends Controller
                         'batches_id' => $batch->id,
                         'receiving_items_id' => $item->id,
                         'etalases_id' => 99,
-                        'qty' => $item->qty_received,
+                        'qty' => $actualStockQty,
                         'status' => 1,
                     ]);
                 } else {
-                    Batches::where('id', $batch->id)->increment('stock', $item->qty_received);
+                    Batches::where('id', $batch->id)->increment('stock', $actualStockQty);
                 }
 
                 $itemsLogInserts[] = [
@@ -1362,7 +1375,7 @@ class ReceivingController extends Controller
                     'code' => $this->generateItemsLogCode(),
                     'type' => 'OR',
                     'medicine_id' => $medicineId,
-                    'qty' => $item->qty_received,
+                    'qty' => $actualStockQty,
                     'qty_before' => $qtyBefore,
                     'qty_after' => $medicine->stock,
                     'total' => $item->order_items->total ?? 0,

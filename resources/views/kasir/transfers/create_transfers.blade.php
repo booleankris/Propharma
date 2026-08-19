@@ -68,7 +68,7 @@
                         1</div>
                     <h2 class="text-xs font-bold uppercase tracking-wider text-slate-700">Tujuan Apotek</h2>
                 </div>
-                <div class="max-w-xl">
+                <div class="w-full">
                     <select id="pharmacySelect" onchange="checkSubmit()"
                         class="w-full rounded-lg border border-slate-200 bg-slate-50/50 px-3.5 py-2.5 text-sm text-slate-800 focus:border-sky-500 focus:bg-white focus:ring-4 focus:ring-sky-500/10 outline-none transition">
                         <option value="">— Pilih Tujuan Apotek —</option>
@@ -89,7 +89,7 @@
                 </div>
 
                 <!-- Search Input -->
-                <div class="relative max-w-xl" id="searchWrapper">
+                <div class="relative w-full" id="searchWrapper">
                     <div class="relative">
                         <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none"
                             viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
@@ -104,7 +104,7 @@
 
                     <!-- Search Dropdown -->
                     <div id="searchDropdown"
-                        class="hidden absolute left-0 right-0 top-full mt-1 z-50 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden max-w-xl">
+                        class="hidden absolute left-0 right-0 top-full mt-1 z-50 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden w-full md:w-[78%]">
                         <div
                             class="grid grid-cols-[32px_1fr_1fr_80px] px-4 py-2 bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                             <span>#</span>

@@ -119,9 +119,7 @@
                 @foreach ($invoice->receiving_items as $i => $item)
                     @php
                         $activePrice = $item->raw_price ?? $item->order_items->price;
-                        $isPack = ($item->order_items->pack == 1);
-                        $content = $isPack ? ($item->order_items->medicines->content ?? 1) : 1;
-                        $itemSubtotal = $item->total ?? ($item->qty_received * $activePrice * $content);
+                        $itemSubtotal = $item->total ?? ($item->qty_received * $activePrice);
                         
                         $discVal = $item->discount ?? 0;
                         $extraDiscVal = $item->extra_discount ?? 0;

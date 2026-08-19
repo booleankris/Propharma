@@ -17,8 +17,7 @@
             <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                 <div class="overflow-x-auto rounded-xl border border-gray-200">
                     <table id="revisiTable" class="w-full text-left text-xs text-gray-700">
-                        <thead
-                            class="bg-gray-50 text-[11px] uppercase font-semibold text-gray-600 border-b border-gray-200">
+                        <thead class="bg-gray-50 text-[11px] uppercase font-semibold text-gray-600 border-b border-gray-200">
                             <tr>
                                 <th class="px-4 py-3">Nama Obat</th>
                                 <th class="px-3 py-3 text-center">Batch</th>
@@ -48,7 +47,8 @@
 
                             @foreach ($groupedItems as $nomorTerima => $items)
                                 <tr class="bg-blue-50/50">
-                                    <td colspan="9" class="px-4 py-2 text-xs font-bold text-blue-800 border-b border-blue-100">
+                                    <td colspan="9"
+                                        class="px-4 py-2 text-xs font-bold text-blue-800 border-b border-blue-100">
                                         Nomor Terima: {{ $nomorTerima }}
                                     </td>
                                 </tr>
@@ -60,13 +60,16 @@
                                         <td class="px-3 py-3 text-center">{{ $ri->qty_received }}</td>
                                         <td class="px-4 py-3 text-right">Rp {{ number_format($ri->raw_price, 0, ',', '.') }}
                                         </td>
-                                        <td class="px-3 py-3 text-center">Rp {{ number_format($ri->discount, 0, ',', '.') }}</td>
-                                        <td class="px-3 py-3 text-center">Rp {{ number_format($ri->extra_discount, 0, ',', '.') }}
+                                        <td class="px-3 py-3 text-center">Rp {{ number_format($ri->discount, 0, ',', '.') }}
+                                        </td>
+                                        <td class="px-3 py-3 text-center">Rp
+                                            {{ number_format($ri->extra_discount, 0, ',', '.') }}
                                         </td>
                                         <td class="px-4 py-3 text-right">Rp {{ number_format($ri->total, 0, ',', '.') }}
                                         </td>
                                         <td class="px-3 py-3 text-center">
-                                            <button onclick="editRow(this)" class="text-blue-600 font-semibold">Edit</button>
+                                            <button onclick="editRow(this)"
+                                                class="text-blue-600 font-semibold">Edit</button>
                                             <button onclick="deleteRow({{ $ri->id }})"
                                                 class="text-red-600 font-semibold ml-2">Hapus</button>
                                         </td>
@@ -106,7 +109,7 @@
                                 class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs">
                         </div>
                         <div>
-                            <label class="text-xs font-semibold">Raw Price</label>
+                            <label class="text-xs font-semibold">HNA</label>
                             <input id="edit_raw_price" type="text"
                                 class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs">
                         </div>
@@ -175,7 +178,7 @@
             e.target.value = val ? formatRupiah(val) : '';
         }
 
-        document.getElementById('edit_raw_price').addEventListener('input', function (e) {
+        document.getElementById('edit_raw_price').addEventListener('input', function(e) {
             formatInputRupiah(e);
             recalcEditTotal();
         });
