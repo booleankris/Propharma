@@ -218,8 +218,8 @@ class ReturController extends Controller
             //     $batches->increment('stock', $request->qty_rsetur);
             // }
 
-            $transfer = MedicineTransfers::findOrFail($request->transfer_id);
-            $transfer->stock += $request->qty_retur; // add back to counter stock
+            $transfer = MedicineTransferItems::findOrFail($request->transfer_id);
+            $transfer->qty += $request->qty_retur; // add back to counter stock
             $transfer->save();
 
 
@@ -301,10 +301,13 @@ class ReturController extends Controller
         } catch (\Throwable $e) {
 
             DB::rollBack();
+            
+            \Log::error('Retur Error: ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine());
 
-            return redirect()
-                ->back()
-                ->with('error', 'Gagal menyimpan retur: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal menyimpan retur: ' . $e->getMessage(),
+            ], 500);
         }
     }
     public function getBatchesByMedicine(Request $request)

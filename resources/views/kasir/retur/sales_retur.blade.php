@@ -19,53 +19,139 @@
             overflow: hidden;
             display: none;
         }
-        .dropdown-table table { width: 100%; border-collapse: collapse; font-size: 13px; }
+
+        .dropdown-table table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
         .dropdown-table thead th {
-            position: sticky; top: 0; background: #f9fafb; color: #374151;
-            font-weight: 600; padding: 9px 12px; border-bottom: 1px solid #e5e7eb;
-            text-transform: uppercase; font-size: 11px; letter-spacing: .04em;
+            position: sticky;
+            top: 0;
+            background: #f9fafb;
+            color: #374151;
+            font-weight: 600;
+            padding: 9px 12px;
+            border-bottom: 1px solid #e5e7eb;
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: .04em;
         }
-        .dropdown-table tbody tr { cursor: pointer; transition: background-color .12s; }
+
+        .dropdown-table tbody tr {
+            cursor: pointer;
+            transition: background-color .12s;
+        }
+
         .dropdown-table tbody tr:hover,
-        .dropdown-table tbody tr.active { background-color: #dbeafe; }
-        .dropdown-table td {
-            padding: 9px 12px; border-bottom: 1px solid #f1f5f9;
-            color: #111827; vertical-align: middle;
+        .dropdown-table tbody tr.active {
+            background-color: #dbeafe;
         }
-        .dropdown-table tbody tr:last-child td { border-bottom: none; }
-        .dropdown-table td:first-child { width: 36px; color: #9ca3af; font-size: 12px; }
-        .dropdown-table td:nth-child(4) { font-weight: 600; color: #16a34a; }
-        #tableScroll { max-height: 250px; overflow-y: auto; }
+
+        .dropdown-table td {
+            padding: 9px 12px;
+            border-bottom: 1px solid #f1f5f9;
+            color: #111827;
+            vertical-align: middle;
+        }
+
+        .dropdown-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .dropdown-table td:first-child {
+            width: 36px;
+            color: #9ca3af;
+            font-size: 12px;
+        }
+
+        .dropdown-table td:nth-child(4) {
+            font-weight: 600;
+            color: #16a34a;
+        }
+
+        #tableScroll {
+            max-height: 250px;
+            overflow-y: auto;
+        }
 
         .dataTables_wrapper .top {
-            display: flex !important; justify-content: space-between !important;
-            align-items: center !important; margin-bottom: 12px !important;
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+            margin-bottom: 12px !important;
         }
+
         .dataTables_filter {
             margin-bottom: 10px;
         }
+
         .dataTables_filter input {
-            width: 220px !important; font-size: 12px !important; padding: 6px 10px !important;
-            border-radius: 6px !important; border: 1px solid #d1d5db !important; outline: none !important;
+            width: 220px !important;
+            font-size: 12px !important;
+            padding: 6px 10px !important;
+            border-radius: 6px !important;
+            border: 1px solid #d1d5db !important;
+            outline: none !important;
         }
+
         .dataTables_length select {
-            padding: 6px 28px 6px 12px !important; border-radius: 6px !important; border: 1px solid #d1d5db !important;
+            padding: 6px 28px 6px 12px !important;
+            border-radius: 6px !important;
+            border: 1px solid #d1d5db !important;
         }
+
         #medicineTable thead th {
-            background-color: #f8fafc !important; font-weight: 600 !important;
-            font-size: 11px !important; text-transform: uppercase !important;
-            border-bottom: 2px solid #e5e7eb !important; padding: 10px !important;
+            background-color: #f8fafc !important;
+            font-weight: 600 !important;
+            font-size: 11px !important;
+            text-transform: uppercase !important;
+            border-bottom: 2px solid #e5e7eb !important;
+            padding: 10px !important;
         }
-        #medicineTable tbody td { padding: 12px 10px !important; font-size: 13px !important; vertical-align: middle !important; border-bottom: 1px solid #f1f5f9 !important; }
-        #medicineTable tbody tr { cursor: pointer; transition: background-color 0.15s; }
-        #medicineTable tbody tr:hover { background-color: #f8fafc !important; }
-        #medicineTable tbody tr.active { background-color: #eff6ff !important; border-left: 3px solid #3b82f6 !important; }
-        #medicineTable tbody tr.keyboard-focus { background-color: #eff6ff !important; outline: 2px solid #93c5fd; outline-offset: -2px; }
-        .dataTables_paginate .paginate_button { padding: 5px 10px !important; border-radius: 6px !important; }
-        .text-end { text-align: right !important; }
+
+        #medicineTable tbody td {
+            padding: 12px 10px !important;
+            font-size: 13px !important;
+            vertical-align: middle !important;
+            border-bottom: 1px solid #f1f5f9 !important;
+        }
+
+        #medicineTable tbody tr {
+            cursor: pointer;
+            transition: background-color 0.15s;
+        }
+
+        #medicineTable tbody tr:hover {
+            background-color: #f8fafc !important;
+        }
+
+        #medicineTable tbody tr.active {
+            background-color: #eff6ff !important;
+            border-left: 3px solid #3b82f6 !important;
+        }
+
+        #medicineTable tbody tr.keyboard-focus {
+            background-color: #eff6ff !important;
+            outline: 2px solid #93c5fd;
+            outline-offset: -2px;
+        }
+
+        .dataTables_paginate .paginate_button {
+            padding: 5px 10px !important;
+            border-radius: 6px !important;
+        }
+
+        .text-end {
+            text-align: right !important;
+        }
 
         /* Visual focus ring for retur-input fields */
-        .retur-input:focus { border-color: #3b82f6 !important; box-shadow: 0 0 0 3px rgba(59,130,246,.15) !important; }
+        .retur-input:focus {
+            border-color: #3b82f6 !important;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, .15) !important;
+        }
     </style>
 @endsection
 
@@ -367,7 +453,8 @@
                 (document.getElementById('item_price').value || '0').replace(/[^\d.-]/g, '')
             ) || 0;
 
-            document.getElementById('total_retur').value = $('#price').val() - Math.ceil(((oldQty - returQty) * itemPrice) / 1000) * 1000;
+            document.getElementById('total_retur').value = $('#price').val() - Math.ceil(((oldQty - returQty) * itemPrice) /
+                1000) * 1000;
         }
 
         // ─── Enter key navigation ─────────────────────────────────────────────────────

@@ -330,7 +330,14 @@
                             <div class="flex items-end pb-0.5">
                                 <button type="button" onclick="printSPBCreditor()"
                                     class="inline-flex items-center gap-1.5 px-4 py-2.5 text-[12px] font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm transition-all duration-150">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round">
+                                        <path d="M6 9V2h12v7" />
+                                        <path
+                                            d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                                        <rect x="6" y="14" width="12" height="8" />
+                                    </svg>
                                     Cetak SP PBF Ini
                                 </button>
                             </div>
@@ -381,22 +388,27 @@
 
                                 <div class="w-full sm:w-40">
                                     <div class="py-1 text-[13px] font-bold">QTY Beli</div>
-                                                                <!-- Diskon -->
-                                <div>
-                                    <label for="discount" class="block text-xs font-semibold text-gray-700 mb-1">Diskon
-                                        (%) <span id="discount_info" class="text-[10px] text-gray-500 font-normal"></span></label>
-                                    <input id="discount" value="0" type="number" placeholder="0" oninput="handleDiscount(this)"
-                                        class="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-xs text-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                                </div>
+                                    <!-- Diskon -->
+                                    <div>
+                                        <label for="discount"
+                                            class="block text-xs font-semibold text-gray-700 mb-1">Diskon
+                                            (%) <span id="discount_info"
+                                                class="text-[10px] text-gray-500 font-normal"></span></label>
+                                        <input id="discount" value="0" type="number" placeholder="0"
+                                            oninput="handleDiscount(this)"
+                                            class="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-xs text-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    </div>
 
-                                <!-- Ekstra Diskon -->
-                                <div>
-                                    <label for="extra_discount"
-                                        class="block text-xs font-semibold text-gray-700 mb-1">Ex. Diskon
-                                        (%) <span id="extra_discount_info" class="text-[10px] text-gray-500 font-normal"></span></label>
-                                    <input id="extra_discount" value="0" type="number" required oninput="handleDiscount(this)"
-                                        class="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-xs text-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                                </div>
+                                    <!-- Ekstra Diskon -->
+                                    <div>
+                                        <label for="extra_discount"
+                                            class="block text-xs font-semibold text-gray-700 mb-1">Ex. Diskon
+                                            (%) <span id="extra_discount_info"
+                                                class="text-[10px] text-gray-500 font-normal"></span></label>
+                                        <input id="extra_discount" value="0" type="number" required
+                                            oninput="handleDiscount(this)"
+                                            class="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-xs text-gray-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    </div>
                                     <input id="qty" type="number" readonly name="qty"
                                         class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
                                         placeholder="QTY Retur" oninput="counttotal()">
@@ -565,7 +577,7 @@
         let selectedRowIndex = null;
 
         document.addEventListener('DOMContentLoaded', function() {
-       
+
             // SELECT2
             $('#factor_payment').select2({
                 placeholder: 'Pilih Pembayaran...',
@@ -634,32 +646,36 @@
                 }
 
                 const qtyOrder = parseFloat(document.getElementById('qty').value) || 0;
-                
-        function calculateVisualTotal() {
-            let grossTotal = parseFloat(total_transaction) || 0;
-            let discVal = parseFloat(discount.value.replace(',', '.')) || 0;
-            let extraDiscVal = parseFloat(extra_discount.value.replace(',', '.')) || 0;
 
-            let nomDisc = discVal <= 100 && discVal > 0 ? Math.round(grossTotal * discVal / 100) : discVal;
-            let nomExtraDisc = extraDiscVal <= 100 && extraDiscVal > 0 ? Math.round(grossTotal * extraDiscVal / 100) : extraDiscVal;
+                function calculateVisualTotal() {
+                    let grossTotal = parseFloat(total_transaction) || 0;
+                    let discVal = parseFloat(discount.value.replace(',', '.')) || 0;
+                    let extraDiscVal = parseFloat(extra_discount.value.replace(',', '.')) || 0;
 
-            let discInfo = document.getElementById('discount_info');
-            let extraDiscInfo = document.getElementById('extra_discount_info');
-            
-            if (discInfo) {
-                discInfo.textContent = discVal <= 100 && discVal > 0 ? `(Rp ${formatRupiah(nomDisc)})` : '';
-            }
-            if (extraDiscInfo) {
-                extraDiscInfo.textContent = extraDiscVal <= 100 && extraDiscVal > 0 ? `(Rp ${formatRupiah(nomExtraDisc)})` : '';
-            }
+                    let nomDisc = discVal <= 100 && discVal > 0 ? Math.round(grossTotal * discVal / 100) :
+                        discVal;
+                    let nomExtraDisc = extraDiscVal <= 100 && extraDiscVal > 0 ? Math.round(grossTotal *
+                        extraDiscVal / 100) : extraDiscVal;
 
-            let netTotal = grossTotal - nomDisc - nomExtraDisc;
-            document.getElementById('total_price').value = formatRupiah(Math.max(0, netTotal));
-        }
+                    let discInfo = document.getElementById('discount_info');
+                    let extraDiscInfo = document.getElementById('extra_discount_info');
 
-        function handleDiscount(inputElement) {
-            calculateVisualTotal();
-        }
+                    if (discInfo) {
+                        discInfo.textContent = discVal <= 100 && discVal > 0 ?
+                            `(Rp ${formatRupiah(nomDisc)})` : '';
+                    }
+                    if (extraDiscInfo) {
+                        extraDiscInfo.textContent = extraDiscVal <= 100 && extraDiscVal > 0 ?
+                            `(Rp ${formatRupiah(nomExtraDisc)})` : '';
+                    }
+
+                    let netTotal = grossTotal - nomDisc - nomExtraDisc;
+                    document.getElementById('total_price').value = formatRupiah(Math.max(0, netTotal));
+                }
+
+                function handleDiscount(inputElement) {
+                    calculateVisualTotal();
+                }
 
                 let value = parseFloat(this.value) || 0;
 
@@ -717,7 +733,7 @@
             itemprice = data.medicines.raw_price;
             itemqty = data.quantity;
             itemcontent = data.medicines.content;
-            
+
             // Recalculate gross total and update visual total
             counttotalreceived();
         });

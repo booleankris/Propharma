@@ -50,7 +50,7 @@ class ReturDataController extends Controller
 
             // 3. Apply pharmacy_id filter inside the subquery
             if ($pharmacyId) {
-                $sub->where('items_log.pharmacy_id', $pharmacyId);
+                $sub->where('medicine_transactions.pharmacy_id', $pharmacyId);
             }
 
             // ======================
