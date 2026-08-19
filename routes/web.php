@@ -148,12 +148,7 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
 
     Route::resource('sales', SalesController::class);
 
-    // Route::get('/transaction', [SalesController::class, 'index'])->name('transaction');
-    Route::get('/debug-items-log', function() {
-        return \App\Models\ItemsLog::orderBy('id', 'desc')->take(5)->get();
-    });
-
-    // Create New Retur Transaction
+    // Initiate New Transaction
     Route::post('/createtransaction/', [SalesController::class, 'createTransaction'])->name('transaction.createnew');
     Route::post('/addtocart', [SalesController::class, 'addToCart'])
         ->name('transaction.addToCart');

@@ -18,9 +18,7 @@ class ReturDataController extends Controller
             $parsedDate = $this->parseDate($search);
             $startDate = $request->input('start_date');
             $endDate = $request->input('end_date');
-            $pharmacyId = $request->input('pharmacy_id'); // 1. Capture pharmacy_id from request
-
-
+            $pharmacyId = getActivePharmacyId();
 
             // ======================
             // SUB QUERY
@@ -29,6 +27,7 @@ class ReturDataController extends Controller
                 ->leftJoin('medicines', 'medicines.id', '=', 'items_log.medicine_id')
                 ->leftJoin('medicine_transactions', 'medicine_transactions.transaction_code', '=', 'items_log.transaction_code')
                 ->leftJoin('patients', 'patients.id', '=', 'medicine_transactions.patient_id')
+                ->leftJoin('receiving', 'receiving.code', '=', 'items_log.transaction_code')
                 ->whereIn('items_log.status', [3, 4])
                 ->select([
                     'items_log.id',
@@ -36,7 +35,7 @@ class ReturDataController extends Controller
                     'items_log.qty',
                     'items_log.total',
                     'items_log.created_at',
-                    'medicine_transactions.pharmacy_id',
+                    DB::raw('COALESCE(medicine_transactions.pharmacy_id, receiving.pharmacy_id) as pharmacy_id'),
                     'medicines.name  as medicine_name',
                     'patients.name   as patient_name',
 
@@ -48,9 +47,12 @@ class ReturDataController extends Controller
                     "),
                 ]);
 
-            // 3. Apply pharmacy_id filter inside the subquery
+            // Apply active pharmacy filter
             if ($pharmacyId) {
-                $sub->where('medicine_transactions.pharmacy_id', $pharmacyId);
+                $sub->where(function ($q) use ($pharmacyId) {
+                    $q->where('medicine_transactions.pharmacy_id', $pharmacyId)
+                        ->orWhere('receiving.pharmacy_id', $pharmacyId);
+                });
             }
 
             // ======================
