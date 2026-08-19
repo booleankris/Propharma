@@ -90,7 +90,7 @@ class SuppliesController extends Controller
                 'batches',                              // Fetch batches for batch name display
                 'receiving.receiving_details.creditor', // Fetch creditor through receiving details
                 'medicine_transaction.user'             // Fetch cashier user through transactions
-            ])->whereNotIn('status', [5, 6, 7]);
+            ])->whereNotIn('status', [5, 6]);
 
             // 5. RETURN DATATABLES RESPONSE
             return DataTables::eloquent($items)
