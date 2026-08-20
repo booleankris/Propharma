@@ -95,12 +95,15 @@ class OrdersController extends Controller
             $last = Order::where('pharmacy_id', getActivePharmacyId())
                 ->where('status', '0')
                 ->first();
+            
+            $now = Carbon::now()->format('d/m/Y');
+            $last->update(['date' => $now]);
+
             $d_price = OrderItems::where('order_id', $last->id)->where('status', '0')->sum('total') ?? '';
             $d_ppn = $d_price * 0.11 ?? '';
             $d_total = $d_price + $d_ppn ?? '';
             $order_id = $last->id;
             $order_code = $last->code;
-            $now = $last->date;
 
             return view('orders.order', compact('order_code', 'now', 'd_price', 'd_ppn', 'd_total', 'order_id'));
         } else {
@@ -427,11 +430,11 @@ class OrdersController extends Controller
                 ], 422);
             }
 
+            $now = now()->format('d/m/Y');
             $order->update([
                 'status' => 1,
+                'date' => $now,
             ]);
-
-            $now = now()->format('d/m/Y');
             $year = now()->format('y');
             $month = now()->format('m');
             $prefix = $year . $month . 'RE';
