@@ -60,7 +60,7 @@ class DoctorExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
             ->where('pharmacy_id', $this->pharmacyId)
             ->whereIn('transaction_type', ['RESEP TUNAI', 'KREDIT'])
             ->where('status', 1)
-            ->whereBetween('created_at', [$this->startDate, $this->endDate]);
+            ->whereBetween('updated_at', [$this->startDate, $this->endDate]);
    
 
         $transactions = $query->get();
@@ -106,7 +106,7 @@ class DoctorExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
             ->whereIn('transaction_type', ['RESEP TUNAI', 'KREDIT'])
             ->where('status', 1)
             ->where('doctor_id', $this->doctorId)
-            ->whereBetween('created_at', [$this->startDate, $this->endDate])
+            ->whereBetween('updated_at', [$this->startDate, $this->endDate])
             ->get();
 
         $rows   = [];

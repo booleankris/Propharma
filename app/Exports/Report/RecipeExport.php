@@ -32,13 +32,14 @@ class RecipeExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
     public function array(): array
     {
         $pharmacy  = \App\Models\Pharmacies::find($this->pharmacyId);
-        $shift     = \App\Models\Shifts::findOrFail($this->shift);
+        $shift     = $this->shift ? \App\Models\Shifts::find($this->shift) : null;
+        $shiftLabel = $shift ? 'Shift ' . ucfirst(strtolower($shift->name)) : 'Semua Shift';
 
         $header = [
             [$pharmacy->name ?? 'APOTEK'],
             [$pharmacy->address ?? ''],
             [''],
-            ['Laporan Daftar Resep (Shift ' . ucfirst(strtolower($shift->name)) . ')'],
+            ['Laporan Daftar Resep (' . $shiftLabel . ')'],
             ['Tanggal : ' . $this->startDate->format('d/m/Y') . ' s/d ' . $this->endDate->format('d/m/Y')],
             [''],
         ];
@@ -50,15 +51,19 @@ class RecipeExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
 
     private function buildBody(): array
     {
-        $transactions = MedicineTransactions::with(['doctors', 'patients', 'shift_logs.shift'])
+        $query = MedicineTransactions::with(['doctors', 'patients', 'shift_logs.shift'])
             ->where('pharmacy_id', $this->pharmacyId)
             ->whereIn('transaction_type', ['RESEP TUNAI', 'KREDIT'])
             ->where('status', 1)
-            ->whereHas('shift_logs', function ($q) {
+            ->whereBetween('updated_at', [$this->startDate, $this->endDate]);
+
+        if ($this->shiftType === 'shift' && !empty($this->shift)) {
+            $query->whereHas('shift_logs', function ($q) {
                 $q->where('shift_id', $this->shift);
-            })
-            ->whereBetween('created_at', [$this->startDate, $this->endDate])
-            ->get();
+            });
+        }
+
+        $transactions = $query->get();
 
         $rows   = [];
         $rows[] = ['No.', 'Tanggal', 'No. Resep', 'Layanan', 'Dokter', 'Pasien', 'Netto', 'Shift'];

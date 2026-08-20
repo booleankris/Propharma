@@ -36,7 +36,7 @@ class FactoryExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
         $transactions = MedicineTransactions::with(['transactions.medicine.factory'])
             ->where('pharmacy_id', $this->pharmacyId)
             ->where('status', 1)
-            ->whereBetween('created_at', [$this->startDate, $this->endDate])
+            ->whereBetween('updated_at', [$this->startDate, $this->endDate])
             ->get();
 
         $pharmacy = \App\Models\Pharmacies::find($this->pharmacyId);

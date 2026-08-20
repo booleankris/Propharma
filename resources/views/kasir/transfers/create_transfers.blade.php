@@ -566,24 +566,57 @@
 
         // ── Keyboard nav / outside click ─────────────────────────────────
         $(document).ready(function() {
-            document.getElementById('searchInput').addEventListener('keydown', function(e) {
+            const searchInputEl = document.getElementById('searchInput');
+            const stageQtyEl = document.getElementById('stageQty');
+            const stageEtalaseEl = document.getElementById('stageEtalase');
+
+            // Search input: Arrow/Enter for dropdown nav, Enter to jump to qty if batch staged & dropdown closed
+            searchInputEl.addEventListener('keydown', function(e) {
                 const rows = document.querySelectorAll('#searchResults .dropdown-row');
                 const dropdown = document.getElementById('searchDropdown');
-                if (dropdown.classList.contains('hidden') || !rows.length) return;
+                const dropdownVisible = !dropdown.classList.contains('hidden') && rows.length;
 
-                if (e.key === 'ArrowDown') {
+                if (dropdownVisible) {
+                    if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        activeIdx = Math.min(activeIdx + 1, rows.length - 1);
+                        updateActive(rows);
+                    } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        activeIdx = Math.max(activeIdx - 1, 0);
+                        updateActive(rows);
+                    } else if (e.key === 'Enter' && activeIdx >= 0) {
+                        e.preventDefault();
+                        selectBatch(rows[activeIdx]);
+                    } else if (e.key === 'Escape') {
+                        hideDropdown();
+                    }
+                } else if (e.key === 'Enter') {
                     e.preventDefault();
-                    activeIdx = Math.min(activeIdx + 1, rows.length - 1);
-                    updateActive(rows);
-                } else if (e.key === 'ArrowUp') {
+                    // If batch already staged, jump to qty field
+                    if (stagedBatch) {
+                        stageQtyEl.focus();
+                        stageQtyEl.select();
+                    }
+                }
+            });
+
+            // stageQty: Enter → jump to etalase select
+            stageQtyEl.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
                     e.preventDefault();
-                    activeIdx = Math.max(activeIdx - 1, 0);
-                    updateActive(rows);
-                } else if (e.key === 'Enter' && activeIdx >= 0) {
+                    stageEtalaseEl.focus();
+                }
+            });
+
+            // stageEtalase: Enter → trigger addItemToCart if valid
+            stageEtalaseEl.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
                     e.preventDefault();
-                    selectBatch(rows[activeIdx]);
-                } else if (e.key === 'Escape') {
-                    hideDropdown();
+                    const addBtn = document.getElementById('addItemBtn');
+                    if (!addBtn.disabled) {
+                        addItemToCart();
+                    }
                 }
             });
 
@@ -733,6 +766,10 @@
             if (stagedBatch) {
                 renderEtalaseOptions(document.getElementById('stageEtalase'), '');
                 checkAddItemBtn();
+            }
+            // After picking pharmacy, focus search input for next step
+            if (document.getElementById('pharmacySelect').value !== '') {
+                document.getElementById('searchInput').focus();
             }
         }
 

@@ -34,7 +34,7 @@ class CategoryExport implements FromArray, WithStyles, WithColumnWidths, WithTit
         $transactions = MedicineTransactions::with(['transactions.medicine.category'])
             ->where('pharmacy_id', $this->pharmacyId)
             ->where('status', 1)
-            ->whereBetween('created_at', [$this->startDate, $this->endDate])
+            ->whereBetween('updated_at', [$this->startDate, $this->endDate])
             ->get();
 
         $pharmacy = \App\Models\Pharmacies::find($this->pharmacyId);
