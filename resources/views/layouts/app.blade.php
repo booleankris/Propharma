@@ -46,12 +46,12 @@
     </script>
 
     <script>
-        $(document).ready(function () {
+        $(document).ready(function() {
             initFactorySelect();
             initDoctorSelect();
         });
         // Sales Report Onpage load (Starting point)
-        document.addEventListener("DOMContentLoaded", function () {
+        document.addEventListener("DOMContentLoaded", function() {
 
             const activeBtn = document.querySelector('.report-btn[data-active="true"]');
 
@@ -75,10 +75,10 @@
 
 
         });
-        $('#factory').on('change', function () {
+        $('#factory').on('change', function() {
             console.log('Selected factory:', $(this).val());
         });
-        $('#doctor').on('change', function () {
+        $('#doctor').on('change', function() {
             console.log('Selected doctor:', $(this).val());
         });
         var selectedReport = "LIPH";
@@ -133,7 +133,7 @@
             });
         });
         const backdrop = document.getElementById('modalBackdrop');
-        window.openModal = function (id) {
+        window.openModal = function(id) {
             const modal = document.getElementById(id);
             if (!modal) return;
             modal.classList.remove('modal-hide');
@@ -148,7 +148,7 @@
                 setTimeout(() => initOrderSupplierSelect(), 100);
             }
         };
-        window.closeModals = function () {
+        window.closeModals = function() {
             document.querySelectorAll('.modal-show').forEach(modal => {
                 modal.classList.remove('modal-show');
                 modal.classList.add('modal-hide');
@@ -171,7 +171,7 @@
             target.classList.toggle('hidden');
         }
 
-        document.addEventListener('click', function (e) {
+        document.addEventListener('click', function(e) {
             ['notif-modal', 'expiry-modal'].forEach(id => {
                 const modal = document.getElementById(id);
                 if (!modal) return;
@@ -205,7 +205,7 @@
                 document.getElementById('type_filter').style.display = 'none';
                 document.getElementById('factory-select').style.display = 'none';
                 document.getElementById('doctor-select').style.display = 'none';
-                
+
                 if (document.getElementById('btn-online')) {
                     document.getElementById('btn-online').style.display = 'flex';
                 }
@@ -266,7 +266,7 @@
             } else {
                 document.getElementById('type_filter').style.display = 'none';
             }
-            
+
             if (selectedReport !== "LIPH" && document.getElementById('btn-online')) {
                 document.getElementById('btn-online').style.display = 'none';
                 if (selectedShiftType === 'online') {
@@ -284,7 +284,7 @@
             const shiftSel = document.getElementById('shift-select');
 
             [btnSemua, btnShift, btnOnline].forEach(btn => {
-                if(btn) {
+                if (btn) {
                     btn.classList.remove('border-slate-800', 'bg-slate-800', 'text-white');
                     btn.classList.add('border-slate-200', 'bg-slate-50', 'text-slate-600');
                 }
@@ -337,7 +337,8 @@
                     document.getElementById('previewModal').classList.add('modal-show');
 
                     // Update download button inside modal to trigger the sales report download instead
-                    const modalDownloadBtn = document.querySelector('#previewModal button[onclick="getOrderReport(\\\'download\\\')"]');
+                    const modalDownloadBtn = document.querySelector(
+                        '#previewModal button[onclick="getOrderReport(\\\'download\\\')"]');
                     if (modalDownloadBtn) {
                         // Change it to use getReport for sales reports
                         modalDownloadBtn.setAttribute('onclick', "getReport('download')");
@@ -345,7 +346,11 @@
                 }
             }).catch((err) => {
                 if (err.response && err.response.data && err.response.data.message) {
-                    iziToast.error({ title: 'Error', message: err.response.data.message, position: 'topRight' });
+                    iziToast.error({
+                        title: 'Error',
+                        message: err.response.data.message,
+                        position: 'topRight'
+                    });
                 } else {
                     console.log(err);
                 }
@@ -443,7 +448,7 @@
             },
         };
         // Order Initial Setup
-        document.addEventListener("DOMContentLoaded", function () {
+        document.addEventListener("DOMContentLoaded", function() {
             initOrderSupplierSelect();
 
             // Set initial state based on data-active button
@@ -599,7 +604,11 @@
                 }
             }).catch((err) => {
                 if (err.response && err.response.data && err.response.data.message) {
-                    iziToast.error({ title: 'Error', message: err.response.data.message, position: 'topRight' });
+                    iziToast.error({
+                        title: 'Error',
+                        message: err.response.data.message,
+                        position: 'topRight'
+                    });
                 } else {
                     console.error(err);
                 }
@@ -612,7 +621,7 @@
             document.querySelectorAll('.sheet-tab-btn').forEach(function(btn) {
                 var idx = parseInt(btn.dataset.tabIndex);
                 btn.classList.remove('border-slate-800', 'bg-slate-800', 'text-white',
-                                     'border-slate-200', 'bg-slate-50', 'text-slate-600');
+                    'border-slate-200', 'bg-slate-50', 'text-slate-600');
                 if (idx === activeIdx) {
                     btn.classList.add('border-slate-800', 'bg-slate-800', 'text-white');
                 } else {
@@ -729,7 +738,7 @@
         }
 
         // Attach once DOM is ready
-        document.addEventListener('DOMContentLoaded', function () {
+        document.addEventListener('DOMContentLoaded', function() {
             const searchInput = document.getElementById('searchInput');
             if (searchInput) {
                 searchInput.addEventListener('keyup', filterItems);
@@ -784,7 +793,7 @@
     @endif
 
     <script>
-        $(document).ready(function () {
+        $(document).ready(function() {
 
             // JS
             new Swiper('.productSwiper', {

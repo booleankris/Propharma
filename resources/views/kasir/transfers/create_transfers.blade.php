@@ -69,8 +69,8 @@
                     <h2 class="text-xs font-bold uppercase tracking-wider text-slate-700">Tujuan Apotek</h2>
                 </div>
                 <div class="w-full">
-                    <select id="pharmacySelect" onchange="checkSubmit()"
-                        class="w-full rounded-lg border border-slate-200 bg-slate-50/50 px-3.5 py-2.5 text-sm text-slate-800 focus:border-sky-500 focus:bg-white focus:ring-4 focus:ring-sky-500/10 outline-none transition">
+                    <select id="pharmacySelect" onchange="onPharmacyChange()"
+                        class="w-full rounded-lg font-nunito-bold border border-slate-200 bg-slate-50/50 px-3.5 py-2.5 text-sm text-slate-800 focus:border-sky-500 focus:bg-white focus:ring-4 focus:ring-sky-500/10 outline-none transition">
                         <option value="">— Pilih Tujuan Apotek —</option>
                         @foreach ($pharmacies as $pharmacy)
                             <option value="{{ $pharmacy->id }}">{{ $pharmacy->name }}</option>
@@ -120,8 +120,7 @@
                 </div>
 
                 <!-- Staged Batch Card -->
-                <div id="stagingCard"
-                    class="hidden mt-4 p-4 rounded-xl bg-sky-50/40 border border-sky-200/60 max-w-xl space-y-4">
+                <div id="stagingCard" class="hidden mt-4 p-4 rounded-xl bg-sky-50/40 border border-sky-200/60 space-y-4">
                     <div class="flex items-center justify-between">
                         <div>
                             <span class="text-[10px] uppercase font-bold text-sky-600 tracking-wider">Batch Terpilih</span>
@@ -135,15 +134,15 @@
                     <div class="grid grid-cols-3 gap-2">
                         <div class="bg-white p-2.5 rounded-lg border border-slate-200/60">
                             <div class="text-[10px] font-bold uppercase text-slate-400">Nama Obat</div>
-                            <div class="text-xs font-semibold text-slate-800 mt-0.5 truncate" id="stageMedName">—</div>
+                            <div class="text-xs font-nunito-bold mt-0.5 truncate" id="stageMedName">—</div>
                         </div>
                         <div class="bg-white p-2.5 rounded-lg border border-slate-200/60">
                             <div class="text-[10px] font-bold uppercase text-slate-400">Satuan</div>
-                            <div class="text-xs font-semibold font-mono text-slate-800 mt-0.5" id="stageUnit">—</div>
+                            <div class="text-xs font-nunito-bold text-slate-800 mt-0.5" id="stageUnit">—</div>
                         </div>
                         <div class="bg-white p-2.5 rounded-lg border border-slate-200/60">
                             <div class="text-[10px] font-bold uppercase text-slate-400">Stok</div>
-                            <div class="text-xs font-bold font-mono text-emerald-600 mt-0.5" id="stageStock">—</div>
+                            <div class="text-xs font-nunito-bold text-emerald-600 mt-0.5" id="stageStock">—</div>
                         </div>
                     </div>
 
@@ -219,6 +218,7 @@
                             <tr>
                                 <th class="py-3 px-4">Batch</th>
                                 <th class="py-3 px-4">Obat</th>
+                                <th class="py-3 px-4">Satuan</th>
                                 <th class="py-3 px-4">Stok</th>
                                 <th class="py-3 px-4 w-28">Qty</th>
                                 <th class="py-3 px-4 w-48">Etalase</th>
@@ -227,7 +227,7 @@
                         </thead>
                         <tbody id="cartBody" class="divide-y divide-slate-100 text-slate-700">
                             <tr id="cartEmptyRow">
-                                <td colspan="6" class="py-10 text-center text-slate-400 text-xs">Belum ada item
+                                <td colspan="7" class="py-10 text-center text-slate-400 text-xs">Belum ada item
                                     ditambahkan</td>
                             </tr>
                         </tbody>
@@ -300,7 +300,8 @@
         let hasMore = true;
         let activeIdx = -1;
         let stagedBatch = null; // batch just picked, not yet added to cart
-        let cartItems = []; // {batches_id, batchName, medName, unit, stock, qty, etalases_id, etalasesName}
+        const CART_KEY = 'transfer_cart_{{ auth()->id() ?? 0 }}_{{ getActivePharmacyId() ?? 0 }}';
+        let cartItems = JSON.parse(localStorage.getItem(CART_KEY)) || []; // {batches_id, batchName, medName, unit, stock, qty, etalases_id, etalasesName}
         let etalaseList = []; // {id, name}
 
         // ── Search ────────────────────────────────────────────────────────
@@ -352,7 +353,7 @@
                         row.innerHTML = `
                             <span class="font-mono text-slate-400 text-[10px]">${((page - 1) * (res.per_page || 10)) + i + 1}</span>
                             <span class="font-medium text-slate-700 truncate pr-2">${item.batches_name ?? '—'}</span>
-                            <span class="text-slate-500 truncate pr-2">${item.name ?? '—'}</span>
+                            <span class="font-nunito-bold text-[#010741] truncate pr-2">${item.name ?? '—'}</span>
                             <span class="text-right"><span class="inline-flex items-center px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 font-mono text-[11px] font-semibold">${item.stock ?? 0}</span></span>
                         `;
                         row.addEventListener('click', () => selectBatch(row));
@@ -439,6 +440,10 @@
         }
 
         // ── Cart ──────────────────────────────────────────────────────────
+        function saveCart() {
+            localStorage.setItem(CART_KEY, JSON.stringify(cartItems));
+        }
+
         function addItemToCart() {
             const qty = parseInt(document.getElementById('stageQty').value) || 0;
             const etSelect = document.getElementById('stageEtalase');
@@ -463,9 +468,13 @@
                 etalasesName: etName,
             });
 
+            saveCart();
             clearStaging();
             renderCart();
             checkSubmit();
+            
+            // Refocus search input for next item
+            document.getElementById('searchInput').focus();
         }
 
         function renderCart() {
@@ -474,7 +483,7 @@
 
             if (cartItems.length === 0) {
                 body.innerHTML =
-                    `<tr id="cartEmptyRow"><td colspan="6" class="py-10 text-center text-slate-400 text-xs">Belum ada item ditambahkan</td></tr>`;
+                    `<tr id="cartEmptyRow"><td colspan="7" class="py-10 text-center text-slate-400 text-xs">Belum ada item ditambahkan</td></tr>`;
                 return;
             }
 
@@ -485,6 +494,7 @@
                 tr.innerHTML = `
                     <td class="py-3 px-4 font-semibold text-slate-800">${it.batchName}</td>
                     <td class="py-3 px-4 text-slate-600">${it.medName}</td>
+                    <td class="py-3 px-4 text-slate-600">${it.unit}</td>
                     <td class="py-3 px-4"><span class="inline-flex items-center px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 font-mono text-[11px] font-semibold">${it.stock}</span></td>
                     <td class="py-3 px-4">
                         <input type="number" class="w-20 px-2 py-1 bg-white border border-slate-200 rounded text-xs font-mono text-slate-800 outline-none focus:border-sky-500" min="1" max="${it.stock}" value="${it.qty}" data-idx="${idx}" onchange="updateCartQty(this)">
@@ -521,6 +531,7 @@
 
             input.value = val;
             item.qty = val;
+            saveCart();
             checkSubmit();
         }
 
@@ -528,11 +539,13 @@
             const idx = parseInt(select.dataset.idx);
             cartItems[idx].etalases_id = select.value;
             cartItems[idx].etalasesName = select.options[select.selectedIndex]?.textContent ?? '—';
+            saveCart();
             checkSubmit();
         }
 
         function removeCartItem(idx) {
             cartItems.splice(idx, 1);
+            saveCart();
             renderCart();
             checkSubmit();
         }
@@ -616,11 +629,27 @@
         function renderEtalaseOptions(selectEl, selectedId) {
             if (!selectEl) return;
             selectEl.innerHTML = '<option value="">— Pilih etalase —</option>';
+            
+            let autoSelectedId = selectedId;
+            if (!autoSelectedId) {
+                const destSelect = document.getElementById('pharmacySelect');
+                if (destSelect && destSelect.value !== '') {
+                    const destName = destSelect.options[destSelect.selectedIndex].text.toLowerCase();
+                    if (destName.includes('pmi')) {
+                        const otc = etalaseList.find(e => e.name.toLowerCase().includes('otc'));
+                        if (otc) autoSelectedId = otc.id;
+                    } else {
+                        const cabang = etalaseList.find(e => e.name.toLowerCase().includes('apotek cabang') || e.name.toLowerCase().includes('cabang'));
+                        if (cabang) autoSelectedId = cabang.id;
+                    }
+                }
+            }
+
             etalaseList.forEach(e => {
                 const opt = document.createElement('option');
                 opt.value = e.id;
                 opt.textContent = e.name;
-                if (String(e.id) === String(selectedId)) opt.selected = true;
+                if (String(e.id) === String(autoSelectedId)) opt.selected = true;
                 selectEl.appendChild(opt);
             });
         }
@@ -694,9 +723,19 @@
                 });
         }
 
+        renderCart();
+        checkSubmit();
         loadEtalases();
 
         // ── Submit ────────────────────────────────────────────────────────
+        function onPharmacyChange() {
+            checkSubmit();
+            if (stagedBatch) {
+                renderEtalaseOptions(document.getElementById('stageEtalase'), '');
+                checkAddItemBtn();
+            }
+        }
+
         function checkSubmit() {
             const pharmacy = document.getElementById('pharmacySelect').value;
             const valid = cartItems.length > 0 && pharmacy !== '' &&
@@ -730,6 +769,7 @@
 
             axios.post('{{ route('transfer') }}', payload)
                 .then(res => {
+                    localStorage.removeItem(CART_KEY); // Clear cart on success
                     iziToast.success({
                         title: 'Berhasil',
                         message: res.data.message ?? 'Transfer disimpan.'

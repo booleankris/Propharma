@@ -7,614 +7,370 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 
     <style>
-        * {
-            box-sizing: border-box;
-        }
-
-        html,
+        /* Base Overrides for clean UI */
         body {
-            overflow-x: hidden;
-            max-width: 100%;
+            background-color: #f8fafc;
         }
 
-        .section,
-        .section-body {
-            max-width: 100%;
-            overflow-x: hidden;
-        }
-
-        /* ── Layout grid ── */
-        .opname-grid {
-            display: grid;
-            grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
-            gap: 16px;
-            align-items: start;
-            width: 100%;
-        }
-
-        @media (max-width: 768px) {
-            .opname-grid {
-                grid-template-columns: minmax(0, 1fr) !important;
-            }
-        }
-
-        /* ── Card panels ── */
-        .card-panel {
-            background: #fff;
-            border: 1px solid #e2e8f0;
-            border-radius: 14px;
-            padding: 16px 18px;
-            min-width: 0;
-            overflow: hidden;
-            width: 100%;
-        }
-
-        .section-label {
-            display: block;
-            font-size: 11px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: .07em;
-            color: #94a3b8;
-            margin-bottom: 10px;
-        }
-
-        /* ── Form fields ── */
-        .field-label {
-            display: block;
-            font-size: 11px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: .05em;
-            color: #64748b;
-            margin-bottom: 5px;
-        }
-
-        .field-input {
-            width: 100%;
-            border: 1.5px solid #e2e8f0;
-            border-radius: 10px;
-            padding: 8px 12px;
-            font-size: 13px;
-            background: #fff;
-            color: #1e293b;
-            transition: border .15s, box-shadow .15s;
-            outline: none;
-        }
-
-        .field-input:focus,
-        .nav-input:focus {
-            border-color: #3b82f6 !important;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, .12) !important;
-        }
-
-        .field-input[readonly] {
-            background: #f8fafc;
-            color: #94a3b8;
-            cursor: default;
-        }
-
-        .field-input.border-red-500 {
-            border-color: #ef4444 !important;
-            color: #dc2626 !important;
-        }
-
-        select.field-input {
-            height: 38px;
-        }
-
-        /* ── Opname form grid ── */
-        .opname-form-grid {
-            display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 10px;
-            margin-bottom: 12px;
-        }
-
-        @media (max-width: 600px) {
-            .opname-form-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        /* ── DataTable overrides ── */
-        #medicines_data,
-        #orderItemsTable {
-            width: 100% !important;
-            max-width: 100%;
-            table-layout: fixed;
-        }
-
-        #medicines_data td,
-        #medicines_data th,
-        #orderItemsTable td,
-        #orderItemsTable th {
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-
+        /* DataTable Overrides to match new UI */
         .dataTables_wrapper {
             width: 100%;
-            overflow-x: auto;
+            padding: 10px;
+            font-family: inherit;
         }
 
         table.dataTable thead th,
         table.dataTable thead td {
-            padding: 9px 12px !important;
-            background: #f8fafc !important;
             border-bottom: 1px solid #e2e8f0 !important;
+            padding: 12px 16px !important;
+            white-space: nowrap;
             font-size: 11px !important;
             font-weight: 700 !important;
             text-transform: uppercase !important;
-            letter-spacing: .04em !important;
             color: #64748b !important;
-            white-space: nowrap;
         }
 
         table.dataTable tbody td {
-            padding: 9px 12px !important;
-            font-size: 13px !important;
+            padding: 12px 16px !important;
             vertical-align: middle !important;
             border-bottom: 1px solid #f1f5f9 !important;
+            font-size: 10px !important;
         }
 
         table.dataTable tbody tr:hover {
-            background: #f8fafc !important;
+            background-color: #f8fafc !important;
+            cursor: pointer;
         }
 
-        /* ── DataTable controls ── */
+        table.dataTable tbody tr.active {
+            background-color: #eef2ff !important;
+        }
+
+        /* DataTable Controls (Search & Pagination) */
         .dataTables_wrapper .top,
         .dataTables_wrapper .bottom {
             display: flex !important;
-            flex-direction: row !important;
             justify-content: space-between !important;
             align-items: center !important;
-            flex-wrap: wrap !important;
-            gap: 6px !important;
-            padding: 0 0 8px 0 !important;
-        }
-
-        .dataTables_wrapper .dataTables_length,
-        .dataTables_wrapper .dataTables_filter {
-            float: none !important;
-            text-align: left !important;
+            padding: 12px 0 !important;
+            gap: 10px;
+            flex-wrap: wrap;
         }
 
         .dataTables_length label,
         .dataTables_filter label {
             display: flex !important;
             align-items: center !important;
-            gap: 6px !important;
+            gap: 8px !important;
             font-size: 13px !important;
-            white-space: nowrap !important;
+            color: #64748b !important;
             margin: 0 !important;
         }
 
         .dataTables_filter input {
-            display: inline-block !important;
-            width: 130px !important;
-            max-width: 130px !important;
-            padding: 5px 10px !important;
-            border-radius: 8px !important;
             border: 1px solid #e2e8f0 !important;
+            border-radius: 8px !important;
+            padding: 6px 12px !important;
             font-size: 13px !important;
             outline: none !important;
-            margin: 0 !important;
+            width: 150px !important;
+            display: inline-block !important;
         }
 
         .dataTables_filter input:focus {
-            border-color: #3b82f6 !important;
+            border-color: #6366f1 !important;
+            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2) !important;
         }
 
         .dataTables_length select {
-            width: auto !important;
-            padding: 4px 6px !important;
-            border-radius: 8px !important;
             border: 1px solid #e2e8f0 !important;
+            border-radius: 8px !important;
+            padding: 4px 24px 4px 8px !important;
             font-size: 13px !important;
-            margin: 0 !important;
+            width: auto !important;
         }
 
         .dataTables_info {
             font-size: 12px !important;
             color: #94a3b8 !important;
-            white-space: nowrap !important;
-        }
-
-        /* ── Pagination ── */
-        .dataTables_wrapper .dataTables_paginate {
-            display: flex !important;
-            flex-wrap: wrap !important;
-            align-items: center !important;
-            gap: 3px !important;
-            justify-content: flex-end !important;
-            padding: 6px 0 0 !important;
         }
 
         .dataTables_paginate .paginate_button {
-            padding: 4px 9px !important;
-            border-radius: 6px !important;
-            margin: 0 !important;
-            font-size: 12px !important;
+            padding: 3px 8px !important;
+            border-radius: 5px !important;
+            margin: 0 1px !important;
+            font-size: 11px !important;
             background: #f1f5f9 !important;
-            border: none !important;
+            border: 1px solid #e2e8f0 !important;
             cursor: pointer !important;
+            color: #475569 !important;
+            display: inline-block !important;
         }
 
         .dataTables_wrapper .dataTables_paginate .paginate_button.current {
-            background: #2563eb !important;
+            background: #4f46e5 !important;
             color: #fff !important;
-            border: none !important;
+            border-color: #4f46e5 !important;
+        }
+
+        .dataTables_wrapper .dataTables_paginate .paginate_button:hover:not(.current):not(.disabled) {
+            background: #e2e8f0 !important;
+            color: #1e293b !important;
+            border-color: #cbd5e1 !important;
         }
 
         .dataTables_wrapper .dataTables_paginate .paginate_button.disabled {
-            opacity: .4 !important;
+            opacity: 0.4 !important;
+            cursor: not-allowed !important;
             background: transparent !important;
-            cursor: default !important;
+            border-color: transparent !important;
         }
 
-        .dataTables_wrapper .dataTables_paginate .paginate_button:not(.current):not(.disabled):hover {
-            background: #e2e8f0 !important;
-            color: #1e293b !important;
-            border: none !important;
+        /* Custom Scrollbar for Logs */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
         }
 
-        .paginate_button.previous {
-            background: #fee2e2 !important;
-            color: #b91c1c !important;
-        }
-
-        .paginate_button.next {
-            background: #dcfce7 !important;
-            color: #166534 !important;
-        }
-
-        @media (max-width: 768px) {
-            .dataTables_paginate .paginate_button {
-                padding: 4px 7px !important;
-                font-size: 11px !important;
-            }
-
-            .dataTables_filter input {
-                width: 110px !important;
-                max-width: 110px !important;
-            }
-        }
-
-        /* ── Log panel ── */
-        .log-panel {
-            max-height: 36vh;
-            overflow-x: auto;
-            overflow-y: auto;
-            background: #f8fafc;
-            border-radius: 10px;
-            border: 1px solid #e2e8f0;
-        }
-
-        @media (max-width: 768px) {
-            .log-panel {
-                max-height: 240px;
-            }
-        }
-
-        .log-panel::-webkit-scrollbar {
-            width: 4px;
-            height: 4px;
-        }
-
-        .log-panel::-webkit-scrollbar-track {
+        .custom-scrollbar::-webkit-scrollbar-track {
             background: transparent;
         }
 
-        .log-panel::-webkit-scrollbar-thumb {
+        .custom-scrollbar::-webkit-scrollbar-thumb {
             background: #cbd5e1;
-            border-radius: 99px;
-        }
-
-        #orderItemsTable thead th {
-            position: sticky;
-            top: 0;
-            z-index: 1;
-            background: #f8fafc !important;
-        }
-
-        /* ── Stat cards ── */
-        .stat-row {
-            display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
-            gap: 8px;
-            margin-top: 12px;
-        }
-
-        @media (max-width: 480px) {
-            .stat-row {
-                grid-template-columns: repeat(2, minmax(0, 1fr));
-            }
-        }
-
-        .stat-card {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 2px;
-            padding: 10px 8px;
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
             border-radius: 10px;
         }
 
-        .stat-card .val {
-            font-size: 20px;
-            font-weight: 800;
-            color: #2563eb;
-            line-height: 1;
-        }
-
-        .stat-card .lbl {
-            font-size: 11px;
-            color: #94a3b8;
-            font-weight: 500;
-            white-space: nowrap;
-        }
-
-        /* ── Medicine table rows ── */
-        #medicines_data tbody tr {
-            cursor: pointer;
-            transition: background .1s;
-        }
-
-        #medicines_data tbody tr:hover {
-            background: #eff6ff !important;
-        }
-
-        #medicines_data tbody tr.active {
-            background: #dbeafe !important;
-        }
-
-        #orderItemsTable tbody tr.table-primary {
-            background: #dbeafe !important;
-        }
-
-        /* ── Discrepancy badge ── */
-        #discrepancy_badge {
-            display: none;
-            font-size: 12px;
-            font-weight: 700;
-            padding: 3px 10px;
-            border-radius: 99px;
-            margin-top: 6px;
-        }
-
-        /* ── Buttons ── */
-        .btn-primary,
-        .btn-danger,
-        .btn-export {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 0 14px;
-            height: 36px;
-            border-radius: 8px;
-            font-size: 13px;
-            font-weight: 500;
-            border: none;
-            cursor: pointer;
-            text-decoration: none;
-            white-space: nowrap;
-        }
-
-        .btn-primary {
-            background: #2563eb;
-            color: #fff;
-        }
-
-        .btn-primary:hover {
-            background: #1d4ed8;
-        }
-
-        .btn-danger {
-            background: #fee2e2;
-            color: #b91c1c;
-        }
-
-        .btn-danger:hover {
-            background: #fecaca;
-        }
-
-        .btn-export {
-            background: #dcfce7;
-            color: #166534;
-        }
-
-        .btn-export:hover {
-            background: #bbf7d0;
-        }
-
-        /* ── Scanner FAB — mobile only, fixed bottom-right ── */
-        .scanner-fab {
-            display: none;
-            position: fixed;
-            bottom: 24px;
-            right: 24px;
-            z-index: 999;
-            background: #2563eb;
-            color: #fff;
-            border-radius: 99px;
-            padding: 13px 20px;
-            font-size: 14px;
-            font-weight: 600;
-            text-decoration: none;
-            align-items: center;
-            gap: 8px;
-            border: none;
-        }
-
-        .scanner-fab svg {
-            width: 18px;
-            height: 18px;
-            flex-shrink: 0;
-        }
-
-        @media (max-width: 768px) {
-            .scanner-fab {
-                display: flex;
-            }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
         }
     </style>
 @endsection
 
 @section('content')
-    <section class="section px-4 pb-8">
-        <div class="section-body">
+    <div class="min-h-screen bg-slate-50/50 pb-12 pt-2 px-4 sm:px-6 lg:px-8">
+        <div class="mx-auto space-y-3">
 
-            {{-- Page header --}}
-            <div class="flex items-center gap-3 mb-5">
-                <div class="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center flex-shrink-0">
-                    <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                        stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2
-                                           M9 5a2 2 0 002 2h2a2 2 0 002-2
-                                           M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                    </svg>
+            {{-- Header --}}
+            <div
+                class="flex flex-col gap-4 p-4 bg-white border border-slate-200/80 rounded-xl shadow-xs md:flex-row md:items-center md:justify-between">
+
+
+                <div class="flex items-center gap-3">
+                    <div
+                        class="flex items-center justify-center w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 shrink-0">
+
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-blue-600" viewBox="0 0 24 24"
+                            fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                            stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-package">
+                            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                            <path d="M12 3l8 4.5l0 9l-8 4.5l-8 -4.5l0 -9l8 -4.5" />
+                            <path d="M12 12l8 -4.5" />
+                            <path d="M12 12l0 9" />
+                            <path d="M12 12l-8 -4.5" />
+                            <path d="M16 5.25l-8 4.5" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h2 class="text-base font-bold text-slate-800 leading-tight">Stock Opname</h2>
+                        <p class="text-xs text-slate-400">Rekonsiliasi Stok Obat</p>
+                    </div>
                 </div>
-                <div>
-                    <h1 class="text-xl font-bold text-gray-800 leading-tight">Stock Opname</h1>
-                    <p class="text-[12px] text-gray-400">Rekonsiliasi stok fisik vs sistem</p>
-                </div>
+
+
             </div>
 
-            <div class="opname-grid">
+            <div class="grid grid-cols-1 xl:grid-cols-12 gap-6">
 
-                {{-- LEFT: Medicine selector --}}
-                <div class="card-panel">
-                    <span class="section-label">Pilih Obat</span>
+                {{-- Left Column: Medicine Selector --}}
+                <div class="xl:col-span-4 space-y-3">
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 h-full flex flex-col">
+                        <div class="flex items-center gap-2 mb-5">
+                            <span
+                                class="flex items-center justify-center w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 font-bold text-xs">1</span>
+                            <h2 class="text-sm font-bold text-slate-700 uppercase tracking-wider">Pilih Obat</h2>
+                        </div>
 
-                    <div class="grid grid-cols-1 gap-3 mb-4">
-                        <div>
-                            <label class="field-label">Rentang Tanggal</label>
-                            <input type="text" id="dateRange" placeholder="Pilih rentang tanggal..." class="field-input"
-                                autocomplete="off">
+                        <div class="space-y-4 mb-6">
+                            <div>
+                                <label
+                                    class="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Rentang
+                                    Tanggal</label>
+                                <input type="text" id="dateRange" placeholder="Pilih rentang tanggal..."
+                                    class="w-full rounded-xl border-slate-200 text-sm focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 transition-shadow py-2 px-3"
+                                    autocomplete="off">
+                            </div>
+                            <div>
+                                <label
+                                    class="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Obat
+                                    Terpilih</label>
+                                <input type="text" readonly id="medicine_name" placeholder="Klik 2x pada tabel..."
+                                    class="w-full rounded-xl border-slate-200 bg-slate-50 text-slate-700 text-sm font-semibold focus:ring-0 py-2 px-3 placeholder-slate-400"
+                                    autocomplete="off">
+                            </div>
                         </div>
-                        <div>
-                            <label class="field-label">Obat Dipilih</label>
-                            <input type="text" readonly id="medicine_name" placeholder="Klik 2x pada tabel..."
-                                class="field-input" autocomplete="off">
+
+                        <div class="border border-slate-200 rounded-xl overflow-hidden flex-1 flex flex-col">
+                            <table id="medicines_data" class="w-full text-sm text-left">
+                                <thead class="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold tracking-wider">
+                                    <tr>
+                                        <th class="px-4 py-3 border-b border-slate-200">#</th>
+                                        <th class="px-4 py-3 border-b border-slate-200">Nama</th>
+                                        <th class="px-4 py-3 border-b border-slate-200">Satuan</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100 text-slate-600"></tbody>
+                            </table>
                         </div>
+                        <p
+                            class="text-[11px] font-medium text-slate-400 mt-4 flex items-center gap-1.5 bg-slate-50 p-2 rounded-lg border border-slate-100">
+                            <svg class="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122">
+                                </path>
+                            </svg>
+                            Double-click pada baris untuk memilih obat
+                        </p>
                     </div>
-
-                    <table id="medicines_data" class="w-full text-sm text-left text-gray-600">
-                        <thead class="bg-gray-100 text-gray-700 uppercase text-xs">
-                            <tr>
-                                <th class="px-3 py-2">#</th>
-                                <th class="px-3 py-2">Nama</th>
-                                <th class="px-3 py-2">Satuan</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
-                    <p class="text-[11px] text-gray-400 mt-2">* Double-click baris untuk memilih obat</p>
                 </div>
 
-                {{-- RIGHT: Log + Opname form --}}
-                <div class="flex flex-col gap-4">
+                {{-- Right Column: Details & Input --}}
+                <div class="xl:col-span-8">
 
-                    {{-- Hidden fields --}}
+                    {{-- Hidden Fields --}}
                     <input type="hidden" id="medicine_id">
                     <input type="hidden" id="medicine_stock">
                     <input type="hidden" id="batches_id">
                     <input type="hidden" id="expired_date">
 
-                    {{-- Stock log panel --}}
-                    <div class="card-panel">
-                        <span class="section-label">Riwayat Stok</span>
-                        <div class="log-panel">
-                            <table id="orderItemsTable" class="w-full text-sm text-left text-gray-600">
-                                <thead>
-                                    <tr>
-                                        <th class="px-3 py-2">#</th>
-                                        <th class="px-3 py-2">Tanggal</th>
-                                        <th class="px-3 py-2">Kode</th>
-                                        <th class="px-3 py-2">Tipe</th>
-                                        <th class="px-3 py-2">Saldo Awal</th>
-                                        <th class="px-3 py-2">Qty</th>
-                                        <th class="px-3 py-2">Jumlah</th>
-                                        <th class="px-3 py-2">Saldo Kini</th>
-                                        <th class="px-3 py-2">Ket.</th>
-                                    </tr>
-                                </thead>
-                                <tbody></tbody>
-                            </table>
+                    {{-- Stock History & Stats --}}
+                    <div class="bg-white rounded-2xl shadow-sm border mb-3 border-slate-200 p-6">
+                        <div class="flex items-center gap-2 mb-5">
+                            <span
+                                class="flex items-center justify-center w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 font-bold text-xs">2</span>
+                            <h2 class="text-sm font-bold text-slate-700 uppercase tracking-wider">Riwayat & Ringkasan Stok
+                            </h2>
                         </div>
 
-                        <div class="stat-row">
-                            <div class="stat-card">
-                                <span class="val" id="qty_awal">—</span>
-                                <span class="lbl">QTY Awal</span>
+                        <div class="grid grid-cols-2 md:grid-cols-6 gap-3 mb-6">
+                            <div
+                                class="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col justify-center transition-all hover:shadow-sm">
+                                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">QTY
+                                    Awal</span>
+                                <span class="text-2xl font-black text-slate-700" id="qty_awal">—</span>
                             </div>
-                            <div class="stat-card">
-                                <span class="val" id="qty_beli">—</span>
-                                <span class="lbl">QTY Beli</span>
+                            <div
+                                class="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col justify-center transition-all hover:shadow-sm">
+                                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">QTY
+                                    Beli</span>
+                                <span class="text-2xl font-black text-slate-700" id="qty_beli">—</span>
                             </div>
-                            <div class="stat-card">
-                                <span class="val" id="qty_jual">—</span>
-                                <span class="lbl">QTY Jual</span>
+                            <div
+                                class="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col justify-center transition-all hover:shadow-sm">
+                                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">QTY
+                                    Jual</span>
+                                <span class="text-2xl font-black text-slate-700" id="qty_jual">—</span>
                             </div>
-                            <div class="stat-card">
-                                <span class="val" id="qty_akhir">—</span>
-                                <span class="lbl">QTY Akhir</span>
+                            <div
+                                class="bg-amber-50/50 p-4 rounded-xl border border-amber-100 flex flex-col justify-center transition-all hover:shadow-sm hover:bg-amber-50">
+                                <span class="text-[10px] font-bold uppercase tracking-wider text-amber-600 mb-1">Stok
+                                    Gudang</span>
+                                <span class="text-2xl font-black text-amber-600" id="qty_gudang">—</span>
                             </div>
+                            <div
+                                class="bg-purple-50/50 p-4 rounded-xl border border-purple-100 flex flex-col justify-center transition-all hover:shadow-sm hover:bg-purple-50">
+                                <span class="text-[10px] font-bold uppercase tracking-wider text-purple-600 mb-1">Stok
+                                    Etalase</span>
+                                <span class="text-2xl font-black text-purple-600" id="qty_etalase">—</span>
+                            </div>
+                            <div
+                                class="bg-emerald-50/50 p-4 rounded-xl border border-emerald-100 flex flex-col justify-center transition-all hover:shadow-sm hover:bg-emerald-50">
+                                <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-600 mb-1">Total
+                                    Stok</span>
+                                <span class="text-2xl font-black text-emerald-600" id="qty_akhir">—</span>
+                            </div>
+                        </div>
+
+                        <div
+                            class="border border-slate-200 rounded-xl overflow-hidden max-h-[350px] overflow-y-auto custom-scrollbar relative">
+                            <table id="orderItemsTable" class="w-full text-sm text-left">
+                                <thead
+                                    class="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold tracking-wider sticky top-0 z-10 shadow-sm">
+                                    <tr>
+                                        <th class="px-4 py-3 border-b border-slate-200">#</th>
+                                        <th class="px-4 py-3 border-b border-slate-200">Tanggal</th>
+                                        <th class="px-4 py-3 border-b border-slate-200">Kode</th>
+                                        <th class="px-4 py-3 border-b border-slate-200">Tipe</th>
+                                        <th class="px-4 py-3 border-b border-slate-200 text-right">Saldo Awal</th>
+                                        <th class="px-4 py-3 border-b border-slate-200 text-right">Qty</th>
+                                        <th class="px-4 py-3 border-b border-slate-200 text-right">Jumlah</th>
+                                        <th class="px-4 py-3 border-b border-slate-200 text-right">Saldo Kini</th>
+                                        <th class="px-4 py-3 border-b border-slate-200">Ket.</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100 text-slate-600"></tbody>
+                            </table>
                         </div>
                     </div>
 
-                    {{-- Opname form --}}
-                    <div class="card-panel">
-                        <span class="section-label">Input Opname</span>
+                    {{-- Opname Input --}}
+                    <div
+                        class="bg-white rounded-2xl shadow-md border border-slate-200 p-6 border-t-4 border-t-indigo-500 relative overflow-hidden">
+                        <!-- Decorative background -->
+                        <div
+                            class="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-indigo-50 rounded-full opacity-50 pointer-events-none">
+                        </div>
 
-                        <div class="opname-form-grid">
-                            <div>
-                                <label class="field-label">Stok Fisik (Gudang)</label>
+                        <div class="flex items-center gap-2 mb-6 relative">
+                            <span
+                                class="flex items-center justify-center w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 font-bold text-xs">3</span>
+                            <h2 class="text-sm font-bold text-slate-700 uppercase tracking-wider">Input Fisik Opname</h2>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-5 relative">
+                            <div class="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                                <label class="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">Stok
+                                    Fisik (Gudang)</label>
                                 <input type="number" id="stock_physic" data-nav-enter="counter_stock_physic"
-                                    onkeyup="countDiscrepancy()" placeholder="Stok gudang fisik..."
-                                    class="nav-input field-input" autocomplete="off">
+                                    onkeyup="countDiscrepancy()" placeholder="0"
+                                    class="w-full rounded-lg border-slate-200 text-xl font-black text-center text-slate-700 focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 transition-all py-3 shadow-sm"
+                                    autocomplete="off">
                             </div>
-                            <div>
-                                <label class="field-label">Stok Fisik (Counter)</label>
+                            <div class="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                                <label class="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">Stok
+                                    Fisik (Counter)</label>
                                 <input type="number" id="counter_stock_physic" data-nav-enter="batch_select"
-                                    placeholder="Stok counter fisik..." class="nav-input field-input" autocomplete="off">
+                                    onkeyup="countDiscrepancy()" placeholder="0"
+                                    class="w-full rounded-lg border-slate-200 text-xl font-black text-center text-slate-700 focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 transition-all py-3 shadow-sm"
+                                    autocomplete="off">
                             </div>
-                            <div>
-                                <label class="field-label">Selisih Stok</label>
+                            <div class="bg-slate-50 p-3 rounded-xl border border-slate-100 flex flex-col">
+                                <label
+                                    class="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide flex justify-between items-center">
+                                    Selisih Stok
+                                    <span id="discrepancy_badge"
+                                        class="hidden text-[10px] px-2 py-0.5 rounded-md font-bold shadow-sm"></span>
+                                </label>
                                 <input type="text" readonly id="stock_discrepancy" placeholder="—"
-                                    class="field-input">
-                                <span id="discrepancy_badge"></span>
+                                    class="w-full rounded-lg border-transparent bg-slate-100/50 text-xl font-black text-center text-slate-400 focus:ring-0 py-3 mt-auto h-[54px]">
                             </div>
                         </div>
 
-                        <div class="mb-4">
-                            <label class="field-label">
-                                Batch
-                                <span
-                                    style="font-size:11px;font-weight:400;text-transform:none;letter-spacing:0;color:#94a3b8;margin-left:4px;">
-                                    (opsional — default: expired terdekat)
-                                </span>
+                        <div class="mb-6 bg-slate-50/80 p-4 rounded-xl border border-slate-100 relative">
+                            <label class="block text-xs font-bold text-slate-600 mb-2 uppercase tracking-wide">
+                                Penyesuaian Batch <span
+                                    class="text-slate-400 font-medium ml-1 normal-case tracking-normal">(opsional —
+                                    default: FEFO)</span>
                             </label>
-                            <select id="batch_select" data-nav-enter="submit" class="nav-input field-input">
+                            <select id="batch_select" data-nav-enter="submit"
+                                class="w-full rounded-lg border-slate-200 text-sm font-medium text-slate-700 focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 py-2.5 shadow-sm bg-white">
                                 <option value="">— Otomatis (FEFO) —</option>
                             </select>
                         </div>
 
-                        <div class="flex flex-wrap gap-2">
-                            <button id="save_opname" class="btn-primary">
-                                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                    stroke-width="2">
-                                    <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z" />
-                                    <polyline points="17 21 17 13 7 13 7 21" />
-                                    <polyline points="7 3 7 8 15 8" />
-                                </svg>
-                                Simpan
-                            </button>
-                            <button id="back" class="btn-danger">
+                        <div class="flex flex-wrap items-center justify-end gap-3 pt-5 border-t border-slate-100 relative">
+                            <button id="back"
+                                class="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 hover:text-slate-900 transition-all shadow-sm">
                                 <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                     stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round"
@@ -622,7 +378,8 @@
                                 </svg>
                                 Kembali
                             </button>
-                            <a href="{{ route('supplies.printstockopname') }}" target="_blank" class="btn-export">
+                            <a href="{{ route('supplies.printstockopname') }}" target="_blank"
+                                class="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl hover:bg-emerald-100 transition-all shadow-sm">
                                 <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                     stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round"
@@ -630,23 +387,31 @@
                                 </svg>
                                 Export Excel
                             </a>
+                            <button id="save_opname"
+                                class="inline-flex items-center justify-center gap-2 px-6 py-2.5 text-sm font-bold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 shadow-md shadow-indigo-200 focus:ring-4 focus:ring-indigo-100 transition-all">
+                                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                                </svg>
+                                Simpan Opname
+                            </button>
                         </div>
                     </div>
 
                 </div>
-            </div>{{-- /.opname-grid --}}
-
+            </div>
         </div>
-    </section>
+    </div>
 
-    {{-- Scanner FAB — rendered outside the grid so position:fixed works correctly --}}
-    <a href="{{ route('supplies.scanner') }}" class="scanner-fab" title="Scan Barcode">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    {{-- Scanner FAB (Mobile) --}}
+    <a href="{{ route('supplies.scanner') }}"
+        class="fixed bottom-6 right-6 z-50 flex items-center justify-center w-14 h-14 bg-indigo-600 text-white rounded-full shadow-lg hover:bg-indigo-700 transition-transform hover:scale-105 md:hidden"
+        title="Scan Barcode">
+        <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round"
                 d="M5 9V7a2 2 0 012-2h2M15 5h2a2 2 0 012 2v2M19 15v2a2 2 0 01-2 2h-2M9 19H7a2 2 0 01-2-2v-2" />
             <rect x="9" y="9" width="6" height="6" rx="1" />
         </svg>
-        <span>Scan</span>
     </a>
 @endsection
 @section('scripts')
@@ -659,7 +424,9 @@
 
     <script>
         /* ── State ─────────────────────────────────────────────────────── */
-        let total_stock = 0; // current system stock (from selected batch / log)
+        let current_storage_stock = 0;
+        let current_counter_stock = 0;
+        let total_stock = 0; // current system stock (storage + counter)
         let orderItemsTable, medicineData;
         let startDate = '',
             endDate = '',
@@ -699,21 +466,25 @@
                 .then(batches => {
                     select.innerHTML = '<option value="">— Otomatis (FEFO) —</option>';
 
-                    let totalBatchStock = 0; // ← accumulate here
+                    let totalStorageStock = 0;
+                    let totalCounterStock = 0;
 
                     batches.forEach(b => {
                         const opt = document.createElement('option');
                         opt.value = b.id;
-                        opt.textContent = `${b.name} — Exp: ${b.expired_date} (Stok: ${b.stock})`;
-                        opt.dataset.stock = b.stock;
+                        const gStock = parseInt(b.stock || 0);
+                        const cStock = parseInt(b.counter_stock || 0);
+                        opt.textContent =
+                            `${b.name} — Exp: ${b.expired_date} (Gudang: ${gStock}, Etalase: ${cStock})`;
+                        opt.dataset.stock = gStock;
+                        opt.dataset.counterStock = cStock;
                         select.appendChild(opt);
-                        totalBatchStock += parseInt(b.stock || 0); // ← sum all batches
+                        totalStorageStock += gStock;
+                        totalCounterStock += cStock;
                     });
 
-                    // ← Update qty_akhir with real total storage stock
-                    $('#qty_akhir').text(totalBatchStock);
-                    $('#medicine_stock').val(totalBatchStock);
-                    total_stock = totalBatchStock;
+                    // Update qty_akhir with real total stock
+                    $('#qty_akhir').text(totalStorageStock + totalCounterStock);
 
                     updateTotalStockFromSelect();
                 })
@@ -728,17 +499,28 @@
             const selectedOpt = select.options[select.selectedIndex];
 
             if (selectedOpt && selectedOpt.value !== '') {
-                // User picked a specific batch → use that batch's stock
-                total_stock = parseInt(selectedOpt.dataset.stock) || 0;
+                current_storage_stock = parseInt(selectedOpt.dataset.stock) || 0;
+                current_counter_stock = parseInt(selectedOpt.dataset.counterStock) || 0;
             } else {
-                // "Otomatis (FEFO)" → use first real option's stock
-                const firstBatch = select.options[1]; // index 0 is the placeholder
-                total_stock = firstBatch ? (parseInt(firstBatch.dataset.stock) || 0) : 0;
+                let sumStorage = 0;
+                let sumCounter = 0;
+                for (let i = 1; i < select.options.length; i++) {
+                    sumStorage += parseInt(select.options[i].dataset.stock) || 0;
+                    sumCounter += parseInt(select.options[i].dataset.counterStock) || 0;
+                }
+                current_storage_stock = sumStorage;
+                current_counter_stock = sumCounter;
             }
 
+            total_stock = current_storage_stock + current_counter_stock;
             $('#medicine_stock').val(total_stock);
-            // Recalculate discrepancy if physic is already filled
-            if ($('#stock_physic').val() !== '') countDiscrepancy();
+            $('#qty_gudang').text(current_storage_stock);
+            $('#qty_etalase').text(current_counter_stock);
+            $('#qty_akhir').text(total_stock);
+
+            if ($('#stock_physic').val() !== '' || $('#counter_stock_physic').val() !== '') {
+                countDiscrepancy();
+            }
         }
 
         document.getElementById('batch_select')
@@ -746,19 +528,23 @@
 
         /* ── Discrepancy indicator ─────────────────────────────────────── */
         function countDiscrepancy() {
-            const val = $('#stock_physic').val();
+            const valGudang = $('#stock_physic').val();
+            const valCounter = $('#counter_stock_physic').val();
             const input = document.getElementById('stock_discrepancy');
             const badge = document.getElementById('discrepancy_badge');
 
-            if (val === '') {
+            if (valGudang === '' && valCounter === '') {
                 input.value = '';
                 input.classList.remove('border-red-500', 'text-red-600');
                 badge.style.display = 'none';
                 return;
             }
 
-            const stockPhysic = parseInt(val) || 0;
-            const discrepancy = stockPhysic - total_stock;
+            const gudangPhysic = valGudang !== '' ? (parseInt(valGudang) || 0) : current_storage_stock;
+            const counterPhysic = valCounter !== '' ? (parseInt(valCounter) || 0) : current_counter_stock;
+
+            const totalPhysic = gudangPhysic + counterPhysic;
+            const discrepancy = totalPhysic - total_stock;
             input.value = discrepancy;
 
             if (discrepancy !== 0) {
@@ -934,7 +720,7 @@
                 responsive: true,
                 serverSide: true,
                 ajax: "{{ route('supplies.medicines') }}",
-                dom: '<"top"lf>rt<"bottom"ip>', // ← this controls the layout order
+                dom: '<"top"f>rt<"bottom"p>', // Show only search at top and pagination at bottom
                 columns: [{
                         data: 'DT_RowIndex',
                         orderable: false,
@@ -970,16 +756,13 @@
 
                 // Load stock log for this medicine
                 orderItemsTable.ajax.reload(function() {
-                    // Update stat cards from the last row (most recent state)
+                    // Update stat cards from the log row
                     orderItemsTable.rows().every(function() {
                         const row = this.data();
                         if (row.name === searchMedicine) {
-                            total_stock = row.qty_after_number || 0;
-                            $('#medicine_stock').val(total_stock);
                             $('#qty_awal').text(row.stock_start?.qty_before ?? 0);
                             $('#qty_beli').text(row.total_orders ?? 0);
                             $('#qty_jual').text(row.total_sales ?? 0);
-                            $('#qty_akhir').text(total_stock);
                             return false;
                         }
                     });

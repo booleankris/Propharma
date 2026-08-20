@@ -468,6 +468,7 @@
             orderItemsTable = $('#orderItemsTable').DataTable({
                 processing: true,
                 serverSide: true,
+                order: [], // Let the server handle the default sorting
                 ajax: {
                     url: "{{ route('supplies.getSupplies') }}",
                     data: function(d) {

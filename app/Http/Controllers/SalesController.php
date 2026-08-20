@@ -849,7 +849,7 @@ class SalesController extends Controller
             $txWithItems = MedicineTransactions::with('transactions.medicine')
                 ->findOrFail($validated['transaction_id']);
 
-            $now = Carbon::now()->format('Y-m-d');
+            $now = Carbon::now()->format('Y-m-d H:i:s');
 
             foreach ($txWithItems->transactions as $cart) {
                 $medicine = $cart->medicine;

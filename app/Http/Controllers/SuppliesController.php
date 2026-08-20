@@ -21,6 +21,32 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class SuppliesController extends Controller
 {
+    private function calculateRealtimeStock($medicineId, $pharmacyId, $type = 'total')
+    {
+        if (!$medicineId) return 0;
+
+        $storageStock = (int) Batches::where('medicine_id', $medicineId)
+            ->where('pharmacy_id', $pharmacyId)
+            ->sum('stock');
+
+        if ($type === 'storage') {
+            return $storageStock;
+        }
+
+        $counterStock = (int) MedicineTransferItems::whereHas('batches', function ($b) use ($medicineId, $pharmacyId) {
+                $b->where('medicine_id', $medicineId)
+                  ->where('pharmacy_id', $pharmacyId);
+            })
+            ->where('status', 1)
+            ->sum('qty');
+
+        if ($type === 'counter') {
+            return $counterStock;
+        }
+
+        return $storageStock + $counterStock;
+    }
+
     // Stok Pelayanan
     public function supplies(Request $request)
     {
@@ -95,7 +121,26 @@ class SuppliesController extends Controller
                 'batches',                              // Fetch batches for batch name display
                 'receiving.receiving_details.creditor', // Fetch creditor through receiving details
                 'medicine_transaction.user'             // Fetch cashier user through transactions
-            ])->whereNotIn('status', [5, 6]);
+            ])->whereNotIn('status', [5, 6])
+              ->orderBy('updated_at', 'asc')
+              ->orderBy('id', 'asc');
+
+            // Balance calculation: Real-time stock if medicine is selected, otherwise last record's qty_after
+            $balance = 0;
+            if ($request->filled('searchMedicine')) {
+                $searchValue = $request->searchMedicine;
+                $med = is_numeric($searchValue)
+                    ? Medicines::find($searchValue)
+                    : Medicines::where('name', $searchValue)->orWhere('code', $searchValue)->first();
+
+                if ($med) {
+                    $balance = $this->calculateRealtimeStock($med->id, $pharmacyId, 'total');
+                } else if ($lastRecord) {
+                    $balance = $lastRecord->qty_after;
+                }
+            } else if ($lastRecord) {
+                $balance = $lastRecord->qty_after;
+            }
 
             // 5. RETURN DATATABLES RESPONSE
             return DataTables::eloquent($items)
@@ -176,7 +221,13 @@ class SuppliesController extends Controller
                             return "<div style='color:#d34163;font-weight:bold;'><span></span><b>" . $row->qty . "</b></div>";
                         }
                     } else if ($row->status == 7) {
-                        return "<div style='color:#248787;font-weight:bold;'><span></span><b>+" . $row->qty . "</b></div>";
+                        if ($row->qty_after < $row->qty_before) {
+                            // Pengurangan (dari gudang/sumber)
+                            return "<div style='color:#d34163;font-weight:bold;'><span>-</span><b>" . abs($row->qty) . "</b></div>";
+                        } else {
+                            // Penambahan (ke etalase/tujuan)
+                            return "<div style='color:#248787;font-weight:bold;'><span>+</span><b>" . abs($row->qty) . "</b></div>";
+                        }
                     }
                     return "";
                 })
@@ -192,8 +243,16 @@ class SuppliesController extends Controller
                 ->addColumn('qty_after_number', function ($row) {
                     return $row->qty_after;
                 })
-                ->addColumn('supply', function ($row) {
-                    return $row->medicines?->stock ?? '-';
+                ->addColumn('supply', function ($row) use ($pharmacyId) {
+                    static $stockCache = [];
+                    $medId = $row->medicine_id;
+                    if (!$medId) return '-';
+
+                    if (!isset($stockCache[$medId])) {
+                        $stockCache[$medId] = $this->calculateRealtimeStock($medId, $pharmacyId, 'total');
+                    }
+
+                    return $stockCache[$medId];
                 })
                 ->addColumn('status', function ($row) {
                     if ($row->status == 1) {
@@ -219,7 +278,7 @@ class SuppliesController extends Controller
                         'stat_bought_rt' => $stats->qty_bought_rt ?? 0,
                         'stat_sold' => $stats->qty_sold ?? 0,
                         'stat_sold_rt' => $stats->qty_sold_rt ?? 0,
-                        'stat_balance' => $lastRecord ? $lastRecord->qty_after : 0,
+                        'stat_balance' => $balance,
                     ]
                 ])
                 ->make(true);
@@ -299,7 +358,17 @@ class SuppliesController extends Controller
                 // Fixed: these two were both returning qty_after
                 ->addColumn('qty_before_number', fn($r) => $r->qty_before)
                 ->addColumn('qty_after_number', fn($r) => $r->qty_after)
-                ->addColumn('supply', fn($r) => $r->medicines->stock)
+                ->addColumn('supply', function ($r) {
+                    static $storageCache = [];
+                    $medId = $r->medicine_id;
+                    if (!$medId) return '-';
+
+                    if (!isset($storageCache[$medId])) {
+                        $storageCache[$medId] = $this->calculateRealtimeStock($medId, getActivePharmacyId(), 'storage');
+                    }
+
+                    return $storageCache[$medId];
+                })
                 ->addColumn('status', function ($row) {
                     $map = [
                         2 => ['label' => 'Pembelian', 'bg' => '#caffc5', 'color' => '#457b00'],
@@ -574,7 +643,7 @@ class SuppliesController extends Controller
             return DataTables::eloquent($items)
                 ->addIndexColumn()
                 ->addColumn('date', function ($row) {
-                    return $row->date;
+                    return $row->date->format('d/m/Y');
                 })
                 ->addColumn('transaction_code', function ($row) {
                     if (!$row->transaction_code)
@@ -582,7 +651,7 @@ class SuppliesController extends Controller
                     $code = e($row->transaction_code);
                     return '
                     <div class="flex items-center gap-1.5">
-                        <span class="font-mono text-xs font-medium text-slate-700 bg-slate-50 px-2 py-0.5 rounded border border-slate-200">' . $code . '</span>
+                        <span style="font-size:10px" class="font-nunito-bold text-slate-700 bg-slate-50 px-2 py-0.5 rounded border border-slate-200">' . $code . '</span>
                         <button type="button" onclick="navigator.clipboard.writeText(\'' . $code . '\'); iziToast.success({title: \'Tersalin\', message: \'Kode berhasil disalin\', position: \'topRight\'})" class="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Salin kode">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
                         </button>
@@ -672,7 +741,15 @@ class SuppliesController extends Controller
                     return $row->qty_after;
                 })
                 ->addColumn('supply', function ($row) {
-                    return $row->medicines->stock;
+                    static $stockCache = [];
+                    $medId = $row->medicine_id;
+                    if (!$medId) return '-';
+
+                    if (!isset($stockCache[$medId])) {
+                        $stockCache[$medId] = $this->calculateRealtimeStock($medId, getActivePharmacyId(), 'total');
+                    }
+
+                    return $stockCache[$medId];
                 })
                 ->addColumn('status', function ($row) {
                     if ($row->status == 1) {
@@ -764,7 +841,11 @@ class SuppliesController extends Controller
     public function getBatchesByMedicine(Request $request)
     {
         $batches = Batches::where('medicine_id', $request->medicine_id)
+            ->where('pharmacy_id', getActivePharmacyId())
             ->orderBy('expired_date', 'asc') // FEFO
+            ->withSum(['medicine_transfer_items as counter_stock' => function ($q) {
+                $q->where('status', 1);
+            }], 'qty')
             ->get(['id', 'name', 'expired_date', 'stock']);
 
         return response()->json($batches);
@@ -949,39 +1030,52 @@ class SuppliesController extends Controller
                     ->firstOrFail();
             }
 
-            $stockBefore = (int) $batch->stock;
-            $stockPhysic = (int) $request->stock_physic;
-            $discrepancy = $stockPhysic - $stockBefore;
+            $storageBefore = (int) $batch->stock;
+            $transfer = MedicineTransferItems::where('batches_id', $batch->id)
+                ->where('status', 1)
+                ->first();
+            $counterBefore = $transfer ? (int) $transfer->qty : 0;
+
+            $stockBeforeTotal = $storageBefore + $counterBefore;
+
+            $storagePhysic = (int) $request->stock_physic;
+            $hasCounterInput = $request->filled('counter_stock_physic');
+            $counterPhysic = $hasCounterInput ? (int) $request->counter_stock_physic : $counterBefore;
+
+            $stockAfterTotal = $storagePhysic + $counterPhysic;
+            $discrepancy = $stockAfterTotal - $stockBeforeTotal;
 
             // status 5 = surplus or equal, status 6 = deficit
             $status = $discrepancy >= 0 ? 5 : 6;
 
-            // 2. Update batch stock to the physical count (Storage And COunter)
-            $batch->stock = $stockPhysic;
+            // 2. Update batch storage stock
+            $batch->stock = $storagePhysic;
             $batch->save();
 
-            if ($request->filled('counter_stock_physic')) {
-                $counterPhysic = (int) $request->counter_stock_physic;
-
-                $transfer = MedicineTransferItems::where('batches_id', $batch->id)->first();
-
+            // 3. Update counter stock if input provided
+            if ($hasCounterInput) {
                 if ($transfer) {
                     $transfer->qty = $counterPhysic;
                     $transfer->save();
+                } else {
+                    MedicineTransferItems::create([
+                        'batches_id' => $batch->id,
+                        'source_batches_id' => $batch->id,
+                        'qty' => $counterPhysic,
+                        'status' => 1,
+                    ]);
                 }
-                // If no transfer record exists for this batch, skip silently
             }
 
-            // 3. Write to items_log
-            // Generate a transaction code — adjust the format to your convention
+            // 4. Write StockOpname and ItemsLog
             StockOpname::create([
                 'users_id' => auth()->id(),
                 'batches_id' => $batch->id,
-                'stock_physical' => $stockPhysic,
-                'stock_discrepancy' => $discrepancy,          // signed: positive = surplus, negative = deficit
-                'stock_total' => $stockPhysic,          // final stock after correction
+                'stock_physical' => $stockAfterTotal,
+                'stock_discrepancy' => $discrepancy,
+                'stock_total' => $stockAfterTotal,
                 'date' => now()->toDateString(),
-                'status' => $status,               // 5 = surplus/sama, 6 = defisit
+                'status' => $status,
             ]);
 
             ItemsLog::create([
@@ -991,23 +1085,21 @@ class SuppliesController extends Controller
                 'type' => "SO",
                 'medicine_id' => $request->medicine_id,
                 'qty' => abs($discrepancy),
-                'qty_before' => $stockBefore,
-                'qty_after' => $stockPhysic,
+                'qty_before' => $stockBeforeTotal,
+                'qty_after' => $stockAfterTotal,
                 'total' => $discrepancy,
-                'date' => now()->toDateString(),
+                'date' => now()->toDateTimeString(),
                 'status' => $status,
-                'user_id' => auth()->user()->id,
+                'user_id' => auth()->id(),
             ]);
-
-
 
             DB::commit();
 
             return response()->json([
                 'message' => 'Stock opname berhasil disimpan.',
                 'batch' => $batch->fresh(),
-                'qty_before' => $stockBefore,
-                'qty_after' => $stockPhysic,
+                'qty_before' => $stockBeforeTotal,
+                'qty_after' => $stockAfterTotal,
                 'discrepancy' => $discrepancy,
                 'status' => $status,
             ]);

@@ -560,7 +560,7 @@ class ReceivingController extends Controller
             ->with(['order_items.receivingItems.receiving_details'])
             ->withSum('order_items', 'total')
             ->orderByDesc('id');
-
+    
         if ($request->filled('order_code')) {
             $searchTerm = $request->order_code;
             $items->where(function ($q) use ($searchTerm) {
@@ -576,15 +576,27 @@ class ReceivingController extends Controller
         if ($request->filled('end_date')) {
             $items->whereDate('created_at', '<=', $request->end_date);
         }
-
+    
+        // Helper tombol: satu template, warna & label beda-beda lewat parameter.
+        // stroke-width 1.75 + w-3.5 h-3.5 dipakai di SEMUA tombol (termasuk Lanjutkan/Terima)
+        // supaya ukuran icon konsisten di seluruh kolom aksi.
+        $actionBtn = function (string $href, string $label, string $iconPath, string $colorClasses, bool $blank = false) {
+            $target = $blank ? ' target="_blank"' : '';
+            return '<a href="' . $href . '"' . $target . ' class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border rounded-lg transition-colors ' . $colorClasses . '">'
+                . '<svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">' . $iconPath . '</svg>'
+                . '<span>' . $label . '</span>'
+                . '</a>';
+        };
+    
         return DataTables::of($items)
             ->addIndexColumn()
             ->addColumn('date', fn($row) => $row->date ? date('d M Y', strtotime($row->updated_at)) : '-')
+    
+            // SPB code + badge NT, dibatasi 3 + "+N lainnya" (bagian yang kamu suka, tetap dipertahankan)
             ->addColumn('code', function ($row) {
                 $code = e($row->code ?? '0');
-                $html = '<span class="inline-flex items-center px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 font-mono text-xs font-semibold tracking-wide border border-slate-200">' . $code . '</span>';
-
-                // Add Nomor Terima badges below SPB code
+                $html = '<span style="font-size:10px" class="inline-flex items-center px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 font-nunito-bold tracking-wide border border-slate-200">' . $code . '</span>';
+    
                 $codes = collect();
                 if ($row->relationLoaded('order_items')) {
                     $codes = $row->order_items->flatMap(function ($item) {
@@ -593,89 +605,107 @@ class ReceivingController extends Controller
                         });
                     })->filter()->unique()->values();
                 }
-
+    
                 if ($codes->isNotEmpty()) {
-                    $html .= '<div class="mt-1 flex flex-wrap gap-1">';
-                    foreach ($codes as $c) {
-                        $html .= '<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-200">' . e($c) . '</span>';
+                    $visibleLimit = 3;
+                    $visible = $codes->take($visibleLimit);
+                    $hidden = $codes->slice($visibleLimit);
+    
+                    // font-size disamakan: 11px, level "sekunder" yang sama buat badge NT & "+N lainnya"
+                    $badge = fn($c) => '<span style="font-size:10px" class="inline-flex items-center px-2 py-0.5 rounded font-nunito font-medium bg-blue-50 text-blue-700 border border-blue-200">' . e($c) . '</span>';
+    
+                    $html .= '<div class="mt-1 flex flex-wrap items-center gap-1">';
+                    foreach ($visible as $c) {
+                        $html .= $badge($c);
+                    }
+    
+                    if ($hidden->isNotEmpty()) {
+                        $html .= '<details class="inline-block align-middle">';
+                        $html .= '<summary class="list-none [&::-webkit-details-marker]:hidden inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-500 border border-slate-200 cursor-pointer hover:bg-slate-200">+' . $hidden->count() . ' lainnya</summary>';
+                        $html .= '<div class="mt-1 flex flex-wrap gap-1">';
+                        foreach ($hidden as $c) {
+                            $html .= $badge($c);
+                        }
+                        $html .= '</div></details>';
                     }
                     $html .= '</div>';
                 }
-
+    
                 return $html;
             })
+    
+            // Status badge — pakai raw inline style, bukan class Tailwind, supaya warnanya
+            // pasti render tanpa tergantung content-scanning/build Tailwind (ini yang bikin
+            // titik statusnya sempat tidak muncul sebelumnya)
             ->addColumn('status_order', function ($row) {
-                if ($row->status == 3) {
-                    // DITERIMA
-                    return '<div style="text-align:center;">
-                        <span style="display:inline-flex; align-items:center; gap:6px; padding:4px 12px; border-radius:9999px; font-size:11px; font-weight:700; color:#047857; background-color:#ecfdf5; border:1px solid #a7f3d0; box-shadow:0 0 10px rgb(16 185 129 / 17%);">
-                            <span style="position:relative; display:flex; width:8px; height:8px;">
-                                <span style="position:absolute; width:100%; height:100%; border-radius:50%; background-color:#10b981; box-shadow:0 0 6px #10b981;"></span>
-                            </span>
-                            DITERIMA
-                        </span>
-                    </div>';
-                } elseif ($row->status == 1 || $row->status == 2) {
-                    // DIPESAN
-                    return '<div style="text-align:center;">
-                        <span style="display:inline-flex; align-items:center; gap:6px; padding:4px 12px; border-radius:9999px; font-size:11px; font-weight:700; color:#b45309; background-color:#fffbeb; border:1px solid #fde68a; box-shadow:0 0 10px rgb(245 158 11 / 18%);">
-                            <span style="position:relative; display:flex; width:8px; height:8px;">
-                                <span style="position:absolute; width:100%; height:100%; border-radius:50%; background-color:#f59e0b; box-shadow:0 0 6px #f59e0b;"></span>
-                            </span>
-                            DIPESAN
-                        </span>
-                    </div>';
-                } else {
-                    // PENDING
-                    return '<div style="text-align:center;">
-                        <span style="display:inline-flex; align-items:center; gap:6px; padding:4px 12px; border-radius:9999px; font-size:11px; font-weight:700; color:#be123c; background-color:#fff1f2; border:1px solid #fecdd3; box-shadow:0 0 10px rgb(244 63 94 / 15%);">
-                            <span style="position:relative; display:flex; width:8px; height:8px;">
-                                <span style="position:absolute; width:100%; height:100%; border-radius:50%; background-color:#f43f5e; box-shadow:0 0 6px #f43f5e;"></span>
-                            </span>
-                            PENDING
-                        </span>
-                    </div>';
-                }
+                $variants = [
+                    'diterima' => ['label' => 'DITERIMA', 'text' => '#047857', 'bg' => '#ecfdf5', 'border' => '#a7f3d0', 'dot' => '#10b981'],
+                    'dipesan'  => ['label' => 'DIPESAN',  'text' => '#b45309', 'bg' => '#fffbeb', 'border' => '#fde68a', 'dot' => '#f59e0b'],
+                    'pending'  => ['label' => 'PENDING',  'text' => '#be123c', 'bg' => '#fff1f2', 'border' => '#fecdd3', 'dot' => '#f43f5e'],
+                ];
+    
+                $key = $row->status == 3 ? 'diterima' : (in_array($row->status, [1, 2]) ? 'dipesan' : 'pending');
+                $v = $variants[$key];
+    
+                return '<span style="display:inline-flex; align-items:center; gap:6px; padding:4px 12px; border-radius:9999px; font-size:12px; font-weight:600; color:' . $v['text'] . '; background-color:' . $v['bg'] . '; border:1px solid ' . $v['border'] . ';">'
+                    . '<span style="display:inline-block; width:6px; height:6px; border-radius:9999px; background-color:' . $v['dot'] . ';"></span>'
+                    . $v['label']
+                    . '</span>';
             })
-            ->addColumn('action', function ($row) {
+    
+            // Action buttons — warna balik lagi, icon lebih kecil & konsisten, tanpa glow
+            ->addColumn('action', function ($row) use ($actionBtn) {
                 if ($row->status == 0) {
-                    return '
-                    <a href="/createorder" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm hover:shadow transition-all duration-150">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/></svg>
-                        <span>Lanjutkan</span>
-                    </a>';
-                } else if ($row->status == 1 || $row->status == 2) {
-                    return '
-                    <a href="/receive/' . $row->id . '" style="background: #e6ffe8; border: solid 1px #00bd5a; color: #078f03; box-shadow: 0 0 10px #2d8c056b;" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm hover:shadow transition-all duration-150">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                        <span>Terima</span>
-                    </a>';
-                } else {
-
-
-
-                    return '
-                <div class="flex items-center gap-2">
-                    <a target="_blank" href="/receiving/' . $row->id . '/printspbfinal" style="box-shadow:0 0 10px rgb(255 236 159 / 47%);" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg shadow-xs transition-all duration-150">
-                        <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0 1 10.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0 .229 2.523a1.125 1.125 0 0 1-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0 0 21 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 0 0-1.913-.247M6.34 18H5.25A2.25 2.25 0 0 1 3 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 0 1 1.913-.247m10.5 0a48.536 48.536 0 0 0-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.656"/></svg>
-                        <span>Cetak SPB</span>
-                    </a>
-                    <a target="_blank" href="/receiving/' . $row->id . '/printorders" style="box-shadow:0 0 10px rgb(245 11 11 / 18%);" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-pink-700 bg-pink-50 hover:bg-pink-100 border border-pink-200 rounded-lg shadow-xs transition-all duration-150">
-                        <svg class="w-4 h-4 text-pink-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m8.25-2.142V8.25"/></svg>
-                        <span>Invoice</span>
-                    </a>
-                    <a href="/orders/' . $row->id . '/revision" style="box-shadow:0 0 10px rgb(43 212 255 / 45%);background:#aceaff;color:#112196;" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium hover:bg-[#aceaff] border border-[#1cb8fe] rounded-lg shadow-xs transition-all duration-150">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-cash-edit"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M7 15h-3a1 1 0 0 1 -1 -1v-8a1 1 0 0 1 1 -1h12a1 1 0 0 1 1 1v3" /><path d="M11 19h-3a1 1 0 0 1 -1 -1v-8a1 1 0 0 1 1 -1h12a1 1 0 0 1 1 1v1.25" /><path d="M18.42 15.61a2.1 2.1 0 1 1 2.97 2.97l-3.39 3.42h-3v-3l3.42 -3.39" /></svg>                        <span>Revisi Faktur</span>
-                    </a>
-                </div>';
+                    return $actionBtn(
+                        '/createorder',
+                        'Lanjutkan',
+                        '<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/>',
+                        'text-white bg-blue-600 hover:bg-blue-700 border-blue-600'
+                    );
                 }
+    
+                if ($row->status == 1 || $row->status == 2) {
+                    return $actionBtn(
+                        '/receive/' . $row->id,
+                        'Terima',
+                        '<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>',
+                        'text-white bg-emerald-600 hover:bg-emerald-700 border-emerald-600'
+                    );
+                }
+    
+                // status == 3 (DITERIMA): tiga aksi, masing-masing warna beda biar cepat dibedain
+                return '<div class="flex items-center gap-2">'
+                    . $actionBtn(
+                        '/receiving/' . $row->id . '/printspbfinal',
+                        'Cetak SPB',
+                        '<path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0 1 10.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0 .229 2.523a1.125 1.125 0 0 1-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0 0 21 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 0 0-1.913-.247M6.34 18H5.25A2.25 2.25 0 0 1 3 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 0 1 1.913-.247m10.5 0a48.536 48.536 0 0 0-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.656"/>',
+                        'text-amber-700 bg-amber-50 hover:bg-amber-100 border-amber-200',
+                        true
+                    )
+                    . $actionBtn(
+                        '/receiving/' . $row->id . '/printorders',
+                        'Invoice',
+                        '<path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m8.25-2.142V8.25"/>',
+                        'text-pink-700 bg-pink-50 hover:bg-pink-100 border-pink-200',
+                        true
+                    )
+                    . $actionBtn(
+                        '/orders/' . $row->id . '/revision',
+                        'Revisi Faktur',
+                        '<path d="M7 15h-3a1 1 0 0 1 -1 -1v-8a1 1 0 0 1 1 -1h12a1 1 0 0 1 1 1v3" /><path d="M11 19h-3a1 1 0 0 1 -1 -1v-8a1 1 0 0 1 1 -1h12a1 1 0 0 1 1 1v1.25" /><path d="M18.42 15.61a2.1 2.1 0 1 1 2.97 2.97l-3.39 3.42h-3v-3l3.42 -3.39" />',
+                        'text-sky-700 bg-sky-50 hover:bg-sky-100 border-sky-200'
+                    )
+                    . '</div>';
             })
-            ->addColumn('total', fn($row) => '<span class="font-semibold text-slate-700">Rp ' . number_format($row->order_items_sum_total ?? 0, 0, ',', '.') . '</span>')
-            ->addColumn('total_ppn', fn($row) => '<span class="font-bold text-slate-900">Rp ' . number_format(floor(($row->order_items_sum_total ?? 0) * 1.11), 0, ',', '.') . '</span>')
+    
+            // Total & Total PPN — font-size 13px (sengaja sedikit lebih besar dari 12px karena ini
+            // yang paling penting dilihat kasir), no-wrap biar angka gak patah baris
+            ->addColumn('total', fn($row) => '<span class="text-[13px] font-semibold text-slate-700 whitespace-nowrap tabular-nums">Rp ' . number_format($row->order_items_sum_total ?? 0, 0, ',', '.') . '</span>')
+            ->addColumn('total_ppn', fn($row) => '<span class="text-[13px] font-bold text-slate-900 whitespace-nowrap tabular-nums">Rp ' . number_format(floor(($row->order_items_sum_total ?? 0) * 1.11), 0, ',', '.') . '</span>')
+    
             ->rawColumns(['code', 'status_order', 'action', 'total', 'total_ppn'])
             ->make(true);
     }
-
     function generateReceivingCode()
     {
         $now = Carbon::now();
@@ -776,7 +806,7 @@ class ReceivingController extends Controller
                         'qty_before' => $qtyBefore,
                         'qty_after' => $medicine->stock,
                         'total' => $request->total,
-                        'date' => Carbon::now()->format('Y-m-d'),
+                        'date' => Carbon::now()->format('Y-m-d H:i:s'),
                         'status' => 8,
                         'batches_id' => $item->batches_id,
                         'user_id' => auth()->user()->id,
@@ -839,7 +869,7 @@ class ReceivingController extends Controller
                     'qty_before' => $qtyBeforeReverse,
                     'qty_after' => $medicine->stock,
                     'total' => $request->total,
-                    'date' => Carbon::now()->format('Y-m-d'),
+                    'date' => Carbon::now()->format('Y-m-d H:i:s'),
                     'status' => 8,
                     'batches_id' => $newBatch->id,
                     'user_id' => auth()->user()->id,
@@ -918,7 +948,7 @@ class ReceivingController extends Controller
                 'qty_before' => $qtyBefore,
                 'qty_after' => $medicine->stock,
                 'total' => 0,
-                'date' => Carbon::now()->format('Y-m-d'),
+                'date' => Carbon::now()->format('Y-m-d H:i:s'),
                 'status' => 9,
                 'batches_id' => $item->batches_id,
                 'user_id' => auth()->user()->id,
