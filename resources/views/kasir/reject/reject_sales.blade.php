@@ -512,7 +512,7 @@
 
             const tbody = document.getElementById('searchResults');
             tbody.innerHTML = '';
-            resetInputs();
+            clearFormFields();
 
             if (keyword.length < 1) {
                 document.getElementById('searchDropdown').style.display = 'none';
@@ -586,22 +586,6 @@
             document.getElementById('searchInput').value = "";
 
             document.getElementById('qty')?.focus();
-            axios.get(`/orders/${item.id}/creditors`)
-                .then(res => {
-                    let creditors = res.data.creditors;
-                    console.log(creditors);
-
-                    let select = $("#creditor");
-                    select.empty();
-
-                    creditors.forEach(c => {
-                        select.append(new Option(c.name, c.code));
-                    });
-                    select.val(data.creditor_code).trigger("change");
-
-                    select.trigger("change");
-                })
-                .catch(err => console.log(err));
         }
         // Nav
         document.addEventListener('keydown', function (e) {
