@@ -782,8 +782,21 @@
                 extraDiscInfo.textContent = extraDiscVal <= 100 && extraDiscVal > 0 ? `(Rp ${formatRupiah(nomExtraDisc)})` : '';
             }
 
-            let netTotal = grossTotal - nomDisc - nomExtraDisc;
-            document.getElementById('total_price').value = formatRupiah(Math.max(0, netTotal));
+            let netBeforePpn = Math.max(0, grossTotal - nomDisc - nomExtraDisc);
+            let ppnType = (invoice_ppn && invoice_ppn.value) ? invoice_ppn.value.toUpperCase().trim() : 'TANPA';
+            let finalSubtotal = netBeforePpn;
+
+            if (ppnType === 'EXCLUDE') {
+                let ppnNominal = Math.round(netBeforePpn * 0.11);
+                finalSubtotal = netBeforePpn + ppnNominal;
+            } else if (ppnType === 'INCLUDE') {
+                finalSubtotal = netBeforePpn;
+            } else { // TANPA
+                finalSubtotal = netBeforePpn;
+            }
+
+            document.getElementById('total_price').value = formatRupiah(Math.max(0, finalSubtotal));
+            return finalSubtotal;
         }
 
         function handleDiscount(inputElement) {
@@ -815,6 +828,7 @@
         // Event listeners
         discountInput.addEventListener('input', () => handleDiscount(discountInput));
         extraDiscountInput.addEventListener('input', () => handleDiscount(extraDiscountInput));
+        invoice_ppn.addEventListener('change', () => calculateVisualTotal());
 
 
         var pack = document.getElementById('pack');
@@ -1159,6 +1173,7 @@
                         document.getElementById('invoice_ppn').value = response.data.query?.invoice_ppn
                             ?.trim() || response.data.creditor?.ppn_type?.trim() || 'TANPA';
                         count_due();
+                        calculateVisualTotal();
                     })
                     .catch(console.error);
             }
@@ -1216,6 +1231,7 @@
                         document.getElementById('invoice_ppn').value = ppn;
 
                         count_due();
+                        calculateVisualTotal();
                         // invoice_number.value = response.data.query?.invoice_number || '';
 
                     })
@@ -1516,6 +1532,7 @@
         }
 
         function addItem() {
+            let finalItemTotal = calculateVisualTotal();
             const payload = {
                 creditor_code: creditor.value,
                 receiving_items_id: document.getElementById('receiving_items_id').value,
@@ -1531,7 +1548,7 @@
                 location: itemlocation.value,
                 etalase: etalase.value,
                 status: itemstatus.value,
-                total: total_transaction,
+                total: finalItemTotal,
                 invoice_payment: invoice_payment.value,
                 invoice_number: invoice_number.value,
                 invoice_date: invoice_date.value,

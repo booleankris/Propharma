@@ -150,7 +150,7 @@ class ReceivingController extends Controller
         }
 
         $orderItems = OrderItems::query()
-            ->with(['medicines', 'receivingItems.locations', 'receivingItems.etalases'])
+            ->with(['medicines', 'creditors', 'receivingItems.locations', 'receivingItems.etalases', 'receivingItems.receiving_details'])
             ->withSum('receivingItems as qty_received_total', 'qty_received')
             ->whereHas('orders', fn($q) => $q->where('id', $ordersid))
             ->where('creditor_code', $creditorCode)
@@ -161,8 +161,32 @@ class ReceivingController extends Controller
         foreach ($orderItems as $orderItem) {
             $qtyReceived = $orderItem->qty_received_total ?? 0;
             $qtyRemaining = max(0, $orderItem->quantity - $qtyReceived);
+            $creditorPpn = $orderItem->creditors?->ppn_type ?? 'TANPA';
 
             if ($orderItem->receivingItems->isEmpty()) {
+                $ppnType = strtoupper(trim($creditorPpn));
+                $rawPrice = floatval($orderItem->price ?? 0);
+                $gross = floatval($orderItem->quantity ?? 0) * $rawPrice;
+                $disc = floatval($orderItem->discount ?? 0);
+                $extraDisc = floatval($orderItem->extra_discount ?? 0);
+                $nomDisc = ($disc <= 100 && $disc > 0) ? ($gross * $disc / 100) : $disc;
+                $nomExtraDisc = ($extraDisc <= 100 && $extraDisc > 0) ? ($gross * $extraDisc / 100) : $extraDisc;
+                $net = max(0, $gross - $nomDisc - $nomExtraDisc);
+
+                if ($ppnType === 'EXCLUDE') {
+                    $priceStr = 'Rp ' . number_format($rawPrice, 0, ',', '.');
+                    $pricePpnStr = 'Rp ' . number_format(floor($rawPrice * 1.11), 0, ',', '.');
+                    $itemTotal = floor($net * 1.11);
+                } elseif ($ppnType === 'INCLUDE') {
+                    $priceStr = 'Rp ' . number_format(floor($rawPrice / 1.11), 0, ',', '.');
+                    $pricePpnStr = 'Rp ' . number_format($rawPrice, 0, ',', '.');
+                    $itemTotal = $net;
+                } else { // TANPA
+                    $priceStr = 'Rp ' . number_format($rawPrice, 0, ',', '.');
+                    $pricePpnStr = 'Rp ' . number_format($rawPrice, 0, ',', '.');
+                    $itemTotal = $net;
+                }
+
                 $rows->push([
                     'id' => $orderItem->id,
                     'order_id' => $orderItem->order_id,
@@ -171,16 +195,39 @@ class ReceivingController extends Controller
                     'quantity' => $orderItem->quantity,
                     'qty_received' => 0,
                     'qty_remaining' => $orderItem->quantity,
-                    'raw_price' => $orderItem->price,          // Added
-                    'pack' => $orderItem->pack,           // Added
-                    'price' => 'Rp ' . number_format($orderItem->price, 0, ',', '.'),
-                    'price_ppn' => 'Rp ' . number_format(floor($orderItem->price * 1.11), 0, ',', '.'),
-                    'total' => 'Rp ' . number_format($orderItem->total, 0, ',', '.'),
+                    'raw_price' => $rawPrice,
+                    'pack' => $orderItem->pack,
+                    'price' => $priceStr,
+                    'price_ppn' => $pricePpnStr,
+                    'total' => 'Rp ' . number_format($itemTotal, 0, ',', '.'),
                     'receiving_items' => null,
                 ]);
             } else {
                 foreach ($orderItem->receivingItems as $batch) {
-                    $activePrice = $batch->raw_price ?? $orderItem->price;
+                    $ppnType = strtoupper(trim($batch->receiving_details?->invoice_ppn ?? $creditorPpn));
+                    $activePrice = floatval($batch->raw_price ?? $orderItem->price ?? 0);
+                    $qtyReceived = floatval($batch->qty_received ?? 0);
+                    $gross = $qtyReceived * $activePrice;
+                    $disc = floatval($batch->discount ?? 0);
+                    $extraDisc = floatval($batch->extra_discount ?? 0);
+                    $nomDisc = ($disc <= 100 && $disc > 0) ? ($gross * $disc / 100) : $disc;
+                    $nomExtraDisc = ($extraDisc <= 100 && $extraDisc > 0) ? ($gross * $extraDisc / 100) : $extraDisc;
+                    $net = max(0, $gross - $nomDisc - $nomExtraDisc);
+
+                    if ($ppnType === 'EXCLUDE') {
+                        $priceStr = 'Rp ' . number_format($activePrice, 0, ',', '.');
+                        $pricePpnStr = 'Rp ' . number_format(floor($activePrice * 1.11), 0, ',', '.');
+                        $itemTotal = floor($net * 1.11);
+                    } elseif ($ppnType === 'INCLUDE') {
+                        $priceStr = 'Rp ' . number_format(floor($activePrice / 1.11), 0, ',', '.');
+                        $pricePpnStr = 'Rp ' . number_format($activePrice, 0, ',', '.');
+                        $itemTotal = $net;
+                    } else { // TANPA
+                        $priceStr = 'Rp ' . number_format($activePrice, 0, ',', '.');
+                        $pricePpnStr = 'Rp ' . number_format($activePrice, 0, ',', '.');
+                        $itemTotal = $net;
+                    }
+
                     $rows->push([
                         'id' => $orderItem->id,
                         'order_id' => $orderItem->order_id,
@@ -189,11 +236,11 @@ class ReceivingController extends Controller
                         'quantity' => $orderItem->quantity,
                         'qty_received' => $batch->qty_received,
                         'qty_remaining' => $qtyRemaining,
-                        'raw_price' => $activePrice, // Added
-                        'pack' => $orderItem->pack,                       // Added
-                        'price' => 'Rp ' . number_format($activePrice, 0, ',', '.'),
-                        'price_ppn' => 'Rp ' . number_format(floor($activePrice * 1.11), 0, ',', '.'),
-                        'total' => 'Rp ' . number_format($batch->total, 0, ',', '.'),
+                        'raw_price' => $activePrice,
+                        'pack' => $orderItem->pack,
+                        'price' => $priceStr,
+                        'price_ppn' => $pricePpnStr,
+                        'total' => 'Rp ' . number_format($batch->total ? floatval($batch->total) : $itemTotal, 0, ',', '.'),
                         'receiving_items' => $batch,
                     ]);
                 }
@@ -1037,15 +1084,46 @@ class ReceivingController extends Controller
             $receiving_code = $transaction->code;
             $order_id = $getOrder->id;
             $order_code = $getOrder->code;
-            $getOrderItems = OrderItems::where('order_id', $order_id)->first();
-            $getOrderId = $getOrderItems->id;
-            $d_price = ReceivingItems::with('order_items')
-                ->whereHas('order_items', function ($q) use ($getOrderId) {
-                    $q->where('id', $getOrderId);
-                })
-                ->sum('total') ?? '0';
-            $d_ppn = $d_price * 0.11 ?? '0';
-            $d_total = $d_price + $d_ppn ?? '0';
+
+            $receivingDetails = ReceivingDetails::with(['receiving_items.order_items.medicines', 'creditor'])
+                ->where('receiving_id', $transaction->id)
+                ->get();
+
+            $d_price = 0;
+            $d_ppn = 0;
+            $d_total = 0;
+
+            foreach ($receivingDetails as $detail) {
+                $ppnType = strtoupper(trim($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA'));
+                foreach ($detail->receiving_items as $rItem) {
+                    $qty = floatval($rItem->qty_received ?? $rItem->qty ?? 0);
+                    $price = floatval($rItem->raw_price ?? $rItem->order_items->price ?? 0);
+                    $gross = $qty * $price;
+                    $disc = floatval($rItem->discount ?? 0);
+                    $extraDisc = floatval($rItem->extra_discount ?? 0);
+                    $nomDisc = ($disc <= 100 && $disc > 0) ? ($gross * $disc / 100) : $disc;
+                    $nomExtraDisc = ($extraDisc <= 100 && $extraDisc > 0) ? ($gross * $extraDisc / 100) : $extraDisc;
+                    $net = max(0, $gross - $nomDisc - $nomExtraDisc);
+
+                    if ($ppnType === 'EXCLUDE') {
+                        $itemHna = $net;
+                        $itemPpn = floor($net * 0.11);
+                        $itemTotal = $itemHna + $itemPpn;
+                    } elseif ($ppnType === 'INCLUDE') {
+                        $itemTotal = $net;
+                        $itemHna = floor($net / 1.11);
+                        $itemPpn = $itemTotal - $itemHna;
+                    } else { // TANPA
+                        $itemHna = $net;
+                        $itemPpn = 0;
+                        $itemTotal = $net;
+                    }
+
+                    $d_price += $itemHna;
+                    $d_ppn += $itemPpn;
+                    $d_total += $itemTotal;
+                }
+            }
 
             return view('orders.receiving', compact('order_id', 'd_price', 'd_ppn', 'd_total', 'order_code', 'creditorOption', 'receiving_code', 'transaction', 'now', 'datenow', 'receiving_id', 'allFakturs'));
         } else {
@@ -1164,23 +1242,54 @@ class ReceivingController extends Controller
 
             DB::commit();
 
-            $getOrderId = $request->order_items_id;
+            $receivingDetails = ReceivingDetails::with(['receiving_items.order_items.medicines', 'creditor'])
+                ->where('receiving_id', $receiving->id)
+                ->get();
 
-            $price_total = ReceivingItems::with('order_items')
-                ->whereHas('order_items', function ($q) use ($getOrderId) {
-                    $q->where('id', $getOrderId);
-                })
-                ->sum('total') ?? 0;
-            $ppn = $price_total * 0.11;
+            $d_price = 0;
+            $d_ppn = 0;
+            $d_total = 0;
+
+            foreach ($receivingDetails as $detail) {
+                $ppnType = strtoupper(trim($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA'));
+                foreach ($detail->receiving_items as $rItem) {
+                    $qty = floatval($rItem->qty_received ?? $rItem->qty ?? 0);
+                    $price = floatval($rItem->raw_price ?? $rItem->order_items->price ?? 0);
+                    $gross = $qty * $price;
+                    $disc = floatval($rItem->discount ?? 0);
+                    $extraDisc = floatval($rItem->extra_discount ?? 0);
+                    $nomDisc = ($disc <= 100 && $disc > 0) ? ($gross * $disc / 100) : $disc;
+                    $nomExtraDisc = ($extraDisc <= 100 && $extraDisc > 0) ? ($gross * $extraDisc / 100) : $extraDisc;
+                    $net = max(0, $gross - $nomDisc - $nomExtraDisc);
+
+                    if ($ppnType === 'EXCLUDE') {
+                        $itemHna = $net;
+                        $itemPpn = floor($net * 0.11);
+                        $itemTotal = $itemHna + $itemPpn;
+                    } elseif ($ppnType === 'INCLUDE') {
+                        $itemTotal = $net;
+                        $itemHna = floor($net / 1.11);
+                        $itemPpn = $itemTotal - $itemHna;
+                    } else { // TANPA
+                        $itemHna = $net;
+                        $itemPpn = 0;
+                        $itemTotal = $net;
+                    }
+
+                    $d_price += $itemHna;
+                    $d_ppn += $itemPpn;
+                    $d_total += $itemTotal;
+                }
+            }
 
             return response()->json([
                 'success' => true,
                 'receiving' => $receiving,
                 'item' => $item,
                 'summary' => [
-                    'price_item' => $price_total,
-                    'price_ppn' => $ppn,
-                    'price_total' => $price_total + $ppn,
+                    'price_item' => $d_price,
+                    'price_ppn' => $d_ppn,
+                    'price_total' => $d_total,
                 ]
             ]);
         } catch (\Exception $e) {

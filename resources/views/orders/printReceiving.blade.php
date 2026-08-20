@@ -172,9 +172,20 @@
 
                 <tfoot>
                     @php
+                        $ppnType = strtoupper(trim($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA'));
                         $detailNet = max(0, $detailSubtotal - $detailDiscount);
-                        $detailPpn = floor($detailNet * 0.11);
-                        $detailGrandTotal = $detailNet + $detailPpn;
+
+                        if ($ppnType === 'EXCLUDE') {
+                            $detailPpn = floor($detailNet * 0.11);
+                            $detailGrandTotal = $detailNet + $detailPpn;
+                        } elseif ($ppnType === 'INCLUDE') {
+                            $detailGrandTotal = $detailNet;
+                            $detailHna = floor($detailNet / 1.11);
+                            $detailPpn = $detailGrandTotal - $detailHna;
+                        } else { // TANPA
+                            $detailPpn = 0;
+                            $detailGrandTotal = $detailNet;
+                        }
                     @endphp
 
                     <tr>
@@ -192,7 +203,7 @@
                     </tr>
 
                     <tr>
-                        <th colspan="7" class="text-right">TOTAL PPN (11%)</th>
+                        <th colspan="7" class="text-right">TOTAL PPN ({{ $ppnType === 'EXCLUDE' ? '11% Exclude' : ($ppnType === 'INCLUDE' ? 'Include' : 'Tanpa PPN') }})</th>
                         <th class="text-right">
                             {{ number_format($detailPpn, 0, ',', '.') }}
                         </th>
