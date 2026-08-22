@@ -3,6 +3,7 @@
 @section('title', 'Scan Barcode')
 
 @section('style')
+    <link rel="stylesheet" href="{{ asset('templates/library/izitoast/dist/css/iziToast.min.css') }}">
     <style>
         * {
             box-sizing: border-box;
@@ -19,6 +20,7 @@
             background: #0f172a;
             color: #f8fafc;
             padding: 0;
+            padding-bottom: 20px;
         }
 
         /* ── Top bar ── */
@@ -172,6 +174,8 @@
             transition: transform .35s cubic-bezier(.32, 1.2, .42, 1);
             max-width: 560px;
             margin: 0 auto;
+            max-height: 90dvh;
+            overflow-y: auto;
         }
 
         .bottom-sheet.visible {
@@ -257,7 +261,7 @@
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: .05em;
-            color: #475569;
+            color: #94a3b8;
             margin-bottom: 4px;
         }
 
@@ -274,6 +278,71 @@
 
         .detail-item.highlight .di-value {
             color: #60a5fa;
+        }
+
+        /* Form Opname Inputs */
+        .form-opname {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+
+        .form-group {
+            margin-bottom: 12px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .05em;
+            color: #94a3b8;
+            margin-bottom: 6px;
+        }
+
+        .form-control {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #f1f5f9;
+            padding: 12px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 700;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .form-control:focus {
+            border-color: #3b82f6;
+        }
+
+        select.form-control {
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            background-size: 16px;
+            padding-right: 40px;
+        }
+        select.form-control option {
+            background: #1e293b;
+            color: #f1f5f9;
+        }
+
+        .form-control.discrepancy {
+            background: transparent;
+            border: none;
+            padding: 0;
+            font-size: 20px;
+            text-align: center;
+        }
+        
+        .form-control.discrepancy.error {
+            color: #fca5a5;
         }
 
         /* not found state inside sheet */
@@ -299,13 +368,18 @@
             font-size: 12px;
         }
 
-        /* rescan button */
-        .btn-rescan {
+        /* buttons */
+        .btn-wrapper {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-action {
             display: flex;
             align-items: center;
             justify-content: center;
             gap: 8px;
-            width: 100%;
+            flex: 1;
             padding: 14px;
             background: #2563eb;
             color: #fff;
@@ -317,64 +391,42 @@
             transition: background .15s, transform .1s;
         }
 
-        .btn-rescan:active {
+        .btn-action:active {
             transform: scale(.97);
         }
 
-        .btn-rescan:hover {
+        .btn-action:hover {
             background: #1d4ed8;
         }
 
-        .btn-rescan.danger {
+        .btn-action.secondary {
+            background: #334155;
+            color: #e2e8f0;
+        }
+
+        .btn-action.secondary:hover {
+            background: #475569;
+        }
+
+        .btn-action.danger {
             background: rgba(220, 38, 38, .15);
             color: #fca5a5;
             border: 1px solid rgba(220, 38, 38, .25);
         }
 
-        .btn-rescan.danger:hover {
+        .btn-action.danger:hover {
             background: rgba(220, 38, 38, .25);
         }
 
-        /* ── Alert ── */
-        .scan-alert {
+        #discrepancy_badge {
             display: none;
-            margin-top: 16px;
-            background: rgba(220, 38, 38, .12);
-            border: 1px solid rgba(220, 38, 38, .3);
-            border-radius: 14px;
-            padding: 16px 18px;
-            color: #fca5a5;
-            font-size: 14px;
-            font-weight: 600;
-            text-align: center;
-        }
-
-        .scan-alert.visible {
-            display: block;
-        }
-
-        /* ── Rescan button ── */
-        .btn-rescan {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            width: 100%;
-            margin-top: 16px;
-            padding: 13px;
-            background: #2563eb;
-            color: #fff;
-            font-size: 14px;
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 99px;
             font-weight: 700;
-            border: none;
-            border-radius: 12px;
-            cursor: pointer;
-            transition: background .15s;
+            margin-left: auto;
         }
 
-        .btn-rescan:hover {
-            background: #1d4ed8;
-        }
     </style>
 @endsection
 
@@ -436,20 +488,60 @@
                         <div class="di-label">Harga Beli</div>
                         <div class="di-value" id="res_price">—</div>
                     </div>
-                    <div class="detail-item highlight span2">
+                    <div class="detail-item highlight">
+                        <div class="di-label">Stok Gudang</div>
+                        <div class="di-value" id="res_stock_gudang">—</div>
+                    </div>
+                    <div class="detail-item highlight">
                         <div class="di-label">Stok Counter</div>
-                        <div class="di-value" id="res_stock">—</div>
+                        <div class="di-value" id="res_stock_counter">—</div>
                     </div>
                 </div>
 
-                <button class="btn-rescan" id="btn_rescan">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                        stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                            d="M4 4v5h5M20 20v-5h-5M4 9a9 9 0 0115 0M20 15a9 9 0 01-15 0" />
-                    </svg>
-                    Scan Lagi
-                </button>
+                {{-- Opname Form (Matches Desktop) --}}
+                <div class="form-opname">
+                    <input type="hidden" id="medicine_id">
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div class="form-group">
+                            <label>Fisik Gudang</label>
+                            <input type="number" id="stock_physic" class="form-control" placeholder="0" onkeyup="countDiscrepancy()">
+                        </div>
+                        <div class="form-group">
+                            <label>Fisik Counter</label>
+                            <input type="number" id="counter_stock_physic" class="form-control" placeholder="0" onkeyup="countDiscrepancy()">
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="text-align: center; margin: 15px 0;">
+                        <label style="display: flex; justify-content: center; align-items: center; gap: 8px;">
+                            Selisih Stok <span id="discrepancy_badge"></span>
+                        </label>
+                        <input type="text" readonly id="stock_discrepancy" class="form-control discrepancy" placeholder="—">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Penyesuaian Batch (Opsional)</label>
+                        <select id="batch_select" class="form-control">
+                            <option value="">— Otomatis (FEFO) —</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="btn-wrapper">
+                    <button class="btn-action secondary" id="btn_rescan">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h5M20 20v-5h-5M4 9a9 9 0 0115 0M20 15a9 9 0 01-15 0" />
+                        </svg>
+                        Tutup & Scan
+                    </button>
+                    <button class="btn-action" id="btn_save_opname">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                        Simpan Opname
+                    </button>
+                </div>
             </div>
 
             {{-- Not found state --}}
@@ -460,7 +552,7 @@
                     <small>Periksa kembali dan coba scan ulang</small>
                 </div>
                 <br>
-                <button class="btn-rescan danger" id="btn_rescan_alert">
+                <button class="btn-action danger" id="btn_rescan_alert">
                     Scan Ulang
                 </button>
             </div>
@@ -470,6 +562,8 @@
 
 @section('scripts')
     <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/umd/index.min.js"></script>
+    <script src="{{ asset('templates/library/izitoast/dist/js/iziToast.min.js') }}"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 
     <script>
         /* ── State & DOM refs ─────────────────────────────────────────── */
@@ -480,6 +574,10 @@
         const sheet = document.getElementById('bottom_sheet');
         const shFound = document.getElementById('sheet_found');
         const shMissing = document.getElementById('sheet_notfound');
+
+        let current_storage_stock = 0;
+        let current_counter_stock = 0;
+        let total_stock = 0; // current system stock (storage + counter)
 
         /* ── Helpers ──────────────────────────────────────────────────── */
         function formatRupiah(val) {
@@ -503,7 +601,167 @@
         function resetScan() {
             statusEl.textContent = 'Siap scan…';
             scanning = true;
+            $('#stock_physic, #counter_stock_physic, #stock_discrepancy').val('');
+            $('#batch_select').prop('selectedIndex', 0);
+            document.getElementById('discrepancy_badge').style.display = 'none';
+            document.getElementById('stock_discrepancy').classList.remove('error');
         }
+
+        /* ── Opname Logic (Matches Desktop) ────────────────────────────── */
+        function loadBatches(medicine_id) {
+            const select = document.getElementById('batch_select');
+            select.innerHTML = '<option value="">Memuat batch…</option>';
+
+            fetch(`{{ route('supplies.batches') }}?medicine_id=${medicine_id}`)
+                .then(res => res.json())
+                .then(batches => {
+                    select.innerHTML = '<option value="">— Otomatis (FEFO) —</option>';
+
+                    let totalStorageStock = 0;
+                    let totalCounterStock = 0;
+
+                    batches.forEach(b => {
+                        const opt = document.createElement('option');
+                        opt.value = b.id;
+                        const gStock = parseInt(b.stock || 0);
+                        const cStock = parseInt(b.counter_stock || 0);
+                        opt.textContent = `${b.name} — Exp: ${b.expired_date} (Gdg: ${gStock}, Ctr: ${cStock})`;
+                        opt.dataset.stock = gStock;
+                        opt.dataset.counterStock = cStock;
+                        select.appendChild(opt);
+                        
+                        totalStorageStock += gStock;
+                        totalCounterStock += cStock;
+                    });
+
+                    updateTotalStockFromSelect();
+                    // Set default display
+                    document.getElementById('res_stock_gudang').textContent = totalStorageStock;
+                    document.getElementById('res_stock_counter').textContent = totalCounterStock;
+                })
+                .catch(() => {
+                    select.innerHTML = '<option value="">— Gagal memuat batch —</option>';
+                });
+        }
+
+        function updateTotalStockFromSelect() {
+            const select = document.getElementById('batch_select');
+            const selectedOpt = select.options[select.selectedIndex];
+
+            if (selectedOpt && selectedOpt.value !== '') {
+                current_storage_stock = parseInt(selectedOpt.dataset.stock) || 0;
+                current_counter_stock = parseInt(selectedOpt.dataset.counterStock) || 0;
+            } else {
+                let sumStorage = 0;
+                let sumCounter = 0;
+                for (let i = 1; i < select.options.length; i++) {
+                    sumStorage += parseInt(select.options[i].dataset.stock) || 0;
+                    sumCounter += parseInt(select.options[i].dataset.counterStock) || 0;
+                }
+                current_storage_stock = sumStorage;
+                current_counter_stock = sumCounter;
+            }
+
+            total_stock = current_storage_stock + current_counter_stock;
+
+            if ($('#stock_physic').val() !== '' || $('#counter_stock_physic').val() !== '') {
+                countDiscrepancy();
+            }
+        }
+
+        document.getElementById('batch_select')?.addEventListener('change', updateTotalStockFromSelect);
+
+        function countDiscrepancy() {
+            const valGudang = $('#stock_physic').val();
+            const valCounter = $('#counter_stock_physic').val();
+            const input = document.getElementById('stock_discrepancy');
+            const badge = document.getElementById('discrepancy_badge');
+
+            if (valGudang === '' && valCounter === '') {
+                input.value = '';
+                input.classList.remove('error');
+                badge.style.display = 'none';
+                return;
+            }
+
+            const gudangPhysic = valGudang !== '' ? (parseInt(valGudang) || 0) : current_storage_stock;
+            const counterPhysic = valCounter !== '' ? (parseInt(valCounter) || 0) : current_counter_stock;
+
+            const totalPhysic = gudangPhysic + counterPhysic;
+            const discrepancy = totalPhysic - total_stock;
+            input.value = (discrepancy > 0 ? '+' : '') + discrepancy;
+
+            if (discrepancy !== 0) {
+                input.classList.add('error');
+                if (discrepancy > 0) {
+                    badge.textContent = `+${discrepancy} Lebih`;
+                    badge.style.cssText = 'display:inline-block;background:#059669;color:#fff;';
+                } else {
+                    badge.textContent = `${discrepancy} Kurang`;
+                    badge.style.cssText = 'display:inline-block;background:#dc2626;color:#fff;';
+                }
+            } else {
+                input.classList.remove('error');
+                badge.style.display = 'none';
+            }
+        }
+
+        function SaveOpname() {
+            const medicineId = $('#medicine_id').val();
+            const stockPhysic = $('#stock_physic').val();
+            const counterStockPhysic = $('#counter_stock_physic').val();
+            const batchesId = $('#batch_select').val();
+
+            if (!medicineId) {
+                iziToast.warning({ title: 'Peringatan', message: 'Obat tidak valid.', position: 'topRight' });
+                return;
+            }
+            if (stockPhysic === '') {
+                iziToast.warning({ title: 'Peringatan', message: 'Isi stok fisik gudang terlebih dahulu!', position: 'topRight' });
+                document.getElementById('stock_physic').focus();
+                return;
+            }
+
+            const btn = document.getElementById('btn_save_opname');
+            const originalContent = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = 'Menyimpan...';
+
+            $.ajax({
+                url: "{{ route('supplies.opname') }}",
+                type: 'POST',
+                data: {
+                    _token: "{{ csrf_token() }}",
+                    medicine_id: medicineId,
+                    stock_physic: stockPhysic,
+                    counter_stock_physic: counterStockPhysic,
+                    batches_id: batchesId,
+                },
+                success: function(response) {
+                    iziToast.success({
+                        title: 'Berhasil',
+                        message: response.message || 'Stok berhasil disimpan!',
+                        position: 'topRight'
+                    });
+                    closeSheet(); // Automatically close and ready for next scan
+                },
+                error: function(xhr) {
+                    const msg = xhr.responseJSON?.message || 'Terjadi kesalahan!';
+                    iziToast.error({
+                        title: 'Gagal',
+                        message: msg,
+                        position: 'topRight'
+                    });
+                },
+                complete: function() {
+                    btn.disabled = false;
+                    btn.innerHTML = originalContent;
+                }
+            });
+        }
+        
+        document.getElementById('btn_save_opname').addEventListener('click', SaveOpname);
+
 
         /* ── Show results ─────────────────────────────────────────────── */
         function showResult(data) {
@@ -511,7 +769,11 @@
             document.getElementById('res_code').textContent = data.code;
             document.getElementById('res_unit').textContent = data.unit;
             document.getElementById('res_price').textContent = formatRupiah(data.raw_price);
-            document.getElementById('res_stock').textContent = data.stock;
+            document.getElementById('medicine_id').value = data.id;
+            
+            // Start loading batches so we get real total stock from the server logic
+            loadBatches(data.id);
+
             statusEl.textContent = 'Ditemukan';
             scanning = false;
             openSheet('found');
@@ -524,7 +786,9 @@
         }
 
         /* ── Event listeners (each button bound exactly once) ─────────── */
-        overlay.addEventListener('click', closeSheet);
+        overlay.addEventListener('click', (e) => {
+            if(e.target === overlay) closeSheet();
+        });
         document.getElementById('btn_close').addEventListener('click', closeSheet);
         document.getElementById('btn_rescan').addEventListener('click', closeSheet);
         document.getElementById('btn_rescan_alert').addEventListener('click', closeSheet);

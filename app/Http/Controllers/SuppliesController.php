@@ -936,6 +936,7 @@ class SuppliesController extends Controller
 
         return response()->json([
             'found' => true,
+            'id' => $medicine->id,
             'code' => $medicine->code,
             'name' => $medicine->name,
             'unit' => $medicine->unit,
