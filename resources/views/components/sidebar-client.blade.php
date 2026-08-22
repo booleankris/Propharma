@@ -44,7 +44,7 @@
     .sidebar {
         width: 240px;
         min-height: 100vh;
-        background: #0f2744;
+        background: linear-gradient(32deg, #022859, #387fdd);
         display: flex;
         flex-direction: column;
         position: fixed;
@@ -118,7 +118,7 @@
         gap: 10px;
         padding: 10px 12px;
         border-radius: 10px;
-        color: #94a3b8;
+        color: #fff;
         font-size: 13.5px;
         font-weight: 500;
         cursor: pointer;
