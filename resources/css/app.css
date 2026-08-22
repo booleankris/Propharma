@@ -675,7 +675,13 @@ table {
   color: #475569 !important;
   cursor: pointer;
 }
-
+/* Search Master */
+.dataTables_wrapper .dataTables_filter input{
+  margin-left: 0.5em;
+  padding: 5px;
+  border: 0.5px solid #646262;
+  border-radius: 7px;
+}
 .dataTables_paginate .paginate_button.current,
 .dataTables_paginate .paginate_button.current:hover {
   background: #0D9488 !important;
@@ -690,7 +696,7 @@ table {
 .dataTables_wrapper .dataTables_processing,
 .dataTables_wrapper .dataTables_paginate .dataTables_wrapper .dataTables_paginate .paginate_button.current,
 .dataTables_wrapper .dataTables_paginate {
-  color: #fff !important;
+  /* color: #fff !important; */
   margin: 7px 0 !important;
 }
 
