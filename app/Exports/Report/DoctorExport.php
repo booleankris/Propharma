@@ -2,7 +2,9 @@
 
 namespace App\Exports\Report;
 
+use App\Models\Doctors;
 use App\Models\MedicineTransactions;
+use App\Models\Pharmacies;
 use Illuminate\Support\Carbon;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\WithStyles;
@@ -35,13 +37,20 @@ class DoctorExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
 
     public function array(): array
     {
-        $pharmacy = \App\Models\Pharmacies::find($this->pharmacyId);
+        $pharmacy = Pharmacies::find($this->pharmacyId);
+        $doctorName = null;
+        if (!empty($this->doctorId)) {
+            $doctorObj = Doctors::find($this->doctorId);
+            $doctorName = $doctorObj?->name;
+        }
+
+        $titleSuffix = $doctorName ? " - {$doctorName}" : '';
 
         $header = [
             [$pharmacy->name ?? 'APOTEK'],
             [$pharmacy->address ?? ''],
             [''],
-            ['Laporan Penjualan ' . ($this->selectedType === 'rekap' ? 'Dokter' : 'Daftar Transaksi Penjualan') . ' (' . ucfirst($this->selectedType) . ')'],
+            ['Laporan Penjualan Dokter (' . ucfirst($this->selectedType) . "){$titleSuffix}"],
             ['Tanggal : ' . $this->startDate->format('d/m/Y') . ' s/d ' . $this->endDate->format('d/m/Y')],
             [''],
         ];
@@ -53,17 +62,136 @@ class DoctorExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         return array_merge($header, $body);
     }
 
-    // REKAP — transactions with a specific doctor, show medicines sold
+    // REKAP — 5 Kolom: No, Nama Dokter, Nilai Resep, Lembar, Jumlah R/
     private function buildRecap(): array
     {
-        $query = MedicineTransactions::with(['transactions.medicine', 'doctors', 'patients'])
+        $query = MedicineTransactions::with(['transactions', 'doctors'])
             ->where('pharmacy_id', $this->pharmacyId)
             ->whereIn('transaction_type', ['RESEP TUNAI', 'KREDIT'])
             ->where('status', 1)
             ->whereBetween('updated_at', [$this->startDate, $this->endDate]);
-   
+
+        if (!empty($this->doctorId)) {
+            $query->where('doctor_id', $this->doctorId);
+        } else {
+            $query->whereNotNull('doctor_id');
+        }
+
+        if ($this->shiftType === 'shift' && !empty($this->shift)) {
+            $query->whereHas('shift_logs', function ($q) {
+                $q->where('shift_id', $this->shift);
+            });
+        }
 
         $transactions = $query->get();
+
+        $grouped = [];
+
+        foreach ($transactions as $trx) {
+            $docId   = $trx->doctor_id ?? 0;
+            $docName = $trx->doctors?->name ?? 'TANPA DOKTER';
+
+            if (!isset($grouped[$docId])) {
+                $grouped[$docId] = [
+                    'doctor_name' => $docName,
+                    'nilai_resep' => 0,
+                    'lembar'      => 0,
+                    'jumlah_r'    => 0,
+                ];
+            }
+
+            $grouped[$docId]['nilai_resep'] += (float) ($trx->subtotal ?? 0);
+            $grouped[$docId]['lembar']      += 1;
+
+            foreach ($trx->transactions ?? [] as $item) {
+                $grouped[$docId]['jumlah_r'] += (float) ($item->quantity ?? 0);
+            }
+        }
+
+        // Sort alphabetically by Doctor Name (A-Z)
+        uasort($grouped, fn($a, $b) => strcasecmp($a['doctor_name'], $b['doctor_name']));
+
+        $rows   = [];
+        $rows[] = ['No.', 'Nama Dokter', 'Nilai Resep', 'Lembar', 'Jumlah R/'];
+
+        $no           = 1;
+        $grandNilai   = 0;
+        $grandLembar  = 0;
+        $grandJumlahR = 0;
+
+        foreach ($grouped as $doc) {
+            $rows[] = [
+                $no++,
+                $doc['doctor_name'],
+                $doc['nilai_resep'],
+                $doc['lembar'],
+                $doc['jumlah_r'],
+            ];
+
+            $grandNilai   += $doc['nilai_resep'];
+            $grandLembar  += $doc['lembar'];
+            $grandJumlahR += $doc['jumlah_r'];
+        }
+
+        $rows[] = ['', 'TOTAL', $grandNilai, $grandLembar, $grandJumlahR];
+
+        return $rows;
+    }
+
+    // DETAIL — 5 Kolom: No, Nama Dokter, Nama Obat, Qty, Jumlah
+    private function buildDetail(): array
+    {
+        $query = MedicineTransactions::with(['transactions.medicine', 'doctors'])
+            ->where('pharmacy_id', $this->pharmacyId)
+            ->whereIn('transaction_type', ['RESEP TUNAI', 'KREDIT'])
+            ->where('status', 1)
+            ->whereBetween('updated_at', [$this->startDate, $this->endDate]);
+
+        if (!empty($this->doctorId)) {
+            $query->where('doctor_id', $this->doctorId);
+        } else {
+            $query->whereNotNull('doctor_id');
+        }
+
+        if ($this->shiftType === 'shift' && !empty($this->shift)) {
+            $query->whereHas('shift_logs', function ($q) {
+                $q->where('shift_id', $this->shift);
+            });
+        }
+
+        $transactions = $query->get();
+
+        $grouped = [];
+
+        foreach ($transactions as $trx) {
+            $docId   = $trx->doctor_id ?? 0;
+            $docName = $trx->doctors?->name ?? 'TANPA DOKTER';
+
+            foreach ($trx->transactions ?? [] as $item) {
+                $med     = $item->medicine;
+                $medId   = $med?->id ?? ('item_' . $item->id);
+                $medName = $med?->name ?? ($item->medicine_name ?? '-');
+                $key     = "{$docId}_{$medId}";
+
+                if (!isset($grouped[$key])) {
+                    $grouped[$key] = [
+                        'doctor'   => $docName,
+                        'medicine' => $medName,
+                        'qty'      => 0,
+                        'total'    => 0,
+                    ];
+                }
+
+                $grouped[$key]['qty']   += (float) ($item->quantity ?? 0);
+                $grouped[$key]['total'] += (float) ($item->final_price ?? 0);
+            }
+        }
+
+        // Sort by Doctor Name (A-Z), then Medicine Name (A-Z)
+        uasort($grouped, function ($a, $b) {
+            $cmpDoc = strcasecmp($a['doctor'], $b['doctor']);
+            return $cmpDoc !== 0 ? $cmpDoc : strcasecmp($a['medicine'], $b['medicine']);
+        });
 
         $rows   = [];
         $rows[] = ['No.', 'Nama Dokter', 'Nama Obat', 'Qty', 'Jumlah'];
@@ -72,81 +200,28 @@ class DoctorExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         $grandQty   = 0;
         $grandTotal = 0;
 
-        foreach ($transactions as $trx) {
-            $doctorName = $trx->doctors?->name ?? '-';
-
-            foreach ($trx->transactions ?? [] as $item) {
-                $medicineName = $item->medicine?->name ?? '-';
-                $qty          = (int) ($item->quantity ?? 0);
-                $jumlah       = (int) ($item->final_price ?? 0);
-
-                $rows[] = [
-                    $no++,
-                    $doctorName,
-                    $medicineName,
-                    $qty,
-                    $jumlah,
-                ];
-
-                $grandQty   += $qty;
-                $grandTotal += $jumlah;
-            }
-        }
-
-        $rows[] = ['', 'Total Penjualan Dokter', '', $grandQty, $grandTotal];
-
-        return $rows;
-    }
-
-    // DETAIL — transactions where doctor_id IS NULL
-    private function buildDetail(): array
-    {
-        $transactions = MedicineTransactions::with(['doctors', 'patients'])
-            ->where('pharmacy_id', $this->pharmacyId)
-            ->whereIn('transaction_type', ['RESEP TUNAI', 'KREDIT'])
-            ->where('status', 1)
-            ->where('doctor_id', $this->doctorId)
-            ->whereBetween('updated_at', [$this->startDate, $this->endDate])
-            ->get();
-
-        $rows   = [];
-        $rows[] = ['No.', 'Tanggal', 'No Resep', 'Layanan', 'Dokter', 'Pasien', 'Jumlah'];
-
-        $no         = 1;
-        $grandTotal = 0;
-
-        foreach ($transactions as $trx) {
-            $layanan = '-';
-            if ($trx->transaction_type === 'KREDIT') {
-                $layanan = 'UK';
-            } elseif ($trx->transaction_type === 'RESEP TUNAI') {
-                $layanan = 'UM';
-            }
-
-            $jumlah = (int) ($trx->subtotal ?? 0);
-
+        foreach ($grouped as $item) {
             $rows[] = [
                 $no++,
-                Carbon::parse($trx->created_at)->format('d/m/Y'),
-                $trx->transaction_code ?? '-',
-                $layanan,
-                $trx->doctors?->name ?? '-',
-                $trx->patients?->name ?? '-',
-                $jumlah,
+                $item['doctor'],
+                $item['medicine'],
+                $item['qty'],
+                $item['total'],
             ];
 
-            $grandTotal += $jumlah;
+            $grandQty   += $item['qty'];
+            $grandTotal += $item['total'];
         }
 
-        $rows[] = ['', '', '', '', '', 'TOTAL', $grandTotal];
+        $rows[] = ['', 'TOTAL', '', $grandQty, $grandTotal];
 
         return $rows;
     }
 
     public function styles(Worksheet $sheet)
     {
-        $lastCol     = $sheet->getHighestColumn();
-        $lastRow     = $sheet->getHighestRow();
+        $lastCol      = $sheet->getHighestColumn();
+        $lastRow      = $sheet->getHighestRow();
         $dataStartRow = 7;
 
         // Merge header rows
@@ -172,29 +247,29 @@ class DoctorExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
             $sheet->getRowDimension($i)->setRowHeight(25);
         }
 
-        // Right-align & number format on Jumlah column
-        $jumlahCol = $this->selectedType === 'rekap' ? 'E' : 'G';
-
-        $sheet->getStyle("{$jumlahCol}{$dataStartRow}:{$jumlahCol}{$lastRow}")
+        // Center-align No column
+        $sheet->getStyle("A{$dataStartRow}:A{$lastRow}")
             ->getAlignment()
-            ->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+            ->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-        $sheet->getStyle("{$jumlahCol}{$dataStartRow}:{$jumlahCol}{$lastRow}")
-            ->getNumberFormat()
-            ->setFormatCode('#,##0');
-
-        // Right-align Qty column in rekap
         if ($this->selectedType === 'rekap') {
-            $sheet->getStyle("D{$dataStartRow}:D{$lastRow}")
+            // Rekap: C (Nilai Resep), D (Lembar), E (Jumlah R/) -> Right-aligned & Number format
+            $sheet->getStyle("C{$dataStartRow}:E{$lastRow}")
                 ->getAlignment()
                 ->setHorizontal(Alignment::HORIZONTAL_RIGHT);
-        }
 
-        // Center-align Layanan column in detail
-        if ($this->selectedType === 'detail') {
-            $sheet->getStyle("D{$dataStartRow}:D{$lastRow}")
+            $sheet->getStyle("C{$dataStartRow}:E{$lastRow}")
+                ->getNumberFormat()
+                ->setFormatCode('#,##0');
+        } else {
+            // Detail: D (Qty), E (Jumlah) -> Right-aligned & Number format
+            $sheet->getStyle("D{$dataStartRow}:E{$lastRow}")
                 ->getAlignment()
-                ->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                ->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+
+            $sheet->getStyle("D{$dataStartRow}:E{$lastRow}")
+                ->getNumberFormat()
+                ->setFormatCode('#,##0');
         }
     }
 
@@ -202,25 +277,23 @@ class DoctorExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
     {
         return $this->selectedType === 'rekap'
             ? [
-                'A' => 5,
+                'A' => 6,
                 'B' => 35,
-                'C' => 40,
-                'D' => 10,
-                'E' => 20,
+                'C' => 20,
+                'D' => 12,
+                'E' => 14,
             ]
             : [
-                'A' => 5,
-                'B' => 15,
-                'C' => 15,
-                'D' => 10,
-                'E' => 30,
-                'F' => 30,
-                'G' => 20,
+                'A' => 6,
+                'B' => 32,
+                'C' => 38,
+                'D' => 12,
+                'E' => 20,
             ];
     }
 
     public function title(): string
     {
-        return 'DoctorExport';
+        return 'Penjualan Dokter';
     }
 }

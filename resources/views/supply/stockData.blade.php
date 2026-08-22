@@ -1,124 +1,107 @@
 @extends('layouts.app')
 
-@section('title', 'Sales Data')
+@section('title', 'Kartu Stock')
 
 @section('style')
-    <!-- CSS Libraries -->
     <link rel="stylesheet" href="{{ asset('templates/library/datatables/media/css/jquery.dataTables.min.css') }}">
     <link rel="stylesheet" href="{{ asset('templates/library/izitoast/dist/css/iziToast.min.css') }}">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 
     <style>
-        table.dataTable thead th,
-        table.dataTable thead td {
-            padding: 21px 18px !important;
-            background: #ffffff !important;
-            border-bottom: 1px solid #111 !important;
+        #medicine+.select2-container .select2-selection--single {
+            height: 42px !important;
+            border: 1px solid #cbd5e1 !important;
+            border-radius: 0.5rem !important;
+            display: flex;
+            align-items: center;
+            padding: 0 1rem !important;
         }
 
-        .dataTables_wrapper .top {
-            font-family: "Poppins";
-            display: flex !important;
-            justify-content: space-between !important;
-            align-items: center !important;
-            margin-bottom: 12px !important;
+        #medicine+.select2-container .select2-selection--single .select2-selection__rendered {
+            padding: 0;
+            line-height: normal;
+            font-size: 13px;
+            color: #1e293b;
         }
 
-        .dataTables_filter {
-            display: block !important;
+        #medicine+.select2-container .select2-selection--single .select2-selection__arrow {
+            height: 100%;
+            right: 1rem;
         }
 
-        .dataTables_filter label {
-            font-weight: 600 !important;
+        #medicine+.select2-container--open .select2-selection--single,
+        #medicine+.select2-container--focus .select2-selection--single {
+            border-color: #93c5fd !important;
+            box-shadow: 0 0 0 3px rgba(191, 219, 254, 0.5);
         }
 
-        .dataTables_filter input {
-            width: 260px !important;
-            padding: 6px 10px !important;
-            border-radius: 6px !important;
-            border: 1px solid #d1d5db !important;
-            outline: none !important;
-        }
-
-        .dataTables_length {
-            display: block !important;
-        }
-
-        .dataTables_length select {
-            padding: 4px 23px !important;
-            border-radius: 6px !important;
-            border: 1px solid #d1d5db !important;
-        }
-
-
-        #medicineTable thead th {
+        #orderItemsTable thead th {
             background-color: #f8fafc !important;
+            color: #475569 !important;
             font-weight: 600 !important;
-            font-size: 13px !important;
+            font-size: 11px !important;
             text-transform: uppercase !important;
-            border-bottom: 2px solid #e5e7eb !important;
+            letter-spacing: 0.04em !important;
+            border-bottom: 1px solid #e2e8f0 !important;
+            padding: 12px 16px !important;
+            white-space: nowrap;
         }
 
-
-        #medicineTable tbody td {
-            padding: 12px 10px !important;
-            font-size: 14px !important;
+        #orderItemsTable tbody td {
+            padding: 12px 16px !important;
+            font-size: 13px !important;
             vertical-align: middle !important;
+            color: #475569 !important;
+            border-bottom: 1px solid #f1f5f9 !important;
         }
 
-        #medicineTable tbody tr:hover {
-            background-color: #f1f5f9 !important;
+        #orderItemsTable tbody tr:hover td {
+            background-color: #f8fafc !important;
         }
 
-        #orderItemsTable tr.selected {
-            background-color: #e0f2fe !important;
-        }
-
-        .dataTables_paginate .paginate_button {
+        .dataTables_wrapper .dataTables_paginate .paginate_button {
             padding: 6px 12px !important;
             border-radius: 6px !important;
-            background: #f3f3f3;
-            margin: 0 4px;
+            margin: 0 3px !important;
+            font-size: 13px !important;
+            border: 1px solid #e2e8f0 !important;
+            background: #ffffff !important;
         }
 
         .dataTables_wrapper .dataTables_paginate .paginate_button.current {
-            background: #2563eb;
+            background: #2563eb !important;
             color: #fff !important;
-            border: 1px solid #2563eb;
-            margin: 0 4px;
+            border: 1px solid #2563eb !important;
+        }
+
+        .dataTables_wrapper .dataTables_paginate .paginate_button:hover {
+            background: #eff6ff !important;
+            color: #2563eb !important;
+            border: 1px solid #bfdbfe !important;
         }
 
         .dataTables_wrapper .dataTables_paginate .paginate_button.disabled {
             cursor: default !important;
-            color: #666 !important;
-            border: 1px solid transparent !important;
-            background: transparent !important;
-            box-shadow: none !important;
-        }
-
-        .paginate_button.previous {
-            background: #ffd7d7 !important;
-        }
-
-        .paginate_button.next {
-            background: #c4ffcf !important;
-            font-family: 'Poppins';
-            font-size: 14px;
+            color: #94a3b8 !important;
+            border: 1px solid #e2e8f0 !important;
+            background: #f8fafc !important;
         }
     </style>
 @endsection
 
 @section('content')
-    <section class="section px-4">
-        <div class="section-body">
-            <div class="">
+    <div class="min-h-screen bg-slate-50/50 pb-12 pt-2 px-4 sm:px-6 lg:px-8">
+        <div class="mx-auto space-y-4">
 
-                <div class="card  shadow-md rounded-2xl p-6 bg-white">
-                    <div class="flex items-center gap-2">
+            <div
+                class="flex flex-col gap-4 p-5 bg-white border border-slate-200/80 rounded-xl shadow-sm md:flex-row md:items-center md:justify-between">
 
+                <div class="flex items-center gap-3">
+                    <div
+                        class="flex items-center justify-center w-11 h-11 rounded-xl bg-blue-50 border border-blue-100 shrink-0">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-blue-600" viewBox="0 0 24 24"
                             fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                            stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-package">
+                            stroke-linejoin="round">
                             <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                             <path d="M12 3l8 4.5l0 9l-8 4.5l-8 -4.5l0 -9l8 -4.5" />
                             <path d="M12 12l8 -4.5" />
@@ -126,93 +109,80 @@
                             <path d="M12 12l-8 -4.5" />
                             <path d="M16 5.25l-8 4.5" />
                         </svg>
-                        <h2 class="text-lg font-semibold text-gray-800">Kartu Stock</h2>
                     </div>
-                    <div class="flex py-2 gap-1">
-
-                        <div>
-                            <div class="py-1 text-[13px] font-bold">Tanggal</div>
-
-                            <input type="text" id="dateRange" placeholder="Pilih rentang tanggal..."
-                                class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
-                                autocomplete="off">
-                        </div>
-                        <div>
-                            <div class="py-1 text-[13px] font-bold">Cari Obat...</div>
-
-                            <input type="text" onkeyup="searchMedicines(this.value)" id="medicine"
-                                placeholder="Ketik Nama atau Kode Obat..."
-                                class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
-                                autocomplete="off">
-                        </div>
-                        <div>
-                            <div class="py-1 text-[13px] font-bold">Nama Obat</div>
-
-                            <input type="text" readonly id="medicine_name" placeholder="Ketik Nama Obat..."
-                                class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
-                                autocomplete="off">
-                        </div>
-                    </div>
-                    <a href="{{ route('supplies.printstockdata') }}" target="_blank">
-                        <button style="background:#41bd33"
-                            class="group rounded-md shadow text-white cursor-pointer flex justify-between items-center overflow-hidden transition-all hover:glow">
-                            <div
-                                class="relative w-10 h-12 bg-white bg-opacity-20 flex justify-center items-center transition-all">
-                                <svg class="w-4 h-4 transition-all group-hover:-translate-y-1" fill="none"
-                                    stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
-                                </svg>
-                            </div>
-                            <p class="px-3">Export Excel</p>
-                        </button>
-                    </a>
-                    <div class="overflow-x-auto p-3">
-                        <table id="orderItemsTable" class="min-w-full text-sm text-left text-gray-600">
-                            <thead class="bg-gray-100 text-gray-700 uppercase text-xs">
-                                <tr>
-                                    <th class="px-4 py-3">#</th>
-                                    <th class="px-4 py-3">Kode Obat</th>
-                                    <th class="px-4 py-3">Nama Obat</th>
-                                    <th class="px-4 py-3">Satuan</th>
-                                    <th class="px-4 py-3">QTY Awal</th>
-                                    <th class="px-4 py-3">QTY Jual</th>
-                                    <th class="px-4 py-3">QTY Beli</th>
-                                    <th class="px-4 py-3">Saldo Sekarang</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-100"></tbody>
-                        </table>
+                    <div>
+                        <h2 class="text-base font-bold text-slate-800 leading-tight">Kartu Stock</h2>
+                        <p class="text-xs text-slate-400">Pilih rentang tanggal dan obat untuk melihat pergerakan stok</p>
                     </div>
                 </div>
+
+                <a href="{{ route('supplies.printstockdata') }}" target="_blank"
+                    class="inline-flex items-center gap-2 px-4 h-10 rounded-lg text-sm font-semibold text-white bg-emerald-500 hover:bg-emerald-600 transition shadow-sm shrink-0 w-fit">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Export Excel
+                </a>
+            </div>
+
+            <div class="bg-white rounded-xl border border-slate-200/80 shadow-sm p-5">
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Rentang
+                            Tanggal</label>
+                        <input type="text" id="dateRange" placeholder="Pilih rentang tanggal..."
+                            class="w-full h-[42px] rounded-lg border border-slate-300 bg-white px-4 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 transition"
+                            autocomplete="off">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Pilih
+                            Obat</label>
+                        <select id="medicine" class="w-full"></select>
+                    </div>
+                </div>
+
+                <div class="mt-4 overflow-x-auto">
+                    <table id="orderItemsTable" class="w-full text-sm text-left text-slate-600">
+                        <thead>
+                            <tr>
+                                <th class="px-4 py-3">#</th>
+                                <th class="px-4 py-3">Kode Obat</th>
+                                <th class="px-4 py-3">Nama Obat</th>
+                                <th class="px-4 py-3">Satuan</th>
+                                <th class="px-4 py-3">QTY Awal</th>
+                                <th class="px-4 py-3">QTY Jual</th>
+                                <th class="px-4 py-3">QTY Beli</th>
+                                <th class="px-4 py-3">Saldo Sekarang</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+
             </div>
         </div>
-    </section>
+    </div>
 @endsection
 
 @section('scripts')
     <script src="{{ asset('templates/library/datatables/media/js/jquery.dataTables.min.js') }}"></script>
-    <script src="{{ asset('templates/library/jquery-ui-dist/jquery-ui.min.js') }}"></script>
     <script src="{{ asset('templates/js/page/modules-datatables.js') }}"></script>
-    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="{{ asset('templates/library/izitoast/dist/js/iziToast.min.js') }}"></script>
-    <script src="https://unpkg.com/sweetalert/dist/sweetalert.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
     <script>
         let orderItemsTable;
         let startDate = '';
         let endDate = '';
-        var searchMedicine = '';
-        let tableData, selectedData = null;
-        const form = document.getElementById('patientForm');
+        let selectedMedicineId = '';
 
         document.addEventListener('DOMContentLoaded', function() {
             flatpickr("#dateRange", {
                 mode: "range",
                 dateFormat: "Y-m-d",
-                onClose: function(selectedDates, dateStr) {
-
+                onClose: function(selectedDates) {
                     if (selectedDates.length === 2) {
                         startDate = flatpickr.formatDate(selectedDates[0], "Y-m-d");
                         endDate = flatpickr.formatDate(selectedDates[1], "Y-m-d");
@@ -225,27 +195,52 @@
                 }
             });
 
+            $('#medicine').select2({
+                placeholder: 'Cari nama atau kode obat...',
+                allowClear: true,
+                width: '100%',
+                ajax: {
+                    url: "{{ route('supplies.medicineSelect') }}",
+                    dataType: 'json',
+                    delay: 250,
+                    data: function(params) {
+                        return {
+                            q: params.term
+                        };
+                    },
+                    processResults: function(data) {
+                        return {
+                            results: data.map(function(item) {
+                                return {
+                                    id: item.id,
+                                    text: item.code + ' - ' + item.name
+                                };
+                            })
+                        };
+                    },
+                    cache: true
+                }
+            }).on('change', function() {
+                selectedMedicineId = $(this).val() || '';
+                orderItemsTable.ajax.reload();
+            });
 
-            // DATATABLE INIT
             orderItemsTable = $('#orderItemsTable').DataTable({
                 processing: true,
                 serverSide: true,
                 ajax: {
                     url: "{{ route('supplies.getStockData') }}",
                     data: function(d) {
-                        d.searchMedicine = searchMedicine;
+                        d.medicine_id = selectedMedicineId;
                         d.start_date = startDate;
                         d.end_date = endDate;
-
                     }
                 },
                 columns: [{
                         data: 'DT_RowIndex',
-                        name: 'DT_RowIndex',
                         orderable: false,
                         searchable: false
                     },
-
                     {
                         data: 'code'
                     },
@@ -264,56 +259,31 @@
                     {
                         data: 'qty_orders'
                     },
-
                     {
                         data: 'qty_now'
                     }
-
                 ],
                 paging: true,
                 searching: false,
-                info: false,
-
+                info: true,
+                pageLength: 10,
+                lengthMenu: [10, 25, 50, 100],
+                language: {
+                    processing: 'Memuat data...',
+                    emptyTable: 'Tidak ada data tersedia',
+                    zeroRecords: 'Tidak ada data yang cocok',
+                    info: 'Menampilkan _START_–_END_ dari _TOTAL_ data',
+                    infoEmpty: 'Menampilkan 0 data',
+                    infoFiltered: '(disaring dari _MAX_ total data)',
+                    lengthMenu: 'Tampilkan _MENU_ data',
+                    paginate: {
+                        first: 'Pertama',
+                        last: 'Terakhir',
+                        next: 'Selanjutnya',
+                        previous: 'Sebelumnya',
+                    }
+                },
             });
-
-        });
-
-        function searchMedicines(medicine) {
-            if (!medicine || medicine.trim() === '') {
-                $('#medicine_name').val('');
-                searchMedicine = '';
-                orderItemsTable.ajax.reload();
-                return;
-            }
-
-            searchMedicine = medicine;
-
-            orderItemsTable.ajax.reload(function(json) {
-
-                if (json.data && json.data.length > 0) {
-                    let firstRow = json.data[0];
-
-                    let firstMedicineName = firstRow.name ?? '-';
-
-                    $('#medicine_name').val(firstMedicineName);
-
-                    console.log('First medicine name:', firstMedicineName);
-                } else {
-                    console.log('No rows found for this medicine.');
-                    $('#medicine_name').val('');
-                }
-
-            }, false);
-        }
-        // BACK BUTTON 
-        $('#back').click(function() {
-            window.location.href = "{{ route('home') }}";
-        });
-        $('#back').click(function() {
-            form.reset();
-            $('#patient_id').val('');
-            $('#table-data tbody tr').removeClass('bg-blue-100');
         });
     </script>
-
 @endsection

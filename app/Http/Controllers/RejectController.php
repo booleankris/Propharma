@@ -119,8 +119,65 @@ class RejectController extends Controller
                 fn($data) =>
                 "Rp. " . number_format($data->total)
             )
+            ->addColumn('raw_total', fn($data) => $data->total)
+            ->addColumn('raw_price', fn($data) => $data->quantity > 0 ? $data->total / $data->quantity : 0)
+            ->addColumn('action', function ($data) {
+                return '
+                    <div class="flex items-center gap-2">
+                        <button type="button" onclick="editReject(' . $data->id . ')"
+                            class="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1.5 text-[11px] font-semibold text-blue-600 hover:bg-blue-100 transition-colors">
+                            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4l10.5-10.5a1.5 1.5 0 0 0-4-4l-10.5 10.5z"/><path d="M13.5 6.5l4 4"/></svg>
+                            Edit
+                        </button>
+                        <button type="button" onclick="deleteReject(' . $data->id . ')"
+                            class="inline-flex items-center gap-1 rounded-lg bg-rose-50 px-2.5 py-1.5 text-[11px] font-semibold text-rose-600 hover:bg-rose-100 transition-colors">
+                            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12"/><path d="M9 7v-2a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
+                            Hapus
+                        </button>
+                    </div>';
+            })
+            ->rawColumns(['action'])
             ->escapeColumns([])
             ->make(true);
+    }
+    public function updateItemReject(Request $request, $id)
+    {
+        $validated = $request->validate([
+            'medicine_id'   => 'nullable',
+            'medicine_name' => 'nullable|string',
+            'quantity'      => 'required',
+            'total'         => 'nullable|numeric',
+            'reason'        => 'required',
+        ]);
+
+        $item = Reject::findOrFail($id);
+        $item->update([
+            'medicine_id'   => $validated['medicine_id'],
+            'medicine_name' => $validated['medicine_name'] ?? $item->medicine_name,
+            'quantity'      => $validated['quantity'],
+            'total'         => $validated['total'] ?? 0,
+            'reason'        => $validated['reason'],
+        ]);
+
+        $total = Reject::where('pharmacy_id', getActivePharmacyId())->sum('total');
+
+        return response()->json([
+            'success' => true,
+            'item'    => $item,
+            'total'   => $total,
+        ]);
+    }
+    public function deleteItemReject($id)
+    {
+        $item = Reject::findOrFail($id);
+        $item->delete();
+
+        $total = Reject::where('pharmacy_id', getActivePharmacyId())->sum('total');
+
+        return response()->json([
+            'success' => true,
+            'total'   => $total,
+        ]);
     }
     public function postRejection(Request $request) {}
 }

@@ -1134,7 +1134,15 @@
 
             document.getElementById('qty').value = data.quantity ?? 0;
             document.getElementById('qty_received').value = data.receiving_items?.qty_received ?? '';
-            document.getElementById('item_price').value = formatRupiah(itemrawprice);
+
+            if (data.pack == "1") {
+                itemprice = itemrawprice * itemcontent;
+                document.getElementById('item_price').value = formatRupiah(itemprice);
+            } else {
+                itemprice = itemrawprice;
+                document.getElementById('item_price').value = formatRupiah(itemprice);
+            }
+
             document.getElementById('total_price').value = data.total ?? '';
 
             document.getElementById('batch').value = data.receiving_items?.batch ?? '';
@@ -1519,15 +1527,15 @@
                 itemstatus.value = "Tidak Diterima";
             }
 
-            if (pack.checked) {
-                itemprice = itemrawprice * itemcontent;
-                itemtotal = qty * itemprice;
-                total_transaction = itemtotal;
+            const priceInput = document.getElementById('item_price');
+            if (priceInput && priceInput.value) {
+                itemprice = parseFloat(priceInput.value.replace(/[^\d-]/g, '')) || 0;
             } else {
-                itemprice = itemrawprice;
-                itemtotal = qty * itemprice;
-                total_transaction = itemtotal;
+                itemprice = pack.checked ? (itemrawprice * itemcontent) : itemrawprice;
             }
+
+            itemtotal = qty * itemprice;
+            total_transaction = itemtotal;
             calculateVisualTotal();
         }
 

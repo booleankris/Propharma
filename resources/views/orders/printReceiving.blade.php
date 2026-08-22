@@ -111,24 +111,30 @@
 
                 <tbody>
                     @php
+                        $ppnType = strtoupper(trim($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA'));
                         $detailSubtotal = 0;
                         $detailDiscount = 0;
                     @endphp
 
                     @foreach ($detail->receiving_items as $i => $item)
                         @php
-                            $activePrice = $item->raw_price ?? $item->order_items->price;
-                            $itemSubtotal = $item->total ?? ($item->qty_received * $activePrice);
-                            
-                            $discVal = $item->discount ?? 0;
-                            $extraDiscVal = $item->extra_discount ?? 0;
-                            
-                            $nomDisc = $discVal <= 100 ? ($itemSubtotal * $discVal / 100) : $discVal;
-                            $nomExtraDisc = $extraDiscVal <= 100 ? ($itemSubtotal * $extraDiscVal / 100) : $extraDiscVal;
+                            // Harga dasar (HNA) per satuan
+                            $activePrice = floatval($item->raw_price ?? $item->order_items->price ?? 0);
+                            $qty = floatval($item->qty_received ?? 0);
+
+                            // Gross = qty × HNA (sebelum diskon, sebelum PPN)
+                            $itemGross = $qty * $activePrice;
+
+                            $discVal = floatval($item->discount ?? 0);
+                            $extraDiscVal = floatval($item->extra_discount ?? 0);
+
+                            // Hitung nominal diskon dari gross HNA
+                            $nomDisc = ($discVal > 0 && $discVal <= 100) ? ($itemGross * $discVal / 100) : $discVal;
+                            $nomExtraDisc = ($extraDiscVal > 0 && $extraDiscVal <= 100) ? ($itemGross * $extraDiscVal / 100) : $extraDiscVal;
 
                             $itemDiscount = $nomDisc + $nomExtraDisc;
 
-                            $detailSubtotal += $itemSubtotal;
+                            $detailSubtotal += $itemGross;
                             $detailDiscount += $itemDiscount;
                         @endphp
 
@@ -156,15 +162,15 @@
                             </td>
 
                             <td class="text-center">
-                                {{ $discVal <= 100 && $discVal > 0 ? $discVal . '%' : number_format($discVal, 0, ',', '.') }}
-                                {{ $discVal <= 100 && $discVal > 0 ? ' (' . number_format($nomDisc, 0, ',', '.') . ')' : '' }}
+                                {{ $discVal > 0 && $discVal <= 100 ? $discVal . '%' : number_format($discVal, 0, ',', '.') }}
+                                {{ $discVal > 0 && $discVal <= 100 ? ' (' . number_format($nomDisc, 0, ',', '.') . ')' : '' }}
                             </td>
                             <td class="text-center">
-                                {{ $extraDiscVal <= 100 && $extraDiscVal > 0 ? $extraDiscVal . '%' : number_format($extraDiscVal, 0, ',', '.') }}
-                                {{ $extraDiscVal <= 100 && $extraDiscVal > 0 ? ' (' . number_format($nomExtraDisc, 0, ',', '.') . ')' : '' }}
+                                {{ $extraDiscVal > 0 && $extraDiscVal <= 100 ? $extraDiscVal . '%' : number_format($extraDiscVal, 0, ',', '.') }}
+                                {{ $extraDiscVal > 0 && $extraDiscVal <= 100 ? ' (' . number_format($nomExtraDisc, 0, ',', '.') . ')' : '' }}
                             </td>
                             <td class="text-right">
-                                {{ number_format($itemSubtotal, 0, ',', '.') }}
+                                {{ number_format($itemGross, 0, ',', '.') }}
                             </td>
                         </tr>
                     @endforeach
@@ -172,45 +178,52 @@
 
                 <tfoot>
                     @php
-                        $ppnType = strtoupper(trim($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA'));
-                        $detailNet = max(0, $detailSubtotal - $detailDiscount);
+                        // DPP = Total Harga - Total Diskon
+                        $detailDpp = max(0, $detailSubtotal - $detailDiscount);
 
                         if ($ppnType === 'EXCLUDE') {
-                            $detailPpn = floor($detailNet * 0.11);
-                            $detailGrandTotal = $detailNet + $detailPpn;
+                            $detailPpn = floor($detailDpp * 0.11);
+                            $detailGrandTotal = $detailDpp + $detailPpn;
                         } elseif ($ppnType === 'INCLUDE') {
-                            $detailGrandTotal = $detailNet;
-                            $detailHna = floor($detailNet / 1.11);
+                            $detailGrandTotal = $detailDpp;
+                            $detailHna = floor($detailDpp / 1.11);
                             $detailPpn = $detailGrandTotal - $detailHna;
                         } else { // TANPA
                             $detailPpn = 0;
-                            $detailGrandTotal = $detailNet;
+                            $detailGrandTotal = $detailDpp;
                         }
                     @endphp
 
                     <tr>
-                        <th colspan="7" class="text-right">SUBTOTAL</th>
+                        <th colspan="7" class="text-right">TOTAL HARGA</th>
                         <th class="text-right">
                             {{ number_format($detailSubtotal, 0, ',', '.') }}
                         </th>
                     </tr>
 
                     <tr>
-                        <th colspan="7" class="text-right">TOTAL DISKON</th>
+                        <th colspan="7" class="text-right">POTONGAN</th>
                         <th class="text-right">
                             {{ number_format($detailDiscount, 0, ',', '.') }}
                         </th>
                     </tr>
 
                     <tr>
-                        <th colspan="7" class="text-right">TOTAL PPN ({{ $ppnType === 'EXCLUDE' ? '11% Exclude' : ($ppnType === 'INCLUDE' ? 'Include' : 'Tanpa PPN') }})</th>
+                        <th colspan="7" class="text-right">DPP</th>
+                        <th class="text-right">
+                            {{ number_format($detailDpp, 0, ',', '.') }}
+                        </th>
+                    </tr>
+
+                    <tr>
+                        <th colspan="7" class="text-right">PPN ({{ $ppnType === 'EXCLUDE' ? '11%' : ($ppnType === 'INCLUDE' ? 'Include' : 'Tanpa PPN') }})</th>
                         <th class="text-right">
                             {{ number_format($detailPpn, 0, ',', '.') }}
                         </th>
                     </tr>
 
                     <tr>
-                        <th colspan="7" class="text-right">TOTAL AKHIR</th>
+                        <th colspan="7" class="text-right">JUMLAH TAGIHAN</th>
                         <th class="text-right">
                             {{ number_format($detailGrandTotal, 0, ',', '.') }}
                         </th>

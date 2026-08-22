@@ -276,65 +276,63 @@ class SalesController extends Controller
 
         $items = Medicines::query()
             ->select([
-                'id',
-                'code',
-                'barcode',
-                'name',
-                'raw_price',
-                'het_price',
-                'net_price',
-                'location',
-                'etalase',
-                'strip',
-                'stock',
-                'unit',
-                'packaging',
-                'content',
-                'dosage',
+                'medicines.id',
+                'medicines.code',
+                'medicines.barcode',
+                'medicines.name',
+                'medicines.factory_id',
+                'medicines.raw_price',
+                'medicines.het_price',
+                'medicines.net_price',
+                'medicines.location',
+                'medicines.etalase',
+                'medicines.strip',
+                'medicines.stock',
+                'medicines.unit',
+                'medicines.packaging',
+                'medicines.content',
+                'medicines.dosage',
             ])
 
-            // Total stock in storage
-            ->selectRaw('(
-            SELECT COALESCE(SUM(stock), 0)
-            FROM batches
-            WHERE medicine_id = medicines.id
-            AND pharmacy_id = ?
-        ) as storage_stock', [$pharmacyId])
+            ->selectRaw('COALESCE(bs.storage_stock, 0) as storage_stock')
+            ->selectRaw('COALESCE(cs.counter_stock, 0) as counter_stock')
 
-            // Total qty in counter (medicine_transfer_items)
-            ->selectRaw('(
-            SELECT COALESCE(SUM(mt.qty), 0)
-            FROM medicine_transfer_items mt
-            JOIN batches b ON b.id = mt.batches_id
-            WHERE b.medicine_id = medicines.id
-            AND mt.status = 1
-            AND b.pharmacy_id = ?
-        ) as counter_stock', [$pharmacyId])
+            ->leftJoinSub(
+                DB::table('batches')
+                    ->select('medicine_id', DB::raw('COALESCE(SUM(stock), 0) as storage_stock'))
+                    ->where('pharmacy_id', $pharmacyId)
+                    ->groupBy('medicine_id'),
+                'bs',
+                'bs.medicine_id',
+                '=',
+                'medicines.id'
+            )
 
-            // Latest etalase_id from medicine_transfer_items (Option 1)
-            ->selectRaw('(
-            SELECT mt.etalases_id
-            FROM medicine_transfer_items mt
-            JOIN batches b ON b.id = mt.batches_id
-            WHERE b.medicine_id = medicines.id
-            AND mt.status = 1
-            AND b.pharmacy_id = ?
-            ORDER BY mt.created_at DESC
-            LIMIT 1
-        ) as transfer_etalase_id', [$pharmacyId])
+            ->leftJoinSub(
+                DB::table('medicine_transfer_items as mt')
+                    ->join('batches as b', 'b.id', '=', 'mt.batches_id')
+                    ->select('b.medicine_id', DB::raw('COALESCE(SUM(mt.qty), 0) as counter_stock'))
+                    ->where('mt.status', 1)
+                    ->where('b.pharmacy_id', $pharmacyId)
+                    ->groupBy('b.medicine_id'),
+                'cs',
+                'cs.medicine_id',
+                '=',
+                'medicines.id'
+            )
 
-            ->with(['etalases', 'locations'])
+            ->with(['etalases', 'locations', 'factory'])
 
             ->when($q !== '', function ($builder) use ($q) {
                 $builder->where(function ($x) use ($q) {
-                    $x->where('code', 'like', $q . '%')
-                        ->orWhere('barcode', 'like', $q . '%')
-                        ->orWhere('name', 'like', '%' . $q . '%');
+                    $x->where('medicines.code', 'like', $q . '%')
+                        ->orWhere('medicines.barcode', 'like', $q . '%')
+                        ->orWhere('medicines.name', 'like', '%' . $q . '%');
                 });
             })
 
             ->orderByRaw(
-                "CASE WHEN code LIKE ? THEN 0 ELSE 1 END, code ASC",
+                "CASE WHEN medicines.code LIKE ? THEN 0 ELSE 1 END, medicines.code ASC",
                 [$q . '%']
             )
 

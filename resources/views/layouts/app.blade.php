@@ -46,45 +46,75 @@
     </script>
 
     <script>
-        $(document).ready(function() {
-            initFactorySelect();
-            initDoctorSelect();
-        });
-        // Sales Report Onpage load (Starting point)
-        document.addEventListener("DOMContentLoaded", function() {
+        // Sales Report Filter Configuration
+        const salesReportFilters = {
+            "LIPH": {
+                date_filter: true,
+                type_filter: false,
+                online_btn: true,
+                has_factory: false,
+                has_doctor: false
+            },
+            "Obat": {
+                date_filter: true,
+                type_filter: true,
+                online_btn: false,
+                has_factory: false,
+                has_doctor: false
+            },
+            "Golongan": {
+                date_filter: false,
+                type_filter: false,
+                online_btn: false,
+                has_factory: false,
+                has_doctor: false
+            },
+            "Pabrik": {
+                date_filter: false,
+                type_filter: true,
+                online_btn: false,
+                has_factory: true,
+                has_doctor: false
+            },
+            "Dokter": {
+                date_filter: false,
+                type_filter: true,
+                online_btn: false,
+                has_factory: false,
+                has_doctor: true
+            },
+            "Daftar Resep": {
+                date_filter: true,
+                type_filter: false,
+                online_btn: false,
+                has_factory: false,
+                has_doctor: false
+            },
+            "Retur Jual": {
+                date_filter: false,
+                type_filter: false,
+                online_btn: false,
+                has_factory: false,
+                has_doctor: false
+            },
+        };
 
-            const activeBtn = document.querySelector('.report-btn[data-active="true"]');
-
-            if (!activeBtn) return;
-
-            const label = activeBtn.innerText.trim();
-
-            if (label === "LIPH") {
-                document.getElementById('type_filter').style.display = 'none';
-                document.getElementById('factory-select').style.display = 'none';
-                document.getElementById('doctor-select').style.display = 'none';
-                if (document.getElementById('btn-online')) {
-                    document.getElementById('btn-online').style.display = 'flex';
-                }
-            } else {
-                document.getElementById('type_filter').style.display = 'block';
-                if (document.getElementById('btn-online')) {
-                    document.getElementById('btn-online').style.display = 'none';
-                }
-            }
-
-
-        });
-        $('#factory').on('change', function() {
-            console.log('Selected factory:', $(this).val());
-        });
-        $('#doctor').on('change', function() {
-            console.log('Selected doctor:', $(this).val());
-        });
         var selectedReport = "LIPH";
         var selectedShift = "";
-        var selectedType = 'recap';
+        var selectedType = 'rekap';
         var selectedShiftType = "shift";
+
+        document.addEventListener("DOMContentLoaded", function() {
+            initFactorySelect();
+            initDoctorSelect();
+
+            const activeBtn = document.querySelector('.report-btn[data-active="true"]');
+            if (activeBtn) {
+                const label = activeBtn.querySelector('span.text-sm')?.textContent.trim() || activeBtn.innerText.trim();
+                selectedReport = label;
+                applySalesFilters(label);
+            }
+        });
 
         // ─── Sidebar (mobile) ─────────────────────────────────────────────────────────
         function initFactorySelect() {
@@ -181,6 +211,60 @@
             });
         });
 
+        function applySalesFilters(reportLabel) {
+            const config = salesReportFilters[reportLabel] ?? {
+                date_filter: false,
+                type_filter: false,
+                online_btn: false,
+                has_factory: false,
+                has_doctor: false
+            };
+
+            const titleEl = document.getElementById('reporttitle');
+            if (titleEl) {
+                titleEl.textContent = `Laporan Penjualan - ${reportLabel}`;
+            }
+
+            const dateFilterEl = document.getElementById('date_filter');
+            const shiftSelectEl = document.getElementById('shift-select');
+            const typeFilterEl = document.getElementById('type_filter');
+            const factorySelectEl = document.getElementById('factory-select');
+            const doctorSelectEl = document.getElementById('doctor-select');
+            const btnOnline = document.getElementById('btn-online');
+
+            if (dateFilterEl) {
+                dateFilterEl.style.display = config.date_filter ? 'block' : 'none';
+            }
+
+            if (btnOnline) {
+                btnOnline.style.display = config.online_btn ? 'flex' : 'none';
+                if (!config.online_btn && selectedShiftType === 'online') {
+                    setFilter('semua', document.getElementById('btn-semua'));
+                }
+            }
+
+            if (shiftSelectEl) {
+                shiftSelectEl.style.display = (config.date_filter && selectedShiftType === 'shift') ? 'block' : 'none';
+            }
+
+            if (typeFilterEl) {
+                typeFilterEl.style.display = config.type_filter ? 'block' : 'none';
+            }
+
+            // Always reset type to 'rekap' when switching report
+            resetReportTypeOptions();
+
+            // Factory & Doctor only shown on detail
+            if (factorySelectEl) factorySelectEl.style.display = 'none';
+            if (doctorSelectEl) doctorSelectEl.style.display = 'none';
+
+            if (reportLabel === "Pabrik") {
+                setTimeout(() => initFactorySelect(), 100);
+            } else if (reportLabel === "Dokter") {
+                setTimeout(() => initDoctorSelect(), 100);
+            }
+        }
+
         function selectReport(el) {
             document.querySelectorAll('.report-btn').forEach(btn => {
                 btn.classList.remove('border-violet-200', 'bg-violet-50');
@@ -191,6 +275,7 @@
                     label.classList.add('text-slate-600');
                 }
             });
+
             el.classList.remove('border-slate-100', 'bg-slate-50');
             el.classList.add('border-violet-200', 'bg-violet-50');
             const label = el.querySelector('span.text-sm');
@@ -198,82 +283,9 @@
                 label.classList.remove('text-slate-600');
                 label.classList.add('text-violet-700');
             }
-            selectedReport = label ? label.textContent.trim() : null;
-            if (selectedReport == "LIPH") {
-                document.getElementById('date_filter').style.display = 'block';
-                document.getElementById('shift-select').style.display = 'block';
-                document.getElementById('type_filter').style.display = 'none';
-                document.getElementById('factory-select').style.display = 'none';
-                document.getElementById('doctor-select').style.display = 'none';
 
-                if (document.getElementById('btn-online')) {
-                    document.getElementById('btn-online').style.display = 'flex';
-                }
-
-            } else if (selectedReport == "Obat") {
-                document.getElementById('date_filter').style.display = 'block';
-                document.getElementById('shift-select').style.display = 'block';
-                document.getElementById('type_filter').style.display = 'block';
-                document.getElementById('factory-select').style.display = 'none';
-                document.getElementById('doctor-select').style.display = 'none';
-
-
-            } else if (selectedReport == "Golongan") {
-                document.getElementById('date_filter').style.display = 'none';
-                document.getElementById('shift-select').style.display = 'none';
-                document.getElementById('type_filter').style.display = 'none';
-                document.getElementById('factory-select').style.display = 'none';
-                document.getElementById('doctor-select').style.display = 'none';
-
-
-            } else if (selectedReport == "Pabrik") {
-                document.getElementById('date_filter').style.display = 'none';
-                document.getElementById('shift-select').style.display = 'none';
-                document.getElementById('type_filter').style.display = 'block';
-                document.getElementById('factory-select').style.display = 'none';
-                document.getElementById('doctor-select').style.display = 'none';
-
-
-                setTimeout(() => {
-                    initFactorySelect();
-                }, 100);
-            } else if (selectedReport == "Dokter") {
-                document.getElementById('date_filter').style.display = 'none';
-                document.getElementById('shift-select').style.display = 'none';
-                document.getElementById('type_filter').style.display = 'block';
-                document.getElementById('doctor-select').style.display = 'none';
-
-                setTimeout(() => {
-                    initDoctorSelect();
-                }, 100);
-            } else if (selectedReport == "Daftar Resep") {
-                document.getElementById('date_filter').style.display = 'none';
-                document.getElementById('shift-select').style.display = 'block';
-                document.getElementById('type_filter').style.display = 'none';
-                document.getElementById('doctor-select').style.display = 'none';
-
-                setTimeout(() => {
-                    initDoctorSelect();
-                }, 100);
-            } else if (selectedReport == "Retur Jual") {
-                document.getElementById('date_filter').style.display = 'none';
-                document.getElementById('shift-select').style.display = 'none';
-                document.getElementById('type_filter').style.display = 'none';
-                document.getElementById('factory-select').style.display = 'none';
-                document.getElementById('doctor-select').style.display = 'none';
-
-
-            } else {
-                document.getElementById('type_filter').style.display = 'none';
-            }
-
-            if (selectedReport !== "LIPH" && document.getElementById('btn-online')) {
-                document.getElementById('btn-online').style.display = 'none';
-                if (selectedShiftType === 'online') {
-                    // reset to semua if online was selected
-                    setFilter('semua', document.getElementById('btn-semua'));
-                }
-            }
+            selectedReport = label ? label.textContent.trim() : "LIPH";
+            applySalesFilters(selectedReport);
             console.log('Selected report:', selectedReport);
         }
 
@@ -290,12 +302,17 @@
                 }
             });
 
-            el.classList.remove('border-slate-200', 'bg-slate-50', 'text-slate-600');
-            el.classList.add('border-slate-800', 'bg-slate-800', 'text-white');
-
-            shiftSel.style.display = type === 'shift' ? 'block' : 'none';
+            if (el) {
+                el.classList.remove('border-slate-200', 'bg-slate-50', 'text-slate-600');
+                el.classList.add('border-slate-800', 'bg-slate-800', 'text-white');
+            }
 
             selectedShiftType = type;
+
+            const config = salesReportFilters[selectedReport] ?? { date_filter: false };
+            if (shiftSel) {
+                shiftSel.style.display = (config.date_filter && type === 'shift') ? 'block' : 'none';
+            }
         }
 
         function getReport(mode = 'download') {
@@ -375,41 +392,85 @@
             desc: ['text-gray-400'],
         };
 
+        function resetReportTypeOptions() {
+            selectedType = 'rekap';
+            const rekapOpt = document.querySelector('.opt[data-value="rekap"]');
+            if (!rekapOpt) return;
+
+            document.querySelectorAll('.opt').forEach(o => {
+                o.classList.remove(...active.card);
+                o.classList.add(...inactive.card);
+                o.querySelector('.icon-box')?.classList.remove(...active.icon);
+                o.querySelector('.icon-box')?.classList.add(...inactive.icon);
+                o.querySelector('.icon-svg')?.classList.remove(...active.svg);
+                o.querySelector('.icon-svg')?.classList.add(...inactive.svg);
+                o.querySelector('.opt-title')?.classList.remove(...active.title);
+                o.querySelector('.opt-title')?.classList.add(...inactive.title);
+                o.querySelector('.opt-desc')?.classList.remove(...active.desc);
+                o.querySelector('.opt-desc')?.classList.add(...inactive.desc);
+            });
+
+            rekapOpt.classList.remove(...inactive.card);
+            rekapOpt.classList.add(...active.card);
+            rekapOpt.querySelector('.icon-box')?.classList.remove(...inactive.icon);
+            rekapOpt.querySelector('.icon-box')?.classList.add(...active.icon);
+            rekapOpt.querySelector('.icon-svg')?.classList.remove(...inactive.svg);
+            rekapOpt.querySelector('.icon-svg')?.classList.add(...active.svg);
+            rekapOpt.querySelector('.opt-title')?.classList.remove(...inactive.title);
+            rekapOpt.querySelector('.opt-title')?.classList.add(...active.title);
+            rekapOpt.querySelector('.opt-desc')?.classList.remove(...inactive.desc);
+            rekapOpt.querySelector('.opt-desc')?.classList.add(...active.desc);
+        }
+
         function selectOption(el) {
             document.querySelectorAll('.opt').forEach(o => {
                 o.classList.remove(...active.card);
                 o.classList.add(...inactive.card);
-                o.querySelector('.icon-box').classList.remove(...active.icon);
-                o.querySelector('.icon-box').classList.add(...inactive.icon);
-                o.querySelector('.icon-svg').classList.remove(...active.svg);
-                o.querySelector('.icon-svg').classList.add(...inactive.svg);
-                o.querySelector('.opt-title').classList.remove(...active.title);
-                o.querySelector('.opt-title').classList.add(...inactive.title);
-                o.querySelector('.opt-desc').classList.remove(...active.desc);
-                o.querySelector('.opt-desc').classList.add(...inactive.desc);
+                o.querySelector('.icon-box')?.classList.remove(...active.icon);
+                o.querySelector('.icon-box')?.classList.add(...inactive.icon);
+                o.querySelector('.icon-svg')?.classList.remove(...active.svg);
+                o.querySelector('.icon-svg')?.classList.add(...inactive.svg);
+                o.querySelector('.opt-title')?.classList.remove(...active.title);
+                o.querySelector('.opt-title')?.classList.add(...inactive.title);
+                o.querySelector('.opt-desc')?.classList.remove(...active.desc);
+                o.querySelector('.opt-desc')?.classList.add(...inactive.desc);
             });
 
             el.classList.remove(...inactive.card);
             el.classList.add(...active.card);
-            el.querySelector('.icon-box').classList.remove(...inactive.icon);
-            el.querySelector('.icon-box').classList.add(...active.icon);
-            el.querySelector('.icon-svg').classList.remove(...inactive.svg);
-            el.querySelector('.icon-svg').classList.add(...active.svg);
-            el.querySelector('.opt-title').classList.remove(...inactive.title);
-            el.querySelector('.opt-title').classList.add(...active.title);
-            el.querySelector('.opt-desc').classList.remove(...inactive.desc);
-            el.querySelector('.opt-desc').classList.add(...active.desc);
+            el.querySelector('.icon-box')?.classList.remove(...inactive.icon);
+            el.querySelector('.icon-box')?.classList.add(...active.icon);
+            el.querySelector('.icon-svg')?.classList.remove(...inactive.svg);
+            el.querySelector('.icon-svg')?.classList.add(...active.svg);
+            el.querySelector('.opt-title')?.classList.remove(...inactive.title);
+            el.querySelector('.opt-title')?.classList.add(...active.title);
+            el.querySelector('.opt-desc')?.classList.remove(...inactive.desc);
+            el.querySelector('.opt-desc')?.classList.add(...active.desc);
 
             selectedType = el.dataset.value;
-            if (selectedType == "detail" && selectedReport == "Pabrik") {
-                document.getElementById('factory-select').style.display = 'block';
-            } else if (selectedType == "detail" && selectedReport == "Dokter") {
-                document.getElementById('doctor-select').style.display = 'block';
-            } else {
-                document.getElementById('factory-select').style.display = 'none';
-                document.getElementById('doctor-select').style.display = 'none';
+
+            const factorySelectEl = document.getElementById('factory-select');
+            const doctorSelectEl = document.getElementById('doctor-select');
+
+            if (selectedReport === "Pabrik") {
+                if (factorySelectEl) {
+                    factorySelectEl.style.display = selectedType === "detail" ? 'block' : 'none';
+                    if (selectedType === "detail") setTimeout(() => initFactorySelect(), 50);
+                }
+            } else if (factorySelectEl) {
+                factorySelectEl.style.display = 'none';
             }
-            console.log(selectedType);
+
+            if (selectedReport === "Dokter") {
+                if (doctorSelectEl) {
+                    doctorSelectEl.style.display = selectedType === "detail" ? 'block' : 'none';
+                    if (selectedType === "detail") setTimeout(() => initDoctorSelect(), 50);
+                }
+            } else if (doctorSelectEl) {
+                doctorSelectEl.style.display = 'none';
+            }
+
+            console.log('Selected type:', selectedType);
         }
 
 

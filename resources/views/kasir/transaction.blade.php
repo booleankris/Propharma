@@ -1901,7 +1901,8 @@
     // Button / Submitting
     let isSubmitting = false;
 
-
+    let debounceTimer = null;
+    let closeTimer = null;
     // ===============================
     // Helper Functions
     // ===============================
@@ -2195,18 +2196,29 @@
     // Autocomplete Box Control
     // ===============================
     function openBox() {
+        clearTimeout(closeTimer);
         box.classList.remove('hidden');
+
+        requestAnimationFrame(() => {
+            box.classList.remove('opacity-0', '-translate-y-1', 'pointer-events-none');
+            box.classList.add('opacity-100', 'translate-y-0', 'pointer-events-auto');
+        });
     }
 
+
     function closeBox() {
-        box.classList.add('hidden');
+        box.classList.add('opacity-0', '-translate-y-1', 'pointer-events-none');
+        box.classList.remove('opacity-100', 'translate-y-0', 'pointer-events-auto');
         activeIndex = -1;
         highlight();
+        closeTimer = setTimeout(() => box.classList.add('hidden'), 150);
     }
 
     function highlight() {
+
         [...list.children].forEach((li, i) => {
-            li.classList.toggle('bg-gray-100', i === activeIndex);
+            li.classList.toggle('bg-slate-50', i === activeIndex);
+            li.classList.toggle('border-blue-400', i === activeIndex);
         });
     }
 
@@ -2222,7 +2234,6 @@
         else if (liBottom > lBottom) list.scrollTop = liBottom - list.clientHeight;
     }
 
-    // Searchbar / Search Medicine
     function render(items) {
         list.innerHTML = '';
         activeIndex = -1;
@@ -2232,63 +2243,81 @@
             return;
         }
 
-        for (const it of items) {
+        items.forEach((it, index) => {
             const li = document.createElement('li');
             li.setAttribute('role', 'option');
-            li.className = 'cursor-pointer px-4 py-3 hover:bg-gray-100';
+            // border-l dipakai sebagai accent bar; warnanya sama yang di-toggle highlight()
+            // di atas, jadi hover mouse & keyboard-active kelihatan sama persis
+            li.className =
+                'flex items-start justify-between gap-4 mx-1.5 my-1 p-3 rounded-xl cursor-pointer border-l-[3px] border-transparent transition-all duration-200 ease-out hover:border-blue-400 hover:bg-slate-50 opacity-0 animate-fade-slide-in';
+            li.style.animationDelay = `${index * 35}ms`;
             li.dataset.id = it.id;
 
+            const stock = (Number(it.storage_stock) || 0) + (Number(it.counter_stock) || 0);
+
             li.innerHTML = `
-        <div class="flex items-start justify-between gap-3 p-1">
-            <div class="flex flex-col gap-1 min-w-0">
-                <div class="font-semibold text-sm text-gray-800">${escapeHtml(it.name)}</div>
-                <div class="font-mono text-[11px] text-blue-400 bg-blue-50 px-2 py-0.5 rounded-md w-fit">${escapeHtml(it.code)}</div>
-
-                <div class="grid grid-cols-2 gap-x-4 gap-y-1 mt-1">
-                    <div>
-                        <div class="text-[10px] uppercase tracking-wide text-gray-400">Etalase</div>
-                        <div class="text-xs text-gray-700">${escapeHtml(it.etalases?.name || '—')}</div>
-                    </div>
-                    <div>
-                        <div class="text-[10px] uppercase tracking-wide text-gray-400">Lokasi</div>
-                        <div class="text-xs text-gray-700">${escapeHtml(it.locations?.name || '—')}</div>
-                    </div>
-                    <div>
-                        <div class="text-[10px] uppercase tracking-wide text-gray-400">Barcode</div>
-                        <div class="text-xs text-gray-700 font-mono">${escapeHtml(it.barcode || '—')}</div>
-                    </div>
-                    <div>
-                        <div class="text-[10px] uppercase tracking-wide text-gray-400">Strip</div>
-                        <div class="text-xs text-gray-700 font-mono">${escapeHtml(it.strip || '—')}</div>
-                    </div>
-                    <div>
-                        <div class="text-[10px] uppercase tracking-wide text-gray-400">Etalase</div>
-                        <div class="text-xs text-gray-700">${escapeHtml(it.etalases?.name || '—')}</div>
+        <div class="flex flex-col gap-1.5 min-w-0">
+            <div class="font-semibold text-[15px] text-gray-800 tracking-tight truncate">${escapeHtml(it.name)}</div>
+            <div class="inline-flex gap-1 items-center font-nunito-bold">
+                <p class='text-blue-600 bg-red text-[11px] tracking-wide px-2 py-0.5 border-solid border-[0.7px] shadow-[0.6px_solid_#048409] rounded-md w-fit'>${escapeHtml(it.factory.name)}</p>    
+                <p class='text-blue-600 bg-blue-50 text-[11px] tracking-wide px-2 py-0.5 rounded-md w-fit'>${escapeHtml(it.code)}</p>    
+            </div>
+ 
+            <div class="grid grid-cols-2 gap-x-5 gap-y-1.5 mt-1">
+                <div class="flex items-center gap-1.5">
+                    <svg class="w-3 h-3 text-gray-300 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9.75h16.5M3.75 9.75V6.108c0-.621.504-1.125 1.125-1.125h14.25c.621 0 1.125.504 1.125 1.125V9.75m-16.5 0v9.017c0 .621.504 1.125 1.125 1.125h14.25c.621 0 1.125-.504 1.125-1.125V9.75"/></svg>
+                    <div class="min-w-0">
+                        <div class="text-[9px] uppercase tracking-wider text-gray-400 leading-none">Etalase</div>
+                        <div class="text-xs text-gray-700 truncate">${escapeHtml(it.etalases?.name || '—')}</div>
                     </div>
                 </div>
-
-                <div class="flex gap-2 flex-wrap mt-1">
-                    <div class="flex items-center gap-1 bg-emerald-50 border border-emerald-200 rounded-md px-2 py-1">
-                        <span class="text-[10px] text-emerald-500 font-medium">Stok</span>
-                        <span class="text-xs font-bold text-emerald-700">${escapeHtml(String((Number(it.storage_stock) || 0) + (Number(it.counter_stock) || 0) || '—'))}</span>
+                <div class="flex items-center gap-1.5">
+                    <svg class="w-3 h-3 text-gray-300 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z"/></svg>
+                    <div class="min-w-0">
+                        <div class="text-[9px] uppercase tracking-wider text-gray-400 leading-none">Lokasi</div>
+                        <div class="text-xs text-gray-700 truncate">${escapeHtml(it.locations?.name || '—')}</div>
                     </div>
-                    <div class="flex items-center gap-1 bg-violet-50 border border-violet-200 rounded-md px-2 py-1">
-                        <span class="text-[10px] text-violet-500 font-medium">Gudang</span>
-                        <span class="text-xs font-bold text-violet-700">${escapeHtml(String(it.storage_stock || '—'))}</span>
+                </div>
+                <div class="flex items-center gap-1.5">
+                    <svg class="w-3 h-3 text-gray-300 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.5v15m3-15v15m4.5-15v15m3-15v15m4.5-15v15"/></svg>
+                    <div class="min-w-0">
+                        <div class="text-[9px] uppercase tracking-wider text-gray-400 leading-none">Barcode</div>
+                        <div class="text-xs text-gray-700 font-mono truncate">${escapeHtml(it.barcode || '—')}</div>
                     </div>
-                    <div class="flex items-center gap-1 bg-amber-50 border border-amber-200 rounded-md px-2 py-1">
-                        <span class="text-[10px] text-amber-500 font-medium">Pelayanan</span>
-                        <span class="text-xs font-bold text-amber-700">${escapeHtml(String(it.counter_stock || '—'))}</span>
+                </div>
+                <div class="flex items-center gap-1.5">
+                    <svg class="w-3 h-3 text-gray-300 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5"/></svg>
+                    <div class="min-w-0">
+                        <div class="text-[9px] uppercase tracking-wider text-gray-400 leading-none">Strip</div>
+                        <div class="text-xs text-gray-700 font-mono truncate">${escapeHtml(it.strip || '—')}</div>
                     </div>
                 </div>
             </div>
-
-            <div class="flex flex-col items-end flex-shrink-0">
-                <div class="text-sm font-bold text-gray-800 whitespace-nowrap">${formatRupiah(it.net_price)}</div>
-                ${it.het_price && Number(it.het_price)
-                    ? `<div class="text-xs font-semibold text-red-500 bg-red-50 border border-red-200 rounded px-1.5 py-0.5 mt-1 whitespace-nowrap">HET: ${formatRupiah(it.het_price)}</div>`
-                    : ''}
+ 
+            <div class="flex gap-1.5 flex-wrap mt-1.5">
+                <div class="flex items-center gap-1 bg-emerald-50 border border-emerald-200 rounded-md px-2 py-1">
+                    <span class="w-1 h-1 rounded-full bg-emerald-500"></span>
+                    <span class="text-[10px] text-emerald-600 font-medium">Stok</span>
+                    <span class="text-xs font-bold text-emerald-700">${escapeHtml(String(stock || '—'))}</span>
+                </div>
+                <div class="flex items-center gap-1 bg-violet-50 border border-violet-200 rounded-md px-2 py-1">
+                    <span class="w-1 h-1 rounded-full bg-violet-500"></span>
+                    <span class="text-[10px] text-violet-600 font-medium">Gudang</span>
+                    <span class="text-xs font-bold text-violet-700">${escapeHtml(String(it.storage_stock || '—'))}</span>
+                </div>
+                <div class="flex items-center gap-1 bg-amber-50 border border-amber-200 rounded-md px-2 py-1">
+                    <span class="w-1 h-1 rounded-full bg-amber-500"></span>
+                    <span class="text-[10px] text-amber-600 font-medium">Pelayanan</span>
+                    <span class="text-xs font-bold text-amber-700">${escapeHtml(String(it.counter_stock || '—'))}</span>
+                </div>
             </div>
+        </div>
+ 
+        <div class="flex flex-col items-end flex-shrink-0 pt-0.5">
+            <div class="text-sm font-bold text-gray-900 whitespace-nowrap">${formatRupiah(it.net_price)}</div>
+            ${it.het_price && Number(it.het_price)
+                ? `<div class="text-[11px] font-semibold text-red-600 bg-red-50 border border-red-200 rounded px-1.5 py-0.5 mt-1 whitespace-nowrap">HET: ${formatRupiah(it.het_price)}</div>`
+                : ''}
         </div>
     `;
 
@@ -2298,7 +2327,7 @@
             });
 
             list.appendChild(li);
-        }
+        });
     }
 
     function selectItem(it) {
@@ -2386,7 +2415,6 @@
     }
 
     // Search (Debounced)
-    let debounceTimer = null;
 
     function debounce(fn, delay) {
         return (...args) => {
@@ -3204,7 +3232,7 @@
     }
 
     function submit() {
-        if(quantity.value == 0) return;
+        if (quantity.value == 0) return;
         if (isSubmitting) return; // guard against double-fire
         isSubmitting = true;
 

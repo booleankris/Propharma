@@ -139,6 +139,7 @@ Route::middleware(['auth', 'role:HO'])->group(function () {
 });
 Route::middleware(['auth', 'role:Kasir'])->group(function () {
     Route::get('/home', [HomeController::class, 'index'])->name('home');
+    Route::get('/near-expiry', [HomeController::class, 'nearExpiry'])->name('kasir.nearExpiry');
 
     // Global Feature
     Route::prefix('account')->name('account.')->group(function () {
@@ -245,6 +246,8 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     Route::get('/getreject', [RejectController::class, 'getReject'])->name('sales.getreject');
     Route::get('reject/searchmedicine', [RejectController::class, 'searchMedicine'])->name('sales.searchmedicine');
     Route::post('reject/additemreject', [RejectController::class, 'addItemReject'])->name('sales.addItemReject');
+    Route::put('reject/updateitemreject/{id}', [RejectController::class, 'updateItemReject'])->name('sales.updateItemReject');
+    Route::delete('reject/deleteitemreject/{id}', [RejectController::class, 'deleteItemReject'])->name('sales.deleteItemReject');
     Route::post('/postrejecttion', [RejectController::class, 'postRejection'])->name('sales.rejection');
 
     // Sales Retur
@@ -268,6 +271,7 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     // Stock Data
     Route::get('/stock-data', [SuppliesController::class, 'stockData'])->name('supplies.stockData');
     Route::get('/stock-data/get', [SuppliesController::class, 'getStockData'])->name('supplies.getStockData');
+    Route::get('/stock-data/medicine-select', [SuppliesController::class, 'medicineSelect'])->name('supplies.medicineSelect');
     Route::get('/stock-data/export', [SuppliesController::class, 'exportStock'])->name('supplies.exportStockData');
 
     // Stock Opname

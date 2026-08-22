@@ -4,10 +4,17 @@
 
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
         rel="stylesheet">
+
+    <style>
+        .kasir-home,
+        .kasir-home * {
+            font-family: 'Plus Jakarta Sans', sans-serif !important;
+        }
+    </style>
 @endsection
 @section('content')
     {{-- Section Product Preview --}}
-    <div class="mx-4 max-w-full grid grid-cols-12 gap-6">
+    <div class="kasir-home px-2 py-2 md:px-[46px] md:py-[15px] mx-4 p-4 max-w-full grid grid-cols-12 gap-6">
         <!-- LEFT COLUMN -->
         <section class="col-span-12 lg:col-span-12">
             <!-- Header Card -->
@@ -19,282 +26,310 @@
                         href="https://horizon-ui.com?ref=tailwindcomponents.com" target="_blank"
                         class="text-brand-500 font-bold">Horizon UI Tailwind React</a></p>
             </div> --}}
-            <div class="flex items-center justify-start"><span
-                    class="inline-flex justify-center items-center w-12 h-12 rounded-full bg-white text-[#008bff]  mr-3"><svg
-                        viewBox="0 0 24 24" width="24" height="24" class="inline-block">
-                        <path fill="currentColor"
-                            d="M3,14L3.5,14.07L8.07,9.5C7.89,8.85 8.06,8.11 8.59,7.59C9.37,6.8 10.63,6.8 11.41,7.59C11.94,8.11 12.11,8.85 11.93,9.5L14.5,12.07L15,12C15.18,12 15.35,12 15.5,12.07L19.07,8.5C19,8.35 19,8.18 19,8A2,2 0 0,1 21,6A2,2 0 0,1 23,8A2,2 0 0,1 21,10C20.82,10 20.65,10 20.5,9.93L16.93,13.5C17,13.65 17,13.82 17,14A2,2 0 0,1 15,16A2,2 0 0,1 13,14L13.07,13.5L10.5,10.93C10.18,11 9.82,11 9.5,10.93L4.93,15.5L5,16A2,2 0 0,1 3,18A2,2 0 0,1 1,16A2,2 0 0,1 3,14Z">
-                        </path>
-                    </svg></span>
-                <h1 class="text-2xl font-montserrat font-black text-[#008bff] capitalize leading-tight">Dashboard Kasir
-                </h1>
+            <div class="flex items-center justify-start gap-3">
+                <span
+                    class="inline-flex justify-center items-center w-12 h-12 rounded-2xl bg-white text-[#008bff] shadow-sm border border-slate-100">
+                    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor"
+                        stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                        <path d="M3 12a9 9 0 1 0 3-6.708" />
+                        <path d="M3 4v5h5" />
+                        <path d="M12 7v5l3 3" />
+                    </svg>
+                </span>
+                <div>
+                    <h1 class="text-2xl font-bold text-slate-800 capitalize leading-tight">Dashboard Kasir</h1>
+                    <p class="text-xs text-slate-400">Selamat datang, dan silahkan pilih menu untuk melanjutkan </p>
+                </div>
             </div>
-            <div
-                class="px-[30px] py-[5px] my-[18px] bg-[#ebf8ff] rounded-[20px] shadow-[0px_12px_24px_#8f8f8f1c] border border-[#73e2ff]">
-                <div class="py-5 space-y-3 w-full md:w-[70%]">
+            <div class="p-5 md:p-6 my-4 bg-white rounded-2xl shadow-sm border border-slate-200 w-full mx-auto">
+                <div class="space-y-6 w-full">
 
-                    {{-- TRANSAKSI --}}
+                    {{-- 1. HIGHLIGHT TRANSAKSI UTAMA --}}
                     <div>
-                        <p class="text-[10.5px] font-semibold uppercase tracking-widest mb-2.5 px-0.5"
-                            style="color:#7aa3c0; letter-spacing:0.09em;">
-                            Transaksi
-                        </p>
-                        <div class="grid grid-cols-2 gap-2 w-full md:w-auto md:inline-grid"
-                            style="grid-template-columns: repeat(3, minmax(80px, 224px))">
+                        <div class="flex items-center gap-2 mb-3 px-1">
+                            <span class="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+                            <h2 class="text-[11px] font-bold uppercase tracking-widest text-slate-500">
+                                Aksi Transaksi
+                            </h2>
+                        </div>
 
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
                             {{-- Penjualan --}}
                             <a href="{{ url('transaction/upds') }}"
-                                class="group flex flex-col items-center gap-2 rounded-2xl px-3 py-4 text-center transition-all duration-200
-          bg-[#1d7ed8] text-white shadow-[0px_6px_16px_#1d7ed866]
-          hover:-translate-y-0.5 hover:bg-[#1669b2] active:scale-95">
+                                class="group relative flex items-center justify-between overflow-hidden rounded-xl px-5 py-4 transition-all duration-300 bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-md shadow-blue-500/20 hover:-translate-y-1 hover:shadow-lg hover:shadow-blue-500/40">
 
-                                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-white/20">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
-                                        stroke="currentColor" stroke-width="2">
-                                        <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
-                                        <line x1="3" y1="6" x2="21" y2="6" />
-                                        <path d="M16 10a4 4 0 0 1-8 0" />
+                                <div class="flex items-center gap-4 relative z-10">
+                                    <div
+                                        class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3">
+
+
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="text-white w-6 h-6"
+                                            viewBox="0 0 24 24" fill="none" stroke="currentcolor" stroke-width="1.75"
+                                            stroke-linecap="round" stroke-linejoin="round">
+                                            <path
+                                                d="M21 15h-2.5c-.398 0 -.779 .158 -1.061 .439c-.281 .281 -.439 .663 -.439 1.061c0 .398 .158 .779 .439 1.061c.281 .281 .663 .439 1.061 .439h1c.398 0 .779 .158 1.061 .439c.281 .281 .439 .663 .439 1.061c0 .398 -.158 .779 -.439 1.061c-.281 .281 -.663 .439 -1.061 .439h-2.5" />
+                                            <path d="M19 21v1m0 -8v1" />
+                                            <path
+                                                d="M13 21h-7c-.53 0 -1.039 -.211 -1.414 -.586c-.375 -.375 -.586 -.884 -.586 -1.414v-10c0 -.53 .211 -1.039 .586 -1.414c.375 -.375 .884 -.586 1.414 -.586h2m12 3.12v-1.12c0 -.53 -.211 -1.039 -.586 -1.414c-.375 -.375 -.884 -.586 -1.414 -.586h-2" />
+                                            <path
+                                                d="M16 10v-6c0 -.53 -.211 -1.039 -.586 -1.414c-.375 -.375 -.884 -.586 -1.414 -.586h-4c-.53 0 -1.039 .211 -1.414 .586c-.375 .375 -.586 .884 -.586 1.414v6m8 0h-8m8 0h1m-9 0h-1" />
+                                            <path d="M8 14v.01" />
+                                            <path d="M8 17v.01" />
+                                            <path d="M12 13.99v.01" />
+                                            <path d="M12 17v.01" />
+                                        </svg>
+
+                                    </div>
+                                    <div class="flex flex-col text-left">
+                                        <span class="text-sm font-bold tracking-wide">Penjualan</span>
+                                        <span class="text-[11px] text-blue-100 font-medium">Catat transaksi
+                                            kasir/sales</span>
+                                    </div>
+                                </div>
+
+                                <div
+                                    class="relative z-10 opacity-0 -translate-x-2 transition-all duration-300 group-hover:opacity-100 group-hover:translate-x-0">
+                                    <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M5 12h14"></path>
+                                        <path d="m12 5 7 7-7 7"></path>
                                     </svg>
                                 </div>
 
-                                <span class="text-[12px] font-semibold">Penjualan</span>
+                                <!-- Decorative background element -->
+                                <div
+                                    class="absolute -right-6 -top-6 w-24 h-24 rounded-full bg-white/10 blur-xl group-hover:bg-white/20 transition-all duration-300">
+                                </div>
                             </a>
 
                             {{-- Pembelian --}}
                             <a href="{{ route('receiving.index') }}"
-                                class="group flex flex-col items-center gap-2 rounded-2xl px-3 py-4 text-center transition-all duration-200
-          bg-[#2e7d32] text-white shadow-[0px_6px_16px_#2e7d3266]
-          hover:-translate-y-0.5 hover:bg-[#256628] active:scale-95">
+                                class="group relative flex items-center justify-between overflow-hidden rounded-xl px-5 py-4 transition-all duration-300 bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-md shadow-emerald-500/20 hover:-translate-y-1 hover:shadow-lg hover:shadow-emerald-500/40">
 
-                                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-white/20">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
-                                        stroke="currentColor" stroke-width="2">
-                                        <circle cx="9" cy="21" r="1" />
-                                        <circle cx="20" cy="21" r="1" />
-                                        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+                                <div class="flex items-center gap-4 relative z-10">
+                                    <div
+                                        class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3">
+                                        <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                            <path d="M6 19m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
+                                            <path d="M17 19m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
+                                            <path d="M17 17h-11v-14h-2" />
+                                            <path d="M6 5l14 1l-1 7h-13" />
+                                        </svg>
+                                    </div>
+                                    <div class="flex flex-col text-left">
+                                        <span class="text-sm font-bold tracking-wide">Pembelian</span>
+                                        <span class="text-[11px] text-emerald-100 font-medium">Buat BPBA & Terima Barang</span>
+                                    </div>
+                                </div>
+
+                                <div
+                                    class="relative z-10 opacity-0 -translate-x-2 transition-all duration-300 group-hover:opacity-100 group-hover:translate-x-0">
+                                    <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M5 12h14"></path>
+                                        <path d="m12 5 7 7-7 7"></path>
                                     </svg>
                                 </div>
 
-                                <span class="text-[12px] font-semibold">Pembelian</span>
+                                <!-- Decorative background element -->
+                                <div
+                                    class="absolute -right-6 -top-6 w-24 h-24 rounded-full bg-white/10 blur-xl group-hover:bg-white/20 transition-all duration-300">
+                                </div>
                             </a>
                         </div>
                     </div>
 
-                    <hr style="border-color:#cce0f0;">
+                    <hr class="border-t border-dashed border-slate-200">
 
-                    {{-- DATA & LAPORAN --}}
+                    {{-- 2. DATA & LAPORAN --}}
                     <div>
-                        <p class="text-[10.5px] font-semibold uppercase tracking-widest mb-2.5 px-0.5"
-                            style="color:#7aa3c0; letter-spacing:0.09em;">
+                        <h2 class="text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-3 px-1">
                             Data &amp; Laporan
-                        </p>
-                        <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
-
+                        </h2>
+                        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                             {{-- Data Penjualan --}}
                             <a onclick="openModal('salesModal')"
-                                class="group flex flex-col items-center gap-2 shadow-[0px_2px_10px_#218aeb38] rounded-2xl bg-white px-2 py-4 text-center transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#f7fbff] active:scale-95 cursor-pointer"
-                                style="border: 1px solid #d4e8f7;">
-                                <div class="flex h-11 w-11 items-center justify-center rounded-xl transition-colors duration-200"
-                                    style="background:#fef0d6; color:#7a4a08;" onmouseover="this.style.background='#fde5b8'"
-                                    onmouseout="this.style.background='#fef0d6'">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
-                                        stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                        stroke-linejoin="round">
-                                        <line x1="12" y1="20" x2="12" y2="10" />
-                                        <line x1="18" y1="20" x2="18" y2="4" />
-                                        <line x1="6" y1="20" x2="6" y2="16" />
-                                        <polyline points="1 20 23 20" />
+                                class="group flex flex-col items-center gap-2.5 rounded-xl border border-slate-100 bg-slate-50/50 p-3.5 text-center transition-all duration-200 hover:-translate-y-0.5 hover:bg-white hover:border-amber-200 hover:shadow-md hover:shadow-amber-500/5 cursor-pointer">
+                                <div
+                                    class="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-100 text-amber-600 transition-transform duration-200 group-hover:scale-110">
+                                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                        <path
+                                            d="M3 13a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v6a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z" />
+                                        <path
+                                            d="M15 9a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v10a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z" />
+                                        <path
+                                            d="M9 5a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v14a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z" />
+                                        <path d="M4 20h14" />
                                     </svg>
                                 </div>
-                                <span class="text-[11.5px] font-medium leading-tight" style="color:#2d4a62;">Data
+                                <span class="text-[11px] font-semibold text-slate-600 group-hover:text-amber-700">Data
                                     Penjualan</span>
                             </a>
 
                             {{-- Data Pembelian --}}
                             <a onclick="openModal('receivingModal')"
-                                class="group flex flex-col items-center gap-2 shadow-[0px_2px_10px_#218aeb38] rounded-2xl bg-white px-2 py-4 text-center transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#f7fbff] active:scale-95 cursor-pointer"
-                                style="border: 1px solid #d4e8f7;">
-                                <div class="flex h-11 w-11 items-center justify-center rounded-xl transition-colors duration-200"
-                                    style="background:#eeecfd; color:#4c41b5;" onmouseover="this.style.background='#e0ddfb'"
-                                    onmouseout="this.style.background='#eeecfd'">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
-                                        stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                        stroke-linejoin="round">
-                                        <rect x="1" y="3" width="15" height="13" rx="2" />
-                                        <path d="M16 8h4l4 5v4h-8V8z" />
-                                        <circle cx="5.5" cy="18.5" r="2.5" />
-                                        <circle cx="18.5" cy="18.5" r="2.5" />
+                                class="group flex flex-col items-center gap-2.5 rounded-xl border border-slate-100 bg-slate-50/50 p-3.5 text-center transition-all duration-200 hover:-translate-y-0.5 hover:bg-white hover:border-violet-200 hover:shadow-md hover:shadow-violet-500/5 cursor-pointer">
+                                <div
+                                    class="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-100 text-violet-600 transition-transform duration-200 group-hover:scale-110">
+                                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                        <path d="M6 19m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
+                                        <path d="M17 19m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
+                                        <path d="M17 17h-11v-14h-2" />
+                                        <path d="M6 5l14 1l-1 7h-13" />
                                     </svg>
                                 </div>
-                                <span class="text-[11.5px] font-medium leading-tight" style="color:#2d4a62;">Data
+                                <span class="text-[11px] font-semibold text-slate-600 group-hover:text-violet-700">Data
                                     Pembelian</span>
                             </a>
 
                             {{-- Laporan Penjualan --}}
                             <a onclick="openModal('reportModal')"
-                                class="group flex flex-col items-center gap-2 shadow-[0px_2px_10px_#218aeb38] rounded-2xl bg-white px-2 py-4 text-center transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#f7fbff] active:scale-95 cursor-pointer"
-                                style="border: 1px solid #d4e8f7;">
-                                <div class="flex h-11 w-11 items-center justify-center rounded-xl transition-colors duration-200"
-                                    style="background:#fde8e8; color:#9b2020;"
-                                    onmouseover="this.style.background='#fcd4d4'"
-                                    onmouseout="this.style.background='#fde8e8'">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
-                                        stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                        stroke-linejoin="round">
-                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                                        <polyline points="14 2 14 8 20 8" />
-                                        <line x1="16" y1="13" x2="8" y2="13" />
-                                        <line x1="16" y1="17" x2="8" y2="17" />
+                                class="group flex flex-col items-center gap-2.5 rounded-xl border border-slate-100 bg-slate-50/50 p-3.5 text-center transition-all duration-200 hover:-translate-y-0.5 hover:bg-white hover:border-rose-200 hover:shadow-md hover:shadow-rose-500/5 cursor-pointer">
+                                <div
+                                    class="flex h-10 w-10 items-center justify-center rounded-lg bg-rose-100 text-rose-600 transition-transform duration-200 group-hover:scale-110">
+                                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                        <path d="M14 3v4a1 1 0 0 0 1 1h4" />
+                                        <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" />
+                                        <path d="M9 17v-5l2 2l2 -2v5" />
                                     </svg>
                                 </div>
-                                <span class="text-[11.5px] font-medium leading-tight" style="color:#2d4a62;">Laporan
+                                <span class="text-[11px] font-semibold text-slate-600 group-hover:text-rose-700">Lap.
                                     Penjualan</span>
                             </a>
 
                             {{-- Laporan Pembelian --}}
                             <a onclick="openModal('orderReportModal')"
-                                class="group flex flex-col items-center gap-2 shadow-[0px_2px_10px_#218aeb38] rounded-2xl bg-white px-2 py-4 text-center transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#f7fbff] active:scale-95 cursor-pointer"
-                                style="border: 1px solid #d4e8f7;">
-                                <div class="flex h-11 w-11 items-center justify-center rounded-xl transition-colors duration-200"
-                                    style="background:#fdeae2; color:#8c3418;"
-                                    onmouseover="this.style.background='#fcd8cc'"
-                                    onmouseout="this.style.background='#fdeae2'">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
-                                        stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                        stroke-linejoin="round">
-                                        <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" />
-                                        <line x1="3" y1="6" x2="21" y2="6" />
-                                        <path d="M16 10a4 4 0 01-8 0" />
+                                class="group flex flex-col items-center gap-2.5 rounded-xl border border-slate-100 bg-slate-50/50 p-3.5 text-center transition-all duration-200 hover:-translate-y-0.5 hover:bg-white hover:border-orange-200 hover:shadow-md hover:shadow-orange-500/5 cursor-pointer">
+                                <div
+                                    class="flex h-10 w-10 items-center justify-center rounded-lg bg-orange-100 text-orange-600 transition-transform duration-200 group-hover:scale-110">
+                                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                        <path d="M14 3v4a1 1 0 0 0 1 1h4" />
+                                        <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" />
+                                        <path d="M9 17l0 -5" />
+                                        <path d="M12 17l0 -1" />
+                                        <path d="M15 17l0 -3" />
                                     </svg>
                                 </div>
-                                <span class="text-[11.5px] font-medium leading-tight" style="color:#2d4a62;">Laporan
+                                <span class="text-[11px] font-semibold text-slate-600 group-hover:text-orange-700">Lap.
                                     Pembelian</span>
                             </a>
 
                             {{-- Pareto --}}
                             <a href="{{ route('pareto.index') }}"
-                                class="group flex flex-col items-center gap-2 shadow-[0px_2px_10px_#218aeb38] rounded-2xl bg-white px-2 py-4 text-center transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#f7fbff] active:scale-95 cursor-pointer"
-                                style="border: 1px solid #d4e8f7;">
-                                <div class="flex h-11 w-11 items-center justify-center rounded-xl transition-colors duration-200"
-                                    style="background:#fce8f3; color:#8b2857;"
-                                    onmouseover="this.style.background='#f9d4e8'"
-                                    onmouseout="this.style.background='#fce8f3'">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"
-                                        viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                                        stroke-linecap="round" stroke-linejoin="round">
+                                class="group flex flex-col items-center gap-2.5 rounded-xl border border-slate-100 bg-slate-50/50 p-3.5 text-center transition-all duration-200 hover:-translate-y-0.5 hover:bg-white hover:border-pink-200 hover:shadow-md hover:shadow-pink-500/5 cursor-pointer">
+                                <div
+                                    class="flex h-10 w-10 items-center justify-center rounded-lg bg-pink-100 text-pink-600 transition-transform duration-200 group-hover:scale-110">
+                                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
                                         <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                                        <path d="M3 3v18h18" />
-                                        <path d="M3 6h18" />
-                                        <path d="M3 8c10 0 8 9 18 9" />
+                                        <path d="M4 19l16 0" />
+                                        <path d="M4 15l4 -6l4 2l4 -5l4 4" />
                                     </svg>
                                 </div>
-                                <span class="text-[11.5px] font-medium leading-tight" style="color:#2d4a62;">Pareto</span>
+                                <span
+                                    class="text-[11px] font-semibold text-slate-600 group-hover:text-pink-700">Pareto</span>
                             </a>
-
                         </div>
                     </div>
 
-                    <hr style="border-color:#cce0f0;">
+                    <hr class="border-t border-dashed border-slate-200">
 
-                    {{-- MANAJEMEN --}}
+                    {{-- 3. MANAJEMEN --}}
                     <div>
-                        <p class="text-[10.5px] font-semibold uppercase tracking-widest mb-2.5 px-0.5"
-                            style="color:#7aa3c0; letter-spacing:0.09em;">
+                        <h2 class="text-[11px] font-bold uppercase tracking-widest text-slate-400 mb-3 px-1">
                             Manajemen
-                        </p>
-                        <div class="grid grid-cols-5 gap-2 w-full md:w-auto md:inline-grid"
-                            style="grid-template-columns: repeat(5, minmax(80px, 110px))">
-
+                        </h2>
+                        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                             {{-- Master Data --}}
                             <a onclick="openModal('masterModal')"
-                                class="group flex flex-col items-center gap-2 shadow-[0px_2px_10px_#218aeb38] rounded-2xl bg-white px-2 py-4 text-center transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#f7fbff] active:scale-95 cursor-pointer"
-                                style="border: 1px solid #d4e8f7;">
-                                <div class="flex h-11 w-11 items-center justify-center rounded-xl transition-colors duration-200"
-                                    style="background:#d8f2eb; color:#0d6b55;"
-                                    onmouseover="this.style.background='#c2ece1'"
-                                    onmouseout="this.style.background='#d8f2eb'">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
-                                        stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                        stroke-linejoin="round">
+                                class="group flex flex-col items-center gap-2.5 rounded-xl border border-slate-100 bg-slate-50/50 p-3.5 text-center transition-all duration-200 hover:-translate-y-0.5 hover:bg-white hover:border-teal-200 hover:shadow-md hover:shadow-teal-500/5 cursor-pointer">
+                                <div
+                                    class="flex h-10 w-10 items-center justify-center rounded-lg bg-teal-100 text-teal-600 transition-transform duration-200 group-hover:scale-110">
+                                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                                         <ellipse cx="12" cy="5" rx="9" ry="3" />
                                         <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
-                                        <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
+                                        <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3v-14" />
                                     </svg>
                                 </div>
-                                <span class="text-[11.5px] font-medium leading-tight" style="color:#2d4a62;">Master
+                                <span class="text-[11px] font-semibold text-slate-600 group-hover:text-teal-700">Master
                                     Data</span>
                             </a>
 
                             {{-- Persediaan --}}
                             <a onclick="openModal('logModal')"
-                                class="group flex flex-col items-center gap-2 shadow-[0px_2px_10px_#218aeb38] rounded-2xl bg-white px-2 py-4 text-center transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#f7fbff] active:scale-95 cursor-pointer"
-                                style="border: 1px solid #d4e8f7;">
-                                <div class="flex h-11 w-11 items-center justify-center rounded-xl transition-colors duration-200"
-                                    style="background:#fef0d6; color:#7a4a08;"
-                                    onmouseover="this.style.background='#fde5b8'"
-                                    onmouseout="this.style.background='#fef0d6'">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
-                                        stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                        stroke-linejoin="round">
-                                        <path
-                                            d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-                                        <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
-                                        <line x1="12" y1="22.08" x2="12" y2="12" />
-                                    </svg>
-                                </div>
-                                <span class="text-[11.5px] font-medium leading-tight"
-                                    style="color:#2d4a62;">Persediaan</span>
-                            </a>
-                            {{-- Mutasi --}}
-                            <a onclick="openModal('transfersModal')"
-                                class="group flex flex-col items-center gap-2 rounded-2xl shadow-[0px_2px_10px_#218aeb38] bg-white px-2 py-4 text-center transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#f7fbff] active:scale-95 cursor-pointer"
-                                style="border: 1px solid #d4e8f7;">
-                                <div class="flex h-11 w-11 items-center justify-center rounded-xl transition-colors duration-200"
-                                    style="background:#d8f2eb; color:#0d6b55;"
-                                    onmouseover="this.style.background='#c2ece1'"
-                                    onmouseout="this.style.background='#d8f2eb'">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
-                                        stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                        stroke-linejoin="round">
-                                        <polyline points="17 1 21 5 17 9" />
-                                        <path d="M3 11V9a4 4 0 0 1 4-4h14" />
-                                        <polyline points="7 23 3 19 7 15" />
-                                        <path d="M21 13v2a4 4 0 0 1-4 4H3" />
-                                    </svg>
-                                </div>
-                                <span class="text-[11.5px] font-medium leading-tight" style="color:#2d4a62;">Mutasi</span>
-                            </a>
-
-                            <a href="{{ url('invoices/') }}"
-                                class="group flex flex-col items-center gap-2 rounded-2xl shadow-[0px_2px_10px_#218aeb38] bg-white px-2 py-4 text-center transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#f7fbff] active:scale-95 cursor-pointer"
-                                style="border: 1px solid #d4e8f7;">
-                                <div class="flex h-11 w-11 items-center justify-center rounded-xl transition-colors duration-200"
-                                    style="background:#daf1ff;; color:#1c4188;"
-                                    onmouseover="this.style.background='#eeeeee'"
-                                    onmouseout="this.style.background='#daf1ff'">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"
-                                        viewBox="0 0 24 24" fill="currentColor"
-                                        class="icon icon-tabler icons-tabler-filled icon-tabler-receipt">
+                                class="group flex flex-col items-center gap-2.5 rounded-xl border border-slate-100 bg-slate-50/50 p-3.5 text-center transition-all duration-200 hover:-translate-y-0.5 hover:bg-white hover:border-amber-200 hover:shadow-md hover:shadow-amber-500/5 cursor-pointer">
+                                <div
+                                    class="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-100 text-amber-600 transition-transform duration-200 group-hover:scale-110">
+                                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
                                         <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                                         <path
-                                            d="M17 2a3 3 0 0 1 3 3v16a1 1 0 0 1 -1.555 .832l-2.318 -1.545l-1.42 1.42a1 1 0 0 1 -1.32 .083l-.094 -.083l-1.293 -1.292l-1.293 1.292a1 1 0 0 1 -1.32 .083l-.094 -.083l-1.421 -1.42l-2.317 1.545l-.019 .012l-.054 .03l-.028 .017l-.054 .023l-.05 .023l-.049 .015l-.06 .019l-.052 .009l-.057 .011l-.084 .006l-.026 .003h-.022l-.049 -.003h-.039l-.013 -.003h-.016l-.041 -.008l-.038 -.005l-.015 -.005l-.018 -.002l-.034 -.011l-.04 -.01l-.019 -.007l-.015 -.004l-.029 -.013l-.04 -.015l-.021 -.011l-.013 -.005l-.028 -.016l-.036 -.018l-.014 -.01l-.018 -.01l-.038 -.027l-.022 -.014l-.01 -.009l-.02 -.014l-.045 -.041l-.012 -.008l-.024 -.024l-.035 -.039l-.02 -.02l-.007 -.011l-.011 -.012l-.032 -.045l-.02 -.025l-.012 -.019l-.03 -.054l-.017 -.028l-.023 -.054l-.023 -.05a1 1 0 0 1 -.034 -.108l-.01 -.057l-.01 -.053l-.009 -.132v-16a3 3 0 0 1 3 -3zm-2 12h-2a1 1 0 0 0 0 2h2a1 1 0 0 0 0 -2m0 -4h-6a1 1 0 0 0 0 2h6a1 1 0 0 0 0 -2m0 -4h-6a1 1 0 1 0 0 2h6a1 1 0 0 0 0 -2" />
+                                            d="M21 16v-8a2 2 0 0 0 -1 -1.73l-7 -4a2 2 0 0 0 -2 0l-7 4a2 2 0 0 0 -1 1.73v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7 -4a2 2 0 0 0 1 -1.73z" />
+                                        <path d="M3.27 6.96l8.73 5.05l8.73 -5.05" />
+                                        <path d="M12 22.08v-10" />
                                     </svg>
                                 </div>
-                                <span class="text-[11.5px] font-medium leading-tight" style="color:#2d4a62;">Klaim
-                                    Tagihan</span>
-
+                                <span
+                                    class="text-[11px] font-semibold text-slate-600 group-hover:text-amber-700">Persediaan</span>
                             </a>
+
+                            {{-- Mutasi --}}
+                            <a onclick="openModal('transfersModal')"
+                                class="group flex flex-col items-center gap-2.5 rounded-xl border border-slate-100 bg-slate-50/50 p-3.5 text-center transition-all duration-200 hover:-translate-y-0.5 hover:bg-white hover:border-cyan-200 hover:shadow-md hover:shadow-cyan-500/5 cursor-pointer">
+                                <div
+                                    class="flex h-10 w-10 items-center justify-center rounded-lg bg-cyan-100 text-cyan-600 transition-transform duration-200 group-hover:scale-110">
+                                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                        <path d="M17 1l4 4l-4 4" />
+                                        <path d="M3 11v-2a4 4 0 0 1 4 -4h14" />
+                                        <path d="M7 23l-4 -4l4 -4" />
+                                        <path d="M21 13v2a4 4 0 0 1 -4 4h-14" />
+                                    </svg>
+                                </div>
+                                <span
+                                    class="text-[11px] font-semibold text-slate-600 group-hover:text-cyan-700">Mutasi</span>
+                            </a>
+
+                            {{-- Klaim Tagihan --}}
+                            <a href="{{ url('invoices/') }}"
+                                class="group flex flex-col items-center gap-2.5 rounded-xl border border-slate-100 bg-slate-50/50 p-3.5 text-center transition-all duration-200 hover:-translate-y-0.5 hover:bg-white hover:border-blue-200 hover:shadow-md hover:shadow-blue-500/5 cursor-pointer">
+                                <div
+                                    class="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 text-blue-600 transition-transform duration-200 group-hover:scale-110">
+                                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                        <path
+                                            d="M5 21v-16a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v16l-3 -2l-2 2l-2 -2l-2 2l-2 -2l-3 2" />
+                                        <path d="M9 7l6 0" />
+                                        <path d="M9 11l6 0" />
+                                        <path d="M9 15l4 0" />
+                                    </svg>
+                                </div>
+                                <span class="text-[11px] font-semibold text-slate-600 group-hover:text-blue-700">Klaim
+                                    Tagihan</span>
+                            </a>
+
+                            {{-- Hutang Dagang --}}
                             <a href="{{ url('orders-payment/') }}"
-                                class="group flex flex-col items-center gap-2 rounded-2xl shadow-[0px_2px_10px_#218aeb38] bg-white px-2 py-4 text-center transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#f7fbff] active:scale-95 cursor-pointer"
-                                style="border: 1px solid #d4e8f7;">
-                                <div class="flex h-11 w-11 items-center justify-center rounded-xl transition-colors duration-200"
-                                    style="background:#ffe5cf; color:#ad5a29;"
-                                    onmouseover="this.style.background='#eeeeee'"
-                                    onmouseout="this.style.background='#ffe5cf'">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"
-                                        viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                                        stroke-linecap="round" stroke-linejoin="round"
-                                        class="icon icon-tabler icons-tabler-outline icon-tabler-notebook">
+                                class="group flex flex-col items-center gap-2.5 rounded-xl border border-slate-100 bg-slate-50/50 p-3.5 text-center transition-all duration-200 hover:-translate-y-0.5 hover:bg-white hover:border-orange-200 hover:shadow-md hover:shadow-orange-500/5 cursor-pointer">
+                                <div
+                                    class="flex h-10 w-10 items-center justify-center rounded-lg bg-orange-100 text-orange-600 transition-transform duration-200 group-hover:scale-110">
+                                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
                                         <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                                         <path
                                             d="M6 4h11a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-11a1 1 0 0 1 -1 -1v-14a1 1 0 0 1 1 -1m3 0v18" />
@@ -302,9 +337,8 @@
                                         <path d="M13 12l2 0" />
                                     </svg>
                                 </div>
-                                <span class="text-[11.5px] font-medium leading-tight" style="color:#2d4a62;">Hutang
+                                <span class="text-[11px] font-semibold text-slate-600 group-hover:text-orange-700">Hutang
                                     Dagang</span>
-
                             </a>
                         </div>
                     </div>
@@ -312,148 +346,139 @@
                 </div>
             </div>
 
-            <div
-                class="min-w-[375px] md:min-w-[700px] xl:min-w-[800px] mt-3 grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-3 3xl:grid-cols-6">
+            <div class="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+
+                {{-- Total Penjualan --}}
                 <div
-                    class="relative flex flex-grow !flex-row flex-col items-center rounded-[10px] rounded-[10px] border-[1px] border-gray-200 bg-white bg-clip-border shadow-md shadow-[#F3F3F3] dark:border-[#ffffff33] dark:!bg-navy-800 text-dark font-poppins dark:shadow-none">
-                    <div class="ml-[18px] flex h-[90px] w-auto flex-row items-center">
-                        <div class="rounded-full bg-[#ebf3ff] p-3">
-                            <span class="flex items-center text-brand-500 text-[#422afb] font-poppins">
-                                <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 24 24"
-                                    class="h-7 w-7" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg">
-                                    <path fill="none" d="M0 0h24v24H0z"></path>
-                                    <path d="M4 9h4v11H4zM16 13h4v7h-4zM10 4h4v16h-4z"></path>
-                                </svg>
-                            </span>
-                        </div>
+                    class="group relative flex items-center gap-4 overflow-hidden rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-500 to-blue-600 p-5 shadow-lg shadow-blue-500/20 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-blue-500/30">
+                    <div
+                        class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/20 text-white backdrop-blur">
+                        <svg class="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                            <path d="M4 20l16 0" />
+                            <path d="M4 15l4 -6l4 2l4 -5l4 4" />
+                        </svg>
                     </div>
-                    <div class="h-50 ml-4 flex w-auto flex-col justify-center">
-                        <p class="font-dm text-sm font-medium text-gray-600">Total Penjualan</p>
-                        <h4 class="text-xl font-bold text-navy-700 text-dark font-poppins">{{ $total_sales_rp }}</h4>
+                    <div class="min-w-0">
+                        <p class="text-xs font-medium uppercase tracking-wide text-blue-100">Total Penjualan</p>
+                        <h4 class="text-xl font-bold text-white truncate">{{ $total_sales_rp }}</h4>
                     </div>
                 </div>
 
+                {{-- Total Pembelian --}}
                 <div
-                    class="relative flex flex-grow !flex-row flex-col items-center rounded-[10px] rounded-[10px] border-[1px] border-gray-200 bg-white bg-clip-border shadow-md shadow-[#F3F3F3] dark:border-[#ffffff33] dark:!bg-navy-800 text-dark font-poppins dark:shadow-none">
-                    <div class="ml-[18px] flex h-[90px] w-auto flex-row items-center">
-                        <div class="rounded-full bg-[#ebf3ff] p-3">
-                            <span class="flex items-center text-brand-500 text-[#422afb] font-poppins">
-                                <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 512 512"
-                                    class="h-6 w-6" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg">
-                                    <path
-                                        d="M298.39 248a4 4 0 002.86-6.8l-78.4-79.72a4 4 0 00-6.85 2.81V236a12 12 0 0012 12z">
-                                    </path>
-                                    <path
-                                        d="M197 267a43.67 43.67 0 01-13-31v-92h-72a64.19 64.19 0 00-64 64v224a64 64 0 0064 64h144a64 64 0 0064-64V280h-92a43.61 43.61 0 01-31-13zm175-147h70.39a4 4 0 002.86-6.8l-78.4-79.72a4 4 0 00-6.85 2.81V108a12 12 0 0012 12z">
-                                    </path>
-                                    <path
-                                        d="M372 152a44.34 44.34 0 01-44-44V16H220a60.07 60.07 0 00-60 60v36h42.12A40.81 40.81 0 01231 124.14l109.16 111a41.11 41.11 0 0111.83 29V400h53.05c32.51 0 58.95-26.92 58.95-60V152z">
-                                    </path>
-                                </svg>
-                            </span>
-                        </div>
+                    class="group relative flex items-center gap-4 overflow-hidden rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-500 to-emerald-600 p-5 shadow-lg shadow-emerald-500/20 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-emerald-500/30">
+                    <div
+                        class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/20 text-white backdrop-blur">
+                        <svg class="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                            <path d="M6 19m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
+                            <path d="M17 19m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
+                            <path d="M17 17h-11v-14h-2" />
+                            <path d="M6 5l14 1l-1 7h-13" />
+                        </svg>
                     </div>
-                    <div class="h-50 ml-4 flex w-auto flex-col justify-center">
-                        <p class="font-dm text-sm font-medium text-gray-600">Total Pembelian</p>
-                        <h4 class="text-xl font-bold text-navy-700 text-dark font-poppins">{{ $total_orders_rp }}</h4>
+                    <div class="min-w-0">
+                        <p class="text-xs font-medium uppercase tracking-wide text-emerald-100">Total Pembelian</p>
+                        <h4 class="text-xl font-bold text-white truncate">{{ $total_orders_rp }}</h4>
                     </div>
                 </div>
+
+                {{-- Total Ditolak --}}
                 <div
-                    class="relative flex flex-grow !flex-row flex-col items-center rounded-[10px] rounded-[10px] border-[1px] border-gray-200 bg-white bg-clip-border shadow-md shadow-[#F3F3F3] dark:border-[#ffffff33] dark:!bg-navy-800 text-dark font-poppins dark:shadow-none">
-                    <div class="ml-[18px] flex h-[90px] w-auto flex-row items-center">
-                        <div class="rounded-full bg-[#ebf3ff] p-3">
-                            <span class="flex items-center text-brand-500 text-[#422afb] font-poppins">
-                                <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 24 24"
-                                    class="h-7 w-7" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg">
-                                    <path fill="none" d="M0 0h24v24H0z"></path>
-                                    <path d="M4 9h4v11H4zM16 13h4v7h-4zM10 4h4v16h-4z"></path>
-                                </svg>
-                            </span>
-                        </div>
+                    class="group relative flex items-center gap-4 overflow-hidden rounded-2xl border border-rose-100 bg-gradient-to-br from-rose-500 to-rose-600 p-5 shadow-lg shadow-rose-500/20 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-rose-500/30">
+                    <div
+                        class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/20 text-white backdrop-blur">
+                        <svg class="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                            <path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" />
+                            <path d="M10 10l4 4m0 -4l-4 4" />
+                        </svg>
                     </div>
-                    <div class="h-50 ml-4 flex w-auto flex-col justify-center">
-                        <p class="font-dm text-sm font-medium text-gray-600">Total Ditolak</p>
-                        <h4 class="text-xl font-bold text-navy-700 text-dark font-poppins">{{ $total_reject_rp }}</h4>
+                    <div class="min-w-0">
+                        <p class="text-xs font-medium uppercase tracking-wide text-rose-100">Total Ditolak</p>
+                        <h4 class="text-xl font-bold text-white truncate">{{ $total_reject_rp }}</h4>
                     </div>
                 </div>
+
             </div>
-            <div
-                class="min-w-[375px] md:min-w-[700px] xl:min-w-[800px] mt-3 grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-3 3xl:grid-cols-6">
-                <div
-                    class="relative flex flex-grow !flex-row flex-col items-center rounded-[10px] rounded-[10px] border-[1px] border-gray-200 bg-white bg-clip-border shadow-md shadow-[#F3F3F3] dark:border-[#ffffff33] dark:!bg-navy-800 text-dark font-poppins dark:shadow-none">
-                    <div id="chart" style="width: 600px; height:400px;"></div>
+            <div class="mt-3 rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+                    <div class="flex items-center gap-2">
+                        <span class="flex items-center justify-center w-8 h-8 rounded-lg bg-amber-50 text-amber-600">
+                            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                <path d="M12 8v4l2 2" />
+                                <path d="M3.05 11a9 9 0 1 1 .5 4m-.5-5v-5h5" />
+                            </svg>
+                        </span>
+                        <h3 class="text-sm font-bold text-slate-800">Barang Mendekati Kadaluarsa</h3>
+                    </div>
+                    <a href="{{ route('kasir.nearExpiry') }}"
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors">
+                        Lihat detail
+                        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                            <path d="M5 12l14 0" />
+                            <path d="M13 6l6 6l-6 6" />
+                        </svg>
+                    </a>
                 </div>
-                <div
-                    class="relative flex flex-grow !flex-row flex-col items-center rounded-[10px] rounded-[10px] border-[1px] border-gray-200 bg-white bg-clip-border shadow-md shadow-[#F3F3F3] dark:border-[#ffffff33] dark:!bg-navy-800 text-dark font-poppins dark:shadow-none">
-                    <div id="distribution" style="width: 600px; height:400px;"></div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left">
+                        <thead>
+                            <tr class="text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-100">
+                                <th class="px-5 py-3 font-semibold">Obat</th>
+                                <th class="px-5 py-3 font-semibold">Batch</th>
+                                <th class="px-5 py-3 font-semibold">Expired Date</th>
+                                <th class="px-5 py-3 font-semibold">Sisa Hari</th>
+                                <th class="px-5 py-3 font-semibold text-right">Stok</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-50">
+                            @forelse ($nearExpiry as $item)
+                                <tr class="hover:bg-slate-50/60 transition-colors">
+                                    <td class="px-5 py-3">
+                                        <div class="font-semibold text-slate-700">{{ $item->medicines->name ?? '-' }}
+                                        </div>
+                                        <div class="text-[11px] text-slate-400">{{ $item->medicines->code ?? '-' }}</div>
+                                    </td>
+                                    <td class="px-5 py-3 text-slate-600">{{ $item->name }}</td>
+                                    <td class="px-5 py-3 text-slate-600">{{ $item->expiry_formatted }}</td>
+                                    <td class="px-5 py-3">
+                                        @if ($item->expiry_status === 'expired')
+                                            <span
+                                                class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-600">Expired
+                                                ({{ abs($item->days_left) }} hari lalu)
+                                            </span>
+                                        @elseif ($item->expiry_status === 'near')
+                                            <span
+                                                class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-600">{{ $item->days_left }}
+                                                hari lagi</span>
+                                        @else
+                                            <span
+                                                class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-600">{{ $item->days_left }}
+                                                hari lagi</span>
+                                        @endif
+                                    </td>
+                                    <td class="px-5 py-3 text-right font-semibold text-slate-700">{{ $item->stock }}</td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="5" class="px-5 py-8 text-center text-sm text-slate-400">Tidak ada
+                                        barang yang mendekati kadaluarsa.</td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </section>
     </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/echarts/dist/echarts.min.js"></script>
-    <script>
-        var chartDom = document.getElementById('chart');
-        var distributionDom = document.getElementById('distribution');
-        var myChart = echarts.init(chartDom);
-        var distributionChart = echarts.init(distributionDom);
-
-        var option = {
-            title: {
-                text: 'Penjualan Bulanan'
-            },
-            tooltip: {},
-            xAxis: {
-                type: 'category',
-                data: ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun']
-            },
-            yAxis: {
-                type: 'value'
-            },
-            series: [{
-                data: [120, 200, 150, 80, 70, 110],
-                type: 'line'
-            }]
-        };
-
-        var distribution = {
-            title: {
-                text: 'Distribusi Penjualan'
-            },
-            tooltip: {
-                trigger: 'item'
-            },
-            series: [{
-                name: 'Penjualan',
-                type: 'pie',
-                radius: '50%',
-                data: [{
-                        value: 1048,
-                        name: 'UPDS'
-                    },
-                    {
-                        value: 735,
-                        name: 'HV/OTC'
-                    },
-                    {
-                        value: 580,
-                        name: 'RESEP'
-                    },
-                    {
-                        value: 484,
-                        name: 'RESEP KREDIT'
-                    }
-                ]
-            }]
-        };
-
-        myChart.setOption(option);
-
-        distributionChart.setOption(distribution);
-    </script>
-
-
-
-
-    {{-- ------------------- Fixed Cart Card --------------------- --}}
 @endsection

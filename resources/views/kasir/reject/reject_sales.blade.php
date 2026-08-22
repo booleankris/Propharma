@@ -341,6 +341,7 @@
                                 <th>Jumlah Ditolak</th>
                                 <th>Total</th>
                                 <th>Alasan</th>
+                                <th>Aksi</th>
                             </tr>
                         </thead>
                         <tbody class="text-[11px]"></tbody>
@@ -418,6 +419,7 @@
         let d_total = {{ $d_total }};
         let rejection_code = @json($rejection_code);
         let isCustomMode = false;
+        let editingId = null;
         // Setting Initial Transaction Value
 
         $('#d_total').val(formatRupiah(d_total));
@@ -465,6 +467,12 @@
                 {
                     data: 'reason',
                     name: 'reason'
+                },
+                {
+                    data: 'action',
+                    name: 'action',
+                    orderable: false,
+                    searchable: false
                 },
                 ],
                 paging: false,
@@ -792,6 +800,69 @@
             }
         }
 
+        function editReject(id) {
+            const row = orderItemsTable.rows().data().toArray().find(r => r.id === id);
+            if (!row) return;
+
+            editingId = id;
+            medicineSelectedId = row.medicine_id || '';
+            itemcode = row.medicine_id || '';
+            itemprice = row.raw_price || 0;
+
+            document.getElementById('medicine_code').value = row.medicines?.code ?? '';
+            document.getElementById('medicine_name').value = row.medicines ? row.medicines.name : (row.medicine_name || '');
+            document.getElementById('unit').value = row.medicines?.unit ?? '';
+            document.getElementById('item_price').value = formatRupiah(row.raw_price || 0);
+            document.getElementById('qty').value = row.quantity ?? '';
+            document.getElementById('total').value = formatRupiah(row.raw_total || 0);
+            document.getElementById('reason').value = row.reason ?? '';
+
+            document.getElementById('medicine_name').scrollIntoView({ block: 'center', behavior: 'smooth' });
+            document.getElementById('qty').focus();
+
+            iziToast.info({
+                title: 'Edit Mode',
+                position: 'topRight',
+                message: 'Ubah data lalu klik Simpan untuk memperbarui.',
+            });
+        }
+
+        function deleteReject(id) {
+            Swal.fire({
+                title: 'Hapus Penolakan?',
+                text: 'Data ini akan dihapus permanen.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Ya, Hapus',
+                cancelButtonText: 'Batal',
+                confirmButtonColor: '#e11d48',
+            }).then((result) => {
+                if (!result.isConfirmed) return;
+
+                axios.delete(`{{ url('reject/deleteitemreject') }}/${id}`, {
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                    }
+                })
+                    .then(res => {
+                        if (res.data.success) {
+                            orderItemsTable.ajax.reload(null, false);
+                            d_total = res.data.total;
+                            $('#d_total').val(formatRupiah(d_total));
+                            iziToast.success({
+                                title: 'Berhasil',
+                                position: 'topRight',
+                                message: 'Penolakan berhasil dihapus.',
+                            });
+                        }
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        iziToast.error({ title: 'Gagal', position: 'topRight', message: 'Gagal menghapus data.' });
+                    });
+            });
+        }
+
         function addItem() {
             const payload = {
                 code: rejection_code,
@@ -803,22 +874,32 @@
                 reason: document.getElementById('reason').value,
             };
 
-            axios.post("{{ route('sales.addItemReject') }}", payload, {
+            const url = editingId
+                ? `{{ url('reject/updateitemreject') }}/${editingId}`
+                : "{{ route('sales.addItemReject') }}";
+
+            const method = editingId ? 'put' : 'post';
+
+            axios({
+                method: method,
+                url: url,
+                data: payload,
                 headers: {
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
                 }
             })
                 .then(res => {
                     if (res.data.success) {
-                        let item = res.data.summary;
+                        const wasEditing = editingId !== null;
                         orderItemsTable.ajax.reload(null, false);
-                        d_total += item.price_item;
+                        d_total = res.data.total ?? (d_total + (res.data.summary?.price_item || 0));
                         $('#d_total').val(formatRupiah(d_total));
                         resetInputs();
+                        editingId = null;
                         iziToast.success({
                             title: 'Berhasil',
                             position: 'topRight',
-                            message: "Penolakan Berhasil Dicatat"
+                            message: wasEditing ? "Penolakan berhasil diperbarui" : "Penolakan Berhasil Dicatat",
                         });
                     }
                 })

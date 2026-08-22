@@ -1,7 +1,6 @@
-{{-- resources/views/supply/history.blade.php --}}
 @extends('layouts.app')
 
-@section('title', 'Riwayat Stok')
+@section('title', 'Riwayat Stok Gudang')
 
 @section('style')
     <link rel="stylesheet" href="{{ asset('templates/library/datatables/media/css/jquery.dataTables.min.css') }}">
@@ -9,156 +8,141 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 
     <style>
-        /* ── DataTables overrides ── */
-        .dataTables_wrapper .top {
+        .select2-container--default .select2-selection--single {
+            height: 42px !important;
+            border: 1px solid #cbd5e1 !important;
+            border-radius: 0.5rem !important;
             display: flex !important;
-            justify-content: space-between !important;
             align-items: center !important;
-            margin-bottom: 12px !important;
-            font-family: inherit;
         }
 
-        .dataTables_filter input,
-        .dataTables_length select {
-            padding: 5px 10px !important;
-            border-radius: 6px !important;
-            border: 1px solid #d1d5db !important;
-            outline: none !important;
+        .select2-container--default .select2-selection--single .select2-selection__rendered {
+            line-height: 40px !important;
+            padding-left: 0.9rem !important;
+            color: #334155 !important;
+            font-size: 13px !important;
         }
 
-        .dataTables_filter input:focus {
-            border-color: #378ADD !important;
-            box-shadow: 0 0 0 3px rgba(55, 138, 221, 0.12) !important;
+        .select2-container--default .select2-selection--single .select2-selection__arrow {
+            height: 40px !important;
         }
 
-        /* ── Table ── */
         #historyTable thead th {
-            padding: 10px 14px !important;
+            background-color: #f8fafc !important;
+            color: #475569 !important;
+            font-weight: 600 !important;
             font-size: 11px !important;
-            font-weight: 500 !important;
             text-transform: uppercase !important;
             letter-spacing: 0.04em !important;
-            background: #f8fafc !important;
-            border-bottom: 1px solid #e5e7eb !important;
+            border-bottom: 1px solid #e2e8f0 !important;
+            padding: 12px 16px !important;
             white-space: nowrap;
         }
 
         #historyTable tbody td {
-            padding: 10px 14px !important;
+            padding: 12px 16px !important;
             font-size: 13px !important;
             vertical-align: middle !important;
+            color: #475569 !important;
             border-bottom: 1px solid #f1f5f9 !important;
         }
 
         #historyTable tbody tr:hover td {
-            background: #f8fafc !important;
+            background-color: #f8fafc !important;
         }
 
-        #historyTable th:nth-child(5),
-        #historyTable td:nth-child(5) {
-            width: 120px;
-            height: 20px;
-
-        }
-
-        /* ── Pagination ── */
-        .dataTables_wrapper .paginate_button {
-            padding: 5px 11px !important;
+        .dataTables_wrapper .dataTables_paginate .paginate_button {
+            padding: 6px 12px !important;
             border-radius: 6px !important;
-            margin: 0 2px !important;
+            margin: 0 3px !important;
             font-size: 13px !important;
+            border: 1px solid #e2e8f0 !important;
+            background: #ffffff !important;
         }
 
-        .dataTables_wrapper .paginate_button.current {
-            background: #378ADD !important;
+        .dataTables_wrapper .dataTables_paginate .paginate_button.current {
+            background: #2563eb !important;
             color: #fff !important;
-            border: 1px solid #378ADD !important;
+            border: 1px solid #2563eb !important;
         }
 
-        .dataTables_wrapper .paginate_button.previous {
-            background: #FCEBEB !important;
-            color: #A32D2D !important;
+        .dataTables_wrapper .dataTables_paginate .paginate_button:hover {
+            background: #eff6ff !important;
+            color: #2563eb !important;
+            border: 1px solid #bfdbfe !important;
         }
 
-        .dataTables_wrapper .paginate_button.next {
-            background: #EAF3DE !important;
-            color: #27500A !important;
-        }
-
-        .dataTables_wrapper .paginate_button.disabled {
-            opacity: 0.4 !important;
+        .dataTables_wrapper .dataTables_paginate .paginate_button.disabled {
             cursor: default !important;
+            color: #94a3b8 !important;
+            border: 1px solid #e2e8f0 !important;
+            background: #f8fafc !important;
         }
     </style>
 @endsection
 
 @section('content')
-    <section class="section px-4">
-        <div class="section-body">
-            <div class="card shadow-sm rounded-2xl p-6 bg-white">
+    <div class="min-h-screen bg-slate-50/50 pb-12 pt-2 px-4 sm:px-6 lg:px-8">
+        <div class="mx-auto space-y-4">
 
-                {{-- Header --}}
-                <div class="flex items-center justify-between mb-5 flex-wrap gap-3">
-                    <div class="flex items-center gap-2">
+            <div
+                class="flex flex-col gap-4 p-5 bg-white border border-slate-200/80 rounded-xl shadow-sm md:flex-row md:items-center md:justify-between">
+
+                <div class="flex items-center gap-3">
+                    <div class="flex items-center justify-center w-11 h-11 rounded-xl bg-blue-50 border border-blue-100 shrink-0">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-blue-600" fill="none"
                             viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0
-                                         002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0
-                                         002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0
+                                 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                         </svg>
-                        <h2 class="text-lg font-semibold text-gray-800">Riwayat Stok Gudang</h2>
-                    </div>
-
-                    <a href="{{ route('supplies.printstockdata') }}" target="_blank">
-                        <button
-                            class="flex items-center gap-2 px-4 h-9 rounded-lg text-sm font-medium
-                                   text-green-900 bg-green-100 hover:bg-green-200 transition">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                            </svg>
-                            Export Excel
-                        </button>
-                    </a>
-                </div>
-
-                {{-- Filters --}}
-                <div class="flex flex-wrap gap-3 mb-5 items-end">
-                    <div>
-                        <p class="text-xs font-medium text-gray-500 mb-1">Tanggal</p>
-                        <input type="text" id="dateRange" placeholder="Pilih rentang tanggal..." autocomplete="off"
-                            class="h-9 px-3 rounded-lg border border-gray-300 text-sm w-56
-                                  focus:outline-none focus:ring-2 focus:ring-blue-200">
                     </div>
                     <div>
-                        <p class="text-xs font-medium text-gray-500 mb-1">Cari obat</p>
-                        <input type="text" id="medicine" onkeyup="searchMedicines(this.value)"
-                            placeholder="Nama atau kode obat..." autocomplete="off"
-                            class="h-9 px-3 rounded-lg border border-gray-300 text-sm w-52
-                                  focus:outline-none focus:ring-2 focus:ring-blue-200">
-                    </div>
-                    <div>
-                        <p class="text-xs font-medium text-gray-500 mb-1">Nama obat</p>
-                        <input type="text" id="medicine_name" readonly placeholder="—"
-                            class="h-9 px-3 rounded-lg border border-gray-300 text-sm w-44
-                                  bg-gray-50 text-gray-500 cursor-default">
+                        <h2 class="text-base font-bold text-slate-800 leading-tight">Riwayat Stok Gudang</h2>
+                        <p class="text-xs text-slate-400">Pergerakan stok masuk dan keluar gudang</p>
                     </div>
                 </div>
 
-                {{-- Table --}}
-                <div class="overflow-x-auto">
-                    <table id="historyTable" class="w-full text-sm text-gray-700">
+                <a href="{{ route('supplies.printstockdata') }}" target="_blank"
+                    class="inline-flex items-center gap-2 px-4 h-10 rounded-lg text-sm font-semibold text-white bg-emerald-500 hover:bg-emerald-600 transition shadow-sm shrink-0 w-fit">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Export Excel
+                </a>
+            </div>
+
+            <div class="bg-white rounded-xl border border-slate-200/80 shadow-sm p-5">
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Rentang
+                            Tanggal</label>
+                        <input type="text" id="dateRange" placeholder="Pilih rentang tanggal..."
+                            class="w-full h-[42px] rounded-lg border border-slate-300 bg-white px-4 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 transition"
+                            autocomplete="off">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Pilih
+                            Obat</label>
+                        <select id="medicine" class="w-full"></select>
+                    </div>
+                </div>
+
+                <div class="mt-4 overflow-x-auto">
+                    <table id="historyTable" class="w-full text-sm text-left">
                         <thead>
                             <tr>
                                 <th>#</th>
                                 <th>Tanggal</th>
-                                <th>Kode obat</th>
-                                <th>Nama obat</th>
+                                <th>Kode Obat</th>
+                                <th>Nama Obat</th>
                                 <th>Status</th>
                                 <th>QTY</th>
                                 <th>QTY Awal</th>
                                 <th>QTY Akhir</th>
-                                <th>Stok saat ini</th>
+                                <th>Stok Saat Ini</th>
                             </tr>
                         </thead>
                         <tbody></tbody>
@@ -167,7 +151,7 @@
 
             </div>
         </div>
-    </section>
+    </div>
 @endsection
 
 @section('scripts')
@@ -177,8 +161,8 @@
 
     <script>
         let table, startDate = '',
-            endDate = '',
-            searchMedicine = '';
+            endDate = '';
+        let selectedMedicineId = '';
 
         document.addEventListener('DOMContentLoaded', function() {
 
@@ -196,6 +180,36 @@
                 }
             });
 
+            $('#medicine').select2({
+                placeholder: 'Cari nama atau kode obat...',
+                allowClear: true,
+                width: '100%',
+                ajax: {
+                    url: "{{ route('supplies.medicineSelect') }}",
+                    dataType: 'json',
+                    delay: 250,
+                    data: function(params) {
+                        return {
+                            q: params.term
+                        };
+                    },
+                    processResults: function(data) {
+                        return {
+                            results: data.map(function(item) {
+                                return {
+                                    id: item.id,
+                                    text: item.code + ' - ' + item.name
+                                };
+                            })
+                        };
+                    },
+                    cache: true
+                }
+            }).on('change', function() {
+                selectedMedicineId = $(this).val() || '';
+                table.ajax.reload();
+            });
+
             table = $('#historyTable').DataTable({
                 processing: true,
                 serverSide: true,
@@ -203,7 +217,7 @@
                     url: "{{ route('supplies.getStorageSupplies') }}",
                     type: 'GET',
                     data(d) {
-                        d.searchMedicine = searchMedicine;
+                        d.medicine_id = selectedMedicineId;
                         d.start_date = startDate;
                         d.end_date = endDate;
                     }
@@ -274,23 +288,11 @@
                     paginate: {
                         first: 'Pertama',
                         last: 'Terakhir',
-                        next: 'Selanjutnya →',
-                        previous: '← Sebelumnya',
+                        next: 'Selanjutnya',
+                        previous: 'Sebelumnya',
                     }
                 },
             });
         });
-
-        function searchMedicines(value) {
-            searchMedicine = value.trim();
-            if (!searchMedicine) {
-                $('#medicine_name').val('');
-            }
-            table.ajax.reload(function(json) {
-                $('#medicine_name').val(
-                    json.data?.length ? (json.data[0].name ?? '—') : '—'
-                );
-            }, false);
-        }
     </script>
 @endsection

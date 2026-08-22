@@ -112,7 +112,7 @@ class ReportsController extends Controller
                     $request->shiftType,
                     $request->selectedType,
                 ),
-                'DATAOBAT_' . $pharmacy->name . '_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx',
+                'DATA_OBAT_' . $pharmacy->name . '_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx',
             ],
             'Golongan' => [
                 new CategoryExport(
@@ -123,7 +123,7 @@ class ReportsController extends Controller
                     $request->shiftType,
                     $request->selectedType,
                 ),
-                'KATEGORI_OBAT' . $pharmacy->name . '_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx',
+                'GOLONGAN_OBAT_' . $pharmacy->name . '_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx',
             ],
             'Pabrik' => [
                 new FactoryExport(
@@ -135,7 +135,7 @@ class ReportsController extends Controller
                     $request->selectedType,
                     $request->factory,
                 ),
-                'KATEGORI_OBAT' . $pharmacy->name . '_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx',
+                'PABRIK_' . $pharmacy->name . '_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx',
             ],
             'Dokter' => [
                 new DoctorExport(
@@ -147,7 +147,7 @@ class ReportsController extends Controller
                     $request->selectedType,
                     $request->doctor,
                 ),
-                'DOKTER' . $pharmacy->name . '_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx',
+                'DOKTER_' . $pharmacy->name . '_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx',
             ],
             'Daftar Resep' => [
                 new RecipeExport(
@@ -156,14 +156,12 @@ class ReportsController extends Controller
                     $request->end_date,
                     $request->shift,
                     $request->shiftType,
-                    $request->selectedType,
-                    $request->doctor,
                 ),
-                'RESEP' . $pharmacy->name . '_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx',
+                'RESEP_' . $pharmacy->name . '_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx',
             ],
             'Retur Jual' => [
                 new ReturExport($pharmacy->id, $request->start_date, $request->end_date),
-                'RESEP' . $pharmacy->name . '_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx',
+                'RETUR_JUAL_' . $pharmacy->name . '_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx',
             ],
             'Laporan Pembelian' => [
                 new OrdersExport($pharmacy->id, $request->start_date, $request->end_date),

@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Data Transfer Obat')
+@section('title', 'Stock Pelayanan')
 
 @section('style')
     <link rel="stylesheet" href="{{ asset('templates/library/datatables/media/css/jquery.dataTables.min.css') }}">
@@ -14,52 +14,37 @@
             margin-bottom: 12px !important;
         }
 
-        .dataTables_filter input {
-            width: 220px !important;
-            padding: 6px 10px !important;
-            border-radius: 6px !important;
-            border: 1px solid #d1d5db !important;
-            outline: none !important;
-        }
-
-        .dataTables_length select {
-            padding: 4px 8px !important;
-            border-radius: 6px !important;
-            border: 1px solid #d1d5db !important;
-        }
-
         #transferTable thead th {
             background-color: #f8fafc !important;
+            color: #475569 !important;
             font-weight: 600 !important;
             font-size: 11px !important;
             text-transform: uppercase !important;
             letter-spacing: .04em !important;
-            border-bottom: 2px solid #e5e7eb !important;
-            padding: 10px 12px !important;
-            color: #6b7280 !important;
+            border-bottom: 1px solid #e2e8f0 !important;
+            padding: 12px 16px !important;
+            white-space: nowrap;
         }
 
         #transferTable tbody td {
-            padding: 11px 12px !important;
+            padding: 12px 16px !important;
             font-size: 13px !important;
             vertical-align: middle !important;
+            color: #475569 !important;
             border-bottom: 1px solid #f1f5f9 !important;
         }
 
-        #transferTable tbody tr:hover {
+        #transferTable tbody tr:hover td {
             background-color: #f8fafc !important;
         }
 
-        #transferTable tbody tr:last-child td {
-            border-bottom: none !important;
-        }
-
-        .dataTables_paginate .paginate_button {
-            padding: 5px 10px !important;
+        .dataTables_wrapper .dataTables_paginate .paginate_button {
+            padding: 6px 12px !important;
             border-radius: 6px !important;
-            margin: 0 2px !important;
-            background: #f3f4f6 !important;
+            margin: 0 3px !important;
             font-size: 13px !important;
+            border: 1px solid #e2e8f0 !important;
+            background: #ffffff !important;
         }
 
         .dataTables_wrapper .dataTables_paginate .paginate_button.current {
@@ -68,10 +53,17 @@
             border: 1px solid #2563eb !important;
         }
 
+        .dataTables_wrapper .dataTables_paginate .paginate_button:hover {
+            background: #eff6ff !important;
+            color: #2563eb !important;
+            border: 1px solid #bfdbfe !important;
+        }
+
         .dataTables_wrapper .dataTables_paginate .paginate_button.disabled {
-            background: transparent !important;
-            color: #9ca3af !important;
-            border: 1px solid transparent !important;
+            cursor: default !important;
+            color: #94a3b8 !important;
+            border: 1px solid #e2e8f0 !important;
+            background: #f8fafc !important;
         }
 
         .badge-stock {
@@ -123,47 +115,49 @@
 @endsection
 
 @section('content')
-    <section class="section px-4">
-        <div class="section-body">
-            <div class="bg-white border border-gray-100 rounded-xl p-6 shadow-sm">
+    <div class="min-h-screen bg-slate-50/50 pb-12 pt-2 px-4 sm:px-6 lg:px-8">
+        <div class="mx-auto space-y-4">
 
-                {{-- Header --}}
-                <div class="flex items-center justify-between mb-6">
-                    <div class="flex items-center gap-3">
-                        <div class="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center">
-                            <svg class="w-5 h-5 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M5 12h14M12 5l7 7-7 7" />
-                            </svg>
-                        </div>
-                        <div>
-                            <h2 class="text-[15px] font-semibold text-gray-800 leading-tight">Data Transfer Obat</h2>
-                            <p class="text-[12px] text-gray-400">Riwayat transfer stok ke etalase</p>
-                        </div>
+            <div
+                class="flex flex-col gap-4 p-5 bg-white border border-slate-200/80 rounded-xl shadow-sm md:flex-row md:items-center md:justify-between">
+
+                <div class="flex items-center gap-3">
+                    <div class="flex items-center justify-center w-11 h-11 rounded-xl bg-blue-50 border border-blue-100 shrink-0">
+                        <svg class="w-5 h-5 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M5 12h14M12 5l7 7-7 7" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h2 class="text-base font-bold text-slate-800 leading-tight">Stock Pelayanan</h2>
+                        <p class="text-xs text-slate-400">Riwayat transfer stok ke etalase pelayanan</p>
                     </div>
                 </div>
 
-                {{-- Filters --}}
-                <div class="flex flex-wrap gap-3 mb-5">
+            </div>
+
+            <div class="bg-white rounded-xl border border-slate-200/80 shadow-sm p-5">
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
-                        <label class="block text-[12px] font-medium text-gray-500 mb-1">Cari obat</label>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Cari
+                            Obat</label>
                         <div class="relative">
-                            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none"
+                            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none"
                                 viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
                                 <circle cx="6.5" cy="6.5" r="4.5" />
                                 <line x1="10.5" y1="10.5" x2="14" y2="14" />
                             </svg>
-                            <input type="text" id="searchInput" placeholder="Kode atau nama obat..."
-                                oninput="filterTable(this.value)"
-                                class="pl-9 pr-3 py-2 rounded-lg border border-gray-200 bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400 w-64"
+                            <input type="text" id="searchInput" placeholder="Kode, batch, atau nama obat..."
+                                class="pl-9 pr-3 h-10 w-full rounded-lg border border-slate-300 bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 transition"
                                 autocomplete="off">
                         </div>
                     </div>
 
                     <div>
-                        <label class="block text-[12px] font-medium text-gray-500 mb-1">Status</label>
-                        <select id="statusFilter" onchange="filterTable()"
-                            class="px-3 py-2 rounded-lg border border-gray-200 bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400">
+                        <label class="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Status</label>
+                        <select id="statusFilter"
+                            class="px-3 h-10 w-full rounded-lg border border-slate-300 bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 transition">
                             <option value="">Semua status</option>
                             <option value="0">Pending</option>
                             <option value="1">Diterima</option>
@@ -173,8 +167,8 @@
 
                     <div class="flex items-end">
                         <button onclick="resetFilters()"
-                            class="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 text-[13px] transition-colors duration-150">
-                            <svg class="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+                            class="inline-flex items-center gap-1.5 px-4 h-10 rounded-lg border border-slate-300 text-slate-500 hover:bg-slate-50 text-[13px] font-medium transition-colors">
+                            <svg class="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor"
                                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M1 4h14M4 4V2h8v2M3 4l1 10h8l1-10" />
                             </svg>
@@ -183,8 +177,7 @@
                     </div>
                 </div>
 
-                {{-- Table --}}
-                <div class="overflow-x-auto">
+                <div class="mt-4 overflow-x-auto">
                     <table id="transferTable" class="w-full text-sm text-left">
                         <thead>
                             <tr>
@@ -205,7 +198,7 @@
 
             </div>
         </div>
-    </section>
+    </div>
 @endsection
 
 @section('scripts')
@@ -234,23 +227,16 @@
             return `<span class="badge-status ${cls}">${label}</span>`;
         }
 
-        function filterTable() {
-            if (transferTable) {
-                transferTable.ajax.reload(null, false);
-            }
-        }
-
         function resetFilters() {
             document.getElementById('searchInput').value = '';
             document.getElementById('statusFilter').value = '';
-
-            filterTable();
+            transferTable.ajax.reload(null, false);
         }
 
         document.addEventListener('DOMContentLoaded', function() {
             transferTable = $('#transferTable').DataTable({
                 processing: true,
-                serverSide: true, // ✅ IMPORTANT
+                serverSide: true,
 
                 ajax: {
                     url: '{{ route('supplies.getStockDetail') }}',
@@ -302,22 +288,25 @@
                     },
                 ],
 
-                order: [
-                    [0, 'desc']
-                ], // safer
-
                 searching: false,
                 lengthChange: true,
                 autoWidth: false,
+                pageLength: 10,
+                lengthMenu: [10, 25, 50, 100],
 
                 language: {
                     processing: 'Memuat data...',
+                    emptyTable: 'Tidak ada data tersedia',
                     zeroRecords: 'Tidak ada data ditemukan',
-                    info: 'Menampilkan _START_ - _END_ dari _TOTAL_ data',
-                    infoEmpty: 'Tidak ada data',
+                    info: 'Menampilkan _START_–_END_ dari _TOTAL_ data',
+                    infoEmpty: 'Menampilkan 0 data',
+                    infoFiltered: '(disaring dari _MAX_ total data)',
+                    lengthMenu: 'Tampilkan _MENU_ data',
                     paginate: {
-                        previous: '&#8592;',
-                        next: '&#8594;'
+                        first: 'Pertama',
+                        last: 'Terakhir',
+                        next: 'Selanjutnya',
+                        previous: 'Sebelumnya',
                     }
                 }
             });

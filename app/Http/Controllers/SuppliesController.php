@@ -297,13 +297,8 @@ class SuppliesController extends Controller
             $items = ItemsLog::with('medicines')
                 ->whereIn('status', [2, 5, 6, 7]);
 
-            if ($request->filled('searchMedicine')) {
-                $items->whereHas('medicines', function ($q) use ($request) {
-                    $q->where(function($sq) use ($request) {
-                        $sq->where('name', 'like', "%{$request->searchMedicine}%")
-                           ->orWhere('code', 'like', "%{$request->searchMedicine}%");
-                    });
-                });
+            if ($request->filled('medicine_id')) {
+                $items->where('medicine_id', $request->medicine_id);
             }
 
             // Selalu filter berdasarkan apotek aktif
@@ -399,41 +394,47 @@ class SuppliesController extends Controller
     public function getStockData(Request $request)
     {
         if ($request->ajax()) {
+            $dateScope = function ($q) use ($request) {
+                if ($request->filled('start_date')) {
+                    $q->whereDate('date', '>=', $request->start_date);
+                }
+                if ($request->filled('end_date')) {
+                    $q->whereDate('date', '<=', $request->end_date);
+                }
+            };
+
             $medicines = Medicines::query()
                 ->withSum([
-                    'items_log as qty_orders' => function ($q) {
+                    'items_log as qty_orders' => function ($q) use ($dateScope) {
                         $q->where('status', 2);
+                        $dateScope($q);
                     }
                 ], 'qty')
                 ->withSum([
-                    'items_log as qty_sales' => function ($q) {
+                    'items_log as qty_sales' => function ($q) use ($dateScope) {
                         $q->where('status', 1);
+                        $dateScope($q);
                     }
                 ], 'qty')
                 ->addSelect([
                     'qty_start' => ItemsLog::select('qty_before')
                         ->whereColumn('medicine_id', 'medicines.id')
-                        ->orderByDesc('id')
+                        ->when($request->filled('start_date'), fn($q) => $q->whereDate('date', '>=', $request->start_date))
+                        ->when($request->filled('end_date'), fn($q) => $q->whereDate('date', '<=', $request->end_date))
+                        ->orderBy('date')
+                        ->orderBy('id')
                         ->limit(1),
 
                     'qty_now' => ItemsLog::select('qty_after')
                         ->whereColumn('medicine_id', 'medicines.id')
+                        ->when($request->filled('start_date'), fn($q) => $q->whereDate('date', '>=', $request->start_date))
+                        ->when($request->filled('end_date'), fn($q) => $q->whereDate('date', '<=', $request->end_date))
+                        ->orderByDesc('date')
                         ->orderByDesc('id')
                         ->limit(1),
                 ]);
-            if ($request->filled('searchMedicine')) {
-                $medicines->where(function ($q) use ($request) {
-                    $q->where('name', 'like', "%{$request->searchMedicine}%")
-                        ->orWhere('code', 'like', "%{$request->searchMedicine}%");
-                });
-            }
-
-            if ($request->filled('start_date')) {
-                $medicines->whereDate('date', '>=', $request->start_date);
-            }
-
-            if ($request->filled('end_date')) {
-                $medicines->whereDate('date', '<=', $request->end_date);
+            if ($request->filled('medicine_id')) {
+                $medicines->where('medicines.id', $request->medicine_id);
             }
             return DataTables::of($medicines)
                 ->addIndexColumn()
@@ -444,6 +445,21 @@ class SuppliesController extends Controller
                 ->editColumn('qty_now', fn($m) => $m->qty_now ?? 0)
                 ->make(true);
         }
+    }
+    public function medicineSelect(Request $request)
+    {
+        $search = $request->q;
+
+        $result = Medicines::where('status', 1)
+            ->where(function ($q) use ($search) {
+                $q->where('name', 'like', '%' . $search . '%')
+                    ->orWhere('code', 'like', '%' . $search . '%');
+            })
+            ->select('id', 'code', 'name', 'unit')
+            ->limit(20)
+            ->get();
+
+        return response()->json($result);
     }
     public function printStockData(Request $request)
     {

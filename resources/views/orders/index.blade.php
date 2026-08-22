@@ -113,7 +113,7 @@
 @endsection
 
 @section('content')
-    <section class="section px-4 py-6 font-poppins text-[#1c1c1c]">
+    <section class="section px-4 py-2 font-poppins text-[#1c1c1c]">
         <div class="section-body flex flex-col gap-5">
 
             <div

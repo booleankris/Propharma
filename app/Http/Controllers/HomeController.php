@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Batches;
 use App\Models\Item;
 use App\Models\ItemCart;
 use App\Models\MedicineTransactions;
@@ -10,6 +11,9 @@ use App\Models\Reject;
 use App\Models\Sales;
 use App\Models\Shifts;
 use App\Models\TicketTransaction;
+use Carbon\Carbon;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Http\Request;
@@ -46,10 +50,101 @@ class HomeController extends Controller
         $total_orders_rp = formatRupiah($total_orders);
         $total_reject_rp = formatRupiah($total_reject);
         
-        // Reports
+        // 5 barang dengan ED terdekat
+        $nearExpiry = $this->queryNearExpiry()->take(5);
 
-        return view('kasir.home', compact('total_sales_rp', 'total_orders_rp', 'total_reject_rp'));
+        return view('kasir.home', compact('total_sales_rp', 'total_orders_rp', 'total_reject_rp', 'nearExpiry'));
     }
+    public function nearExpiry(Request $request)
+    {
+        $items = $this->queryNearExpiry();
+
+        $perPage = 10;
+        $page = Paginator::resolveCurrentPage() ?: 1;
+        $collection = $items->forPage($page, $perPage);
+
+        $paginator = new LengthAwarePaginator(
+            $collection,
+            $items->count(),
+            $perPage,
+            $page,
+            ['path' => Paginator::resolveCurrentPath(), 'query' => $request->query()]
+        );
+
+        return view('kasir.near-expiry', ['items' => $paginator]);
+    }
+
+    private function queryNearExpiry()
+    {
+        $items = Batches::query()
+            ->with('medicines:id,name,code,unit')
+            ->where('pharmacy_id', getActivePharmacyId())
+            ->where('stock', '>', 0)
+            ->whereNotNull('expired_date')
+            ->get()
+            ->map(function ($batch) {
+                $batch->expiry_carbon = $this->parseExpiryDate($batch->expired_date);
+                $batch->expiry_formatted = $batch->expiry_carbon
+                    ? $batch->expiry_carbon->format('d/m/Y')
+                    : $batch->expired_date;
+
+                if ($batch->expiry_carbon) {
+                    $today = Carbon::today()->startOfDay();
+                    $expiry = $batch->expiry_carbon->startOfDay();
+                    $daysLeft = $today->diffInDays($expiry, false);
+
+                    $batch->days_left = $daysLeft;
+
+                    if ($daysLeft < 0) {
+                        $batch->expiry_status = 'expired';
+                    } elseif ($daysLeft <= 30) {
+                        $batch->expiry_status = 'near';
+                    } else {
+                        $batch->expiry_status = 'safe';
+                    }
+                } else {
+                    $batch->days_left = null;
+                    $batch->expiry_status = null;
+                }
+
+                return $batch;
+            })
+            ->filter(fn($batch) => $batch->expiry_carbon !== null)
+            ->sortBy(fn($batch) => $batch->expiry_carbon)
+            ->values();
+
+        return $items;
+    }
+
+    private function parseExpiryDate($value)
+    {
+        if (empty($value)) {
+            return null;
+        }
+
+        $formats = [
+            'Y-m-d H:i:s',
+            'Y-m-d H:i',
+            'Y-m-d',
+            'd/m/Y H:i:s',
+            'd/m/Y H:i',
+            'd/m/Y',
+            'd-m-Y H:i:s',
+            'd-m-Y H:i',
+            'd-m-Y',
+        ];
+
+        foreach ($formats as $format) {
+            try {
+                return Carbon::createFromFormat($format, trim($value));
+            } catch (\Throwable $e) {
+                continue;
+            }
+        }
+
+        return null;
+    }
+
     public function profile($edit = null)
     {
         $user = Auth::user()->only(['id', 'name', 'email']);
