@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 use App\Models\Medicines;
 use App\Models\Patients;
 use App\Models\MedicineTransactions;
-use App\Models\Transactions;
+use App\Models\MedicineCart;
 use App\Models\MedicineTransferItems;
 use App\Models\ItemsLog;
 use Illuminate\Support\Facades\DB;
@@ -103,9 +103,9 @@ class MobileSyncController extends Controller
                     'items' => $trans->transactions->map(function($item) {
                         return [
                             'medicine_name' => $item->medicine ? $item->medicine->name : '-',
-                            'qty' => $item->qty,
-                            'price' => $item->price,
-                            'total' => $item->total,
+                            'qty' => $item->quantity,
+                            'price' => $item->item_price,
+                            'total' => $item->final_price,
                         ];
                     })
                 ];
@@ -180,17 +180,17 @@ class MobileSyncController extends Controller
 
                 $totalPrice = ($item['qty'] * $item['price']) - ($item['discount'] ?? 0);
 
-                Transactions::create([
-                    'medicine_transactions_id' => $medTransaction->id,
+                MedicineCart::create([
+                    'transaction_id' => $medTransaction->id,
                     'medicine_id' => $medicine->id,
-                    'pharmacy_id' => $webPharmacyId,
-                    'qty' => $item['qty'],
-                    'price' => $item['price'],
+                    'user_id' => 1, // Default user
+                    'quantity' => $item['qty'],
+                    'item_price' => $item['price'],
                     'discount' => $item['discount'] ?? 0,
-                    'total' => $totalPrice,
+                    'total_price' => $totalPrice,
+                    'final_price' => $totalPrice,
+                    'cart_type' => $request->transaction_type, // Misal ONLINE
                     'status' => 1,
-                    'created_at' => now(),
-                    'updated_at' => now(),
                 ]);
 
                 // Pemotongan Stok Serupa dengan Kasir Web POS
