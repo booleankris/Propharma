@@ -136,14 +136,24 @@
                     <button class="filter-btn" onclick="setFilter(this, 'all')">Semua</button>
                     <button class="filter-btn" onclick="setFilter(this, 'custom')">Custom</button>
                 </div>
-                <div id="customRange" class="flex items-center gap-2 ml-auto">
-                    <input type="date" id="dateFrom" value="{{ now()->toDateString() }}">
-                    <span class="text-gray-300 text-sm">—</span>
-                    <input type="date" id="dateTo" value="{{ now()->toDateString() }}">
-                    <button onclick="applyCustomFilter()"
-                        class="text-[12px] font-medium bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 transition-colors">
-                        Terapkan
-                    </button>
+
+                <div class="flex items-center gap-2 ml-auto">
+                    <select id="pharmacyFilter" onchange="applyCustomFilter()" class="text-[12px] px-3 py-1.5 border border-gray-200 rounded-lg outline-none focus:border-blue-500 bg-gray-50 hover:bg-white transition-colors cursor-pointer text-gray-700 font-medium">
+                        <option value="all">Semua Cabang</option>
+                        @foreach($pharmacies as $p)
+                            <option value="{{ $p->id }}">{{ $p->name }}</option>
+                        @endforeach
+                    </select>
+
+                    <div id="customRange" class="hidden items-center gap-2">
+                        <input type="date" id="dateFrom" value="{{ now()->toDateString() }}">
+                        <span class="text-gray-300 text-sm">—</span>
+                        <input type="date" id="dateTo" value="{{ now()->toDateString() }}">
+                        <button onclick="applyCustomFilter()"
+                            class="text-[12px] font-medium bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 transition-colors">
+                            Terapkan
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -257,6 +267,7 @@
                     data(d) {
                         d.start_date = startDate;
                         d.end_date = endDate;
+                        d.pharmacy_id = document.getElementById('pharmacyFilter').value;
                     }
                 },
                 language: {
@@ -287,9 +298,10 @@
                             <div class="avatar-cell">${row.initials}</div>
                             <div>
                                 <div class="font-semibold text-gray-800 leading-tight">${val}</div>
-                                <div class="text-gray-400" style="font-size:10px">@${row.username}</div>
+                                <div class="text-gray-400" style="font-size:10px">
+                                    @${row.username} &bull; ${row.pharmacy_name ? row.pharmacy_name : 'Tidak ada cabang'}
+                                </div>
                             </div>
-                            <span class="role-pill ml-1">Kasir</span>
                          </div>`,
                     },
                     {

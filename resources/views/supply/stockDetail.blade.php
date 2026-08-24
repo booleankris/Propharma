@@ -111,6 +111,34 @@
             background: #fee2e2;
             color: #b91c1c;
         }
+
+        /* Select2 Custom Styles */
+        #searchInput+.select2-container .select2-selection--single {
+            height: 40px !important;
+            border: 1px solid #cbd5e1 !important;
+            border-radius: 0.5rem !important;
+            display: flex;
+            align-items: center;
+            padding: 0 0.5rem !important;
+        }
+
+        #searchInput+.select2-container .select2-selection--single .select2-selection__rendered {
+            padding: 0;
+            line-height: normal;
+            font-size: 13px;
+            color: #1e293b;
+        }
+
+        #searchInput+.select2-container .select2-selection--single .select2-selection__arrow {
+            height: 100%;
+            right: 0.75rem;
+        }
+
+        #searchInput+.select2-container--open .select2-selection--single,
+        #searchInput+.select2-container--focus .select2-selection--single {
+            border-color: #60a5fa !important;
+            box-shadow: 0 0 0 2px rgba(191, 219, 254, 0.5);
+        }
     </style>
 @endsection
 
@@ -122,7 +150,8 @@
                 class="flex flex-col gap-4 p-5 bg-white border border-slate-200/80 rounded-xl shadow-sm md:flex-row md:items-center md:justify-between">
 
                 <div class="flex items-center gap-3">
-                    <div class="flex items-center justify-center w-11 h-11 rounded-xl bg-blue-50 border border-blue-100 shrink-0">
+                    <div
+                        class="flex items-center justify-center w-11 h-11 rounded-xl bg-blue-50 border border-blue-100 shrink-0">
                         <svg class="w-5 h-5 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M5 12h14M12 5l7 7-7 7" />
@@ -142,20 +171,12 @@
                     <div>
                         <label class="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Cari
                             Obat</label>
-                        <div class="relative">
-                            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none"
-                                viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
-                                <circle cx="6.5" cy="6.5" r="4.5" />
-                                <line x1="10.5" y1="10.5" x2="14" y2="14" />
-                            </svg>
-                            <input type="text" id="searchInput" placeholder="Kode, batch, atau nama obat..."
-                                class="pl-9 pr-3 h-10 w-full rounded-lg border border-slate-300 bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 transition"
-                                autocomplete="off">
-                        </div>
+                        <select id="searchInput" class="w-full"></select>
                     </div>
 
                     <div>
-                        <label class="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Status</label>
+                        <label
+                            class="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Status</label>
                         <select id="statusFilter"
                             class="px-3 h-10 w-full rounded-lg border border-slate-300 bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 transition">
                             <option value="">Semua status</option>
@@ -165,20 +186,29 @@
                         </select>
                     </div>
 
-                    <div class="flex items-end">
-                        <button onclick="resetFilters()"
-                            class="inline-flex items-center gap-1.5 px-4 h-10 rounded-lg border border-slate-300 text-slate-500 hover:bg-slate-50 text-[13px] font-medium transition-colors">
-                            <svg class="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor"
-                                stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M1 4h14M4 4V2h8v2M3 4l1 10h8l1-10" />
-                            </svg>
+                    <div class="flex items-end gap-2">
+                        <button type="button" onclick="resetFilters()"
+                            class="px-4 h-10 rounded-lg text-[13px] font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition">
                             Reset
                         </button>
                     </div>
                 </div>
 
+                <!-- Total Stock Info -->
+                <div id="stockInfoContainer"
+                    class="mt-4 hidden p-3 bg-blue-50/50 border border-blue-100 rounded-lg inline-flex items-center justify-between">
+                    <div class="px-1 flex items-center gap-2 text-blue-700">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                        </svg>
+                        <span class="text-sm font-semibold">Total Stok di Pelayanan :</span>
+                    </div>
+                    <span id="totalStockDisplay" class="text-xl font-bold text-blue-700">0</span>
+                </div>
+
                 <div class="mt-4 overflow-x-auto">
-                    <table id="transferTable" class="w-full text-sm text-left">
+                    <table id="transferTable" class="w-full text-sm text-left text-slate-600">
                         <thead>
                             <tr>
                                 <th>#</th>
@@ -234,6 +264,36 @@
         }
 
         document.addEventListener('DOMContentLoaded', function() {
+
+            $('#searchInput').select2({
+                placeholder: 'Cari kode, batch, atau nama obat...',
+                allowClear: true,
+                width: '100%',
+                ajax: {
+                    url: "{{ route('supplies.medicineSelect') }}",
+                    dataType: 'json',
+                    delay: 250,
+                    data: function(params) {
+                        return {
+                            q: params.term
+                        };
+                    },
+                    processResults: function(data) {
+                        return {
+                            results: data.map(function(item) {
+                                return {
+                                    id: item.id,
+                                    text: item.code + ' - ' + item.name
+                                };
+                            })
+                        };
+                    },
+                    cache: true
+                }
+            }).on('change', function() {
+                transferTable.ajax.reload(null, false);
+            });
+
             transferTable = $('#transferTable').DataTable({
                 processing: true,
                 serverSide: true,
@@ -241,7 +301,7 @@
                 ajax: {
                     url: '{{ route('supplies.getStockDetail') }}',
                     data: function(d) {
-                        d.search = $('#searchInput').val().trim();
+                        d.medicine_id = $('#searchInput').val();
                         d.status = $('#statusFilter').val();
                     }
                 },
@@ -311,12 +371,22 @@
                 }
             });
 
-            $('#searchInput').on('input', function() {
+            $('#statusFilter').on('change', function() {
                 transferTable.ajax.reload(null, false);
             });
 
-            $('#statusFilter').on('change', function() {
-                transferTable.ajax.reload(null, false);
+            transferTable.on('xhr.dt', function(e, settings, json, xhr) {
+                let medicineId = $('#searchInput').val();
+                let stockContainer = document.getElementById('stockInfoContainer');
+                let stockDisplay = document.getElementById('totalStockDisplay');
+
+                if (medicineId) {
+                    stockContainer.classList.remove('hidden');
+                    let total = json.total_stock_pelayanan !== undefined ? json.total_stock_pelayanan : 0;
+                    stockDisplay.textContent = total;
+                } else {
+                    stockContainer.classList.add('hidden');
+                }
             });
         });
     </script>

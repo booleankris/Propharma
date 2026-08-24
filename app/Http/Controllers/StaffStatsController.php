@@ -16,7 +16,8 @@ class StaffStatsController extends Controller
 {
     public function index()
     {
-        return view('staff-stats');
+        $pharmacies = Pharmacies::all();
+        return view('staff-stats', compact('pharmacies'));
     }
 
     public function data(Request $request)
@@ -37,11 +38,12 @@ class StaffStatsController extends Controller
         $pharmacyid = getActivePharmacyId();
 
         $users = User::query()
-            ->where('users.pharmacy_id', $pharmacyid)
+            ->leftJoin('pharmacies', 'users.pharmacy_id', '=', 'pharmacies.id')
             ->select([
                 'users.id',
                 'users.name',
                 'users.username',
+                'pharmacies.name as pharmacy_name',
 
                 // Filtered sales
                 DB::raw("
@@ -49,7 +51,6 @@ class StaffStatsController extends Controller
                         SELECT SUM(subtotal)
                         FROM medicine_transactions
                         WHERE medicine_transactions.user_id = users.id
-                        AND medicine_transactions.pharmacy_id = {$pharmacyid}
                         AND updated_at BETWEEN '{$startDate}' AND '{$endDate}'
                     ), 0) as filtered_sales
                 "),
@@ -60,7 +61,6 @@ class StaffStatsController extends Controller
                         SELECT COUNT(*)
                         FROM medicine_transactions
                         WHERE medicine_transactions.user_id = users.id
-                        AND medicine_transactions.pharmacy_id = {$pharmacyid}
                         AND updated_at BETWEEN '{$startDate}' AND '{$endDate}'
                     ) as filtered_transactions
                 "),
@@ -76,6 +76,10 @@ class StaffStatsController extends Controller
                     ) as shifts_completed
                 "),
             ]);
+
+        if ($request->filled('pharmacy_id') && $request->pharmacy_id !== 'all') {
+            $users->where('users.pharmacy_id', $request->pharmacy_id);
+        }
 
         return DataTables::of($users)
             ->addIndexColumn()

@@ -130,6 +130,19 @@
                     </div>
                 </div>
 
+                <!-- Total Stock Info -->
+                <div id="stockInfoContainer"
+                    class="mt-4 hidden p-3 bg-blue-50/50 border border-blue-100 rounded-lg inline-flex items-center justify-between">
+                    <div class="px-1 flex items-center gap-2 text-blue-700">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                        </svg>
+                        <span class="text-sm font-semibold">Total Stok di Gudang :</span>
+                    </div>
+                    <span id="totalStockDisplay" class="text-xl font-bold text-blue-700 ml-3">0</span>
+                </div>
+
                 <div class="mt-4 overflow-x-auto">
                     <table id="historyTable" class="w-full text-sm text-left">
                         <thead>
@@ -292,6 +305,20 @@
                         previous: 'Sebelumnya',
                     }
                 },
+            });
+
+            table.on('xhr.dt', function(e, settings, json, xhr) {
+                let medicineId = $('#medicine').val();
+                let stockContainer = document.getElementById('stockInfoContainer');
+                let stockDisplay = document.getElementById('totalStockDisplay');
+
+                if (medicineId) {
+                    stockContainer.classList.remove('hidden');
+                    let total = json.total_stock_gudang !== undefined ? json.total_stock_gudang : 0;
+                    stockDisplay.textContent = total;
+                } else {
+                    stockContainer.classList.add('hidden');
+                }
             });
         });
     </script>

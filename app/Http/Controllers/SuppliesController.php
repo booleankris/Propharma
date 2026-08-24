@@ -297,8 +297,10 @@ class SuppliesController extends Controller
             $items = ItemsLog::with('medicines')
                 ->whereIn('status', [2, 5, 6, 7]);
 
+            $totalStockGudang = 0;
             if ($request->filled('medicine_id')) {
                 $items->where('medicine_id', $request->medicine_id);
+                $totalStockGudang = $this->calculateRealtimeStock($request->medicine_id, getActivePharmacyId(), 'storage');
             }
 
             // Selalu filter berdasarkan apotek aktif
@@ -382,6 +384,7 @@ class SuppliesController extends Controller
                     </div>";
                 })
                 ->rawColumns(['status', 'stock', 'qty_before', 'qty_after'])
+                ->with('total_stock_gudang', $totalStockGudang)
                 ->make(true);
         }
     }
@@ -1146,6 +1149,11 @@ class SuppliesController extends Controller
                 $q->where('pharmacy_id', getActivePharmacyId());
             });
 
+        $totalStockPelayanan = 0;
+        if ($request->medicine_id) {
+            $totalStockPelayanan = $this->calculateRealtimeStock($request->medicine_id, getActivePharmacyId(), 'counter');
+        }
+
         return DataTables::eloquent($query)
 
             ->addIndexColumn()
@@ -1157,18 +1165,24 @@ class SuppliesController extends Controller
                     $query->where('status', $request->status);
                 }
 
-                // Filter search
-                if ($request->search) {
-                    $search = $request->search;
+                // Filter medicine_id
+                if ($request->medicine_id) {
+                    $query->whereHas('batches', function ($q) use ($request) {
+                        $q->where('medicine_id', $request->medicine_id);
+                    });
+                }
 
-                    $query->where(function ($sub) use ($search) {
-                        $sub->whereHas('batches.medicines', function ($q) use ($search) {
-                            $q->where('name', 'like', "%{$search}%")
-                                ->orWhere('code', 'like', "%{$search}%");
-                        })->orWhereHas('transfer', function ($q) use ($search) {
-                            $q->where('code', 'like', "%{$search}%");
-                        })->orWhereHas('batches', function ($q) use ($search) {
-                            $q->where('name', 'like', "%{$search}%");
+                // Filter search
+                $searchValue = is_array($request->search) ? ($request->search['value'] ?? '') : $request->search;
+                if (!empty($searchValue)) {
+                    $query->where(function ($sub) use ($searchValue) {
+                        $sub->whereHas('batches.medicines', function ($q) use ($searchValue) {
+                            $q->where('name', 'like', "%{$searchValue}%")
+                                ->orWhere('code', 'like', "%{$searchValue}%");
+                        })->orWhereHas('transfer', function ($q) use ($searchValue) {
+                            $q->where('code', 'like', "%{$searchValue}%");
+                        })->orWhereHas('batches', function ($q) use ($searchValue) {
+                            $q->where('name', 'like', "%{$searchValue}%");
                         });
                     });
                 }
@@ -1208,6 +1222,7 @@ class SuppliesController extends Controller
 
             ->rawColumns([])
 
+            ->with('total_stock_pelayanan', $totalStockPelayanan ?? 0)
             ->make(true);
     }
 }

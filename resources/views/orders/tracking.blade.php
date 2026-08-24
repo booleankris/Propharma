@@ -356,6 +356,7 @@
                         <th>Qty</th>
                         <th>Total</th>
                         <th>Status</th>
+                        <th>Aksi</th>
                     </tr>
                 </thead>
                 <tbody></tbody>
@@ -498,6 +499,12 @@
                         orderable: false,
                         searchable: false
                     },
+                    {
+                        data: 'action',
+                        name: 'action',
+                        orderable: false,
+                        searchable: false
+                    }
                 ]
             });
 
