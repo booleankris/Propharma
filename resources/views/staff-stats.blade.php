@@ -168,12 +168,9 @@
                         <tr>
                             <th>#</th>
                             <th>Kasir</th>
-                            <th class="text-right">Penjualan Hari Ini</th>
-                            <th class="text-right">Bulan Ini</th>
-                            <th class="text-right">Total Semua</th>
+                            <th class="text-right">Penjualan</th>
+                            <th class="text-right">Transaksi</th>
                             <th class="text-right">Shift Selesai</th>
-                            <th class="text-right">Transaksi Hari Ini</th>
-                            <th class="text-right">Total Transaksi</th>
                         </tr>
                     </thead>
                     <tbody></tbody>
@@ -296,42 +293,19 @@
                          </div>`,
                     },
                     {
-                        data: 'today_sales',
+                        data: 'filtered_sales',
                         orderable: true,
                         className: 'text-right',
-                        render: (val, type, row) =>
-                            `<div class="font-semibold text-gray-800">${rp(val)}</div>
-                         <div style="font-size:10px">${changeHtml(row.today_change)}</div>`,
+                        render: val => `<div class="font-semibold text-gray-800">${rp(val)}</div>`,
                     },
                     {
-                        data: 'month_sales',
-                        orderable: true,
-                        className: 'text-right',
-                        render: (val, type, row) =>
-                            `<div class="font-semibold text-gray-800">${rp(val)}</div>
-                         <div style="font-size:10px">${changeHtml(row.month_change)}</div>`,
-                    },
-                    {
-                        data: 'all_time_sales',
-                        orderable: true,
-                        className: 'text-right',
-                        render: val => `<div class="font-semibold text-gray-700">${rp(val)}</div>`,
-                    },
-                    {
-                        data: 'shifts_completed',
-                        orderable: true,
-                        className: 'text-right',
-                        render: val => `<div class="font-semibold text-gray-700">${num(val)}</div>
-                                    <div class="text-gray-400" style="font-size:10px">bulan ini</div>`,
-                    },
-                    {
-                        data: 'today_transactions',
+                        data: 'filtered_transactions',
                         orderable: true,
                         className: 'text-right',
                         render: val => `<div class="font-semibold text-gray-700">${num(val)}</div>`,
                     },
                     {
-                        data: 'total_transactions',
+                        data: 'shifts_completed',
                         orderable: true,
                         className: 'text-right',
                         render: val => `<div class="font-semibold text-gray-700">${num(val)}</div>`,
