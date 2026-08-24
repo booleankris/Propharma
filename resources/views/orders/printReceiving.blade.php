@@ -78,7 +78,7 @@
                         <tr>
                             <td>Tgl. Terima</td>
                             <td>:</td>
-                            <td>{{ $receiving->date }}</td>
+                            <td>{{ \Carbon\Carbon::parse($detail->created_at)->translatedFormat('d F Y') }}</td>
                         </tr>
                     </table>
                 </div>
