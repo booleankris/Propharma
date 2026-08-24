@@ -65,82 +65,118 @@ class InvoiceExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
     // ── DETAIL: one row per invoice_number ───────────────────────────────────
     private function buildDetail(): array
     {
-        $invoices = $this->baseQuery()
+        $items = $this->baseQuery()
             ->select([
                 'receiving_details.invoice_number',
                 'receiving_details.invoice_date',
                 'receiving_details.invoice_due',
                 'receiving_details.invoice_times',
+                'receiving_details.invoice_ppn',
                 'receiving_details.receiving_id',
                 'receiving.code as receiving_code',
                 'receiving.updated_at as receiving_updated_at',
                 'order_items.creditor_code',
                 'creditors.name as creditor_name',
-                DB::raw('SUM(receiving_items.total) as dpp_raw'),
-            ])
-            ->groupBy([
-                'receiving_details.invoice_number',
-                'receiving_details.invoice_date',
-                'receiving_details.invoice_due',
-                'receiving_details.invoice_times',
-                'receiving_details.receiving_id',
-                'receiving.code',
-                'receiving.updated_at',
-                'order_items.creditor_code',
-                'creditors.name',
+                
+                'receiving_items.qty_received',
+                'receiving_items.qty',
+                'receiving_items.discount',
+                'receiving_items.extra_discount',
+                'receiving_items.raw_price as receiving_raw_price',
+                'order_items.price as order_items_price',
             ])
             ->orderBy('receiving.updated_at', 'asc')
             ->orderBy('receiving_details.invoice_number', 'asc')
             ->get();
- 
-        if ($invoices->isEmpty()) {
+
+        if ($items->isEmpty()) {
             return [['Tidak ada data untuk periode yang dipilih.']];
         }
- 
+
+        $invoices = [];
+        foreach ($items as $item) {
+            $key = $item->invoice_number . '_' . $item->receiving_id;
+            if (!isset($invoices[$key])) {
+                $invoices[$key] = [
+                    'invoice_number' => $item->invoice_number,
+                    'invoice_date' => $item->invoice_date,
+                    'invoice_due' => $item->invoice_due,
+                    'invoice_times' => $item->invoice_times,
+                    'receiving_code' => $item->receiving_code,
+                    'receiving_updated_at' => $item->receiving_updated_at,
+                    'creditor_code' => $item->creditor_code,
+                    'creditor_name' => $item->creditor_name,
+                    'dpp' => 0,
+                    'ppn' => 0,
+                    'jumlah' => 0,
+                ];
+            }
+            
+            $qty = (float) ($item->qty_received ?? $item->qty ?? 0);
+            $rawPrice = (float) ($item->receiving_raw_price ?? $item->order_items_price ?? 0);
+            $gross = $qty * $rawPrice;
+            $disc = (float) ($item->discount ?? 0);
+            $extraDisc = (float) ($item->extra_discount ?? 0);
+            $nomDisc = ($disc <= 100 && $disc > 0) ? ($gross * $disc / 100) : $disc;
+            $nomExtraDisc = ($extraDisc <= 100 && $extraDisc > 0) ? ($gross * $extraDisc / 100) : $extraDisc;
+            
+            $dpp = max(0, $gross - $nomDisc - $nomExtraDisc);
+            $ppnType = strtoupper(trim($item->invoice_ppn ?? 'TANPA'));
+            $ppn = 0;
+            
+            if ($ppnType === 'EXCLUDE') {
+                $ppn = floor($dpp * self::PPN);
+            } else if ($ppnType === 'INCLUDE') {
+                $ppn = floor($dpp - ($dpp / (1 + self::PPN)));
+                $dpp = $dpp - $ppn;
+            }
+            
+            $jumlah = $dpp + $ppn;
+            $invoices[$key]['dpp'] += $dpp;
+            $invoices[$key]['ppn'] += $ppn;
+            $invoices[$key]['jumlah'] += $jumlah;
+        }
+
         $rows   = [];
         $rows[] = [
             'No.', 'Nama Kreditur', 'Kode Kreditur', 'No Faktur',
             'Tgl Faktur', 'No Terima', 'Tgl Terima',
             'DPP', 'PPN', 'Jumlah', 'Jatuh Tempo', 'Waktu Kredit',
         ];
- 
+
         $no         = 1;
         $grandDpp   = 0.0;
         $grandPpn   = 0.0;
         $grandTotal = 0.0;
- 
+
         foreach ($invoices as $inv) {
-            $dpp    = (float) ($inv->dpp_raw ?? 0);
-            $ppn    = round($dpp * self::PPN);
-            $jumlah = round($dpp + $ppn);
- 
-            $tglFaktur  = $inv->invoice_date
-                ? Carbon::parse($inv->invoice_date)->format('d/m/Y') : '-';
-            $tglTerima  = $inv->receiving_updated_at
-                ? Carbon::parse($inv->receiving_updated_at)->format('d/m/Y') : '-';
-            $jatuhTempo = $inv->invoice_due
-                ? Carbon::parse($inv->invoice_due)->format('d/m/Y') : '-';
- 
+            $tglFaktur  = $inv['invoice_date']
+                ? Carbon::parse($inv['invoice_date'])->format('d/m/Y') : '-';
+            $tglTerima  = $inv['receiving_updated_at']
+                ? Carbon::parse($inv['receiving_updated_at'])->format('d/m/Y') : '-';
+            $jatuhTempo = $inv['invoice_due']
+                ? Carbon::parse($inv['invoice_due'])->format('d/m/Y') : '-';
+
             $rows[] = [
                 (int)   $no++,
-                        $inv->creditor_name  ?? '-',
-                        $inv->creditor_code  ?? '-',
-                        $inv->invoice_number ?? '-',
+                        $inv['creditor_name']  ?? '-',
+                        $inv['creditor_code']  ?? '-',
+                        $inv['invoice_number'] ?? '-',
                         $tglFaktur,
-                        $inv->receiving_code ?? '-',
+                        $inv['receiving_code'] ?? '-',
                         $tglTerima,
-                (float) $dpp,
-                (float) $ppn,
-                (float) $jumlah,
+                (float) $inv['dpp'],
+                (float) $inv['ppn'],
+                (float) $inv['jumlah'],
                         $jatuhTempo,
-                        $inv->invoice_times  ?? '-',
+                        $inv['invoice_times']  ?? '-',
             ];
- 
-            $grandDpp   += $dpp;
-            $grandPpn   += $ppn;
-            $grandTotal += $jumlah;
+
+            $grandDpp   += $inv['dpp'];
+            $grandPpn   += $inv['ppn'];
+            $grandTotal += $inv['jumlah'];
         }
- 
+
         $rows[] = [
             '', '', '', '', '', '', 'TOTAL',
             (float) $grandDpp,
@@ -148,63 +184,100 @@ class InvoiceExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
             (float) $grandTotal,
             '', '',
         ];
- 
+
         return $rows;
     }
  
     // ── REKAP: one row per creditor ───────────────────────────────────────────
     private function buildRekap(): array
     {
-        $creditors = $this->baseQuery()
+        $items = $this->baseQuery()
             ->select([
                 'order_items.creditor_code',
                 'creditors.name as creditor_name',
-                DB::raw('SUM(receiving_items.total) as dpp_raw'),
-            ])
-            ->groupBy([
-                'order_items.creditor_code',
-                'creditors.name',
+                
+                'receiving_details.invoice_ppn',
+                'receiving_items.qty_received',
+                'receiving_items.qty',
+                'receiving_items.discount',
+                'receiving_items.extra_discount',
+                'receiving_items.raw_price as receiving_raw_price',
+                'order_items.price as order_items_price',
             ])
             ->orderBy('creditors.name', 'asc')
             ->get();
- 
-        if ($creditors->isEmpty()) {
+
+        if ($items->isEmpty()) {
             return [['Tidak ada data untuk periode yang dipilih.']];
         }
- 
+
+        $creditorsArr = [];
+        foreach ($items as $item) {
+            $key = $item->creditor_code;
+            if (!isset($creditorsArr[$key])) {
+                $creditorsArr[$key] = [
+                    'creditor_code' => $item->creditor_code,
+                    'creditor_name' => $item->creditor_name,
+                    'dpp' => 0,
+                    'ppn' => 0,
+                    'jumlah' => 0,
+                ];
+            }
+            
+            $qty = (float) ($item->qty_received ?? $item->qty ?? 0);
+            $rawPrice = (float) ($item->receiving_raw_price ?? $item->order_items_price ?? 0);
+            $gross = $qty * $rawPrice;
+            $disc = (float) ($item->discount ?? 0);
+            $extraDisc = (float) ($item->extra_discount ?? 0);
+            $nomDisc = ($disc <= 100 && $disc > 0) ? ($gross * $disc / 100) : $disc;
+            $nomExtraDisc = ($extraDisc <= 100 && $extraDisc > 0) ? ($gross * $extraDisc / 100) : $extraDisc;
+            
+            $dpp = max(0, $gross - $nomDisc - $nomExtraDisc);
+            $ppnType = strtoupper(trim($item->invoice_ppn ?? 'TANPA'));
+            $ppn = 0;
+            
+            if ($ppnType === 'EXCLUDE') {
+                $ppn = floor($dpp * self::PPN);
+            } else if ($ppnType === 'INCLUDE') {
+                $ppn = floor($dpp - ($dpp / (1 + self::PPN)));
+                $dpp = $dpp - $ppn;
+            }
+            
+            $jumlah = $dpp + $ppn;
+            $creditorsArr[$key]['dpp'] += $dpp;
+            $creditorsArr[$key]['ppn'] += $ppn;
+            $creditorsArr[$key]['jumlah'] += $jumlah;
+        }
+
         $rows   = [];
         $rows[] = ['No.', 'Kreditur', 'DPP', 'PPN', 'Jumlah'];
- 
+
         $no         = 1;
         $grandDpp   = 0.0;
         $grandPpn   = 0.0;
         $grandTotal = 0.0;
- 
-        foreach ($creditors as $cred) {
-            $dpp    = (float) ($cred->dpp_raw ?? 0);
-            $ppn    = round($dpp * self::PPN);
-            $jumlah = round($dpp + $ppn);
- 
+
+        foreach ($creditorsArr as $cred) {
             $rows[] = [
                 (int)   $no++,
-                        $cred->creditor_name ?? '-',
-                (float) $dpp,
-                (float) $ppn,
-                (float) $jumlah,
+                        $cred['creditor_name'] ?? '-',
+                (float) $cred['dpp'],
+                (float) $cred['ppn'],
+                (float) $cred['jumlah'],
             ];
- 
-            $grandDpp   += $dpp;
-            $grandPpn   += $ppn;
-            $grandTotal += $jumlah;
+
+            $grandDpp   += $cred['dpp'];
+            $grandPpn   += $cred['ppn'];
+            $grandTotal += $cred['jumlah'];
         }
- 
+
         $rows[] = [
             '', 'TOTAL',
             (float) $grandDpp,
             (float) $grandPpn,
             (float) $grandTotal,
         ];
- 
+
         return $rows;
     }
  
