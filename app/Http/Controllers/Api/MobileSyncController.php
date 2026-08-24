@@ -19,6 +19,7 @@ class MobileSyncController extends Controller
     {
         $medicines = Medicines::select('code', 'name', DB::raw('het_price as price'), 'unit', 'stock')
             ->where('status', 1)
+            ->limit(10)
             ->get();
 
         return response()->json([
