@@ -17,7 +17,7 @@ class MobileSyncController extends Controller
     // 1. [GET] /api/mobile/products
     public function getProducts(Request $request)
     {
-        $medicines = Medicines::select('code', 'name', 'het_price as price', 'unit', 'stock')
+        $medicines = Medicines::select('code', 'name', DB::raw('het_price as price'), 'unit', 'stock')
             ->where('status', 1)
             ->get();
 
