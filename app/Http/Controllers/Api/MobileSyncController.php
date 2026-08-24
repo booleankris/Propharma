@@ -251,7 +251,11 @@ class MobileSyncController extends Controller
                     'qty' => $item['qty'],
                     'qty_before' => $qty_before,
                     'qty_after' => $medicine->stock,
+                    'total' => $totalPrice,
+                    'date' => now()->format('Y-m-d H:i:s'),
                     'status' => 1,
+                    'batches_id' => $transfer->batches_id ?? null,
+                    'user_id' => 1,
                 ]);
             }
 
