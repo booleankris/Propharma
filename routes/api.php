@@ -30,3 +30,13 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 Route::post("/midtrans-feedback",[MidtransController::class,"midtransNotification"]);
 Route::post("/scanticket",[LandingpageController::class,"scanTicket"]);
 Route::post("/midtrans-ticket-feedback",[MidtransController::class,"midtransNotificationTicket"]);
+
+use App\Http\Controllers\Api\MobileSyncController;
+
+Route::prefix('mobile')->group(function () {
+    Route::get('/products', [MobileSyncController::class, 'getProducts']);
+    Route::post('/members/check', [MobileSyncController::class, 'checkMember']);
+    Route::post('/members/checkout', [MobileSyncController::class, 'checkoutPoints']);
+    Route::get('/members/{phone}/history', [MobileSyncController::class, 'memberHistory']);
+    Route::post('/transactions/checkout', [MobileSyncController::class, 'transactionCheckout']);
+});

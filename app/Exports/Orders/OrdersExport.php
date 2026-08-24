@@ -55,7 +55,8 @@ class OrdersExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
             ->join('orders', 'orders.id', '=', 'order_items.order_id')
             ->leftJoin('creditors', 'creditors.code', '=', 'order_items.creditor_code')
             ->where('receiving.pharmacy_id', $this->pharmacyId)
-            ->whereBetween('receiving.updated_at', [$this->startDate, $this->endDate])
+            ->whereNotNull('receiving_items.batches_id')
+            ->whereBetween('receiving_details.created_at', [$this->startDate, $this->endDate])
             ->select([
                 'receiving_items.id',
                 'receiving_items.qty_received',
@@ -73,6 +74,7 @@ class OrdersExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                 'receiving_details.invoice_ppn',
                 'receiving.code as receiving_code',
                 'receiving.updated_at as receiving_updated_at',
+                'receiving_details.created_at as receiving_details_created_at',
                 'order_items.creditor_code',
                 'order_items.price as order_items_price',
                 'order_items.pack as order_pack',
@@ -144,8 +146,8 @@ class OrdersExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
             $jumlah = $dpp + $ppn;
             $hargaPpn = round($rawPrice * (1 + self::PPN));
 
-            $tglTerima = $item->receiving_updated_at
-                ? Carbon::parse($item->receiving_updated_at)->format('d/m/Y')
+            $tglTerima = $item->receiving_details_created_at
+                ? Carbon::parse($item->receiving_details_created_at)->format('d/m/Y')
                 : '-';
             $tglFaktur = $item->invoice_date
                 ? Carbon::parse($item->invoice_date)->format('d/m/Y')

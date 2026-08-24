@@ -59,7 +59,8 @@ class InvoiceExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
             ->join('orders', 'orders.id', '=', 'order_items.order_id')
             ->leftJoin('creditors', 'creditors.code', '=', 'order_items.creditor_code')
             ->where('receiving.pharmacy_id', $this->pharmacyId)
-            ->whereBetween('receiving.updated_at', [$this->startDate, $this->endDate]);
+            ->whereNotNull('receiving_items.batches_id')
+            ->whereBetween('receiving_details.created_at', [$this->startDate, $this->endDate]);
     }
  
     // ── DETAIL: one row per invoice_number ───────────────────────────────────
@@ -75,6 +76,7 @@ class InvoiceExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
                 'receiving_details.receiving_id',
                 'receiving.code as receiving_code',
                 'receiving.updated_at as receiving_updated_at',
+                'receiving_details.created_at as receiving_details_created_at',
                 'order_items.creditor_code',
                 'creditors.name as creditor_name',
                 
@@ -104,6 +106,7 @@ class InvoiceExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
                     'invoice_times' => $item->invoice_times,
                     'receiving_code' => $item->receiving_code,
                     'receiving_updated_at' => $item->receiving_updated_at,
+                    'receiving_details_created_at' => $item->receiving_details_created_at,
                     'creditor_code' => $item->creditor_code,
                     'creditor_name' => $item->creditor_name,
                     'dpp' => 0,
@@ -152,8 +155,8 @@ class InvoiceExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
         foreach ($invoices as $inv) {
             $tglFaktur  = $inv['invoice_date']
                 ? Carbon::parse($inv['invoice_date'])->format('d/m/Y') : '-';
-            $tglTerima  = $inv['receiving_updated_at']
-                ? Carbon::parse($inv['receiving_updated_at'])->format('d/m/Y') : '-';
+            $tglTerima  = $inv['receiving_details_created_at']
+                ? Carbon::parse($inv['receiving_details_created_at'])->format('d/m/Y') : '-';
             $jatuhTempo = $inv['invoice_due']
                 ? Carbon::parse($inv['invoice_due'])->format('d/m/Y') : '-';
 
