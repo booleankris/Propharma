@@ -159,14 +159,16 @@ class MobileSyncController extends Controller
             $code = $prefix . str_pad($num, 4, '0', STR_PAD_LEFT);
 
             $medTransaction = MedicineTransactions::create([
+                'pharmacy_id' => $webPharmacyId,
                 'patient_id' => $patient->id,
+                'user_id' => 1,
                 'transaction_code' => $code,
                 'transaction_type' => $request->transaction_type, // Misal: ONLINE
                 'subtotal' => $request->total_transaction,
                 'discount' => $request->discount ?? 0,
                 'paid' => $request->total_transaction,
                 'changes' => 0,
-                'paymentType' => $request->payment_type,
+                'payment_method' => $request->payment_type,
                 'status' => 1,
                 'created_at' => now(),
                 'updated_at' => now(),
