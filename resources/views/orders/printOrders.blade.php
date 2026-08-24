@@ -169,8 +169,21 @@
             </table>
 
             @php
-                $ppn = $fakturTotal * 0.11;
-                $finalTotal = $fakturTotal + $ppn;
+                $ppnType = strtoupper(trim($details->invoice_ppn ?? $details->creditor?->ppn_type ?? 'TANPA'));
+                if ($ppnType === 'EXCLUDE') {
+                    $ppn = floor($fakturTotal * 0.11);
+                    $finalTotal = $fakturTotal + $ppn;
+                    $ppnLabel = 'PPN (11%)';
+                } elseif ($ppnType === 'INCLUDE') {
+                    $finalTotal = $fakturTotal;
+                    $hna = floor($fakturTotal / 1.11);
+                    $ppn = $finalTotal - $hna;
+                    $ppnLabel = 'PPN (Include)';
+                } else {
+                    $ppn = 0;
+                    $finalTotal = $fakturTotal;
+                    $ppnLabel = 'PPN (Tanpa)';
+                }
             @endphp
 
             <table class="grand-total">
@@ -179,7 +192,7 @@
                     <td class="gt-value">Rp. {{ number_format($fakturTotal, 0, ',', '.') }}</td>
                 </tr>
                 <tr>
-                    <td class="gt-label">PPN (11%)</td>
+                    <td class="gt-label">{{ $ppnLabel }}</td>
                     <td class="gt-value">Rp. {{ number_format($ppn, 0, ',', '.') }}</td>
                 </tr>
                 <tr class="gt-final">

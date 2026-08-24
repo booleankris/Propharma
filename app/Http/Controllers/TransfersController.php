@@ -254,8 +254,11 @@ class TransfersController extends Controller
             'items.etalases',
             'users.pharmacy',
         ])
-            ->whereHas('users', fn($q) => $q->where('pharmacy_id', $pharmacyId))
             ->where('status', 2)
+            ->where(function ($q) use ($pharmacyId) {
+                $q->whereHas('users', fn($u) => $u->where('pharmacy_id', $pharmacyId))
+                    ->orWhereHas('items.batches', fn($b) => $b->where('pharmacy_id', $pharmacyId));
+            })
             ->latest()
             ->paginate(10, ['*'], 'denied_page')
             ->withQueryString();

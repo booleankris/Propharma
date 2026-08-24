@@ -371,6 +371,8 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     Route::get('/orders/{id}/creditors', [OrdersController::class, 'getCreditors']);
     Route::get('/orders/{order}/printspb', [OrdersController::class, 'printSPB'])
         ->name('orders.print');
+    Route::get('/orders/{order}/printspb-dotmatrix', [OrdersController::class, 'printSPBDotMatrix'])
+        ->name('orders.print.dotmatrix');
     Route::get('/orders/printorder/{id}', [OrdersController::class, 'printOrder'])->name('orders.printorder');
     Route::get('/orders/print-preview/{order_id}', [OrdersController::class, 'printPreview']);
 

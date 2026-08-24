@@ -412,6 +412,15 @@
                         SPB
                     </button>
 
+                    <button onclick="printSPBDotMatrix()"
+                        class="inline-flex items-center gap-2 rounded-lg btn-pharma !bg-teal-600 !shadow-[0_2px_6px_#0d9488] px-6 py-4 text-sm font-xl text-white hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M6 9V4h12v5M6 18h12v-5H6v5zM6 14h12" />
+                        </svg>
+                        SPB Dot Matrix
+                    </button>
+
                 </div>
 
                 <table id="orderItemsTable" class="w-full">
@@ -1302,6 +1311,32 @@
         function printSPB() {
             if (!validateOrderCreditorsBeforePrint()) return;
             window.open(`/orders/${orderid}/printspb`, "_blank");
+        }
+
+        function printSPBDotMatrix() {
+            if (!validateOrderCreditorsBeforePrint()) return;
+
+            Swal.fire({
+                title: 'Mengirim ke printer...',
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                didOpen: () => Swal.showLoading()
+            });
+
+            fetch(`/orders/${orderid}/printspb-dotmatrix`, {
+                headers: { 'Accept': 'application/json' }
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.error) {
+                    Swal.fire('Gagal', data.error, 'error');
+                } else {
+                    Swal.fire('Berhasil', data.message ?? 'SP berhasil dikirim.', 'success');
+                }
+            })
+            .catch(() => {
+                Swal.fire('Gagal', 'Terjadi kesalahan saat mengirim ke printer.', 'error');
+            });
         }
 
         function printOrder() {

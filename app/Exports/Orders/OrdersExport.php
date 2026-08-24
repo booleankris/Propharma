@@ -88,13 +88,6 @@ class OrdersExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
             return [['Tidak ada data untuk periode yang dipilih.']];
         }
 
-        // Pre-compute DPP per receiving_id
-        $dppByReceivingId = [];
-        foreach ($items as $item) {
-            $rid = $item->receiving_id;
-            $dppByReceivingId[$rid] = ($dppByReceivingId[$rid] ?? 0) + (float) ($item->total ?? 0);
-        }
-
         $rows   = [];
         $rows[] = [
             'ID', 'No Terima', 'Tgl Terima', 'Nama Kreditur', 'Kode Kreditur',
@@ -108,12 +101,12 @@ class OrdersExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         $grandTotal = 0;
 
         foreach ($items as $item) {
-            $dpp        = (float) ($dppByReceivingId[$item->receiving_id] ?? 0);
+            $itemTotal  = (float) ($item->total ?? 0);
+            $dpp        = $itemTotal; // DPP per item
             $ppn        = round($dpp * self::PPN);
             $rawPrice   = (float) ($item->raw_price ?? 0);
             $hargaPpn   = round($rawPrice * (1 + self::PPN));
-            $itemTotal  = (float) ($item->total ?? 0);
-            $jumlah     = round($itemTotal * (1 + self::PPN));
+            $jumlah     = $dpp + $ppn;
 
             $tglTerima  = $item->receiving_updated_at
                 ? Carbon::parse($item->receiving_updated_at)->format('d/m/Y') : '-';

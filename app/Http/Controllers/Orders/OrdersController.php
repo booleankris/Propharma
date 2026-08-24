@@ -18,6 +18,8 @@ use Illuminate\Support\Facades\DB;
 use DataTables;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Maatwebsite\Excel\Facades\Excel;
+use App\Services\DotMatrixPrinter;
+use App\Services\SuratPesananFormatter;
 
 class OrdersController extends Controller
 {
@@ -100,7 +102,7 @@ class OrdersController extends Controller
             $last->update(['date' => $now]);
 
             $d_price = OrderItems::where('order_id', $last->id)->where('status', '0')->sum('total') ?? '';
-            $d_ppn = $d_price * 0.11 ?? '';
+            $d_ppn = floor($d_price * 0.11) ?? '';
             $d_total = $d_price + $d_ppn ?? '';
             $order_id = $last->id;
             $order_code = $last->code;
@@ -276,7 +278,7 @@ class OrdersController extends Controller
 
         $price_total = OrderItems::where('order_id', $item->order_id)->where('status', '0')->sum('total') ?? '';
 
-        $ppn = $price_total * 0.11;
+        $ppn = floor($price_total * 0.11);
         return response()->json([
             'success' => true,
             'item' => $item,
@@ -316,7 +318,7 @@ class OrdersController extends Controller
 
         $price_total = OrderItems::where('order_id', $item->order_id)->where('status', '0')->sum('total') ?? '';
 
-        $ppn = $price_total * 0.11;
+        $ppn = floor($price_total * 0.11);
         return response()->json([
             'success' => true,
             'item' => $item,
@@ -338,7 +340,7 @@ class OrdersController extends Controller
 
         $price_total = OrderItems::where('order_id', $item->order_id)->where('status', '0')->sum('total') ?? '';
 
-        $ppn = $price_total * 0.11;
+        $ppn = floor($price_total * 0.11);
         return response()->json([
             'success' => true,
             'item' => $item,
@@ -529,6 +531,65 @@ class OrdersController extends Controller
             dd($e->getMessage(), $e->getFile(), $e->getLine());
         }
     }
+
+    public function printSPBDotMatrix($orderId)
+    {
+        try {
+            ini_set('memory_limit', '512M');
+            $date = Carbon::now()->translatedFormat('d F Y');
+            $order = Order::with([
+                'pharmacy',
+                'order_items.medicines',
+                'order_items.medicines.creditors',
+                'order_items.creditors',
+                'order_items.medicines.composition',
+            ])->findOrFail($orderId);
+
+            $pharmacy = $order->pharmacy;
+
+            $grouped = $order->order_items->groupBy(function ($item) {
+                $type = $item->medicines->type ?? "Kosong";
+                if (strtoupper($type) === 'NARKOTIKA') {
+                    return 'NARKOTIKA_' . $item->id;
+                }
+                return $type;
+            })->map(function ($perCreditor) {
+                return $perCreditor->groupBy('creditor_code') ?? "Kosong";
+            });
+
+            $text = SuratPesananFormatter::build(
+                $order,
+                $pharmacy,
+                $grouped,
+                $date,
+                filter_var(env('DOTMATRIX_PRINTER_DRAFT', true), FILTER_VALIDATE_BOOLEAN)
+            );
+
+            if ($text === '') {
+                return response()->json(['error' => 'Tidak ada item obat untuk dicetak.'], 422);
+            }
+
+            if (request()->boolean('preview')) {
+                return response($text, 200, ['Content-Type' => 'text/plain; charset=UTF-8']);
+            }
+
+            $ip = env('DOTMATRIX_PRINTER_IP');
+            $port = (int) env('DOTMATRIX_PRINTER_PORT', 9100);
+
+            if (!$ip) {
+                return response()->json([
+                    'error' => 'Printer belum dikonfigurasi. Atur DOTMATRIX_PRINTER_IP di .env.',
+                ], 400);
+            }
+
+            DotMatrixPrinter::send($text, $ip, $port);
+
+            return response()->json(['message' => 'Surat Pesanan berhasil dikirim ke printer dot matrix.']);
+        } catch (\Throwable $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
     public function printPreview($order_id)
     {
         $order = Order::with(['order_items.medicines', 'order_items.medicines.factory'])
@@ -640,7 +701,7 @@ class OrdersController extends Controller
         }
 
         $price_total = OrderItems::where('order_id', $request->order_id)->where('status', '0')->sum('total') ?? 0;
-        $ppn = $price_total * 0.11;
+        $ppn = floor($price_total * 0.11);
 
         return response()->json([
             'success' => true,

@@ -1095,6 +1095,9 @@ class ReceivingController extends Controller
 
             foreach ($receivingDetails as $detail) {
                 $ppnType = strtoupper(trim($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA'));
+                $detailSubtotal = 0;
+                $detailDiscount = 0;
+
                 foreach ($detail->receiving_items as $rItem) {
                     $qty = floatval($rItem->qty_received ?? $rItem->qty ?? 0);
                     $price = floatval($rItem->raw_price ?? $rItem->order_items->price ?? 0);
@@ -1103,26 +1106,30 @@ class ReceivingController extends Controller
                     $extraDisc = floatval($rItem->extra_discount ?? 0);
                     $nomDisc = ($disc <= 100 && $disc > 0) ? ($gross * $disc / 100) : $disc;
                     $nomExtraDisc = ($extraDisc <= 100 && $extraDisc > 0) ? ($gross * $extraDisc / 100) : $extraDisc;
-                    $net = max(0, $gross - $nomDisc - $nomExtraDisc);
-
-                    if ($ppnType === 'EXCLUDE') {
-                        $itemHna = $net;
-                        $itemPpn = floor($net * 0.11);
-                        $itemTotal = $itemHna + $itemPpn;
-                    } elseif ($ppnType === 'INCLUDE') {
-                        $itemTotal = $net;
-                        $itemHna = floor($net / 1.11);
-                        $itemPpn = $itemTotal - $itemHna;
-                    } else { // TANPA
-                        $itemHna = $net;
-                        $itemPpn = 0;
-                        $itemTotal = $net;
-                    }
-
-                    $d_price += $itemHna;
-                    $d_ppn += $itemPpn;
-                    $d_total += $itemTotal;
+                    
+                    $detailSubtotal += $gross;
+                    $detailDiscount += ($nomDisc + $nomExtraDisc);
                 }
+
+                $detailDpp = max(0, $detailSubtotal - $detailDiscount);
+
+                if ($ppnType === 'EXCLUDE') {
+                    $detailPpn = floor($detailDpp * 0.11);
+                    $detailGrandTotal = $detailDpp + $detailPpn;
+                    $detailHna = $detailDpp;
+                } elseif ($ppnType === 'INCLUDE') {
+                    $detailGrandTotal = $detailDpp;
+                    $detailHna = floor($detailDpp / 1.11);
+                    $detailPpn = $detailGrandTotal - $detailHna;
+                } else { // TANPA
+                    $detailPpn = 0;
+                    $detailGrandTotal = $detailDpp;
+                    $detailHna = $detailDpp;
+                }
+
+                $d_price += $detailHna;
+                $d_ppn += $detailPpn;
+                $d_total += $detailGrandTotal;
             }
 
             return view('orders.receiving', compact('order_id', 'd_price', 'd_ppn', 'd_total', 'order_code', 'creditorOption', 'receiving_code', 'transaction', 'now', 'datenow', 'receiving_id', 'allFakturs'));
@@ -1247,11 +1254,15 @@ class ReceivingController extends Controller
                 ->get();
 
             $d_price = 0;
+            $d_price = 0;
             $d_ppn = 0;
             $d_total = 0;
 
             foreach ($receivingDetails as $detail) {
                 $ppnType = strtoupper(trim($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA'));
+                $detailSubtotal = 0;
+                $detailDiscount = 0;
+
                 foreach ($detail->receiving_items as $rItem) {
                     $qty = floatval($rItem->qty_received ?? $rItem->qty ?? 0);
                     $price = floatval($rItem->raw_price ?? $rItem->order_items->price ?? 0);
@@ -1260,26 +1271,30 @@ class ReceivingController extends Controller
                     $extraDisc = floatval($rItem->extra_discount ?? 0);
                     $nomDisc = ($disc <= 100 && $disc > 0) ? ($gross * $disc / 100) : $disc;
                     $nomExtraDisc = ($extraDisc <= 100 && $extraDisc > 0) ? ($gross * $extraDisc / 100) : $extraDisc;
-                    $net = max(0, $gross - $nomDisc - $nomExtraDisc);
-
-                    if ($ppnType === 'EXCLUDE') {
-                        $itemHna = $net;
-                        $itemPpn = floor($net * 0.11);
-                        $itemTotal = $itemHna + $itemPpn;
-                    } elseif ($ppnType === 'INCLUDE') {
-                        $itemTotal = $net;
-                        $itemHna = floor($net / 1.11);
-                        $itemPpn = $itemTotal - $itemHna;
-                    } else { // TANPA
-                        $itemHna = $net;
-                        $itemPpn = 0;
-                        $itemTotal = $net;
-                    }
-
-                    $d_price += $itemHna;
-                    $d_ppn += $itemPpn;
-                    $d_total += $itemTotal;
+                    
+                    $detailSubtotal += $gross;
+                    $detailDiscount += ($nomDisc + $nomExtraDisc);
                 }
+
+                $detailDpp = max(0, $detailSubtotal - $detailDiscount);
+
+                if ($ppnType === 'EXCLUDE') {
+                    $detailPpn = floor($detailDpp * 0.11);
+                    $detailGrandTotal = $detailDpp + $detailPpn;
+                    $detailHna = $detailDpp;
+                } elseif ($ppnType === 'INCLUDE') {
+                    $detailGrandTotal = $detailDpp;
+                    $detailHna = floor($detailDpp / 1.11);
+                    $detailPpn = $detailGrandTotal - $detailHna;
+                } else { // TANPA
+                    $detailPpn = 0;
+                    $detailGrandTotal = $detailDpp;
+                    $detailHna = $detailDpp;
+                }
+
+                $d_price += $detailHna;
+                $d_ppn += $detailPpn;
+                $d_total += $detailGrandTotal;
             }
 
             return response()->json([

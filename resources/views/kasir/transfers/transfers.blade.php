@@ -75,6 +75,14 @@
             @endforeach
         </div>
 
+        @php
+            $statusMap = [
+                0 => ['Pending', 'bg-amber-50 text-amber-700 border-amber-200'],
+                1 => ['Diterima', 'bg-emerald-50 text-emerald-700 border-emerald-200'],
+                2 => ['Ditolak', 'bg-rose-50 text-rose-700 border-rose-200'],
+            ];
+        @endphp
+
         {{-- TAB: Mutasi Keluar (Pending) --}}
         <div id="tab-pending" class="tab-panel space-y-4">
             @forelse($pending as $transfer)
@@ -93,11 +101,6 @@
                             <span class="text-xs text-slate-500">Oleh: <span
                                     class="font-semibold text-slate-700">{{ $transfer->users?->name ?? '—' }}</span></span>
                             @php
-                                $statusMap = [
-                                    0 => ['Pending', 'bg-amber-50 text-amber-700 border-amber-200'],
-                                    1 => ['Diterima', 'bg-emerald-50 text-emerald-700 border-emerald-200'],
-                                    2 => ['Ditolak', 'bg-rose-50 text-rose-700 border-rose-200'],
-                                ];
                                 [$statusLabel, $statusClass] = $statusMap[$transfer->status] ?? ['—', ''];
                             @endphp
                             <span class="text-[11px] font-semibold px-2.5 py-1 rounded-full border {{ $statusClass }}">
@@ -332,10 +335,19 @@
                             </span>
                             <span class="text-xs text-slate-400">{{ $transfer->created_at->format('d M Y, H:i') }}</span>
                         </div>
-                        <span
-                            class="text-[11px] font-semibold px-2.5 py-1 rounded-full border bg-rose-50 text-rose-700 border-rose-200">
-                            Ditolak
-                        </span>
+                        <div class="flex items-center gap-2">
+                            @if ($transfer->users && $transfer->users->pharmacy_id == getActivePharmacyId())
+                                <span class="text-xs text-slate-500">Dikirim oleh: <span
+                                        class="font-semibold text-slate-700">{{ $transfer->users->name ?? '—' }}</span></span>
+                            @else
+                                <span class="text-xs text-slate-500">Dari: <span
+                                        class="font-semibold text-slate-700">{{ $transfer->users?->pharmacy?->name ?? '—' }}</span></span>
+                            @endif
+                            <span
+                                class="text-[11px] font-semibold px-2.5 py-1 rounded-full border bg-rose-50 text-rose-700 border-rose-200">
+                                Ditolak
+                            </span>
+                        </div>
                     </div>
 
                     <div class="overflow-x-auto">
