@@ -73,7 +73,7 @@
                         <tr>
                             <td>No. Terima</td>
                             <td>:</td>
-                            <td>{{ $receiving->code }}</td>
+                            <td>{{ $detail->receiving_details_code ?? '-' }}</td>
                         </tr>
                         <tr>
                             <td>Tgl. Terima</td>
@@ -111,7 +111,7 @@
 
                 <tbody>
                     @php
-                        $ppnType = strtoupper(trim($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA'));
+                        $ppnType = strtoupper(trim($detail->invoice_ppn ?? ($detail->creditor?->ppn_type ?? 'TANPA')));
                         $detailSubtotal = 0;
                         $detailDiscount = 0;
                     @endphp
@@ -119,7 +119,7 @@
                     @foreach ($detail->receiving_items as $i => $item)
                         @php
                             // Harga dasar (HNA) per satuan
-                            $activePrice = floatval($item->raw_price ?? $item->order_items->price ?? 0);
+                            $activePrice = floatval($item->raw_price ?? ($item->order_items->price ?? 0));
                             $qty = floatval($item->qty_received ?? 0);
 
                             // Gross = qty × HNA (sebelum diskon, sebelum PPN)
@@ -129,8 +129,11 @@
                             $extraDiscVal = floatval($item->extra_discount ?? 0);
 
                             // Hitung nominal diskon dari gross HNA
-                            $nomDisc = ($discVal > 0 && $discVal <= 100) ? ($itemGross * $discVal / 100) : $discVal;
-                            $nomExtraDisc = ($extraDiscVal > 0 && $extraDiscVal <= 100) ? ($itemGross * $extraDiscVal / 100) : $extraDiscVal;
+                            $nomDisc = $discVal > 0 && $discVal <= 100 ? ($itemGross * $discVal) / 100 : $discVal;
+                            $nomExtraDisc =
+                                $extraDiscVal > 0 && $extraDiscVal <= 100
+                                    ? ($itemGross * $extraDiscVal) / 100
+                                    : $extraDiscVal;
 
                             $itemDiscount = $nomDisc + $nomExtraDisc;
 
@@ -188,7 +191,8 @@
                             $detailGrandTotal = $detailDpp;
                             $detailHna = floor($detailDpp / 1.11);
                             $detailPpn = $detailGrandTotal - $detailHna;
-                        } else { // TANPA
+                        } else {
+                            // TANPA
                             $detailPpn = 0;
                             $detailGrandTotal = $detailDpp;
                         }
@@ -216,7 +220,9 @@
                     </tr>
 
                     <tr>
-                        <th colspan="7" class="text-right">PPN ({{ $ppnType === 'EXCLUDE' ? '11%' : ($ppnType === 'INCLUDE' ? 'Include' : 'Tanpa PPN') }})</th>
+                        <th colspan="7" class="text-right">PPN
+                            ({{ $ppnType === 'EXCLUDE' ? '11%' : ($ppnType === 'INCLUDE' ? 'Include' : 'Tanpa PPN') }})
+                        </th>
                         <th class="text-right">
                             {{ number_format($detailPpn, 0, ',', '.') }}
                         </th>
