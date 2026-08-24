@@ -14,17 +14,23 @@ use Illuminate\Support\Facades\DB;
 
 class MobileSyncController extends Controller
 {
-    // 1. [GET] /api/mobile/products
     public function getProducts(Request $request)
     {
+        $limit = $request->input('limit', 100); // Default 100 item per request
         $medicines = Medicines::select('code', 'name', DB::raw('het_price as price'), 'unit', 'stock')
             ->where('status', 1)
-            ->limit(10)
-            ->get();
+            ->paginate($limit);
 
         return response()->json([
             'success' => true,
-            'data' => $medicines
+            'data' => $medicines->items(),
+            'pagination' => [
+                'current_page' => $medicines->currentPage(),
+                'last_page' => $medicines->lastPage(),
+                'per_page' => $medicines->perPage(),
+                'total' => $medicines->total(),
+                'next_page_url' => $medicines->nextPageUrl(),
+            ]
         ]);
     }
 
