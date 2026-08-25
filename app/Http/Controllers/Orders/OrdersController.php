@@ -37,6 +37,7 @@ class OrdersController extends Controller
             'order_items.total',
             'order_items.pack',
             'order_items.creditor_code',
+            'order_items.note',
         ])
             ->with([
                 'medicines.factory',
@@ -205,7 +206,7 @@ class OrdersController extends Controller
             $order->code . '.xlsx'
         );
     }
-    public function getOrdersCode($medicineId, $orderId)
+    public function getOrdersCode($medicineId, $orderId, $creditorCode = null)
     {
         $medicine = \App\Models\Medicines::findOrFail($medicineId);
         $order = \App\Models\Order::findOrFail($orderId);
@@ -225,6 +226,23 @@ class OrdersController extends Controller
             $code = "R";
         } else {
             $code = "R";
+        }
+
+        if ($type !== "NARKOTIKA") {
+            $existingItem = \App\Models\OrderItems::where('order_id', $orderId)
+                ->where('creditor_code', $creditorCode)
+                ->whereHas('medicines', function ($query) use ($type) {
+                    if ($type == "OBAT-OBAT TERTENTU (OOT)" || $type == "OBAT TERTENTU") {
+                        $query->whereIn(\Illuminate\Support\Facades\DB::raw('UPPER(type)'), ["OBAT-OBAT TERTENTU (OOT)", "OBAT TERTENTU"]);
+                    } else {
+                        $query->where(\Illuminate\Support\Facades\DB::raw('UPPER(type)'), $type);
+                    }
+                })
+                ->first();
+
+            if ($existingItem && $existingItem->order_items_code) {
+                return $existingItem->order_items_code;
+            }
         }
 
         $year = now()->format('y');
@@ -262,7 +280,7 @@ class OrdersController extends Controller
             'total' => 'required',
         ]);
 
-        $itemCode = $this->getOrdersCode($validated['medicine_id'], $validated['order_id']);
+        $itemCode = $this->getOrdersCode($validated['medicine_id'], $validated['order_id'], $validated['creditor_code'] ?? null);
 
         $item = OrderItems::create([
             'order_items_code' => $itemCode,
@@ -273,6 +291,7 @@ class OrdersController extends Controller
             'price' => $validated['price'],
             'quantity' => $validated['quantity'],
             'total' => $validated['total'],
+            'note' => $request->note ?? null,
             'status' => 0,
         ]);
 
@@ -308,10 +327,11 @@ class OrdersController extends Controller
             'price' => $request->price,
             'quantity' => $request->quantity,
             'total' => $request->total,
+            'note' => $request->note ?? null,
         ];
 
-        if ($item->medicine_id != $request->medicine_id) {
-            $data['order_items_code'] = $this->getOrdersCode($request->medicine_id, $item->order_id);
+        if ($item->medicine_id != $request->medicine_id || $item->creditor_code != $request->creditor_code) {
+            $data['order_items_code'] = $this->getOrdersCode($request->medicine_id, $item->order_id, $request->creditor_code);
         }
 
         $item->update($data);
@@ -676,7 +696,7 @@ class OrdersController extends Controller
                 $qty = $item['quantity'];
                 $price = $medicine->raw_price;
 
-                $itemCode = $this->getOrdersCode($item['medicine_id'], $request->order_id);
+                $itemCode = $this->getOrdersCode($item['medicine_id'], $request->order_id, null);
 
                 OrderItems::create([
                     'order_items_code' => $itemCode,

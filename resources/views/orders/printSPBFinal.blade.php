@@ -152,7 +152,7 @@
                     <table style="width:100%; margin-top:2px;">
                         <tr>
                             <td style="width:50%; vertical-align:top;">
-                                <b>No :</b> {{ $receivingDetail->sp_code ?? $creditorItems->first()->order_items_code }}{{ $chunkIndex > 0 ? ' (Hal '.($chunkIndex+1).')' : '' }}
+                                <b>No :</b> {{ $creditorItems->first()->order_items_code }}{{ $chunkIndex > 0 ? ' (Hal '.($chunkIndex+1).')' : '' }}
                             </td>
                             <td style="width:50%; text-align:right; font-size: 6px; vertical-align:top;">
                                 <b>Kepada Yth :</b> {{ optional($creditorItems->first()->creditors)->name ?? '-' }}
@@ -250,7 +250,7 @@
                     SURAT PESANAN OBAT MENGANDUNG PREKURSOR FARMASI
                 </div>
                 <div class="subtitle">
-                    Nomor SP : {{ $receivingDetail->sp_code ?? $items->first()->order_items_code }}
+                    Nomor SP : {{ $items->first()->order_items_code }}
                 </div>
 
                 <div class="section-gap">Yang bertanda tangan dibawah ini :</div>
@@ -408,7 +408,7 @@
                 </div>
 
                 <div class="subtitle">
-                    Nomor : {{ $receivingDetail->sp_code ?? $items->first()->order_items_code }}
+                    Nomor : {{ $items->first()->order_items_code }}
                 </div>
 
                 <div class="section-gap">Yang bertanda tangan dibawah ini :</div>
@@ -552,7 +552,7 @@
                     SURAT PESANAN NARKOTIKA
                 </div>
                 <div class="subtitle">
-                    Nomor : {{ $receivingDetail->sp_code ?? $items->first()->order_items_code }}
+                    Nomor : {{ $items->first()->order_items_code }}
                 </div>
 
                 {{-- IDENTITAS --}}
@@ -691,7 +691,7 @@
                     SURAT PESANAN PSIKOTROPIKA
                 </div>
                 <div class="subtitle">
-                    Nomor : {{ $receivingDetail->sp_code ?? $items->first()->order_items_code }}
+                    Nomor : {{ $items->first()->order_items_code }}
                 </div>
 
                 {{-- IDENTITAS --}}

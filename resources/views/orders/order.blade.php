@@ -327,6 +327,14 @@
                                     <option value="">-- Pilih Kreditur --</option>
                                 </select>
                             </div>
+                            
+                            <div>
+                                <label
+                                    class="block mb-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Keterangan (Opsional)</label>
+                                <input id="note" type="text" name="note"
+                                    class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                                    placeholder="Catatan untuk item ini...">
+                            </div>
 
                             {{-- Pill editor (hidden by default) --}}
                             <div id="creditorPillEditor" class="w-full hidden">
@@ -434,6 +442,7 @@
                             <th>Harga</th>
                             <th>Qty</th>
                             <th>Sisa</th>
+                            <th>Keterangan</th>
                             <th>Total</th>
                         </tr>
                     </thead>
@@ -616,6 +625,11 @@
                         name: 'medicines.stock'
                     },
                     {
+                        data: 'note',
+                        name: 'note',
+                        defaultContent: '-'
+                    },
+                    {
                         data: 'item_total',
                         name: 'item_total'
                     },
@@ -655,6 +669,7 @@
             document.getElementById('item_price').value = formatRupiah(itemrawprice);
             document.getElementById('qty').value = data.quantity;
             document.getElementById('medicine_code').value = data.medicines.code;
+            document.getElementById('note').value = data.note ?? '';
             loadMedicineCreditors(data.medicine_id, data.creditor_code);
 
             if (data.pack == "1") {
@@ -676,6 +691,12 @@
             document.getElementById('creditor').focus();
         });
         document.getElementById('creditor').addEventListener('keydown', function(e) {
+            if (e.key !== 'Enter') return;
+            e.preventDefault();
+            document.getElementById('note').focus();
+        });
+        
+        document.getElementById('note').addEventListener('keydown', function(e) {
             if (e.key !== 'Enter') return;
             e.preventDefault();
             if (selectedRowData) {
@@ -710,6 +731,7 @@
                     price: itemprice,
                     quantity: itemqty,
                     total: itemtotal,
+                    note: document.getElementById('note').value,
                 }, {
                     headers: {
                         'X-CSRF-TOKEN': document
@@ -1152,6 +1174,7 @@
             document.getElementById('content').value = '';
             document.getElementById('item_price').value = '';
             document.getElementById('total_price').value = '';
+            document.getElementById('note').value = '';
             const isActive = document.getElementById('is_active');
             pack.checked = false;
             itempack = 0;
@@ -1185,6 +1208,7 @@
                     price: itemprice,
                     quantity: itemqty,
                     total: itemtotal,
+                    note: document.getElementById('note').value,
                 };
                 axios.post("{{ route('orders.addItemOrder') }}", payload, {
                     headers: {

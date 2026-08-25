@@ -3356,6 +3356,7 @@
                 payment_total.value = formatRupiah(response.data.totalbought);
                 totaltransaction = response.data.total_transaction;
                 totalbought = response.data.totalbought;
+                total_discount = response.data.total_discount;
             })
             .catch(err => console.error('Failed to delete item:', err));
     }
@@ -4839,8 +4840,9 @@
             console.log('Before:', totaltransaction);
             console.log('After:', roundUpToNearestThousand(totaltransaction));
 
+            totalbought = response.data.totalbought;
             previewtransactiontotal.value = formatRupiah(totaltransaction);
-            payment_total.value = formatRupiah(totaltransaction);
+            payment_total.value = formatRupiah(totalbought);
 
 
         }).catch(error => {

@@ -157,14 +157,12 @@ class SalesController extends Controller
         // 5. Collect view data───────────────
         $totaltransaction = MedicineCart::where('user_id', $user_id)
             ->where('transaction_id', $trx_id)
+            ->where('status', '0')
             ->sum('final_price');
 
-        // $priceTotal = MedicineCart::where('user_id', $user_id)
-        //     ->where('transaction_id', $trx_id)
-        //     ->selectRaw('SUM(total_price) as total_price, SUM(embalase) as embalase')
-        //     ->first();
         $total_price = MedicineCart::where('user_id', $user_id)
             ->where('transaction_id', $trx_id)
+            ->where('status', '0')
             ->selectRaw('SUM(total_price) as total_price, SUM(embalase) as embalase')
             ->first();
         $existingpackage = MedicineCart::where('user_id', $user_id)
@@ -633,12 +631,15 @@ class SalesController extends Controller
 
         $total_transaction = MedicineCart::where('transaction_id', $cart->transaction_id)
             ->where('user_id', auth()->id())
+            ->where('status', '0')
             ->sum('final_price');
         $total_discount = MedicineCart::where('transaction_id', $cart->transaction_id)
             ->where('user_id', auth()->id())
+            ->where('status', '0')
             ->sum('discount');
         $totalbought = MedicineCart::where('transaction_id', $cart->transaction_id)
             ->where('user_id', auth()->id())
+            ->where('status', '0')
             ->selectRaw('SUM(total_price) as total_price, SUM(embalase) as embalase')->first();
 
         $total_raw = $totalbought->total_price + $totalbought->embalase;
@@ -1084,7 +1085,7 @@ class SalesController extends Controller
                 ]);
             }
 
-            $finalprice = $transaction->total_price + $jasaValue;
+            $finalprice = $transaction->total_price - $transaction->discount + $jasaValue;
 
             $transaction->update([
                 'embalase' => $jasaValue,
@@ -1095,15 +1096,23 @@ class SalesController extends Controller
 
             $total_transaction = MedicineCart::where('transaction_id', $transactionId)
                 ->where('user_id', auth()->id())
+                ->where('status', '0')
                 ->sum('final_price');
+
+            $totalbought = MedicineCart::where('transaction_id', $transactionId)
+                ->where('user_id', auth()->id())
+                ->where('status', '0')
+                ->selectRaw('SUM(total_price) as total_price, SUM(embalase) as embalase')->first();
+
+            $total_raw = $totalbought->total_price + $totalbought->embalase;
 
             return response()->json([
                 'success' => true,
                 'message' => 'Data embalase berhasil disimpan.',
                 'racikStatus' => 1,
                 'finalprice' => $transaction->final_price,
-                'message' => 'Data embalase berhasil disimpan.',
                 'totaltransaction' => $total_transaction,
+                'totalbought' => $total_raw,
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -1138,15 +1147,18 @@ class SalesController extends Controller
 
         $total_transaction = MedicineCart::where('transaction_id', $cart->transaction_id)
             ->where('user_id', auth()->id())
+            ->where('status', '0')
             ->sum('final_price');
 
         $total_discount = MedicineCart::where('transaction_id', $cart->transaction_id)
             ->where('user_id', auth()->id())
+            ->where('status', '0')
             ->sum('discount');
 
 
         $totalbought = MedicineCart::where('transaction_id', $cart->transaction_id)
             ->where('user_id', auth()->id())
+            ->where('status', '0')
             ->selectRaw('SUM(total_price) as total_price, SUM(embalase) as embalase')->first();
 
         $total_raw = $totalbought->total_price + $totalbought->embalase;

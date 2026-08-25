@@ -37,7 +37,7 @@ class OrdersTrackingController extends Controller
             ->orderBy('orders.updated_at', 'desc');
 
         return DataTables::of($query)
-            ->addColumn('sp_code', fn($row) => $row->receiving_items->receiving_details->sp_code ?? '-')
+            ->addColumn('sp_code', fn($row) => $row->order_items_code ?? '-')
             ->addColumn('order_code', fn($row) => $row->orders->code)
             ->addColumn('order_date', fn($row) => $row->orders->date)
             ->addColumn('medicine_name', fn($row) => $row->medicines->name ?? '-')
