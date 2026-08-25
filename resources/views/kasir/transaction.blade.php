@@ -627,7 +627,7 @@
                                             class="text-[10px] leading-normal px-1 py-1 font-semibold text-gray-800">
                                             {{ $cart->medicine->name }}
                                         </td>
-                                        <td class="px-1 py-1 text-center">{{ $cart->medicine->unit }}</td>
+                                        <td class="px-1 py-1 text-center">{{ $cart->medicine->unit ?? $cart->medicine->packaging ?? '' }}</td>
                                         <td class="px-1 py-1 text-center">Rp
                                             {{ number_format($cart->item_price, 0, ',', '.') }}</td>
                                         <td class="px-1 py-1 text-center">{{ $cart->quantity }}</td>
@@ -2345,9 +2345,9 @@
         quantity.value = '';
         totalprice.value = '';
         discount = '';
-        stock.value = it.stock;
-        unit.value = it.unit;
-        name.value = it.name;
+        stock.value = it.stock || 0;
+        unit.value = it.unit || it.packaging || '';
+        name.value = it.name || '';
 
         if (currenttransaction == 'KREDIT' || currenttransaction == 'RESEP TUNAI') {
             dosage.value = it.dosage;
@@ -3006,7 +3006,7 @@
     axios.defaults.headers.common['X-CSRF-TOKEN'] = '{{ csrf_token() }}';
 
     function resetInputs() {
-        const ids = ['pay', 'change', 'quantity', 'dosage', 'dosage_r'];
+        const ids = ['pay', 'change', 'quantity', 'dosage', 'dosage_r', 'name', 'stock', 'unit'];
 
         ids.forEach(id => {
             const el = document.getElementById(id);
@@ -3078,7 +3078,7 @@
                             <td colspan="7" class="leading-normal text-[10px] px-1 py-1 font-semibold text-gray-800">
                                 ${item.medicine.name}
                             </td>
-                            <td class="px-1 py-1 text-center">${item.medicine.unit}</td>
+                            <td class="px-1 py-1 text-center">${item.medicine.unit || item.medicine.packaging || ''}</td>
                             <td class="px-1 py-1 text-center">${formatRupiah(item_finalprice)}</td>
                             <td class="px-1 py-1 text-center">${item.quantity}</td>
                             <td class="px-1 py-1 text-center">${formatRupiah(item.discount)}</td>
@@ -3099,7 +3099,7 @@
                             <tr id="itemincart${item.id}" data-id="${item.id}" class="cart-row border-b hover:bg-blue-50 transition text-[10px] cursor-pointer">
                                 <td class="px-1 py-1 text-center text-gray-600">${document.querySelectorAll('#carts tr').length + 1}</td>
                                 <td colspan="7" class="leading-normal text-[10px] px-1 py-1 font-semibold text-gray-800">${item.medicine.name}</td>
-                                <td class="px-1 py-1 text-center">${item.medicine.unit}</td>
+                                <td class="px-1 py-1 text-center">${item.medicine.unit || item.medicine.packaging || ''}</td>
                                 <td class="px-1 py-1 text-center">${formatRupiah(item.final_price)}</td>
                                 <td class="px-1 py-1 text-center">${item.quantity}</td>
                                 <td class="px-1 py-1 text-center">${formatRupiah(item.discount)}</td>
@@ -3196,7 +3196,7 @@
                         <td colspan="7" class="leading-normal text-[10px] px-1 py-1 font-semibold text-gray-800">
                             ${item.name}
                         </td>
-                        <td class="px-1 py-1 text-center">${item.unit}</td>
+                        <td class="px-1 py-1 text-center">${item.unit || item.packaging || ''}</td>
                         <td class="px-1 py-1 text-center">${formatRupiah(item_finalprice)}</td>
                         <td class="px-1 py-1 text-center">${item.quantity}</td>
                         <td class="px-1 py-1 text-center">${formatRupiah(item.discount)}</td>
@@ -3408,8 +3408,8 @@
                 final_price = subtotal - item.discount;
                 discount = item.discount;
                 grossprice = subtotal;
-                name.value = item.medicine.name;
-                unit.value = item.medicine.unit;
+                name.value = item.medicine.name || '';
+                unit.value = item.medicine.unit || item.medicine.packaging || '';
                 if (currenttransaction == 'RESEP TUNAI') {
                     dosage.value = item.medicine.dosage;
                     if (dosageRInput || packageInput) {

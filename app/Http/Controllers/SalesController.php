@@ -603,13 +603,14 @@ class SalesController extends Controller
             'medicine_type' => $request->get('medicine_type'),
             'service_fee' => $service,
         ]);
-        $itemInCart = MedicineCart::with('medicine')->where('transaction_id', $transaction->transaction_id)->where('user_id', Auth()->user()->id)->first();
+        $transaction->load('medicine');
 
         return response()->json([
             'id' => $transaction->id,
             'name' => $transaction->medicine->name,
-            'unit' => $itemInCart->medicine->unit,
-            'price' => $itemInCart->medicine->net_price,
+            'unit' => $transaction->medicine->unit,
+            'packaging' => $transaction->medicine->packaging,
+            'price' => $transaction->medicine->net_price,
             'quantity' => $transaction->quantity,
             'discount' => $transaction->discount,
             'total_price' => $transaction->total_price,
