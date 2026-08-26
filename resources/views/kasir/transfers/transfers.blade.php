@@ -59,6 +59,48 @@
             </div>
         @endif
 
+        {{-- Filter & Export --}}
+        <div class="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <form action="{{ route('transfers.incoming') }}" method="GET" class="flex flex-wrap items-end gap-3 flex-1">
+                <div>
+                    <label class="block text-[11px] font-medium text-slate-500 mb-1">Mulai Tanggal</label>
+                    <input type="date" name="start_date" value="{{ request('start_date') }}" class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 outline-none focus:border-indigo-500 transition">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-medium text-slate-500 mb-1">Sampai Tanggal</label>
+                    <input type="date" name="end_date" value="{{ request('end_date') }}" class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 outline-none focus:border-indigo-500 transition">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-medium text-slate-500 mb-1">Cari Obat</label>
+                    <input type="text" name="search" value="{{ request('search') }}" placeholder="Ketik nama obat..." class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 outline-none focus:border-indigo-500 transition w-48">
+                </div>
+                <div class="flex gap-2">
+                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-1.5 rounded-lg text-xs font-semibold transition">
+                        Terapkan
+                    </button>
+                    @if(request()->anyFilled(['start_date', 'end_date', 'search']))
+                        <a href="{{ route('transfers.incoming') }}" class="bg-slate-100 hover:bg-slate-200 text-slate-600 px-4 py-1.5 rounded-lg text-xs font-semibold transition flex items-center">
+                            Reset
+                        </a>
+                    @endif
+                </div>
+            </form>
+
+            <div>
+                <a href="{{ route('transfers.export', request()->all()) }}" class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-xs font-semibold transition shadow-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                        <path d="M14 3v4a1 1 0 0 0 1 1h4" />
+                        <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" />
+                        <path d="M8 11h8v7h-8z" />
+                        <path d="M8 15h8" />
+                        <path d="M11 11v7" />
+                    </svg>
+                    Export Excel
+                </a>
+            </div>
+        </div>
+
         {{-- Tabs --}}
         <div class="flex gap-1 mb-6 bg-slate-100 p-1 rounded-xl w-fit">
             @foreach ([['pending', 'Mutasi Keluar', count($pending)], ['accepted', 'Mutasi Masuk', count($accepted)], ['denied', 'Ditolak', count($denied)]] as [$key, $label, $count])
@@ -97,7 +139,20 @@
                             </span>
                             <span class="text-xs text-slate-400">{{ $transfer->created_at->format('d M Y, H:i') }}</span>
                         </div>
-                        <div class="flex items-center gap-2">
+                        <div class="flex items-center gap-3">
+                            <!-- Transfer Location -->
+                            <div class="flex items-center gap-1.5 px-3 py-1 bg-white border border-slate-200 rounded-lg shadow-sm text-xs hidden sm:flex">
+                                <span class="font-semibold text-slate-700">{{ $transfer->users?->pharmacy?->name ?? '—' }}</span>
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-slate-400" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                    <path d="M5 12l14 0" />
+                                    <path d="M13 18l6 -6" />
+                                    <path d="M13 6l6 6" />
+                                </svg>
+                                <span class="font-semibold text-indigo-600">{{ $transfer->items->first()?->batches?->pharmacy?->name ?? '—' }}</span>
+                            </div>
+                            <div class="hidden sm:block h-4 w-px bg-slate-300"></div>
+                            
                             <span class="text-xs text-slate-500">Oleh: <span
                                     class="font-semibold text-slate-700">{{ $transfer->users?->name ?? '—' }}</span></span>
                             @php
@@ -363,7 +418,7 @@
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-50">
-                                @forelse($transfer->items as $item)
+                                @forelse($transfer->items->where('status', 2) as $item)
                                     <tr class="hover:bg-slate-50/50 transition">
                                         <td class="py-3 px-5">
                                             <div class="font-semibold text-slate-800">

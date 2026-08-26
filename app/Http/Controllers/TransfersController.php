@@ -14,7 +14,8 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Barryvdh\DomPDF\Facade\Pdf;
-
+use Maatwebsite\Excel\Facades\Excel;
+use App\Exports\TransfersExport;
 
 class TransfersController extends Controller
 {
@@ -227,13 +228,28 @@ class TransfersController extends Controller
     public function incomingTransfers()
     {
         $pharmacyId = getActivePharmacyId();
+        $search = request('search');
+        $startDate = request('start_date');
+        $endDate = request('end_date');
+
+        $applyFilters = function ($query) use ($search, $startDate, $endDate) {
+            $query->when($search, function ($q) use ($search) {
+                $q->whereHas('items.batches.medicines', function ($subQ) use ($search) {
+                    $subQ->where('name', 'like', "%{$search}%");
+                });
+            })->when($startDate && $endDate, function ($q) use ($startDate, $endDate) {
+                $q->whereBetween('created_at', [$startDate . ' 00:00:00', $endDate . ' 23:59:59']);
+            });
+        };
 
         $pending = MedicineTransfers::with([
             'items.batches.medicines',
+            'items.batches.pharmacy',
             'items.etalases',
             'users.pharmacy',
         ])
             ->whereHas('users', fn($q) => $q->where('pharmacy_id', $pharmacyId))
+            ->where($applyFilters)
             ->latest()
             ->paginate(10, ['*'], 'pending_page')
             ->withQueryString();
@@ -245,6 +261,7 @@ class TransfersController extends Controller
         ])
             ->whereHas('items.batches', fn($q) => $q->where('pharmacy_id', $pharmacyId))
             ->whereIn('status', [0, 1])
+            ->where($applyFilters)
             ->latest()
             ->paginate(10, ['*'], 'accepted_page')
             ->withQueryString();
@@ -254,16 +271,32 @@ class TransfersController extends Controller
             'items.etalases',
             'users.pharmacy',
         ])
-            ->where('status', 2)
+            ->where(function ($q) {
+                $q->where('status', 2)
+                  ->orWhereHas('items', fn($i) => $i->where('status', 2));
+            })
             ->where(function ($q) use ($pharmacyId) {
                 $q->whereHas('users', fn($u) => $u->where('pharmacy_id', $pharmacyId))
                     ->orWhereHas('items.batches', fn($b) => $b->where('pharmacy_id', $pharmacyId));
             })
+            ->where($applyFilters)
             ->latest()
             ->paginate(10, ['*'], 'denied_page')
             ->withQueryString();
 
         return view('kasir.transfers.transfers', compact('pending', 'accepted', 'denied'));
+    }
+
+    public function exportTransfers(Request $request)
+    {
+        $pharmacyId = getActivePharmacyId();
+        $startDate = $request->start_date;
+        $endDate = $request->end_date;
+        $search = $request->search;
+        $type = $request->type ?? 'semua'; // pending, accepted, denied, semua
+
+        $filename = "Mutasi_Apotek_" . date('Ymd_His') . ".xlsx";
+        return Excel::download(new TransfersExport($pharmacyId, $startDate, $endDate, $search, $type), $filename);
     }
     private function processItemTransferStock($item, $transfer, $now)
     {
@@ -427,6 +460,10 @@ class TransfersController extends Controller
             if ($transfer->items()->where('status', 0)->doesntExist()) {
                 $hasAccepted = $transfer->items()->where('status', 1)->exists();
                 $transfer->update(['status' => $hasAccepted ? 1 : 2]);
+            }
+
+            if ($transfer->status == 2) {
+                return redirect(url()->previous() . '#denied')->with('success', 'Semua item ditolak.');
             }
 
             return redirect(url()->previous() . '#accepted')->with('success', 'Item ditolak.');
