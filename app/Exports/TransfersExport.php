@@ -29,7 +29,17 @@ class TransfersExport implements FromQuery, WithHeadings, WithMapping, ShouldAut
 
     public function query()
     {
-        $query = MedicineTransferItems::with([
+        $query = MedicineTransferItems::query()
+            ->select('medicine_transfer_items.*')
+            ->join('medicine_transfers', 'medicine_transfer_items.medicine_transfer_id', '=', 'medicine_transfers.id')
+            ->join('users', 'medicine_transfers.user_id', '=', 'users.id')
+            ->join('batches', 'medicine_transfer_items.batches_id', '=', 'batches.id');
+
+        if ($this->search) {
+            $query->join('medicines', 'batches.medicine_id', '=', 'medicines.id');
+        }
+
+        $query->with([
             'transfer.users.pharmacy',
             'batches.medicines',
             'batches.pharmacy',
@@ -37,22 +47,21 @@ class TransfersExport implements FromQuery, WithHeadings, WithMapping, ShouldAut
         ]);
 
         if ($this->startDate && $this->endDate) {
-            $query->whereHas('transfer', function($q) {
-                $q->whereBetween('created_at', [$this->startDate . ' 00:00:00', $this->endDate . ' 23:59:59']);
-            });
+            $query->whereBetween('medicine_transfers.created_at', [
+                $this->startDate . ' 00:00:00',
+                $this->endDate . ' 23:59:59'
+            ]);
         }
 
         if ($this->search) {
-            $query->whereHas('batches.medicines', function ($q) {
-                $q->where('name', 'like', "%{$this->search}%");
-            });
+            $query->where('medicines.name', 'like', "%{$this->search}%");
         }
 
         $pharmacyId = $this->pharmacyId;
         
         $query->where(function ($q) use ($pharmacyId) {
-            $q->whereHas('transfer.users', fn($u) => $u->where('pharmacy_id', $pharmacyId))
-              ->orWhereHas('batches', fn($b) => $b->where('pharmacy_id', $pharmacyId));
+            $q->where('users.pharmacy_id', $pharmacyId)
+              ->orWhere('batches.pharmacy_id', $pharmacyId);
         });
 
         // Optimize memory and query speed by ordering by id

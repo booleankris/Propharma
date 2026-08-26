@@ -87,7 +87,7 @@
             </form>
 
             <div>
-                <a href="{{ route('transfers.export', request()->all()) }}" class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-xs font-semibold transition shadow-sm">
+                <a href="{{ route('transfers.export', request()->all()) }}" id="export-excel-btn" class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-xs font-semibold transition shadow-sm">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                         <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
                         <path d="M14 3v4a1 1 0 0 0 1 1h4" />
@@ -96,7 +96,7 @@
                         <path d="M8 15h8" />
                         <path d="M11 11v7" />
                     </svg>
-                    Export Excel
+                    <span>Export Excel</span>
                 </a>
             </div>
         </div>
@@ -497,6 +497,68 @@
             const hash = window.location.hash.replace('#', '');
             const validTabs = ['pending', 'accepted', 'denied'];
             switchTab(validTabs.includes(hash) ? hash : 'pending');
+
+            // Export Loading State
+            const exportBtn = document.getElementById('export-excel-btn');
+            if (exportBtn) {
+                exportBtn.addEventListener('click', async function(e) {
+                    e.preventDefault();
+                    
+                    const originalContent = exportBtn.innerHTML;
+                    exportBtn.innerHTML = `
+                        <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span>Menyiapkan Export...</span>
+                    `;
+                    exportBtn.classList.add('opacity-75', 'cursor-not-allowed', 'pointer-events-none');
+
+                    try {
+                        const response = await fetch(exportBtn.href);
+                        if (!response.ok) throw new Error('Gagal mengunduh');
+                        
+                        const blob = await response.blob();
+                        const url = window.URL.createObjectURL(blob);
+                        
+                        const a = document.createElement('a');
+                        a.style.display = 'none';
+                        a.href = url;
+                        
+                        // Try to parse filename from header
+                        let filename = 'Mutasi_Apotek.xlsx';
+                        const disposition = response.headers.get('content-disposition');
+                        if (disposition && disposition.indexOf('attachment') !== -1) {
+                            const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
+                            const matches = filenameRegex.exec(disposition);
+                            if (matches != null && matches[1]) { 
+                                filename = matches[1].replace(/['"]/g, '');
+                            }
+                        }
+                        
+                        a.download = filename;
+                        document.body.appendChild(a);
+                        a.click();
+                        window.URL.revokeObjectURL(url);
+                        a.remove();
+                        
+                        iziToast.success({
+                            title: 'Berhasil',
+                            message: 'File berhasil diunduh.',
+                            position: 'topRight'
+                        });
+                    } catch (error) {
+                        iziToast.error({
+                            title: 'Gagal',
+                            message: 'Terjadi kesalahan saat mengekspor data.',
+                            position: 'topRight'
+                        });
+                    } finally {
+                        exportBtn.innerHTML = originalContent;
+                        exportBtn.classList.remove('opacity-75', 'cursor-not-allowed', 'pointer-events-none');
+                    }
+                });
+            }
         });
     </script>
 @endsection
