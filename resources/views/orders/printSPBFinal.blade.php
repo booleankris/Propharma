@@ -151,10 +151,6 @@
                     {{-- NO & KEPADA --}}
                     @php
                         $spCode = $creditorItems->first()->order_items_code;
-                        $firstRecItem = $creditorItems->first()->receivingItems->first();
-                        if ($firstRecItem && $firstRecItem->receiving_details && $firstRecItem->receiving_details->sp_code) {
-                            $spCode = $firstRecItem->receiving_details->sp_code;
-                        }
                     @endphp
                     <table style="width:100%; margin-top:2px;">
                         <tr>
@@ -255,10 +251,6 @@
             @foreach ($items as $creditorCode => $items)
                 @php
                     $spCode = $items->first()->order_items_code;
-                    $firstRecItem = $items->first()->receivingItems->first();
-                    if ($firstRecItem && $firstRecItem->receiving_details && $firstRecItem->receiving_details->sp_code) {
-                        $spCode = $firstRecItem->receiving_details->sp_code;
-                    }
                 @endphp
                 <div class="title-main">
                     SURAT PESANAN OBAT MENGANDUNG PREKURSOR FARMASI
@@ -419,10 +411,6 @@
             @foreach ($items as $creditorCode => $items)
                 @php
                     $spCode = $items->first()->order_items_code;
-                    $firstRecItem = $items->first()->receivingItems->first();
-                    if ($firstRecItem && $firstRecItem->receiving_details && $firstRecItem->receiving_details->sp_code) {
-                        $spCode = $firstRecItem->receiving_details->sp_code;
-                    }
                 @endphp
                 <div class="title-main">
                     SURAT PESANAN OBAT-OBAT TERTENTU
@@ -571,10 +559,6 @@
             @foreach ($items as $creditorCode => $items)
                 @php
                     $spCode = $items->first()->order_items_code;
-                    $firstRecItem = $items->first()->receivingItems->first();
-                    if ($firstRecItem && $firstRecItem->receiving_details && $firstRecItem->receiving_details->sp_code) {
-                        $spCode = $firstRecItem->receiving_details->sp_code;
-                    }
                 @endphp
                 <div class="title-main">
                     SURAT PESANAN NARKOTIKA
@@ -717,10 +701,6 @@
             @foreach ($items as $creditorCode => $items)
                 @php
                     $spCode = $items->first()->order_items_code;
-                    $firstRecItem = $items->first()->receivingItems->first();
-                    if ($firstRecItem && $firstRecItem->receiving_details && $firstRecItem->receiving_details->sp_code) {
-                        $spCode = $firstRecItem->receiving_details->sp_code;
-                    }
                 @endphp
                 <div class="title-main">
                     SURAT PESANAN PSIKOTROPIKA
