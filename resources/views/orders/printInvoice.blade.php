@@ -74,7 +74,7 @@
                     <tr>
                         <td>No. Terima</td>
                         <td>:</td>
-                        <td>{{ $invoice->receiving?->code }}</td>
+                        <td>{{ $invoice->receiving_details_code ?? '-' }}</td>
                     </tr>
                     <tr>
                         <td>Tgl. Terima</td>

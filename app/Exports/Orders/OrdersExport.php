@@ -67,12 +67,12 @@ class OrdersExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                 'receiving_items.raw_price as receiving_raw_price',
                 'receiving_items.expired_date',
                 'receiving_details.receiving_id',
+                'receiving_details.receiving_details_code',
                 'receiving_details.invoice_number',
                 'receiving_details.invoice_date',
                 'receiving_details.invoice_due',
                 'receiving_details.invoice_times',
                 'receiving_details.invoice_ppn',
-                'receiving.code as receiving_code',
                 'receiving.updated_at as receiving_updated_at',
                 'receiving_details.created_at as receiving_details_created_at',
                 'order_items.creditor_code',
@@ -161,7 +161,7 @@ class OrdersExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
 
             $rows[] = [
                 $item->id,
-                $item->receiving_code ?? '-',
+                $item->receiving_details_code ?? '-',
                 $tglTerima,
                 $item->creditor_name ?? '-',
                 $item->creditor_code ?? '-',

@@ -57,7 +57,9 @@ class HomeController extends Controller
     }
     public function nearExpiry(Request $request)
     {
-        $items = $this->queryNearExpiry();
+        $medicineId = $request->get('medicine_id');
+
+        $items = $this->queryNearExpiry($medicineId);
 
         $perPage = 10;
         $page = Paginator::resolveCurrentPage() ?: 1;
@@ -71,16 +73,29 @@ class HomeController extends Controller
             ['path' => Paginator::resolveCurrentPath(), 'query' => $request->query()]
         );
 
-        return view('kasir.near-expiry', ['items' => $paginator]);
+        $selectedMedicine = $medicineId
+            ? \App\Models\Medicines::find($medicineId)
+            : null;
+
+        return view('kasir.near-expiry', [
+            'items' => $paginator,
+            'selectedMedicine' => $selectedMedicine,
+        ]);
     }
 
-    private function queryNearExpiry()
+    private function queryNearExpiry($medicineId = null)
     {
-        $items = Batches::query()
+        $query = Batches::query()
             ->with('medicines:id,name,code,unit')
             ->where('pharmacy_id', getActivePharmacyId())
             ->where('stock', '>', 0)
-            ->whereNotNull('expired_date')
+            ->whereNotNull('expired_date');
+
+        if ($medicineId) {
+            $query->where('medicine_id', $medicineId);
+        }
+
+        $items = $query
             ->get()
             ->map(function ($batch) {
                 $batch->expiry_carbon = $this->parseExpiryDate($batch->expired_date);
