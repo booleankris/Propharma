@@ -253,7 +253,7 @@ class OrdersController extends Controller
             ->whereHas('orders', function ($query) use ($pharmacyId) {
                 $query->where('pharmacy_id', $pharmacyId);
             })
-            ->orderBy('order_items_code', 'desc')
+            ->orderByRaw("CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(order_items_code, '/', -1), '-', 1) AS UNSIGNED) DESC")
             ->first();
 
         if ($lastItem && $lastItem->order_items_code) {
