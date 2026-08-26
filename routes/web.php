@@ -398,6 +398,7 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     Route::get('/invoice/print/{id}', [ReceivingController::class, 'printInvoice']);
     Route::put('/receiving-items/{id}', [ReceivingController::class, 'updateReceivingItem'])->name('receiving.updateItem');
     Route::delete('/receiving-items/{id}', [ReceivingController::class, 'deleteReceivingItem'])->name('receiving.deleteItem');
+    Route::delete('/receiving-draft-items/{id}', [ReceivingController::class, 'deleteReceivingDraftItem'])->name('receiving.deleteDraftItem');
     Route::get('/orders/{orderId}/revision', [ReceivingController::class, 'invoiceRevision'])->name('receiving.revision');
 
     // Save Order

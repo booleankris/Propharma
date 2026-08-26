@@ -12,18 +12,17 @@ use App\Models\Order;
 use App\Models\OrderItems;
 use App\Models\Receiving;
 use App\Models\Transfers;
+use App\Services\DotMatrixPrinter;
+use App\Services\SuratPesananFormatter;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use DataTables;
-use Barryvdh\DomPDF\Facade\Pdf;
 use Maatwebsite\Excel\Facades\Excel;
-use App\Services\DotMatrixPrinter;
-use App\Services\SuratPesananFormatter;
+use DataTables;
 
 class OrdersController extends Controller
 {
-
     public function OrderItems(Request $request)
     {
         $creditorId = $request->creditor_id;
@@ -49,31 +48,26 @@ class OrdersController extends Controller
             ->whereHas('orders', function ($q) {
                 $q->where('status', 0)->where('pharmacy_id', getActivePharmacyId());
             })
-
             ->when($creditorId, function ($q) use ($creditorId) {
                 $q->where('creditor_code', $creditorId);
             });
 
         return DataTables::of($query)
-
             ->addColumn(
                 'item_total',
                 fn($data) =>
-                "Rp. " . number_format($data->total)
+                    'Rp. ' . number_format($data->total)
             )
-
             ->addColumn(
                 'item_price',
                 fn($data) =>
-                "Rp. " . number_format($data->price)
+                    'Rp. ' . number_format($data->price)
             )
-
             ->addColumn(
                 'creditors',
                 fn($data) =>
-                $data->creditors->name ?? 'Belum Dipilih'
+                    $data->creditors->name ?? 'Belum Dipilih'
             )
-
             ->addColumn(
                 'discount',
                 function ($data) {
@@ -83,22 +77,22 @@ class OrdersController extends Controller
                     return $mc ? ($mc->discount ?? 0) . '%' : '0%';
                 }
             )
-
             ->escapeColumns([])
             ->make(true);
     }
+
     public function createOrder(Request $request)
     {
         $now = Carbon::now()->format('d/m/Y');
         $check_transaction = Order::where('pharmacy_id', getActivePharmacyId())
-            ->where('status', '0')->first();
+            ->where('status', '0')
+            ->first();
 
         if ($check_transaction) {
-
             $last = Order::where('pharmacy_id', getActivePharmacyId())
                 ->where('status', '0')
                 ->first();
-            
+
             $now = Carbon::now()->format('d/m/Y');
             $last->update(['date' => $now]);
 
@@ -141,17 +135,17 @@ class OrdersController extends Controller
                     'status' => 0,
                 ]);
                 DB::commit();
-                return redirect()->back()->with('message', "Berhasil Menyimpan! ");
+                return redirect()->back()->with('message', 'Berhasil Menyimpan! ');
             } catch (\Exception $e) {
                 DB::rollBack();
-                return redirect()->back()->with('message', "Gagal Menyimpan! " . $e->getMessage());
+                return redirect()->back()->with('message', 'Gagal Menyimpan! ' . $e->getMessage());
             }
         }
-
 
         // if ($check_transaction == 0) {
         // }
     }
+
     public function orderList(Request $request)
     {
         $orderCode = $request->order_id;
@@ -170,34 +164,30 @@ class OrdersController extends Controller
 
         return DataTables::of($items)
             ->addIndexColumn()
-
             ->addColumn('qty_received', function ($row) {
                 return $row->qty_received ?? 0;
             })
-
             ->addColumn('qty_remaining', function ($row) {
                 return max(0, $row->quantity - ($row->qty_received ?? 0));
             })
-
             ->addColumn(
                 'price',
                 fn($row) =>
-                'Rp ' . number_format($row->price, 0, ',', '.')
+                    'Rp ' . number_format($row->price, 0, ',', '.')
             )
             ->addColumn(
                 'price_ppn',
                 fn($row) =>
-
-                'Rp ' . number_format(floor($row->price * 1.11), 0, ',', '.')
+                    'Rp ' . number_format(floor($row->price * 1.11), 0, ',', '.')
             )
             ->addColumn(
                 'total',
                 fn($row) =>
-                'Rp ' . number_format($row->total, 0, ',', '.')
+                    'Rp ' . number_format($row->total, 0, ',', '.')
             )
-
             ->make(true);
     }
+
     public function printOrder($id)
     {
         $order = Order::where('id', $id)->first();
@@ -206,6 +196,7 @@ class OrdersController extends Controller
             $order->code . '.xlsx'
         );
     }
+
     public function getOrdersCode($medicineId, $orderId, $creditorCode = null)
     {
         $medicine = \App\Models\Medicines::findOrFail($medicineId);
@@ -214,26 +205,26 @@ class OrdersController extends Controller
 
         $type = strtoupper($medicine->type);
         $code = '';
-        if ($type == "NARKOTIKA") {
-            $code = "N";
-        } else if ($type == "PSIKOTROPIKA") {
-            $code = "P";
-        } else if ($type == "PREKURSOR") {
-            $code = "PR";
-        } else if ($type == "OBAT-OBAT TERTENTU (OOT)" || $type == "OBAT TERTENTU") {
-            $code = "O";
-        } else if ($type == "REGULER") {
-            $code = "R";
+        if ($type == 'NARKOTIKA') {
+            $code = 'N';
+        } else if ($type == 'PSIKOTROPIKA') {
+            $code = 'P';
+        } else if ($type == 'PREKURSOR') {
+            $code = 'PR';
+        } else if ($type == 'OBAT-OBAT TERTENTU (OOT)' || $type == 'OBAT TERTENTU') {
+            $code = 'O';
+        } else if ($type == 'REGULER') {
+            $code = 'R';
         } else {
-            $code = "R";
+            $code = 'R';
         }
 
-        if ($type !== "NARKOTIKA") {
+        if ($type !== 'NARKOTIKA') {
             $existingItem = \App\Models\OrderItems::where('order_id', $orderId)
                 ->where('creditor_code', $creditorCode)
                 ->whereHas('medicines', function ($query) use ($type) {
-                    if ($type == "OBAT-OBAT TERTENTU (OOT)" || $type == "OBAT TERTENTU") {
-                        $query->whereIn(\Illuminate\Support\Facades\DB::raw('UPPER(type)'), ["OBAT-OBAT TERTENTU (OOT)", "OBAT TERTENTU"]);
+                    if ($type == 'OBAT-OBAT TERTENTU (OOT)' || $type == 'OBAT TERTENTU') {
+                        $query->whereIn(\Illuminate\Support\Facades\DB::raw('UPPER(type)'), ['OBAT-OBAT TERTENTU (OOT)', 'OBAT TERTENTU']);
                     } else {
                         $query->where(\Illuminate\Support\Facades\DB::raw('UPPER(type)'), $type);
                     }
@@ -253,7 +244,7 @@ class OrdersController extends Controller
             ->whereHas('orders', function ($query) use ($pharmacyId) {
                 $query->where('pharmacy_id', $pharmacyId);
             })
-            ->orderByRaw("CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(order_items_code, '/', -1), '-', 1) AS UNSIGNED) DESC")
+            ->orderBy('order_items_code', 'desc')
             ->first();
 
         if ($lastItem && $lastItem->order_items_code) {
@@ -268,6 +259,7 @@ class OrdersController extends Controller
 
         return $prefix . str_pad($nextSerial, 6, '0', STR_PAD_LEFT) . '-' . $pharmacyId;
     }
+
     public function addItemOrder(Request $request)
     {
         $validated = $request->validate([
@@ -308,6 +300,7 @@ class OrdersController extends Controller
             ]
         ]);
     }
+
     public function updateOrderItem(Request $request)
     {
         $request->validate([
@@ -349,6 +342,7 @@ class OrdersController extends Controller
             ]
         ]);
     }
+
     public function deleteOrderItem(Request $request)
     {
         $request->validate([
@@ -372,6 +366,7 @@ class OrdersController extends Controller
             ]
         ]);
     }
+
     public function searchMedicine(Request $request)
     {
         $search = $request->search;
@@ -384,8 +379,6 @@ class OrdersController extends Controller
                 'factory',
                 'creditor'
             ])
-
-
             ->where('medicines.name', 'LIKE', "%{$search}%")
             ->orWhere('medicines.code', 'LIKE', "%{$search}%")
             ->paginate(10);
@@ -410,8 +403,8 @@ class OrdersController extends Controller
     {
         $now = Carbon::now();
 
-        $year = $now->format('y'); // 25
-        $month = $now->format('m'); // 11
+        $year = $now->format('y');  // 25
+        $month = $now->format('m');  // 11
         $prefix = "{$year}{$month}OI";
 
         $lastCode = Order::where('code', 'like', "{$prefix}%")
@@ -427,6 +420,7 @@ class OrdersController extends Controller
 
         return $prefix . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
     }
+
     public function order()
     {
         $now = Carbon::now()->format('d/m/Y');
@@ -434,6 +428,7 @@ class OrdersController extends Controller
 
         return view('orders.order', compact('order_code', 'now'));
     }
+
     public function completeOrder(Request $request)
     {
         $request->validate([
@@ -500,6 +495,7 @@ class OrdersController extends Controller
             ], 500);
         }
     }
+
     public function getCreditors($id)
     {
         $medicine = Medicines::with('creditors')->findOrFail($id);
@@ -516,6 +512,7 @@ class OrdersController extends Controller
             })
         ]);
     }
+
     public function printSPB($orderId)
     {
         try {
@@ -534,13 +531,13 @@ class OrdersController extends Controller
             $pharmacy = $order->pharmacy;
 
             $grouped = $order->order_items->groupBy(function ($item) {
-                $type = $item->medicines->type ?? "Kosong";
+                $type = $item->medicines->type ?? 'Kosong';
                 if (strtoupper($type) === 'NARKOTIKA') {
                     return 'NARKOTIKA_' . $item->id;
                 }
                 return $type;
             })->map(function ($perCreditor) {
-                return $perCreditor->groupBy('creditor_code') ?? "Kosong";
+                return $perCreditor->groupBy('creditor_code') ?? 'Kosong';
             });
 
             $pdf = Pdf::loadView('orders.printSPB', compact('order', 'date', 'grouped', 'pharmacy'))
@@ -568,13 +565,13 @@ class OrdersController extends Controller
             $pharmacy = $order->pharmacy;
 
             $grouped = $order->order_items->groupBy(function ($item) {
-                $type = $item->medicines->type ?? "Kosong";
+                $type = $item->medicines->type ?? 'Kosong';
                 if (strtoupper($type) === 'NARKOTIKA') {
                     return 'NARKOTIKA_' . $item->id;
                 }
                 return $type;
             })->map(function ($perCreditor) {
-                return $perCreditor->groupBy('creditor_code') ?? "Kosong";
+                return $perCreditor->groupBy('creditor_code') ?? 'Kosong';
             });
 
             $text = SuratPesananFormatter::build(
@@ -616,9 +613,9 @@ class OrdersController extends Controller
             ->findOrFail($order_id);
         $grouped = $order->order_items->groupBy('creditor_code');
 
-
         return view('orders.printSPB', compact('grouped'));
     }
+
     public function smartMedicines(Request $request)
     {
         $dateFrom = $request->date_from ?? now()->subDays(30)->format('Y-m-d');
@@ -655,7 +652,6 @@ class OrdersController extends Controller
             ->paginate(20);
 
         $results->getCollection()->transform(function ($row) {
-
             $batchStock = \App\Models\Batches::where('medicine_id', $row->medicine_id)->sum('stock');
 
             $transferStock = \App\Models\MedicineTransferItems::whereHas('batches', function ($q) use ($row) {

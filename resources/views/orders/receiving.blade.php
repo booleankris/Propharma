@@ -1058,10 +1058,16 @@
                     searchable: false,
                     defaultContent: '',
                     render: function (data, type, row) {
-                        if (row.receiving_items && row.receiving_items.id && row.receiving_items.receiving_details_id) {
-                            return `<button type="button" onclick="printSPBFaktur(${row.receiving_items.receiving_details_id}, '${row.creditor_code}')" class="inline-flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-all" title="Cetak SP Faktur Ini"><svg xmlns='http://www.w3.org/2000/svg' class='w-3 h-3' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9V2h12v7'/><path d='M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2'/><rect x='6' y='14' width='12' height='8'/></svg>SP Faktur</button>`;
+                        if (!row.receiving_items || !row.receiving_items.id) {
+                            return '-';
                         }
-                        return '-';
+                        const saved = row.receiving_items.batches_id != null;
+                        let html = '';
+                        if (row.receiving_items.receiving_details_id) {
+                            html += `<button type="button" onclick="printSPBFaktur(${row.receiving_items.receiving_details_id}, '${row.creditor_code}')" class="inline-flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-all" title="Cetak SP Faktur Ini"><svg xmlns='http://www.w3.org/2000/svg' class='w-3 h-3' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9V2h12v7'/><path d='M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2'/><rect x='6' y='14' width='12' height='8'/></svg>SP Faktur</button>`;
+                        }
+                        html += `<button type="button" onclick="deleteDraftItem(${row.receiving_items.id}, ${saved})" class="inline-flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-semibold text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-all" title="Hapus Item"><svg xmlns='http://www.w3.org/2000/svg' class='w-3 h-3' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M3 6h18'/><path d='M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2'/><path d='M10 11v6'/><path d='M14 11v6'/></svg>Hapus</button>`;
+                        return html;
                     }
                 },
                 ],
@@ -1296,13 +1302,25 @@
 
             e.preventDefault();
 
-            const name = selectedRowData.medicines?.name ?? 'item';
+            const receivingItem = selectedRowData.receiving_items;
+            if (!receivingItem || !receivingItem.id) return;
 
-            if (!confirm(`Hapus item "${name}" ?`)) return;
+            deleteDraftItem(receivingItem.id, receivingItem.batches_id != null);
+        });
 
-            axios.post("{{ route('orders.deleteOrderItem') }}", {
-                id: selectedRowData.order_item_id
-            }, {
+        function deleteDraftItem(id, saved) {
+            if (saved) {
+                iziToast.warning({
+                    title: 'Tidak Bisa Dihapus',
+                    message: 'Barang sudah diterima dan disimpan',
+                    position: 'topRight'
+                });
+                return;
+            }
+
+            if (!confirm('Hapus item ini ?')) return;
+
+            axios.delete("{{ route('receiving.deleteDraftItem', ['id' => '__ID__']) }}".replace('__ID__', id), {
                 headers: {
                     'X-CSRF-TOKEN': document
                         .querySelector('meta[name="csrf-token"]')
@@ -1310,15 +1328,24 @@
                 }
             }).then(res => {
                 if (res.data.success) {
+                    iziToast.success({
+                        title: 'Berhasil',
+                        message: res.data.message ?? 'Item berhasil dihapus',
+                        position: 'topRight'
+                    });
                     orderItemsTable.ajax.reload(null, false);
                     selectedRowData = null;
                     selectedRowIndex = null;
                 }
             }).catch(err => {
-                console.error(err);
-                alert('Delete failed');
+                const message = err.response?.data?.message ?? 'Gagal menghapus item';
+                iziToast.error({
+                    title: 'Gagal',
+                    message: message,
+                    position: 'topRight'
+                });
             });
-        });
+        }
 
 
 

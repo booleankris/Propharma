@@ -8,8 +8,8 @@ use App\Models\Creditor;
 use App\Models\ItemsLog;
 use App\Models\MedicinePriceHistory;
 use App\Models\Medicines;
-use App\Models\MedicineTransfers;
 use App\Models\MedicineTransferItems;
+use App\Models\MedicineTransfers;
 use App\Models\Order;
 use App\Models\OrderItems;
 use App\Models\Receiving;
@@ -25,7 +25,6 @@ use Form;
 
 class ReceivingController extends Controller
 {
-
     public function createReceiving(Request $request)
     {
         $now = Carbon::now()->format('d/m/Y');
@@ -46,7 +45,7 @@ class ReceivingController extends Controller
             $order_exist = Order::whereHas('order_items.receivingItems.receiving_details.receiving', function ($q) use ($transaction) {
                 $q->where('id', $transaction->id);
             })
-                ->where('status', '!=', 2) // not yet completed order
+                ->where('status', '!=', 2)  // not yet completed order
                 ->first();
 
             return view('orders.receiving', compact('order_code', 'transaction', 'now', 'order_exist', 'receiving_id'));
@@ -81,6 +80,7 @@ class ReceivingController extends Controller
             }
         }
     }
+
     function generateItemsLogCode()
     {
         $now = Carbon::now();
@@ -111,7 +111,8 @@ class ReceivingController extends Controller
             'order_items.medicines.factory'
         ])
             ->where(function ($q) use ($search) {
-                $q->where('id', 'like', "%{$search}%")
+                $q
+                    ->where('id', 'like', "%{$search}%")
                     ->orWhere('code', 'like', "%{$search}%");
                 $q->where('status', '!=', 2);
             })
@@ -181,7 +182,7 @@ class ReceivingController extends Controller
                     $priceStr = 'Rp ' . number_format(floor($rawPrice / 1.11), 0, ',', '.');
                     $pricePpnStr = 'Rp ' . number_format($rawPrice, 0, ',', '.');
                     $itemTotal = $net;
-                } else { // TANPA
+                } else {  // TANPA
                     $priceStr = 'Rp ' . number_format($rawPrice, 0, ',', '.');
                     $pricePpnStr = 'Rp ' . number_format($rawPrice, 0, ',', '.');
                     $itemTotal = $net;
@@ -222,7 +223,7 @@ class ReceivingController extends Controller
                         $priceStr = 'Rp ' . number_format(floor($activePrice / 1.11), 0, ',', '.');
                         $pricePpnStr = 'Rp ' . number_format($activePrice, 0, ',', '.');
                         $itemTotal = $net;
-                    } else { // TANPA
+                    } else {  // TANPA
                         $priceStr = 'Rp ' . number_format($activePrice, 0, ',', '.');
                         $pricePpnStr = 'Rp ' . number_format($activePrice, 0, ',', '.');
                         $itemTotal = $net;
@@ -254,7 +255,6 @@ class ReceivingController extends Controller
 
     public function searchReceivingDetails(Request $request)
     {
-
         $query = ReceivingDetails::where('id', $request->detail_id)->first();
         $creditor_code = $query->creditor_code;
 
@@ -292,6 +292,7 @@ class ReceivingController extends Controller
     {
         return view('orders.orderhistory');
     }
+
     public function printSPBFinal($orderId)
     {
         ini_set('memory_limit', '512M');
@@ -311,13 +312,13 @@ class ReceivingController extends Controller
         $pharmacy = \App\Models\Pharmacies::find(getActivePharmacyId()) ?? $order->pharmacy;
 
         $grouped = $order->order_items->groupBy(function ($item) {
-            $type = $item->medicines->type ?? "Kosong";
+            $type = $item->medicines->type ?? 'Kosong';
             if (strtoupper($type) === 'NARKOTIKA') {
                 return 'NARKOTIKA_' . $item->id;
             }
             return $type;
         })->map(function ($perCreditor) {
-            return $perCreditor->groupBy('creditor_code') ?? "Kosong";
+            return $perCreditor->groupBy('creditor_code') ?? 'Kosong';
         });
 
         $pdf = Pdf::loadView('orders.printSPBFinal', compact('order', 'date', 'grouped', 'pharmacy'))
@@ -348,13 +349,13 @@ class ReceivingController extends Controller
         $pharmacy = \App\Models\Pharmacies::find(getActivePharmacyId()) ?? $order->pharmacy;
 
         $grouped = $order->order_items->groupBy(function ($item) {
-            $type = $item->medicines->type ?? "Kosong";
+            $type = $item->medicines->type ?? 'Kosong';
             if (strtoupper($type) === 'NARKOTIKA') {
                 return 'NARKOTIKA_' . $item->id;
             }
             return $type;
         })->map(function ($perCreditor) {
-            return $perCreditor->groupBy('creditor_code') ?? "Kosong";
+            return $perCreditor->groupBy('creditor_code') ?? 'Kosong';
         });
 
         $receivingDetail = \App\Models\ReceivingDetails::where('sp_code', $order->order_items->first()->order_items_code)
@@ -370,17 +371,18 @@ class ReceivingController extends Controller
     {
         ini_set('memory_limit', '512M');
         $date = Carbon::now()->translatedFormat('d F Y');
-        
+
         $receivingDetail = \App\Models\ReceivingDetails::findOrFail($receivingDetailsId);
         $creditorCode = $receivingDetail->creditor_code;
 
         $order = Order::with([
             'pharmacy',
             'order_items' => function ($q) use ($creditorCode, $receivingDetailsId) {
-                $q->where('creditor_code', $creditorCode)
-                  ->whereHas('receivingItems', function($q2) use ($receivingDetailsId) {
-                      $q2->where('receiving_details_id', $receivingDetailsId);
-                  });
+                $q
+                    ->where('creditor_code', $creditorCode)
+                    ->whereHas('receivingItems', function ($q2) use ($receivingDetailsId) {
+                        $q2->where('receiving_details_id', $receivingDetailsId);
+                    });
             },
             'order_items.receivingItems' => function ($q) use ($receivingDetailsId) {
                 $q->where('receiving_details_id', $receivingDetailsId);
@@ -397,13 +399,13 @@ class ReceivingController extends Controller
         $pharmacy = \App\Models\Pharmacies::find(getActivePharmacyId()) ?? $order->pharmacy;
 
         $grouped = $order->order_items->groupBy(function ($item) {
-            $type = $item->medicines->type ?? "Kosong";
+            $type = $item->medicines->type ?? 'Kosong';
             if (strtoupper($type) === 'NARKOTIKA') {
                 return 'NARKOTIKA_' . $item->id;
             }
             return $type;
         })->map(function ($perCreditor) {
-            return $perCreditor->groupBy('creditor_code') ?? "Kosong";
+            return $perCreditor->groupBy('creditor_code') ?? 'Kosong';
         });
 
         $pdf = Pdf::loadView('orders.printSPBFinal', compact('order', 'date', 'grouped', 'pharmacy', 'receivingDetail'))
@@ -434,13 +436,13 @@ class ReceivingController extends Controller
         $pharmacy = \App\Models\Pharmacies::find(getActivePharmacyId()) ?? $order->pharmacy;
 
         $grouped = $order->order_items->groupBy(function ($item) {
-            $type = $item->medicines->type ?? "Kosong";
+            $type = $item->medicines->type ?? 'Kosong';
             if (strtoupper($type) === 'NARKOTIKA') {
                 return 'NARKOTIKA_' . $item->id;
             }
             return $type;
         })->map(function ($perCreditor) {
-            return $perCreditor->groupBy('creditor_code') ?? "Kosong";
+            return $perCreditor->groupBy('creditor_code') ?? 'Kosong';
         });
 
         $pdf = Pdf::loadView('orders.printSPBFinal', compact('order', 'date', 'grouped', 'pharmacy'))
@@ -480,7 +482,7 @@ class ReceivingController extends Controller
         ])
             ->findOrFail($receivingId);
 
-        $groupedByPBF = $receiving->receiving_details->groupBy(function($detail) {
+        $groupedByPBF = $receiving->receiving_details->groupBy(function ($detail) {
             return $detail->creditor ? $detail->creditor->name : 'Unknown PBF';
         });
 
@@ -488,6 +490,7 @@ class ReceivingController extends Controller
             ->setPaper('a4', 'landscape')
             ->stream('tanda-penerimaan-barang-' . $receiving->code . '.pdf');
     }
+
     public function gethistory(Request $request)
     {
         $query = MedicinePriceHistory::with(['medicines', 'user'])
@@ -496,7 +499,8 @@ class ReceivingController extends Controller
         if ($request->filled('search_medicine')) {
             $kw = $request->search_medicine;
             $query->whereHas('medicines', function ($q) use ($kw) {
-                $q->where('name', 'like', "%{$kw}%")
+                $q
+                    ->where('name', 'like', "%{$kw}%")
                     ->orWhere('code', 'like', "%{$kw}%");
             });
         }
@@ -546,7 +550,8 @@ class ReceivingController extends Controller
         if ($request->filled('search')) {
             $search = $request->search;
             $items->where(function ($query) use ($search) {
-                $query->where('invoice_date', $search)
+                $query
+                    ->where('invoice_date', $search)
                     ->orWhere('invoice_number', $search)
                     ->orWhereHas('creditor', function ($q) use ($search) {
                         $q->where('name', 'like', "%$search%");
@@ -566,7 +571,7 @@ class ReceivingController extends Controller
                 return Carbon::parse($row->invoice_date)->format('d/m/Y');
             })
             ->addColumn('invoice_number', function ($row) {
-                return $row->invoice_number ?? "-";
+                return $row->invoice_number ?? '-';
             })
             ->addColumn('creditor', function ($row) {
                 return $row->creditor->name;
@@ -611,11 +616,12 @@ class ReceivingController extends Controller
             ->with(['order_items.receivingItems.receiving_details'])
             ->withSum('order_items', 'total')
             ->orderByDesc('id');
-    
+
         if ($request->filled('order_code')) {
             $searchTerm = $request->order_code;
             $items->where(function ($q) use ($searchTerm) {
-                $q->where('code', 'like', '%' . $searchTerm . '%')
+                $q
+                    ->where('code', 'like', '%' . $searchTerm . '%')
                     ->orWhereHas('order_items.receivingItems.receiving_details', function ($q2) use ($searchTerm) {
                         $q2->where('receiving_details_code', 'like', '%' . $searchTerm . '%');
                     });
@@ -627,7 +633,7 @@ class ReceivingController extends Controller
         if ($request->filled('end_date')) {
             $items->whereDate('created_at', '<=', $request->end_date);
         }
-    
+
         // Helper tombol: satu template, warna & label beda-beda lewat parameter.
         // stroke-width 1.75 + w-3.5 h-3.5 dipakai di SEMUA tombol (termasuk Lanjutkan/Terima)
         // supaya ukuran icon konsisten di seluruh kolom aksi.
@@ -638,16 +644,15 @@ class ReceivingController extends Controller
                 . '<span>' . $label . '</span>'
                 . '</a>';
         };
-    
+
         return DataTables::of($items)
             ->addIndexColumn()
             ->addColumn('date', fn($row) => $row->date ? date('d M Y', strtotime($row->updated_at)) : '-')
-    
             // SPB code + badge NT, dibatasi 3 + "+N lainnya" (bagian yang kamu suka, tetap dipertahankan)
             ->addColumn('code', function ($row) {
                 $code = e($row->code ?? '0');
                 $html = '<span style="font-size:10px" class="inline-flex items-center px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 font-nunito-bold tracking-wide border border-slate-200">' . $code . '</span>';
-    
+
                 $codes = collect();
                 if ($row->relationLoaded('order_items')) {
                     $codes = $row->order_items->flatMap(function ($item) {
@@ -656,20 +661,20 @@ class ReceivingController extends Controller
                         });
                     })->filter()->unique()->values();
                 }
-    
+
                 if ($codes->isNotEmpty()) {
                     $visibleLimit = 3;
                     $visible = $codes->take($visibleLimit);
                     $hidden = $codes->slice($visibleLimit);
-    
+
                     // font-size disamakan: 11px, level "sekunder" yang sama buat badge NT & "+N lainnya"
                     $badge = fn($c) => '<span style="font-size:10px" class="inline-flex items-center px-2 py-0.5 rounded font-nunito font-medium bg-blue-50 text-blue-700 border border-blue-200">' . e($c) . '</span>';
-    
+
                     $html .= '<div class="mt-1 flex flex-wrap items-center gap-1">';
                     foreach ($visible as $c) {
                         $html .= $badge($c);
                     }
-    
+
                     if ($hidden->isNotEmpty()) {
                         $html .= '<details class="inline-block align-middle">';
                         $html .= '<summary class="list-none [&::-webkit-details-marker]:hidden inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-500 border border-slate-200 cursor-pointer hover:bg-slate-200">+' . $hidden->count() . ' lainnya</summary>';
@@ -681,29 +686,27 @@ class ReceivingController extends Controller
                     }
                     $html .= '</div>';
                 }
-    
+
                 return $html;
             })
-    
             // Status badge — pakai raw inline style, bukan class Tailwind, supaya warnanya
             // pasti render tanpa tergantung content-scanning/build Tailwind (ini yang bikin
             // titik statusnya sempat tidak muncul sebelumnya)
             ->addColumn('status_order', function ($row) {
                 $variants = [
                     'diterima' => ['label' => 'DITERIMA', 'text' => '#047857', 'bg' => '#ecfdf5', 'border' => '#a7f3d0', 'dot' => '#10b981'],
-                    'dipesan'  => ['label' => 'DIPESAN',  'text' => '#b45309', 'bg' => '#fffbeb', 'border' => '#fde68a', 'dot' => '#f59e0b'],
-                    'pending'  => ['label' => 'PENDING',  'text' => '#be123c', 'bg' => '#fff1f2', 'border' => '#fecdd3', 'dot' => '#f43f5e'],
+                    'dipesan' => ['label' => 'DIPESAN', 'text' => '#b45309', 'bg' => '#fffbeb', 'border' => '#fde68a', 'dot' => '#f59e0b'],
+                    'pending' => ['label' => 'PENDING', 'text' => '#be123c', 'bg' => '#fff1f2', 'border' => '#fecdd3', 'dot' => '#f43f5e'],
                 ];
-    
+
                 $key = $row->status == 3 ? 'diterima' : (in_array($row->status, [1, 2]) ? 'dipesan' : 'pending');
                 $v = $variants[$key];
-    
+
                 return '<span style="display:inline-flex; align-items:center; gap:6px; padding:4px 12px; border-radius:9999px; font-size:12px; font-weight:600; color:' . $v['text'] . '; background-color:' . $v['bg'] . '; border:1px solid ' . $v['border'] . ';">'
                     . '<span style="display:inline-block; width:6px; height:6px; border-radius:9999px; background-color:' . $v['dot'] . ';"></span>'
                     . $v['label']
                     . '</span>';
             })
-    
             // Action buttons — warna balik lagi, icon lebih kecil & konsisten, tanpa glow
             ->addColumn('action', function ($row) use ($actionBtn) {
                 if ($row->status == 0) {
@@ -714,7 +717,7 @@ class ReceivingController extends Controller
                         'text-white bg-blue-600 hover:bg-blue-700 border-blue-600'
                     );
                 }
-    
+
                 if ($row->status == 1 || $row->status == 2) {
                     return $actionBtn(
                         '/receive/' . $row->id,
@@ -723,7 +726,7 @@ class ReceivingController extends Controller
                         'text-white bg-emerald-600 hover:bg-emerald-700 border-emerald-600'
                     );
                 }
-    
+
                 // status == 3 (DITERIMA): tiga aksi, masing-masing warna beda biar cepat dibedain
                 return '<div class="flex items-center gap-2">'
                     . $actionBtn(
@@ -748,15 +751,14 @@ class ReceivingController extends Controller
                     )
                     . '</div>';
             })
-    
             // Total & Total PPN — font-size 13px (sengaja sedikit lebih besar dari 12px karena ini
             // yang paling penting dilihat kasir), no-wrap biar angka gak patah baris
             ->addColumn('total', fn($row) => '<span class="text-[13px] font-semibold text-slate-700 whitespace-nowrap tabular-nums">Rp ' . number_format($row->order_items_sum_total ?? 0, 0, ',', '.') . '</span>')
             ->addColumn('total_ppn', fn($row) => '<span class="text-[13px] font-bold text-slate-900 whitespace-nowrap tabular-nums">Rp ' . number_format(floor(($row->order_items_sum_total ?? 0) * 1.11), 0, ',', '.') . '</span>')
-    
             ->rawColumns(['code', 'status_order', 'action', 'total', 'total_ppn'])
             ->make(true);
     }
+
     function generateReceivingCode()
     {
         $now = Carbon::now();
@@ -802,6 +804,7 @@ class ReceivingController extends Controller
 
         return $prefix . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
     }
+
     public function updateReceivingItem(Request $request, $id)
     {
         $request->validate([
@@ -1022,6 +1025,40 @@ class ReceivingController extends Controller
             ], 500);
         }
     }
+
+    public function deleteReceivingDraftItem($id)
+    {
+        try {
+            DB::beginTransaction();
+
+            $item = ReceivingItems::findOrFail($id);
+
+            if (!is_null($item->batches_id)) {
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Barang sudah diterima dan disimpan, tidak dapat dihapus',
+                ], 422);
+            }
+
+            $item->delete();
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Item berhasil dihapus',
+            ]);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            \Log::error('Delete draft item error', ['message' => $e->getMessage(), 'line' => $e->getLine()]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal menghapus item',
+            ], 500);
+        }
+    }
+
     public function invoiceRevision($orderId)
     {
         $order = Order::with([
@@ -1059,7 +1096,7 @@ class ReceivingController extends Controller
         }
 
         if ($check_order->orders->status == 3) {
-            return redirect()->route('receiving.index')->with('success', "Pesanan Berhasil Diterima");
+            return redirect()->route('receiving.index')->with('success', 'Pesanan Berhasil Diterima');
         }
 
         $creditorOption = OrderItems::where('order_id', $id)
@@ -1110,7 +1147,7 @@ class ReceivingController extends Controller
                     $extraDisc = floatval($rItem->extra_discount ?? 0);
                     $nomDisc = ($disc <= 100 && $disc > 0) ? ($gross * $disc / 100) : $disc;
                     $nomExtraDisc = ($extraDisc <= 100 && $extraDisc > 0) ? ($gross * $extraDisc / 100) : $extraDisc;
-                    
+
                     $detailSubtotal += $gross;
                     $detailDiscount += ($nomDisc + $nomExtraDisc);
                 }
@@ -1125,7 +1162,7 @@ class ReceivingController extends Controller
                     $detailGrandTotal = $detailDpp;
                     $detailHna = floor($detailDpp / 1.11);
                     $detailPpn = $detailGrandTotal - $detailHna;
-                } else { // TANPA
+                } else {  // TANPA
                     $detailPpn = 0;
                     $detailGrandTotal = $detailDpp;
                     $detailHna = $detailDpp;
@@ -1172,7 +1209,7 @@ class ReceivingController extends Controller
                 return redirect()->route('receiving.receive', $id);
             } catch (\Exception $e) {
                 DB::rollBack();
-                return redirect()->back()->with('message', "Gagal Menyimpan! " . $e->getMessage());
+                return redirect()->back()->with('message', 'Gagal Menyimpan! ' . $e->getMessage());
             }
         }
     }
@@ -1198,7 +1235,6 @@ class ReceivingController extends Controller
         ]);
 
         $receiving = Receiving::findOrFail($request->receiving_id);
-
 
         if ($receiving->status == 3) {
             return response()->json([
@@ -1275,7 +1311,7 @@ class ReceivingController extends Controller
                     $extraDisc = floatval($rItem->extra_discount ?? 0);
                     $nomDisc = ($disc <= 100 && $disc > 0) ? ($gross * $disc / 100) : $disc;
                     $nomExtraDisc = ($extraDisc <= 100 && $extraDisc > 0) ? ($gross * $extraDisc / 100) : $extraDisc;
-                    
+
                     $detailSubtotal += $gross;
                     $detailDiscount += ($nomDisc + $nomExtraDisc);
                 }
@@ -1290,7 +1326,7 @@ class ReceivingController extends Controller
                     $detailGrandTotal = $detailDpp;
                     $detailHna = floor($detailDpp / 1.11);
                     $detailPpn = $detailGrandTotal - $detailHna;
-                } else { // TANPA
+                } else {  // TANPA
                     $detailPpn = 0;
                     $detailGrandTotal = $detailDpp;
                     $detailHna = $detailDpp;
@@ -1427,7 +1463,8 @@ class ReceivingController extends Controller
                     $needsSave = true;
                 }
                 if (empty($details->sp_code)) {
-                    $details->sp_code = $this->generateSPCode($receiving->pharmacy_id);
+                    $firstItem = $details->receiving_items->first();
+                    $details->sp_code = $firstItem && $firstItem->order_items ? $firstItem->order_items->order_items_code : $this->generateSPCode($receiving->pharmacy_id);
                     $needsSave = true;
                 }
                 if ($needsSave) {
@@ -1435,7 +1472,8 @@ class ReceivingController extends Controller
                 }
             }
 
-            $receivingItems = $receiving->receiving_details
+            $receivingItems = $receiving
+                ->receiving_details
                 ->pluck('receiving_items')
                 ->flatten()
                 ->whereNull('batches_id')
@@ -1570,7 +1608,7 @@ class ReceivingController extends Controller
             // Check if all order items for this order have been received (status 2)
             $totalOrderItems = OrderItems::where('order_id', $order->id)->count();
             $receivedOrderItems = OrderItems::where('order_id', $order->id)->where('status', 2)->count();
-            
+
             if ($totalOrderItems > 0 && $totalOrderItems === $receivedOrderItems) {
                 $order->update(['status' => 2]);
             }
@@ -1598,6 +1636,7 @@ class ReceivingController extends Controller
             ], 500);
         }
     }
+
     public function completeOrder(Request $request)
     {
         $request->validate([
@@ -1621,7 +1660,8 @@ class ReceivingController extends Controller
 
             $order = Order::findOrFail($request->orderid);
 
-            $receivingItems = $receiving->receiving_details
+            $receivingItems = $receiving
+                ->receiving_details
                 ->pluck('receiving_items')
                 ->flatten();
 
@@ -1665,9 +1705,10 @@ class ReceivingController extends Controller
             ], 500);
         }
     }
+
     private function generateSPCode($pharmacyId)
     {
-        $code = "R";
+        $code = 'R';
         $year = now()->format('y');
         $month = now()->format('m');
         $prefix = "SP-O-{$year}{$month}/";
