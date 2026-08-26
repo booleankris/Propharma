@@ -577,8 +577,8 @@
                     </div>
                     <!-- Tombol Aksi Form Item -->
                     <div class="col-span-2 sm:col-span-2 flex items-end gap-2">
-                        <button onclick="addItem()" type="button"
-                            class="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-blue-700 transition-all focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                        <button onclick="addItem()" type="button" id="confirmItemBtn"
+                            class="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-blue-700 transition-all focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                             </svg>
@@ -712,6 +712,7 @@
         let d_ppn = {{ $d_ppn }};
         let d_total = {{ $d_total }};
         let total_received = '';
+        let isAddingItem = false;
 
         function updateBoxPriceInfo() {
             const boxInfo = document.getElementById('box_price_info');
@@ -1527,6 +1528,7 @@
         });
         invoice_ppn.addEventListener('keydown', function (e) {
             if (e.key === 'Enter') {
+                e.preventDefault();
                 addItem();
             }
         });
@@ -1563,6 +1565,16 @@
         }
 
         function addItem() {
+            if (isAddingItem) return;
+            isAddingItem = true;
+
+            const confirmBtn = document.getElementById('confirmItemBtn');
+            const btnOriginal = confirmBtn ? confirmBtn.innerHTML : '';
+            if (confirmBtn) {
+                confirmBtn.disabled = true;
+                confirmBtn.innerHTML = `<svg class="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Menyimpan...`;
+            }
+
             let finalItemTotal = calculateVisualTotal();
             const payload = {
                 creditor_code: creditor.value,
@@ -1636,6 +1648,13 @@
                         message: message,
                         position: 'topRight'
                     });
+                })
+                .finally(() => {
+                    isAddingItem = false;
+                    if (confirmBtn) {
+                        confirmBtn.disabled = false;
+                        confirmBtn.innerHTML = btnOriginal;
+                    }
                 });
         }
         // NEW: "Simpan" button — posts items to batches, status → 2
@@ -1852,6 +1871,7 @@
         });
         itemstatus.addEventListener('keydown', function (e) {
             if (e.key == 'Enter') {
+                e.preventDefault();
                 addItem();
             }
         });
