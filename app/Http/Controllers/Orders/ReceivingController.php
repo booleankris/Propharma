@@ -202,6 +202,7 @@ class ReceivingController extends Controller
                     'price_ppn' => $pricePpnStr,
                     'total' => 'Rp ' . number_format($itemTotal, 0, ',', '.'),
                     'receiving_items' => null,
+                    'creditor_code' => $creditorCode,
                 ]);
             } else {
                 foreach ($orderItem->receivingItems as $batch) {
@@ -243,6 +244,7 @@ class ReceivingController extends Controller
                         'price_ppn' => $pricePpnStr,
                         'total' => 'Rp ' . number_format($batch->total ? floatval($batch->total) : $itemTotal, 0, ',', '.'),
                         'receiving_items' => $batch,
+                        'creditor_code' => $creditorCode,
                     ]);
                 }
             }

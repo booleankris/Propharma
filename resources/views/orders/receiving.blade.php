@@ -392,7 +392,6 @@
                                 <th class="px-3 py-3 text-center">Diskon</th>
                                 <th class="px-3 py-3 text-center">Extra Diskon</th>
                                 <th class="px-3 py-3 text-center">Diskon Diterima</th>
-                                <th class="px-3 py-3">Lokasi</th>
                                 <th class="px-4 py-3 text-right">Total</th>
                                 <th class="px-3 py-3 text-center">Status</th>
                                 <th class="px-3 py-3 text-center">Aksi</th>
@@ -1040,10 +1039,7 @@
                     data: 'creditor_discount',
                     defaultContent: '0%'
                 },
-                {
-                    data: 'receiving_items.locations.name',
-                    defaultContent: '-'
-                },
+             
                 {
                     data: 'total',
                     defaultContent: 'Rp 0'
@@ -1064,10 +1060,10 @@
                         const saved = row.receiving_items.batches_id != null;
                         let html = '';
                         if (row.receiving_items.receiving_details_id) {
-                            html += `<button type="button" onclick="printSPBFaktur(${row.receiving_items.receiving_details_id}, '${row.creditor_code}')" class="inline-flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-all" title="Cetak SP Faktur Ini"><svg xmlns='http://www.w3.org/2000/svg' class='w-3 h-3' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9V2h12v7'/><path d='M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2'/><rect x='6' y='14' width='12' height='8'/></svg>SP Faktur</button>`;
+                            html += `<button type="button" onclick="printSPBFaktur(${row.receiving_items.receiving_details_id}, '${row.creditor_code}')" class="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 text-[10px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-all w-[120px]" title="Cetak SP Faktur Ini"><svg xmlns='http://www.w3.org/2000/svg' class='w-4 h-4 shrink-0' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9V2h12v7'/><path d='M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2'/><rect x='6' y='14' width='12' height='8'/></svg>SP Faktur</button>`;
                         }
-                        html += `<button type="button" onclick="deleteDraftItem(${row.receiving_items.id}, ${saved})" class="inline-flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-semibold text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-all" title="Hapus Item"><svg xmlns='http://www.w3.org/2000/svg' class='w-3 h-3' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M3 6h18'/><path d='M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2'/><path d='M10 11v6'/><path d='M14 11v6'/></svg>Hapus</button>`;
-                        return html;
+                        html += `<button type="button" onclick="deleteDraftItem(${row.receiving_items.id}, ${saved})" class="inline-flex items-center justify-center gap-1 px-2.5 py-2 text-[10px] font-semibold text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-all w-[70px]" title="Hapus Item"><svg xmlns='http://www.w3.org/2000/svg' class='w-4 h-4 shrink-0' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M3 6h18'/><path d='M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2'/><path d='M10 11v6'/><path d='M14 11v6'/></svg>Hapus</button>`;
+                        return `<div class="flex flex-row gap-1 w-full min-w-[80px]">${html}</div>`;
                     }
                 },
                 ],
