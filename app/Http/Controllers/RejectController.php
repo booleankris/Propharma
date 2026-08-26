@@ -7,6 +7,8 @@ use App\Models\Reject;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use DataTables;
+use App\Models\ExportJob;
+use App\Jobs\ProcessRejectSalesExport;
 
 class RejectController extends Controller
 {
@@ -180,4 +182,40 @@ class RejectController extends Controller
         ]);
     }
     public function postRejection(Request $request) {}
+
+    public function exportReject(Request $request)
+    {
+        $pharmacyId = getActivePharmacyId();
+        $startDate = $request->start_date;
+        $endDate = $request->end_date;
+
+        $job = ExportJob::create([
+            'type' => 'rejects',
+            'status' => 'pending',
+            'progress' => 0
+        ]);
+
+        dispatch(new ProcessRejectSalesExport(
+            $job->id, 
+            $pharmacyId, 
+            $startDate, 
+            $endDate
+        ));
+
+        return response()->json([
+            'job_id' => $job->id,
+            'message' => 'Export started.'
+        ]);
+    }
+
+    public function exportStatus($id)
+    {
+        $job = ExportJob::findOrFail($id);
+
+        return response()->json([
+            'status' => $job->status,
+            'progress' => $job->progress,
+            'file' => $job->file_path ? asset('storage/' . $job->file_path) : null
+        ]);
+    }
 }

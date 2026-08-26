@@ -244,6 +244,8 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     // Sales Reject
     Route::get('/reject', [RejectController::class, 'reject'])->name('sales.reject');
     Route::get('/getreject', [RejectController::class, 'getReject'])->name('sales.getreject');
+    Route::get('/reject/export', [RejectController::class, 'exportReject'])->name('sales.reject.export');
+    Route::get('/reject/export/status/{id}', [RejectController::class, 'exportStatus'])->name('sales.reject.export.status');
     Route::get('reject/searchmedicine', [RejectController::class, 'searchMedicine'])->name('sales.searchmedicine');
     Route::post('reject/additemreject', [RejectController::class, 'addItemReject'])->name('sales.addItemReject');
     Route::put('reject/updateitemreject/{id}', [RejectController::class, 'updateItemReject'])->name('sales.updateItemReject');

@@ -171,9 +171,42 @@
             <div class="relative w-full p-[24px] bg-[#ffffff] rounded-[22px]">
                 <div id="searchWrapper" class="flex gap-5" style="position: relative; width: 100%;">
                     <div class="w-11/12">
-                        <div class="flex items-end justify-between md:block">
-                            <h1 class="text-2xl font-semibold tracking-tight font-poppins text-[#1c1c1c]">Penolakan Barang
-                            </h1>
+                        <div class="flex items-center justify-between mb-4">
+                            <h1 class="text-2xl font-semibold tracking-tight font-poppins text-[#1c1c1c]">Penolakan Barang</h1>
+                            
+                            <!-- Export Controls -->
+                            <div class="flex items-end gap-3">
+                                <div>
+                                    <label class="block text-[11px] font-medium text-slate-500 mb-1">Mulai Tanggal</label>
+                                    <input type="date" id="export_start_date" class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 outline-none focus:border-blue-500 transition">
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-medium text-slate-500 mb-1">Sampai Tanggal</label>
+                                    <input type="date" id="export_end_date" class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 outline-none focus:border-blue-500 transition">
+                                </div>
+                                <div>
+                                    <button type="button" id="export-reject-btn" class="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-1.5 rounded-lg text-xs font-semibold transition shadow-sm h-[32px]">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                            <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                            <path d="M14 3v4a1 1 0 0 0 1 1h4" />
+                                            <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" />
+                                            <path d="M8 11h8v7h-8z" />
+                                            <path d="M8 15h8" />
+                                            <path d="M11 11v7" />
+                                        </svg>
+                                        <span>Export Excel</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- Progress Bar --}}
+                        <div id="progressContainer" class="hidden mb-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm w-full">
+                            <p class="font-semibold text-slate-700 mb-2 text-sm">Export Progress</p>
+                            <div class="w-full bg-slate-200 rounded-full h-3">
+                                <div id="progressBar" class="h-3 bg-emerald-500 rounded-full transition-all duration-300" style="width: 0%;"></div>
+                            </div>
+                            <p id="progressText" class="text-xs mt-2 text-slate-500 font-medium">0%</p>
                         </div>
                         <div class="flex py-2 gap-1">
                             <div>
@@ -975,6 +1008,128 @@
         });
         $('#back').click(function () {
             window.location.href = "{{ route('home') }}";
+        });
+
+        // --- EXPORT QUEUE LOGIC ---
+        document.getElementById('export-reject-btn').addEventListener('click', async function(e) {
+            e.preventDefault();
+            
+            const startDate = document.getElementById('export_start_date').value;
+            const endDate = document.getElementById('export_end_date').value;
+            
+            const exportBtn = this;
+            const originalContent = exportBtn.innerHTML;
+            
+            exportBtn.innerHTML = `
+                <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span>Menyiapkan...</span>
+            `;
+            exportBtn.classList.add('opacity-75', 'cursor-not-allowed', 'pointer-events-none');
+
+            let queryParams = new URLSearchParams();
+            if (startDate) queryParams.append('start_date', startDate);
+            if (endDate) queryParams.append('end_date', endDate);
+            
+            try {
+                const response = await fetch(`{{ route('sales.reject.export') }}?${queryParams.toString()}`, {
+                    headers: { 'Accept': 'application/json' }
+                });
+                
+                if (!response.ok) throw new Error('Gagal memulai export');
+                const data = await response.json();
+                
+                if (data.job_id) {
+                    iziToast.info({
+                        title: 'Memproses',
+                        message: 'Export sedang disiapkan...',
+                        position: 'topRight'
+                    });
+                    document.getElementById('progressContainer').classList.remove('hidden');
+                    pollRejectExportStatus(data.job_id);
+                }
+            } catch (error) {
+                iziToast.error({
+                    title: 'Gagal',
+                    message: 'Terjadi kesalahan saat memulai export.',
+                    position: 'topRight'
+                });
+                resetRejectExportButton();
+            }
+        });
+
+        function resetRejectExportButton() {
+            const exportBtn = document.getElementById('export-reject-btn');
+            exportBtn.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                    <path d="M14 3v4a1 1 0 0 0 1 1h4" />
+                    <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" />
+                    <path d="M8 11h8v7h-8z" />
+                    <path d="M8 15h8" />
+                    <path d="M11 11v7" />
+                </svg>
+                <span>Export Excel</span>
+            `;
+            exportBtn.classList.remove('opacity-75', 'cursor-not-allowed', 'pointer-events-none');
+        }
+
+        function pollRejectExportStatus(jobId) {
+            const progressBar = document.getElementById('progressBar');
+            const progressText = document.getElementById('progressText');
+            
+            let interval = setInterval(() => {
+                fetch(`/reject/export/status/${jobId}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        progressBar.style.width = data.progress + "%";
+                        progressText.innerText = data.progress + "%";
+                        
+                        if (data.status === "completed") {
+                            clearInterval(interval);
+                            iziToast.success({
+                                title: 'Selesai',
+                                message: 'File Excel siap diunduh!',
+                                position: 'topRight'
+                            });
+                            document.getElementById('progressContainer').classList.add('hidden');
+                            progressBar.style.width = "0%";
+                            progressText.innerText = "0%";
+                            resetRejectExportButton();
+                            
+                            // Trigger download
+                            window.location.href = data.file;
+                        } else if (data.status === "failed") {
+                            clearInterval(interval);
+                            iziToast.error({
+                                title: 'Gagal',
+                                message: 'Gagal men-generate file Excel.',
+                                position: 'topRight'
+                            });
+                            document.getElementById('progressContainer').classList.add('hidden');
+                            resetRejectExportButton();
+                        }
+                    })
+                    .catch(err => {
+                        clearInterval(interval);
+                        document.getElementById('progressContainer').classList.add('hidden');
+                        resetRejectExportButton();
+                    });
+            }, 2000);
+        }
+
+        document.getElementById('export_start_date').addEventListener('keydown', function (e) {
+            if (e.key !== 'Enter') return;
+            e.preventDefault();
+            document.getElementById('export_end_date').focus();
+        });
+
+        document.getElementById('export_end_date').addEventListener('keydown', function (e) {
+            if (e.key !== 'Enter') return;
+            e.preventDefault();
+            document.getElementById('export-reject-btn').click();
         });
     </script>
 
