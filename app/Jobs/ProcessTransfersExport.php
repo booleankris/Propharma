@@ -1,0 +1,67 @@
+<?php
+
+namespace App\Jobs;
+
+use App\Models\ExportJob;
+use Maatwebsite\Excel\Facades\Excel;
+use App\Exports\TransfersExport;
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\SerializesModels;
+
+class ProcessTransfersExport implements ShouldQueue
+{
+    use InteractsWithQueue, Queueable, SerializesModels;
+
+    protected $exportJobId;
+    protected $pharmacyId;
+    protected $startDate;
+    protected $endDate;
+    protected $search;
+    protected $type;
+
+    public function __construct($exportJobId, $pharmacyId, $startDate, $endDate, $search, $type)
+    {
+        $this->exportJobId = $exportJobId;
+        $this->pharmacyId = $pharmacyId;
+        $this->startDate = $startDate;
+        $this->endDate = $endDate;
+        $this->search = $search;
+        $this->type = $type;
+    }
+
+    public function handle()
+    {
+        $job = ExportJob::find($this->exportJobId);
+        if (!$job) return;
+
+        $job->update([
+            'status'   => 'processing',
+            'progress' => 10
+        ]);
+
+        $fileName = 'Mutasi_Apotek_' . time() . '.xlsx';
+        $path = 'exports/' . $fileName;
+
+        try {
+            Excel::store(
+                new TransfersExport($this->pharmacyId, $this->startDate, $this->endDate, $this->search, $this->type),
+                $path,
+                'public'
+            );
+
+            $job->update([
+                'status'    => 'completed',
+                'file_path' => $path,
+                'progress'  => 100
+            ]);
+        } catch (\Exception $e) {
+            $job->update([
+                'status'    => 'failed',
+                'progress'  => 0
+            ]);
+            \Log::error("Transfer Export Failed: " . $e->getMessage());
+        }
+    }
+}

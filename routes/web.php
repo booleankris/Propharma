@@ -302,6 +302,7 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     Route::post('/etalases', [TransfersController::class, 'store'])->name('etalases.store');
     Route::put('/etalases/{etalase}', [TransfersController::class, 'update']);
     Route::get('/transfers/export', [TransfersController::class, 'exportTransfers'])->name('transfers.export');
+    Route::get('/transfers/export/status/{id}', [TransfersController::class, 'exportStatus'])->name('transfers.export.status');
     Route::get('/transfers/incoming', [TransfersController::class, 'incomingTransfers'])->name('transfers.incoming');
     Route::post('/transfers/{transfer}/accept', [TransfersController::class, 'acceptTransfer'])->name('transfers.accept');
     Route::post('/transfers/{transfer}/deny', [TransfersController::class, 'denyTransfer'])->name('transfers.deny');

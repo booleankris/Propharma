@@ -101,6 +101,15 @@
             </div>
         </div>
 
+        {{-- Progress Bar --}}
+        <div id="progressContainer" class="hidden mb-6 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <p class="font-semibold text-slate-700 mb-2 text-sm">Export Progress</p>
+            <div class="w-full bg-slate-200 rounded-full h-3">
+                <div id="progressBar" class="h-3 bg-emerald-500 rounded-full transition-all duration-300" style="width: 0%;"></div>
+            </div>
+            <p id="progressText" class="text-xs mt-2 text-slate-500 font-medium">0%</p>
+        </div>
+
         {{-- Tabs --}}
         <div class="flex gap-1 mb-6 bg-slate-100 p-1 rounded-xl w-fit">
             @foreach ([['pending', 'Mutasi Keluar', count($pending)], ['accepted', 'Mutasi Masuk', count($accepted)], ['denied', 'Ditolak', count($denied)]] as [$key, $label, $count])
@@ -515,49 +524,89 @@
                     exportBtn.classList.add('opacity-75', 'cursor-not-allowed', 'pointer-events-none');
 
                     try {
-                        const response = await fetch(exportBtn.href);
-                        if (!response.ok) throw new Error('Gagal mengunduh');
-                        
-                        const blob = await response.blob();
-                        const url = window.URL.createObjectURL(blob);
-                        
-                        const a = document.createElement('a');
-                        a.style.display = 'none';
-                        a.href = url;
-                        
-                        // Try to parse filename from header
-                        let filename = 'Mutasi_Apotek.xlsx';
-                        const disposition = response.headers.get('content-disposition');
-                        if (disposition && disposition.indexOf('attachment') !== -1) {
-                            const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
-                            const matches = filenameRegex.exec(disposition);
-                            if (matches != null && matches[1]) { 
-                                filename = matches[1].replace(/['"]/g, '');
-                            }
-                        }
-                        
-                        a.download = filename;
-                        document.body.appendChild(a);
-                        a.click();
-                        window.URL.revokeObjectURL(url);
-                        a.remove();
-                        
-                        iziToast.success({
-                            title: 'Berhasil',
-                            message: 'File berhasil diunduh.',
-                            position: 'topRight'
+                        const response = await fetch(exportBtn.href, {
+                            headers: { 'Accept': 'application/json' }
                         });
+                        if (!response.ok) throw new Error('Gagal mengunduh');
+                        const data = await response.json();
+                        
+                        if (data.job_id) {
+                            iziToast.info({
+                                title: 'Memproses',
+                                message: 'Export sedang disiapkan...',
+                                position: 'topRight'
+                            });
+                            document.getElementById('progressContainer').classList.remove('hidden');
+                            pollExportStatus(data.job_id);
+                        }
                     } catch (error) {
                         iziToast.error({
                             title: 'Gagal',
-                            message: 'Terjadi kesalahan saat mengekspor data.',
+                            message: 'Terjadi kesalahan saat memulai export.',
                             position: 'topRight'
                         });
-                    } finally {
-                        exportBtn.innerHTML = originalContent;
-                        exportBtn.classList.remove('opacity-75', 'cursor-not-allowed', 'pointer-events-none');
+                        resetExportButton();
                     }
                 });
+
+                function resetExportButton() {
+                    exportBtn.innerHTML = `
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                            <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                            <path d="M14 3v4a1 1 0 0 0 1 1h4" />
+                            <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" />
+                            <path d="M8 11h8v7h-8z" />
+                            <path d="M8 15h8" />
+                            <path d="M11 11v7" />
+                        </svg>
+                        <span>Export Excel</span>
+                    `;
+                    exportBtn.classList.remove('opacity-75', 'cursor-not-allowed', 'pointer-events-none');
+                }
+
+                function pollExportStatus(jobId) {
+                    const progressBar = document.getElementById('progressBar');
+                    const progressText = document.getElementById('progressText');
+                    
+                    let interval = setInterval(() => {
+                        fetch(`/transfers/export/status/${jobId}`)
+                            .then(res => res.json())
+                            .then(data => {
+                                progressBar.style.width = data.progress + "%";
+                                progressText.innerText = data.progress + "%";
+                                
+                                if (data.status === "completed") {
+                                    clearInterval(interval);
+                                    iziToast.success({
+                                        title: 'Selesai',
+                                        message: 'File Excel siap diunduh!',
+                                        position: 'topRight'
+                                    });
+                                    document.getElementById('progressContainer').classList.add('hidden');
+                                    progressBar.style.width = "0%";
+                                    progressText.innerText = "0%";
+                                    resetExportButton();
+                                    
+                                    // Trigger download
+                                    window.location.href = data.file;
+                                } else if (data.status === "failed") {
+                                    clearInterval(interval);
+                                    iziToast.error({
+                                        title: 'Gagal',
+                                        message: 'Gagal men-generate file Excel.',
+                                        position: 'topRight'
+                                    });
+                                    document.getElementById('progressContainer').classList.add('hidden');
+                                    resetExportButton();
+                                }
+                            })
+                            .catch(err => {
+                                clearInterval(interval);
+                                document.getElementById('progressContainer').classList.add('hidden');
+                                resetExportButton();
+                            });
+                    }, 2000);
+                }
             }
         });
     </script>

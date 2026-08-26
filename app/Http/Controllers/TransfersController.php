@@ -16,6 +16,8 @@ use Illuminate\Support\Facades\DB;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\TransfersExport;
+use App\Models\ExportJob;
+use App\Jobs\ProcessTransfersExport;
 
 class TransfersController extends Controller
 {
@@ -295,8 +297,36 @@ class TransfersController extends Controller
         $search = $request->search;
         $type = $request->type ?? 'semua'; // pending, accepted, denied, semua
 
-        $filename = "Mutasi_Apotek_" . date('Ymd_His') . ".xlsx";
-        return Excel::download(new TransfersExport($pharmacyId, $startDate, $endDate, $search, $type), $filename);
+        $job = ExportJob::create([
+            'type' => 'transfers',
+            'status' => 'pending',
+            'progress' => 0
+        ]);
+
+        dispatch(new ProcessTransfersExport(
+            $job->id, 
+            $pharmacyId, 
+            $startDate, 
+            $endDate, 
+            $search, 
+            $type
+        ));
+
+        return response()->json([
+            'job_id' => $job->id,
+            'message' => 'Export started.'
+        ]);
+    }
+
+    public function exportStatus($id)
+    {
+        $job = ExportJob::findOrFail($id);
+
+        return response()->json([
+            'status' => $job->status,
+            'progress' => $job->progress,
+            'file' => $job->file_path ? asset('storage/' . $job->file_path) : null
+        ]);
     }
     private function processItemTransferStock($item, $transfer, $now)
     {
