@@ -566,6 +566,7 @@
         let smartHasMore = true;
         let smartLoading = false;
         let smartRange;
+        let isSubmitting = false;
 
 
         // Setting Initial Transaction Value
@@ -699,11 +700,7 @@
         document.getElementById('note').addEventListener('keydown', function(e) {
             if (e.key !== 'Enter') return;
             e.preventDefault();
-            if (selectedRowData) {
-                updateItem();
-            } else {
-                addItem();
-            }
+            submit_data();
         });
 
         function empyCreditorOption() {
@@ -712,6 +709,9 @@
         }
 
         function submit_data() {
+            if (isSubmitting) return;
+            isSubmitting = true;
+
             if (selectedRowData) {
                 updateItem();
             } else {
@@ -758,11 +758,14 @@
                     }
                 }).catch(err => {
                     console.error(err);
-                    console.log(err.response.data);
+                    console.log(err.response?.data);
 
                     alert('Update failed');
+                }).finally(() => {
+                    isSubmitting = false;
                 });
             }).catch(err => {
+                isSubmitting = false;
                 console.error(err);
                 alert('Gagal menyimpan kreditur!');
             });
@@ -1231,8 +1234,11 @@
                     console.error(err);
                     empyCreditorOption();
                     alert('Isi Form Dengan Benar!');
+                }).finally(() => {
+                    isSubmitting = false;
                 });
             }).catch(err => {
+                isSubmitting = false;
                 console.error(err);
                 alert('Gagal menyimpan kreditur!');
             });

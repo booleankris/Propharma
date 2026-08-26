@@ -299,6 +299,7 @@ class ReceivingController extends Controller
         $order = Order::with([
             'pharmacy',
             'order_items.receivingItems',
+            'order_items.receivingItems.receiving_details',
             'order_items.medicines',
             'order_items.medicines.creditors',
             'order_items.creditors',
@@ -335,6 +336,7 @@ class ReceivingController extends Controller
                 $q->where('creditor_code', $creditorCode);
             },
             'order_items.receivingItems',
+            'order_items.receivingItems.receiving_details',
             'order_items.medicines',
             'order_items.medicines.creditors',
             'order_items.creditors',
@@ -383,6 +385,7 @@ class ReceivingController extends Controller
             'order_items.receivingItems' => function ($q) use ($receivingDetailsId) {
                 $q->where('receiving_details_id', $receivingDetailsId);
             },
+            'order_items.receivingItems.receiving_details',
             'order_items.medicines',
             'order_items.medicines.creditors',
             'order_items.creditors',
@@ -419,6 +422,7 @@ class ReceivingController extends Controller
                 $q->where('id', $orderItemId);
             },
             'order_items.receivingItems',
+            'order_items.receivingItems.receiving_details',
             'order_items.medicines',
             'order_items.medicines.creditors',
             'order_items.creditors',

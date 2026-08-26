@@ -149,10 +149,17 @@
                     <div class="line"></div>
 
                     {{-- NO & KEPADA --}}
+                    @php
+                        $spCode = $creditorItems->first()->order_items_code;
+                        $firstRecItem = $creditorItems->first()->receivingItems->first();
+                        if ($firstRecItem && $firstRecItem->receiving_details && $firstRecItem->receiving_details->sp_code) {
+                            $spCode = $firstRecItem->receiving_details->sp_code;
+                        }
+                    @endphp
                     <table style="width:100%; margin-top:2px;">
                         <tr>
                             <td style="width:50%; vertical-align:top;">
-                                <b>No :</b> {{ $creditorItems->first()->order_items_code }}{{ $chunkIndex > 0 ? ' (Hal '.($chunkIndex+1).')' : '' }}
+                                <b>No :</b> {{ $spCode }}{{ $chunkIndex > 0 ? ' (Hal '.($chunkIndex+1).')' : '' }}
                             </td>
                             <td style="width:50%; text-align:right; font-size: 6px; vertical-align:top;">
                                 <b>Kepada Yth :</b> {{ optional($creditorItems->first()->creditors)->name ?? '-' }}
@@ -246,11 +253,18 @@
             ========================================================== --}}
         @elseif ($type == 'PREKURSOR')
             @foreach ($items as $creditorCode => $items)
+                @php
+                    $spCode = $items->first()->order_items_code;
+                    $firstRecItem = $items->first()->receivingItems->first();
+                    if ($firstRecItem && $firstRecItem->receiving_details && $firstRecItem->receiving_details->sp_code) {
+                        $spCode = $firstRecItem->receiving_details->sp_code;
+                    }
+                @endphp
                 <div class="title-main">
                     SURAT PESANAN OBAT MENGANDUNG PREKURSOR FARMASI
                 </div>
                 <div class="subtitle">
-                    Nomor SP : {{ $items->first()->order_items_code }}
+                    Nomor SP : {{ $spCode }}
                 </div>
 
                 <div class="section-gap">Yang bertanda tangan dibawah ini :</div>
@@ -403,12 +417,19 @@
             ========================================================== --}}
         @elseif ($type == 'Obat Tertentu' || $type == 'OBAT-OBAT TERTENTU (OOT)')
             @foreach ($items as $creditorCode => $items)
+                @php
+                    $spCode = $items->first()->order_items_code;
+                    $firstRecItem = $items->first()->receivingItems->first();
+                    if ($firstRecItem && $firstRecItem->receiving_details && $firstRecItem->receiving_details->sp_code) {
+                        $spCode = $firstRecItem->receiving_details->sp_code;
+                    }
+                @endphp
                 <div class="title-main">
                     SURAT PESANAN OBAT-OBAT TERTENTU
                 </div>
 
                 <div class="subtitle">
-                    Nomor : {{ $items->first()->order_items_code }}
+                    Nomor : {{ $spCode }}
                 </div>
 
                 <div class="section-gap">Yang bertanda tangan dibawah ini :</div>
@@ -548,11 +569,18 @@
             ========================================================== --}}
         @elseif (str_starts_with($type, 'NARKOTIKA'))
             @foreach ($items as $creditorCode => $items)
+                @php
+                    $spCode = $items->first()->order_items_code;
+                    $firstRecItem = $items->first()->receivingItems->first();
+                    if ($firstRecItem && $firstRecItem->receiving_details && $firstRecItem->receiving_details->sp_code) {
+                        $spCode = $firstRecItem->receiving_details->sp_code;
+                    }
+                @endphp
                 <div class="title-main">
                     SURAT PESANAN NARKOTIKA
                 </div>
                 <div class="subtitle">
-                    Nomor : {{ $items->first()->order_items_code }}
+                    Nomor : {{ $spCode }}
                 </div>
 
                 {{-- IDENTITAS --}}
@@ -687,11 +715,18 @@
             ========================================================== --}}
         @elseif ($type == 'Psikotropika' || $type == 'PSIKOTROPIKA')
             @foreach ($items as $creditorCode => $items)
+                @php
+                    $spCode = $items->first()->order_items_code;
+                    $firstRecItem = $items->first()->receivingItems->first();
+                    if ($firstRecItem && $firstRecItem->receiving_details && $firstRecItem->receiving_details->sp_code) {
+                        $spCode = $firstRecItem->receiving_details->sp_code;
+                    }
+                @endphp
                 <div class="title-main">
                     SURAT PESANAN PSIKOTROPIKA
                 </div>
                 <div class="subtitle">
-                    Nomor : {{ $items->first()->order_items_code }}
+                    Nomor : {{ $spCode }}
                 </div>
 
                 {{-- IDENTITAS --}}

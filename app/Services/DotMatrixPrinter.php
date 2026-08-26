@@ -19,8 +19,11 @@ class DotMatrixPrinter
      */
     public static function init(bool $draft = true): string
     {
+        $pageLength = (int) env('DOTMATRIX_PAGE_LENGTH', 44);
+
         return self::ESC . '@'
             . self::ESC . '0'                          // 1/8" line spacing
+            . self::ESC . 'C' . chr($pageLength)       // Set page length (44 lines * 1/8 = 5.5 inches)
             . self::ESC . 'x' . ($draft ? "\x00" : "\x01"); // draft / LQ
     }
 
