@@ -29,17 +29,7 @@ class TransfersExport implements FromQuery, WithHeadings, WithMapping, ShouldAut
 
     public function query()
     {
-        $query = MedicineTransferItems::query()
-            ->select('medicine_transfer_items.*')
-            ->join('medicine_transfers', 'medicine_transfer_items.medicine_transfer_id', '=', 'medicine_transfers.id')
-            ->join('users', 'medicine_transfers.user_id', '=', 'users.id')
-            ->join('batches', 'medicine_transfer_items.batches_id', '=', 'batches.id');
-
-        if ($this->search) {
-            $query->join('medicines', 'batches.medicine_id', '=', 'medicines.id');
-        }
-
-        $query->with([
+        $query = MedicineTransferItems::with([
             'transfer.users.pharmacy',
             'batches.medicines',
             'batches.pharmacy',
@@ -47,21 +37,32 @@ class TransfersExport implements FromQuery, WithHeadings, WithMapping, ShouldAut
         ]);
 
         if ($this->startDate && $this->endDate) {
-            $query->whereBetween('medicine_transfers.created_at', [
-                $this->startDate . ' 00:00:00',
-                $this->endDate . ' 23:59:59'
-            ]);
+            $query->whereIn('medicine_transfer_id', function($q) {
+                $q->select('id')->from('medicine_transfers')
+                  ->whereBetween('created_at', [$this->startDate . ' 00:00:00', $this->endDate . ' 23:59:59']);
+            });
         }
 
         if ($this->search) {
-            $query->where('medicines.name', 'like', "%{$this->search}%");
+            $query->whereIn('batches_id', function($q) {
+                $q->select('id')->from('batches')
+                  ->whereIn('medicine_id', function($q2) {
+                      $q2->select('id')->from('medicines')->where('name', 'like', "%{$this->search}%");
+                  });
+            });
         }
 
         $pharmacyId = $this->pharmacyId;
         
-        $query->where(function ($q) use ($pharmacyId) {
-            $q->where('users.pharmacy_id', $pharmacyId)
-              ->orWhere('batches.pharmacy_id', $pharmacyId);
+        $query->where(function($q) use ($pharmacyId) {
+            $q->whereIn('medicine_transfer_id', function($sub1) use ($pharmacyId) {
+                $sub1->select('id')->from('medicine_transfers')
+                     ->whereIn('user_id', function($sub2) use ($pharmacyId) {
+                         $sub2->select('id')->from('users')->where('pharmacy_id', $pharmacyId);
+                     });
+            })->orWhereIn('batches_id', function($sub3) use ($pharmacyId) {
+                $sub3->select('id')->from('batches')->where('pharmacy_id', $pharmacyId);
+            });
         });
 
         // Optimize memory and query speed by ordering by id
