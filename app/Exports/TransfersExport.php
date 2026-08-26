@@ -93,8 +93,8 @@ class TransfersExport implements FromQuery, WithHeadings, WithMapping, ShouldAut
             2 => 'Ditolak',
         ];
 
-        $senderId = $item->transfer->users->pharmacy_id ?? null;
-        $receiverId = $item->batches->pharmacy_id ?? null;
+        $senderId = $item->transfer?->users?->pharmacy_id ?? null;
+        $receiverId = $item->batches?->pharmacy_id ?? null;
 
         if ($senderId == $this->pharmacyId && $receiverId == $this->pharmacyId) {
             $tipe = 'Internal';
@@ -107,15 +107,15 @@ class TransfersExport implements FromQuery, WithHeadings, WithMapping, ShouldAut
         }
 
         return [
-            $item->transfer->code ?? '-',
+            $item->transfer?->code ?? '-',
             $tipe,
-            $item->transfer->created_at ? $item->transfer->created_at->format('Y-m-d H:i') : '-',
-            $item->transfer->users->pharmacy->name ?? '-',
-            $item->batches->pharmacy->name ?? '-',
-            $item->batches->medicines->code ?? '-',
-            $item->batches->medicines->name ?? '-',
-            $item->batches->name ?? '-',
-            $item->etalases->name ?? '-',
+            $item->transfer?->created_at ? $item->transfer->created_at->format('Y-m-d H:i') : '-',
+            $item->transfer?->users?->pharmacy?->name ?? '-',
+            $item->batches?->pharmacy?->name ?? '-',
+            $item->batches?->medicines?->code ?? '-',
+            $item->batches?->medicines?->name ?? '-',
+            $item->batches?->name ?? '-',
+            $item->etalases?->name ?? '-',
             $item->qty,
             $statusMap[$item->status] ?? '-',
         ];
