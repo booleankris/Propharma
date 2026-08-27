@@ -268,11 +268,12 @@
 
                     {{-- Statcard --}}
                     <div class="mx-2 mt-5 mb-2">
-                        <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+                        <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
+
                             <div
-                                class="flex items-center px-3 py-2.5 sm:px-5 sm:py-3 bg-white border border-slate-100 rounded-[60px] shadow-[0_1px_10px_1px_#347ef52e] hover:shadow-md transition-shadow duration-200">
-                                <div class="p-1.5 rounded-xl bg-indigo-50 text-indigo-600 flex-shrink-0">
-                                    <svg class="h-4 w-4" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"
+                                class="flex items-center gap-3 rounded-2xl border border-gray-100 bg-white px-4 py-3.5 shadow-sm hover:shadow-md transition-shadow">
+                                <div class="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
+                                    <svg class="h-6 w-6" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"
                                         fill="none" stroke-linecap="round" stroke-linejoin="round">
                                         <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                                         <path d="M12 3l8 4.5l0 9l-8 4.5l-8 -4.5l0 -9z" />
@@ -282,17 +283,18 @@
                                         <path d="M16 5.25l-8 4.5" />
                                     </svg>
                                 </div>
-                                <div class="ml-1.5 sm:ml-3 flex flex-col min-w-0">
+                                <div class="min-w-0">
                                     <span
-                                        class="text-[10px] sm:text-xs font-semibold text-gray-400 uppercase tracking-wider truncate">Awal</span>
+                                        class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider truncate">Awal</span>
                                     <span id="stat-before"
-                                        class="text-sm sm:text-[17px] font-bold font-montserrat text-gray-800 leading-none">0</span>
+                                        class="block text-lg font-bold font-montserrat text-gray-800 leading-tight">0</span>
                                 </div>
                             </div>
+
                             <div
-                                class="flex items-center px-3 py-2.5 sm:px-5 sm:py-3 bg-white border border-slate-100 rounded-[60px] shadow-[0_1px_10px_1px_#347ef52e] hover:shadow-md transition-shadow duration-200">
-                                <div class="p-1.5 rounded-xl bg-blue-50 text-blue-600 flex-shrink-0">
-                                    <svg class="h-4 w-4" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"
+                                class="flex items-center gap-3 rounded-2xl border border-gray-100 bg-white px-4 py-3.5 shadow-sm hover:shadow-md transition-shadow">
+                                <div class="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                                    <svg class="h-6 w-6" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"
                                         fill="none" stroke-linecap="round" stroke-linejoin="round">
                                         <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                                         <path d="M6 19m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
@@ -301,37 +303,36 @@
                                         <path d="M6 5l14 1l-1 7h-13" />
                                     </svg>
                                 </div>
-                                <div class="ml-1.5 sm:ml-3 flex flex-col min-w-0">
+                                <div class="min-w-0">
                                     <span
-                                        class="text-[10px] sm:text-xs font-semibold text-gray-400 uppercase tracking-wider truncate">Beli</span>
+                                        class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider truncate">Beli</span>
                                     <span id="stat-bought"
-                                        class="text-sm sm:text-[17px] font-bold font-montserrat text-gray-800 leading-none">0</span>
+                                        class="block text-lg font-bold font-montserrat text-gray-800 leading-tight">0</span>
                                 </div>
                             </div>
+
                             <div
-                                class="flex items-center px-3 py-2.5 sm:px-5 sm:py-3 bg-white border border-slate-100 rounded-[60px] shadow-[0_1px_10px_1px_#347ef52e] hover:shadow-md transition-shadow duration-200">
-                                <div class="p-1.5 rounded-xl bg-rose-50 text-rose-600 flex-shrink-0">
-                                    <svg class="h-4 w-4" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"
+                                class="flex items-center gap-3 rounded-2xl border border-gray-100 bg-white px-4 py-3.5 shadow-sm hover:shadow-md transition-shadow">
+                                <div class="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-600">
+                                    <svg class="h-6 w-6" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"
                                         fill="none" stroke-linecap="round" stroke-linejoin="round">
                                         <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                                         <path d="M9 14l-4 -4l4 -4" />
                                         <path d="M5 10h11a4 4 0 1 1 0 8h-1" />
                                     </svg>
                                 </div>
-                                <div class="ml-1.5 sm:ml-3 flex flex-col min-w-0">
+                                <div class="min-w-0">
                                     <span
-                                        class="text-[10px] sm:text-xs font-semibold text-gray-400 uppercase tracking-wider truncate">RT
-                                        Beli</span>
+                                        class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider truncate">RT Beli</span>
                                     <span id="stat-bought-rt"
-                                        class="text-sm sm:text-[17px] font-bold font-montserrat text-gray-800 leading-none">0</span>
-
+                                        class="block text-lg font-bold font-montserrat text-gray-800 leading-tight">0</span>
                                 </div>
                             </div>
 
                             <div
-                                class="flex items-center px-3 py-2.5 sm:px-5 sm:py-3 bg-white border border-slate-100 rounded-[60px] shadow-[0_1px_10px_1px_#347ef52e] hover:shadow-md transition-shadow duration-200">
-                                <div class="p-1.5 rounded-xl bg-emerald-50 text-emerald-600 flex-shrink-0">
-                                    <svg class="h-4 w-4" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"
+                                class="flex items-center gap-3 rounded-2xl border border-gray-100 bg-white px-4 py-3.5 shadow-sm hover:shadow-md transition-shadow">
+                                <div class="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+                                    <svg class="h-6 w-6" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"
                                         fill="none" stroke-linecap="round" stroke-linejoin="round">
                                         <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                                         <path
@@ -341,17 +342,18 @@
                                         <path d="M6 12l.01 0" />
                                     </svg>
                                 </div>
-                                <div class="ml-1.5 sm:ml-3 flex flex-col min-w-0">
+                                <div class="min-w-0">
                                     <span
-                                        class="text-[10px] sm:text-xs font-semibold text-gray-400 uppercase tracking-wider truncate">Jual</span>
+                                        class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider truncate">Jual</span>
                                     <span id="stat-sold"
-                                        class="text-sm sm:text-[17px] font-bold font-montserrat text-gray-800 leading-none">0</span>
+                                        class="block text-lg font-bold font-montserrat text-gray-800 leading-tight">0</span>
                                 </div>
                             </div>
+
                             <div
-                                class="flex items-center px-3 py-2.5 sm:px-5 sm:py-3 bg-white border border-slate-100 rounded-[60px] shadow-[0_1px_10px_1px_#347ef52e] hover:shadow-md transition-shadow duration-200">
-                                <div class="p-1.5 rounded-xl bg-pink-50 text-pink-600 flex-shrink-0">
-                                    <svg class="h-4 w-4" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"
+                                class="flex items-center gap-3 rounded-2xl border border-gray-100 bg-white px-4 py-3.5 shadow-sm hover:shadow-md transition-shadow">
+                                <div class="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-pink-50 text-pink-600">
+                                    <svg class="h-6 w-6" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"
                                         fill="none" stroke-linecap="round" stroke-linejoin="round">
                                         <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                                         <path
@@ -359,22 +361,59 @@
                                         <path d="M15 14v-2a2 2 0 0 0 -2 -2h-4l2 -2m0 4l-2 -2" />
                                     </svg>
                                 </div>
-                                <div class="ml-1.5 sm:ml-3 flex flex-col min-w-0">
+                                <div class="min-w-0">
                                     <span
-                                        class="text-[10px] sm:text-xs font-semibold text-gray-400 uppercase tracking-wider truncate">RT
-                                        Jual</span>
+                                        class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider truncate">RT Jual</span>
                                     <span id="stat-sold-rt"
-                                        class="text-sm sm:text-[17px] font-bold font-montserrat text-gray-800 leading-none">0</span>
-
+                                        class="block text-lg font-bold font-montserrat text-gray-800 leading-tight">0</span>
                                 </div>
                             </div>
+
                             <div
-                                class="flex items-center px-3 py-2.5 sm:px-5 sm:py-3 bg-white border border-slate-100 rounded-[60px] shadow-[0_1px_10px_1px_#347ef52e] hover:shadow-md transition-shadow duration-200">
-                                <div class="p-1.5 rounded-xl bg-purple-50 text-purple-600 flex-shrink-0">
-                                    <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-                                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                        stroke-linejoin="round"
-                                        class="icon icon-tabler icons-tabler-outline icon-tabler-package">
+                                class="flex items-center gap-3 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3.5 shadow-sm hover:shadow-md transition-shadow">
+                                <div class="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
+                                    <svg class="h-6 w-6" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"
+                                        fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                        <path d="M3 21v-13l9 -4l9 4v13" />
+                                        <path d="M13 13h4v8h-10v-6h6" />
+                                        <path d="M13 21v-9a1 1 0 0 0 -1 -1h-2a1 1 0 0 0 -1 1v3" />
+                                    </svg>
+                                </div>
+                                <div class="min-w-0">
+                                    <span
+                                        class="block text-[11px] font-semibold text-amber-600 uppercase tracking-wider truncate">Stok Gudang</span>
+                                    <span id="stat-storage"
+                                        class="block text-lg font-bold font-montserrat text-gray-800 leading-tight">0</span>
+                                </div>
+                            </div>
+
+                            <div
+                                class="flex items-center gap-3 rounded-2xl border border-cyan-100 bg-cyan-50 px-4 py-3.5 shadow-sm hover:shadow-md transition-shadow">
+                                <div class="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-cyan-100 text-cyan-700">
+                                    <svg class="h-6 w-6" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"
+                                        fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                        <path d="M3 21l18 0" />
+                                        <path d="M5 21v-14a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v14" />
+                                        <path d="M9 21v-5a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v5" />
+                                        <path d="M9 10h.01" />
+                                        <path d="M15 10h.01" />
+                                    </svg>
+                                </div>
+                                <div class="min-w-0">
+                                    <span
+                                        class="block text-[11px] font-semibold text-cyan-700 uppercase tracking-wider truncate">Stok Etalase</span>
+                                    <span id="stat-counter"
+                                        class="block text-lg font-bold font-montserrat text-gray-800 leading-tight">0</span>
+                                </div>
+                            </div>
+
+                            <div
+                                class="flex items-center gap-3 rounded-2xl border border-gray-100 bg-white px-4 py-3.5 shadow-sm hover:shadow-md transition-shadow">
+                                <div class="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
+                                    <svg class="h-6 w-6" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"
+                                        fill="none" stroke-linecap="round" stroke-linejoin="round">
                                         <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                                         <path d="M12 3l8 4.5l0 9l-8 4.5l-8 -4.5l0 -9l8 -4.5" />
                                         <path d="M12 12l8 -4.5" />
@@ -383,11 +422,11 @@
                                         <path d="M16 5.25l-8 4.5" />
                                     </svg>
                                 </div>
-                                <div class="ml-1.5 sm:ml-3 flex flex-col min-w-0">
+                                <div class="min-w-0">
                                     <span
-                                        class="text-[10px] sm:text-xs font-semibold text-gray-400 uppercase tracking-wider truncate">Saldo</span>
+                                        class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider truncate">Saldo</span>
                                     <span id="stat-balance"
-                                        class="text-sm sm:text-[17px] font-bold font-montserrat text-gray-800 leading-none">0</span>
+                                        class="block text-lg font-bold font-montserrat text-gray-800 leading-tight">0</span>
                                 </div>
                             </div>
 
@@ -529,6 +568,8 @@
                     updateStatCard('stat-bought-rt', json.stats.stat_bought_rt);
                     updateStatCard('stat-sold', json.stats.stat_sold);
                     updateStatCard('stat-sold-rt', json.stats.stat_sold_rt);
+                    updateStatCard('stat-storage', json.stats.stat_storage);
+                    updateStatCard('stat-counter', json.stats.stat_counter);
                     // Matches 'stat-saldo' HTML id with 'stat_balance' JSON property
                     updateStatCard('stat-balance', json.stats.stat_balance);
                 }

@@ -186,7 +186,7 @@
                         <div class="flex gap-1">
                             <div class="w-full">
                                 <label class="block text-[14px] font-semibold text-gray-800 mb-1">Code</label>
-                                <input id="code" name="code" readonly
+                                <input id="code" name="code"
                                     class="w-full rounded-lg border border-gray-300 bg-gray-100 px-4 py-2.5 text-[13px]">
                             </div>
                             <div class="w-full">

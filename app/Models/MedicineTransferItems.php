@@ -12,6 +12,7 @@ class MedicineTransferItems extends Model
         'medicine_transfer_id',
         'batches_id',
         'source_batches_id',
+        'source_type',
         'etalases_id',
         'qty',
         'status',

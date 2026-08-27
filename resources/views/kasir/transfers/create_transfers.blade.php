@@ -142,11 +142,12 @@
                     <div id="searchDropdown"
                         class="hidden absolute left-0 right-0 top-full mt-1 z-50 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden w-full">
                         <div
-                            class="grid grid-cols-[28px_1fr_1fr_64px] sm:grid-cols-[32px_1fr_1fr_80px] px-3 sm:px-4 py-2 bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                            class="grid grid-cols-[28px_1fr_1fr_50px_110px] sm:grid-cols-[32px_1fr_1fr_60px_130px] px-3 sm:px-4 py-2 bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                             <span>#</span>
                             <span>Batch</span>
                             <span>Obat</span>
                             <span class="text-right">Stok</span>
+                            <span class="text-right">Sumber</span>
                         </div>
                         <div class="max-h-56 overflow-y-auto divide-y divide-slate-50" id="tableScroll"
                             onscroll="handleScroll()">
@@ -339,7 +340,7 @@
         let stagedBatch = null; // batch just picked, not yet added to cart
         const CART_KEY = 'transfer_cart_{{ auth()->id() ?? 0 }}_{{ getActivePharmacyId() ?? 0 }}';
         let cartItems = JSON.parse(localStorage.getItem(CART_KEY)) ||
-        []; // {batches_id, batchName, medName, unit, stock, qty, etalases_id, etalasesName}
+        []; // {batches_id, batchName, medName, unit, stock, qty, etalases_id, etalasesName, source_type}
         let etalaseList = []; // {id, name}
 
         // ── Search ────────────────────────────────────────────────────────
@@ -376,23 +377,32 @@
                     }
 
                     res.data.forEach((item, i) => {
-                        if (cartItems.some(c => String(c.batches_id) === String(item.id))) return;
+                        const srcType = item.source_type ?? 'gudang';
+                        if (cartItems.some(c => String(c.batches_id) === String(item.id) && c.source_type === srcType)) return;
 
                         const row = document.createElement('div');
                         row.className =
-                            'dropdown-row grid grid-cols-[28px_1fr_1fr_64px] sm:grid-cols-[32px_1fr_1fr_80px] px-3 sm:px-4 py-2.5 text-xs cursor-pointer hover:bg-sky-50 transition items-center border-b border-slate-50';
+                            'dropdown-row grid grid-cols-[28px_1fr_1fr_50px_110px] sm:grid-cols-[32px_1fr_1fr_60px_130px] px-3 sm:px-4 py-2.5 text-xs cursor-pointer hover:bg-sky-50 transition items-center border-b border-slate-50';
                         row.dataset.batchesId = item.id ?? '';
                         row.dataset.batchName = item.batches_name ?? '';
                         row.dataset.medName = item.name ?? '—';
                         row.dataset.medCode = item.medicine_code ?? '—';
                         row.dataset.unit = item.unit ?? '—';
                         row.dataset.stock = item.stock ?? 0;
+                        row.dataset.sourceType = srcType;
+
+                        const isPmi = {{ getActivePharmacyId() == 1 ? 'true' : 'false' }};
+                        const badgeColor = srcType === 'gudang'
+                            ? 'bg-amber-50 text-amber-700 border-amber-200'
+                            : 'bg-violet-50 text-violet-700 border-violet-200';
+                        const badgeLabel = srcType === 'gudang' ? 'Gudang ➝ Pelayanan' : (isPmi ? 'Pelayanan ➝ Gudang' : 'Pelayanan ➝ Cabang');
 
                         row.innerHTML = `
                             <span class="font-mono text-slate-400 text-[10px]">${((page - 1) * (res.per_page || 10)) + i + 1}</span>
                             <span class="font-medium text-slate-700 truncate pr-2">${item.batches_name ?? '—'}</span>
                             <span class="font-nunito-bold text-[#010741] truncate pr-2">${item.name ?? '—'}</span>
                             <span class="text-right"><span class="inline-flex items-center px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 font-mono text-[11px] font-semibold">${item.stock ?? 0}</span></span>
+                            <span class="text-right"><span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border whitespace-nowrap ${badgeColor}">${badgeLabel}</span></span>
                         `;
                         row.addEventListener('click', () => selectBatch(row));
                         container.appendChild(row);
@@ -422,9 +432,12 @@
                 medCode: row.dataset.medCode,
                 unit: row.dataset.unit,
                 stock: parseInt(row.dataset.stock) || 0,
+                source_type: row.dataset.sourceType || 'gudang',
             };
 
-            document.getElementById('searchInput').value = stagedBatch.batchName;
+            const isPmi = {{ getActivePharmacyId() == 1 ? 'true' : 'false' }};
+            const displayLabel = stagedBatch.source_type === 'gudang' ? 'Gudang ➝ Pelayanan' : (isPmi ? 'Pelayanan ➝ Gudang' : 'Pelayanan ➝ Cabang');
+            document.getElementById('searchInput').value = stagedBatch.medName + ' (' + displayLabel + ')';
             hideDropdown();
 
             document.getElementById('stageBatchName').textContent = stagedBatch.batchName;
@@ -504,6 +517,7 @@
                 qty: qty,
                 etalases_id: etId,
                 etalasesName: etName,
+                source_type: stagedBatch.source_type || 'gudang',
             });
 
             saveCart();
@@ -529,8 +543,16 @@
             cartItems.forEach((it, idx) => {
                 const tr = document.createElement('tr');
                 tr.className = 'hover:bg-slate-50/50 transition';
+                const isPmi = {{ getActivePharmacyId() == 1 ? 'true' : 'false' }};
+                const srcBadgeColor = it.source_type === 'gudang'
+                    ? 'bg-amber-50 text-amber-700 border-amber-200'
+                    : 'bg-violet-50 text-violet-700 border-violet-200';
+                const srcBadgeLabel = it.source_type === 'gudang' ? 'Gudang ➝ Pelayanan' : (isPmi ? 'Pelayanan ➝ Gudang' : 'Pelayanan ➝ Cabang');
                 tr.innerHTML = `
-                    <td class="py-3 px-4 font-semibold text-slate-800">${it.batchName}</td>
+                    <td class="py-3 px-4 font-semibold text-slate-800">
+                        ${it.batchName}
+                        <span class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border ${srcBadgeColor}">${srcBadgeLabel}</span>
+                    </td>
                     <td class="py-3 px-4 text-slate-600">${it.medName}</td>
                     <td class="py-3 px-4 text-slate-600">${it.unit}</td>
                     <td class="py-3 px-4"><span class="inline-flex items-center px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 font-mono text-[11px] font-semibold">${it.stock}</span></td>
@@ -703,18 +725,9 @@
 
             let autoSelectedId = selectedId;
             if (!autoSelectedId) {
-                const destSelect = document.getElementById('pharmacySelect');
-                if (destSelect && destSelect.value !== '') {
-                    const destName = destSelect.options[destSelect.selectedIndex].text.toLowerCase();
-                    if (destName.includes('pmi')) {
-                        const otc = etalaseList.find(e => e.name.toLowerCase().includes('otc'));
-                        if (otc) autoSelectedId = otc.id;
-                    } else {
-                        const cabang = etalaseList.find(e => e.name.toLowerCase().includes('apotek cabang') || e.name
-                            .toLowerCase().includes('cabang'));
-                        if (cabang) autoSelectedId = cabang.id;
-                    }
-                }
+                // Default to etalase id 99 ("Apotek Cabang")
+                const defaultEtalase = etalaseList.find(e => e.id == 99);
+                if (defaultEtalase) autoSelectedId = 99;
             }
 
             etalaseList.forEach(e => {
@@ -833,6 +846,7 @@
                     batches_id: it.batches_id,
                     qty: it.qty,
                     etalases_id: it.etalases_id,
+                    source_type: it.source_type || 'gudang',
                 })),
             };
 

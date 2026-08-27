@@ -96,7 +96,7 @@
             <td width="70%">
                 <div style="padding-top:6px"><span class="label">Nomor Terima</span>: {{ $transfer->code }}</div>
                 <div style="padding-top:6px"><span class="label">Apotek Asal</span>: {{ $transfer->users?->pharmacy?->name ?? '—' }}</div>
-                <div style="padding-top:6px"><span class="label">Apotek Tujuan</span>: {{ $transfer->batches?->pharmacy?->name ?? '—' }}</div>
+                <div style="padding-top:6px"><span class="label">Apotek Tujuan</span>: {{ $transfer->items->first()?->batches?->pharmacy?->name ?? '—' }}</div>
             </td>
             <td width="30%" class="date-box">
                 <div>Date:</div>
@@ -111,14 +111,18 @@
         <thead>
             <tr>
                 <th>Item</th>
+                <th>Batch</th>
                 <th class="qty-col">Quantity</th>
             </tr>
         </thead>
         <tbody>
+            @foreach($transfer->items as $item)
             <tr>
-                <td>{{ $transfer->batches?->medicines?->name ?? '—' }}</td>
-                <td class="qty-col">{{ $transfer->stock }}</td>
+                <td>{{ $item->batches?->medicines?->name ?? '—' }}</td>
+                <td>{{ $item->batches?->name ?? '—' }}</td>
+                <td class="qty-col">{{ $item->qty }}</td>
             </tr>
+            @endforeach
         </tbody>
     </table>
 

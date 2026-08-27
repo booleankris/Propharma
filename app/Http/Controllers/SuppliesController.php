@@ -127,19 +127,28 @@ class SuppliesController extends Controller
 
             // Balance calculation: Real-time stock if medicine is selected, otherwise last record's qty_after
             $balance = 0;
+            $storageStock = 0;
+            $counterStock = 0;
+
+            $med = null;
             if ($request->filled('searchMedicine')) {
                 $searchValue = $request->searchMedicine;
                 $med = is_numeric($searchValue)
                     ? Medicines::find($searchValue)
                     : Medicines::where('name', $searchValue)->orWhere('code', $searchValue)->first();
+            }
 
-                if ($med) {
-                    $balance = $this->calculateRealtimeStock($med->id, $pharmacyId, 'total');
-                } else if ($lastRecord) {
-                    $balance = $lastRecord->qty_after;
-                }
+            if ($med) {
+                $storageStock = $this->calculateRealtimeStock($med->id, $pharmacyId, 'storage');
+                $counterStock = $this->calculateRealtimeStock($med->id, $pharmacyId, 'counter');
+                $balance = $storageStock + $counterStock;
             } else if ($lastRecord) {
                 $balance = $lastRecord->qty_after;
+                // Aggregate stock across the active pharmacy when no specific medicine is selected
+                $storageStock = (int) Batches::where('pharmacy_id', $pharmacyId)->sum('stock');
+                $counterStock = (int) MedicineTransferItems::whereHas('batches', function ($b) use ($pharmacyId) {
+                    $b->where('pharmacy_id', $pharmacyId);
+                })->where('status', 1)->sum('qty');
             }
 
             // 5. RETURN DATATABLES RESPONSE
@@ -278,6 +287,8 @@ class SuppliesController extends Controller
                         'stat_bought_rt' => $stats->qty_bought_rt ?? 0,
                         'stat_sold' => $stats->qty_sold ?? 0,
                         'stat_sold_rt' => $stats->qty_sold_rt ?? 0,
+                        'stat_storage' => $storageStock,
+                        'stat_counter' => $counterStock,
                         'stat_balance' => $balance,
                     ]
                 ])
