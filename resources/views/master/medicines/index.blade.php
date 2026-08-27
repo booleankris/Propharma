@@ -185,9 +185,19 @@
                         {{-- CODE + CATEGORY --}}
                         <div class="flex gap-1">
                             <div class="w-full">
-                                <label class="block text-[14px] font-semibold text-gray-800 mb-1">Code</label>
-                                <input id="code" name="code"
-                                    class="w-full rounded-lg border border-gray-300 bg-gray-100 px-4 py-2.5 text-[13px]">
+                                <div class="flex items-center justify-between mb-1">
+                                    <label class="block text-[14px] font-semibold text-gray-800">Code</label>
+                                    <label class="inline-flex items-center gap-1.5 cursor-pointer text-xs text-amber-700 font-semibold hover:text-amber-800 select-none bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                                        <input type="checkbox" id="enable_manual_code" class="w-3.5 h-3.5 text-amber-600 rounded border-gray-300 focus:ring-amber-500">
+                                        <span>Edit Manual</span>
+                                    </label>
+                                </div>
+                                <input id="code" name="code" readonly
+                                    class="w-full rounded-lg border border-gray-300 bg-gray-100 px-4 py-2.5 text-[13px] transition"
+                                    placeholder="Otomatis digenerate sistem">
+                                <p id="code_warning" class="hidden mt-1 text-[11px] text-rose-600 font-semibold leading-tight">
+                                    ⚠️ Bahaya: Mengubah kode secara manual berisiko duplikasi jika kode sudah digunakan obat lain!
+                                </p>
                             </div>
                             <div class="w-full">
                                 <label class="block text-[14px] font-semibold text-gray-800 mb-1">Golongan Obat</label>
@@ -436,10 +446,53 @@
         const pills = document.getElementById('pillContainer');
         const hiddenCreds = document.getElementById('creditor_ids');
 
+        const elCode = document.getElementById('code');
+        const elManualCodeCheck = document.getElementById('enable_manual_code');
+        const elCodeWarning = document.getElementById('code_warning');
+        let originalCode = '';
+
         let selected = new Map();
         let filtered = [];
         let activeIdx = -1;
         let tableData = null;
+
+        function setManualCodeMode(enabled) {
+            if (!elCode || !elManualCodeCheck) return;
+            if (enabled) {
+                elCode.removeAttribute('readonly');
+                elCode.classList.remove('bg-gray-100', 'border-gray-300');
+                elCode.classList.add('bg-white', 'border-amber-400', 'focus:border-amber-500', 'ring-2', 'ring-amber-200');
+                if (elCodeWarning) elCodeWarning.classList.remove('hidden');
+                elManualCodeCheck.checked = true;
+            } else {
+                elCode.setAttribute('readonly', true);
+                elCode.classList.remove('bg-white', 'border-amber-400', 'focus:border-amber-500', 'ring-2', 'ring-amber-200');
+                elCode.classList.add('bg-gray-100', 'border-gray-300');
+                if (elCodeWarning) elCodeWarning.classList.add('hidden');
+                elManualCodeCheck.checked = false;
+            }
+        }
+
+        if (elManualCodeCheck) {
+            elManualCodeCheck.addEventListener('change', function(e) {
+                if (this.checked) {
+                    const ok = confirm(
+                        "⚠️ PERINGATAN BAHAYA:\n\n" +
+                        "Mengubah kode obat secara manual berisiko tinggi menyebabkan duplikasi data kode obat jika kode yang diinput sama dengan obat lain.\n\n" +
+                        "Apakah Anda yakin ingin mengaktifkan edit kode manual?"
+                    );
+                    if (ok) {
+                        setManualCodeMode(true);
+                        elCode.focus();
+                    } else {
+                        this.checked = false;
+                        setManualCodeMode(false);
+                    }
+                } else {
+                    setManualCodeMode(false);
+                }
+            });
+        }
 
         // ════════════════════════════════════════════════
         // PRICE HELPERS
@@ -521,6 +574,10 @@
             elNet.value = 'Rp 0';
             elHet.value = '';
             elRaw.value = '0';
+
+            originalCode = '';
+            setManualCodeMode(false);
+            if (elCode) elCode.value = '';
 
             setMode('add');
             $('#table-data tbody tr').removeClass('active-row');
@@ -676,6 +733,10 @@
                 packCheckbox.checked = row.content !== '1';
             }
 
+            // Code & manual edit reset
+            originalCode = row.code ?? '';
+            setManualCodeMode(false);
+
             // Hidden id
             $('#medicine_id').val(row.id);
         }
@@ -686,6 +747,18 @@
         function handleSubmit() {
             const fd = new FormData(form);
             const id = document.getElementById('medicine_id').value;
+            const currentCode = elCode ? elCode.value.trim() : '';
+
+            // Konfirmasi bahaya jika edit manual aktif atau kode berubah
+            if (elManualCodeCheck && elManualCodeCheck.checked && currentCode !== '') {
+                const proceed = confirm(
+                    "⚠️ KONFIRMASI BAHAYA KODE OBAT:\n\n" +
+                    "Anda akan menyimpan obat dengan kode: '" + currentCode + "'.\n" +
+                    "Pastikan kode ini belum pernah digunakan oleh obat lain agar tidak terjadi duplikasi kode.\n\n" +
+                    "Apakah Anda yakin ingin melanjutkan penyimpanan?"
+                );
+                if (!proceed) return;
+            }
 
             // send cleaned numeric values
             fd.set('generic', document.getElementById('generic_check').checked ? 1 : 0);

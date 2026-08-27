@@ -725,9 +725,24 @@
 
             let autoSelectedId = selectedId;
             if (!autoSelectedId) {
-                // Default to etalase id 99 ("Apotek Cabang")
-                const defaultEtalase = etalaseList.find(e => e.id == 99);
-                if (defaultEtalase) autoSelectedId = 99;
+                const destSelect = document.getElementById('pharmacySelect');
+                let isPmiDest = false;
+                if (destSelect && destSelect.value !== '') {
+                    const destName = destSelect.options[destSelect.selectedIndex]?.text?.toLowerCase() || '';
+                    isPmiDest = destSelect.value == 1 || destName.includes('pmi');
+                } else {
+                    isPmiDest = {{ getActivePharmacyId() == 1 ? 'true' : 'false' }};
+                }
+
+                if (isPmiDest) {
+                    // Default to etalase id 134 ("Gudang") for PMI
+                    const gudangEtalase = etalaseList.find(e => e.id == 134 || e.name.toLowerCase() === 'gudang');
+                    autoSelectedId = gudangEtalase ? gudangEtalase.id : 134;
+                } else {
+                    // Default to etalase id 99 ("Apotek Cabang") for Cabang
+                    const cabangEtalase = etalaseList.find(e => e.id == 99 || e.name.toLowerCase().includes('cabang'));
+                    autoSelectedId = cabangEtalase ? cabangEtalase.id : 99;
+                }
             }
 
             etalaseList.forEach(e => {

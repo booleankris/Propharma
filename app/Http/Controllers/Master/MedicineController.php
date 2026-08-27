@@ -58,6 +58,7 @@ class MedicineController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
+            'code'                 => 'nullable|string|max:255',
             'generic'              => 'nullable|string|max:255',
             'pharmacy_id'          => 'required|integer',
             'medicine_category_id' => 'required|integer',
@@ -89,7 +90,7 @@ class MedicineController extends Controller
 
         // Insert the new medicine record
         $insert = Medicines::create([
-            'code'                 => Medicines::generateCode(),
+            'code'                 => $request->filled('code') ? $request->code : Medicines::generateCode(),
             'barcode'              => $request->barcode,
             'generic'              => $request->generic,
             'pharmacy_id'          => $request->pharmacy_id,
@@ -141,6 +142,7 @@ class MedicineController extends Controller
     {
         // Validation rules
         $request->validate([
+            'code'                 => 'nullable|string|max:255',
             'generic'              => 'nullable|string|max:255',
             'pharmacy_id'          => 'required|integer',
             'medicine_category_id' => 'required|integer',
@@ -174,6 +176,7 @@ class MedicineController extends Controller
 
         // Update the medicine record
         $medicine->update([
+            'code'                 => $request->filled('code') ? $request->code : $medicine->code,
             'barcode'              => $request->barcode,
             'generic'              => $request->generic,
             'pharmacy_id'          => $request->pharmacy_id,
