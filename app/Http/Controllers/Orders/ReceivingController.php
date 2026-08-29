@@ -370,7 +370,7 @@ class ReceivingController extends Controller
                 'isHtml5ParserEnabled' => true,
                 'isRemoteEnabled' => false,
                 'isFontSubsettingEnabled' => true,
-                'dpi' => 72,
+                'dpi' => 96,
                 'defaultFont' => 'sans-serif'
             ]);
 
@@ -453,7 +453,7 @@ class ReceivingController extends Controller
                 'isHtml5ParserEnabled' => true,
                 'isRemoteEnabled' => false,
                 'isFontSubsettingEnabled' => true,
-                'dpi' => 72,
+                'dpi' => 96,
                 'defaultFont' => 'sans-serif'
             ]);
 
@@ -543,7 +543,7 @@ class ReceivingController extends Controller
                 'isHtml5ParserEnabled' => true,
                 'isRemoteEnabled' => false,
                 'isFontSubsettingEnabled' => true,
-                'dpi' => 72,
+                'dpi' => 96,
                 'defaultFont' => 'sans-serif'
             ]);
 
@@ -623,7 +623,7 @@ class ReceivingController extends Controller
                 'isHtml5ParserEnabled' => true,
                 'isRemoteEnabled' => false,
                 'isFontSubsettingEnabled' => true,
-                'dpi' => 72,
+                'dpi' => 96,
                 'defaultFont' => 'sans-serif'
             ]);
 
