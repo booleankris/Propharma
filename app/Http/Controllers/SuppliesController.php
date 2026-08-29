@@ -1282,32 +1282,49 @@ class SuppliesController extends Controller
                 }
             }
 
-            $storageBefore = $canSeeWarehouse ? (int) $batch->stock : 0;
-            $transfer = MedicineTransferItems::where('batches_id', $batch->id)
+            // Resolusi batch khusus Gudang PMI (pharmacy_id = 9) untuk stok gudang
+            $storageBatch = null;
+            if ($canSeeWarehouse) {
+                if ($batch->pharmacy_id == $warehouseId) {
+                    $storageBatch = $batch;
+                } else {
+                    $storageBatch = Batches::firstOrCreate([
+                        'medicine_id' => $request->medicine_id,
+                        'pharmacy_id' => $warehouseId,
+                        'name' => $batch->name,
+                    ], [
+                        'expired_date' => $batch->expired_date ?? now()->addYears(2)->toDateString(),
+                        'stock' => 0,
+                    ]);
+                }
+                $storageBefore = (int) $storageBatch->stock;
+            } else {
+                $storageBefore = 0;
+            }
+
+            // Resolusi batch counter / pelayanan (pharmacy_id = 1 untuk PMI, atau pharmacy_id cabang)
+            $counterBatch = null;
+            if ($batch->pharmacy_id == $counterPharmacyId) {
+                $counterBatch = $batch;
+            } else {
+                $counterBatch = Batches::firstOrCreate([
+                    'medicine_id' => $request->medicine_id,
+                    'pharmacy_id' => $counterPharmacyId,
+                    'name' => $batch->name,
+                ], [
+                    'expired_date' => $batch->expired_date ?? now()->addYears(2)->toDateString(),
+                    'stock' => 0,
+                ]);
+            }
+
+            $transfer = MedicineTransferItems::where('batches_id', $counterBatch->id)
                 ->where('status', 1)
                 ->where(function ($q) {
                     $q->whereNull('source_type')->orWhere('source_type', '!=', 'retur_gudang');
                 })
                 ->first();
 
-            // Jika tidak ditemukan transfer langsung di batch ini dan akun adalah Gudang PMI, cari transfer di batch PMI
-            if (!$transfer && isWarehousePharmacy($pharmacyId)) {
-                $pmiBatch = Batches::where('medicine_id', $request->medicine_id)
-                    ->where('pharmacy_id', 1)
-                    ->where('name', $batch->name)
-                    ->first();
-                if ($pmiBatch) {
-                    $transfer = MedicineTransferItems::where('batches_id', $pmiBatch->id)
-                        ->where('status', 1)
-                        ->where(function ($q) {
-                            $q->whereNull('source_type')->orWhere('source_type', '!=', 'retur_gudang');
-                        })
-                        ->first();
-                }
-            }
-
             $counterBefore = $transfer ? (int) $transfer->qty : 0;
-
             $stockBeforeTotal = $storageBefore + $counterBefore;
 
             $storagePhysic = $canSeeWarehouse ? (int) ($request->stock_physic ?? 0) : $storageBefore;
@@ -1322,13 +1339,19 @@ class SuppliesController extends Controller
             // status 5 = surplus or equal, status 6 = deficit
             $status = $discrepancy >= 0 ? 5 : 6;
 
-            // 2. Update batch storage stock (only if authorized)
-            if ($canSeeWarehouse) {
-                $batch->stock = $storagePhysic;
-                $batch->save();
+            // 2. Update batch storage stock (hanya di batch Gudang PMI pharmacy_id = 9)
+            if ($canSeeWarehouse && $storageBatch) {
+                $storageBatch->stock = $storagePhysic;
+                $storageBatch->save();
+
+                // Jika $batch awal bukan batch gudang (misal pharmacy_id = 1), pastikan batches.stock di apotek bernilai 0
+                if ($batch->id != $storageBatch->id && $batch->pharmacy_id != $warehouseId) {
+                    $batch->stock = 0;
+                    $batch->save();
+                }
             }
 
-            // 3. Update counter stock if input provided
+            // 3. Update counter stock if input provided (hanya di medicine_transfer_items dengan batches_id = counterBatch)
             if ($hasCounterInput) {
                 if ($transfer) {
                     $transfer->qty = $counterPhysic;
@@ -1340,23 +1363,10 @@ class SuppliesController extends Controller
                         'user_id' => auth()->id(),
                     ]);
 
-                    $targetBatchId = $batch->id;
-                    if (isWarehousePharmacy($pharmacyId) && $batch->pharmacy_id != 1) {
-                        $pmiBatch = Batches::firstOrCreate([
-                            'medicine_id' => $request->medicine_id,
-                            'pharmacy_id' => 1,
-                            'name' => $batch->name,
-                        ], [
-                            'expired_date' => $batch->expired_date ?? now()->addYears(2)->toDateString(),
-                            'stock' => 0,
-                        ]);
-                        $targetBatchId = $pmiBatch->id;
-                    }
-
                     MedicineTransferItems::create([
                         'medicine_transfer_id' => $transferHeader->id,
-                        'batches_id' => $targetBatchId,
-                        'source_batches_id' => $batch->id,
+                        'batches_id' => $counterBatch->id,
+                        'source_batches_id' => $storageBatch ? $storageBatch->id : $counterBatch->id,
                         'qty' => $counterPhysic,
                         'status' => 1,
                         'source_type' => 'pelayanan',
@@ -1375,7 +1385,7 @@ class SuppliesController extends Controller
             // 5. Write StockOpname and ItemsLog
             StockOpname::create([
                 'users_id' => auth()->id(),
-                'batches_id' => $batch->id,
+                'batches_id' => $storageBatch ? $storageBatch->id : $batch->id,
                 'stock_physical' => $stockAfterTotal,
                 'stock_discrepancy' => $discrepancy,
                 'stock_total' => $stockAfterTotal,
@@ -1384,7 +1394,7 @@ class SuppliesController extends Controller
             ]);
 
             ItemsLog::create([
-                'batches_id' => $batch->id,
+                'batches_id' => $storageBatch ? $storageBatch->id : $batch->id,
                 'transaction_code' => $this->generateOpnameCode(),
                 'code' => $this->generateItemsLogCode(),
                 'type' => "SO",
@@ -1402,7 +1412,7 @@ class SuppliesController extends Controller
 
             return response()->json([
                 'message' => 'Stock opname berhasil disimpan.',
-                'batch' => $batch->fresh(),
+                'batch' => ($storageBatch ?? $batch)->fresh(),
                 'qty_before' => $stockBeforeTotal,
                 'qty_after' => $stockAfterTotal,
                 'discrepancy' => $discrepancy,
