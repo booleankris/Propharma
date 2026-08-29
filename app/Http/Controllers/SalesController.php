@@ -881,6 +881,7 @@ class SalesController extends Controller
                 ]);
 
                 while ($qty_bought > 0) {
+                    // 1. Cari batch counter dengan stok > 0 (FIFO berdasarkan expired date)
                     $transfer = MedicineTransferItems::join('batches', 'medicine_transfer_items.batches_id', '=', 'batches.id')
                         ->where('batches.medicine_id', $medicine_id)
                         ->where('batches.pharmacy_id', getActivePharmacyId())
@@ -896,6 +897,7 @@ class SalesController extends Controller
                         ->first();
 
                     if (!$transfer) {
+                        // 2. Tidak ada stok > 0, cari batch counter manapun (izinkan minus)
                         $transfer = MedicineTransferItems::join('batches', 'medicine_transfer_items.batches_id', '=', 'batches.id')
                             ->where('batches.medicine_id', $medicine_id)
                             ->where('batches.pharmacy_id', getActivePharmacyId())
@@ -904,25 +906,31 @@ class SalesController extends Controller
                                 $q->whereNull('medicine_transfer_items.source_type')
                                   ->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang');
                             })
-                            ->where('medicine_transfer_items.qty', '>', 0)
                             ->orderBy('batches.expired_date', 'desc')
                             ->lockForUpdate()
                             ->select('medicine_transfer_items.*')
                             ->first();
 
                         if (!$transfer) {
-                            throw new \Exception("Stok counter tidak ditemukan untuk obat: {$medicine->name}.");
+                            // 3. Tidak ada transfer item sama sekali, skip deduction counter
+                            \Log::warning("Stok counter tidak ditemukan untuk obat: {$medicine->name} (ID: {$medicine_id}). Penjualan tetap diproses dengan stok minus.");
+                            break;
                         }
-                    }
 
-                    if ($transfer->qty >= $qty_bought) {
+                        // Kurangi langsung semua sisa qty ke batch ini (akan jadi minus)
                         $transfer->qty -= $qty_bought;
                         $transfer->save();
                         $qty_bought = 0;
                     } else {
-                        $qty_bought -= $transfer->qty;
-                        $transfer->qty = 0;
-                        $transfer->save();
+                        if ($transfer->qty >= $qty_bought) {
+                            $transfer->qty -= $qty_bought;
+                            $transfer->save();
+                            $qty_bought = 0;
+                        } else {
+                            $qty_bought -= $transfer->qty;
+                            $transfer->qty = 0;
+                            $transfer->save();
+                        }
                     }
                 }
 
