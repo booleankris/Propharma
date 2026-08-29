@@ -520,6 +520,11 @@ class OrdersController extends Controller
         try {
             set_time_limit(0);
             ini_set('memory_limit', '-1');
+
+            // Release session lock early — prevents blocking other requests from same user
+            if (session()->isStarted()) {
+                session()->save();
+            }
             $date = Carbon::now()->translatedFormat('d F Y');
             $order = Order::with([
                 'pharmacy',
