@@ -581,14 +581,21 @@ class OrdersController extends Controller
                     'defaultFont' => 'sans-serif'
                 ]);
 
-            if (ob_get_level() > 0) {
+            $pdfContent = $pdf->output();
+
+            // Flush ALL output buffers aggressively to prevent stray bytes
+            while (ob_get_level() > 0) {
                 ob_end_clean();
             }
 
-            return response($pdf->output(), 200, [
+            // Write to temp file first, then serve — eliminates intermittent stream corruption
+            $tmpFile = tempnam(sys_get_temp_dir(), 'spb_') . '.pdf';
+            file_put_contents($tmpFile, $pdfContent);
+
+            return response()->file($tmpFile, [
                 'Content-Type' => 'application/pdf',
                 'Content-Disposition' => "inline; filename=\"SPB-{$order->code}.pdf\"",
-            ]);
+            ])->deleteFileAfterSend(true);
         } catch (\Throwable $e) {
             \Log::error('Print SPB Error: ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine());
             return response('<h3>Error Mencetak SPB:</h3><p><b>' . htmlspecialchars($e->getMessage()) . '</b> di <code>' . htmlspecialchars($e->getFile()) . ':' . $e->getLine() . '</code></p>', 500, ['Content-Type' => 'text/html; charset=UTF-8']);

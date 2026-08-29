@@ -311,8 +311,8 @@ class ReceivingController extends Controller
 
     public function printSPBFinal($orderId)
     {
-        set_time_limit(300);
-        ini_set('memory_limit', '1024M');
+        set_time_limit(0);
+        ini_set('memory_limit', '-1');
         $date = Carbon::now()->translatedFormat('d F Y');
         $order = Order::with([
             'pharmacy',
@@ -372,20 +372,22 @@ class ReceivingController extends Controller
                 'defaultFont' => 'sans-serif'
             ]);
 
-        if (ob_get_level() > 0) {
-            ob_end_clean();
-        }
+        $pdfContent = $pdf->output();
+        while (ob_get_level() > 0) { ob_end_clean(); }
 
-        return response($pdf->output(), 200, [
+        $tmpFile = tempnam(sys_get_temp_dir(), 'spbf_') . '.pdf';
+        file_put_contents($tmpFile, $pdfContent);
+
+        return response()->file($tmpFile, [
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => "inline; filename=\"SPBFINAL-{$order->code}.pdf\"",
-        ]);
+        ])->deleteFileAfterSend(true);
     }
 
     public function printSPBFinalByCreditor($orderId, $creditorCode)
     {
-        set_time_limit(300);
-        ini_set('memory_limit', '1024M');
+        set_time_limit(0);
+        ini_set('memory_limit', '-1');
         $date = Carbon::now()->translatedFormat('d F Y');
         $order = Order::with([
             'pharmacy',
@@ -451,20 +453,22 @@ class ReceivingController extends Controller
                 'defaultFont' => 'sans-serif'
             ]);
 
-        if (ob_get_level() > 0) {
-            ob_end_clean();
-        }
+        $pdfContent = $pdf->output();
+        while (ob_get_level() > 0) { ob_end_clean(); }
 
-        return response($pdf->output(), 200, [
+        $tmpFile = tempnam(sys_get_temp_dir(), 'spbfc_') . '.pdf';
+        file_put_contents($tmpFile, $pdfContent);
+
+        return response()->file($tmpFile, [
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => "inline; filename=\"SPBFINAL-{$order->code}-{$creditorCode}.pdf\"",
-        ]);
+        ])->deleteFileAfterSend(true);
     }
 
     public function printSPBFinalByFaktur($orderId, $receivingDetailsId)
     {
-        set_time_limit(300);
-        ini_set('memory_limit', '1024M');
+        set_time_limit(0);
+        ini_set('memory_limit', '-1');
         $date = Carbon::now()->translatedFormat('d F Y');
 
         $receivingDetail = \App\Models\ReceivingDetails::findOrFail($receivingDetailsId);
@@ -537,20 +541,22 @@ class ReceivingController extends Controller
                 'defaultFont' => 'sans-serif'
             ]);
 
-        if (ob_get_level() > 0) {
-            ob_end_clean();
-        }
+        $pdfContent = $pdf->output();
+        while (ob_get_level() > 0) { ob_end_clean(); }
 
-        return response($pdf->output(), 200, [
+        $tmpFile = tempnam(sys_get_temp_dir(), 'spbff_') . '.pdf';
+        file_put_contents($tmpFile, $pdfContent);
+
+        return response()->file($tmpFile, [
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => "inline; filename=\"SPBFINAL-{$order->code}-{$creditorCode}-FAKTUR.pdf\"",
-        ]);
+        ])->deleteFileAfterSend(true);
     }
 
     public function printSPBFinalByItem($orderId, $orderItemId)
     {
-        set_time_limit(300);
-        ini_set('memory_limit', '1024M');
+        set_time_limit(0);
+        ini_set('memory_limit', '-1');
         $date = Carbon::now()->translatedFormat('d F Y');
         $order = Order::with([
             'pharmacy',
@@ -613,14 +619,16 @@ class ReceivingController extends Controller
                 'defaultFont' => 'sans-serif'
             ]);
 
-        if (ob_get_level() > 0) {
-            ob_end_clean();
-        }
+        $pdfContent = $pdf->output();
+        while (ob_get_level() > 0) { ob_end_clean(); }
 
-        return response($pdf->output(), 200, [
+        $tmpFile = tempnam(sys_get_temp_dir(), 'spbi_') . '.pdf';
+        file_put_contents($tmpFile, $pdfContent);
+
+        return response()->file($tmpFile, [
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => "inline; filename=\"SPBFINAL-{$order->code}-item-{$orderItemId}.pdf\"",
-        ]);
+        ])->deleteFileAfterSend(true);
     }
 
     public function printOrders($orderId)
