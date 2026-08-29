@@ -267,7 +267,7 @@
             2) PREKURSOR
             ========================================================== --}}
         @elseif ($type == 'PREKURSOR')
-            @foreach ($items as $creditorCode => $items)
+            @foreach ($items as $creditorCode => $creditorItems)
                 @if (!$isFirstPage)
                     <div style="page-break-before: always;"></div>
                 @endif
@@ -277,7 +277,7 @@
                     SURAT PESANAN OBAT MENGANDUNG PREKURSOR FARMASI
                 </div>
                 <div class="subtitle">
-                    Nomor SP : {{ $items->first()->order_items_code }}
+                    Nomor SP : {{ $creditorItems->first()->order_items_code }}
                 </div>
 
                 <div class="section-gap">Yang bertanda tangan dibawah ini :</div>
@@ -309,21 +309,21 @@
                         <td style="width:60px;">Nama PBF</td>
                         <td style="width:8px;">:</td>
                         <td class="dotted">
-                            <b>{{ optional($items->first()->creditors)->name ?? '-' }}</b>
+                            <b>{{ optional($creditorItems->first()->creditors)->name ?? '-' }}</b>
                         </td>
                     </tr>
                     <tr>
                         <td>Alamat</td>
                         <td>:</td>
                         <td class="dotted">
-                            {{ optional($items->first()->creditors)->address ?? '-' }}
+                            {{ optional($creditorItems->first()->creditors)->address ?? '-' }}
                         </td>
                     </tr>
                     <tr>
                         <td>No. Telp.</td>
                         <td>:</td>
                         <td class="dotted">
-                            {{ optional($items->first()->creditors)->phone ?? '-' }}
+                            {{ optional($creditorItems->first()->creditors)->phone ?? '-' }}
                         </td>
                     </tr>
                 </table>
@@ -345,7 +345,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach ($items as $index => $row)
+                        @foreach ($creditorItems as $index => $row)
                             <tr>
                                 <td style="text-align:center;">{{ $index + 1 }}</td>
                                 <td style="text-align:left;">{{ $row->medicines->name ?? '-' }}</td>
@@ -360,7 +360,7 @@
                             </tr>
                         @endforeach
 
-                        @for ($i = count($items); $i < 8; $i++)
+                        @for ($i = count($creditorItems); $i < 8; $i++)
                             <tr>
                                 <td>&nbsp;</td>
                                 <td></td>

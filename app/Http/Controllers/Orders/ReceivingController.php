@@ -363,7 +363,14 @@ class ReceivingController extends Controller
                 'defaultFont' => 'sans-serif'
             ]);
 
-        return $pdf->stream("SPBFINAL-{$order->code}.pdf");
+        if (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+
+        return response($pdf->output(), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => "inline; filename=\"SPBFINAL-{$order->code}.pdf\"",
+        ]);
     }
 
     public function printSPBFinalByCreditor($orderId, $creditorCode)
@@ -426,7 +433,14 @@ class ReceivingController extends Controller
                 'defaultFont' => 'sans-serif'
             ]);
 
-        return $pdf->stream("SPBFINAL-{$order->code}-{$creditorCode}.pdf");
+        if (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+
+        return response($pdf->output(), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => "inline; filename=\"SPBFINAL-{$order->code}-{$creditorCode}.pdf\"",
+        ]);
     }
 
     public function printSPBFinalByFaktur($orderId, $receivingDetailsId)
@@ -496,7 +510,14 @@ class ReceivingController extends Controller
                 'defaultFont' => 'sans-serif'
             ]);
 
-        return $pdf->stream("SPBFINAL-{$order->code}-{$creditorCode}-FAKTUR.pdf");
+        if (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+
+        return response($pdf->output(), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => "inline; filename=\"SPBFINAL-{$order->code}-{$creditorCode}-FAKTUR.pdf\"",
+        ]);
     }
 
     public function printSPBFinalByItem($orderId, $orderItemId)
@@ -556,7 +577,14 @@ class ReceivingController extends Controller
                 'defaultFont' => 'sans-serif'
             ]);
 
-        return $pdf->stream("SPBFINAL-{$order->code}-item-{$orderItemId}.pdf");
+        if (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+
+        return response($pdf->output(), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => "inline; filename=\"SPBFINAL-{$order->code}-item-{$orderItemId}.pdf\"",
+        ]);
     }
 
     public function printOrders($orderId)

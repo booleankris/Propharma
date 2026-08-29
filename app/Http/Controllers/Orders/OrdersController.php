@@ -568,9 +568,17 @@ class OrdersController extends Controller
                     'defaultFont' => 'sans-serif'
                 ]);
 
-            return $pdf->stream("SPB-{$order->code}.pdf");
+            if (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+
+            return response($pdf->output(), 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => "inline; filename=\"SPB-{$order->code}.pdf\"",
+            ]);
         } catch (\Throwable $e) {
-            dd($e->getMessage(), $e->getFile(), $e->getLine());
+            \Log::error('Print SPB Error: ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine());
+            abort(500, 'Gagal mencetak SPB: ' . $e->getMessage());
         }
     }
 
