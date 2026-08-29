@@ -311,7 +311,8 @@ class ReceivingController extends Controller
 
     public function printSPBFinal($orderId)
     {
-        ini_set('memory_limit', '512M');
+        set_time_limit(300);
+        ini_set('memory_limit', '1024M');
         $date = Carbon::now()->translatedFormat('d F Y');
         $order = Order::with([
             'pharmacy',
@@ -339,15 +340,36 @@ class ReceivingController extends Controller
             return $perCreditor->groupBy('creditor_code') ?? 'Kosong';
         });
 
-        $pdf = Pdf::loadView('orders.printSPBFinal', compact('order', 'date', 'grouped', 'pharmacy'))
-            ->setPaper('A7', 'portrait');
+        $logoPath = $pharmacy->logo && file_exists(public_path('img/' . $pharmacy->logo))
+            ? public_path('img/' . $pharmacy->logo)
+            : public_path('img/logo-shb.png');
+        $logoBase64 = file_exists($logoPath)
+            ? 'data:image/' . pathinfo($logoPath, PATHINFO_EXTENSION) . ';base64,' . base64_encode(file_get_contents($logoPath))
+            : null;
+
+        $sigPath = $pharmacy->signature && file_exists(public_path('img/' . $pharmacy->signature))
+            ? public_path('img/' . $pharmacy->signature)
+            : null;
+        $signatureBase64 = $sigPath && file_exists($sigPath)
+            ? 'data:image/' . pathinfo($sigPath, PATHINFO_EXTENSION) . ';base64,' . base64_encode(file_get_contents($sigPath))
+            : null;
+
+        $pdf = Pdf::loadView('orders.printSPBFinal', compact('order', 'date', 'grouped', 'pharmacy', 'logoBase64', 'signatureBase64'))
+            ->setPaper('A7', 'portrait')
+            ->setOptions([
+                'isHtml5ParserEnabled' => true,
+                'isRemoteEnabled' => true,
+                'dpi' => 96,
+                'defaultFont' => 'sans-serif'
+            ]);
 
         return $pdf->stream("SPBFINAL-{$order->code}.pdf");
     }
 
     public function printSPBFinalByCreditor($orderId, $creditorCode)
     {
-        ini_set('memory_limit', '512M');
+        set_time_limit(300);
+        ini_set('memory_limit', '1024M');
         $date = Carbon::now()->translatedFormat('d F Y');
         $order = Order::with([
             'pharmacy',
@@ -381,15 +403,36 @@ class ReceivingController extends Controller
         $receivingDetail = \App\Models\ReceivingDetails::where('sp_code', $order->order_items->first()->order_items_code)
             ->first();
 
-        $pdf = Pdf::loadView('orders.printSPBFinal', compact('order', 'date', 'grouped', 'pharmacy', 'receivingDetail'))
-            ->setPaper('A7', 'portrait');
+        $logoPath = $pharmacy->logo && file_exists(public_path('img/' . $pharmacy->logo))
+            ? public_path('img/' . $pharmacy->logo)
+            : public_path('img/logo-shb.png');
+        $logoBase64 = file_exists($logoPath)
+            ? 'data:image/' . pathinfo($logoPath, PATHINFO_EXTENSION) . ';base64,' . base64_encode(file_get_contents($logoPath))
+            : null;
+
+        $sigPath = $pharmacy->signature && file_exists(public_path('img/' . $pharmacy->signature))
+            ? public_path('img/' . $pharmacy->signature)
+            : null;
+        $signatureBase64 = $sigPath && file_exists($sigPath)
+            ? 'data:image/' . pathinfo($sigPath, PATHINFO_EXTENSION) . ';base64,' . base64_encode(file_get_contents($sigPath))
+            : null;
+
+        $pdf = Pdf::loadView('orders.printSPBFinal', compact('order', 'date', 'grouped', 'pharmacy', 'receivingDetail', 'logoBase64', 'signatureBase64'))
+            ->setPaper('A7', 'portrait')
+            ->setOptions([
+                'isHtml5ParserEnabled' => true,
+                'isRemoteEnabled' => true,
+                'dpi' => 96,
+                'defaultFont' => 'sans-serif'
+            ]);
 
         return $pdf->stream("SPBFINAL-{$order->code}-{$creditorCode}.pdf");
     }
 
     public function printSPBFinalByFaktur($orderId, $receivingDetailsId)
     {
-        ini_set('memory_limit', '512M');
+        set_time_limit(300);
+        ini_set('memory_limit', '1024M');
         $date = Carbon::now()->translatedFormat('d F Y');
 
         $receivingDetail = \App\Models\ReceivingDetails::findOrFail($receivingDetailsId);
@@ -430,15 +473,36 @@ class ReceivingController extends Controller
             return $perCreditor->groupBy('creditor_code') ?? 'Kosong';
         });
 
-        $pdf = Pdf::loadView('orders.printSPBFinal', compact('order', 'date', 'grouped', 'pharmacy', 'receivingDetail'))
-            ->setPaper('A7', 'portrait');
+        $logoPath = $pharmacy->logo && file_exists(public_path('img/' . $pharmacy->logo))
+            ? public_path('img/' . $pharmacy->logo)
+            : public_path('img/logo-shb.png');
+        $logoBase64 = file_exists($logoPath)
+            ? 'data:image/' . pathinfo($logoPath, PATHINFO_EXTENSION) . ';base64,' . base64_encode(file_get_contents($logoPath))
+            : null;
+
+        $sigPath = $pharmacy->signature && file_exists(public_path('img/' . $pharmacy->signature))
+            ? public_path('img/' . $pharmacy->signature)
+            : null;
+        $signatureBase64 = $sigPath && file_exists($sigPath)
+            ? 'data:image/' . pathinfo($sigPath, PATHINFO_EXTENSION) . ';base64,' . base64_encode(file_get_contents($sigPath))
+            : null;
+
+        $pdf = Pdf::loadView('orders.printSPBFinal', compact('order', 'date', 'grouped', 'pharmacy', 'receivingDetail', 'logoBase64', 'signatureBase64'))
+            ->setPaper('A7', 'portrait')
+            ->setOptions([
+                'isHtml5ParserEnabled' => true,
+                'isRemoteEnabled' => true,
+                'dpi' => 96,
+                'defaultFont' => 'sans-serif'
+            ]);
 
         return $pdf->stream("SPBFINAL-{$order->code}-{$creditorCode}-FAKTUR.pdf");
     }
 
     public function printSPBFinalByItem($orderId, $orderItemId)
     {
-        ini_set('memory_limit', '512M');
+        set_time_limit(300);
+        ini_set('memory_limit', '1024M');
         $date = Carbon::now()->translatedFormat('d F Y');
         $order = Order::with([
             'pharmacy',
@@ -469,8 +533,28 @@ class ReceivingController extends Controller
             return $perCreditor->groupBy('creditor_code') ?? 'Kosong';
         });
 
-        $pdf = Pdf::loadView('orders.printSPBFinal', compact('order', 'date', 'grouped', 'pharmacy'))
-            ->setPaper('A7', 'portrait');
+        $logoPath = $pharmacy->logo && file_exists(public_path('img/' . $pharmacy->logo))
+            ? public_path('img/' . $pharmacy->logo)
+            : public_path('img/logo-shb.png');
+        $logoBase64 = file_exists($logoPath)
+            ? 'data:image/' . pathinfo($logoPath, PATHINFO_EXTENSION) . ';base64,' . base64_encode(file_get_contents($logoPath))
+            : null;
+
+        $sigPath = $pharmacy->signature && file_exists(public_path('img/' . $pharmacy->signature))
+            ? public_path('img/' . $pharmacy->signature)
+            : null;
+        $signatureBase64 = $sigPath && file_exists($sigPath)
+            ? 'data:image/' . pathinfo($sigPath, PATHINFO_EXTENSION) . ';base64,' . base64_encode(file_get_contents($sigPath))
+            : null;
+
+        $pdf = Pdf::loadView('orders.printSPBFinal', compact('order', 'date', 'grouped', 'pharmacy', 'logoBase64', 'signatureBase64'))
+            ->setPaper('A7', 'portrait')
+            ->setOptions([
+                'isHtml5ParserEnabled' => true,
+                'isRemoteEnabled' => true,
+                'dpi' => 96,
+                'defaultFont' => 'sans-serif'
+            ]);
 
         return $pdf->stream("SPBFINAL-{$order->code}-item-{$orderItemId}.pdf");
     }
