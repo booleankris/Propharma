@@ -523,7 +523,7 @@
                             @foreach ($chunkItems as $index => $row)
                                 @php
                                     $komposisi =
-                                        $row->medicines->component ?: $row->medicines->composition->name ?? '-';
+                                        $row->medicines->component ?: (optional($row->medicines->composition)->name ?? '-');
                                     $bentukKekuatan = trim(
                                         ($row->medicines->unit ?: $row->medicines->packaging ?: '') .
                                             ' ' .
@@ -677,7 +677,7 @@
                     <tbody>
                         @foreach ($creditorItems as $index => $row)
                             @php
-                                $komposisi = $row->medicines->component ?: $row->medicines->composition->name ?? '-';
+                                $komposisi = $row->medicines->component ?: (optional($row->medicines->composition)->name ?? '-');
                                 $bentukKekuatan = trim(
                                     ($row->medicines->unit ?: $row->medicines->packaging ?: '') .
                                         ' ' .
@@ -835,7 +835,7 @@
                             @foreach ($chunkItems as $index => $row)
                                 @php
                                     $komposisi =
-                                        $row->medicines->component ?: $row->medicines->composition->name ?? '-';
+                                        $row->medicines->component ?: (optional($row->medicines->composition)->name ?? '-');
                                     $bentukKekuatan = trim(
                                         ($row->medicines->unit ?: $row->medicines->packaging ?: '') .
                                             ' ' .

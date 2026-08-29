@@ -536,13 +536,22 @@ class OrdersController extends Controller
             $pharmacy = \App\Models\Pharmacies::find($targetPharmacyId) ?? $order->pharmacy;
 
             $grouped = $order->order_items->groupBy(function ($item) {
-                $type = $item->medicines->type ?? 'Kosong';
-                if (strtoupper($type) === 'NARKOTIKA') {
+                $rawType = strtoupper(trim($item->medicines->type ?? 'REGULER'));
+                if ($rawType === 'NARKOTIKA') {
                     return 'NARKOTIKA_' . $item->id;
                 }
-                return $type;
+                if ($rawType === 'PREKURSOR') {
+                    return 'PREKURSOR';
+                }
+                if ($rawType === 'PSIKOTROPIKA') {
+                    return 'PSIKOTROPIKA';
+                }
+                if ($rawType === 'OBAT-OBAT TERTENTU (OOT)' || $rawType === 'OBAT TERTENTU' || $rawType === 'OOT') {
+                    return 'OBAT-OBAT TERTENTU (OOT)';
+                }
+                return 'REGULER';
             })->map(function ($perCreditor) {
-                return $perCreditor->groupBy('creditor_code') ?? 'Kosong';
+                return $perCreditor->groupBy('creditor_code');
             });
 
             $logoPath = $pharmacy->logo && file_exists(public_path('img/' . $pharmacy->logo))
