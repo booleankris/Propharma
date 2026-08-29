@@ -187,3 +187,57 @@ if (!function_exists('terbilang')) {
         return $result;
     }
 }
+
+if (!function_exists('imageToBase64')) {
+    /**
+     * Convert an image file to a compact base64 data URI.
+     * Resizes to maxHeight using GD to keep PDF rendering fast.
+     *
+     * @param  string $path     Absolute path to image file
+     * @param  int    $maxHeight Maximum height in pixels (default 100)
+     * @return string|null      data:image/png;base64,... or null on failure
+     */
+    function imageToBase64(string $path, int $maxHeight = 100): ?string
+    {
+        if (!file_exists($path) || !function_exists('imagecreatefromstring')) {
+            // GD not available, fallback to raw base64
+            if (file_exists($path)) {
+                $ext = pathinfo($path, PATHINFO_EXTENSION);
+                return 'data:image/' . $ext . ';base64,' . base64_encode(file_get_contents($path));
+            }
+            return null;
+        }
+
+        $imgData = file_get_contents($path);
+        $src = @imagecreatefromstring($imgData);
+        if (!$src) {
+            // Corrupt or unsupported image, fallback
+            $ext = pathinfo($path, PATHINFO_EXTENSION);
+            return 'data:image/' . $ext . ';base64,' . base64_encode($imgData);
+        }
+
+        $origW = imagesx($src);
+        $origH = imagesy($src);
+
+        if ($origH > $maxHeight) {
+            $newH = $maxHeight;
+            $newW = (int) round($origW * ($maxHeight / $origH));
+            $dst = imagecreatetruecolor($newW, $newH);
+            // Preserve transparency
+            imagealphablending($dst, false);
+            imagesavealpha($dst, true);
+            $transparent = imagecolorallocatealpha($dst, 0, 0, 0, 127);
+            imagefill($dst, 0, 0, $transparent);
+            imagecopyresampled($dst, $src, 0, 0, 0, 0, $newW, $newH, $origW, $origH);
+            imagedestroy($src);
+            $src = $dst;
+        }
+
+        ob_start();
+        imagepng($src, null, 9); // max compression
+        $pngData = ob_get_clean();
+        imagedestroy($src);
+
+        return 'data:image/png;base64,' . base64_encode($pngData);
+    }
+}

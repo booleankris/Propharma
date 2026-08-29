@@ -562,16 +562,12 @@ class OrdersController extends Controller
             $logoPath = $pharmacy->logo && file_exists(public_path('img/' . $pharmacy->logo))
                 ? public_path('img/' . $pharmacy->logo)
                 : public_path('img/logo-sahabat.png');
-            $logoBase64 = file_exists($logoPath)
-                ? 'data:image/' . pathinfo($logoPath, PATHINFO_EXTENSION) . ';base64,' . base64_encode(file_get_contents($logoPath))
-                : null;
+            $logoBase64 = imageToBase64($logoPath, 80);
 
             $sigPath = $pharmacy->signature && file_exists(public_path('img/' . $pharmacy->signature))
                 ? public_path('img/' . $pharmacy->signature)
                 : null;
-            $signatureBase64 = $sigPath && file_exists($sigPath)
-                ? 'data:image/' . pathinfo($sigPath, PATHINFO_EXTENSION) . ';base64,' . base64_encode(file_get_contents($sigPath))
-                : null;
+            $signatureBase64 = $sigPath ? imageToBase64($sigPath, 70) : null;
 
             if (request()->has('debug')) {
                 return view('orders.printSPB', compact('order', 'date', 'grouped', 'pharmacy', 'logoBase64', 'signatureBase64'));
@@ -581,8 +577,9 @@ class OrdersController extends Controller
                 ->setPaper('A7', 'portrait')
                 ->setOptions([
                     'isHtml5ParserEnabled' => true,
-                    'isRemoteEnabled' => true,
-                    'dpi' => 96,
+                    'isRemoteEnabled' => false,
+                    'isFontSubsettingEnabled' => true,
+                    'dpi' => 72,
                     'defaultFont' => 'sans-serif'
                 ]);
 
