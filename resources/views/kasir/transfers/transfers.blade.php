@@ -71,6 +71,10 @@
                     <input type="date" name="end_date" value="{{ request('end_date') }}" class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 outline-none focus:border-indigo-500 transition">
                 </div>
                 <div>
+                    <label class="block text-[11px] font-medium text-slate-500 mb-1">Expired Date</label>
+                    <input type="date" name="expired_date" value="{{ request('expired_date') }}" class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 outline-none focus:border-indigo-500 transition">
+                </div>
+                <div>
                     <label class="block text-[11px] font-medium text-slate-500 mb-1">Cari Obat</label>
                     <input type="text" name="search" value="{{ request('search') }}" placeholder="Ketik nama obat..." class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 outline-none focus:border-indigo-500 transition w-48">
                 </div>
@@ -78,7 +82,7 @@
                     <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-1.5 rounded-lg text-xs font-semibold transition">
                         Terapkan
                     </button>
-                    @if(request()->anyFilled(['start_date', 'end_date', 'search']))
+                    @if(request()->anyFilled(['start_date', 'end_date', 'expired_date', 'search']))
                         <a href="{{ route('transfers.incoming') }}" class="bg-slate-100 hover:bg-slate-200 text-slate-600 px-4 py-1.5 rounded-lg text-xs font-semibold transition flex items-center">
                             Reset
                         </a>

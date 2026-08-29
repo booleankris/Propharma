@@ -206,7 +206,7 @@
                             </div>
                         </div>
 
-                        {{-- COMPOSITION + FACTORY --}}
+                        {{-- COMPOSITION + COMPONENT + FACTORY --}}
                         <div class="flex gap-1">
                             <div class="w-full">
                                 <label class="block text-[14px] font-semibold text-gray-800 mb-1">Komposisi</label>
@@ -214,6 +214,12 @@
                                     class="select2 w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px]">
                                     <option value="">-- Select Composition --</option>
                                 </select>
+                            </div>
+                            <div class="w-full">
+                                <label class="block text-[14px] font-semibold text-gray-800 mb-1">Komponen (SP)</label>
+                                <input id="component" name="component" type="text"
+                                    class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px]"
+                                    placeholder="Contoh: Paracetamol 500mg">
                             </div>
                             <div class="w-full">
                                 <label class="block text-[14px] font-semibold text-gray-800 mb-1">Pabrik</label>
@@ -701,7 +707,7 @@
         // ════════════════════════════════════════════════
         function populateForm(row) {
             // Plain inputs
-            ['code', 'name', 'barcode', 'content', 'dosage',
+            ['code', 'name', 'barcode', 'component', 'content', 'dosage',
                 'minimal_stock', 'strip', 'stock', 'preparations'
             ].forEach(key => {
                 const el = document.getElementById(key);

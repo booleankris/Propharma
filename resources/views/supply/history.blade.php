@@ -209,6 +209,9 @@
                             <path d="M20 12v3a3 3 0 0 1 -3 3h-13m3 3l-3 -3l3 -3" />
                         </svg>
                         <h2 class="text-lg font-semibold text-gray-800">Kartu Stock</h2>
+                        @if(isWarehousePharmacy())
+                            <span class="px-2.5 py-0.5 text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200 rounded-full">Apotek SAHABAT PMI</span>
+                        @endif
                     </div>
                     <div class="flex flex-wrap items-end gap-4 py-2">
                         <div class="flex-1 min-w-[200px]">
@@ -369,6 +372,7 @@
                                 </div>
                             </div>
 
+                            @if(canAccessWarehouseStock())
                             <div
                                 class="flex items-center gap-3 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3.5 shadow-sm hover:shadow-md transition-shadow">
                                 <div class="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
@@ -387,6 +391,7 @@
                                         class="block text-lg font-bold font-montserrat text-gray-800 leading-tight">0</span>
                                 </div>
                             </div>
+                            @endif
 
                             <div
                                 class="flex items-center gap-3 rounded-2xl border border-cyan-100 bg-cyan-50 px-4 py-3.5 shadow-sm hover:shadow-md transition-shadow">
@@ -403,7 +408,7 @@
                                 </div>
                                 <div class="min-w-0">
                                     <span
-                                        class="block text-[11px] font-semibold text-cyan-700 uppercase tracking-wider truncate">Stok Etalase</span>
+                                        class="block text-[11px] font-semibold text-cyan-700 uppercase tracking-wider truncate">{{ isWarehousePharmacy() ? 'Pelayanan PMI' : 'Stok Etalase' }}</span>
                                     <span id="stat-counter"
                                         class="block text-lg font-bold font-montserrat text-gray-800 leading-tight">0</span>
                                 </div>

@@ -197,6 +197,7 @@
 
                                 </div>
                                 <input autofocus required id="debtorSearch" type="text"
+                                    value="{{ $transaction->debtors->name ?? '' }}"
                                     placeholder="Ketik ID / Nama…"
                                     class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300 text-[11px] font-poppins"
                                     autocomplete="off" />
@@ -208,7 +209,7 @@
                                 </div>
 
                                 <!-- Hidden field to hold selection (optional) -->
-                                <input type="hidden" id="selectedDebtorId" />
+                                <input type="hidden" id="selectedDebtorId" value="{{ $transaction->debtor_id ?? '' }}" />
                             </div>
                             <div class="mr-2 w-full hidden">
                                 <div class="w-full my-1">
@@ -216,6 +217,7 @@
 
                                 </div>
                                 <input id="debtorname" type="text" name="debtorname" readonly
+                                    value="{{ $transaction->debtors->name ?? '' }}"
                                     placeholder="Nama Debitur"
                                     class="w-full rounded-md readonly border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300 text-[11px] font-poppins"
                                     autocomplete="off" />
@@ -329,7 +331,7 @@
 
                         </div>
                         <input id="quantity" required name="quantity"
-                            oninput="this.value = this.value.replace(/[^0-9]/g, '')" step="1"
+                            oninput="this.value = this.value.replace(/[^0-9]/g, ''); count(this.value);" step="1"
                             onkeyup="count(this.value)" type="number" placeholder="QTY"
                             class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300 text-[11px] font-poppins"
                             autocomplete="off" />
@@ -991,7 +993,6 @@
                             <div class="flex items-center">
                                 <div class="searchdoctors w-full">
                                     <input autofocus required id="doctorSearch"
-                                        @if ($transaction->transaction_type == 'KREDIT') onclick="creditsubmit()" @endif
                                         type="text" placeholder="Ketik ID / Nama…"
                                         class="w-full rounded-xl border my-1 border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
                                         autocomplete="off" />
@@ -1169,6 +1170,7 @@
                     <div class="w-full">
                         <label class="text-[13px] font-poppins font-semibold pb-1">Debitur</label>
                         <input id="debtor_name" tabindex="-1" readonly type="text" name="change"
+                            value="{{ $transaction->debtors->name ?? '' }}"
                             placeholder="Nama Debitur"
                             class="w-full rounded-xl border my-1 readonly border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
                             autocomplete="off" />
@@ -1205,7 +1207,7 @@
                     <input type="hidden" required name="patient_id" id="patient_id" />
                     <input type="hidden" @if ($transaction->transaction_type == 'RESEP TUNAI') value="0" @endif required
                         name="doctor_id" id="doctor_id" />
-                    <input type="hidden" required name="debtor_id" id="debtor_id" />
+                    <input type="hidden" required name="debtor_id" id="debtor_id" value="{{ $transaction->debtor_id ?? '' }}" />
 
                     @if ($check_transaction != 0)
                         @if ($transaction->transaction_type == 'KREDIT')
@@ -2253,7 +2255,10 @@
             li.style.animationDelay = `${index * 35}ms`;
             li.dataset.id = it.id;
 
-            const stock = (Number(it.storage_stock) || 0) + (Number(it.counter_stock) || 0);
+            const canSeeWarehouse = {{ canAccessWarehouseStock() ? 'true' : 'false' }};
+            const stock = canSeeWarehouse
+                ? ((Number(it.storage_stock) || 0) + (Number(it.counter_stock) || 0))
+                : (Number(it.counter_stock) || 0);
 
             li.innerHTML = `
         <div class="flex flex-col gap-1.5 min-w-0">
@@ -2300,11 +2305,13 @@
                     <span class="text-[10px] text-emerald-600 font-medium">Stok</span>
                     <span class="text-xs font-bold text-emerald-700">${escapeHtml(String(stock || '—'))}</span>
                 </div>
+                ${canSeeWarehouse ? `
                 <div class="flex items-center gap-1 bg-violet-50 border border-violet-200 rounded-md px-2 py-1">
                     <span class="w-1 h-1 rounded-full bg-violet-500"></span>
                     <span class="text-[10px] text-violet-600 font-medium">Gudang</span>
                     <span class="text-xs font-bold text-violet-700">${escapeHtml(String(it.storage_stock || '—'))}</span>
                 </div>
+                ` : ''}
                 <div class="flex items-center gap-1 bg-amber-50 border border-amber-200 rounded-md px-2 py-1">
                     <span class="w-1 h-1 rounded-full bg-amber-500"></span>
                     <span class="text-[10px] text-amber-600 font-medium">Pelayanan</span>
@@ -2335,6 +2342,11 @@
             isScanning = false;
             return;
         }
+
+        // Reset mode edit saat kasir memilih obat baru dari pencarian
+        edit_status = 0;
+        selectedRowId = null;
+        document.querySelectorAll('.cart-row').forEach(r => r.classList.remove('bg-blue-100'));
 
         isScanning = true;
         clearTimeout(debounceTimer);
@@ -2367,6 +2379,12 @@
         price.value = formatRupiah(raw);
         price2 = raw;
         item_finalprice = raw;
+        total_item = 0;
+        subtotal = 0;
+        grossprice = 0;
+        final_price = 0;
+        pharmacy_price = 0;
+        true_price = 0;
 
         items = [];
         list.innerHTML = '';
@@ -2926,15 +2944,16 @@
 
             parameters = it.parameters[0].receipt;
             rounding = it.parameters[0].rounding;
-            document.getElementById('debtor_id').value = it.id;
+            if (document.getElementById('debtor_id')) document.getElementById('debtor_id').value = it.id;
+            if (document.getElementById('selectedDebtorId')) document.getElementById('selectedDebtorId').value = it.id;
             console.log(rounding);
             if (transaction_type == 'KREDIT') {
                 input.focus();
             } else {
                 discountInput.focus();
             }
-            document.getElementById('debtorSearch').value = it.name;
-            document.getElementById('debtor_name').value = it.name;
+            if (document.getElementById('debtorSearch')) document.getElementById('debtorSearch').value = it.name;
+            if (document.getElementById('debtor_name')) document.getElementById('debtor_name').value = it.name;
             document.getElementById('embalase').value = it.parameters[0].embalas;
             service = it.parameters[0].embalas;
             closedebtorBox();
@@ -2945,40 +2964,48 @@
     function count(val) {
 
         val = Math.floor(Number(val) || 0);
-        console.log('harga diskon adalah : ' + discount);
-        if (discount == "") {
-            discount = 0;
-        }
-        console.log('harganya itu adalah : ' + price2);
         total_item = val;
-        roundedtotal = price2 * val - discount;
+        let rawAmount = price2 * val;
+
         if (currenttransaction == "KREDIT" && racikstatus === 0) {
-            subtotal = roundedtotal + parseInt(service);
+            subtotal = rawAmount + parseInt(service || 0);
         } else if (transaction_type == "RESEP TUNAI" && racikstatus === 0) {
-            subtotal = Math.max(1000, Math.round(roundedtotal / 1000) * 1000) + parseInt(service);
+            subtotal = Math.max(1000, Math.round(rawAmount / 1000) * 1000) + parseInt(service || 0);
         } else {
-            subtotal = Math.max(1000, Math.round(roundedtotal / 1000) * 1000);
+            subtotal = Math.max(1000, Math.round(rawAmount / 1000) * 1000);
         }
-        totalprice.value = formatRupiah(subtotal);
-        pharmacy_price = price2 * val;
-        final_price = subtotal;
+
+        pharmacy_price = rawAmount;
         grossprice = subtotal;
-        console.log("count() => subtotal:", subtotal, "grossprice:", grossprice, "pharmacy_price price :",
-            pharmacy_price);
+
+        const currentDisc = Number(discountInput?.value) || 0;
+        if (currentDisc > 0) {
+            if (currentDisc > 100) {
+                discount = currentDisc;
+            } else {
+                discount = Math.round((subtotal * currentDisc / 100) / 1000) * 1000;
+            }
+            final_price = subtotal - discount;
+        } else {
+            discount = 0;
+            final_price = subtotal;
+        }
+
+        totalprice.value = formatRupiah(final_price);
+        console.log("count() => subtotal:", subtotal, "grossprice:", grossprice, "final_price:", final_price, "pharmacy_price:", pharmacy_price);
 
     }
 
     function countDiscount(val) {
-
+        val = Number(val) || 0;
         if (val > 100) {
-            final_price = subtotal - val;
-            discount = Math.round(val / 1000) * 1000;
+            discount = val;
+        } else if (val > 0) {
+            discount = Math.round((subtotal * val / 100) / 1000) * 1000;
         } else {
-            const discountAmount = subtotal * val / 100;
-            final_price = subtotal - discountAmount;
-            discount = Math.round(discountAmount / 1000) * 1000;
+            discount = 0;
         }
-        final_price = Math.round(final_price / 1000) * 1000;
+        final_price = subtotal - discount;
         totalprice.value = formatRupiah(final_price);
     }
 
@@ -3006,12 +3033,20 @@
     axios.defaults.headers.common['X-CSRF-TOKEN'] = '{{ csrf_token() }}';
 
     function resetInputs() {
-        const ids = ['pay', 'change', 'quantity', 'dosage', 'dosage_r', 'name', 'stock', 'unit'];
+        const ids = ['pay', 'change', 'quantity', 'dosage', 'dosage_r', 'name', 'stock', 'unit', 'total'];
 
         ids.forEach(id => {
             const el = document.getElementById(id);
             if (el) el.value = "";
         });
+
+        total_item = 0;
+        subtotal = 0;
+        grossprice = 0;
+        final_price = 0;
+        pharmacy_price = 0;
+        true_price = 0;
+        discount = 0;
 
         const pkg = document.getElementById('package');
         if (pkg) pkg.focus();
@@ -3022,12 +3057,15 @@
         raw_total, total_price, final_price, racikstatus) {
 
         var medicine_type = currenttransaction;
+        const debtor_id = document.getElementById('debtor_id')?.value || document.getElementById('selectedDebtorId')?.value || null;
+
         if (document.getElementById('quantity').value != "") {
             if (edit_status != 0) {
                 axios.post("{{ route('transaction.updateCart') }}", {
                         id: selectedRowId,
                         medicine_id,
                         transaction_id,
+                        debtor_id,
                         quantity,
                         discount,
                         embalase,
@@ -3100,7 +3138,7 @@
                                 <td class="px-1 py-1 text-center text-gray-600">${document.querySelectorAll('#carts tr').length + 1}</td>
                                 <td colspan="7" class="leading-normal text-[10px] px-1 py-1 font-semibold text-gray-800">${item.medicine.name}</td>
                                 <td class="px-1 py-1 text-center">${item.medicine.unit || item.medicine.packaging || ''}</td>
-                                <td class="px-1 py-1 text-center">${formatRupiah(item.final_price)}</td>
+                                <td class="px-1 py-1 text-center">${formatRupiah(item_finalprice)}</td>
                                 <td class="px-1 py-1 text-center">${item.quantity}</td>
                                 <td class="px-1 py-1 text-center">${formatRupiah(item.discount)}</td>
                                 <td class="px-1 py-1 text-center">${formatRupiah(item.total_price)}</td>
@@ -3126,6 +3164,7 @@
                 axios.post("{{ route('transaction.addToCart') }}", {
                     medicine_id,
                     transaction_id,
+                    debtor_id,
                     quantity,
                     discount,
                     embalase,
@@ -3232,7 +3271,8 @@
     }
 
     function submit() {
-        if (quantity.value == 0) return;
+        const qtyVal = Math.floor(Number(quantity.value) || 0);
+        if (qtyVal <= 0) return;
         if (isSubmitting) return; // guard against double-fire
         isSubmitting = true;
 
@@ -3240,6 +3280,12 @@
         if (btn) btn.disabled = true;
 
         try {
+            // ALWAYS re-calculate fresh to avoid stale values from previous items
+            count(qtyVal);
+            if (discountInput.value !== "") {
+                countDiscount(discountInput.value);
+            }
+
             if (edit_status != 0) {
                 true_price = final_price + jasa;
                 const pkg = document.getElementById('package')?.value || '';
@@ -3393,21 +3439,22 @@
 
                 medicine_id = item.medicine_id;
                 total_item = item.quantity;
-                item_finalprice = rounded;
-                price2 = rounded;
+                price2 = Number(item.item_price) || 0;
+                item_finalprice = price2;
+                discount = Number(item.discount) || 0;
 
-                // Checkbox trigger if racikan
-
-                if (transaction_type == "RESEP TUNAI" || currenttransaction == "KREDIT") {
-                    totalval = price2 * item.quantity + parseInt(service);
+                let rawAmount = price2 * item.quantity;
+                if (currenttransaction == "KREDIT" && (!item.recipe_status || item.recipe_status == 0)) {
+                    subtotal = rawAmount + parseInt(service || 0);
+                } else if (transaction_type == "RESEP TUNAI" && (!item.recipe_status || item.recipe_status == 0)) {
+                    subtotal = Math.max(1000, Math.round(rawAmount / 1000) * 1000) + parseInt(service || 0);
                 } else {
-                    totalval = price2 * item.quantity;
+                    subtotal = Math.max(1000, Math.round(rawAmount / 1000) * 1000);
                 }
-                subtotal = Math.ceil(totalval / 1000) * 1000;
-                pharmacy_price = subtotal;
-                final_price = subtotal - item.discount;
-                discount = item.discount;
+
+                pharmacy_price = rawAmount;
                 grossprice = subtotal;
+                final_price = subtotal - discount;
                 name.value = item.medicine.name || '';
                 unit.value = item.medicine.unit || item.medicine.packaging || '';
                 if (currenttransaction == 'RESEP TUNAI') {
@@ -3450,7 +3497,7 @@
                 }
                 totalprice.value = formatRupiah(item.total_price - item.discount);
                 quantity.value = item.quantity;
-                // price.value = formatRupiah(rounded);
+                price.value = formatRupiah(item.item_price);
                 discountInput.value = item.discount;
 
 
@@ -3616,6 +3663,7 @@
 
         if (
             (
+                transaction_type === 'KREDIT' ||
                 transaction_type === 'RESEP KREDIT' ||
                 transaction_type === 'RESEP ASURANSI'
             ) &&
@@ -4877,11 +4925,12 @@
     quantity.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
             e.preventDefault();
-            if (quantity.value == 0) {
+            const qtyVal = Math.floor(Number(quantity.value) || 0);
+            if (qtyVal <= 0) {
                 alert("Isi Qty Barang!");
             } else {
+                count(qtyVal);
                 submit();
-
             }
         } else if (e.key === 'Tab') {
             e.preventDefault();

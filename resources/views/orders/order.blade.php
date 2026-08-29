@@ -584,6 +584,7 @@
             orderItemsTable = $('#orderItemsTable').DataTable({
                 processing: true,
                 serverSide: true,
+                order: [[2, 'asc']],
                 ajax: {
                     url: "{{ route('orders.orderitems') }}",
                     data: function(d) {
@@ -602,12 +603,14 @@
                     },
                     {
                         data: 'creditors',
-                        name: 'creditors'
+                        name: 'creditors.name'
                     },
                     {
                         data: 'discount',
                         name: 'discount',
-                        defaultContent: '0%'
+                        defaultContent: '0%',
+                        orderable: false,
+                        searchable: false
                     },
                     {
                         data: 'medicines.packaging',

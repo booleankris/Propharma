@@ -8,7 +8,7 @@ class PharmacySelectorController extends Controller
 {
     public function switch(Request $request)
     {
-        if (!auth()->user()->hasRole('HO')) {
+        if (!auth()->user()->hasRole('HO') && !auth()->user()->hasRole('administrator')) {
             abort(403, 'Unauthorized role.');
         }
 

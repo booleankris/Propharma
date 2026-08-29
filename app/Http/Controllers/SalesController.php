@@ -154,6 +154,16 @@ class SalesController extends Controller
 
         $trx_id = $transaction->id;
 
+        if ($dbType === 'KREDIT' && $transaction->debtor_id) {
+            $transaction->load('debtors.parameters');
+            if ($transaction->debtors && $transaction->debtors->parameters->isNotEmpty()) {
+                $debtorParam = $transaction->debtors->parameters->first();
+                $parameters = $debtorParam->receipt ?? '0';
+                $rounding = $debtorParam->rounding ?? '0';
+                $service = $debtorParam->embalas ?? '0';
+            }
+        }
+
         // 5. Collect view data───────────────
         $totaltransaction = MedicineCart::where('user_id', $user_id)
             ->where('transaction_id', $trx_id)
@@ -271,8 +281,10 @@ class SalesController extends Controller
     {
         $q = trim($request->get('q', ''));
         $pharmacyId = getActivePharmacyId();
+        $warehouseId = getWarehousePharmacyId();
+        $canSeeWarehouse = canAccessWarehouseStock($pharmacyId);
 
-        $items = Medicines::query()
+        $query = Medicines::query()
             ->select([
                 'medicines.id',
                 'medicines.code',
@@ -291,34 +303,40 @@ class SalesController extends Controller
                 'medicines.content',
                 'medicines.dosage',
             ])
+            ->selectRaw('COALESCE(cs.counter_stock, 0) as counter_stock');
 
-            ->selectRaw('COALESCE(bs.storage_stock, 0) as storage_stock')
-            ->selectRaw('COALESCE(cs.counter_stock, 0) as counter_stock')
+        if ($canSeeWarehouse) {
+            $query->selectRaw('COALESCE(bs.storage_stock, 0) as storage_stock')
+                ->leftJoinSub(
+                    DB::table('batches')
+                        ->select('medicine_id', DB::raw('COALESCE(SUM(stock), 0) as storage_stock'))
+                        ->where('pharmacy_id', $warehouseId)
+                        ->groupBy('medicine_id'),
+                    'bs',
+                    'bs.medicine_id',
+                    '=',
+                    'medicines.id'
+                );
+        } else {
+            $query->selectRaw('0 as storage_stock');
+        }
 
-            ->leftJoinSub(
-                DB::table('batches')
-                    ->select('medicine_id', DB::raw('COALESCE(SUM(stock), 0) as storage_stock'))
-                    ->where('pharmacy_id', $pharmacyId)
-                    ->groupBy('medicine_id'),
-                'bs',
-                'bs.medicine_id',
-                '=',
-                'medicines.id'
-            )
-
+        $items = $query
             ->leftJoinSub(
                 DB::table('medicine_transfer_items as mt')
                     ->join('batches as b', 'b.id', '=', 'mt.batches_id')
                     ->select('b.medicine_id', DB::raw('COALESCE(SUM(mt.qty), 0) as counter_stock'))
                     ->where('mt.status', 1)
                     ->where('b.pharmacy_id', $pharmacyId)
+                    ->where(function ($q) {
+                        $q->whereNull('mt.source_type')->orWhere('mt.source_type', '!=', 'retur_gudang');
+                    })
                     ->groupBy('b.medicine_id'),
                 'cs',
                 'cs.medicine_id',
                 '=',
                 'medicines.id'
             )
-
             ->with(['etalases', 'locations', 'factory'])
 
             ->when($q !== '', function ($builder) use ($q) {
@@ -576,12 +594,14 @@ class SalesController extends Controller
             }
         }
 
-        // if ($request->get('cart_type') == "UM" || $request->get('cart_type') == "UK") {
-        //     $service = $request->get('service');
-        // } else {
-        //     $service = 0;
-        // }
-
+        if ($request->has('debtor_id') && $request->filled('debtor_id')) {
+            MedicineTransactions::where('id', $request->get('transaction_id'))
+                ->where('user_id', auth()->id())
+                ->where('transaction_type', 'KREDIT')
+                ->update([
+                    'debtor_id' => $request->get('debtor_id'),
+                ]);
+        }
 
         $transaction = MedicineCart::create([
             'user_id' => Auth()->user()->id,
@@ -864,6 +884,11 @@ class SalesController extends Controller
                     $transfer = MedicineTransferItems::join('batches', 'medicine_transfer_items.batches_id', '=', 'batches.id')
                         ->where('batches.medicine_id', $medicine_id)
                         ->where('batches.pharmacy_id', getActivePharmacyId())
+                        ->where('medicine_transfer_items.status', 1)
+                        ->where(function ($q) {
+                            $q->whereNull('medicine_transfer_items.source_type')
+                              ->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang');
+                        })
                         ->where('medicine_transfer_items.qty', '>', 0)
                         ->orderBy('batches.expired_date', 'asc')
                         ->lockForUpdate()
@@ -874,6 +899,12 @@ class SalesController extends Controller
                         $transfer = MedicineTransferItems::join('batches', 'medicine_transfer_items.batches_id', '=', 'batches.id')
                             ->where('batches.medicine_id', $medicine_id)
                             ->where('batches.pharmacy_id', getActivePharmacyId())
+                            ->where('medicine_transfer_items.status', 1)
+                            ->where(function ($q) {
+                                $q->whereNull('medicine_transfer_items.source_type')
+                                  ->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang');
+                            })
+                            ->where('medicine_transfer_items.qty', '>', 0)
                             ->orderBy('batches.expired_date', 'desc')
                             ->lockForUpdate()
                             ->select('medicine_transfer_items.*')
@@ -882,11 +913,6 @@ class SalesController extends Controller
                         if (!$transfer) {
                             throw new \Exception("Stok counter tidak ditemukan untuk obat: {$medicine->name}.");
                         }
-
-                        $transfer->qty -= $qty_bought;
-                        $transfer->save();
-                        $qty_bought = 0;
-                        break;
                     }
 
                     if ($transfer->qty >= $qty_bought) {
@@ -1130,8 +1156,13 @@ class SalesController extends Controller
             ->where('user_id', auth()->id())
             ->first();
 
-        if (!$cart) {
-            return response()->json(['success' => false, 'message' => 'Cart item not found.'], 404);
+        if ($request->has('debtor_id') && $request->filled('debtor_id')) {
+            MedicineTransactions::where('id', $cart->transaction_id)
+                ->where('user_id', auth()->id())
+                ->where('transaction_type', 'KREDIT')
+                ->update([
+                    'debtor_id' => $request->get('debtor_id'),
+                ]);
         }
 
         $cart->update([

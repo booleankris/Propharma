@@ -245,7 +245,7 @@
                         orderable: true
                     },
                     {
-                        data: 'medicines.code',
+                        data: 'code',
                         orderable: false
                     },
                     {

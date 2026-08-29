@@ -25,3 +25,63 @@ if (!function_exists('getActivePharmacyId')) {
         return (int) $user->pharmacy_id;
     }
 }
+
+if (!function_exists('getWarehousePharmacyId')) {
+    /**
+     * Get the Pharmacy ID for Central Warehouse (Gudang).
+     */
+    function getWarehousePharmacyId(): int
+    {
+        return 9; // GUDANG PMI
+    }
+}
+
+if (!function_exists('isWarehousePharmacy')) {
+    /**
+     * Check if the specified pharmacy (or active pharmacy) is the Central Warehouse,
+     * or if the current user has the 'Gudang PMI' role.
+     */
+    function isWarehousePharmacy($pharmacyId = null): bool
+    {
+        $id = $pharmacyId !== null ? (int) $pharmacyId : getActivePharmacyId();
+        if ($id === getWarehousePharmacyId()) {
+            return true;
+        }
+
+        $user = auth()->user();
+        if ($user && $user->hasRole('Gudang PMI')) {
+            return true;
+        }
+
+        return false;
+    }
+}
+
+if (!function_exists('isPmiPharmacy')) {
+    /**
+     * Check if the specified pharmacy (or active pharmacy) is SAHABAT PMI (ID: 1).
+     */
+    function isPmiPharmacy($pharmacyId = null): bool
+    {
+        $id = $pharmacyId !== null ? (int) $pharmacyId : getActivePharmacyId();
+        return $id === 1;
+    }
+}
+
+if (!function_exists('canAccessWarehouseStock')) {
+    /**
+     * Check if current user / pharmacy can view/manage warehouse stock.
+     * Allowed only for: SAHABAT PMI (ID 1), GUDANG PMI (ID 9), and HO / Administrator / Manager.
+     */
+    function canAccessWarehouseStock($pharmacyId = null): bool
+    {
+        $user = auth()->user();
+        if ($user && ($user->hasRole('HO') || $user->hasRole('administrator') || $user->hasRole('Manager') || $user->hasRole('Gudang PMI'))) {
+            return true;
+        }
+
+        $id = $pharmacyId !== null ? (int) $pharmacyId : getActivePharmacyId();
+        return $id === 1 || $id === getWarehousePharmacyId();
+    }
+}
+

@@ -151,7 +151,13 @@ class ReceivingController extends Controller
         }
 
         $orderItems = OrderItems::query()
-            ->with(['medicines', 'creditors', 'receivingItems.locations', 'receivingItems.etalases', 'receivingItems.receiving_details'])
+            ->with([
+                'medicines.creditors',
+                'creditors',
+                'receivingItems.locations',
+                'receivingItems.etalases',
+                'receivingItems.receiving_details'
+            ])
             ->withSum('receivingItems as qty_received_total', 'qty_received')
             ->whereHas('orders', fn($q) => $q->where('id', $ordersid))
             ->where('creditor_code', $creditorCode)
@@ -163,6 +169,10 @@ class ReceivingController extends Controller
             $qtyReceived = $orderItem->qty_received_total ?? 0;
             $qtyRemaining = max(0, $orderItem->quantity - $qtyReceived);
             $creditorPpn = $orderItem->creditors?->ppn_type ?? 'TANPA';
+
+            $medCred = $orderItem->medicines?->creditors?->firstWhere('code', $creditorCode) ?? $orderItem->medicines?->creditors?->first();
+            $pbfDiscRaw = floatval($medCred?->pivot?->discount ?? 0);
+            $pbfDiscStr = ($pbfDiscRaw > 0) ? (($pbfDiscRaw == (int) $pbfDiscRaw ? (int) $pbfDiscRaw : $pbfDiscRaw) . '%') : '0%';
 
             if ($orderItem->receivingItems->isEmpty()) {
                 $ppnType = strtoupper(trim($creditorPpn));
@@ -200,6 +210,8 @@ class ReceivingController extends Controller
                     'pack' => $orderItem->pack,
                     'price' => $priceStr,
                     'price_ppn' => $pricePpnStr,
+                    'creditor_discount' => $pbfDiscStr,
+                    'pbf_discount_raw' => $pbfDiscRaw,
                     'total' => 'Rp ' . number_format($itemTotal, 0, ',', '.'),
                     'receiving_items' => null,
                     'creditor_code' => $creditorCode,
@@ -242,6 +254,8 @@ class ReceivingController extends Controller
                         'pack' => $orderItem->pack,
                         'price' => $priceStr,
                         'price_ppn' => $pricePpnStr,
+                        'creditor_discount' => $pbfDiscStr,
+                        'pbf_discount_raw' => $pbfDiscRaw,
                         'total' => 'Rp ' . number_format($batch->total ? floatval($batch->total) : $itemTotal, 0, ',', '.'),
                         'receiving_items' => $batch,
                         'creditor_code' => $creditorCode,
@@ -311,7 +325,9 @@ class ReceivingController extends Controller
             'order_items.medicines.composition',
         ])->findOrFail($orderId);
 
-        $pharmacy = \App\Models\Pharmacies::find(getActivePharmacyId()) ?? $order->pharmacy;
+        $activePharmacyId = getActivePharmacyId();
+        $targetPharmacyId = (isWarehousePharmacy($activePharmacyId) || isWarehousePharmacy($order->pharmacy_id)) ? 1 : ($activePharmacyId ?? $order->pharmacy_id);
+        $pharmacy = \App\Models\Pharmacies::find($targetPharmacyId) ?? $order->pharmacy;
 
         $grouped = $order->order_items->groupBy(function ($item) {
             $type = $item->medicines->type ?? 'Kosong';
@@ -348,7 +364,9 @@ class ReceivingController extends Controller
             'order_items.medicines.composition',
         ])->findOrFail($orderId);
 
-        $pharmacy = \App\Models\Pharmacies::find(getActivePharmacyId()) ?? $order->pharmacy;
+        $activePharmacyId = getActivePharmacyId();
+        $targetPharmacyId = (isWarehousePharmacy($activePharmacyId) || isWarehousePharmacy($order->pharmacy_id)) ? 1 : ($activePharmacyId ?? $order->pharmacy_id);
+        $pharmacy = \App\Models\Pharmacies::find($targetPharmacyId) ?? $order->pharmacy;
 
         $grouped = $order->order_items->groupBy(function ($item) {
             $type = $item->medicines->type ?? 'Kosong';
@@ -398,7 +416,9 @@ class ReceivingController extends Controller
             'order_items.medicines.composition',
         ])->findOrFail($orderId);
 
-        $pharmacy = \App\Models\Pharmacies::find(getActivePharmacyId()) ?? $order->pharmacy;
+        $activePharmacyId = getActivePharmacyId();
+        $targetPharmacyId = (isWarehousePharmacy($activePharmacyId) || isWarehousePharmacy($order->pharmacy_id)) ? 1 : ($activePharmacyId ?? $order->pharmacy_id);
+        $pharmacy = \App\Models\Pharmacies::find($targetPharmacyId) ?? $order->pharmacy;
 
         $grouped = $order->order_items->groupBy(function ($item) {
             $type = $item->medicines->type ?? 'Kosong';
@@ -435,7 +455,9 @@ class ReceivingController extends Controller
             'order_items.medicines.composition',
         ])->findOrFail($orderId);
 
-        $pharmacy = \App\Models\Pharmacies::find(getActivePharmacyId()) ?? $order->pharmacy;
+        $activePharmacyId = getActivePharmacyId();
+        $targetPharmacyId = (isWarehousePharmacy($activePharmacyId) || isWarehousePharmacy($order->pharmacy_id)) ? 1 : ($activePharmacyId ?? $order->pharmacy_id);
+        $pharmacy = \App\Models\Pharmacies::find($targetPharmacyId) ?? $order->pharmacy;
 
         $grouped = $order->order_items->groupBy(function ($item) {
             $type = $item->medicines->type ?? 'Kosong';
@@ -824,9 +846,9 @@ class ReceivingController extends Controller
             DB::beginTransaction();
 
             $item = ReceivingItems::with('order_items')->findOrFail($id);
-
             $medicineId = $item->order_items->medicine_id;
             $pharmacyId = getActivePharmacyId();
+
             $oldQty = $item->qty_received;
             $newQty = $request->qty_received;
             $oldBatchKey = "{$medicineId}|{$item->batch}|{$item->expired_date}";
@@ -844,7 +866,7 @@ class ReceivingController extends Controller
                     $qtyBefore = $medicine->stock;
                     $medicine->increment('stock', $deltaActual);
 
-                    if ($pharmacyId != 1) {
+                    if (!isWarehousePharmacy($pharmacyId)) {
                         $transferItem = MedicineTransferItems::where('receiving_items_id', $item->id)->first();
                         if ($transferItem) {
                             $transferItem->update(['qty' => $newActualQty]);
@@ -873,7 +895,7 @@ class ReceivingController extends Controller
                 $medicine->decrement('stock', $oldActualQty);
 
                 $transferHeaderId = null;
-                if ($pharmacyId != 1) {
+                if (!isWarehousePharmacy($pharmacyId)) {
                     $transferItem = MedicineTransferItems::where('receiving_items_id', $item->id)->first();
                     if ($transferItem) {
                         $transferHeaderId = $transferItem->medicine_transfer_id;
@@ -895,7 +917,7 @@ class ReceivingController extends Controller
 
                 $medicine->increment('stock', $newActualQty);
 
-                if ($pharmacyId != 1) {
+                if (!isWarehousePharmacy($pharmacyId)) {
                     if (!$transferHeaderId) {
                         $transferHeader = MedicineTransfers::create([
                             'code' => $this->generateTransfersCode(),
@@ -938,28 +960,23 @@ class ReceivingController extends Controller
                 'qty_received' => $newQty,
                 'qty' => $newQty,
                 'raw_price' => $request->raw_price,
+                'discount' => $request->discount,
+                'subtotal' => $request->total,
                 'batch' => $request->batch,
                 'expired_date' => $request->expired_date,
-                'discount' => $request->discount,
-                'extra_discount' => $request->extra_discount,
-                'status' => $request->status,
-                'total' => $request->total,
-                'batches_id' => $item->batches_id,
             ]);
 
             DB::commit();
 
             return response()->json([
                 'success' => true,
-                'message' => 'Item berhasil direvisi',
-                'item' => $item,
+                'message' => 'Data penerimaan berhasil diubah.',
             ]);
-        } catch (\Throwable $e) {
+        } catch (\Exception $e) {
             DB::rollBack();
-            \Log::error('Revision error', ['message' => $e->getMessage(), 'line' => $e->getLine()]);
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal merevisi: ' . $e->getMessage(),
+                'message' => 'Gagal mengubah data: ' . $e->getMessage(),
             ], 500);
         }
     }
@@ -981,7 +998,7 @@ class ReceivingController extends Controller
             $qtyBefore = $medicine->stock;
             $medicine->decrement('stock', $actualQty);
 
-            if ($pharmacyId != 1) {
+            if (!isWarehousePharmacy($pharmacyId)) {
                 $transferItem = MedicineTransferItems::where('receiving_items_id', $item->id)->first();
                 if ($transferItem) {
                     $transferHeaderId = $transferItem->medicine_transfer_id;
@@ -1514,7 +1531,7 @@ class ReceivingController extends Controller
             $receivingItemUpdates = [];
 
             $transferHeader = null;
-            if ($pharmacyId != 1) {
+            if (!isWarehousePharmacy($pharmacyId)) {
                 $transferHeader = MedicineTransfers::create([
                     'code' => $this->generateTransfersCode(),
                     'status' => 1,
@@ -1555,7 +1572,7 @@ class ReceivingController extends Controller
                 $medicineIncrements[$medicineId] = ($medicineIncrements[$medicineId] ?? 0) + $actualStockQty;
                 $receivingItemUpdates[$item->id] = $batch->id;
 
-                if ($pharmacyId != 1) {
+                if (!isWarehousePharmacy($pharmacyId)) {
                     MedicineTransferItems::create([
                         'medicine_transfer_id' => $transferHeader->id,
                         'batches_id' => $batch->id,

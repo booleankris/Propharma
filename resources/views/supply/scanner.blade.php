@@ -479,7 +479,7 @@
                     </button>
                 </div>
 
-                <div class="detail-grid">
+                <div class="detail-grid" style="{{ canAccessWarehouseStock() ? '' : 'grid-template-columns: 1fr;' }}">
                     <div class="detail-item">
                         <div class="di-label">Satuan</div>
                         <div class="di-value" id="res_unit">—</div>
@@ -488,10 +488,12 @@
                         <div class="di-label">Harga Beli</div>
                         <div class="di-value" id="res_price">—</div>
                     </div>
+                    @if(canAccessWarehouseStock())
                     <div class="detail-item highlight">
                         <div class="di-label">Stok Gudang</div>
                         <div class="di-value" id="res_stock_gudang">—</div>
                     </div>
+                    @endif
                     <div class="detail-item highlight">
                         <div class="di-label">Stok Counter</div>
                         <div class="di-value" id="res_stock_counter">—</div>
@@ -502,11 +504,15 @@
                 <div class="form-opname">
                     <input type="hidden" id="medicine_id">
                     
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div style="display: grid; grid-template-columns: {{ canAccessWarehouseStock() ? '1fr 1fr' : '1fr' }}; gap: 10px;">
+                        @if(canAccessWarehouseStock())
                         <div class="form-group">
                             <label>Fisik Gudang</label>
                             <input type="number" id="stock_physic" class="form-control" placeholder="0" onkeyup="countDiscrepancy()">
                         </div>
+                        @else
+                        <input type="hidden" id="stock_physic" value="0">
+                        @endif
                         <div class="form-group">
                             <label>Fisik Counter</label>
                             <input type="number" id="counter_stock_physic" class="form-control" placeholder="0" onkeyup="countDiscrepancy()">
@@ -612,6 +618,8 @@
             const select = document.getElementById('batch_select');
             select.innerHTML = '<option value="">Memuat batch…</option>';
 
+            const canSeeWarehouse = {{ canAccessWarehouseStock() ? 'true' : 'false' }};
+
             fetch(`{{ route('supplies.batches') }}?medicine_id=${medicine_id}`)
                 .then(res => res.json())
                 .then(batches => {
@@ -625,7 +633,9 @@
                         opt.value = b.id;
                         const gStock = parseInt(b.stock || 0);
                         const cStock = parseInt(b.counter_stock || 0);
-                        opt.textContent = `${b.name} — Exp: ${b.expired_date} (Gdg: ${gStock}, Ctr: ${cStock})`;
+                        opt.textContent = canSeeWarehouse
+                            ? `${b.name} — Exp: ${b.expired_date} (Gdg: ${gStock}, Ctr: ${cStock})`
+                            : `${b.name} — Exp: ${b.expired_date} (Stok: ${cStock})`;
                         opt.dataset.stock = gStock;
                         opt.dataset.counterStock = cStock;
                         select.appendChild(opt);
@@ -636,8 +646,12 @@
 
                     updateTotalStockFromSelect();
                     // Set default display
-                    document.getElementById('res_stock_gudang').textContent = totalStorageStock;
-                    document.getElementById('res_stock_counter').textContent = totalCounterStock;
+                    if (document.getElementById('res_stock_gudang')) {
+                        document.getElementById('res_stock_gudang').textContent = totalStorageStock;
+                    }
+                    if (document.getElementById('res_stock_counter')) {
+                        document.getElementById('res_stock_counter').textContent = totalCounterStock;
+                    }
                 })
                 .catch(() => {
                     select.innerHTML = '<option value="">— Gagal memuat batch —</option>';

@@ -16,6 +16,7 @@ class Medicines extends Model
         'pharmacy_id',
         'medicine_category_id',
         'composition_id',
+        'component',
         'factory_id',
         'creditors_id',
         'name',

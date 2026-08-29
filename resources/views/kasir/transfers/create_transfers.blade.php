@@ -107,9 +107,11 @@
                 <div class="w-full">
                     <select id="pharmacySelect" onchange="onPharmacyChange()"
                         class="w-full rounded-lg font-nunito-bold border border-slate-200 bg-slate-50/50 px-3.5 py-3 sm:py-2.5 text-base sm:text-sm text-slate-800 focus:border-sky-500 focus:bg-white focus:ring-4 focus:ring-sky-500/10 outline-none transition">
-                        <option value="">— Pilih Tujuan Apotek —</option>
+                        @if($pharmacies->count() > 1)
+                            <option value="">— Pilih Tujuan Apotek —</option>
+                        @endif
                         @foreach ($pharmacies as $pharmacy)
-                            <option value="{{ $pharmacy->id }}">{{ $pharmacy->name }}</option>
+                            <option value="{{ $pharmacy->id }}" {{ $pharmacies->count() === 1 ? 'selected' : '' }}>{{ $pharmacy->name }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -141,15 +143,7 @@
                     <!-- Search Dropdown -->
                     <div id="searchDropdown"
                         class="hidden absolute left-0 right-0 top-full mt-1 z-50 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden w-full">
-                        <div
-                            class="grid grid-cols-[28px_1fr_1fr_50px_110px] sm:grid-cols-[32px_1fr_1fr_60px_130px] px-3 sm:px-4 py-2 bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                            <span>#</span>
-                            <span>Batch</span>
-                            <span>Obat</span>
-                            <span class="text-right">Stok</span>
-                            <span class="text-right">Sumber</span>
-                        </div>
-                        <div class="max-h-56 overflow-y-auto divide-y divide-slate-50" id="tableScroll"
+                        <div class="max-h-72 overflow-y-auto divide-y divide-slate-50" id="tableScroll"
                             onscroll="handleScroll()">
                             <div id="searchResults"></div>
                         </div>
@@ -382,27 +376,31 @@
 
                         const row = document.createElement('div');
                         row.className =
-                            'dropdown-row grid grid-cols-[28px_1fr_1fr_50px_110px] sm:grid-cols-[32px_1fr_1fr_60px_130px] px-3 sm:px-4 py-2.5 text-xs cursor-pointer hover:bg-sky-50 transition items-center border-b border-slate-50';
+                            'dropdown-row px-4 py-3 text-xs cursor-pointer hover:bg-sky-50 transition border-b border-slate-50';
                         row.dataset.batchesId = item.id ?? '';
                         row.dataset.batchName = item.batches_name ?? '';
                         row.dataset.medName = item.name ?? '—';
                         row.dataset.medCode = item.medicine_code ?? '—';
                         row.dataset.unit = item.unit ?? '—';
                         row.dataset.stock = item.stock ?? 0;
+                        row.dataset.expiredDate = item.expired_date ?? '-';
                         row.dataset.sourceType = srcType;
 
-                        const isPmi = {{ getActivePharmacyId() == 1 ? 'true' : 'false' }};
+                        const isWarehouse = {{ isWarehousePharmacy() ? 'true' : 'false' }};
                         const badgeColor = srcType === 'gudang'
                             ? 'bg-amber-50 text-amber-700 border-amber-200'
                             : 'bg-violet-50 text-violet-700 border-violet-200';
-                        const badgeLabel = srcType === 'gudang' ? 'Gudang ➝ Pelayanan' : (isPmi ? 'Pelayanan ➝ Gudang' : 'Pelayanan ➝ Cabang');
+                        const badgeLabel = srcType === 'gudang' ? 'Gudang ➝ Pelayanan' : 'Pelayanan ➝ Cabang / Gudang';
 
                         row.innerHTML = `
-                            <span class="font-mono text-slate-400 text-[10px]">${((page - 1) * (res.per_page || 10)) + i + 1}</span>
-                            <span class="font-medium text-slate-700 truncate pr-2">${item.batches_name ?? '—'}</span>
-                            <span class="font-nunito-bold text-[#010741] truncate pr-2">${item.name ?? '—'}</span>
-                            <span class="text-right"><span class="inline-flex items-center px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 font-mono text-[11px] font-semibold">${item.stock ?? 0}</span></span>
-                            <span class="text-right"><span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border whitespace-nowrap ${badgeColor}">${badgeLabel}</span></span>
+                            <div class="flex items-center gap-1.5 min-w-0">
+                                <span class="font-nunito-bold text-[#010741] text-[13px] leading-snug truncate">${item.name ?? '—'}</span>
+                                <span class="shrink-0 inline-flex items-center px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-xs font-bold">${item.stock ?? 0}</span>
+                            </div>
+                            <div class="text-slate-500 text-[11px] mt-1 truncate">${item.batches_name ?? '—'} - ${item.expired_date ?? '—'}</div>
+                            <div class="mt-1.5">
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold border whitespace-nowrap ${badgeColor}">${badgeLabel}</span>
+                            </div>
                         `;
                         row.addEventListener('click', () => selectBatch(row));
                         container.appendChild(row);
@@ -432,11 +430,11 @@
                 medCode: row.dataset.medCode,
                 unit: row.dataset.unit,
                 stock: parseInt(row.dataset.stock) || 0,
-                source_type: row.dataset.sourceType || 'gudang',
+                source_type: row.dataset.sourceType || 'pelayanan',
             };
 
-            const isPmi = {{ getActivePharmacyId() == 1 ? 'true' : 'false' }};
-            const displayLabel = stagedBatch.source_type === 'gudang' ? 'Gudang ➝ Pelayanan' : (isPmi ? 'Pelayanan ➝ Gudang' : 'Pelayanan ➝ Cabang');
+            const isWarehouse = {{ isWarehousePharmacy() ? 'true' : 'false' }};
+            const displayLabel = stagedBatch.source_type === 'gudang' ? 'Gudang ➝ Pelayanan' : 'Pelayanan ➝ Cabang / Gudang';
             document.getElementById('searchInput').value = stagedBatch.medName + ' (' + displayLabel + ')';
             hideDropdown();
 
@@ -543,11 +541,11 @@
             cartItems.forEach((it, idx) => {
                 const tr = document.createElement('tr');
                 tr.className = 'hover:bg-slate-50/50 transition';
-                const isPmi = {{ getActivePharmacyId() == 1 ? 'true' : 'false' }};
+                const isWarehouse = {{ isWarehousePharmacy() ? 'true' : 'false' }};
                 const srcBadgeColor = it.source_type === 'gudang'
                     ? 'bg-amber-50 text-amber-700 border-amber-200'
                     : 'bg-violet-50 text-violet-700 border-violet-200';
-                const srcBadgeLabel = it.source_type === 'gudang' ? 'Gudang ➝ Pelayanan' : (isPmi ? 'Pelayanan ➝ Gudang' : 'Pelayanan ➝ Cabang');
+                const srcBadgeLabel = it.source_type === 'gudang' ? 'Gudang ➝ Pelayanan' : 'Pelayanan ➝ Cabang / Gudang';
                 tr.innerHTML = `
                     <td class="py-3 px-4 font-semibold text-slate-800">
                         ${it.batchName}
@@ -726,20 +724,18 @@
             let autoSelectedId = selectedId;
             if (!autoSelectedId) {
                 const destSelect = document.getElementById('pharmacySelect');
-                let isPmiDest = false;
+                let isGudangDest = false;
                 if (destSelect && destSelect.value !== '') {
                     const destName = destSelect.options[destSelect.selectedIndex]?.text?.toLowerCase() || '';
-                    isPmiDest = destSelect.value == 1 || destName.includes('pmi');
-                } else {
-                    isPmiDest = {{ getActivePharmacyId() == 1 ? 'true' : 'false' }};
+                    isGudangDest = destSelect.value == 9 || destName.includes('gudang') || destName.includes('logistik');
                 }
 
-                if (isPmiDest) {
-                    // Default to etalase id 134 ("Gudang") for PMI
+                if (isGudangDest) {
+                    // Default to etalase id 134 ("Gudang") for Warehouse destination
                     const gudangEtalase = etalaseList.find(e => e.id == 134 || e.name.toLowerCase() === 'gudang');
                     autoSelectedId = gudangEtalase ? gudangEtalase.id : 134;
                 } else {
-                    // Default to etalase id 99 ("Apotek Cabang") for Cabang
+                    // Default to etalase id 99 ("Apotek Cabang") for Pelayanan / Cabang destination
                     const cabangEtalase = etalaseList.find(e => e.id == 99 || e.name.toLowerCase().includes('cabang'));
                     autoSelectedId = cabangEtalase ? cabangEtalase.id : 99;
                 }

@@ -391,7 +391,7 @@
                                 <th class="px-4 py-3 text-right">Harga PPN</th>
                                 <th class="px-3 py-3 text-center">Diskon</th>
                                 <th class="px-3 py-3 text-center">Extra Diskon</th>
-                                <th class="px-3 py-3 text-center">Diskon Diterima</th>
+                                <th class="px-3 py-3 text-center">Diskon PBF</th>
                                 <th class="px-4 py-3 text-right">Total</th>
                                 <th class="px-3 py-3 text-center">Status</th>
                                 <th class="px-3 py-3 text-center">Aksi</th>
@@ -1149,7 +1149,7 @@
             document.getElementById('total_price').value = data.total ?? '';
 
             document.getElementById('batch').value = data.receiving_items?.batch ?? '';
-            document.getElementById('discount').value = data.receiving_items?.discount ?? 0;
+            document.getElementById('discount').value = data.receiving_items?.discount ?? (data.pbf_discount_raw ?? 0);
             document.getElementById('extra_discount').value = data.receiving_items?.extra_discount ?? 0;
             document.getElementById('status').value = data.receiving_items?.status ?? '';
             document.getElementById('expired_date').value = data.receiving_items?.expired_date ?? '';

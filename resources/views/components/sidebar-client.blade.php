@@ -558,6 +558,7 @@
             Dashboard
         </a>
 
+        @if(!isWarehousePharmacy())
         <a href="{{ url('transaction/upds') }}" class="nav-item {{ request()->is('transaction/*') ? 'active' : '' }}">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                 stroke-linecap="round" stroke-linejoin="round">
@@ -567,6 +568,7 @@
             </svg>
             Penjualan
         </a>
+        @endif
 
         <a href="{{ route('receiving.index') }}" class="nav-item {{ request()->is('receiving*') ? 'active' : '' }}">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -603,6 +605,7 @@
 
         <div class="nav-section-title">Statistik</div>
 
+        @if(!isWarehousePharmacy())
         <a onclick="openModal('salesModal')" class="nav-item {{ request()->is('sales*') ? 'active' : '' }}"
             style="cursor:pointer;">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -614,6 +617,7 @@
             </svg>
             Data Penjualan
         </a>
+        @endif
 
         <a onclick="openModal('receivingModal')" class="nav-item {{ request()->is('purchase*') ? 'active' : '' }}"
             style="cursor:pointer;">
@@ -627,6 +631,7 @@
             Data Pembelian
         </a>
 
+        @if(!isWarehousePharmacy())
         <a onclick="openModal('reportModal')" class="nav-item" style="cursor:pointer;">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -637,6 +642,8 @@
             </svg>
             Laporan Penjualan
         </a>
+        @endif
+
         <a onclick="openModal('orderReportModal')" class="nav-item" style="cursor:pointer;">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -647,6 +654,7 @@
             Laporan Pembelian
         </a>
 
+        @if(!isWarehousePharmacy())
         <a href="{{ route('pareto.index') }}" class="nav-item" style="cursor:pointer;">
 
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
@@ -671,6 +679,7 @@
             </svg>
             Master Data
         </a>
+        @endif
 
         <div class="nav-section-title">Akun</div>
 
@@ -682,6 +691,8 @@
             </svg>
             Profil
         </a>
+
+        @if(!isWarehousePharmacy())
         <a href="{{ url('staff-stats') }}" class="nav-item {{ request()->is('staff-stats*') ? 'active' : '' }}">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -690,6 +701,7 @@
             </svg>
             Statistik Kasir
         </a>
+        @endif
 
         <a href="{{ route('logout') }}"
             onclick="event.preventDefault(); document.getElementById('logout-form').submit();" class="nav-item"
@@ -1483,6 +1495,7 @@
                     Stok</span>
             </a>
 
+            @if(!isWarehousePharmacy())
             <a href="{{ route('supplies.stockDetail') }}"
                 class="group flex items-center gap-3 p-3.5 rounded-2xl bg-green-50 hover:bg-green-500 border border-green-100 hover:border-green-500 transition-all duration-200 hover:-translate-y-0.5">
                 <div
@@ -1496,7 +1509,9 @@
                 <span class="text-sm font-semibold text-green-700 group-hover:text-white transition-colors">Stok
                     Pelayanan</span>
             </a>
+            @endif
 
+            @if(canAccessWarehouseStock())
             <a href="{{ route('supplies.storage') }}"
                 class="group flex items-center gap-3 p-3.5 rounded-2xl bg-purple-50 hover:bg-purple-500 border border-purple-100 hover:border-purple-500 transition-all duration-200 hover:-translate-y-0.5">
                 <div
@@ -1510,7 +1525,9 @@
                 <span class="text-sm font-semibold text-purple-700 group-hover:text-white transition-colors">Stok
                     Gudang</span>
             </a>
+            @endif
 
+            @if(isWarehousePharmacy() || canAccessWarehouseStock())
             <a href="{{ route('supplies.stockData') }}"
                 class="group flex items-center gap-3 p-3.5 rounded-2xl bg-orange-50 hover:bg-orange-500 border border-orange-100 hover:border-orange-500 transition-all duration-200 hover:-translate-y-0.5">
                 <div
@@ -1524,10 +1541,10 @@
                 <span class="text-sm font-semibold text-orange-700 group-hover:text-white transition-colors">Data
                     Stok</span>
             </a>
+            @endif
 
-            {{-- 5th item spans full width --}}
             <a href="{{ route('supplies.stockOpname') }}"
-                class="col-span-2 group flex items-center gap-3 p-3.5 rounded-2xl bg-amber-50 hover:bg-amber-500 border border-amber-100 hover:border-amber-500 transition-all duration-200 hover:-translate-y-0.5">
+                class="{{ !isWarehousePharmacy() ? 'col-span-2' : '' }} group flex items-center gap-3 p-3.5 rounded-2xl bg-amber-50 hover:bg-amber-500 border border-amber-100 hover:border-amber-500 transition-all duration-200 hover:-translate-y-0.5">
                 <div
                     class="w-9 h-9 rounded-xl bg-amber-100 group-hover:bg-amber-400 flex items-center justify-center flex-shrink-0 transition-colors">
                     <svg class="w-5 h-5 text-amber-600 group-hover:text-white transition-colors" fill="none"

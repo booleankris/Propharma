@@ -134,10 +134,10 @@ Route::middleware(['auth', 'role:administrator'])->group(function () {
     Route::post('searchreport/', [TransactionReportController::class, 'searchreport'])->name('searchreport');
 });
 
-Route::middleware(['auth', 'role:HO'])->group(function () {
+Route::middleware(['auth', 'role:HO|administrator'])->group(function () {
     Route::post('/pharmacy/switch', [\App\Http\Controllers\PharmacySelectorController::class, 'switch'])->name('pharmacy.switch');
 });
-Route::middleware(['auth', 'role:Kasir'])->group(function () {
+Route::middleware(['auth', 'role:Kasir|Gudang PMI|HO|administrator|manager|Online|UMKM|operator'])->group(function () {
     Route::get('/home', [HomeController::class, 'index'])->name('home');
     Route::get('/near-expiry', [HomeController::class, 'nearExpiry'])->name('kasir.nearExpiry');
 
@@ -274,7 +274,8 @@ Route::middleware(['auth', 'role:Kasir'])->group(function () {
     Route::get('/stock-data', [SuppliesController::class, 'stockData'])->name('supplies.stockData');
     Route::get('/stock-data/get', [SuppliesController::class, 'getStockData'])->name('supplies.getStockData');
     Route::get('/stock-data/medicine-select', [SuppliesController::class, 'medicineSelect'])->name('supplies.medicineSelect');
-    Route::get('/stock-data/export', [SuppliesController::class, 'exportStock'])->name('supplies.exportStockData');
+    Route::get('/stock-data/export', [SuppliesController::class, 'exportStockData'])->name('supplies.exportStockData');
+    Route::get('/stock-data/export/status/{id}', [SuppliesController::class, 'exportStockDataStatus'])->name('supplies.exportStockDataStatus');
 
     // Stock Opname
     Route::get('/stockopname', [SuppliesController::class, 'stockOpname'])->name('supplies.stockOpname');

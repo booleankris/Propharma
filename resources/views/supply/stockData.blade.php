@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Kartu Stock')
+@section('title', 'Data Stok - Gudang PMI')
 
 @section('style')
     <link rel="stylesheet" href="{{ asset('templates/library/datatables/media/css/jquery.dataTables.min.css') }}">
@@ -111,19 +111,52 @@
                         </svg>
                     </div>
                     <div>
-                        <h2 class="text-base font-bold text-slate-800 leading-tight">Kartu Stock</h2>
-                        <p class="text-xs text-slate-400">Pilih rentang tanggal dan obat untuk melihat pergerakan stok</p>
+                        <div class="flex items-center gap-2">
+                            <h2 class="text-base font-bold text-slate-800 leading-tight">Data Stok</h2>
+                            <span
+                                class="px-2 py-0.5 text-[10px] font-semibold bg-violet-50 text-violet-600 border border-violet-100 rounded-full">Gudang
+                                PMI</span>
+                        </div>
+                        <p class="text-xs text-slate-400">Konsolidasi Beli Gudang PMI, Jual Sahabat PMI, dan Total Stok
+                            Real-time</p>
                     </div>
                 </div>
 
-                <a href="{{ route('supplies.printstockdata') }}" target="_blank"
-                    class="inline-flex items-center gap-2 px-4 h-10 rounded-lg text-sm font-semibold text-white bg-emerald-500 hover:bg-emerald-600 transition shadow-sm shrink-0 w-fit">
+                <button id="exportBtn" onclick="startExportExcel()"
+                    class="inline-flex items-center gap-2 px-4 h-10 rounded-lg text-sm font-semibold text-white bg-emerald-500 hover:bg-emerald-600 transition shadow-sm shrink-0 w-fit cursor-pointer">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                     </svg>
-                    Export Excel
-                </a>
+                    <span>Export Excel</span>
+                </button>
+            </div>
+
+            <!-- Export Progress Container -->
+            <div id="progressContainer"
+                class="hidden bg-white rounded-xl border border-blue-200/80 shadow-sm p-4 transition-all duration-300">
+                <div class="flex items-center justify-between mb-2">
+                    <div class="flex items-center gap-2">
+                        <svg class="w-5 h-5 text-blue-600 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none"
+                            viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                                stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor"
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                            </path>
+                        </svg>
+                        <span class="text-sm font-semibold text-slate-700" id="progressStatus">Mempersiapkan data
+                            export...</span>
+                    </div>
+                    <span class="text-sm font-bold text-blue-600" id="progressText">0%</span>
+                </div>
+                <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+                    <div id="progressBar"
+                        class="bg-gradient-to-r from-blue-500 to-indigo-600 h-2.5 rounded-full transition-all duration-300"
+                        style="width: 0%"></div>
+                </div>
+                <p class="text-xs text-slate-400 mt-1.5">Harap tunggu, proses generate file Excel sedang berjalan di latar
+                    belakang.</p>
             </div>
 
             <div class="bg-white rounded-xl border border-slate-200/80 shadow-sm p-5">
@@ -151,10 +184,12 @@
                                 <th class="px-4 py-3">Kode Obat</th>
                                 <th class="px-4 py-3">Nama Obat</th>
                                 <th class="px-4 py-3">Satuan</th>
-                                <th class="px-4 py-3">QTY Awal</th>
-                                <th class="px-4 py-3">QTY Jual</th>
-                                <th class="px-4 py-3">QTY Beli</th>
-                                <th class="px-4 py-3">Saldo Sekarang</th>
+                                <th class="px-4 py-3 text-center">QTY Awal</th>
+                                <th class="px-4 py-3 text-center">QTY Beli</th>
+                                <th class="px-4 py-3 text-center">QTY Jual (PMI)</th>
+                                <th class="px-4 py-3 text-center">Stok Gudang</th>
+                                <th class="px-4 py-3 text-center">Stok Pelayanan PMI</th>
+                                <th class="px-4 py-3 text-center">Total Stok</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100"></tbody>
@@ -177,6 +212,140 @@
         let startDate = '';
         let endDate = '';
         let selectedMedicineId = '';
+        let isExporting = false;
+
+        async function startExportExcel() {
+            if (isExporting) return;
+
+            const exportBtn = document.getElementById('exportBtn');
+            const progressContainer = document.getElementById('progressContainer');
+            const progressBar = document.getElementById('progressBar');
+            const progressText = document.getElementById('progressText');
+            const progressStatus = document.getElementById('progressStatus');
+
+            isExporting = true;
+            exportBtn.disabled = true;
+            exportBtn.innerHTML = `
+                <svg class="w-4 h-4 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span>Memproses Export...</span>
+            `;
+            exportBtn.classList.add('opacity-75', 'cursor-not-allowed');
+
+            progressContainer.classList.remove('hidden');
+            progressBar.style.width = '10%';
+            progressText.innerText = '10%';
+            progressStatus.innerText = 'Memulai proses export...';
+
+            try {
+                let url = "{{ route('supplies.exportStockData') }}?start_date=" + encodeURIComponent(startDate) +
+                    "&end_date=" + encodeURIComponent(endDate) +
+                    "&medicine_id=" + encodeURIComponent(selectedMedicineId);
+
+                const response = await fetch(url, {
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+
+                if (!response.ok) throw new Error('Gagal memulai proses export');
+                const data = await response.json();
+
+                if (data.job_id) {
+                    pollExportStatus(data.job_id);
+                } else {
+                    throw new Error('ID job export tidak valid');
+                }
+            } catch (error) {
+                iziToast.error({
+                    title: 'Gagal',
+                    message: error.message || 'Terjadi kesalahan saat memulai export.',
+                    position: 'topRight'
+                });
+                resetExportState();
+            }
+        }
+
+        function pollExportStatus(jobId) {
+            const progressBar = document.getElementById('progressBar');
+            const progressText = document.getElementById('progressText');
+            const progressStatus = document.getElementById('progressStatus');
+            const progressContainer = document.getElementById('progressContainer');
+
+            let interval = setInterval(() => {
+                fetch(`/stock-data/export/status/${jobId}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        let prog = data.progress || 0;
+                        progressBar.style.width = prog + "%";
+                        progressText.innerText = prog + "%";
+
+                        if (prog < 50) {
+                            progressStatus.innerText = 'Mempersiapkan data dan stok...';
+                        } else if (prog < 100) {
+                            progressStatus.innerText = 'Menyusun file Excel...';
+                        }
+
+                        if (data.status === "completed") {
+                            clearInterval(interval);
+                            progressBar.style.width = "100%";
+                            progressText.innerText = "100%";
+                            progressStatus.innerText = 'Selesai! Mengunduh file...';
+
+                            iziToast.success({
+                                title: 'Selesai',
+                                message: 'File Excel Data Stok siap diunduh!',
+                                position: 'topRight'
+                            });
+
+                            setTimeout(() => {
+                                progressContainer.classList.add('hidden');
+                                resetExportState();
+                            }, 2000);
+
+                            if (data.file) {
+                                window.location.href = data.file;
+                            }
+                        } else if (data.status === "failed") {
+                            clearInterval(interval);
+                            iziToast.error({
+                                title: 'Gagal',
+                                message: 'Terjadi kesalahan saat meng-generate file Excel.',
+                                position: 'topRight'
+                            });
+                            progressContainer.classList.add('hidden');
+                            resetExportState();
+                        }
+                    })
+                    .catch(err => {
+                        clearInterval(interval);
+                        iziToast.error({
+                            title: 'Error',
+                            message: 'Gagal memeriksa status export.',
+                            position: 'topRight'
+                        });
+                        resetExportState();
+                    });
+            }, 1000);
+        }
+
+        function resetExportState() {
+            isExporting = false;
+            const exportBtn = document.getElementById('exportBtn');
+            if (exportBtn) {
+                exportBtn.disabled = false;
+                exportBtn.innerHTML = `
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    <span>Export Excel</span>
+                `;
+                exportBtn.classList.remove('opacity-75', 'cursor-not-allowed');
+            }
+        }
 
         document.addEventListener('DOMContentLoaded', function() {
             flatpickr("#dateRange", {
@@ -251,16 +420,28 @@
                         data: 'unit'
                     },
                     {
-                        data: 'qty_start'
+                        data: 'qty_start',
+                        className: 'text-center font-medium text-slate-700'
                     },
                     {
-                        data: 'qty_sales'
+                        data: 'qty_orders',
+                        className: 'text-center font-semibold text-emerald-600'
                     },
                     {
-                        data: 'qty_orders'
+                        data: 'qty_sales',
+                        className: 'text-center font-semibold text-blue-600'
                     },
                     {
-                        data: 'qty_now'
+                        data: 'qty_storage',
+                        className: 'text-center font-bold text-amber-600'
+                    },
+                    {
+                        data: 'qty_counter',
+                        className: 'text-center font-bold text-indigo-600'
+                    },
+                    {
+                        data: 'qty_now',
+                        className: 'text-center font-bold text-slate-800'
                     }
                 ],
                 paging: true,

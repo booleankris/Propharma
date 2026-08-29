@@ -99,6 +99,17 @@
                             </div>
 
                             <div class="form-group row">
+                                <label for="pharmacy_id" class="col-sm-3 col-form-label">Apotek</label>
+                                <div class="col-sm-9">
+                                    {!! Form::select('pharmacy_id', $pharmacies, $user->pharmacy_id, [
+                                        'id' => 'pharmacy_id',
+                                        'class' => 'form-control custom-select select2',
+                                        'required',
+                                    ]) !!}
+                                </div>
+                            </div>
+
+                            <div class="form-group row">
                                 <label for="roles" class="col-sm-3 col-form-label">Level</label>
                                 <div class="col-sm-9">
                                     {!! Form::select('roles[]', $roles, $userRole, [

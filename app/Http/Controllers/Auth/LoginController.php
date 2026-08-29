@@ -21,10 +21,17 @@ class LoginController extends Controller
         if ($user->hasRole('administrator') || $user->hasRole('Manager')) {
             return redirect()->route('dashboard');
         }
-        if ($user->hasRole('Kasir') || $user->hasRole('UMKM') || $user->hasRole('HO') || $user->hasRole('Online')) {
+        if (
+            $user->hasRole('Kasir') ||
+            $user->hasRole('UMKM') ||
+            $user->hasRole('HO') ||
+            $user->hasRole('Online') ||
+            $user->hasRole('Gudang PMI') ||
+            isWarehousePharmacy($user->pharmacy_id)
+        ) {
             return redirect()->route('home');
         }
-        return redirect('/');
+        return redirect()->route('home');
     }
 
     public function __construct()

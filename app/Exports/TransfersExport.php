@@ -34,7 +34,7 @@ class TransfersExport implements FromQuery, WithHeadings, WithMapping, ShouldAut
             'batches.medicines',
             'batches.pharmacy',
             'etalases'
-        ]);
+        ])->whereNull('receiving_items_id');
 
         if ($this->startDate && $this->endDate) {
             $query->whereIn('medicine_transfer_id', function($q) {

@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Exports\Stocks\PrintStockOpnameExport;
 use App\Exports\Stocks\StockDataExport;
+use App\Jobs\ProcessStockDataExport;
 use App\Models\Batches;
+use App\Models\ExportJob;
 use App\Models\ItemsLog;
 use App\Models\MedicineCart;
 use App\Models\Medicines;
@@ -25,19 +27,30 @@ class SuppliesController extends Controller
     {
         if (!$medicineId) return 0;
 
-        $storageStock = (int) Batches::where('medicine_id', $medicineId)
-            ->where('pharmacy_id', $pharmacyId)
-            ->sum('stock');
+        $warehouseId = getWarehousePharmacyId();
+        $canSeeWarehouse = canAccessWarehouseStock($pharmacyId);
+
+        $storageStock = $canSeeWarehouse
+            ? (int) Batches::where('medicine_id', $medicineId)
+                ->where('pharmacy_id', $warehouseId)
+                ->sum('stock')
+            : 0;
 
         if ($type === 'storage') {
             return $storageStock;
         }
 
-        $counterStock = (int) MedicineTransferItems::whereHas('batches', function ($b) use ($medicineId, $pharmacyId) {
+        // Jika farmasi adalah Gudang (id 9), stok etalase/pelayanan diambil dari SAHABAT PMI (id 1)
+        $counterPharmacyId = isWarehousePharmacy($pharmacyId) ? 1 : $pharmacyId;
+
+        $counterStock = (int) MedicineTransferItems::whereHas('batches', function ($b) use ($medicineId, $counterPharmacyId) {
                 $b->where('medicine_id', $medicineId)
-                  ->where('pharmacy_id', $pharmacyId);
+                  ->where('pharmacy_id', $counterPharmacyId);
             })
             ->where('status', 1)
+            ->where(function ($q) {
+                $q->whereNull('source_type')->orWhere('source_type', '!=', 'retur_gudang');
+            })
             ->sum('qty');
 
         if ($type === 'counter') {
@@ -57,27 +70,35 @@ class SuppliesController extends Controller
 
         if ($request->ajax()) {
 
-            $pharmacyId = getActivePharmacyId();
+            $activePharmacyId = getActivePharmacyId();
+            $warehouseId = getWarehousePharmacyId();
+            $isWarehouse = isWarehousePharmacy($activePharmacyId);
+            $pharmacyId = $isWarehouse ? 1 : $activePharmacyId;
+            $canSeeWarehouse = canAccessWarehouseStock($activePharmacyId);
+
+            // Jika akun gudang PMI, sertakan pharmacy_id Gudang PMI (9) dan Apotek PMI (1)
+            $targetPharmacyIds = $isWarehouse
+                ? array_unique([$activePharmacyId, $warehouseId, 1])
+                : [$activePharmacyId];
 
             $baseQuery = ItemsLog::query();
 
-
-            $baseQuery->where(function ($q) use ($pharmacyId) {
-                $q->where(function ($sub) use ($pharmacyId) {
+            $baseQuery->where(function ($q) use ($targetPharmacyIds, $isWarehouse, $activePharmacyId) {
+                $q->where(function ($sub) use ($targetPharmacyIds) {
                     $sub->where('status', 2)
-                        ->whereHas('receiving', function ($r) use ($pharmacyId) {
-                            $r->where('pharmacy_id', $pharmacyId)
+                        ->whereHas('receiving', function ($r) use ($targetPharmacyIds) {
+                            $r->whereIn('pharmacy_id', $targetPharmacyIds)
                                 ->whereIn('status', [1, 2, 3, 4]);
                         });
-                })->orWhere(function ($sub) use ($pharmacyId) {
+                })->orWhere(function ($sub) use ($targetPharmacyIds) {
                     $sub->where('status', 7)
-                        ->whereHas('batches', function ($b) use ($pharmacyId) {
-                            $b->where('pharmacy_id', $pharmacyId);
+                        ->whereHas('batches', function ($b) use ($targetPharmacyIds) {
+                            $b->whereIn('pharmacy_id', $targetPharmacyIds);
                         });
-                })->orWhere(function ($sub) use ($pharmacyId) {
+                })->orWhere(function ($sub) use ($targetPharmacyIds) {
                     $sub->whereNotIn('status', [2, 7])
-                        ->whereHas('users', function ($u) use ($pharmacyId) {
-                            $u->where('pharmacy_id', $pharmacyId);
+                        ->whereHas('users', function ($u) use ($targetPharmacyIds) {
+                            $u->whereIn('pharmacy_id', $targetPharmacyIds);
                         });
                 });
             });
@@ -139,16 +160,17 @@ class SuppliesController extends Controller
             }
 
             if ($med) {
-                $storageStock = $this->calculateRealtimeStock($med->id, $pharmacyId, 'storage');
+                $storageStock = $canSeeWarehouse ? $this->calculateRealtimeStock($med->id, $pharmacyId, 'storage') : 0;
                 $counterStock = $this->calculateRealtimeStock($med->id, $pharmacyId, 'counter');
                 $balance = $storageStock + $counterStock;
             } else if ($lastRecord) {
-                $balance = $lastRecord->qty_after;
-                // Aggregate stock across the active pharmacy when no specific medicine is selected
-                $storageStock = (int) Batches::where('pharmacy_id', $pharmacyId)->sum('stock');
+                $storageStock = $canSeeWarehouse ? (int) Batches::where('pharmacy_id', $warehouseId)->sum('stock') : 0;
                 $counterStock = (int) MedicineTransferItems::whereHas('batches', function ($b) use ($pharmacyId) {
                     $b->where('pharmacy_id', $pharmacyId);
-                })->where('status', 1)->sum('qty');
+                })->where('status', 1)->where(function ($q) {
+                    $q->whereNull('source_type')->orWhere('source_type', '!=', 'retur_gudang');
+                })->sum('qty');
+                $balance = $storageStock + $counterStock;
             }
 
             // 5. RETURN DATATABLES RESPONSE
@@ -299,25 +321,34 @@ class SuppliesController extends Controller
     // Stok Gudang
     public function storageSupplies(Request $request)
     {
+        if (!canAccessWarehouseStock()) {
+            return redirect()->route('home')->with('error', 'Akses stok gudang hanya untuk PMI dan Gudang.');
+        }
         return view('supply.storageStockData');
     }
 
     public function getStorageSupplies(Request $request)
     {
+        if (!canAccessWarehouseStock()) {
+            return response()->json(['data' => []]);
+        }
+
         if ($request->ajax()) {
+            $warehouseId = getWarehousePharmacyId();
+
             $items = ItemsLog::with('medicines')
-                ->whereIn('status', [2, 5, 6, 7]);
+                ->whereIn('status', [2, 5, 6, 7])
+                ->whereHas('batches', function ($q) use ($warehouseId) {
+                    $q->where('pharmacy_id', $warehouseId);
+                });
 
             $totalStockGudang = 0;
             if ($request->filled('medicine_id')) {
                 $items->where('medicine_id', $request->medicine_id);
-                $totalStockGudang = $this->calculateRealtimeStock($request->medicine_id, getActivePharmacyId(), 'storage');
+                $totalStockGudang = $this->calculateRealtimeStock($request->medicine_id, $warehouseId, 'storage');
+            } else {
+                $totalStockGudang = (int) Batches::where('pharmacy_id', $warehouseId)->sum('stock');
             }
-
-            // Selalu filter berdasarkan apotek aktif
-            $items->whereHas('batches', function ($q) {
-                $q->where('pharmacy_id', getActivePharmacyId());
-            });
 
             if ($request->filled('start_date')) {
                 $items->whereDate('date', '>=', $request->start_date);
@@ -332,10 +363,10 @@ class SuppliesController extends Controller
                 ->addColumn('date', fn($r) => $r->date)
                 ->addColumn('code', fn($r) => $r->code)
                 ->addColumn('type', fn($r) => $r->type)
-                ->addColumn('name', fn($r) => $r->medicines->name)
+                ->addColumn('name', fn($r) => $r->medicines->name ?? '-')
                 ->addColumn('stock', function ($row) {
 
-                    // status 2 — Pembelian ( Stok masuk gudang)
+                    // status 2 — Pembelian (Stok masuk gudang)
                     if ($row->status == 2) {
                         $sign = $row->qty > 0 ? '+' : '';
                         $color = $row->qty >= 0 ? '#854F0B' : '#A32D2D';
@@ -360,19 +391,19 @@ class SuppliesController extends Controller
                         $color = $diff > 0 ? '#854F0B' : '#0F6E56';
                         return "<div style='color:{$color};font-weight:600;'>{$sign}" . abs($diff) . "</div>";
                     }
+                    return $row->qty;
                 })
                 ->addColumn('qty_before', fn($r) => "<b>{$r->qty_before}</b>")
                 ->addColumn('qty_after', fn($r) => "<b>{$r->qty_after}</b>")
-                // Fixed: these two were both returning qty_after
                 ->addColumn('qty_before_number', fn($r) => $r->qty_before)
                 ->addColumn('qty_after_number', fn($r) => $r->qty_after)
-                ->addColumn('supply', function ($r) {
+                ->addColumn('supply', function ($r) use ($warehouseId) {
                     static $storageCache = [];
                     $medId = $r->medicine_id;
                     if (!$medId) return '-';
 
                     if (!isset($storageCache[$medId])) {
-                        $storageCache[$medId] = $this->calculateRealtimeStock($medId, getActivePharmacyId(), 'storage');
+                        $storageCache[$medId] = $this->calculateRealtimeStock($medId, $warehouseId, 'storage');
                     }
 
                     return $storageCache[$medId];
@@ -403,34 +434,49 @@ class SuppliesController extends Controller
     // Data Stok
     public function stockData()
     {
+        if (!canAccessWarehouseStock() && !isWarehousePharmacy()) {
+            return redirect()->route('dashboard')->with('error', 'Halaman Data Stok hanya dapat diakses oleh Gudang PMI.');
+        }
+
         return view('supply.stockData');
     }
     public function getStockData(Request $request)
     {
         if ($request->ajax()) {
-            $dateScope = function ($q) use ($request) {
-                if ($request->filled('start_date')) {
-                    $q->whereDate('date', '>=', $request->start_date);
-                }
-                if ($request->filled('end_date')) {
-                    $q->whereDate('date', '<=', $request->end_date);
-                }
-            };
+            if (!canAccessWarehouseStock() && !isWarehousePharmacy()) {
+                return response()->json(['error' => 'Unauthorized'], 403);
+            }
+
+            $warehouseId = getWarehousePharmacyId(); // 9 (Gudang PMI)
+            $pmiPharmacyId = 1; // SAHABAT PMI
 
             $medicines = Medicines::query()
-                ->withSum([
-                    'items_log as qty_orders' => function ($q) use ($dateScope) {
-                        $q->where('status', 2);
-                        $dateScope($q);
-                    }
-                ], 'qty')
-                ->withSum([
-                    'items_log as qty_sales' => function ($q) use ($dateScope) {
-                        $q->where('status', 1);
-                        $dateScope($q);
-                    }
-                ], 'qty')
+                ->select([
+                    'medicines.id',
+                    'medicines.code',
+                    'medicines.name',
+                    'medicines.unit',
+                ])
                 ->addSelect([
+                    // Qty Beli dari Gudang PMI (pharmacy_id = 9)
+                    'qty_orders' => ItemsLog::select(DB::raw('COALESCE(SUM(CAST(items_log.qty AS UNSIGNED)), 0)'))
+                        ->join('batches', 'batches.id', '=', 'items_log.batches_id')
+                        ->whereColumn('items_log.medicine_id', 'medicines.id')
+                        ->where('items_log.status', 2)
+                        ->where('batches.pharmacy_id', $warehouseId)
+                        ->when($request->filled('start_date'), fn($q) => $q->whereDate('items_log.date', '>=', $request->start_date))
+                        ->when($request->filled('end_date'), fn($q) => $q->whereDate('items_log.date', '<=', $request->end_date)),
+
+                    // Qty Jual dari SAHABAT PMI (pharmacy_id = 1)
+                    'qty_sales' => ItemsLog::select(DB::raw('COALESCE(SUM(CAST(items_log.qty AS UNSIGNED)), 0)'))
+                        ->join('batches', 'batches.id', '=', 'items_log.batches_id')
+                        ->whereColumn('items_log.medicine_id', 'medicines.id')
+                        ->where('items_log.status', 1)
+                        ->where('batches.pharmacy_id', $pmiPharmacyId)
+                        ->when($request->filled('start_date'), fn($q) => $q->whereDate('items_log.date', '>=', $request->start_date))
+                        ->when($request->filled('end_date'), fn($q) => $q->whereDate('items_log.date', '<=', $request->end_date)),
+
+                    // Qty Awal
                     'qty_start' => ItemsLog::select('qty_before')
                         ->whereColumn('medicine_id', 'medicines.id')
                         ->when($request->filled('start_date'), fn($q) => $q->whereDate('date', '>=', $request->start_date))
@@ -439,24 +485,39 @@ class SuppliesController extends Controller
                         ->orderBy('id')
                         ->limit(1),
 
-                    'qty_now' => ItemsLog::select('qty_after')
+                    // Stok Gudang (pharmacy_id = 9)
+                    'qty_storage' => Batches::select(DB::raw('COALESCE(SUM(stock), 0)'))
                         ->whereColumn('medicine_id', 'medicines.id')
-                        ->when($request->filled('start_date'), fn($q) => $q->whereDate('date', '>=', $request->start_date))
-                        ->when($request->filled('end_date'), fn($q) => $q->whereDate('date', '<=', $request->end_date))
-                        ->orderByDesc('date')
-                        ->orderByDesc('id')
-                        ->limit(1),
+                        ->where('pharmacy_id', $warehouseId),
+
+                    // Stok Pelayanan PMI (pharmacy_id = 1)
+                    'qty_counter' => MedicineTransferItems::select(DB::raw('COALESCE(SUM(medicine_transfer_items.qty), 0)'))
+                        ->join('batches', 'batches.id', '=', 'medicine_transfer_items.batches_id')
+                        ->whereColumn('batches.medicine_id', 'medicines.id')
+                        ->where('batches.pharmacy_id', $pmiPharmacyId)
+                        ->where('medicine_transfer_items.status', 1)
+                        ->where(function ($q) {
+                            $q->whereNull('medicine_transfer_items.source_type')
+                              ->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang');
+                        }),
                 ]);
+
             if ($request->filled('medicine_id')) {
                 $medicines->where('medicines.id', $request->medicine_id);
             }
+
             return DataTables::of($medicines)
                 ->addIndexColumn()
-
-                ->editColumn('qty_start', fn($m) => $m->qty_start ?? 0)
-                ->editColumn('qty_orders', fn($m) => $m->qty_orders ?? 0)
-                ->editColumn('qty_sales', fn($m) => $m->qty_sales ?? 0)
-                ->editColumn('qty_now', fn($m) => $m->qty_now ?? 0)
+                ->editColumn('qty_start', fn($m) => (int) ($m->qty_start ?? 0))
+                ->editColumn('qty_orders', fn($m) => (int) ($m->qty_orders ?? 0))
+                ->editColumn('qty_sales', fn($m) => (int) ($m->qty_sales ?? 0))
+                ->editColumn('qty_storage', fn($m) => (int) ($m->qty_storage ?? 0))
+                ->editColumn('qty_counter', fn($m) => (int) ($m->qty_counter ?? 0))
+                ->addColumn('qty_now', function ($m) {
+                    $storage = (int) ($m->qty_storage ?? 0);
+                    $counter = (int) ($m->qty_counter ?? 0);
+                    return $storage + $counter;
+                })
                 ->make(true);
         }
     }
@@ -477,7 +538,41 @@ class SuppliesController extends Controller
     }
     public function printStockData(Request $request)
     {
-        return Excel::download(new StockDataExport, 'stock_data.xlsx');
+        if (!canAccessWarehouseStock() && !isWarehousePharmacy()) {
+            abort(403, 'Unauthorized');
+        }
+        return Excel::download(new StockDataExport($request), 'stock_data_gudang.xlsx');
+    }
+
+    public function exportStockData(Request $request)
+    {
+        if (!canAccessWarehouseStock() && !isWarehousePharmacy()) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $job = ExportJob::create([
+            'type' => 'stock_data',
+            'status' => 'pending',
+            'progress' => 0,
+        ]);
+
+        dispatch(new ProcessStockDataExport($job->id, $request->only(['start_date', 'end_date', 'medicine_id'])));
+
+        return response()->json([
+            'job_id' => $job->id,
+            'message' => 'Export dimulai.',
+        ]);
+    }
+
+    public function exportStockDataStatus($id)
+    {
+        $job = ExportJob::findOrFail($id);
+
+        return response()->json([
+            'status' => $job->status,
+            'progress' => (int) $job->progress,
+            'file' => $job->file_path ? asset('storage/' . $job->file_path) : null,
+        ]);
     }
 
     // Stock Opname
@@ -487,7 +582,7 @@ class SuppliesController extends Controller
         if ($request->ajax()) {
 
             $logs = ItemsLog::query()
-                ->with('medicines')
+                ->with(['medicines', 'batches'])
                 ->select('items_log.*');
 
             if ($request->filled('searchMedicine')) {
@@ -505,11 +600,18 @@ class SuppliesController extends Controller
                 $logs->whereDate('date', '<=', $request->end_date);
             }
 
+            $stats = (clone $logs)->selectRaw("
+                SUM(CASE WHEN status = 1 THEN qty ELSE 0 END) as qty_sold,
+                SUM(CASE WHEN status = 2 THEN qty ELSE 0 END) as qty_bought
+            ")->first();
+
+            $firstRecord = (clone $logs)->orderBy('date', 'asc')->orderBy('id', 'asc')->first();
+
             return DataTables::of($logs)
                 ->addIndexColumn()
 
                 ->addColumn('name', function ($log) {
-                    return $log->medicine->name ?? '-';
+                    return $log->medicines->name ?? '-';
                 })
 
                 ->editColumn('type', function ($log) {
@@ -537,7 +639,7 @@ class SuppliesController extends Controller
                         font-family: Poppins;
                         border-radius:25px;'>
                         Penjualan
-                        </div";
+                        </div>";
                     } else if ($row->status == 2) {
                         return "<div style='text-align: center;
                         font-weight: bold;
@@ -564,7 +666,7 @@ class SuppliesController extends Controller
                         font-family: Poppins;
                         border-radius: 25px;'>
                         Retur Jual
-                        </div";
+                        </div>";
                     } else if ($row->status == 4) {
                         return "<div style='
                         text-align: center;
@@ -578,7 +680,7 @@ class SuppliesController extends Controller
                         font-family: Poppins;
                         border-radius: 25px;'>
                         Retur Beli
-                        </div";
+                        </div>";
                     } else if ($row->status == 5) {
                         return "<div style='
                         text-align: center;
@@ -591,7 +693,7 @@ class SuppliesController extends Controller
                         font-family: Poppins;
                         border-radius: 25px;'>
                         Stock Opname
-                        </div";
+                        </div>";
                     } else if ($row->status == 7) {
                         return "<div style='
                         text-align: center;
@@ -604,10 +706,16 @@ class SuppliesController extends Controller
                         font-family: Poppins;
                         border-radius: 25px;'>
                         Mutasi Stok
-                        </div";
+                        </div>";
                     }
+                    return "-";
                 })
                 ->rawColumns(['status'])
+                ->with([
+                    'qty_awal' => $firstRecord ? (int) $firstRecord->qty_before : 0,
+                    'qty_beli' => (int) ($stats->qty_bought ?? 0),
+                    'qty_jual' => (int) ($stats->qty_sold ?? 0),
+                ])
                 ->make(true);
         }
     }
@@ -650,8 +758,13 @@ class SuppliesController extends Controller
     public function medicineStockLog(Request $request)
     {
         if ($request->ajax()) {
-            $items = ItemsLog::with(['medicines', 'batches'])->whereHas('batches', function ($batch) {
-                $batch->where('pharmacy_id', getActivePharmacyId());
+            $activePharmacyId = getActivePharmacyId();
+            $items = ItemsLog::with(['medicines', 'batches'])->whereHas('batches', function ($batch) use ($activePharmacyId) {
+                if (isWarehousePharmacy($activePharmacyId)) {
+                    $batch->whereIn('pharmacy_id', [getWarehousePharmacyId(), 1]);
+                } else {
+                    $batch->where('pharmacy_id', $activePharmacyId);
+                }
             });
             if ($request->filled('searchMedicine')) {
                 $items->whereHas('medicines', function ($q) use ($request) {
@@ -870,13 +983,40 @@ class SuppliesController extends Controller
     }
     public function getBatchesByMedicine(Request $request)
     {
+        $pharmacyId = getActivePharmacyId();
+        $warehouseId = getWarehousePharmacyId();
+        $canSeeWarehouse = canAccessWarehouseStock($pharmacyId);
+        $counterPharmacyId = isWarehousePharmacy($pharmacyId) ? 1 : $pharmacyId;
+
         $batches = Batches::where('medicine_id', $request->medicine_id)
-            ->where('pharmacy_id', getActivePharmacyId())
+            ->where(function ($q) use ($pharmacyId, $warehouseId, $canSeeWarehouse) {
+                if (isWarehousePharmacy($pharmacyId)) {
+                    $q->where('pharmacy_id', $warehouseId)
+                      ->orWhere('pharmacy_id', 1);
+                } else {
+                    $q->where('pharmacy_id', $pharmacyId);
+                    if ($canSeeWarehouse) {
+                        $q->orWhere('pharmacy_id', $warehouseId);
+                    }
+                }
+            })
             ->orderBy('expired_date', 'asc') // FEFO
-            ->withSum(['medicine_transfer_items as counter_stock' => function ($q) {
-                $q->where('status', 1);
+            ->withSum(['medicine_transfer_items as counter_stock' => function ($q) use ($counterPharmacyId) {
+                $q->where('status', 1)
+                  ->whereHas('batches', fn($b) => $b->where('pharmacy_id', $counterPharmacyId))
+                  ->where(function ($sub) {
+                      $sub->whereNull('source_type')->orWhere('source_type', '!=', 'retur_gudang');
+                  });
             }], 'qty')
-            ->get(['id', 'name', 'expired_date', 'stock']);
+            ->get(['id', 'name', 'expired_date', 'stock', 'pharmacy_id']);
+
+        $batches->each(function ($b) use ($warehouseId) {
+            // Hanya batch milik Gudang PMI (pharmacy_id = 9) yang memiliki stok gudang (storage stock).
+            // Batch milik apotek pelayanan (pharmacy_id != 9) stok fisiknya berada di etalase (counter_stock).
+            if ($b->pharmacy_id != $warehouseId) {
+                $b->stock = 0;
+            }
+        });
 
         return response()->json($batches);
     }
@@ -923,6 +1063,29 @@ class SuppliesController extends Controller
 
         return $prefix . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
     }
+
+    public function generateTransfersCode()
+    {
+        $now = Carbon::now();
+
+        $year = $now->format('y');
+        $month = $now->format('m');
+        $prefix = "{$year}{$month}MUT";
+
+        $lastCode = MedicineTransfers::where('code', 'like', "{$prefix}%")
+            ->orderBy('code', 'desc')
+            ->value('code');
+
+        if ($lastCode) {
+            $lastNumber = (int) substr($lastCode, -4);
+            $nextNumber = $lastNumber + 1;
+        } else {
+            $nextNumber = 1;
+        }
+
+        return $prefix . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+    }
+
     public function stockOpname()
     {
         return view('supply.stockOpname');
@@ -1030,22 +1193,64 @@ class SuppliesController extends Controller
     // }
     public function batches(Request $request)
     {
+        $pharmacyId = getActivePharmacyId();
+        $warehouseId = getWarehousePharmacyId();
+        $canSeeWarehouse = canAccessWarehouseStock($pharmacyId);
+        $counterPharmacyId = isWarehousePharmacy($pharmacyId) ? 1 : $pharmacyId;
+
         $batches = Batches::where('medicine_id', $request->medicine_id)
-            ->where('pharmacy_id', getActivePharmacyId())
-            ->orderBy('expired_date', 'asc')                    // FEFO
-            ->get(['id', 'name', 'expired_date', 'stock']);
+            ->where(function ($q) use ($pharmacyId, $warehouseId, $canSeeWarehouse) {
+                if (isWarehousePharmacy($pharmacyId)) {
+                    $q->where('pharmacy_id', $warehouseId)
+                      ->orWhere('pharmacy_id', 1);
+                } else {
+                    $q->where('pharmacy_id', $pharmacyId);
+                    if ($canSeeWarehouse) {
+                        $q->orWhere('pharmacy_id', $warehouseId);
+                    }
+                }
+            })
+            ->withSum(['medicine_transfer_items as counter_stock' => function ($q) use ($counterPharmacyId) {
+                $q->where('status', 1)
+                  ->whereHas('batches', fn($b) => $b->where('pharmacy_id', $counterPharmacyId))
+                  ->where(function ($sub) {
+                      $sub->whereNull('source_type')->orWhere('source_type', '!=', 'retur_gudang');
+                  });
+            }], 'qty')
+            ->orderBy('expired_date', 'asc')
+            ->get(['id', 'name', 'expired_date', 'stock', 'pharmacy_id']);
+
+        $batches->each(function ($b) use ($warehouseId) {
+            // Hanya batch milik Gudang PMI (pharmacy_id = 9) yang memiliki stok gudang (storage stock).
+            // Batch milik apotek pelayanan (pharmacy_id != 9) stok fisiknya berada di etalase (counter_stock).
+            if ($b->pharmacy_id != $warehouseId) {
+                $b->stock = 0;
+            }
+        });
 
         return response()->json($batches);
     }
 
     public function opname(Request $request)
     {
-        $request->validate([
+        $pharmacyId = getActivePharmacyId();
+        $warehouseId = getWarehousePharmacyId();
+        $canSeeWarehouse = canAccessWarehouseStock($pharmacyId);
+        $counterPharmacyId = isWarehousePharmacy($pharmacyId) ? 1 : $pharmacyId;
+
+        $rules = [
             'medicine_id' => 'required|exists:medicines,id',
-            'stock_physic' => 'required|integer',
-            'counter_stock_physic' => 'nullable|integer',
+            'counter_stock_physic' => 'nullable|integer|min:0',
             'batches_id' => 'nullable|exists:batches,id',
-        ]);
+        ];
+
+        if ($canSeeWarehouse) {
+            $rules['stock_physic'] = 'required|integer|min:0';
+        } else {
+            $rules['stock_physic'] = 'nullable|integer|min:0';
+        }
+
+        $request->validate($rules);
 
         DB::beginTransaction();
 
@@ -1056,22 +1261,60 @@ class SuppliesController extends Controller
             } else {
                 $batch = Batches::lockForUpdate()
                     ->where('medicine_id', $request->medicine_id)
-                    ->where('pharmacy_id', getActivePharmacyId())
+                    ->where(function ($q) use ($pharmacyId, $warehouseId, $canSeeWarehouse) {
+                        $q->where('pharmacy_id', $pharmacyId);
+                        if ($canSeeWarehouse) {
+                            $q->orWhere('pharmacy_id', $warehouseId);
+                            $q->orWhere('pharmacy_id', 1);
+                        }
+                    })
                     ->orderBy('expired_date', 'asc')
-                    ->firstOrFail();
+                    ->first();
+
+                if (!$batch) {
+                    $batch = Batches::create([
+                        'medicine_id' => $request->medicine_id,
+                        'pharmacy_id' => $canSeeWarehouse ? $warehouseId : $pharmacyId,
+                        'name' => 'OPN-' . date('Ymd'),
+                        'expired_date' => now()->addYears(2)->toDateString(),
+                        'stock' => 0,
+                    ]);
+                }
             }
 
-            $storageBefore = (int) $batch->stock;
+            $storageBefore = $canSeeWarehouse ? (int) $batch->stock : 0;
             $transfer = MedicineTransferItems::where('batches_id', $batch->id)
                 ->where('status', 1)
+                ->where(function ($q) {
+                    $q->whereNull('source_type')->orWhere('source_type', '!=', 'retur_gudang');
+                })
                 ->first();
+
+            // Jika tidak ditemukan transfer langsung di batch ini dan akun adalah Gudang PMI, cari transfer di batch PMI
+            if (!$transfer && isWarehousePharmacy($pharmacyId)) {
+                $pmiBatch = Batches::where('medicine_id', $request->medicine_id)
+                    ->where('pharmacy_id', 1)
+                    ->where('name', $batch->name)
+                    ->first();
+                if ($pmiBatch) {
+                    $transfer = MedicineTransferItems::where('batches_id', $pmiBatch->id)
+                        ->where('status', 1)
+                        ->where(function ($q) {
+                            $q->whereNull('source_type')->orWhere('source_type', '!=', 'retur_gudang');
+                        })
+                        ->first();
+                }
+            }
+
             $counterBefore = $transfer ? (int) $transfer->qty : 0;
 
             $stockBeforeTotal = $storageBefore + $counterBefore;
 
-            $storagePhysic = (int) $request->stock_physic;
-            $hasCounterInput = $request->filled('counter_stock_physic');
-            $counterPhysic = $hasCounterInput ? (int) $request->counter_stock_physic : $counterBefore;
+            $storagePhysic = $canSeeWarehouse ? (int) ($request->stock_physic ?? 0) : $storageBefore;
+            $hasCounterInput = $request->filled('counter_stock_physic') || !$canSeeWarehouse;
+            $counterPhysic = $request->filled('counter_stock_physic')
+                ? (int) $request->counter_stock_physic
+                : ($canSeeWarehouse ? $counterBefore : (int) ($request->stock_physic ?? 0));
 
             $stockAfterTotal = $storagePhysic + $counterPhysic;
             $discrepancy = $stockAfterTotal - $stockBeforeTotal;
@@ -1079,9 +1322,11 @@ class SuppliesController extends Controller
             // status 5 = surplus or equal, status 6 = deficit
             $status = $discrepancy >= 0 ? 5 : 6;
 
-            // 2. Update batch storage stock
-            $batch->stock = $storagePhysic;
-            $batch->save();
+            // 2. Update batch storage stock (only if authorized)
+            if ($canSeeWarehouse) {
+                $batch->stock = $storagePhysic;
+                $batch->save();
+            }
 
             // 3. Update counter stock if input provided
             if ($hasCounterInput) {
@@ -1089,16 +1334,45 @@ class SuppliesController extends Controller
                     $transfer->qty = $counterPhysic;
                     $transfer->save();
                 } else {
+                    $transferHeader = MedicineTransfers::create([
+                        'code' => $this->generateTransfersCode(),
+                        'status' => 1,
+                        'user_id' => auth()->id(),
+                    ]);
+
+                    $targetBatchId = $batch->id;
+                    if (isWarehousePharmacy($pharmacyId) && $batch->pharmacy_id != 1) {
+                        $pmiBatch = Batches::firstOrCreate([
+                            'medicine_id' => $request->medicine_id,
+                            'pharmacy_id' => 1,
+                            'name' => $batch->name,
+                        ], [
+                            'expired_date' => $batch->expired_date ?? now()->addYears(2)->toDateString(),
+                            'stock' => 0,
+                        ]);
+                        $targetBatchId = $pmiBatch->id;
+                    }
+
                     MedicineTransferItems::create([
-                        'batches_id' => $batch->id,
+                        'medicine_transfer_id' => $transferHeader->id,
+                        'batches_id' => $targetBatchId,
                         'source_batches_id' => $batch->id,
                         'qty' => $counterPhysic,
                         'status' => 1,
+                        'source_type' => 'pelayanan',
+                        'etalases_id' => 99,
                     ]);
                 }
             }
 
-            // 4. Write StockOpname and ItemsLog
+            // 4. Update master medicine stock
+            $medicine = Medicines::find($request->medicine_id);
+            if ($medicine) {
+                $totalRealStock = $this->calculateRealtimeStock($medicine->id, $pharmacyId, 'total');
+                $medicine->update(['stock' => $totalRealStock]);
+            }
+
+            // 5. Write StockOpname and ItemsLog
             StockOpname::create([
                 'users_id' => auth()->id(),
                 'batches_id' => $batch->id,
@@ -1149,6 +1423,8 @@ class SuppliesController extends Controller
     {
         ini_set('memory_limit', '512M');
 
+        $pharmacyId = getActivePharmacyId();
+
         $query = MedicineTransferItems::query()
             ->with([
                 'transfer:id,code',
@@ -1156,13 +1432,23 @@ class SuppliesController extends Controller
                 'batches.pharmacy:id,name',
                 'etalases:id,name'
             ])
-            ->whereHas('batches', function ($q) {
-                $q->where('pharmacy_id', getActivePharmacyId());
+            ->whereHas('batches', function ($q) use ($pharmacyId) {
+                $q->where('pharmacy_id', $pharmacyId);
+            })
+            ->where(function ($q) {
+                $q->whereNull('source_type')->orWhere('source_type', '!=', 'retur_gudang');
             });
 
         $totalStockPelayanan = 0;
         if ($request->medicine_id) {
-            $totalStockPelayanan = $this->calculateRealtimeStock($request->medicine_id, getActivePharmacyId(), 'counter');
+            $totalStockPelayanan = $this->calculateRealtimeStock($request->medicine_id, $pharmacyId, 'counter');
+        } else {
+            $totalStockPelayanan = (int) MedicineTransferItems::whereHas('batches', fn($q) => $q->where('pharmacy_id', $pharmacyId))
+                ->where('status', 1)
+                ->where(function ($q) {
+                    $q->whereNull('source_type')->orWhere('source_type', '!=', 'retur_gudang');
+                })
+                ->sum('qty');
         }
 
         return DataTables::eloquent($query)

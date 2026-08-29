@@ -126,18 +126,20 @@ class UserController extends Controller
             abort(404);
         }
         $roles = Role::pluck('name', 'name')->all();
+        $pharmacies = Pharmacies::pluck('name', 'id')->all();
         $userRole = $user->roles->pluck('name', 'name')->all();
 
-        return view('admin.users.edit', compact('user', 'roles', 'userRole'));
+        return view('admin.users.edit', compact('user', 'roles', 'userRole', 'pharmacies'));
     }
 
     public function update(Request $request, $id)
     {
         $this->validate($request, [
-            'name'      => 'required',
-            'username'     => 'required',
-            'password'  => 'same:confirm-password',
-            'roles'     => 'required'
+            'name'        => 'required',
+            'username'    => 'required',
+            'pharmacy_id' => 'required|exists:pharmacies,id',
+            'password'    => 'same:confirm-password',
+            'roles'       => 'required'
         ]);
 
         $input = $request->all();

@@ -252,7 +252,7 @@
                             </h2>
                         </div>
 
-                        <div class="grid grid-cols-2 md:grid-cols-6 gap-3 mb-6">
+                        <div class="grid grid-cols-2 {{ canAccessWarehouseStock() ? 'md:grid-cols-6' : 'md:grid-cols-5' }} gap-3 mb-6">
                             <div
                                 class="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col justify-center transition-all hover:shadow-sm">
                                 <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">QTY
@@ -271,12 +271,14 @@
                                     Jual</span>
                                 <span class="text-2xl font-black text-slate-700" id="qty_jual">—</span>
                             </div>
+                            @if(canAccessWarehouseStock())
                             <div
                                 class="bg-amber-50/50 p-4 rounded-xl border border-amber-100 flex flex-col justify-center transition-all hover:shadow-sm hover:bg-amber-50">
                                 <span class="text-[10px] font-bold uppercase tracking-wider text-amber-600 mb-1">Stok
                                     Gudang</span>
                                 <span class="text-2xl font-black text-amber-600" id="qty_gudang">—</span>
                             </div>
+                            @endif
                             <div
                                 class="bg-purple-50/50 p-4 rounded-xl border border-purple-100 flex flex-col justify-center transition-all hover:shadow-sm hover:bg-purple-50">
                                 <span class="text-[10px] font-bold uppercase tracking-wider text-purple-600 mb-1">Stok
@@ -327,7 +329,8 @@
                             <h2 class="text-sm font-bold text-slate-700 uppercase tracking-wider">Input Fisik Opname</h2>
                         </div>
 
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-5 relative">
+                        <div class="grid grid-cols-1 {{ canAccessWarehouseStock() ? 'md:grid-cols-3' : 'md:grid-cols-2' }} gap-5 mb-5 relative">
+                            @if(canAccessWarehouseStock())
                             <div class="bg-slate-50 p-3 rounded-xl border border-slate-100">
                                 <label class="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">Stok
                                     Fisik (Gudang)</label>
@@ -336,6 +339,9 @@
                                     class="w-full rounded-lg border-slate-200 text-xl font-black text-center text-slate-700 focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 transition-all py-3 shadow-sm"
                                     autocomplete="off">
                             </div>
+                            @else
+                            <input type="hidden" id="stock_physic" value="0">
+                            @endif
                             <div class="bg-slate-50 p-3 rounded-xl border border-slate-100">
                                 <label class="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">Stok
                                     Fisik (Counter)</label>
@@ -460,6 +466,7 @@
         function loadBatches(medicine_id) {
             const select = document.getElementById('batch_select');
             select.innerHTML = '<option value="">Memuat batch…</option>';
+            const canSeeWarehouse = {{ canAccessWarehouseStock() ? 'true' : 'false' }};
 
             fetch(`{{ route('supplies.batches') }}?medicine_id=${medicine_id}`)
                 .then(res => res.json())
@@ -474,8 +481,9 @@
                         opt.value = b.id;
                         const gStock = parseInt(b.stock || 0);
                         const cStock = parseInt(b.counter_stock || 0);
-                        opt.textContent =
-                            `${b.name} — Exp: ${b.expired_date} (Gudang: ${gStock}, Etalase: ${cStock})`;
+                        opt.textContent = canSeeWarehouse
+                            ? `${b.name} — Exp: ${b.expired_date} (Gudang: ${gStock}, Etalase: ${cStock})`
+                            : `${b.name} — Exp: ${b.expired_date} (Stok: ${cStock})`;
                         opt.dataset.stock = gStock;
                         opt.dataset.counterStock = cStock;
                         select.appendChild(opt);
@@ -484,7 +492,7 @@
                     });
 
                     // Update qty_akhir with real total stock
-                    $('#qty_akhir').text(totalStorageStock + totalCounterStock);
+                    $('#qty_akhir').text(canSeeWarehouse ? (totalStorageStock + totalCounterStock) : totalCounterStock);
 
                     updateTotalStockFromSelect();
                 })
@@ -755,18 +763,12 @@
                 loadBatches(medicine.id);
 
                 // Load stock log for this medicine
-                orderItemsTable.ajax.reload(function() {
-                    // Update stat cards from the log row
-                    orderItemsTable.rows().every(function() {
-                        const row = this.data();
-                        if (row.name === searchMedicine) {
-                            $('#qty_awal').text(row.stock_start?.qty_before ?? 0);
-                            $('#qty_beli').text(row.total_orders ?? 0);
-                            $('#qty_jual').text(row.total_sales ?? 0);
-                            return false;
-                        }
-                    });
-
+                orderItemsTable.ajax.reload(function(json) {
+                    if (json) {
+                        $('#qty_awal').text(json.qty_awal ?? 0);
+                        $('#qty_beli').text(json.qty_beli ?? 0);
+                        $('#qty_jual').text(json.qty_jual ?? 0);
+                    }
                     document.getElementById('stock_physic').focus();
                 });
             });

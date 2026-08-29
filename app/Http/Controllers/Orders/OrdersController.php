@@ -38,6 +38,7 @@ class OrdersController extends Controller
             'order_items.creditor_code',
             'order_items.note',
         ])
+            ->leftJoin('creditors', 'creditors.code', '=', 'order_items.creditor_code')
             ->with([
                 'medicines.factory',
                 'medicines.creditors',
@@ -49,8 +50,9 @@ class OrdersController extends Controller
                 $q->where('status', 0)->where('pharmacy_id', getActivePharmacyId());
             })
             ->when($creditorId, function ($q) use ($creditorId) {
-                $q->where('creditor_code', $creditorId);
-            });
+                $q->where('order_items.creditor_code', $creditorId);
+            })
+            ->orderBy('creditors.name', 'asc');
 
         return DataTables::of($query)
             ->addColumn(
@@ -528,7 +530,9 @@ class OrdersController extends Controller
                 'order_items.medicines.composition',
             ])->findOrFail($orderId);
 
-            $pharmacy = $order->pharmacy;
+            $activePharmacyId = getActivePharmacyId();
+            $targetPharmacyId = (isWarehousePharmacy($activePharmacyId) || isWarehousePharmacy($order->pharmacy_id)) ? 1 : ($activePharmacyId ?? $order->pharmacy_id);
+            $pharmacy = \App\Models\Pharmacies::find($targetPharmacyId) ?? $order->pharmacy;
 
             $grouped = $order->order_items->groupBy(function ($item) {
                 $type = $item->medicines->type ?? 'Kosong';
@@ -562,7 +566,9 @@ class OrdersController extends Controller
                 'order_items.medicines.composition',
             ])->findOrFail($orderId);
 
-            $pharmacy = $order->pharmacy;
+            $activePharmacyId = getActivePharmacyId();
+            $targetPharmacyId = (isWarehousePharmacy($activePharmacyId) || isWarehousePharmacy($order->pharmacy_id)) ? 1 : ($activePharmacyId ?? $order->pharmacy_id);
+            $pharmacy = \App\Models\Pharmacies::find($targetPharmacyId) ?? $order->pharmacy;
 
             $grouped = $order->order_items->groupBy(function ($item) {
                 $type = $item->medicines->type ?? 'Kosong';
