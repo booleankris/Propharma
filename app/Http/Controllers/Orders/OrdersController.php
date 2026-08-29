@@ -518,8 +518,8 @@ class OrdersController extends Controller
     public function printSPB($orderId)
     {
         try {
-            set_time_limit(300);
-            ini_set('memory_limit', '1024M');
+            set_time_limit(0);
+            ini_set('memory_limit', '-1');
             $date = Carbon::now()->translatedFormat('d F Y');
             $order = Order::with([
                 'pharmacy',
@@ -568,6 +568,10 @@ class OrdersController extends Controller
                 ? 'data:image/' . pathinfo($sigPath, PATHINFO_EXTENSION) . ';base64,' . base64_encode(file_get_contents($sigPath))
                 : null;
 
+            if (request()->has('debug')) {
+                return view('orders.printSPB', compact('order', 'date', 'grouped', 'pharmacy', 'logoBase64', 'signatureBase64'));
+            }
+
             $pdf = Pdf::loadView('orders.printSPB', compact('order', 'date', 'grouped', 'pharmacy', 'logoBase64', 'signatureBase64'))
                 ->setPaper('A7', 'portrait')
                 ->setOptions([
@@ -587,7 +591,7 @@ class OrdersController extends Controller
             ]);
         } catch (\Throwable $e) {
             \Log::error('Print SPB Error: ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine());
-            abort(500, 'Gagal mencetak SPB: ' . $e->getMessage());
+            return response('<h3>Error Mencetak SPB:</h3><p><b>' . htmlspecialchars($e->getMessage()) . '</b> di <code>' . htmlspecialchars($e->getFile()) . ':' . $e->getLine() . '</code></p>', 500, ['Content-Type' => 'text/html; charset=UTF-8']);
         }
     }
 
