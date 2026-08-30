@@ -1939,7 +1939,7 @@
                     <div style="display:flex; align-items:center; gap:6px; margin-bottom:2px;">
                         <span class="notif-badge badge-{{ $info['color'] }}">{{ $info['label'] }}</span>
                     </div>
-                    <div class="notif-meta">{{ \Carbon\Carbon::parse($log->created_at)->format('d M Y H:i') }}</div>
+                    <div class="notif-meta">{{ safeDateFormat($log->created_at, 'd M Y H:i') }}</div>
                 </div>
                 <div class="notif-qty {{ $info['class'] }}">{{ $info['sign'] }} {{ $log->qty }}</div>
             </div>

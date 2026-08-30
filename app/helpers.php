@@ -241,3 +241,34 @@ if (!function_exists('imageToBase64')) {
         return 'data:image/png;base64,' . base64_encode($pngData);
     }
 }
+
+if (!function_exists('safeDateFormat')) {
+    /**
+     * Safely parse and format dates even with unexpected slash formats (e.g. 24/07/2026 08:25).
+     *
+     * @param mixed $date
+     * @param string $format
+     * @return string
+     */
+    function safeDateFormat($date, string $format = 'd/m/Y'): string
+    {
+        if (empty($date)) {
+            return '-';
+        }
+
+        if ($date instanceof \DateTimeInterface) {
+            return $date->format($format);
+        }
+
+        try {
+            $dateStr = trim((string) $date);
+            // Replace slashes with dashes so PHP interprets day-month-year correctly
+            if (strpos($dateStr, '/') !== false) {
+                $dateStr = str_replace('/', '-', $dateStr);
+            }
+            return \Carbon\Carbon::parse($dateStr)->format($format);
+        } catch (\Throwable $e) {
+            return (string) $date;
+        }
+    }
+}

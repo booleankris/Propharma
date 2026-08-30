@@ -273,7 +273,7 @@
                                             <td class="py-3 px-4 text-slate-600">
                                                 <div class="font-medium text-slate-700">{{ $item->batches?->name ?? '—' }}</div>
                                                 <div class="text-[10px] text-slate-400">
-                                                    Exp: {{ $item->batches?->expired_date ? \Carbon\Carbon::parse($item->batches->expired_date)->format('d/m/Y') : '-' }}
+                                                    Exp: {{ safeDateFormat($item->batches?->expired_date) }}
                                                 </div>
                                             </td>
                                             <td class="py-3 px-4 text-slate-600">
@@ -450,7 +450,7 @@
                                             <td class="py-3 px-4 text-slate-600">
                                                 <div class="font-medium text-slate-700">{{ $item->batches?->name ?? '—' }}</div>
                                                 <div class="text-[10px] text-slate-400">
-                                                    Exp: {{ $item->batches?->expired_date ? \Carbon\Carbon::parse($item->batches->expired_date)->format('d/m/Y') : '-' }}
+                                                    Exp: {{ safeDateFormat($item->batches?->expired_date) }}
                                                 </div>
                                             </td>
                                             <td class="py-3 px-4 text-slate-600">
@@ -642,7 +642,7 @@
                                             <td class="py-3 px-4 text-slate-600">
                                                 <div class="font-medium text-slate-700">{{ $item->batches?->name ?? '—' }}</div>
                                                 <div class="text-[10px] text-slate-400">
-                                                    Exp: {{ $item->batches?->expired_date ? \Carbon\Carbon::parse($item->batches->expired_date)->format('d/m/Y') : '-' }}
+                                                    Exp: {{ safeDateFormat($item->batches?->expired_date) }}
                                                 </div>
                                             </td>
                                             <td class="py-3 px-4 text-slate-600">

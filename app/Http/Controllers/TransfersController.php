@@ -135,7 +135,7 @@ class TransfersController extends Controller
                         'name' => $item->medicines?->name ?? '??',
                         'stock' => $availStock,
                         'unit' => $item->medicines?->unit ?? '??',
-                        'expired_date' => $item->expired_date ? \Carbon\Carbon::parse($item->expired_date)->format('d/m/Y') : '-',
+                        'expired_date' => safeDateFormat($item->expired_date),
                         'source_type' => 'gudang',
                     ]);
                 }
@@ -159,7 +159,7 @@ class TransfersController extends Controller
                         'name' => $item->medicines?->name ?? '??',
                         'stock' => $availStock,
                         'unit' => $item->medicines?->unit ?? '??',
-                        'expired_date' => $item->expired_date ? \Carbon\Carbon::parse($item->expired_date)->format('d/m/Y') : '-',
+                        'expired_date' => safeDateFormat($item->expired_date),
                         'source_type' => 'pelayanan',
                     ]);
                 }
