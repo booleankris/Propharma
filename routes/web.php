@@ -136,6 +136,8 @@ Route::middleware(['auth', 'role:administrator'])->group(function () {
 
 Route::middleware(['auth', 'role:HO|administrator'])->group(function () {
     Route::post('/pharmacy/switch', [\App\Http\Controllers\PharmacySelectorController::class, 'switch'])->name('pharmacy.switch');
+    Route::get('/ho/analytics', [\App\Http\Controllers\HO\HODashboardController::class, 'index'])->name('ho.analytics');
+    Route::get('/ho/analytics/data', [\App\Http\Controllers\HO\HODashboardController::class, 'getData'])->name('ho.analytics.data');
 });
 Route::middleware(['auth', 'role:Kasir|Gudang PMI|HO|administrator|manager|Online|UMKM|operator'])->group(function () {
     Route::get('/home', [HomeController::class, 'index'])->name('home');

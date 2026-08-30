@@ -698,7 +698,25 @@
         @endif
 
         @role('HO')
-            <div class="nav-section-title">Master</div>
+            <div class="nav-section-title">Head Office (HO)</div>
+
+            <a href="{{ route('ho.analytics') }}" class="nav-item {{ request()->is('ho/analytics*') ? 'active' : '' }}"
+                style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(139, 92, 246, 0.15) 100%); border-left: 3px solid #6366f1;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                    stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-presentation-analytics text-indigo-400">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                    <path d="M9 12v-4" />
+                    <path d="M15 12v-2" />
+                    <path d="M12 12v-1" />
+                    <path d="M3 4h18" />
+                    <path d="M4 4v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-10" />
+                    <path d="M12 16v4" />
+                    <path d="M9 20h6" />
+                </svg>
+                <span style="font-weight: 700; color: #fff;">Executive Analytics</span>
+                <span style="margin-left:auto; font-size:9px; font-weight:800; background:rgba(99,102,241,0.3); color:#a5b4fc; padding:2px 6px; border-radius:4px; text-transform:uppercase;">HO</span>
+            </a>
 
             <a onclick="openModal('masterModal')" class="nav-item" style="cursor:pointer;">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"

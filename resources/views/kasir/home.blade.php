@@ -55,6 +55,44 @@
                     </p>
                 </div>
             </div>
+
+            @role('HO')
+            <div class="my-4 p-5 rounded-3xl bg-gradient-to-r from-indigo-900 via-indigo-800 to-blue-900 text-white shadow-lg border border-indigo-700/50 flex flex-col sm:flex-row items-center justify-between gap-4 relative overflow-hidden">
+                <div class="absolute -right-10 -bottom-10 w-40 h-40 bg-indigo-500/20 rounded-full blur-2xl pointer-events-none"></div>
+                <div class="flex items-center gap-4 relative z-10">
+                    <div class="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20 text-indigo-200">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-presentation-analytics">
+                            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                            <path d="M9 12v-4" />
+                            <path d="M15 12v-2" />
+                            <path d="M12 12v-1" />
+                            <path d="M3 4h18" />
+                            <path d="M4 4v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-10" />
+                            <path d="M12 16v4" />
+                            <path d="M9 20h6" />
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h3 class="text-lg font-black tracking-tight text-white">Executive Analytics & Monitoring HO</h3>
+                            <span class="text-[9px] font-extrabold px-2 py-0.5 rounded-full bg-indigo-500/40 text-indigo-200 border border-indigo-400/30 uppercase">Eksklusif HO</span>
+                        </div>
+                        <p class="text-xs text-indigo-200 mt-0.5">Monitoring pergerakan omset penjualan, belanja pembelian, retur, tren bulanan & grafik jenis transaksi</p>
+                    </div>
+                </div>
+                <a href="{{ route('ho.analytics') }}"
+                    class="relative z-10 inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-white hover:bg-indigo-50 text-indigo-950 text-xs font-black shadow-sm transition-all hover:scale-105 whitespace-nowrap">
+                    Buka Dashboard HO
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-arrow-right">
+                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                        <path d="M5 12l14 0" />
+                        <path d="M13 18l6 -6" />
+                        <path d="M13 6l6 6" />
+                    </svg>
+                </a>
+            </div>
+            @endrole
+
             <div class="p-5 md:p-6 my-4 bg-white rounded-2xl shadow-sm border border-slate-200 w-full mx-auto">
                 <div class="space-y-6 w-full">
 
