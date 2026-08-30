@@ -90,7 +90,7 @@ class HODashboardController extends Controller
         // 2. METRICS: PEMBELIAN (PURCHASES)
         $purchasesQuery = OrderItems::query()
             ->whereHas('orders', function ($q) use ($startDate, $endDate, $pharmacyId, $applyPharmacy) {
-                $q->where('status', 2)
+                $q->whereIn('status', [1, 2, 3])
                   ->whereBetween('created_at', [$startDate, $endDate]);
                 $applyPharmacy($q);
             });
@@ -183,7 +183,7 @@ class HODashboardController extends Controller
         // Aggregate monthly purchases in single query
         $purchasesByMonth = OrderItems::query()
             ->whereHas('orders', function ($q) use ($targetYear, $pharmacyId) {
-                $q->where('status', 2)->whereYear('created_at', $targetYear);
+                $q->whereIn('status', [1, 2, 3])->whereYear('created_at', $targetYear);
                 if ($pharmacyId !== 'all' && !empty($pharmacyId)) {
                     $q->where('pharmacy_id', $pharmacyId);
                 }
