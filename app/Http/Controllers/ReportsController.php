@@ -310,4 +310,102 @@ class ReportsController extends Controller
 
         return response()->download(storage_path("app/public/" . $job->file_path));
     }
+
+    public function exportSpecialMedicines(Request $request)
+    {
+        $pharmacyId = getActivePharmacyId();
+        $startDate = $request->start_date ?? now()->startOfMonth()->toDateString();
+        $endDate = $request->end_date ?? now()->toDateString();
+
+        $job = ExportJob::create([
+            'type'     => 'special_medicines',
+            'status'   => 'queued',
+            'progress' => 0,
+        ]);
+
+        dispatch(new \App\Jobs\ProcessSpecialMedicinesExport($job->id, $pharmacyId, $startDate, $endDate));
+
+        return response()->json([
+            'job_id'  => $job->id,
+            'message' => 'Export antrean dimulai'
+        ]);
+    }
+
+    public function exportSalesRetur(Request $request)
+    {
+        $pharmacyId = getActivePharmacyId();
+        $startDate = $request->start_date ?? now()->startOfMonth()->toDateString();
+        $endDate = $request->end_date ?? now()->toDateString();
+
+        $job = ExportJob::create([
+            'type'     => 'sales_retur',
+            'status'   => 'queued',
+            'progress' => 0,
+        ]);
+
+        dispatch(new \App\Jobs\ProcessSalesReturExport($job->id, $pharmacyId, $startDate, $endDate));
+
+        return response()->json([
+            'job_id'  => $job->id,
+            'message' => 'Export antrean dimulai'
+        ]);
+    }
+
+    public function exportPurchaseRetur(Request $request)
+    {
+        $pharmacyId = getActivePharmacyId();
+        $startDate = $request->start_date ?? now()->startOfMonth()->toDateString();
+        $endDate = $request->end_date ?? now()->toDateString();
+
+        $job = ExportJob::create([
+            'type'     => 'purchase_retur',
+            'status'   => 'queued',
+            'progress' => 0,
+        ]);
+
+        dispatch(new \App\Jobs\ProcessPurchaseReturExport($job->id, $pharmacyId, $startDate, $endDate));
+
+        return response()->json([
+            'job_id'  => $job->id,
+            'message' => 'Export antrean dimulai'
+        ]);
+    }
+
+    public function exportExpiryDates(Request $request)
+    {
+        $pharmacyId = getActivePharmacyId();
+
+        $job = ExportJob::create([
+            'type'     => 'expiry_dates',
+            'status'   => 'queued',
+            'progress' => 0,
+        ]);
+
+        dispatch(new \App\Jobs\ProcessExpiryDateExport($job->id, $pharmacyId));
+
+        return response()->json([
+            'job_id'  => $job->id,
+            'message' => 'Export antrean dimulai'
+        ]);
+    }
+
+    public function exportRejects(Request $request)
+    {
+        $pharmacyId = getActivePharmacyId();
+        $startDate = $request->start_date ?? now()->startOfMonth()->toDateString();
+        $endDate = $request->end_date ?? now()->toDateString();
+
+        $job = ExportJob::create([
+            'type'     => 'rejects',
+            'status'   => 'queued',
+            'progress' => 0,
+        ]);
+
+        dispatch(new \App\Jobs\ProcessRejectSalesExport($job->id, $pharmacyId, $startDate, $endDate));
+
+        return response()->json([
+            'job_id'  => $job->id,
+            'message' => 'Export antrean dimulai'
+        ]);
+    }
 }

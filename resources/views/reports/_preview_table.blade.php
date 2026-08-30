@@ -51,8 +51,7 @@
                             @foreach($row as $colIndex => $col)
                                 @php
                                     $colStr = trim((string)$col);
-                                    // Treat as numeric if it's numeric and not a transaction code (less than 10 digits or float)
-                                    $isNumeric = is_numeric($col) && strlen($colStr) > 0 && (strlen($colStr) < 10 || str_contains($colStr, '.'));
+                                    $isNumeric = is_numeric($col) && $colStr !== '';
                                     $isNoCol = ($colIndex === 0 && !$isHeader && $colStr !== '');
                                 @endphp
                                 <td class="px-3 py-1.5 border border-slate-200 {{ $isHeader ? 'text-center' : ($isNoCol ? 'text-center' : ($isNumeric ? 'text-right' : 'text-left')) }}">

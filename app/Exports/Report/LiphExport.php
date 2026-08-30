@@ -112,7 +112,7 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
             $grouped = $this->groupTransactions($transactions);
         } else if ($this->shiftType == 'online') {
             $roleName = $this->onlineRole ?? 'Online';
-            $transactions = MedicineTransactions::with(['transactions', 'user'])
+            $transactions = MedicineTransactions::with(['transactions', 'user', 'shift_logs'])
                 ->where('pharmacy_id', $this->pharmacyId)
                 ->where('status', 1)
                 ->whereDate('updated_at', '>=', $this->startDate->toDateString())
@@ -120,6 +120,11 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                 ->whereIn('transaction_type', array_keys(self::TYPE_MAP))
                 ->whereHas('user', function ($q) use ($roleName) {
                     $q->role($roleName);
+                })
+                ->when(!empty($this->shift), function ($q) {
+                    $q->whereHas('shift_logs', function ($shiftQuery) {
+                        $shiftQuery->where('shift_id', $this->shift);
+                    });
                 })
                 ->get();
 

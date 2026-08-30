@@ -244,7 +244,7 @@
             }
 
             if (shiftSelectEl) {
-                shiftSelectEl.style.display = (config.date_filter && selectedShiftType === 'shift') ? 'block' : 'none';
+                shiftSelectEl.style.display = (config.date_filter && (selectedShiftType === 'shift' || selectedShiftType === 'online')) ? 'block' : 'none';
             }
 
             if (typeFilterEl) {
@@ -311,7 +311,7 @@
 
             const config = salesReportFilters[selectedReport] ?? { date_filter: false };
             if (shiftSel) {
-                shiftSel.style.display = (config.date_filter && type === 'shift') ? 'block' : 'none';
+                shiftSel.style.display = (config.date_filter && (type === 'shift' || type === 'online')) ? 'block' : 'none';
             }
         }
 

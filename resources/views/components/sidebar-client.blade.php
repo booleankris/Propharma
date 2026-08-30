@@ -558,27 +558,30 @@
             Dashboard
         </a>
 
-        @if(!isWarehousePharmacy())
-        <a href="{{ url('transaction/upds') }}" class="nav-item {{ request()->is('transaction/*') ? 'active' : '' }}">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                stroke-linecap="round" stroke-linejoin="round">
-                <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
-                <line x1="3" y1="6" x2="21" y2="6" />
-                <path d="M16 10a4 4 0 0 1-8 0" />
-            </svg>
-            Penjualan
-        </a>
+        @if (!isWarehousePharmacy())
+            <a href="{{ url('transaction/upds') }}"
+                class="nav-item {{ request()->is('transaction/*') ? 'active' : '' }}">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
+                    <line x1="3" y1="6" x2="21" y2="6" />
+                    <path d="M16 10a4 4 0 0 1-8 0" />
+                </svg>
+                Penjualan
+            </a>
         @endif
 
-        <a href="{{ route('receiving.index') }}" class="nav-item {{ request()->is('receiving*') ? 'active' : '' }}">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="9" cy="21" r="1" />
-                <circle cx="20" cy="21" r="1" />
-                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
-            </svg>
-            Pembelian
-        </a>
+        @if (canAccessPurchasing())
+            <a href="{{ route('receiving.index') }}" class="nav-item {{ request()->is('receiving*') ? 'active' : '' }}">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="9" cy="21" r="1" />
+                    <circle cx="20" cy="21" r="1" />
+                    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+                </svg>
+                Pembelian
+            </a>
+        @endif
 
         <a onclick="openModal('logModal')" class="nav-item {{ request()->is('inventory*') ? 'active' : '' }}">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -605,81 +608,108 @@
 
         <div class="nav-section-title">Statistik</div>
 
-        @if(!isWarehousePharmacy())
-        <a onclick="openModal('salesModal')" class="nav-item {{ request()->is('sales*') ? 'active' : '' }}"
-            style="cursor:pointer;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="12" y1="20" x2="12" y2="10" />
-                <line x1="18" y1="20" x2="18" y2="4" />
-                <line x1="6" y1="20" x2="6" y2="16" />
-                <polyline points="1 20 23 20" />
-            </svg>
-            Data Penjualan
-        </a>
+        @if (!isWarehousePharmacy())
+            <a onclick="openModal('salesModal')" class="nav-item {{ request()->is('sales*') ? 'active' : '' }}"
+                style="cursor:pointer;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="12" y1="20" x2="12" y2="10" />
+                    <line x1="18" y1="20" x2="18" y2="4" />
+                    <line x1="6" y1="20" x2="6" y2="16" />
+                    <polyline points="1 20 23 20" />
+                </svg>
+                Data Penjualan
+            </a>
         @endif
 
-        <a onclick="openModal('receivingModal')" class="nav-item {{ request()->is('purchase*') ? 'active' : '' }}"
-            style="cursor:pointer;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="1" y="3" width="15" height="13" rx="2" />
-                <path d="M16 8h4l4 5v4h-8V8z" />
-                <circle cx="5.5" cy="18.5" r="2.5" />
-                <circle cx="18.5" cy="18.5" r="2.5" />
-            </svg>
-            Data Pembelian
-        </a>
-
-        @if(!isWarehousePharmacy())
-        <a onclick="openModal('reportModal')" class="nav-item" style="cursor:pointer;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                <polyline points="14 2 14 8 20 8" />
-                <line x1="16" y1="13" x2="8" y2="13" />
-                <line x1="16" y1="17" x2="8" y2="17" />
-            </svg>
-            Laporan Penjualan
-        </a>
+        @if (canAccessPurchasing())
+            <a onclick="openModal('receivingModal')"
+                class="nav-item {{ request()->is('purchase*') ? 'active' : '' }}" style="cursor:pointer;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="1" y="3" width="15" height="13" rx="2" />
+                    <path d="M16 8h4l4 5v4h-8V8z" />
+                    <circle cx="5.5" cy="18.5" r="2.5" />
+                    <circle cx="18.5" cy="18.5" r="2.5" />
+                </svg>
+                Data Pembelian
+            </a>
         @endif
 
-        <a onclick="openModal('orderReportModal')" class="nav-item" style="cursor:pointer;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" />
-                <line x1="3" y1="6" x2="21" y2="6" />
-                <path d="M16 10a4 4 0 01-8 0" />
-            </svg>
-            Laporan Pembelian
-        </a>
+        <div class="nav-section-title">Pusat Laporan & Export</div>
 
-        @if(!isWarehousePharmacy())
-        <a href="{{ route('pareto.index') }}" class="nav-item" style="cursor:pointer;">
-
+        <a onclick="openModal('exportCenterModal')" class="nav-item"
+            style="cursor:pointer; background: rgba(56, 189, 248, 0.1); border-left: 3px solid #38bdf8;">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
                 fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-chart-sankey">
+                stroke-linejoin="round"
+                class="icon icon-tabler icons-tabler-outline icon-tabler-file-spreadsheet text-sky-400">
                 <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                <path d="M3 3v18h18" />
-                <path d="M3 6h18" />
-                <path d="M3 8c10 0 8 9 18 9" />
+                <path d="M14 3v4a1 1 0 0 0 1 1h4" />
+                <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" />
+                <path d="M8 11h8v7h-8z" />
+                <path d="M8 15h8" />
+                <path d="M11 11v7" />
             </svg>
-            Pareto
+            <span style="font-weight:600; color:#fff;">Pusat Export</span>
+            {{-- <span
+                style="margin-left:auto; font-size:9px; font-weight:700; background:rgba(56,189,248,0.25); color:#7dd3fc; padding:2px 6px; border-radius:4px; text-transform:uppercase;">Laporan
+                Kefarmasian</span> --}}
         </a>
 
-        <div class="nav-section-title">Master</div>
-
-        <a onclick="openModal('masterModal')" class="nav-item" style="cursor:pointer;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <ellipse cx="12" cy="5" rx="9" ry="3" />
-                <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
-                <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
-            </svg>
-            Master Data
-        </a>
+        @if (!isWarehousePharmacy())
+            <a onclick="openModal('reportModal')" class="nav-item" style="cursor:pointer;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                    <line x1="16" y1="13" x2="8" y2="13" />
+                    <line x1="16" y1="17" x2="8" y2="17" />
+                </svg>
+                Laporan Penjualan
+            </a>
         @endif
+
+        @if (canAccessPurchasing())
+            <a onclick="openModal('orderReportModal')" class="nav-item" style="cursor:pointer;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" />
+                    <line x1="3" y1="6" x2="21" y2="6" />
+                    <path d="M16 10a4 4 0 01-8 0" />
+                </svg>
+                Laporan Pembelian
+            </a>
+        @endif
+
+        @if (!isWarehousePharmacy())
+            <a href="{{ route('pareto.index') }}" class="nav-item" style="cursor:pointer;">
+
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                    stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-chart-sankey">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                    <path d="M3 3v18h18" />
+                    <path d="M3 6h18" />
+                    <path d="M3 8c10 0 8 9 18 9" />
+                </svg>
+                Pareto
+            </a>
+        @endif
+
+        @role('HO')
+            <div class="nav-section-title">Master</div>
+
+            <a onclick="openModal('masterModal')" class="nav-item" style="cursor:pointer;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <ellipse cx="12" cy="5" rx="9" ry="3" />
+                    <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
+                    <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
+                </svg>
+                Master Data
+            </a>
+        @endrole
 
         <div class="nav-section-title">Akun</div>
 
@@ -692,15 +722,15 @@
             Profil
         </a>
 
-        @if(!isWarehousePharmacy())
-        <a href="{{ url('staff-stats') }}" class="nav-item {{ request()->is('staff-stats*') ? 'active' : '' }}">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                <circle cx="9" cy="7" r="4" />
-            </svg>
-            Statistik Kasir
-        </a>
+        @if (!isWarehousePharmacy())
+            <a href="{{ url('staff-stats') }}" class="nav-item {{ request()->is('staff-stats*') ? 'active' : '' }}">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                    <circle cx="9" cy="7" r="4" />
+                </svg>
+                Statistik Kasir
+            </a>
         @endif
 
         <a href="{{ route('logout') }}"
@@ -1273,189 +1303,187 @@
             Download
         </button>
     </div>
-
 </div>
 
-
-
-
-{{-- Master Modal --}}
-<div id="masterModal"
-    class="modal-hide modal-transition fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
+@role('HO')
+    {{-- Master Modal --}}
+    <div id="masterModal"
+        class="modal-hide modal-transition fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
     w-[92%] max-w-[480px] bg-white rounded-3xl shadow-2xl z-[9999] overflow-hidden">
-    <div class="relative bg-gradient-to-br from-[#4a90d9] via-[#6196c0] to-[#3a7bd5] px-6 pt-6 pb-8">
-        <div class="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2"></div>
-        <div class="absolute bottom-0 left-4 w-16 h-16 bg-white/10 rounded-full translate-y-1/2"></div>
-        <div class="relative flex items-center justify-between">
-            <div>
-                <p class="text-blue-100 text-xs font-medium tracking-widest uppercase mb-1">Manajemen Sistem</p>
-                <h2 class="text-2xl font-bold text-white">Master Data</h2>
+        <div class="relative bg-gradient-to-br from-[#4a90d9] via-[#6196c0] to-[#3a7bd5] px-6 pt-6 pb-8">
+            <div class="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2"></div>
+            <div class="absolute bottom-0 left-4 w-16 h-16 bg-white/10 rounded-full translate-y-1/2"></div>
+            <div class="relative flex items-center justify-between">
+                <div>
+                    <p class="text-blue-100 text-xs font-medium tracking-widest uppercase mb-1">Manajemen Sistem</p>
+                    <h2 class="text-2xl font-bold text-white">Master Data</h2>
+                </div>
+                <div class="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-white" fill="none"
+                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                    </svg>
+                </div>
             </div>
-            <div class="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm">
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-white" fill="none"
-                    viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round"
-                        d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+        </div>
+        <div class="px-5 py-5 max-h-[60vh] overflow-y-auto">
+            <div class="grid grid-cols-2 gap-3">
+                <a href="{{ route('medicines.index') }}"
+                    class="group flex items-center gap-3 p-3.5 rounded-2xl bg-blue-50   hover:bg-blue-500   border border-blue-100   hover:border-blue-500   transition-all duration-200 hover:-translate-y-0.5">
+                    <div
+                        class="w-9 h-9 rounded-xl bg-blue-100   group-hover:bg-blue-400   flex items-center justify-center flex-shrink-0 transition-colors">
+                        <svg class="w-5 h-5 text-blue-500   group-hover:text-white transition-colors" fill="none"
+                            viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                        </svg>
+                    </div>
+                    <span class="text-sm font-semibold text-blue-700   group-hover:text-white transition-colors">Master
+                        Obat</span>
+                </a>
+                <a href="{{ route('debtors.index') }}"
+                    class="group flex items-center gap-3 p-3.5 rounded-2xl bg-emerald-50 hover:bg-emerald-500 border border-emerald-100 hover:border-emerald-500 transition-all duration-200 hover:-translate-y-0.5">
+                    <div
+                        class="w-9 h-9 rounded-xl bg-emerald-100 group-hover:bg-emerald-400 flex items-center justify-center flex-shrink-0 transition-colors">
+                        <svg class="w-5 h-5 text-emerald-500 group-hover:text-white transition-colors" fill="none"
+                            viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                    </div>
+                    <span class="text-sm font-semibold text-emerald-700 group-hover:text-white transition-colors">Master
+                        Debitur</span>
+                </a>
+                <a href="{{ route('categories.index') }}"
+                    class="group flex items-center gap-3 p-3.5 rounded-2xl bg-violet-50  hover:bg-violet-500  border border-violet-100  hover:border-violet-500  transition-all duration-200 hover:-translate-y-0.5">
+                    <div
+                        class="w-9 h-9 rounded-xl bg-violet-100  group-hover:bg-violet-400  flex items-center justify-center flex-shrink-0 transition-colors">
+                        <svg class="w-5 h-5 text-violet-500  group-hover:text-white transition-colors" fill="none"
+                            viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
+                        </svg>
+                    </div>
+                    <span class="text-sm font-semibold text-violet-700  group-hover:text-white transition-colors">Kategori
+                        Obat</span>
+                </a>
+                <a href="{{ route('creditors.index') }}"
+                    class="group flex items-center gap-3 p-3.5 rounded-2xl bg-amber-50  hover:bg-amber-500  border border-amber-100  hover:border-amber-500  transition-all duration-200 hover:-translate-y-0.5">
+                    <div
+                        class="w-9 h-9 rounded-xl bg-amber-100  group-hover:bg-amber-400  flex items-center justify-center flex-shrink-0 transition-colors">
+                        <svg class="w-5 h-5 text-amber-500  group-hover:text-white transition-colors" fill="none"
+                            viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                        </svg>
+                    </div>
+                    <span class="text-sm font-semibold text-amber-700  group-hover:text-white transition-colors">Master
+                        Kreditur</span>
+                </a>
+                <a href="{{ route('compositions.index') }}"
+                    class="group flex items-center gap-3 p-3.5 rounded-2xl bg-cyan-50   hover:bg-cyan-500   border border-cyan-100   hover:border-cyan-500   transition-all duration-200 hover:-translate-y-0.5">
+                    <div
+                        class="w-9 h-9 rounded-xl bg-cyan-100   group-hover:bg-cyan-400   flex items-center justify-center flex-shrink-0 transition-colors">
+                        <svg class="w-5 h-5 text-cyan-500   group-hover:text-white transition-colors" fill="none"
+                            viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                        </svg>
+                    </div>
+                    <span class="text-sm font-semibold text-cyan-700   group-hover:text-white transition-colors">Master
+                        Komposisi</span>
+                </a>
+                <a href="{{ route('doctors.index') }}"
+                    class="group flex items-center gap-3 p-3.5 rounded-2xl bg-rose-50   hover:bg-rose-500   border border-rose-100   hover:border-rose-500   transition-all duration-200 hover:-translate-y-0.5">
+                    <div
+                        class="w-9 h-9 rounded-xl bg-rose-100   group-hover:bg-rose-400   flex items-center justify-center flex-shrink-0 transition-colors">
+                        <svg class="w-5 h-5 text-rose-500   group-hover:text-white transition-colors" fill="none"
+                            viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </div>
+                    <span class="text-sm font-semibold text-rose-700   group-hover:text-white transition-colors">Master
+                        Dokter</span>
+                </a>
+                <a href="{{ route('patients.index') }}"
+                    class="group flex items-center gap-3 p-3.5 rounded-2xl bg-teal-50   hover:bg-teal-500   border border-teal-100   hover:border-teal-500   transition-all duration-200 hover:-translate-y-0.5">
+                    <div
+                        class="w-9 h-9 rounded-xl bg-teal-100   group-hover:bg-teal-400   flex items-center justify-center flex-shrink-0 transition-colors">
+                        <svg class="w-5 h-5 text-teal-500   group-hover:text-white transition-colors" fill="none"
+                            viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                    </div>
+                    <span class="text-sm font-semibold text-teal-700   group-hover:text-white transition-colors">Master
+                        Pasien</span>
+                </a>
+                <a href="{{ route('factories.index') }}"
+                    class="group flex items-center gap-3 p-3.5 rounded-2xl bg-orange-50  hover:bg-orange-500  border border-orange-100  hover:border-orange-500  transition-all duration-200 hover:-translate-y-0.5">
+                    <div
+                        class="w-9 h-9 rounded-xl bg-orange-100  group-hover:bg-orange-400  flex items-center justify-center flex-shrink-0 transition-colors">
+                        <svg class="w-5 h-5 text-orange-500  group-hover:text-white transition-colors" fill="none"
+                            viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M3 7h2l2 9h10l2-9h2M3 7l1-4h16l1 4M9 16v2m6-2v2" />
+                        </svg>
+                    </div>
+                    <span class="text-sm font-semibold text-orange-700  group-hover:text-white transition-colors">Master
+                        Pabrik</span>
+                </a>
+                <a href="{{ route('parameters.index') }}"
+                    class="group flex items-center gap-3 p-3.5 rounded-2xl bg-indigo-50  hover:bg-indigo-500  border border-indigo-100  hover:border-indigo-500  transition-all duration-200 hover:-translate-y-0.5">
+                    <div
+                        class="w-9 h-9 rounded-xl bg-indigo-100  group-hover:bg-indigo-400  flex items-center justify-center flex-shrink-0 transition-colors">
+                        <svg class="w-5 h-5 text-indigo-500  group-hover:text-white transition-colors" fill="none"
+                            viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                        </svg>
+                    </div>
+                    <span class="text-sm font-semibold text-indigo-700  group-hover:text-white transition-colors">Master
+                        Parameter</span>
+                </a>
+                <a href="{{ route('locations.index') }}"
+                    class="group flex items-center gap-3 p-3.5 rounded-2xl bg-pink-50   hover:bg-pink-500   border border-pink-100   hover:border-pink-500   transition-all duration-200 hover:-translate-y-0.5">
+                    <div
+                        class="w-9 h-9 rounded-xl bg-pink-100   group-hover:bg-pink-400   flex items-center justify-center flex-shrink-0 transition-colors">
+                        <svg class="w-5 h-5 text-pink-500   group-hover:text-white transition-colors" fill="none"
+                            viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                    </div>
+                    <span class="text-sm font-semibold text-pink-700   group-hover:text-white transition-colors">Master
+                        Lokasi</span>
+                </a>
+                <a href="{{ route('items.index') }}"
+                    class="group col-span-2 flex items-center gap-3 p-3.5 rounded-2xl bg-lime-50 hover:bg-lime-500 border border-lime-100 hover:border-lime-500 transition-all duration-200 hover:-translate-y-0.5">
+                    <div
+                        class="w-9 h-9 rounded-xl bg-lime-100 group-hover:bg-lime-400 flex items-center justify-center flex-shrink-0 transition-colors">
+                        <svg class="w-5 h-5 text-lime-600 group-hover:text-white transition-colors" fill="none"
+                            viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                        </svg>
+                    </div>
+                    <span class="text-sm font-semibold text-lime-700 group-hover:text-white transition-colors">Master
+                        Etalase</span>
+                </a>
+            </div>
+            <button
+                class="closeModal mt-5 w-full py-2.5 flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-600 font-semibold rounded-2xl transition-all">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
-            </div>
+                Tutup
+            </button>
         </div>
     </div>
-    <div class="px-5 py-5 max-h-[60vh] overflow-y-auto">
-        <div class="grid grid-cols-2 gap-3">
-            <a href="{{ route('medicines.index') }}"
-                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-blue-50   hover:bg-blue-500   border border-blue-100   hover:border-blue-500   transition-all duration-200 hover:-translate-y-0.5">
-                <div
-                    class="w-9 h-9 rounded-xl bg-blue-100   group-hover:bg-blue-400   flex items-center justify-center flex-shrink-0 transition-colors">
-                    <svg class="w-5 h-5 text-blue-500   group-hover:text-white transition-colors" fill="none"
-                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                            d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-                    </svg>
-                </div>
-                <span class="text-sm font-semibold text-blue-700   group-hover:text-white transition-colors">Master
-                    Obat</span>
-            </a>
-            <a href="{{ route('debtors.index') }}"
-                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-emerald-50 hover:bg-emerald-500 border border-emerald-100 hover:border-emerald-500 transition-all duration-200 hover:-translate-y-0.5">
-                <div
-                    class="w-9 h-9 rounded-xl bg-emerald-100 group-hover:bg-emerald-400 flex items-center justify-center flex-shrink-0 transition-colors">
-                    <svg class="w-5 h-5 text-emerald-500 group-hover:text-white transition-colors" fill="none"
-                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                </div>
-                <span class="text-sm font-semibold text-emerald-700 group-hover:text-white transition-colors">Master
-                    Debitur</span>
-            </a>
-            <a href="{{ route('categories.index') }}"
-                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-violet-50  hover:bg-violet-500  border border-violet-100  hover:border-violet-500  transition-all duration-200 hover:-translate-y-0.5">
-                <div
-                    class="w-9 h-9 rounded-xl bg-violet-100  group-hover:bg-violet-400  flex items-center justify-center flex-shrink-0 transition-colors">
-                    <svg class="w-5 h-5 text-violet-500  group-hover:text-white transition-colors" fill="none"
-                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                            d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
-                    </svg>
-                </div>
-                <span class="text-sm font-semibold text-violet-700  group-hover:text-white transition-colors">Kategori
-                    Obat</span>
-            </a>
-            <a href="{{ route('creditors.index') }}"
-                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-amber-50  hover:bg-amber-500  border border-amber-100  hover:border-amber-500  transition-all duration-200 hover:-translate-y-0.5">
-                <div
-                    class="w-9 h-9 rounded-xl bg-amber-100  group-hover:bg-amber-400  flex items-center justify-center flex-shrink-0 transition-colors">
-                    <svg class="w-5 h-5 text-amber-500  group-hover:text-white transition-colors" fill="none"
-                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                            d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                    </svg>
-                </div>
-                <span class="text-sm font-semibold text-amber-700  group-hover:text-white transition-colors">Master
-                    Kreditur</span>
-            </a>
-            <a href="{{ route('compositions.index') }}"
-                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-cyan-50   hover:bg-cyan-500   border border-cyan-100   hover:border-cyan-500   transition-all duration-200 hover:-translate-y-0.5">
-                <div
-                    class="w-9 h-9 rounded-xl bg-cyan-100   group-hover:bg-cyan-400   flex items-center justify-center flex-shrink-0 transition-colors">
-                    <svg class="w-5 h-5 text-cyan-500   group-hover:text-white transition-colors" fill="none"
-                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                    </svg>
-                </div>
-                <span class="text-sm font-semibold text-cyan-700   group-hover:text-white transition-colors">Master
-                    Komposisi</span>
-            </a>
-            <a href="{{ route('doctors.index') }}"
-                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-rose-50   hover:bg-rose-500   border border-rose-100   hover:border-rose-500   transition-all duration-200 hover:-translate-y-0.5">
-                <div
-                    class="w-9 h-9 rounded-xl bg-rose-100   group-hover:bg-rose-400   flex items-center justify-center flex-shrink-0 transition-colors">
-                    <svg class="w-5 h-5 text-rose-500   group-hover:text-white transition-colors" fill="none"
-                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                            d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                </div>
-                <span class="text-sm font-semibold text-rose-700   group-hover:text-white transition-colors">Master
-                    Dokter</span>
-            </a>
-            <a href="{{ route('patients.index') }}"
-                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-teal-50   hover:bg-teal-500   border border-teal-100   hover:border-teal-500   transition-all duration-200 hover:-translate-y-0.5">
-                <div
-                    class="w-9 h-9 rounded-xl bg-teal-100   group-hover:bg-teal-400   flex items-center justify-center flex-shrink-0 transition-colors">
-                    <svg class="w-5 h-5 text-teal-500   group-hover:text-white transition-colors" fill="none"
-                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                            d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                    </svg>
-                </div>
-                <span class="text-sm font-semibold text-teal-700   group-hover:text-white transition-colors">Master
-                    Pasien</span>
-            </a>
-            <a href="{{ route('factories.index') }}"
-                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-orange-50  hover:bg-orange-500  border border-orange-100  hover:border-orange-500  transition-all duration-200 hover:-translate-y-0.5">
-                <div
-                    class="w-9 h-9 rounded-xl bg-orange-100  group-hover:bg-orange-400  flex items-center justify-center flex-shrink-0 transition-colors">
-                    <svg class="w-5 h-5 text-orange-500  group-hover:text-white transition-colors" fill="none"
-                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                            d="M3 7h2l2 9h10l2-9h2M3 7l1-4h16l1 4M9 16v2m6-2v2" />
-                    </svg>
-                </div>
-                <span class="text-sm font-semibold text-orange-700  group-hover:text-white transition-colors">Master
-                    Pabrik</span>
-            </a>
-            <a href="{{ route('parameters.index') }}"
-                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-indigo-50  hover:bg-indigo-500  border border-indigo-100  hover:border-indigo-500  transition-all duration-200 hover:-translate-y-0.5">
-                <div
-                    class="w-9 h-9 rounded-xl bg-indigo-100  group-hover:bg-indigo-400  flex items-center justify-center flex-shrink-0 transition-colors">
-                    <svg class="w-5 h-5 text-indigo-500  group-hover:text-white transition-colors" fill="none"
-                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                            d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-                    </svg>
-                </div>
-                <span class="text-sm font-semibold text-indigo-700  group-hover:text-white transition-colors">Master
-                    Parameter</span>
-            </a>
-            <a href="{{ route('locations.index') }}"
-                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-pink-50   hover:bg-pink-500   border border-pink-100   hover:border-pink-500   transition-all duration-200 hover:-translate-y-0.5">
-                <div
-                    class="w-9 h-9 rounded-xl bg-pink-100   group-hover:bg-pink-400   flex items-center justify-center flex-shrink-0 transition-colors">
-                    <svg class="w-5 h-5 text-pink-500   group-hover:text-white transition-colors" fill="none"
-                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                            d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                </div>
-                <span class="text-sm font-semibold text-pink-700   group-hover:text-white transition-colors">Master
-                    Lokasi</span>
-            </a>
-            <a href="{{ route('items.index') }}"
-                class="group col-span-2 flex items-center gap-3 p-3.5 rounded-2xl bg-lime-50 hover:bg-lime-500 border border-lime-100 hover:border-lime-500 transition-all duration-200 hover:-translate-y-0.5">
-                <div
-                    class="w-9 h-9 rounded-xl bg-lime-100 group-hover:bg-lime-400 flex items-center justify-center flex-shrink-0 transition-colors">
-                    <svg class="w-5 h-5 text-lime-600 group-hover:text-white transition-colors" fill="none"
-                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                            d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                    </svg>
-                </div>
-                <span class="text-sm font-semibold text-lime-700 group-hover:text-white transition-colors">Master
-                    Etalase</span>
-            </a>
-        </div>
-        <button
-            class="closeModal mt-5 w-full py-2.5 flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-600 font-semibold rounded-2xl transition-all">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-            Tutup
-        </button>
-    </div>
-</div>
+@endrole
 
 {{-- Persediaan Modal --}}
 <div id="logModal"
@@ -1495,52 +1523,52 @@
                     Stok</span>
             </a>
 
-            @if(!isWarehousePharmacy())
-            <a href="{{ route('supplies.stockDetail') }}"
-                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-green-50 hover:bg-green-500 border border-green-100 hover:border-green-500 transition-all duration-200 hover:-translate-y-0.5">
-                <div
-                    class="w-9 h-9 rounded-xl bg-green-100 group-hover:bg-green-400 flex items-center justify-center flex-shrink-0 transition-colors">
-                    <svg class="w-5 h-5 text-green-600 group-hover:text-white transition-colors" fill="none"
-                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                            d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                    </svg>
-                </div>
-                <span class="text-sm font-semibold text-green-700 group-hover:text-white transition-colors">Stok
-                    Pelayanan</span>
-            </a>
+            @if (!isWarehousePharmacy())
+                <a href="{{ route('supplies.stockDetail') }}"
+                    class="group flex items-center gap-3 p-3.5 rounded-2xl bg-green-50 hover:bg-green-500 border border-green-100 hover:border-green-500 transition-all duration-200 hover:-translate-y-0.5">
+                    <div
+                        class="w-9 h-9 rounded-xl bg-green-100 group-hover:bg-green-400 flex items-center justify-center flex-shrink-0 transition-colors">
+                        <svg class="w-5 h-5 text-green-600 group-hover:text-white transition-colors" fill="none"
+                            viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                        </svg>
+                    </div>
+                    <span class="text-sm font-semibold text-green-700 group-hover:text-white transition-colors">Stok
+                        Pelayanan</span>
+                </a>
             @endif
 
-            @if(canAccessWarehouseStock())
-            <a href="{{ route('supplies.storage') }}"
-                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-purple-50 hover:bg-purple-500 border border-purple-100 hover:border-purple-500 transition-all duration-200 hover:-translate-y-0.5">
-                <div
-                    class="w-9 h-9 rounded-xl bg-purple-100 group-hover:bg-purple-400 flex items-center justify-center flex-shrink-0 transition-colors">
-                    <svg class="w-5 h-5 text-purple-600 group-hover:text-white transition-colors" fill="none"
-                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                            d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z" />
-                    </svg>
-                </div>
-                <span class="text-sm font-semibold text-purple-700 group-hover:text-white transition-colors">Stok
-                    Gudang</span>
-            </a>
+            @if (canAccessWarehouseStock())
+                <a href="{{ route('supplies.storage') }}"
+                    class="group flex items-center gap-3 p-3.5 rounded-2xl bg-purple-50 hover:bg-purple-500 border border-purple-100 hover:border-purple-500 transition-all duration-200 hover:-translate-y-0.5">
+                    <div
+                        class="w-9 h-9 rounded-xl bg-purple-100 group-hover:bg-purple-400 flex items-center justify-center flex-shrink-0 transition-colors">
+                        <svg class="w-5 h-5 text-purple-600 group-hover:text-white transition-colors" fill="none"
+                            viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z" />
+                        </svg>
+                    </div>
+                    <span class="text-sm font-semibold text-purple-700 group-hover:text-white transition-colors">Stok
+                        Gudang</span>
+                </a>
             @endif
 
-            @if(isWarehousePharmacy() || canAccessWarehouseStock())
-            <a href="{{ route('supplies.stockData') }}"
-                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-orange-50 hover:bg-orange-500 border border-orange-100 hover:border-orange-500 transition-all duration-200 hover:-translate-y-0.5">
-                <div
-                    class="w-9 h-9 rounded-xl bg-orange-100 group-hover:bg-orange-400 flex items-center justify-center flex-shrink-0 transition-colors">
-                    <svg class="w-5 h-5 text-orange-600 group-hover:text-white transition-colors" fill="none"
-                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                            d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                </div>
-                <span class="text-sm font-semibold text-orange-700 group-hover:text-white transition-colors">Data
-                    Stok</span>
-            </a>
+            @if (isWarehousePharmacy() || canAccessWarehouseStock())
+                <a href="{{ route('supplies.stockData') }}"
+                    class="group flex items-center gap-3 p-3.5 rounded-2xl bg-orange-50 hover:bg-orange-500 border border-orange-100 hover:border-orange-500 transition-all duration-200 hover:-translate-y-0.5">
+                    <div
+                        class="w-9 h-9 rounded-xl bg-orange-100 group-hover:bg-orange-400 flex items-center justify-center flex-shrink-0 transition-colors">
+                        <svg class="w-5 h-5 text-orange-600 group-hover:text-white transition-colors" fill="none"
+                            viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                    </div>
+                    <span class="text-sm font-semibold text-orange-700 group-hover:text-white transition-colors">Data
+                        Stok</span>
+                </a>
             @endif
 
             <a href="{{ route('supplies.stockOpname') }}"
@@ -1962,6 +1990,510 @@
 
     </div>
 </div>
+{{-- Export Center Modal --}}
+<div id="exportCenterModal"
+    class="modal-hide modal-transition fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
+    w-[95%] max-w-[680px] bg-white rounded-3xl shadow-2xl z-[9999] overflow-hidden">
+
+    <!-- Modal Header -->
+    <div class="relative bg-gradient-to-r from-sky-600 via-indigo-600 to-blue-700 px-6 pt-6 pb-6 text-white">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div
+                    class="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/20 shadow-inner">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round"
+                        class="icon icon-tabler icons-tabler-outline icon-tabler-file-spreadsheet text-white">
+                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                        <path d="M14 3v4a1 1 0 0 0 1 1h4" />
+                        <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" />
+                        <path d="M8 11h8v7h-8z" />
+                        <path d="M8 15h8" />
+                        <path d="M11 11v7" />
+                    </svg>
+                </div>
+                <div>
+                    <h2 class="text-xl font-bold leading-tight">Pusat Export Data & Laporan</h2>
+                    <p class="text-xs text-sky-100 mt-0.5">Download dokumen rekap & mutasi Excel terstandar</p>
+                </div>
+            </div>
+            <button
+                class="closeModal text-white/70 hover:text-white bg-white/10 hover:bg-white/20 rounded-full w-8 h-8 flex items-center justify-center transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                    stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-x">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                    <path d="M18 6l-12 12" />
+                    <path d="M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- Modal Content -->
+    <div class="p-6 max-h-[72vh] overflow-y-auto space-y-5">
+        <!-- Live Progress Container (for Queue Processing) -->
+        <div id="exportCenterProgress"
+            class="hidden bg-indigo-50/90 border border-indigo-200 rounded-2xl p-4 shadow-sm transition-all animate-fadeIn">
+            <div class="flex items-center justify-between mb-2.5">
+                <div class="flex items-center gap-2.5">
+                    <svg class="w-4 h-4 text-indigo-600 animate-spin" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2.5">
+                        <circle cx="12" cy="12" r="10" stroke-dasharray="40"
+                            stroke-dashoffset="15" />
+                    </svg>
+                    <span id="exportProgressStatus" class="text-xs font-bold text-indigo-950">Memulai proses antrean
+                        di server...</span>
+                </div>
+                <span id="exportProgressText"
+                    class="text-xs font-black text-indigo-600 bg-white px-2 py-0.5 rounded-md border border-indigo-100 shadow-2xs">0%</span>
+            </div>
+            <div class="w-full bg-indigo-100 rounded-full h-2.5 overflow-hidden p-0.5">
+                <div id="exportProgressBar"
+                    class="bg-gradient-to-r from-indigo-500 to-blue-600 h-full rounded-full transition-all duration-300"
+                    style="width: 0%;"></div>
+            </div>
+            <p class="text-[11px] text-slate-500 mt-2">Export berjalan di background queue server agar tidak membebani
+                memori dan browser.</p>
+        </div>
+
+        <!-- Date Filter Toolbar -->
+        <div
+            class="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
+            <div class="flex items-center gap-2 text-slate-700 font-bold text-xs uppercase tracking-wider">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                    stroke-linejoin="round"
+                    class="icon icon-tabler icons-tabler-outline icon-tabler-calendar text-indigo-600">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                    <path d="M4 7a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12z" />
+                    <path d="M16 3v4" />
+                    <path d="M8 3v4" />
+                    <path d="M4 11h16" />
+                </svg>
+                Periode Laporan
+            </div>
+            <div class="flex items-center gap-2 w-full sm:w-auto">
+                <input type="date" id="export_center_start_date"
+                    value="{{ now()->startOfMonth()->format('Y-m-d') }}"
+                    class="rounded-xl border-slate-200 text-xs font-semibold py-2 px-3 focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 shadow-xs">
+                <span class="text-xs text-slate-400 font-medium">s/d</span>
+                <input type="date" id="export_center_end_date" value="{{ now()->format('Y-m-d') }}"
+                    class="rounded-xl border-slate-200 text-xs font-semibold py-2 px-3 focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 shadow-xs">
+            </div>
+        </div>
+
+        <!-- Section 1: Pengawasan & Regulasi (HO & Gudang) -->
+        @if (auth()->user()->hasRole('HO') || isWarehousePharmacy())
+            <div>
+                <div class="flex items-center gap-2 mb-3">
+                    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Laporan Regulasi &
+                        Monitoring (Gudang & HO)</span>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <!-- Card SIPNAP -->
+                    <div
+                        class="bg-gradient-to-br from-amber-50/60 to-orange-50/60 border border-amber-200/80 rounded-2xl p-4 flex flex-col justify-between hover:shadow-md transition-all">
+                        <div>
+                            <div class="flex items-start justify-between gap-2 mb-2">
+                                <div
+                                    class="w-8 h-8 rounded-xl bg-amber-100 border border-amber-200 flex items-center justify-center text-amber-700">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"
+                                        viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                        class="icon icon-tabler icons-tabler-outline icon-tabler-pill">
+                                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                        <path d="M4.5 12.5l8 -8a4.95 4.95 0 1 1 7 7l-8 8a4.95 4.95 0 0 1 -7 -7z" />
+                                        <path d="M8.5 8.5l7 7" />
+                                    </svg>
+                                </div>
+                                <span
+                                    class="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">SIPNAP
+                                    (4 Tab)</span>
+                            </div>
+                            <h4 class="text-sm font-bold text-slate-800 leading-snug mb-1">Narkotika & Psikotropika
+                            </h4>
+                            <p class="text-[11px] text-slate-500 leading-relaxed mb-4">Mutasi obat Narkotika,
+                                Psikotropika, OOT, dan Prekursor (Awal, Masuk, Keluar, Saldo, Fisik, Selisih, ED).</p>
+                        </div>
+                        <button onclick="triggerExportCenter('special_medicines')"
+                            class="w-full inline-flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-xs transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+                                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round"
+                                class="icon icon-tabler icons-tabler-outline icon-tabler-download">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2" />
+                                <path d="M7 11l5 5l5 -5" />
+                                <path d="M12 4l0 12" />
+                            </svg>
+                            Export Excel SIPNAP
+                        </button>
+                    </div>
+
+                    <!-- Card Monitoring ED -->
+                    <div
+                        class="bg-gradient-to-br from-teal-50/60 to-emerald-50/60 border border-teal-200/80 rounded-2xl p-4 flex flex-col justify-between hover:shadow-md transition-all">
+                        <div>
+                            <div class="flex items-start justify-between gap-2 mb-2">
+                                <div
+                                    class="w-8 h-8 rounded-xl bg-teal-100 border border-teal-200 flex items-center justify-center text-teal-700">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"
+                                        viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                        class="icon icon-tabler icons-tabler-outline icon-tabler-hourglass-high">
+                                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                        <path d="M6.5 7h11" />
+                                        <path d="M6 20v-2a6 6 0 1 1 12 0v2a1 1 0 0 1 -1 1h-10a1 1 0 0 1 -1 -1z" />
+                                        <path d="M6 4v2a6 6 0 1 0 12 0v-2a1 1 0 0 0 -1 -1h-10a1 1 0 0 0 -1 1z" />
+                                    </svg>
+                                </div>
+                                <span
+                                    class="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-teal-100 text-teal-800 border border-teal-200">Semua
+                                    Batch</span>
+                            </div>
+                            <h4 class="text-sm font-bold text-slate-800 leading-snug mb-1">Data Kadaluarsa (ED)</h4>
+                            <p class="text-[11px] text-slate-500 leading-relaxed mb-4">Daftar seluruh batch obat
+                                dengan tanggal ED, sisa waktu, status kadaluarsa, stok gudang & pelayanan.</p>
+                        </div>
+                        <button onclick="triggerExportCenter('expiry_dates')"
+                            class="w-full inline-flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold shadow-xs transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+                                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round"
+                                class="icon icon-tabler icons-tabler-outline icon-tabler-download">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2" />
+                                <path d="M7 11l5 5l5 -5" />
+                                <path d="M12 4l0 12" />
+                            </svg>
+                            Export Monitoring ED
+                        </button>
+                    </div>
+                </div>
+            </div>
+        @endif
+
+        <!-- Section 2: Retur & Penolakan (Semua Unit) -->
+        <div>
+            <div class="flex items-center gap-2 mb-3">
+                <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Laporan Retur & Penolakan
+                    (Semua Unit)</span>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <!-- Card Retur Penjualan -->
+                <div
+                    class="bg-slate-50 hover:bg-white border border-slate-200 rounded-2xl p-4 flex flex-col justify-between hover:shadow-md transition-all">
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <div
+                                class="w-7 h-7 rounded-lg bg-indigo-100 flex items-center justify-center text-indigo-600">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+                                    viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                    stroke-linecap="round" stroke-linejoin="round"
+                                    class="icon icon-tabler icons-tabler-outline icon-tabler-arrow-back-up">
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                    <path d="M9 14l-4 -4l4 -4" />
+                                    <path d="M5 10h11a4 4 0 1 1 0 8h-1" />
+                                </svg>
+                            </div>
+                            <span
+                                class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-200 text-slate-700">Kasir</span>
+                        </div>
+                        <h4 class="text-xs font-bold text-slate-800 mb-1">Retur Penjualan</h4>
+                        <p class="text-[11px] text-slate-500 mb-3 leading-relaxed">Pengembalian obat dari pasien /
+                            pembeli kasir.</p>
+                    </div>
+                    <button onclick="triggerExportCenter('sales_retur')"
+                        class="w-full inline-flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14"
+                            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round"
+                            class="icon icon-tabler icons-tabler-outline icon-tabler-download">
+                            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                            <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2" />
+                            <path d="M7 11l5 5l5 -5" />
+                            <path d="M12 4l0 12" />
+                        </svg>
+                        Export Retur Jual
+                    </button>
+                </div>
+
+                <!-- Card Retur Pembelian -->
+                <div
+                    class="bg-slate-50 hover:bg-white border border-slate-200 rounded-2xl p-4 flex flex-col justify-between hover:shadow-md transition-all">
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <div
+                                class="w-7 h-7 rounded-lg bg-indigo-100 flex items-center justify-center text-indigo-600">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+                                    viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                    stroke-linecap="round" stroke-linejoin="round"
+                                    class="icon icon-tabler icons-tabler-outline icon-tabler-truck-return">
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                    <path d="M7 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
+                                    <path d="M17 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
+                                    <path d="M5 17h-2v-11a1 1 0 0 1 1 -1h9v12m-4 0h6m4 0h2v-6h-4" />
+                                    <path d="M9 10.5l3 -3l3 3" />
+                                    <path d="M12 7.5v6" />
+                                </svg>
+                            </div>
+                            <span
+                                class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-200 text-slate-700">Supplier</span>
+                        </div>
+                        <h4 class="text-xs font-bold text-slate-800 mb-1">Retur Pembelian</h4>
+                        <p class="text-[11px] text-slate-500 mb-3 leading-relaxed">Pengembalian obat ke distributor /
+                            supplier.</p>
+                    </div>
+                    <button onclick="triggerExportCenter('purchase_retur')"
+                        class="w-full inline-flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14"
+                            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round"
+                            class="icon icon-tabler icons-tabler-outline icon-tabler-download">
+                            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                            <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2" />
+                            <path d="M7 11l5 5l5 -5" />
+                            <path d="M12 4l0 12" />
+                        </svg>
+                        Export Retur Beli
+                    </button>
+                </div>
+
+                <!-- Card Penolakan -->
+                <div
+                    class="bg-slate-50 hover:bg-white border border-slate-200 rounded-2xl p-4 flex flex-col justify-between hover:shadow-md transition-all">
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="w-7 h-7 rounded-lg bg-red-100 flex items-center justify-center text-red-600">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+                                    viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                    stroke-linecap="round" stroke-linejoin="round"
+                                    class="icon icon-tabler icons-tabler-outline icon-tabler-ban">
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                    <path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" />
+                                    <path d="M5.7 5.7l12.6 12.6" />
+                                </svg>
+                            </div>
+                            <span
+                                class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-200 text-slate-700">Rejects</span>
+                        </div>
+                        <h4 class="text-xs font-bold text-slate-800 mb-1">Penolakan Transaksi</h4>
+                        <p class="text-[11px] text-slate-500 mb-3 leading-relaxed">Rekap penolakan resep dan transaksi
+                            kasir.</p>
+                    </div>
+                    <button onclick="triggerExportCenter('rejects')"
+                        class="w-full inline-flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14"
+                            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round"
+                            class="icon icon-tabler icons-tabler-outline icon-tabler-download">
+                            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                            <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2" />
+                            <path d="M7 11l5 5l5 -5" />
+                            <path d="M12 4l0 12" />
+                        </svg>
+                        Export Penolakan
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 3: Laporan Penjualan & Pembelian Lainnya -->
+        <div class="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+            <span class="text-xs text-slate-400 font-medium">Butuh laporan lainnya?</span>
+            <div class="flex items-center gap-2">
+                @if (!isWarehousePharmacy())
+                    <button onclick="closeModals(); openModal('reportModal');"
+                        class="inline-flex items-center gap-1 text-xs font-bold text-indigo-600 hover:text-indigo-800 hover:underline">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14"
+                            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round"
+                            class="icon icon-tabler icons-tabler-outline icon-tabler-chart-bar">
+                            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                            <path d="M3 12m0 1a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v6a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z" />
+                            <path d="M9 8m0 1a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v10a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z" />
+                            <path d="M15 4m0 1a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v14a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z" />
+                            <path d="M4 20l14 0" />
+                        </svg>
+                        Laporan Penjualan (LIPH, dll)
+                    </button>
+                @endif
+                @if (canAccessPurchasing())
+                    <span class="text-slate-300">•</span>
+                    <button onclick="closeModals(); openModal('orderReportModal');"
+                        class="inline-flex items-center gap-1 text-xs font-bold text-indigo-600 hover:text-indigo-800 hover:underline">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14"
+                            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round"
+                            class="icon icon-tabler icons-tabler-outline icon-tabler-shopping-cart">
+                            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                            <path d="M6 19m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
+                            <path d="M17 19m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
+                            <path d="M17 17h-11v-14h-2" />
+                            <path d="M6 5l14 1l-1 7h-13" />
+                        </svg>
+                        Laporan Pembelian
+                    </button>
+                @endif
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let exportPollInterval = null;
+
+    async function triggerExportCenter(type) {
+        const startDate = document.getElementById('export_center_start_date')?.value || '';
+        const endDate = document.getElementById('export_center_end_date')?.value || '';
+        const token = '{{ csrf_token() }}';
+
+        let url = '';
+        if (type === 'special_medicines') {
+            url = "{{ route('reports.export.specialMedicines') }}";
+        } else if (type === 'expiry_dates') {
+            url = "{{ route('reports.export.expiryDates') }}";
+        } else if (type === 'sales_retur') {
+            url = "{{ route('reports.export.salesRetur') }}";
+        } else if (type === 'purchase_retur') {
+            url = "{{ route('reports.export.purchaseRetur') }}";
+        } else if (type === 'rejects') {
+            url = "{{ route('reports.export.rejects') }}";
+        }
+
+        if (!url) return;
+
+        const progressContainer = document.getElementById('exportCenterProgress');
+        const progressBar = document.getElementById('exportProgressBar');
+        const progressText = document.getElementById('exportProgressText');
+        const progressStatus = document.getElementById('exportProgressStatus');
+
+        if (progressContainer) {
+            progressContainer.classList.remove('hidden');
+            progressBar.style.width = '10%';
+            progressText.innerText = '10%';
+            progressStatus.innerText = 'Mengirim permintaan antrean export...';
+        }
+
+        if (window.iziToast) {
+            iziToast.info({
+                title: 'Export Queue',
+                message: 'Permintaan export telah dimasukkan ke dalam antrean background server...',
+                position: 'topRight',
+                timeout: 3000
+            });
+        }
+
+        try {
+            const formData = new FormData();
+            formData.append('_token', token);
+            formData.append('start_date', startDate);
+            formData.append('end_date', endDate);
+
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': token
+                },
+                body: formData
+            });
+
+            if (!res.ok) throw new Error('Gagal memulai antrean export');
+            const data = await res.json();
+
+            if (data.job_id) {
+                pollExportCenterStatus(data.job_id);
+            } else {
+                throw new Error(data.message || 'ID Job export tidak ditemukan');
+            }
+        } catch (err) {
+            if (progressContainer) progressContainer.classList.add('hidden');
+            if (window.iziToast) {
+                iziToast.error({
+                    title: 'Gagal',
+                    message: err.message || 'Terjadi kesalahan saat memulai antrean export.',
+                    position: 'topRight'
+                });
+            }
+        }
+    }
+
+    function pollExportCenterStatus(jobId) {
+        const progressContainer = document.getElementById('exportCenterProgress');
+        const progressBar = document.getElementById('exportProgressBar');
+        const progressText = document.getElementById('exportProgressText');
+        const progressStatus = document.getElementById('exportProgressStatus');
+
+        if (exportPollInterval) clearInterval(exportPollInterval);
+
+        exportPollInterval = setInterval(async () => {
+            try {
+                const res = await fetch(`/reports/export/status/${jobId}`, {
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                if (!res.ok) return;
+                const data = await res.json();
+
+                let prog = data.progress || 10;
+                if (progressBar) progressBar.style.width = prog + '%';
+                if (progressText) progressText.innerText = prog + '%';
+
+                if (prog < 40) {
+                    if (progressStatus) progressStatus.innerText =
+                        'Mempersiapkan data dan kalkulasi stok...';
+                } else if (prog < 100) {
+                    if (progressStatus) progressStatus.innerText =
+                        'Menyusun file Excel dan styling sheet...';
+                }
+
+                if (data.status === 'completed' && data.file) {
+                    clearInterval(exportPollInterval);
+                    if (progressBar) progressBar.style.width = '100%';
+                    if (progressText) progressText.innerText = '100%';
+                    if (progressStatus) progressStatus.innerText = 'Selesai! Mengunduh file...';
+
+                    if (window.iziToast) {
+                        iziToast.success({
+                            title: 'Export Selesai',
+                            message: 'File Excel berhasil dibuat dan sedang diunduh!',
+                            position: 'topRight'
+                        });
+                    }
+
+                    // Trigger direct file download
+                    const dlLink = document.createElement('a');
+                    dlLink.href = data.file;
+                    dlLink.setAttribute('download', '');
+                    document.body.appendChild(dlLink);
+                    dlLink.click();
+                    document.body.removeChild(dlLink);
+
+                    setTimeout(() => {
+                        if (progressContainer) progressContainer.classList.add('hidden');
+                    }, 4000);
+                } else if (data.status === 'failed') {
+                    clearInterval(exportPollInterval);
+                    if (progressContainer) progressContainer.classList.add('hidden');
+                    if (window.iziToast) {
+                        iziToast.error({
+                            title: 'Export Gagal',
+                            message: 'Gagal memproses file export di background queue. Silakan coba kembali.',
+                            position: 'topRight'
+                        });
+                    }
+                }
+            } catch (e) {
+                console.error("Polling export error:", e);
+            }
+        }, 1500);
+    }
+</script>
+
 <div id="loading-overlay"
     class="hidden fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
 

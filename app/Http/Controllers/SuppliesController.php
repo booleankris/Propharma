@@ -1255,8 +1255,27 @@ class SuppliesController extends Controller
         DB::beginTransaction();
 
         try {
-            // 1. Resolve which batch to use (provided or FEFO default)
-            if ($request->filled('batches_id')) {
+            // 1. Resolve which batch to use (Custom batch if provided, selected batch, or FEFO default)
+            if ($request->filled('custom_batch_name')) {
+                $customName = trim($request->custom_batch_name);
+                $customEd = $request->filled('custom_expired_date')
+                    ? Carbon::parse(str_replace('/', '-', $request->custom_expired_date))->toDateString()
+                    : now()->addYears(2)->toDateString();
+
+                $batch = Batches::lockForUpdate()->firstOrCreate([
+                    'medicine_id' => $request->medicine_id,
+                    'pharmacy_id' => $canSeeWarehouse ? $warehouseId : $pharmacyId,
+                    'name' => $customName,
+                ], [
+                    'expired_date' => $customEd,
+                    'stock' => 0,
+                ]);
+
+                if ($request->filled('custom_expired_date')) {
+                    $batch->expired_date = $customEd;
+                    $batch->save();
+                }
+            } elseif ($request->filled('batches_id')) {
                 $batch = Batches::lockForUpdate()->findOrFail($request->batches_id);
             } else {
                 $batch = Batches::lockForUpdate()

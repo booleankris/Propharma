@@ -85,3 +85,32 @@ if (!function_exists('canAccessWarehouseStock')) {
     }
 }
 
+if (!function_exists('isBranchPharmacy')) {
+    /**
+     * Check if current pharmacy is an external branch pharmacy (not Gudang PMI and not SAHABAT PMI).
+     */
+    function isBranchPharmacy($pharmacyId = null): bool
+    {
+        $id = $pharmacyId !== null ? (int) $pharmacyId : getActivePharmacyId();
+        return $id !== getWarehousePharmacyId() && $id !== 1;
+    }
+}
+
+if (!function_exists('canAccessPurchasing')) {
+    /**
+     * Check if current pharmacy / user can access purchasing (SP & Receiving).
+     * Allowed for: Gudang PMI, Branch Pharmacies, and HO / Administrator.
+     * Denied for: SAHABAT PMI Retail Cashier (ID 1).
+     */
+    function canAccessPurchasing($pharmacyId = null): bool
+    {
+        $user = auth()->user();
+        if ($user && ($user->hasRole('HO') || $user->hasRole('administrator') || $user->hasRole('Manager') || $user->hasRole('Gudang PMI'))) {
+            return true;
+        }
+
+        $id = $pharmacyId !== null ? (int) $pharmacyId : getActivePharmacyId();
+        return $id === getWarehousePharmacyId() || isBranchPharmacy($id);
+    }
+}
+

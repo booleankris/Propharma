@@ -200,29 +200,30 @@ Route::middleware(['auth', 'role:Kasir|Gudang PMI|HO|administrator|manager|Onlin
 
     // ================================================================== Add Data =========================================================================
 
-    // Master
-    Route::resource('creditors', CreditorsController::class)->except(['show']);
-    Route::resource('debtors', DebtorsController::class)->except(['show']);
-    Route::resource('patients', PatientsController::class)->except(['show']);
-    Route::resource('doctors', DoctorsController::class)->except(['show']);
-    Route::resource('compositions', CompositionsController::class)->except(['show']);
-    Route::resource('factories', FactoriesController::class)->except(['show']);
-    Route::resource('categories', CategoriesController::class)->except(['show']);
-    Route::prefix('medicines')->name('medicines.')->group(function () {
-        Route::get('/', [MedicineController::class, 'index'])->name('index');
-        Route::post('/', [MedicineController::class, 'store'])->name('store');
-        Route::put('/{id}', [MedicineController::class, 'update'])->name('update');
-        Route::delete('/{id}', [MedicineController::class, 'destroy'])->name('destroy');
-        Route::get('/{id}/edit-creditor', [MedicineController::class, 'editCreditor'])->name('editCreditor');
+    // Master Data (Hanya Role HO)
+    Route::middleware(['role:HO'])->group(function () {
+        Route::resource('creditors', CreditorsController::class)->except(['show']);
+        Route::resource('debtors', DebtorsController::class)->except(['show']);
+        Route::resource('patients', PatientsController::class)->except(['show']);
+        Route::resource('doctors', DoctorsController::class)->except(['show']);
+        Route::resource('compositions', CompositionsController::class)->except(['show']);
+        Route::resource('factories', FactoriesController::class)->except(['show']);
+        Route::resource('categories', CategoriesController::class)->except(['show']);
+        Route::prefix('medicines')->name('medicines.')->group(function () {
+            Route::get('/', [MedicineController::class, 'index'])->name('index');
+            Route::post('/', [MedicineController::class, 'store'])->name('store');
+            Route::put('/{id}', [MedicineController::class, 'update'])->name('update');
+            Route::delete('/{id}', [MedicineController::class, 'destroy'])->name('destroy');
+            Route::get('/{id}/edit-creditor', [MedicineController::class, 'editCreditor'])->name('editCreditor');
+        });
+
+        Route::resource('parameters', ParametersController::class)->except(['show']);
+        Route::resource('items', ItemsController::class)->except(['show']);
+        Route::resource('locations', LocationsController::class)->except(['show']);
+
+        // Master Addition
+        Route::get('/medicines/{id}/edit-data', [MedicineController::class, 'editCreditor']);
     });
-
-    Route::resource('parameters', ParametersController::class)->except(['show']);
-    Route::resource('items', ItemsController::class)->except(['show']);
-    Route::resource('locations', LocationsController::class)->except(['show']);
-
-
-    // Master Addition
-    Route::get('/medicines/{id}/edit-data', [MedicineController::class, 'editCreditor']);
 
 
     // Sales Data
@@ -359,6 +360,13 @@ Route::middleware(['auth', 'role:Kasir|Gudang PMI|HO|administrator|manager|Onlin
     Route::post('/reports/export/medicines', [ReportsController::class, 'exportMedicines']);
     Route::get('/reports/export/medicines/status/{id}', [ReportsController::class, 'exportMedicinesStatus']);
     Route::get('/reports/export/medicines/download/{id}', [ReportsController::class, 'exportMedicinesDownload']);
+
+    // Pusat Export Baru (SIPNAP, Retur Jual/Beli, Monitoring ED, Penolakan)
+    Route::post('/reports/export/special-medicines', [ReportsController::class, 'exportSpecialMedicines'])->name('reports.export.specialMedicines');
+    Route::post('/reports/export/sales-retur', [ReportsController::class, 'exportSalesRetur'])->name('reports.export.salesRetur');
+    Route::post('/reports/export/purchase-retur', [ReportsController::class, 'exportPurchaseRetur'])->name('reports.export.purchaseRetur');
+    Route::post('/reports/export/expiry-dates', [ReportsController::class, 'exportExpiryDates'])->name('reports.export.expiryDates');
+    Route::post('/reports/export/rejects', [ReportsController::class, 'exportRejects'])->name('reports.export.rejects');
 
     // Order
     Route::get('/createorder', [OrdersController::class, 'createOrder'])->name('orders.create');

@@ -411,15 +411,44 @@
                         </div>
 
                         <div class="mb-6 bg-slate-50/80 p-4 rounded-xl border border-slate-100 relative">
-                            <label class="block text-xs font-bold text-slate-600 mb-2 uppercase tracking-wide">
-                                Penyesuaian Batch <span
-                                    class="text-slate-400 font-medium ml-1 normal-case tracking-normal">(opsional —
-                                    default: FEFO)</span>
-                            </label>
+                            <div class="flex items-center justify-between mb-2">
+                                <label class="block text-xs font-bold text-slate-600 uppercase tracking-wide">
+                                    Penyesuaian Batch <span
+                                        class="text-slate-400 font-medium ml-1 normal-case tracking-normal">(opsional —
+                                        default: FEFO)</span>
+                                </label>
+                                <button type="button" id="btn_toggle_custom_batch"
+                                    class="inline-flex items-center gap-1 text-xs text-indigo-600 font-bold hover:text-indigo-800 transition-colors">
+                                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                                    </svg>
+                                    Input Batch & ED Baru
+                                </button>
+                            </div>
                             <select id="batch_select" data-nav-enter="submit"
                                 class="w-full rounded-lg border-slate-200 text-sm font-medium text-slate-700 focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 py-2.5 shadow-sm bg-white">
                                 <option value="">— Otomatis (FEFO) —</option>
                             </select>
+
+                            {{-- Custom Batch & ED Form --}}
+                            <div id="custom_batch_container" class="hidden mt-3 pt-3 border-t border-slate-200 grid grid-cols-1 sm:grid-cols-2 gap-3 bg-white p-3 rounded-lg border border-indigo-100">
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-600 mb-1 uppercase tracking-wide">
+                                        Nama / No. Batch Kustom
+                                    </label>
+                                    <input type="text" id="custom_batch_name" placeholder="Contoh: BATCH-MANUAL-01"
+                                        class="w-full rounded-lg border-slate-200 text-sm py-2 px-3 focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500"
+                                        autocomplete="off">
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-600 mb-1 uppercase tracking-wide">
+                                        Tanggal Kadaluarsa (ED)
+                                    </label>
+                                    <input type="date" id="custom_expired_date"
+                                        class="w-full rounded-lg border-slate-200 text-sm py-2 px-3 focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500">
+                                </div>
+                            </div>
                         </div>
 
                         <div class="flex flex-wrap items-center justify-end gap-3 pt-5 border-t border-slate-100 relative">
@@ -659,6 +688,8 @@
                     stock_physic: stockPhysic,
                     counter_stock_physic: counterStockPhysic,
                     batches_id: batchesId, // empty string → backend picks FEFO
+                    custom_batch_name: $('#custom_batch_name').val(),
+                    custom_expired_date: $('#custom_expired_date').val(),
                 },
                 success: function(response) {
                     iziToast.success({
@@ -672,8 +703,9 @@
                     $('#medicine_stock').val(total_stock);
 
                     // Reset input fields (keep medicine & batch list intact)
-                    $('#stock_physic, #counter_stock_physic, #stock_discrepancy').val('');
+                    $('#stock_physic, #counter_stock_physic, #stock_discrepancy, #custom_batch_name, #custom_expired_date').val('');
                     $('#batch_select').prop('selectedIndex', 0);
+                    $('#custom_batch_container').addClass('hidden');
                     document.getElementById('discrepancy_badge').style.display = 'none';
                     document.getElementById('stock_discrepancy').classList.remove('border-red-500',
                         'text-red-600');
@@ -705,6 +737,18 @@
         /* ── DOM ready ─────────────────────────────────────────────────── */
         document.addEventListener('DOMContentLoaded', function() {
             initEnterNavigation();
+
+            // Toggle custom batch container
+            const toggleCustomBtn = document.getElementById('btn_toggle_custom_batch');
+            const customBatchContainer = document.getElementById('custom_batch_container');
+            if (toggleCustomBtn && customBatchContainer) {
+                toggleCustomBtn.addEventListener('click', function() {
+                    customBatchContainer.classList.toggle('hidden');
+                    if (!customBatchContainer.classList.contains('hidden')) {
+                        document.getElementById('custom_batch_name')?.focus();
+                    }
+                });
+            }
 
             // Date range picker
             flatpickr("#dateRange", {
