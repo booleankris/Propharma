@@ -38,30 +38,48 @@
 @endsection
 
 @section('content')
-    <div class="p-4 sm:p-6 md:p-8 text-slate-800">
+    <div class="pb-6 md:pb-4 px-3 sm:px-6">
+        <div
+            class="flex flex-col my-2 gap-4 p-4 bg-white border border-slate-200/80 rounded-xl shadow-xs md:flex-row md:items-center md:justify-between">
 
-        {{-- Page Header --}}
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 mb-6 border-b border-slate-200">
-            <div>
-                <div class="flex items-center gap-2 text-xs font-medium text-slate-400 mb-1">
-                    <span>Mutasi</span>
-                    <svg class="w-3 h-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+            {{-- LEFT: JUDUL & IKON HEADER --}}
+            <div class="flex items-center gap-3">
+                <div
+                    class="flex items-center justify-center w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 shrink-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-blue-600" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M7 21v-6" />
+                        <path d="M20 6l-3 -3l-3 3" />
+                        <path d="M17 3v18" />
+                        <path d="M10 18l-3 3l-3 -3" />
+                        <path d="M7 3v2" />
+                        <path d="M7 9v2" />
                     </svg>
-                    <span class="text-sky-600 font-semibold">Daftar Transfer Stok</span>
                 </div>
-                <h1 class="text-xl font-bold tracking-tight text-slate-900">Riwayat & Daftar Transfer Stok</h1>
+                <div>
+                    <h2 class="text-base font-bold text-slate-800 leading-tight">Daftar Transfer Stok</h2>
+                    <p class="text-xs text-slate-400">Riwayat & Mutasi Obat</p>
+                </div>
             </div>
-            <a href="{{ route('transfers.create') }}"
-                class="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold rounded-xl shadow-sm transition">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"
-                    stroke-linecap="round">
-                    <line x1="12" y1="5" x2="12" y2="19" />
-                    <line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
-                Buat Transfer Baru
-            </a>
+
+            {{-- RIGHT: TOMBOL AKSI --}}
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full md:w-auto">
+                <a href="{{ route('transfers.create') }}" class="w-full sm:w-auto">
+                    <button type="button"
+                        class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"
+                            stroke-linecap="round">
+                            <line x1="12" y1="5" x2="12" y2="19" />
+                            <line x1="5" y1="12" x2="19" y2="12" />
+                        </svg>
+                        <span>Buat Transfer Baru</span>
+                    </button>
+                </a>
+            </div>
         </div>
+    </div>
+    <div class="text-slate-800 px-3 sm:px-6">
 
         {{-- Flash Messages --}}
         @if (session('success'))
