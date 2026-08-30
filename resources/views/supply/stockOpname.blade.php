@@ -47,14 +47,19 @@
         }
 
         /* DataTable Controls (Search & Pagination) */
+        /* Modern DataTable Controls (Search & Pagination) */
         .dataTables_wrapper .top,
         .dataTables_wrapper .bottom {
             display: flex !important;
             justify-content: space-between !important;
             align-items: center !important;
-            padding: 12px 0 !important;
-            gap: 10px;
+            padding: 8px 0 !important;
+            gap: 8px;
             flex-wrap: wrap;
+        }
+
+        .dataTables_wrapper .bottom {
+            justify-content: center !important;
         }
 
         .dataTables_length label,
@@ -65,16 +70,18 @@
             font-size: 13px !important;
             color: #64748b !important;
             margin: 0 !important;
+            width: 100% !important;
         }
 
         .dataTables_filter input {
             border: 1px solid #e2e8f0 !important;
             border-radius: 8px !important;
             padding: 6px 12px !important;
-            font-size: 13px !important;
+            font-size: 12px !important;
             outline: none !important;
-            width: 150px !important;
+            width: 100% !important;
             display: inline-block !important;
+            background: #fff !important;
         }
 
         .dataTables_filter input:focus {
@@ -91,39 +98,80 @@
         }
 
         .dataTables_info {
-            font-size: 12px !important;
+            font-size: 11px !important;
             color: #94a3b8 !important;
         }
 
-        .dataTables_paginate .paginate_button {
-            padding: 3px 8px !important;
-            border-radius: 5px !important;
-            margin: 0 1px !important;
+        /* Centered and Clean Pagination Buttons */
+        .dataTables_wrapper .dataTables_paginate {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 3px !important;
+            margin: 8px 0 !important;
+            width: 100% !important;
+            flex-wrap: nowrap !important;
+            overflow-x: auto !important;
+            padding: 4px 0 !important;
+        }
+
+        .dataTables_wrapper .dataTables_paginate span {
+            display: inline-flex !important;
+            align-items: center !important;
+            gap: 3px !important;
+        }
+
+        .dataTables_wrapper .dataTables_paginate .paginate_button {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            min-width: 28px !important;
+            height: 28px !important;
+            padding: 0 6px !important;
+            border-radius: 6px !important;
+            margin: 0 !important;
             font-size: 11px !important;
-            background: #f1f5f9 !important;
+            font-weight: 600 !important;
+            background: #ffffff !important;
             border: 1px solid #e2e8f0 !important;
-            cursor: pointer !important;
             color: #475569 !important;
-            display: inline-block !important;
+            cursor: pointer !important;
+            transition: all 0.15s ease !important;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.04) !important;
+            line-height: 1 !important;
+            text-decoration: none !important;
+        }
+
+        .dataTables_wrapper .dataTables_paginate .paginate_button:hover:not(.current):not(.disabled) {
+            background: #f1f5f9 !important;
+            color: #0f172a !important;
+            border-color: #cbd5e1 !important;
         }
 
         .dataTables_wrapper .dataTables_paginate .paginate_button.current {
             background: #4f46e5 !important;
-            color: #fff !important;
+            color: #ffffff !important;
             border-color: #4f46e5 !important;
-        }
-
-        .dataTables_wrapper .dataTables_paginate .paginate_button:hover:not(.current):not(.disabled) {
-            background: #e2e8f0 !important;
-            color: #1e293b !important;
-            border-color: #cbd5e1 !important;
+            box-shadow: 0 1px 3px 0 rgba(79, 70, 229, 0.3) !important;
         }
 
         .dataTables_wrapper .dataTables_paginate .paginate_button.disabled {
-            opacity: 0.4 !important;
+            opacity: 0.35 !important;
             cursor: not-allowed !important;
-            background: transparent !important;
-            border-color: transparent !important;
+            background: #f8fafc !important;
+            border-color: #f1f5f9 !important;
+            color: #94a3b8 !important;
+            box-shadow: none !important;
+        }
+
+        .dataTables_wrapper .dataTables_paginate .ellipsis {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            width: 18px !important;
+            height: 28px !important;
+            font-size: 11px !important;
+            color: #94a3b8 !important;
         }
 
         /* Custom Scrollbar for Logs */
@@ -719,7 +767,11 @@
                 searching: false,
                 info: false,
                 language: {
-                    emptyTable: "Silakan pilih obat terlebih dahulu"
+                    emptyTable: "Silakan pilih obat terlebih dahulu",
+                    paginate: {
+                        previous: '‹',
+                        next: '›'
+                    }
                 },
             });
 
@@ -742,6 +794,15 @@
                     },
                 ],
                 pageLength: 10,
+                language: {
+                    paginate: {
+                        previous: '‹',
+                        next: '›'
+                    },
+                    search: '',
+                    searchPlaceholder: 'Cari obat...',
+                    emptyTable: 'Tidak ada data obat'
+                },
                 initComplete: function() {
                     $('#medicines_data_filter input').focus();
                 }

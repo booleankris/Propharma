@@ -350,6 +350,7 @@ class TransfersController extends Controller
         $pending = MedicineTransfers::with([
             'items.batches.medicines',
             'items.batches.pharmacy',
+            'items.sourceBatch.pharmacy',
             'items.etalases',
             'users.pharmacy',
         ])
@@ -357,10 +358,13 @@ class TransfersController extends Controller
             ->where($applyFilters)
             ->latest()
             ->paginate(10, ['*'], 'pending_page')
+            ->fragment('pending')
             ->withQueryString();
 
         $accepted = MedicineTransfers::with([
             'items.batches.medicines',
+            'items.batches.pharmacy',
+            'items.sourceBatch.pharmacy',
             'items.etalases',
             'users.pharmacy',
         ])
@@ -369,10 +373,13 @@ class TransfersController extends Controller
             ->where($applyFilters)
             ->latest()
             ->paginate(10, ['*'], 'accepted_page')
+            ->fragment('accepted')
             ->withQueryString();
 
         $denied = MedicineTransfers::with([
             'items.batches.medicines',
+            'items.batches.pharmacy',
+            'items.sourceBatch.pharmacy',
             'items.etalases',
             'users.pharmacy',
         ])
@@ -387,6 +394,7 @@ class TransfersController extends Controller
             ->where($applyFilters)
             ->latest()
             ->paginate(10, ['*'], 'denied_page')
+            ->fragment('denied')
             ->withQueryString();
 
         return view('kasir.transfers.transfers', compact('pending', 'accepted', 'denied'));

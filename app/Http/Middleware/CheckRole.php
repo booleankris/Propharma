@@ -28,7 +28,7 @@ class CheckRole
                 return redirect('/dashboard');
             }
 
-            if ($user->hasRole('UMKM')) {
+            if ($user->hasRole('UMKM') || $user->hasRole('Gudang PMI') || isWarehousePharmacy()) {
                 return redirect('/home');
             }
 
