@@ -1460,6 +1460,12 @@ class ReceivingController extends Controller
                 'status' => $request->status,
             ];
 
+            if ($request->has('pack')) {
+                OrderItems::where('id', $request->order_items_id)->update([
+                    'pack' => $request->pack ? 1 : 0,
+                ]);
+            }
+
             if ($request->filled('receiving_items_id')) {
                 // Editing an existing batch row for this order item
                 $item = ReceivingItems::findOrFail($request->receiving_items_id);

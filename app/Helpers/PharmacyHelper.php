@@ -100,11 +100,15 @@ if (!function_exists('canAccessPurchasing')) {
     /**
      * Check if current pharmacy / user can access purchasing (SP & Receiving).
      * Allowed for: Gudang PMI, Branch Pharmacies, and HO / Administrator.
-     * Denied for: SAHABAT PMI Retail Cashier (ID 1).
+     * Denied for: SAHABAT PMI Retail Cashier (ID 1) and Online Cashier roles.
      */
     function canAccessPurchasing($pharmacyId = null): bool
     {
         $user = auth()->user();
+        if ($user && isOnlineRole($user)) {
+            return false;
+        }
+
         if ($user && ($user->hasRole('HO') || $user->hasRole('administrator') || $user->hasRole('Manager') || $user->hasRole('Gudang PMI'))) {
             return true;
         }
@@ -113,4 +117,32 @@ if (!function_exists('canAccessPurchasing')) {
         return $id === getWarehousePharmacyId() || isBranchPharmacy($id);
     }
 }
+
+if (!function_exists('isOnlineRole')) {
+    /**
+     * Check if the current user has an Online cashier role.
+     */
+    function isOnlineRole($user = null): bool
+    {
+        $user = $user ?? auth()->user();
+        if (!$user) return false;
+        return $user->hasAnyRole(['Online', 'Online Grab', 'Online Shopee']);
+    }
+}
+
+if (!function_exists('getOnlineChannelName')) {
+    /**
+     * Get human-friendly channel title for online user.
+     */
+    function getOnlineChannelName($user = null): string
+    {
+        $user = $user ?? auth()->user();
+        if (!$user) return 'Online';
+        if ($user->hasRole('Online Shopee')) return 'Online Shopee';
+        if ($user->hasRole('Online Grab')) return 'Online Grab';
+        if ($user->hasRole('Online')) return 'Online (WA)';
+        return 'Online';
+    }
+}
+
 

@@ -1366,24 +1366,31 @@ class SalesController extends Controller
     {
         $perPage = 30;
 
-        $query = Medicines::with(['composition', 'factory']);
+        $query = Medicines::with(['composition', 'factory', 'category'])
+            ->where('status', 1);
 
         if ($request->search) {
-            $search = $request->search;
+            $search = trim($request->search);
+            $tokens = array_values(array_filter(explode(' ', $search)));
 
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhereHas('composition', function ($q2) use ($search) {
-                        $q2->where('name', 'like', "%{$search}%");
-                    })
-                    ->orWhereHas('factory', function ($q3) use ($search) {
-                        $q3->where('name', 'like', "%{$search}%");
+            $query->where(function ($q) use ($tokens) {
+                foreach ($tokens as $token) {
+                    $q->where(function ($tq) use ($token) {
+                        $tq->where('medicines.name', 'like', "%{$token}%")
+                            ->orWhere('medicines.code', 'like', "%{$token}%")
+                            ->orWhere('medicines.barcode', 'like', "%{$token}%")
+                            ->orWhere('medicines.dosage', 'like', "%{$token}%")
+                            ->orWhere('medicines.generic', 'like', "%{$token}%")
+                            ->orWhereHas('composition', fn($cq) => $cq->where('name', 'like', "%{$token}%"))
+                            ->orWhereHas('factory', fn($fq) => $fq->where('name', 'like', "%{$token}%"))
+                            ->orWhereHas('category', fn($catq) => $catq->where('name', 'like', "%{$token}%"));
                     });
+                }
             });
         }
 
         return response()->json(
-            $query->orderBy('id', 'desc')->paginate($perPage)
+            $query->orderBy('name', 'asc')->paginate($perPage)
         );
     }
 

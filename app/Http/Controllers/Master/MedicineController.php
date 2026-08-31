@@ -44,6 +44,28 @@ class MedicineController extends Controller
                         ? '<span class="badge-active">Active</span>'
                         : '<span class="badge-inactive">Inactive</span>';
                 })
+                ->filter(function ($query) use ($request) {
+                    $search = $request->input('search.value');
+                    if (!empty($search)) {
+                        $search = trim($search);
+                        $tokens = array_values(array_filter(explode(' ', $search)));
+
+                        $query->where(function ($q) use ($tokens) {
+                            foreach ($tokens as $token) {
+                                $q->where(function ($tq) use ($token) {
+                                    $tq->where('medicines.name', 'like', "%{$token}%")
+                                        ->orWhere('medicines.code', 'like', "%{$token}%")
+                                        ->orWhere('medicines.barcode', 'like', "%{$token}%")
+                                        ->orWhere('medicines.dosage', 'like', "%{$token}%")
+                                        ->orWhere('medicines.generic', 'like', "%{$token}%")
+                                        ->orWhereHas('composition', fn($cq) => $cq->where('name', 'like', "%{$token}%"))
+                                        ->orWhereHas('factory', fn($fq) => $fq->where('name', 'like', "%{$token}%"))
+                                        ->orWhereHas('category', fn($catq) => $catq->where('name', 'like', "%{$token}%"));
+                                });
+                            }
+                        });
+                    }
+                })
                 ->rawColumns(['status_label'])
                 ->make(true);
         }

@@ -26,6 +26,8 @@ class LoginController extends Controller
             $user->hasRole('UMKM') ||
             $user->hasRole('HO') ||
             $user->hasRole('Online') ||
+            $user->hasRole('Online Grab') ||
+            $user->hasRole('Online Shopee') ||
             $user->hasRole('Gudang PMI') ||
             isWarehousePharmacy($user->pharmacy_id)
         ) {

@@ -21,6 +21,7 @@ class LiphOnlineExport implements WithMultipleSheets
     protected $shift;
 
     public const ONLINE_CHANNELS = [
+        'Semua Online'   => ['Online', 'Online Grab', 'Online Shopee'],
         'Online (WA)'    => 'Online',
         'Online Grab'    => 'Online Grab',
         'Online Shopee'  => 'Online Shopee',

@@ -379,10 +379,10 @@
                             <div class="flex flex-wrap items-center gap-3 py-2 w-full">
                                 <div class="w-full sm:w-32">
                                     <div class="py-1 text-[13px] font-bold">Kemasan</div>
-                                    <label class="flex items-center gap-2 mt-2">
-                                        <input type="checkbox" readonly id="pack" name="is_active"
-                                            class="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                                        <span class="text-sm">Utuh</span>
+                                    <label class="flex items-center gap-2 mt-2 cursor-pointer">
+                                        <input type="checkbox" id="pack" name="is_active"
+                                            class="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer">
+                                        <span class="text-sm select-none">Utuh</span>
                                     </label>
                                 </div>
 

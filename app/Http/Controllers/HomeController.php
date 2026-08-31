@@ -28,32 +28,65 @@ class HomeController extends Controller
     {
         $this->middleware('auth');
     }
+
     public function index()
     {
-        function formatRupiah($amount)
-        {
-            return 'Rp ' . number_format($amount, 0, ',', '.');
+        if (!function_exists('App\Http\Controllers\formatRupiah')) {
+            function formatRupiah($amount)
+            {
+                return 'Rp ' . number_format($amount, 0, ',', '.');
+            }
         }
 
 
-        // Dashboard 
-        $total_sales = MedicineTransactions::where('status', 1)->sum('subtotal');
-        $qty_sales = MedicineTransactions::where('status', 1)->count('id');
+        // Dashboard
+        $pharmacyId = getActivePharmacyId();
 
-        $total_orders = OrderItems::whereHas('orders', function ($query) {
-            $query->where('status', 2);
+        if (isOnlineRole()) {
+            $userRole = auth()->user()->getRoleNames()->first();
+            $applyRoleFilter = function ($q) use ($userRole) {
+                $q->role($userRole);
+            };
+
+            $total_sales = MedicineTransactions::where('status', 1)
+                ->where('pharmacy_id', $pharmacyId)
+                ->where(function ($query) use ($applyRoleFilter) {
+                    $query->whereHas('user', $applyRoleFilter)
+                        ->orWhereHas('transactions.user', $applyRoleFilter);
+                })
+                ->sum('subtotal');
+
+            $qty_sales = MedicineTransactions::where('status', 1)
+                ->where('pharmacy_id', $pharmacyId)
+                ->where(function ($query) use ($applyRoleFilter) {
+                    $query->whereHas('user', $applyRoleFilter)
+                        ->orWhereHas('transactions.user', $applyRoleFilter);
+                })
+                ->count('id');
+        } else {
+            $total_sales = MedicineTransactions::where('status', 1)
+                ->where('pharmacy_id', $pharmacyId)
+                ->sum('subtotal');
+
+            $qty_sales = MedicineTransactions::where('status', 1)
+                ->where('pharmacy_id', $pharmacyId)
+                ->count('id');
+        }
+
+        $total_orders = OrderItems::whereHas('orders', function ($query) use ($pharmacyId) {
+            $query->where('status', 2)->where('pharmacy_id', $pharmacyId);
         })->sum('total');
-       
+
         $total_reject = Reject::sum('total');
 
         $total_sales_rp = formatRupiah($total_sales);
         $total_orders_rp = formatRupiah($total_orders);
         $total_reject_rp = formatRupiah($total_reject);
-        
+
         // 5 barang dengan ED terdekat
         $nearExpiry = $this->queryNearExpiry()->take(5);
 
-        return view('kasir.home', compact('total_sales_rp', 'total_orders_rp', 'total_reject_rp', 'nearExpiry'));
+        return view('kasir.home', compact('total_sales_rp', 'total_orders_rp', 'total_reject_rp', 'nearExpiry', 'qty_sales'));
     }
     public function nearExpiry(Request $request)
     {

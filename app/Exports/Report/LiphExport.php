@@ -111,15 +111,30 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
 
             $grouped = $this->groupTransactions($transactions);
         } else if ($this->shiftType == 'online') {
-            $roleName = $this->onlineRole ?? 'Online';
-            $transactions = MedicineTransactions::with(['transactions', 'user', 'shift_logs'])
+            $roleName = $this->onlineRole ?? ['Online', 'Online Grab', 'Online Shopee'];
+            $transactions = MedicineTransactions::with(['transactions.user', 'user', 'shift_logs'])
                 ->where('pharmacy_id', $this->pharmacyId)
                 ->where('status', 1)
                 ->whereDate('updated_at', '>=', $this->startDate->toDateString())
                 ->whereDate('updated_at', '<=', $this->endDate->toDateString())
                 ->whereIn('transaction_type', array_keys(self::TYPE_MAP))
-                ->whereHas('user', function ($q) use ($roleName) {
-                    $q->role($roleName);
+                ->where(function ($query) use ($roleName) {
+                    $applyRoleFilter = function ($q) use ($roleName) {
+                        if (is_array($roleName)) {
+                            $q->whereHas('roles', function ($rq) use ($roleName) {
+                                $rq->whereIn('name', $roleName);
+                            });
+                        } elseif ($roleName === 'semua' || $roleName === 'all' || $roleName === 'Semua Online') {
+                            $q->whereHas('roles', function ($rq) {
+                                $rq->whereIn('name', ['Online', 'Online Grab', 'Online Shopee']);
+                            });
+                        } else {
+                            $q->role($roleName);
+                        }
+                    };
+
+                    $query->whereHas('user', $applyRoleFilter)
+                        ->orWhereHas('transactions.user', $applyRoleFilter);
                 })
                 ->when(!empty($this->shift), function ($q) {
                     $q->whereHas('shift_logs', function ($shiftQuery) {
@@ -249,7 +264,8 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         $rows[] = [$this->pharmacyName];
         $rows[] = [$this->pharmacyAddress];
         $rows[] = [];
-        $rows[] = ['Laporan Penjualan Harian (LIPH)'];
+        $titleSuffix = $this->customTitle ? ' - ' . $this->customTitle : '';
+        $rows[] = ['Laporan Penjualan Harian (LIPH)' . $titleSuffix];
         $rows[] = ['Tanggal : ' . $this->startDate->format('d/m/Y') . ' s/d ' . $this->endDate->format('d/m/Y') . ' (Seluruh)'];
         $rows[] = [];
 

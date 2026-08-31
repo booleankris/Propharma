@@ -583,27 +583,29 @@
             </a>
         @endif
 
-        <a onclick="openModal('logModal')" class="nav-item {{ request()->is('inventory*') ? 'active' : '' }}">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                stroke-linecap="round" stroke-linejoin="round">
-                <path
-                    d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-                <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
-                <line x1="12" y1="22.08" x2="12" y2="12" />
-            </svg>
-            Persediaan
-        </a>
-        <a width="16" height="16" onclick="openModal('transfersModal')"
-            class="nav-item {{ request()->is('inventory*') ? 'active' : '' }}">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                class="icon icon-tabler icons-tabler-outline icon-tabler-transfer">
-                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                <path d="M20 10h-16l5.5 -6" />
-                <path d="M4 14h16l-5.5 6" />
-            </svg>
-            Mutasi
-        </a>
+        @if (!isOnlineRole())
+            <a onclick="openModal('logModal')" class="nav-item {{ request()->is('inventory*') ? 'active' : '' }}">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path
+                        d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                    <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+                    <line x1="12" y1="22.08" x2="12" y2="12" />
+                </svg>
+                Persediaan
+            </a>
+            <a width="16" height="16" onclick="openModal('transfersModal')"
+                class="nav-item {{ request()->is('inventory*') ? 'active' : '' }}">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                    class="icon icon-tabler icons-tabler-outline icon-tabler-transfer">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                    <path d="M20 10h-16l5.5 -6" />
+                    <path d="M4 14h16l-5.5 6" />
+                </svg>
+                Mutasi
+            </a>
+        @endif
 
 
         <div class="nav-section-title">Statistik</div>
@@ -638,24 +640,26 @@
 
         <div class="nav-section-title">Pusat Laporan & Export</div>
 
-        <a onclick="openModal('exportCenterModal')" class="nav-item"
-            style="cursor:pointer; background: rgba(56, 189, 248, 0.1); border-left: 3px solid #38bdf8;">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                stroke-linejoin="round"
-                class="icon icon-tabler icons-tabler-outline icon-tabler-file-spreadsheet text-sky-400">
-                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                <path d="M14 3v4a1 1 0 0 0 1 1h4" />
-                <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" />
-                <path d="M8 11h8v7h-8z" />
-                <path d="M8 15h8" />
-                <path d="M11 11v7" />
-            </svg>
-            <span style="font-weight:600; color:#fff;">Pusat Export</span>
-            {{-- <span
-                style="margin-left:auto; font-size:9px; font-weight:700; background:rgba(56,189,248,0.25); color:#7dd3fc; padding:2px 6px; border-radius:4px; text-transform:uppercase;">Laporan
-                Kefarmasian</span> --}}
-        </a>
+        @if (!isOnlineRole())
+            <a onclick="openModal('exportCenterModal')" class="nav-item"
+                style="cursor:pointer; background: rgba(56, 189, 248, 0.1); border-left: 3px solid #38bdf8;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                    stroke-linejoin="round"
+                    class="icon icon-tabler icons-tabler-outline icon-tabler-file-spreadsheet text-sky-400">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                    <path d="M14 3v4a1 1 0 0 0 1 1h4" />
+                    <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" />
+                    <path d="M8 11h8v7h-8z" />
+                    <path d="M8 15h8" />
+                    <path d="M11 11v7" />
+                </svg>
+                <span style="font-weight:600; color:#fff;">Pusat Export</span>
+                {{-- <span
+                    style="margin-left:auto; font-size:9px; font-weight:700; background:rgba(56,189,248,0.25); color:#7dd3fc; padding:2px 6px; border-radius:4px; text-transform:uppercase;">Laporan
+                    Kefarmasian</span> --}}
+            </a>
+        @endif
 
         @if (!isWarehousePharmacy())
             <a onclick="openModal('reportModal')" class="nav-item" style="cursor:pointer;">
@@ -682,7 +686,7 @@
             </a>
         @endif
 
-        @if (!isWarehousePharmacy())
+        @if (!isWarehousePharmacy() && !isOnlineRole())
             <a href="{{ route('pareto.index') }}" class="nav-item" style="cursor:pointer;">
 
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
@@ -742,7 +746,7 @@
             Profil
         </a>
 
-        @if (!isWarehousePharmacy())
+        @if (!isWarehousePharmacy() && !isOnlineRole())
             <a href="{{ url('staff-stats') }}" class="nav-item {{ request()->is('staff-stats*') ? 'active' : '' }}">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
