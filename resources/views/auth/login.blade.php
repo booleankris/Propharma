@@ -279,6 +279,13 @@
             <h1 class="login-heading">Hai, Selamat Datang!</h1>
             <p class="login-sub">Silahkan Login Untuk Memulai Shift</p>
 
+            @if (session('warning') || session('status') || session('message'))
+                <div style="background: rgba(254, 243, 199, 0.95); border: 1px solid #f59e0b; color: #92400e; border-radius: 12px; padding: 10px 14px; font-size: 12.5px; margin: 1rem 0; display: flex; align-items: center; gap: 8px; line-height: 1.4;">
+                    <i class="fas fa-exclamation-triangle" style="color: #d97706; font-size: 15px; flex-shrink: 0;"></i>
+                    <span>{{ session('warning') ?? session('status') ?? session('message') }}</span>
+                </div>
+            @endif
+
             <form method="POST" action="{{ route('login') }}">
                 @csrf
 

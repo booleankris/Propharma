@@ -723,6 +723,10 @@
                 <span
                     style="margin-left:auto; font-size:9px; font-weight:800; background:rgba(99,102,241,0.3); color:#a5b4fc; padding:2px 6px; border-radius:4px; text-transform:uppercase;">HO</span>
             </a>
+        @endrole
+
+        @hasanyrole('HO|operator|Operator|administrator|manager|Manager')
+            <div class="nav-section-title">Master Data</div>
 
             <a onclick="openModal('masterModal')" class="nav-item" style="cursor:pointer;">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -733,7 +737,7 @@
                 </svg>
                 Master Data
             </a>
-        @endrole
+        @endhasanyrole
 
         <div class="nav-section-title">Akun</div>
 
@@ -1219,6 +1223,7 @@
                 <div id="shift-select">
                     <select id="shift" name="shift"
                         class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300 pr-8">
+                        <option value="">Semua Shift</option>
                         @foreach ($getshift as $shift)
                             <option value="{{ $shift->id }}">{{ $shift->name }}</option>
                         @endforeach
@@ -1329,7 +1334,7 @@
     </div>
 </div>
 
-@role('HO')
+@hasanyrole('HO|operator|Operator|administrator|manager|Manager')
     {{-- Master Modal --}}
     <div id="masterModal"
         class="modal-hide modal-transition fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
@@ -1507,7 +1512,7 @@
             </button>
         </div>
     </div>
-@endrole
+@endhasanyrole
 
 {{-- Persediaan Modal --}}
 <div id="logModal"

@@ -99,6 +99,13 @@ Auth::routes([
     'verify' => false,
 ]);
 
+Route::get('/logout', function () {
+    Auth::logout();
+    request()->session()->invalidate();
+    request()->session()->regenerateToken();
+    return redirect()->route('login')->with('warning', 'Anda telah berhasil logout.');
+})->name('logout.get');
+
 Route::middleware(['auth', 'role:administrator'])->group(function () {
 
     // Admin Dashboard
@@ -202,8 +209,8 @@ Route::middleware(['auth', 'role:Kasir|Gudang PMI|HO|administrator|manager|Onlin
 
     // ================================================================== Add Data =========================================================================
 
-    // Master Data (Hanya Role HO)
-    Route::middleware(['role:HO'])->group(function () {
+    // Master Data (Role HO & Operator)
+    Route::middleware(['role:HO|operator|Operator|administrator|manager|Manager'])->group(function () {
         Route::resource('creditors', CreditorsController::class)->except(['show']);
         Route::resource('debtors', DebtorsController::class)->except(['show']);
         Route::resource('patients', PatientsController::class)->except(['show']);

@@ -334,11 +334,11 @@
                             Periode
                         </span>
                         <div class="flex flex-wrap gap-2">
-                            <button class="filter-btn active" onclick="setFilter(this, 'today')">Hari ini</button>
-                            <button class="filter-btn" onclick="setFilter(this, 'week')">Minggu ini</button>
-                            <button class="filter-btn" onclick="setFilter(this, 'month')">Bulan ini</button>
-                            <button class="filter-btn" onclick="setFilter(this, 'all')">Semua</button>
-                            <button class="filter-btn" onclick="setFilter(this, 'custom')">Custom</button>
+                            <button class="filter-btn active" onclick="setProfileFilter(this, 'today')">Hari ini</button>
+                            <button class="filter-btn" onclick="setProfileFilter(this, 'week')">Minggu ini</button>
+                            <button class="filter-btn" onclick="setProfileFilter(this, 'month')">Bulan ini</button>
+                            <button class="filter-btn" onclick="setProfileFilter(this, 'all')">Semua</button>
+                            <button class="filter-btn" onclick="setProfileFilter(this, 'custom')">Custom</button>
                         </div>
                         <div id="customRange" class="flex items-center gap-2 ml-auto">
                             <input type="date" id="dateFrom" name="date_from"
@@ -434,7 +434,7 @@
         }
 
         // ── Filter button click ──────────────────────────────────────────────
-        function setFilter(btn, type) {
+        function setProfileFilter(btn, type) {
             document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
 

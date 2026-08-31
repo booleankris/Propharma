@@ -3,6 +3,8 @@
 namespace App\Exceptions;
 
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
+use Illuminate\Session\TokenMismatchException;
+use Illuminate\Auth\AuthenticationException;
 use Throwable;
 
 class Handler extends ExceptionHandler
@@ -46,5 +48,32 @@ class Handler extends ExceptionHandler
         $this->reportable(function (Throwable $e) {
             //
         });
+    }
+
+    /**
+     * Render an exception into an HTTP response.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  \Throwable  $e
+     * @return \Symfony\Component\HttpFoundation\Response
+     *
+     * @throws \Throwable
+     */
+    public function render($request, Throwable $e)
+    {
+        // Tangani Page Expired (419 / CSRF Token Mismatch) secara halus
+        if ($e instanceof TokenMismatchException) {
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json([
+                    'message' => 'Sesi Anda telah berakhir. Silakan login kembali.',
+                    'session_expired' => true,
+                    'redirect' => route('login'),
+                ], 419);
+            }
+
+            return redirect()->route('login')->with('warning', 'Sesi Anda telah berakhir karena tidak aktif atau telah logout di tab lain. Silakan login kembali.');
+        }
+
+        return parent::render($request, $e);
     }
 }

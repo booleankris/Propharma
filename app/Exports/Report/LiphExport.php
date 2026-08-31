@@ -265,8 +265,13 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         $rows[] = [$this->pharmacyAddress];
         $rows[] = [];
         $titleSuffix = $this->customTitle ? ' - ' . $this->customTitle : '';
+        $shiftLabel = 'Seluruh';
+        if (!empty($this->shift)) {
+            $shiftObj = \App\Models\Shifts::find($this->shift);
+            $shiftLabel = $shiftObj ? $shiftObj->name : 'Shift ' . $this->shift;
+        }
         $rows[] = ['Laporan Penjualan Harian (LIPH)' . $titleSuffix];
-        $rows[] = ['Tanggal : ' . $this->startDate->format('d/m/Y') . ' s/d ' . $this->endDate->format('d/m/Y') . ' (Seluruh)'];
+        $rows[] = ['Tanggal : ' . $this->startDate->format('d/m/Y') . ' s/d ' . $this->endDate->format('d/m/Y') . ' (' . $shiftLabel . ')'];
         $rows[] = [];
 
         // TABLE HEADER

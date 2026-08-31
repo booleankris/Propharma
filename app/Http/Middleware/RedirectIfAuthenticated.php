@@ -2,10 +2,6 @@
 
 namespace App\Http\Middleware;
 
-// app/Http/Middleware/RedirectIfAuthenticated.php
-
-namespace App\Http\Middleware;
-
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -24,14 +20,7 @@ class RedirectIfAuthenticated
                     return redirect()->route('dashboard');
                 }
 
-                if ($user->hasRole('Kasir') || $user->hasRole('HO')) {
-                    return redirect()->route('home');
-                }
-                // if ($user->hasRole('APJ')) {
-                //     return redirect()->route('homeapj');
-                // }
-
-                return redirect('/'); // fallback
+                return redirect()->route('home');
             }
         }
 

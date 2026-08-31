@@ -18,7 +18,11 @@ if (!function_exists('getActivePharmacyId')) {
             if (session()->has('ho_pharmacy_id')) {
                 return (int) session('ho_pharmacy_id');
             }
-            // Default ke cabang pertama (SAHABAT PMI = 1) jika belum memilih
+            // Jika user punya pharmacy_id sendiri (misal user Gudang PMI ID 9), jadikan default
+            if ($user->pharmacy_id && (int) $user->pharmacy_id !== 6) {
+                return (int) $user->pharmacy_id;
+            }
+            // Default ke cabang pertama (SAHABAT PMI = 1) jika user murni HO dan belum memilih
             return 1;
         }
 
@@ -49,7 +53,7 @@ if (!function_exists('isWarehousePharmacy')) {
         }
 
         $user = auth()->user();
-        if ($user && $user->hasRole('Gudang PMI')) {
+        if ($user && $user->hasRole('Gudang PMI') && $id === getWarehousePharmacyId()) {
             return true;
         }
 

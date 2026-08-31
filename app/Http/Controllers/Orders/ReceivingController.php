@@ -1025,6 +1025,15 @@ class ReceivingController extends Controller
             $newActualQty = $newQty * $content;
             $deltaActual = $newActualQty - $oldActualQty;
 
+            // Proteksi stok minus jika barang sudah terjual di kasir
+            if ($deltaActual < 0 && ($medicine->stock + $deltaActual < 0)) {
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'message' => "Gagal mengurangi kuantiti: Stok saat ini tersisa {$medicine->stock}, tidak mencukupi untuk dikurangi sebesar " . abs($deltaActual) . ". Sebagian barang kemungkinan telah terjual di kasir.",
+                ], 422);
+            }
+
             if ($oldBatchKey === $newBatchKey) {
                 if ($deltaActual != 0) {
                     $qtyBefore = $medicine->stock;
@@ -1158,6 +1167,14 @@ class ReceivingController extends Controller
             $isPack = ($item->order_items->pack == 1);
             $content = $isPack ? (int) ($medicine->content ?? 1) : 1;
             $actualQty = $item->qty_received * $content;
+
+            if ($medicine->stock < $actualQty) {
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'message' => "Gagal menghapus item: Stok saat ini tersisa {$medicine->stock}, kurang dari kuantiti yang akan ditarik ({$actualQty}). Sebagian barang kemungkinan telah terjual di kasir.",
+                ], 422);
+            }
 
             $qtyBefore = $medicine->stock;
             $medicine->decrement('stock', $actualQty);

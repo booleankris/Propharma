@@ -11,7 +11,10 @@
                     <h1 class="text-2xl font-bold uppercase font-poppins text-gray-800">Revisi Faktur</h1>
                     <p class="text-xs text-gray-500 mt-1">Order: {{ $order->code }}</p>
                 </div>
-
+                <a href="{{ $order->status == 3 ? route('receiving.index') : route('receiving.receive', $order->id) }}"
+                    class="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-xs font-semibold text-gray-700 flex items-center gap-1.5 transition-all">
+                    <span>&larr;</span> Kembali ke Penerimaan
+                </a>
             </div>
 
             <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
@@ -80,10 +83,10 @@
                     </table>
                 </div>
                 <div class="flex justify-end pt-2">
-                    <button onclick="window.location.href='{{ route('receiving.index') }}'"
-                        class="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-xs font-semibold text-gray-700 flex items-center gap-1.5 cursor-pointer">
-                        <span>&larr;</span> Selesai & Kembali
-                    </button>
+                    <a href="{{ $order->status == 3 ? route('receiving.index') : route('receiving.receive', $order->id) }}"
+                        class="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-xs font-semibold text-gray-700 flex items-center gap-1.5 cursor-pointer transition-all">
+                        <span>&larr;</span> Selesai & Kembali ke Penerimaan
+                    </a>
                 </div>
             </div>
 
@@ -168,7 +171,11 @@
         function recalcEditTotal() {
             const qty = parseFloat(document.getElementById('edit_qty_received').value) || 0;
             const price = parseRupiah(document.getElementById('edit_raw_price').value);
-            document.getElementById('edit_total').value = formatRupiah(qty * price);
+            const disc = parseRupiah(document.getElementById('edit_discount').value);
+            const extraDisc = parseRupiah(document.getElementById('edit_extra_discount').value);
+            const gross = qty * price;
+            const net = Math.max(0, gross - disc - extraDisc);
+            document.getElementById('edit_total').value = formatRupiah(net);
         }
 
         document.getElementById('edit_qty_received').addEventListener('input', recalcEditTotal);
@@ -182,8 +189,14 @@
             formatInputRupiah(e);
             recalcEditTotal();
         });
-        document.getElementById('edit_discount').addEventListener('input', formatInputRupiah);
-        document.getElementById('edit_extra_discount').addEventListener('input', formatInputRupiah);
+        document.getElementById('edit_discount').addEventListener('input', function(e) {
+            formatInputRupiah(e);
+            recalcEditTotal();
+        });
+        document.getElementById('edit_extra_discount').addEventListener('input', function(e) {
+            formatInputRupiah(e);
+            recalcEditTotal();
+        });
 
         function editRow(btn) {
             const row = btn.closest('tr');

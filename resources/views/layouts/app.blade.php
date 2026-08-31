@@ -34,6 +34,50 @@
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
+    <!-- Global Session Expired Handler (419 / 401) -->
+    <script>
+        (function() {
+            let isRedirecting = false;
+            function handleExpiredSession() {
+                if (isRedirecting) return;
+                isRedirecting = true;
+                if (window.Swal) {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Sesi Telah Berakhir',
+                        text: 'Sesi Anda telah habis atau Anda telah logout di tab lain. Mengarahkan ke login...',
+                        showConfirmButton: false,
+                        timer: 1800
+                    }).then(() => {
+                        window.location.href = "{{ route('login') }}";
+                    });
+                } else {
+                    window.location.href = "{{ route('login') }}";
+                }
+            }
+
+            if (window.axios) {
+                window.axios.interceptors.response.use(
+                    response => response,
+                    error => {
+                        if (error.response && (error.response.status === 419 || error.response.status === 401)) {
+                            handleExpiredSession();
+                        }
+                        return Promise.reject(error);
+                    }
+                );
+            }
+
+            if (window.jQuery) {
+                $(document).ajaxError(function(event, jqXHR) {
+                    if (jqXHR.status === 419 || jqXHR.status === 401) {
+                        handleExpiredSession();
+                    }
+                });
+            }
+        })();
+    </script>
+
     <!-- PWA Service Worker Registration -->
     <script>
         if ('serviceWorker' in navigator) {

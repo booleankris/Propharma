@@ -610,6 +610,14 @@
                         </svg>
                         Simpan Draft
                     </button>
+                    <a href="{{ route('receiving.revision', $order_id) }}"
+                        class="inline-flex items-center gap-1.5 rounded-xl bg-amber-50 border border-amber-200 px-4 py-2 text-xs font-semibold text-amber-800 hover:bg-amber-100 transition-all">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                        Revisi Faktur
+                    </a>
                     <button onclick="printReceiving()" type="button"
                         class="inline-flex items-center gap-1.5 rounded-xl bg-gray-50 border border-gray-200 px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-100 transition-all">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -1046,8 +1054,17 @@
                     defaultContent: 'Rp 0'
                 },
                 {
-                    data: 'receiving_items.status',
-                    defaultContent: '-'
+                    data: null,
+                    defaultContent: '-',
+                    render: function (data, type, row) {
+                        if (!row.receiving_items || !row.receiving_items.id) {
+                            return '<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-600 border border-gray-200">⚪ Belum Diterima</span>';
+                        }
+                        if (row.receiving_items.batches_id != null) {
+                            return '<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">🟢 Masuk Stok (Terkunci)</span>';
+                        }
+                        return '<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">🟡 Belum Disimpan</span>';
+                    }
                 },
                 {
                     data: null,
@@ -1061,9 +1078,13 @@
                         const saved = row.receiving_items.batches_id != null;
                         let html = '';
                         if (row.receiving_items.receiving_details_id) {
-                            html += `<button type="button" onclick="printSPBFaktur(${row.receiving_items.receiving_details_id}, '${row.creditor_code}')" class="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 text-[10px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-all w-[120px]" title="Cetak SP Faktur Ini"><svg xmlns='http://www.w3.org/2000/svg' class='w-4 h-4 shrink-0' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9V2h12v7'/><path d='M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2'/><rect x='6' y='14' width='12' height='8'/></svg>SP Faktur</button>`;
+                            html += `<button type="button" onclick="printSPBFaktur(${row.receiving_items.receiving_details_id}, '${row.creditor_code}')" class="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 text-[10px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-all w-[100px]" title="Cetak SP Faktur Ini"><svg xmlns='http://www.w3.org/2000/svg' class='w-3.5 h-3.5 shrink-0' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9V2h12v7'/><path d='M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2'/><rect x='6' y='14' width='12' height='8'/></svg>SP Faktur</button>`;
                         }
-                        html += `<button type="button" onclick="deleteDraftItem(${row.receiving_items.id}, ${saved})" class="inline-flex items-center justify-center gap-1 px-2.5 py-2 text-[10px] font-semibold text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-all w-[70px]" title="Hapus Item"><svg xmlns='http://www.w3.org/2000/svg' class='w-4 h-4 shrink-0' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M3 6h18'/><path d='M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2'/><path d='M10 11v6'/><path d='M14 11v6'/></svg>Hapus</button>`;
+                        if (saved) {
+                            html += `<a href="/orders/${ordersid}/revision" class="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 text-[10px] font-semibold text-sky-700 bg-sky-50 border border-sky-200 rounded-lg hover:bg-sky-100 transition-all w-[70px]" title="Revisi Faktur"><svg xmlns='http://www.w3.org/2000/svg' class='w-3.5 h-3.5 shrink-0' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><path d='M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z'/></svg>Revisi</a>`;
+                        } else {
+                            html += `<button type="button" onclick="deleteDraftItem(${row.receiving_items.id}, false)" class="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 text-[10px] font-semibold text-rose-700 bg-rose-50 border border-rose-200 rounded-lg hover:bg-rose-100 transition-all w-[70px]" title="Hapus Item"><svg xmlns='http://www.w3.org/2000/svg' class='w-3.5 h-3.5 shrink-0' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M3 6h18'/><path d='M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2'/><path d='M10 11v6'/><path d='M14 11v6'/></svg>Hapus</button>`;
+                        }
                         return `<div class="flex flex-row gap-1 w-full min-w-[80px]">${html}</div>`;
                     }
                 },
@@ -1116,6 +1137,17 @@
         $('#orderItemsTable tbody').on('dblclick', 'tr', function () {
             const data = orderItemsTable.row(this).data();
             if (!data) return;
+
+            // KUNCI ITEM JIKA SUDAH MASUK STOK
+            if (data.receiving_items && data.receiving_items.batches_id != null) {
+                iziToast.warning({
+                    title: 'Item Terkunci di Stok',
+                    message: 'Item ini sudah masuk ke stok fisik. Gunakan tombol "Revisi Faktur" untuk mengubah data.',
+                    position: 'topRight',
+                    timeout: 4000
+                });
+                return;
+            }
 
             isEditMode = !!data.receiving_items?.id;
 
