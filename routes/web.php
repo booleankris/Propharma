@@ -216,6 +216,7 @@ Route::middleware(['auth', 'role:Kasir|Gudang PMI|HO|administrator|manager|Onlin
             Route::post('/', [MedicineController::class, 'store'])->name('store');
             Route::put('/{id}', [MedicineController::class, 'update'])->name('update');
             Route::delete('/{id}', [MedicineController::class, 'destroy'])->name('destroy');
+            Route::post('/{id}/restore', [MedicineController::class, 'restore'])->name('restore');
             Route::get('/{id}/edit-creditor', [MedicineController::class, 'editCreditor'])->name('editCreditor');
         });
 

@@ -18,6 +18,7 @@ class MedicineController extends Controller
     public function index(Request $request)
     {
         if ($request->ajax()) {
+            $statusFilter = $request->input('status_filter', '1');
 
             $data = Medicines::with([
                 'composition',
@@ -28,7 +29,9 @@ class MedicineController extends Controller
                 'locations',
             ])
                 ->select('medicines.*')
-                ->where('status', 1)
+                ->when($statusFilter !== 'all', function ($q) use ($statusFilter) {
+                    $q->where('status', (int) $statusFilter);
+                })
                 ->orderBy('id', 'DESC');
 
             return DataTables::of($data)
@@ -143,7 +146,7 @@ class MedicineController extends Controller
             'location'             => $request->input('location'),
             'type'                 => $request->type,
             'strip'                 => $request->strip,
-            'status'               => 1,
+            'status'               => $request->has('status') ? (int) $request->status : 1,
         ]);
 
         $creditorPayload = json_decode($request->get('creditor_ids', '[]'), true) ?: [];
@@ -231,7 +234,7 @@ class MedicineController extends Controller
             'location'             => $request->input('location'),
             'type'                 => $request->type,
             'strip'                => $request->strip,
-            'status'               => 1,
+            'status'               => $request->has('status') ? (int) $request->status : 1,
         ]);
         // Add Medicine Price History
 
@@ -254,13 +257,23 @@ class MedicineController extends Controller
     }
 
     /**
-     * Soft Delete
+     * Soft Delete (Deactivate)
      */
     public function destroy($id)
     {
         Medicines::findOrFail($id)->update(['status' => 0]);
 
-        return response()->json(['message' => 'Obat Berhasil Dihapus']);
+        return response()->json(['message' => 'Obat Berhasil Dinonaktifkan']);
+    }
+
+    /**
+     * Restore (Activate)
+     */
+    public function restore($id)
+    {
+        Medicines::findOrFail($id)->update(['status' => 1]);
+
+        return response()->json(['message' => 'Obat Berhasil Diaktifkan Kembali']);
     }
 
     /**
