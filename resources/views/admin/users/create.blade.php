@@ -33,96 +33,126 @@
                     <div class="card">
                         <div class="card-body">
 
+                            @if (session('error'))
+                                <div class="alert alert-danger alert-dismissible show fade">
+                                    <div class="alert-body">
+                                        <button class="close" data-dismiss="alert"><span>&times;</span></button>
+                                        <strong><i class="fas fa-exclamation-triangle mr-1"></i> Terjadi Kesalahan!</strong>
+                                        {{ session('error') }}
+                                    </div>
+                                </div>
+                            @endif
+
                             @if (count($errors) > 0)
-                                <div class="alert alert-danger">
-                                    <strong>Whoops!</strong> Ada beberapa masalah dengan inputan/masukan Anda.<br><br>
-                                    <ul>
-                                        @foreach ($errors->all() as $error)
-                                            <li>{{ $error }}</li>
-                                        @endforeach
-                                    </ul>
+                                <div class="alert alert-danger alert-dismissible show fade">
+                                    <div class="alert-body">
+                                        <button class="close" data-dismiss="alert"><span>&times;</span></button>
+                                        <strong><i class="fas fa-exclamation-circle mr-1"></i> Periksa Inputan Anda:</strong>
+                                        <ul class="mb-0 mt-2 pl-3">
+                                            @foreach ($errors->all() as $error)
+                                                <li>{{ $error }}</li>
+                                            @endforeach
+                                        </ul>
+                                    </div>
                                 </div>
                             @endif
 
                             <div class="form-group row">
-                                <label for="name" class="col-sm-3 col-form-label">Nama Lengkap</label>
+                                <label for="name" class="col-sm-3 col-form-label font-weight-bold">Nama Lengkap <span class="text-danger">*</span></label>
                                 <div class="col-sm-9">
-                                    {!! Form::text('name', null, [
+                                    {!! Form::text('name', old('name'), [
                                         'id' => 'name',
                                         'placeholder' => 'Nama Lengkap',
-                                        'class' => 'form-control',
+                                        'class' => 'form-control ' . ($errors->has('name') ? 'is-invalid' : ''),
                                         'required',
                                         'autofocus',
                                     ]) !!}
+                                    @error('name')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
                                 </div>
                             </div>
 
                             <div class="form-group row">
-                                <label for="username" class="col-sm-3 col-form-label">Username</label>
+                                <label for="username" class="col-sm-3 col-form-label font-weight-bold">Username <span class="text-danger">*</span></label>
                                 <div class="col-sm-9">
-                                    {!! Form::text('username', null, [
+                                    {!! Form::text('username', old('username'), [
                                         'id' => 'username',
                                         'placeholder' => 'Username',
-                                        'class' => 'form-control',
+                                        'class' => 'form-control ' . ($errors->has('username') ? 'is-invalid' : ''),
                                         'required',
                                     ]) !!}
+                                    @error('username')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
                                 </div>
                             </div>
 
                             <div class="form-group row">
-                                <label for="password" class="col-sm-3 col-form-label">Password / PIN Rahasia</label>
+                                <label for="password" class="col-sm-3 col-form-label font-weight-bold">Password / PIN Rahasia <span class="text-danger">*</span></label>
                                 <div class="col-sm-9">
                                     {!! Form::password('password', [
                                         'id' => 'password',
-                                        'placeholder' => 'Password / PIN Rahasia',
-                                        'class' => 'form-control pwstrength',
+                                        'placeholder' => 'Password / PIN Rahasia (min. 4 karakter)',
+                                        'class' => 'form-control pwstrength ' . ($errors->has('password') ? 'is-invalid' : ''),
                                         'data-indicator' => 'pwindicator',
                                         'required',
-                                        'maxlength' => 4,
                                     ]) !!}
                                     <div id="pwindicator" class="pwindicator">
                                         <div class="bar"></div>
                                         <div class="label"></div>
                                     </div>
+                                    @error('password')
+                                        <div class="invalid-feedback d-block">{{ $message }}</div>
+                                    @enderror
                                 </div>
                             </div>
 
                             <div class="form-group row">
-                                <label for="confirm-password" class="col-sm-3 col-form-label">Konfirmasi Password / PIN Rahasia</label>
+                                <label for="confirm-password" class="col-sm-3 col-form-label font-weight-bold">Konfirmasi Password / PIN <span class="text-danger">*</span></label>
                                 <div class="col-sm-9">
                                     {!! Form::password('confirm-password', [
                                         'id' => 'confirm-password',
                                         'placeholder' => 'Konfirmasi Password / PIN Rahasia',
-                                        'class' => 'form-control',
+                                        'class' => 'form-control ' . ($errors->has('confirm-password') ? 'is-invalid' : ''),
                                         'required',
-                                        'maxlength' => 4,
                                     ]) !!}
+                                    @error('confirm-password')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
                                 </div>
                             </div>
                             <div class="form-group row">
-                                <label for="roles" class="col-sm-3 col-form-label">Apotek</label>
+                                <label for="pharmacy_id" class="col-sm-3 col-form-label font-weight-bold">Apotek <span class="text-danger">*</span></label>
                                 <div class="col-sm-9">
-                                    {!! Form::select('pharmacy_id', $pharmacies, null, [
+                                    {!! Form::select('pharmacy_id', $pharmacies, old('pharmacy_id'), [
                                         'id' => 'pharmacy_id',
-                                        'class' => 'form-control custom-select select2',
+                                        'class' => 'form-control custom-select select2 ' . ($errors->has('pharmacy_id') ? 'is-invalid' : ''),
                                         'required',
                                     ]) !!}
+                                    @error('pharmacy_id')
+                                        <div class="invalid-feedback d-block">{{ $message }}</div>
+                                    @enderror
                                 </div>
                             </div>
                             <div class="form-group row">
-                                <label for="roles" class="col-sm-3 col-form-label">Level</label>
+                                <label for="roles" class="col-sm-3 col-form-label font-weight-bold">Level / Role <span class="text-danger">*</span></label>
                                 <div class="col-sm-9">
                                     {!! Form::select(
                                         'roles[]',
                                         $roles,
-                                        [],
-                                        ['id' => 'roles', 'class' => 'form-control custom-select select2', 'required'],
+                                        old('roles', []),
+                                        ['id' => 'roles', 'class' => 'form-control custom-select select2 ' . ($errors->has('roles') ? 'is-invalid' : ''), 'required'],
                                     ) !!}
+                                    @error('roles')
+                                        <div class="invalid-feedback d-block">{{ $message }}</div>
+                                    @enderror
                                 </div>
                             </div>
                         </div>
                         <div class="card-footer text-right">
-                            <button type="submit" class="btn btn-lg btn-primary">Simpan</button>
+                            <a href="{{ route('users.index') }}" class="btn btn-lg btn-secondary mr-2">Batal</a>
+                            <button type="submit" class="btn btn-lg btn-primary"><i class="fas fa-save mr-1"></i> Simpan</button>
                         </div>
                     </div>
                     {!! Form::close() !!}
@@ -140,6 +170,12 @@
         $(function() {
             @if ($message = Session::get('success'))
                 toastr.success('{{ $message }}', 'Success');
+            @endif
+            @if ($message = Session::get('error'))
+                toastr.error('{{ $message }}', 'Error');
+            @endif
+            @if ($message = Session::get('warning'))
+                toastr.warning('{{ $message }}', 'Peringatan');
             @endif
 
             $(".pwstrength").pwstrength();

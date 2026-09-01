@@ -92,23 +92,50 @@ class UserController extends Controller
 
     public function store(Request $request)
     {
-
-        $validate = $this->validate($request, [
+        $this->validate($request, [
             'name'        => 'required|string|min:3|max:255',
-            'username'    => 'required|string|min:3|max:255',
+            'username'    => 'required|string|min:3|max:255|unique:users,username',
             'pharmacy_id' => 'required|exists:pharmacies,id',
             'password'    => 'required|min:4|same:confirm-password',
             'roles'       => 'required'
+        ], [
+            'name.required'        => 'Nama lengkap wajib diisi.',
+            'name.min'             => 'Nama lengkap minimal 3 karakter.',
+            'username.required'    => 'Username wajib diisi.',
+            'username.min'         => 'Username minimal 3 karakter.',
+            'username.unique'      => 'Username sudah digunakan, silakan gunakan username lain.',
+            'pharmacy_id.required' => 'Apotek wajib dipilih.',
+            'pharmacy_id.exists'   => 'Apotek yang dipilih tidak valid.',
+            'password.required'    => 'Password / PIN wajib diisi.',
+            'password.min'         => 'Password / PIN minimal 4 karakter.',
+            'password.same'        => 'Konfirmasi password / PIN tidak cocok.',
+            'roles.required'       => 'Level / Role wajib dipilih.',
         ]);
-        $input = $request->all();
-        $input['secret_pin'] =  $input['password'];
-        $input['password'] = FacadesHash::make($input['password']);
 
-        $user = User::create($input);
-        $user->assignRole($request->input('roles'));
+        try {
+            FacadesDB::beginTransaction();
 
-        return redirect()->route('users.index')
-            ->with('success', 'Administrator berhasil ditambahkan');
+            $input = $request->all();
+            $input['secret_pin'] = $input['password'];
+            $input['password'] = FacadesHash::make($input['password']);
+
+            $user = User::create($input);
+            $user->assignRole($request->input('roles'));
+
+            FacadesDB::commit();
+
+            return redirect()->route('users.index')
+                ->with('success', 'User ' . $user->name . ' berhasil ditambahkan');
+        } catch (\Throwable $e) {
+            FacadesDB::rollBack();
+            \Illuminate\Support\Facades\Log::error('Error creating user: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return redirect()->back()
+                ->withInput($request->except(['password', 'confirm-password']))
+                ->with('error', 'Gagal menambahkan user: ' . $e->getMessage());
+        }
     }
 
     public function show($id)
@@ -135,31 +162,53 @@ class UserController extends Controller
     public function update(Request $request, $id)
     {
         $this->validate($request, [
-            'name'        => 'required',
-            'username'    => 'required',
+            'name'        => 'required|string|min:3|max:255',
+            'username'    => 'required|string|min:3|max:255|unique:users,username,' . $id,
             'pharmacy_id' => 'required|exists:pharmacies,id',
-            'password'    => 'same:confirm-password',
+            'password'    => 'nullable|min:4|same:confirm-password',
             'roles'       => 'required'
+        ], [
+            'name.required'        => 'Nama lengkap wajib diisi.',
+            'username.required'    => 'Username wajib diisi.',
+            'username.unique'      => 'Username sudah digunakan oleh user lain.',
+            'pharmacy_id.required' => 'Apotek wajib dipilih.',
+            'pharmacy_id.exists'   => 'Apotek yang dipilih tidak valid.',
+            'password.min'         => 'Password / PIN minimal 4 karakter.',
+            'password.same'        => 'Konfirmasi password / PIN tidak cocok.',
+            'roles.required'       => 'Level / Role wajib dipilih.',
         ]);
 
-        $input = $request->all();
-        if (! empty($input['password'])) {
-            $input['secret_pin'] =  $input['password'];
-            $input['password'] = FacadesHash::make($input['password']);
-        } else {
-            $input = Arr::except($input, ['password', 'secret_pin']);
+        try {
+            FacadesDB::beginTransaction();
+
+            $input = $request->all();
+            if (!empty($input['password'])) {
+                $input['secret_pin'] = $input['password'];
+                $input['password'] = FacadesHash::make($input['password']);
+            } else {
+                $input = Arr::except($input, ['password', 'secret_pin']);
+            }
+
+            $user = User::findOrFail($id);
+            $user->update($input);
+
+            if ($user->fixed == 0) {
+                FacadesDB::table('model_has_roles')->where('model_id', $id)->delete();
+                $user->assignRole($request->input('roles'));
+            }
+
+            FacadesDB::commit();
+
+            return redirect()->route('users.index')
+                ->with('success', 'User ' . $user->name . ' berhasil diperbarui');
+        } catch (\Throwable $e) {
+            FacadesDB::rollBack();
+            \Illuminate\Support\Facades\Log::error('Error updating user ' . $id . ': ' . $e->getMessage());
+
+            return redirect()->back()
+                ->withInput($request->except(['password', 'confirm-password']))
+                ->with('error', 'Gagal memperbarui user: ' . $e->getMessage());
         }
-
-        $user = User::find($id);
-        $user->update($input);
-
-        if ($user->fixed == 0) {
-            FacadesDB::table('model_has_roles')->where('model_id', $id)->delete();
-            $user->assignRole($request->input('roles'));
-        }
-
-        return redirect()->route('users.index')
-            ->with('success', 'Administrator berhasil diupdate');
     }
 
     public function destroy($id)
