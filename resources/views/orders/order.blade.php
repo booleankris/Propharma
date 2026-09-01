@@ -1373,7 +1373,24 @@
         }
 
         function printOrder() {
-            if (!validateOrderCreditorsBeforePrint()) return;
+            if (typeof orderItemsTable === 'undefined' || !orderItemsTable) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Gagal',
+                    text: 'Tabel order belum dimuat!'
+                });
+                return;
+            }
+
+            const data = orderItemsTable.rows().data().toArray();
+            if (!data || data.length === 0) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Peringatan',
+                    text: 'Tidak ada item obat dalam order ini untuk dicetak.'
+                });
+                return;
+            }
 
             const btn = document.getElementById('printorder');
             if (btn.disabled) return;
@@ -1382,7 +1399,7 @@
 
             Swal.fire({
                 title: 'Processing...',
-                text: 'Sedang menyiapkan file',
+                text: 'Sedang menyiapkan file Excel',
                 allowOutsideClick: false,
                 allowEscapeKey: false,
                 didOpen: () => {

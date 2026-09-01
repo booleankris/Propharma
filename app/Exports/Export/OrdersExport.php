@@ -64,18 +64,24 @@ class OrdersExport implements
     public function map($order): array
     {
         $credCode = $order->creditor_code ?? optional($order->creditors)->code;
-        $medCred = $order->medicines?->creditors?->firstWhere('code', $credCode)
-            ?? $order->medicines?->creditors?->first();
-        $disc = $medCred?->pivot?->discount ?? 0;
-        $discFormatted = $disc ? ($disc == (int)$disc ? (int)$disc : $disc) . '%' : '0%';
+        $creditorName = $order->creditors?->name;
+
+        if (empty($creditorName) || $creditorName === 'Belum Dipilih' || empty($credCode)) {
+            $creditorName = '-';
+            $discFormatted = '-';
+        } else {
+            $medCred = $order->medicines?->creditors?->firstWhere('code', $credCode);
+            $disc = $medCred?->pivot?->discount ?? 0;
+            $discFormatted = $disc ? ($disc == (int)$disc ? (int)$disc : $disc) . '%' : '0%';
+        }
 
         return [
-            $order->medicines?->name,
+            $order->medicines?->name ?? '-',
             $order->quantity,
-            $order->medicines?->packaging,
-            $order->medicines?->pharmacy_net_price,
+            $order->medicines?->packaging ?? '-',
+            $order->medicines?->pharmacy_net_price ?? 0,
             $order->total,
-            $order->creditors->name ?? '-',
+            $creditorName,
             $discFormatted,
             $order->medicines?->stock !== null ? (string)$order->medicines->stock : '0',
         ];
