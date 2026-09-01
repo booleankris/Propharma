@@ -371,11 +371,25 @@
 
             <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 space-y-4">
 
-                <!-- Baris Tombol Aksi Utama -->
+                <!-- Baris Tombol Aksi & Pencarian Obat -->
                 <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-4">
                     <h2 class="text-base font-semibold text-gray-800 flex items-center gap-2">
                         Pilih Item Yang Diterima
                     </h2>
+
+                    <!-- Input Pencarian Nama / Kode Obat -->
+                    <div class="relative w-full sm:w-72">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                        </div>
+                        <input type="text" id="searchMedicineTableInput"
+                            placeholder="Cari nama atau kode obat..."
+                            oninput="filterOrderItemsTable(this.value)"
+                            autocomplete="off"
+                            class="w-full pl-9 pr-3.5 py-2 text-xs rounded-xl border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all placeholder:text-gray-400">
+                    </div>
                 </div>
 
                 <!-- Tabel Produk Responsive -->
@@ -1014,6 +1028,7 @@
                     data: function (d) {
                         d.order_id = ordersid;
                         d.creditor_code = $('#creditor').val();
+                        d.search_medicine = $('#searchMedicineTableInput').val();
                     }
                 },
                 columns: [{
@@ -1602,6 +1617,16 @@
 
         function addItem() {
             if (isAddingItem) return;
+
+            if (!receiving_id) {
+                iziToast.warning({
+                    title: 'Peringatan',
+                    message: 'ID Penerimaan tidak ditemukan. Silakan muat ulang halaman!',
+                    position: 'topRight'
+                });
+                return;
+            }
+
             isAddingItem = true;
 
             const confirmBtn = document.getElementById('confirmItemBtn');
@@ -1696,6 +1721,15 @@
         }
         // NEW: "Simpan" button — posts items to batches, status → 2
         function saveOrder() {
+            if (!receiving_id) {
+                iziToast.warning({
+                    title: 'Peringatan',
+                    message: 'ID Penerimaan tidak ditemukan!',
+                    position: 'topRight'
+                });
+                return;
+            }
+
             axios.post("{{ route('receiving.saveOrder') }}", {
                 receivingid: receiving_id,
                 orderid: ordersid,
@@ -1733,6 +1767,24 @@
 
         // UPDATED: "Selesaikan Pesanan" button — now just locks (status → 3)
         function completeOrder() {
+            if (!receiving_id) {
+                iziToast.warning({
+                    title: 'Peringatan',
+                    message: 'ID Penerimaan tidak ditemukan!',
+                    position: 'topRight'
+                });
+                return;
+            }
+
+            if (!ordersid) {
+                iziToast.warning({
+                    title: 'Peringatan',
+                    message: 'ID Pesanan tidak ditemukan!',
+                    position: 'topRight'
+                });
+                return;
+            }
+
             axios.post("{{ route('receiving.completeOrder') }}", {
                 receivingid: receiving_id,
                 orderid: ordersid,
@@ -1749,8 +1801,6 @@
                             position: 'topRight'
                         });
 
-                        // Redirect back to the receiving index after a short delay
-                        // so the user sees the success toast first
                         setTimeout(() => {
                             window.location.href = "{{ route('receiving.index') }}";
                         }, 800);
@@ -1778,33 +1828,20 @@
             });
 
             // Disable buttons
-            document.querySelector('[onclick="addItem()"]').disabled = true;
-            document.querySelector('[onclick="saveOrder()"]').disabled = true;
+            const addBtn = document.querySelector('[onclick="addItem()"]');
+            if (addBtn) addBtn.disabled = true;
+            const saveBtn = document.querySelector('[onclick="saveOrder()"]');
+            if (saveBtn) saveBtn.disabled = true;
         }
 
-        function saveOrder() {
-            axios.post("{{ route('receiving.saveOrder') }}", {
-                receivingid: receiving_id,
-                orderid: ordersid,
-            }, {
-                headers: {
-                    'X-CSRF-TOKEN': document
-                        .querySelector('meta[name="csrf-token"]')
-                        .content
-                }
-            }).then(res => {
-                if (res.data.success) {
+        let searchMedicineTableTimeout = null;
+        function filterOrderItemsTable(keyword) {
+            clearTimeout(searchMedicineTableTimeout);
+            searchMedicineTableTimeout = setTimeout(() => {
+                if (orderItemsTable) {
                     orderItemsTable.ajax.reload(null, false);
-                    resetInputs();
-                    selectedRowData = null;
-                    selectedRowIndex = null;
-                    location.reload();
-
                 }
-            }).catch(err => {
-                console.error(err);
-                alert('Update failed');
-            });
+            }, 250);
         }
 
         let itemsTable;

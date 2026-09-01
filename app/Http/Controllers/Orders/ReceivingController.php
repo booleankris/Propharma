@@ -35,7 +35,15 @@ class ReceivingController extends Controller
 
         if ($transaction) {
             $receiving_id = $transaction->id;
+            $receiving_code = $transaction->code;
             $order_code = $transaction->code;
+            $order_id = null;
+            $d_price = 0;
+            $d_ppn = 0;
+            $d_total = 0;
+            $datenow = Carbon::now()->format('Y-m-d');
+            $creditorOption = collect();
+            $allFakturs = collect();
 
             /*
              * Check if this in-progress receiving already has items
@@ -48,7 +56,7 @@ class ReceivingController extends Controller
                 ->where('status', '!=', 2)  // not yet completed order
                 ->first();
 
-            return view('orders.receiving', compact('order_code', 'transaction', 'now', 'order_exist', 'receiving_id'));
+            return view('orders.receiving', compact('order_code', 'transaction', 'now', 'order_exist', 'receiving_id', 'receiving_code', 'order_id', 'd_price', 'd_ppn', 'd_total', 'datenow', 'creditorOption', 'allFakturs'));
         } else {
             $year = now()->format('y');
             $month = now()->format('m');
@@ -145,6 +153,7 @@ class ReceivingController extends Controller
     {
         $ordersid = $request->order_id;
         $creditorCode = $request->creditor_code;
+        $searchMedicine = $request->search_medicine ?? $request->input('search.value');
 
         if (!$ordersid || !$creditorCode) {
             return DataTables::of(collect())->make(true);
@@ -161,6 +170,12 @@ class ReceivingController extends Controller
             ->withSum('receivingItems as qty_received_total', 'qty_received')
             ->whereHas('orders', fn($q) => $q->where('id', $ordersid))
             ->where('creditor_code', $creditorCode)
+            ->when($searchMedicine, function ($q) use ($searchMedicine) {
+                $q->whereHas('medicines', function ($mq) use ($searchMedicine) {
+                    $mq->where('name', 'like', '%' . $searchMedicine . '%')
+                        ->orWhere('code', 'like', '%' . $searchMedicine . '%');
+                });
+            })
             ->get();
 
         $rows = collect();
@@ -1321,7 +1336,10 @@ class ReceivingController extends Controller
         if ($transaction) {
             $getOrder = Order::findOrFail($id);
 
-            $receiving_id = $getOrder->receiving_id;
+            $receiving_id = $transaction->id;
+            if (!$getOrder->receiving_id || $getOrder->receiving_id != $transaction->id) {
+                $getOrder->update(['receiving_id' => $transaction->id]);
+            }
             $receiving_code = $transaction->code;
             $order_id = $getOrder->id;
             $order_code = $getOrder->code;
