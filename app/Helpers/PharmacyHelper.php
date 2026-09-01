@@ -130,7 +130,7 @@ if (!function_exists('isOnlineRole')) {
     {
         $user = $user ?? auth()->user();
         if (!$user) return false;
-        return $user->hasAnyRole(['Online', 'Online Grab', 'Online Shopee']);
+        return $user->hasAnyRole(['Online', 'Online Grab', 'Online Shopee', 'Digital']);
     }
 }
 
@@ -142,6 +142,7 @@ if (!function_exists('getOnlineChannelName')) {
     {
         $user = $user ?? auth()->user();
         if (!$user) return 'Online';
+        if ($user->hasRole('Digital')) return 'Aplikasi Digital';
         if ($user->hasRole('Online Shopee')) return 'Online Shopee';
         if ($user->hasRole('Online Grab')) return 'Online Grab';
         if ($user->hasRole('Online')) return 'Online (WA)';

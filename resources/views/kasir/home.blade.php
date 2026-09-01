@@ -28,7 +28,7 @@
             </div> --}}
             <div class="flex items-center justify-start gap-3">
                 <span
-                    class="inline-flex justify-center items-center w-12 h-12 rounded-2xl bg-white {{ isWarehousePharmacy() ? 'text-violet-600' : (isOnlineRole() ? (auth()->user()->hasRole('Online Shopee') ? 'text-orange-500' : (auth()->user()->hasRole('Online Grab') ? 'text-emerald-500' : 'text-teal-600')) : 'text-[#008bff]') }} shadow-sm border border-slate-100">
+                    class="inline-flex justify-center items-center w-12 h-12 rounded-2xl bg-white {{ isWarehousePharmacy() ? 'text-violet-600' : (isOnlineRole() ? (auth()->user()->hasRole('Digital') ? 'text-indigo-600' : (auth()->user()->hasRole('Online Shopee') ? 'text-orange-500' : (auth()->user()->hasRole('Online Grab') ? 'text-emerald-500' : 'text-teal-600'))) : 'text-[#008bff]') }} shadow-sm border border-slate-100">
                     @if (isWarehousePharmacy())
                         <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor"
                             stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
@@ -38,7 +38,14 @@
                             <path d="M13 21v-9a1 1 0 0 0 -1 -1h-2a1 1 0 0 0 -1 1v3" />
                         </svg>
                     @elseif (isOnlineRole())
-                        @if (auth()->user()->hasRole('Online Shopee'))
+                        @if (auth()->user()->hasRole('Digital'))
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                <path d="M6 5a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2v-14z" />
+                                <path d="M11 4h2" />
+                                <path d="M12 17v.01" />
+                            </svg>
+                        @elseif (auth()->user()->hasRole('Online Shopee'))
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
                                 <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
                                 <path d="M6.331 8h11.339a2 2 0 0 1 1.977 2.304l-1.255 8.152a3 3 0 0 1 -2.966 2.544h-6.852a3 3 0 0 1 -2.965 -2.544l-1.255 -8.152a2 2 0 0 1 1.977 -2.304z" />
@@ -76,6 +83,29 @@
                     </p>
                 </div>
             </div>
+
+            @if (auth()->user()->hasRole('Digital'))
+                <div class="my-4 p-4 rounded-2xl bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-blue-500/10 border border-indigo-200/60 flex items-center justify-between gap-4">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 text-white flex items-center justify-center shadow-md shadow-indigo-500/20">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                <path d="M12 9h.01" />
+                                <path d="M11 12h1v4h1" />
+                                <path d="M12 3c7.2 0 9 1.8 9 9s-1.8 9 -9 9s-9 -1.8 -9 -9s1.8 -9 9 -9z" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h4 class="text-xs font-bold text-indigo-950 uppercase tracking-wider">Entri Penjualan Aplikasi Digital</h4>
+                            <p class="text-[12px] text-slate-600 mt-0.5">Pencatatan manual pesanan aplikasi digital sementara sebelum integrasi API. Seluruh transaksi otomatis terangkum pada <strong>LIPH Online (Sheet Aplikasi Digital)</strong>.</p>
+                        </div>
+                    </div>
+                    <span class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200 shrink-0">
+                        <span class="w-2 h-2 rounded-full bg-indigo-600 animate-pulse"></span>
+                        Manual Input Pre-API
+                    </span>
+                </div>
+            @endif
 
             @role('HO')
             <div class="my-4 p-5 rounded-3xl bg-gradient-to-r from-indigo-900 via-indigo-800 to-blue-900 text-white shadow-lg border border-indigo-700/50 flex flex-col sm:flex-row items-center justify-between gap-4 relative overflow-hidden">
@@ -206,7 +236,7 @@
                             @elseif (isOnlineRole())
                                 {{-- Penjualan Online --}}
                                 <a href="{{ url('transaction/upds') }}"
-                                    class="group relative flex items-center justify-between overflow-hidden rounded-xl px-5 py-4 transition-all duration-300 {{ auth()->user()->hasRole('Online Shopee') ? 'bg-gradient-to-r from-orange-600 to-amber-500 shadow-orange-500/20 hover:shadow-orange-500/40' : (auth()->user()->hasRole('Online Grab') ? 'bg-gradient-to-r from-emerald-600 to-teal-500 shadow-emerald-500/20 hover:shadow-emerald-500/40' : 'bg-gradient-to-r from-blue-600 to-indigo-500 shadow-blue-500/20 hover:shadow-blue-500/40') }} text-white shadow-md hover:-translate-y-1 hover:shadow-lg">
+                                    class="group relative flex items-center justify-between overflow-hidden rounded-xl px-5 py-4 transition-all duration-300 {{ auth()->user()->hasRole('Digital') ? 'bg-gradient-to-r from-indigo-600 via-purple-600 to-violet-600 shadow-indigo-500/20 hover:shadow-indigo-500/40' : (auth()->user()->hasRole('Online Shopee') ? 'bg-gradient-to-r from-orange-600 to-amber-500 shadow-orange-500/20 hover:shadow-orange-500/40' : (auth()->user()->hasRole('Online Grab') ? 'bg-gradient-to-r from-emerald-600 to-teal-500 shadow-emerald-500/20 hover:shadow-emerald-500/40' : 'bg-gradient-to-r from-blue-600 to-indigo-500 shadow-blue-500/20 hover:shadow-blue-500/40')) }} text-white shadow-md hover:-translate-y-1 hover:shadow-lg">
 
                                     <div class="flex items-center gap-4 relative z-10">
                                         <div
@@ -228,7 +258,7 @@
                                             </svg>
                                         </div>
                                         <div class="flex flex-col text-left">
-                                            <span class="text-sm font-bold tracking-wide">Penjualan Kasir</span>
+                                            <span class="text-sm font-bold tracking-wide">{{ auth()->user()->hasRole('Digital') ? 'Entri Penjualan Digital' : 'Penjualan Kasir' }}</span>
                                             <span class="text-[11px] text-white/90 font-medium">Catat transaksi penjualan pesanan {{ getOnlineChannelName() }}</span>
                                         </div>
                                     </div>

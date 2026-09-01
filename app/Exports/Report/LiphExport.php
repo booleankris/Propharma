@@ -111,7 +111,7 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
 
             $grouped = $this->groupTransactions($transactions);
         } else if ($this->shiftType == 'online') {
-            $roleName = $this->onlineRole ?? ['Online', 'Online Grab', 'Online Shopee'];
+            $roleName = $this->onlineRole ?? ['Online', 'Online Grab', 'Online Shopee', 'Digital'];
             $transactions = MedicineTransactions::with(['transactions.user', 'user', 'shift_logs'])
                 ->where('pharmacy_id', $this->pharmacyId)
                 ->where('status', 1)
@@ -126,7 +126,7 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                             });
                         } elseif ($roleName === 'semua' || $roleName === 'all' || $roleName === 'Semua Online') {
                             $q->whereHas('roles', function ($rq) {
-                                $rq->whereIn('name', ['Online', 'Online Grab', 'Online Shopee']);
+                                $rq->whereIn('name', ['Online', 'Online Grab', 'Online Shopee', 'Digital']);
                             });
                         } else {
                             $q->role($roleName);

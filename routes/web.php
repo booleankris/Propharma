@@ -146,7 +146,7 @@ Route::middleware(['auth', 'role:HO|administrator'])->group(function () {
     Route::get('/ho/analytics', [\App\Http\Controllers\HO\HODashboardController::class, 'index'])->name('ho.analytics');
     Route::get('/ho/analytics/data', [\App\Http\Controllers\HO\HODashboardController::class, 'getData'])->name('ho.analytics.data');
 });
-Route::middleware(['auth', 'role:Kasir|Gudang PMI|HO|administrator|manager|Online|Online Grab|Online Shopee|UMKM|operator'])->group(function () {
+Route::middleware(['auth', 'role:Kasir|Gudang PMI|HO|administrator|manager|Online|Online Grab|Online Shopee|Digital|UMKM|operator'])->group(function () {
     Route::get('/home', [HomeController::class, 'index'])->name('home');
     Route::get('/near-expiry', [HomeController::class, 'nearExpiry'])->name('kasir.nearExpiry');
 

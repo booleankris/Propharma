@@ -21,10 +21,11 @@ class LiphOnlineExport implements WithMultipleSheets
     protected $shift;
 
     public const ONLINE_CHANNELS = [
-        'Semua Online'   => ['Online', 'Online Grab', 'Online Shopee'],
-        'Online (WA)'    => 'Online',
-        'Online Grab'    => 'Online Grab',
-        'Online Shopee'  => 'Online Shopee',
+        'Semua Online'     => ['Online', 'Online Grab', 'Online Shopee', 'Digital'],
+        'Online (WA)'      => 'Online',
+        'Online Grab'      => 'Online Grab',
+        'Online Shopee'    => 'Online Shopee',
+        'Aplikasi Digital' => 'Digital',
     ];
 
     public function __construct($pharmacyId, $startDate, $endDate, $pharmacyName = '', $pharmacyAddress = '', $shift = null)
