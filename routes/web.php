@@ -385,6 +385,8 @@ Route::middleware(['auth', 'role:Kasir|Gudang PMI|HO|administrator|manager|Onlin
     Route::get('/orders/search', [OrdersController::class, 'searchMedicine'])->name('orders.searchmedicine');
     Route::get('/orders/items', [OrdersController::class, 'orderItems'])
         ->name('orders.orderitems');
+    Route::get('/orders/check-updates', [OrdersController::class, 'checkOrderUpdates'])
+        ->name('orders.checkUpdates');
     Route::post('/orders/updateitems', [OrdersController::class, 'updateOrderItem'])
         ->name('orders.updateOrderItem');
     Route::post('/orders/deleteitems', [OrdersController::class, 'deleteOrderItem'])

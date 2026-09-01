@@ -327,10 +327,11 @@
                                     <option value="">-- Pilih Kreditur --</option>
                                 </select>
                             </div>
-                            
+
                             <div>
                                 <label
-                                    class="block mb-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Keterangan (Opsional)</label>
+                                    class="block mb-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Keterangan
+                                    (Opsional)</label>
                                 <input id="note" type="text" name="note"
                                     class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                                     placeholder="Catatan untuk item ini...">
@@ -391,43 +392,52 @@
                 </form>
             </div>
             <div class="mt-3 relative w-full p-[24px] bg-[#ffffff] rounded-[22px]">
-                <div class="flex items-center gap-3">
-                    <button onclick="completeOrder()"
-                        class="inline-flex items-center gap-2 rounded-lg btn-pharma !bg-blue-600 !shadow-[0_2px_6px_#2563eb] px-6 py-4 text-sm font-xl text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            class="w-5 h-5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-                            <polyline points="17 21 17 13 7 13 7 21" />
-                            <polyline points="7 3 7 8 15 8" />
-                        </svg>
-                        Simpan
-                    </button>
+                <div class="flex items-center justify-between flex-wrap gap-3 mb-4">
+                    <div class="flex items-center gap-3 flex-wrap">
+                        <button onclick="completeOrder()"
+                            class="inline-flex items-center gap-2 rounded-lg btn-pharma !bg-blue-600 !shadow-[0_2px_6px_#2563eb] px-6 py-4 text-sm font-xl text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" class="w-5 h-5" stroke-width="2" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                                <polyline points="17 21 17 13 7 13 7 21" />
+                                <polyline points="7 3 7 8 15 8" />
+                            </svg>
+                            Simpan
+                        </button>
 
-                    <button onclick="printOrder()" id='printorder'
-                        class="inline-flex items-center gap-2 rounded-lg btn-pharma !bg-gray-700 !shadow-[0_2px_6px_#374151] px-6 py-4 text-sm font-xl text-white hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round"
-                                d="M6 9V4h12v5M6 18h12v-5H6v5zM6 14h12" />
-                        </svg>
-                        Cetak
-                    </button>
+                        <button onclick="printOrder()" id='printorder'
+                            class="inline-flex items-center gap-2 rounded-lg btn-pharma !bg-gray-700 !shadow-[0_2px_6px_#374151] px-6 py-4 text-sm font-xl text-white hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2">
+                            <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2"
+                                viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M6 9V4h12v5M6 18h12v-5H6v5zM6 14h12" />
+                            </svg>
+                            Cetak
+                        </button>
 
-                    <button onclick="printSPB()"
-                        class="inline-flex items-center gap-2 rounded-lg  btn-pharma !bg-purple-600 !shadow-[0_2px_6px_#9333ea] px-6 py-4 text-sm font-xl text-white hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M7 3h10v18l-2-1-2 1-2-1-2 1-2-1V3z" />
-                        </svg>
-                        SPB
-                    </button>
+                        <button onclick="printSPB()"
+                            class="inline-flex items-center gap-2 rounded-lg  btn-pharma !bg-purple-600 !shadow-[0_2px_6px_#9333ea] px-6 py-4 text-sm font-xl text-white hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2">
+                            <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2"
+                                viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M7 3h10v18l-2-1-2 1-2-1-2 1-2-1V3z" />
+                            </svg>
+                            SPB
+                        </button>
 
-                    <button onclick="printSPBDotMatrix()"
-                        class="inline-flex items-center gap-2 rounded-lg btn-pharma !bg-teal-600 !shadow-[0_2px_6px_#0d9488] px-6 py-4 text-sm font-xl text-white hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2">
-                        <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round"
-                                d="M6 9V4h12v5M6 18h12v-5H6v5zM6 14h12" />
-                        </svg>
-                        SPB Dot Matrix
-                    </button>
+                        <button onclick="printSPBDotMatrix()"
+                            class="inline-flex items-center gap-2 rounded-lg btn-pharma !bg-teal-600 !shadow-[0_2px_6px_#0d9488] px-6 py-4 text-sm font-xl text-white hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2">
+                            <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2"
+                                viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M6 9V4h12v5M6 18h12v-5H6v5zM6 14h12" />
+                            </svg>
+                            SPB Dot Matrix
+                        </button>
+                    </div>
+
+                    <!-- Live Sync Indicator -->
 
                 </div>
 
@@ -436,7 +446,7 @@
                         <tr>
                             <th>Nama Obat</th>
                             <th>Pabrik</th>
-                            <th>Kreditur Dipilih</th>
+                            <th>Status PBF</th>
                             <th>Diskon</th>
                             <th>Satuan</th>
                             <th>Harga</th>
@@ -584,7 +594,9 @@
             orderItemsTable = $('#orderItemsTable').DataTable({
                 processing: true,
                 serverSide: true,
-                order: [[2, 'asc']],
+                order: [
+                    [2, 'asc']
+                ],
                 ajax: {
                     url: "{{ route('orders.orderitems') }}",
                     data: function(d) {
@@ -699,7 +711,7 @@
             e.preventDefault();
             document.getElementById('note').focus();
         });
-        
+
         document.getElementById('note').addEventListener('keydown', function(e) {
             if (e.key !== 'Enter') return;
             e.preventDefault();
@@ -883,7 +895,8 @@
                                                                                                                                                     <td>${((page - 1) * res.per_page) + index + 1}</td>
                                                                                                                                                     <td>${item.name}</td>
                                                                                                                                                 </tr>
-                                                                                                                                            `);
+                                                                                                                                            `
+                        );
                     });
 
                     hasMore = res.current_page < res.last_page;
@@ -1357,19 +1370,21 @@
             });
 
             fetch(`/orders/${orderid}/printspb-dotmatrix`, {
-                headers: { 'Accept': 'application/json' }
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.error) {
-                    Swal.fire('Gagal', data.error, 'error');
-                } else {
-                    Swal.fire('Berhasil', data.message ?? 'SP berhasil dikirim.', 'success');
-                }
-            })
-            .catch(() => {
-                Swal.fire('Gagal', 'Terjadi kesalahan saat mengirim ke printer.', 'error');
-            });
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.error) {
+                        Swal.fire('Gagal', data.error, 'error');
+                    } else {
+                        Swal.fire('Berhasil', data.message ?? 'SP berhasil dikirim.', 'success');
+                    }
+                })
+                .catch(() => {
+                    Swal.fire('Gagal', 'Terjadi kesalahan saat mengirim ke printer.', 'error');
+                });
         }
 
         function printOrder() {
@@ -1582,6 +1597,116 @@
                 alert('Gagal menambahkan item!');
             });
         }
+
+        // =================== LIVE SYNC & HO REAL-TIME DETECTOR ===================
+        let currentOrderHash = null;
+        let isPollingSync = false;
+        let knownHoItemsMap = {}; // item_id -> { creditor_name, updated_at }
+
+        function pollOrderChanges() {
+            if (isPollingSync || (typeof isSubmitting !== 'undefined' && isSubmitting)) return;
+
+            // Do not reload table if edit modal or smart order modal is open to avoid interrupting active user edits
+            const editModal = document.getElementById('editModal');
+            if (editModal && !editModal.classList.contains('hidden')) return;
+
+            const smartModal = document.getElementById('smartOrderModal');
+            if (smartModal && !smartModal.classList.contains('hidden')) return;
+
+            isPollingSync = true;
+
+            axios.get("{{ route('orders.checkUpdates') }}", {
+                    params: {
+                        order_id: orderid,
+                        last_hash: currentOrderHash
+                    }
+                })
+                .then(res => {
+                    if (res.data && res.data.success) {
+                        const newHash = res.data.hash;
+                        const hoItems = res.data.ho_items || [];
+
+                        if (currentOrderHash !== null && res.data.changed) {
+                            // Detect specific new changes made by HO
+                            const newlyChangedHoMedicines = [];
+                            hoItems.forEach(item => {
+                                const prev = knownHoItemsMap[item.id];
+                                if (!prev || prev.creditor_name !== item.creditor_name || prev.updated_at !==
+                                    item.updated_at) {
+                                    newlyChangedHoMedicines.push(
+                                        `<b>${item.medicine_name}</b> &rarr; <span style="color:#4f46e5;font-weight:700;">${item.creditor_name}</span>`
+                                    );
+                                }
+                            });
+
+                            // Show toast notification if HO made changes
+                            if (newlyChangedHoMedicines.length > 0) {
+                                if (typeof iziToast !== 'undefined') {
+                                    iziToast.info({
+                                        title: '🔔 PBF Diperbarui oleh HO',
+                                        message: newlyChangedHoMedicines.slice(0, 4).join('<br>') + (
+                                            newlyChangedHoMedicines.length > 4 ?
+                                            `<br><i>+${newlyChangedHoMedicines.length - 4} obat lainnya</i>` :
+                                            ''),
+                                        position: 'topRight',
+                                        timeout: 8000,
+                                        transitionIn: 'fadeInDown',
+                                        transitionOut: 'fadeOutUp',
+                                    });
+                                }
+                            }
+
+                            // Reload table without resetting user scroll/page
+                            if (typeof orderItemsTable !== 'undefined' && orderItemsTable) {
+                                orderItemsTable.ajax.reload(null, false);
+                            }
+
+                            // Update summary values smoothly
+                            if (res.data.summary) {
+                                $('#d_price').val(formatRupiah(res.data.summary.price_item));
+                                $('#d_ppn').val(formatRupiah(res.data.summary.price_ppn));
+                                $('#d_total').val(formatRupiah(res.data.summary.price_total));
+                            }
+                        }
+
+                        // Update known map and hash
+                        currentOrderHash = newHash;
+                        knownHoItemsMap = {};
+                        hoItems.forEach(item => {
+                            knownHoItemsMap[item.id] = {
+                                creditor_name: item.creditor_name,
+                                updated_at: item.updated_at
+                            };
+                        });
+                    }
+                })
+                .catch(err => {
+                    // Silently ignore background polling network errors
+                    console.warn('Order sync polling:', err);
+                })
+                .finally(() => {
+                    isPollingSync = false;
+                });
+        }
+
+        function manualRefreshOrderItems() {
+            if (typeof orderItemsTable !== 'undefined' && orderItemsTable) {
+                orderItemsTable.ajax.reload(null, false);
+            }
+            pollOrderChanges();
+            if (typeof iziToast !== 'undefined') {
+                iziToast.success({
+                    title: 'Disinkronkan',
+                    message: 'Data order telah disinkronkan dengan server.',
+                    position: 'topRight',
+                    timeout: 2500
+                });
+            }
+        }
+
+        // Start live polling every 5 seconds
+        setInterval(pollOrderChanges, 5000);
+        setTimeout(pollOrderChanges, 1200);
     </script>
 
 

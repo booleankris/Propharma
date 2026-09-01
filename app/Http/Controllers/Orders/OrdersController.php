@@ -36,15 +36,22 @@ class OrdersController extends Controller
             'order_items.total',
             'order_items.pack',
             'order_items.creditor_code',
+            'order_items.branch_creditor_code',
+            'order_items.creditor_updated_by',
+            'order_items.creditor_set_by_role',
+            'order_items.creditor_updated_at',
             'order_items.note',
+            'order_items.updated_at',
         ])
-            ->leftJoin('creditors', 'creditors.code', '=', 'order_items.creditor_code')
+            ->leftJoin('creditors as active_creditors', 'active_creditors.code', '=', 'order_items.creditor_code')
             ->with([
                 'medicines.factory',
                 'medicines.creditors',
                 'medicines.creditor',
                 'orders',
-                'creditors'
+                'creditors',
+                'branchCreditor',
+                'creditorUpdater',
             ])
             ->whereHas('orders', function ($q) {
                 $q->where('status', 0)->where('pharmacy_id', getActivePharmacyId());
@@ -52,7 +59,7 @@ class OrdersController extends Controller
             ->when($creditorId, function ($q) use ($creditorId) {
                 $q->where('order_items.creditor_code', $creditorId);
             })
-            ->orderBy('creditors.name', 'asc');
+            ->orderBy('active_creditors.name', 'asc');
 
         return DataTables::of($query)
             ->addColumn(
@@ -65,11 +72,38 @@ class OrdersController extends Controller
                 fn($data) =>
                     'Rp. ' . number_format($data->price)
             )
-            ->addColumn(
-                'creditors',
-                fn($data) =>
-                    $data->creditors->name ?? 'Belum Dipilih'
-            )
+            ->addColumn('creditors', function ($data) {
+                $branchName = $data->branchCreditor?->name ?? ($data->creditor_set_by_role === 'Cabang' ? $data->creditors?->name : null);
+                $hoName = ($data->creditor_set_by_role === 'HO') ? $data->creditors?->name : null;
+
+                $updaterName = htmlspecialchars($data->creditorUpdater->name ?? 'HO');
+                $timeFormatted = $data->creditor_updated_at ? Carbon::parse($data->creditor_updated_at)->format('d/m H:i') : '';
+
+                $html = '<div class="flex flex-col gap-1.5 text-xs py-1 min-w-[210px]">';
+
+                // 1. Dipilih (Pilihan Cabang)
+                $html .= '<div class="flex items-center gap-2">';
+                $html .= '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200 uppercase tracking-wide shrink-0">Dipilih</span>';
+                if ($branchName) {
+                    $html .= '<span class="font-medium text-slate-800 truncate" title="PBF Dipilih: ' . htmlspecialchars($branchName) . '">' . htmlspecialchars($branchName) . '</span>';
+                } else {
+                    $html .= '<span class="text-slate-400 italic text-[11px]">- Belum dipilih -</span>';
+                }
+                $html .= '</div>';
+
+                // 2. Disetujui HO
+                $html .= '<div class="flex items-center gap-2">';
+                $html .= '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold ' . ($hoName ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200') . ' uppercase tracking-wide shrink-0">Disetujui HO</span>';
+                if ($hoName) {
+                    $html .= '<span class="font-bold text-emerald-950 truncate" title="Disetujui HO: ' . htmlspecialchars($hoName) . ' oleh ' . $updaterName . ' (' . $timeFormatted . ')">' . htmlspecialchars($hoName) . '</span>';
+                } else {
+                    $html .= '<span class="text-amber-600 italic text-[11px] flex items-center gap-1"><i class="fas fa-clock text-[9px]"></i> ' . htmlspecialchars($branchName) . '</span>';
+                }
+                $html .= '</div>';
+
+                $html .= '</div>';
+                return $html;
+            })
             ->addColumn(
                 'discount',
                 function ($data) {
@@ -276,11 +310,19 @@ class OrdersController extends Controller
 
         $itemCode = $this->getOrdersCode($validated['medicine_id'], $validated['order_id'], $validated['creditor_code'] ?? null);
 
+        $user = auth()->user();
+        $hasCreditor = !empty($validated['creditor_code']);
+        $role = $user && ($user->hasRole('HO') || $user->hasRole('administrator') || $user->hasRole('Manager')) ? 'HO' : 'Cabang';
+
         $item = OrderItems::create([
             'order_items_code' => $itemCode,
             'order_id' => $validated['order_id'],
             'medicine_id' => $validated['medicine_id'],
             'creditor_code' => $validated['creditor_code'] ?? null,
+            'branch_creditor_code' => $role === 'Cabang' ? ($validated['creditor_code'] ?? null) : null,
+            'creditor_updated_by' => $hasCreditor ? $user?->id : null,
+            'creditor_set_by_role' => $hasCreditor ? $role : null,
+            'creditor_updated_at' => $hasCreditor ? now() : null,
             'pack' => $validated['pack'],
             'price' => $validated['price'],
             'quantity' => $validated['quantity'],
@@ -315,15 +357,26 @@ class OrdersController extends Controller
 
         $item = OrderItems::findOrFail($request->order_id);
 
+        $user = auth()->user();
+        $hasCreditor = !empty($request->creditor_code);
+        $role = $user && ($user->hasRole('HO') || $user->hasRole('administrator') || $user->hasRole('Manager')) ? 'HO' : 'Cabang';
+
         $data = [
             'medicine_id' => $request->medicine_id,
-            'creditor_code' => $request->creditor_code,
+            'creditor_code' => $request->creditor_code ?: null,
+            'creditor_updated_by' => $hasCreditor ? $user?->id : null,
+            'creditor_set_by_role' => $hasCreditor ? $role : null,
+            'creditor_updated_at' => $hasCreditor ? now() : null,
             'pack' => $request->pack,
             'price' => $request->price,
             'quantity' => $request->quantity,
             'total' => $request->total,
             'note' => $request->note ?? null,
         ];
+
+        if ($role === 'Cabang') {
+            $data['branch_creditor_code'] = $request->creditor_code ?: null;
+        }
 
         if ($item->medicine_id != $request->medicine_id || $item->creditor_code != $request->creditor_code) {
             $data['order_items_code'] = $this->getOrdersCode($request->medicine_id, $item->order_id, $request->creditor_code);
@@ -341,6 +394,57 @@ class OrdersController extends Controller
                 'price_item' => $price_total,
                 'price_ppn' => $ppn,
                 'price_total' => $price_total + $ppn
+            ]
+        ]);
+    }
+
+    public function checkOrderUpdates(Request $request)
+    {
+        $orderId = $request->order_id;
+        if (!$orderId) {
+            return response()->json(['error' => 'Missing order_id'], 400);
+        }
+
+        $items = OrderItems::with(['medicines', 'creditors', 'creditorUpdater'])
+            ->where('order_id', $orderId)
+            ->where('status', 0)
+            ->get();
+
+        $hashString = $items->map(function ($i) {
+            return "{$i->id}:{$i->creditor_code}:{$i->creditor_set_by_role}:{$i->quantity}:{$i->price}:{$i->total}:{$i->updated_at}";
+        })->implode('|');
+
+        $currentHash = md5($hashString);
+        $clientHash = $request->last_hash;
+
+        $price_total = (float) $items->sum('total');
+        $price_ppn = floor($price_total * 0.11);
+        $grand_total = $price_total + $price_ppn;
+
+        // Collect all items where creditor is set by HO
+        $hoItems = [];
+        foreach ($items as $item) {
+            if ($item->creditor_set_by_role === 'HO') {
+                $hoItems[] = [
+                    'id' => $item->id,
+                    'medicine_name' => $item->medicines?->name ?? 'Obat',
+                    'creditor_name' => $item->creditors?->name ?? '-',
+                    'updater_name' => $item->creditorUpdater?->name ?? 'HO',
+                    'updated_at' => $item->creditor_updated_at ? Carbon::parse($item->creditor_updated_at)->format('H:i:s') : '',
+                ];
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'hash' => $currentHash,
+            'changed' => $clientHash && $clientHash !== $currentHash,
+            'items_count' => $items->count(),
+            'ho_items' => $hoItems,
+            'summary' => [
+                'price_item' => $price_total,
+                'price_ppn' => $price_ppn,
+                'price_total' => $grand_total,
             ]
         ]);
     }
