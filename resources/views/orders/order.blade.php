@@ -174,27 +174,51 @@
                 class="relative w-full p-6 bg-white rounded-xl shadow-sm border border-gray-100 font-poppins text-[#1c1c1c]">
 
                 <!-- HEADER & TOP INFO -->
-                <div class="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-6">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 pb-4 border-b border-gray-100">
                     <div>
-                        <h1 class="text-2xl font-bold tracking-tight">Form Pemesanan</h1>
+                        <div class="flex items-center gap-3">
+                            <h1 class="text-2xl font-bold tracking-tight text-slate-800">Form Pemesanan</h1>
+                            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                <i class="fas fa-file-invoice text-[11px]"></i> {{ $order_code }}
+                            </span>
+                        </div>
                         <p class="text-sm text-gray-500 mt-1">Cari dan tambahkan obat ke dalam daftar pesanan Anda.</p>
                     </div>
 
-                    <div class="flex gap-3 w-full md:w-auto">
-                        <div class="flex-1 md:w-32">
-                            <label
-                                class="block mb-1 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Tanggal
-                                Order</label>
-                            <input type="text" id="returdate"
-                                class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600 cursor-not-allowed focus:outline-none"
-                                value="{{ $now }}" readonly autocomplete="off">
-                        </div>
-                        <div class="flex-1 md:w-40">
-                            <label class="block mb-1 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Nomor
-                                Order</label>
-                            <input type="text" id="returnumber"
-                                class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600 font-medium cursor-not-allowed focus:outline-none"
-                                value="{{ $order_code }}" readonly autocomplete="off">
+                    <div class="flex items-center flex-wrap md:flex-nowrap gap-3 w-full md:w-auto">
+                        @if(isset($otherDrafts) && $otherDrafts->count() > 0)
+                            <div class="relative">
+                                <select onchange="if(this.value) window.location.href=this.value;" 
+                                    class="rounded-lg border border-amber-300 bg-amber-50/80 text-amber-900 px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-amber-400">
+                                    <option value="" disabled selected>📁 {{ $otherDrafts->count() }} Draft Lain</option>
+                                    @foreach($otherDrafts as $draft)
+                                        <option value="{{ route('orders.create', ['order_id' => $draft->id]) }}">
+                                            {{ $draft->code }} ({{ $draft->date }})
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        @endif
+
+                        <a href="{{ route('orders.create', ['new' => 1]) }}" 
+                            class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm transition-all hover:shadow hover:-translate-y-0.5 focus:ring-2 focus:ring-emerald-400">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                            </svg>
+                            <span>+ Pesanan Baru</span>
+                        </a>
+
+                        <div class="flex gap-2">
+                            <div class="w-28">
+                                <input type="text" id="returdate"
+                                    class="w-full rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-2 text-xs text-gray-600 cursor-not-allowed focus:outline-none text-center font-medium"
+                                    value="{{ $now }}" readonly autocomplete="off">
+                            </div>
+                            <div class="w-36">
+                                <input type="text" id="returnumber"
+                                    class="w-full rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-2 text-xs text-gray-700 font-bold cursor-not-allowed focus:outline-none text-center"
+                                    value="{{ $order_code }}" readonly autocomplete="off">
+                            </div>
                         </div>
                     </div>
                 </div>

@@ -26,6 +26,7 @@ class OrdersController extends Controller
     public function OrderItems(Request $request)
     {
         $creditorId = $request->creditor_id;
+        $orderId = $request->order_id;
 
         $query = OrderItems::select([
             'order_items.id as order_item_id',
@@ -53,8 +54,12 @@ class OrdersController extends Controller
                 'branchCreditor',
                 'creditorUpdater',
             ])
-            ->whereHas('orders', function ($q) {
-                $q->where('status', 0)->where('pharmacy_id', getActivePharmacyId());
+            ->when($orderId, function ($q) use ($orderId) {
+                $q->where('order_items.order_id', $orderId);
+            }, function ($q) {
+                $q->whereHas('orders', function ($sq) {
+                    $sq->where('status', 0)->where('pharmacy_id', getActivePharmacyId());
+                });
             })
             ->when($creditorId, function ($q) use ($creditorId) {
                 $q->where('order_items.creditor_code', $creditorId);
@@ -119,67 +124,74 @@ class OrdersController extends Controller
 
     public function createOrder(Request $request)
     {
+        $pharmacyId = getActivePharmacyId();
         $now = Carbon::now()->format('d/m/Y');
-        $check_transaction = Order::where('pharmacy_id', getActivePharmacyId())
-            ->where('status', '0')
-            ->first();
 
-        if ($check_transaction) {
-            $last = Order::where('pharmacy_id', getActivePharmacyId())
-                ->where('status', '0')
+        // 1. If explicit order_id is requested
+        if ($request->filled('order_id')) {
+            $order = Order::where('pharmacy_id', $pharmacyId)
+                ->where('id', $request->order_id)
                 ->first();
 
-            $now = Carbon::now()->format('d/m/Y');
-            $last->update(['date' => $now]);
+            if ($order) {
+                $order_id = $order->id;
+                $order_code = $order->code;
+                $d_price = OrderItems::where('order_id', $order_id)->where('status', '0')->sum('total') ?? 0;
+                $d_ppn = floor($d_price * 0.11) ?? 0;
+                $d_total = $d_price + $d_ppn ?? 0;
 
-            $d_price = OrderItems::where('order_id', $last->id)->where('status', '0')->sum('total') ?? '';
-            $d_ppn = floor($d_price * 0.11) ?? '';
-            $d_total = $d_price + $d_ppn ?? '';
-            $order_id = $last->id;
-            $order_code = $last->code;
+                // Get other active drafts in this pharmacy for easy switching
+                $otherDrafts = Order::where('pharmacy_id', $pharmacyId)
+                    ->where('status', 0)
+                    ->where('id', '!=', $order_id)
+                    ->orderBy('id', 'desc')
+                    ->get(['id', 'code', 'date']);
 
-            return view('orders.order', compact('order_code', 'now', 'd_price', 'd_ppn', 'd_total', 'order_id'));
-        } else {
-            // Generate Order COde
-            $year = now()->format('y');
-            $month = now()->format('m');
-            $prefix = $year . $month . 'OR';
-
-            $last = Order::where('code', 'like', $prefix . '%')
-                ->orderBy('code', 'desc')
-                ->first();
-
-            if ($last) {
-                $lastNumber = intval(substr($last->code, -4));
-                $nextNumber = $lastNumber + 1;
-            } else {
-                $nextNumber = 0;
-            }
-
-            $serial = str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
-
-            $transactionCode = $prefix . $serial;
-
-            try {
-                DB::beginTransaction();
-
-                $transaction = Order::create([
-                    'pharmacy_id' => getActivePharmacyId(),
-                    'user_id' => auth()->user()->id,
-                    'code' => $transactionCode,
-                    'date' => $now,
-                    'status' => 0,
-                ]);
-                DB::commit();
-                return redirect()->back()->with('message', 'Berhasil Menyimpan! ');
-            } catch (\Exception $e) {
-                DB::rollBack();
-                return redirect()->back()->with('message', 'Gagal Menyimpan! ' . $e->getMessage());
+                return view('orders.order', compact('order_code', 'now', 'd_price', 'd_ppn', 'd_total', 'order_id', 'otherDrafts'));
             }
         }
 
-        // if ($check_transaction == 0) {
-        // }
+        // 2. If user requests to create a new draft explicitly (?new=1)
+        if ($request->has('new')) {
+            $order = $this->createNewDraftOrder($pharmacyId, $now);
+            return redirect()->route('orders.create', ['order_id' => $order->id]);
+        }
+
+        // 3. Default: find latest open draft or create a new one
+        $latestDraft = Order::where('pharmacy_id', $pharmacyId)
+            ->where('status', 0)
+            ->orderBy('id', 'desc')
+            ->first();
+
+        if ($latestDraft) {
+            return redirect()->route('orders.create', ['order_id' => $latestDraft->id]);
+        }
+
+        $order = $this->createNewDraftOrder($pharmacyId, $now);
+        return redirect()->route('orders.create', ['order_id' => $order->id]);
+    }
+
+    private function createNewDraftOrder($pharmacyId, $now)
+    {
+        $year = now()->format('y');
+        $month = now()->format('m');
+        $prefix = $year . $month . 'OR';
+
+        $last = Order::where('code', 'like', $prefix . '%')
+            ->orderBy('code', 'desc')
+            ->first();
+
+        $nextNumber = $last ? (intval(substr($last->code, -4)) + 1) : 1;
+        $serial = str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+        $transactionCode = $prefix . $serial;
+
+        return Order::create([
+            'pharmacy_id' => $pharmacyId,
+            'user_id' => auth()->user()->id,
+            'code' => $transactionCode,
+            'date' => $now,
+            'status' => 0,
+        ]);
     }
 
     public function orderList(Request $request)
