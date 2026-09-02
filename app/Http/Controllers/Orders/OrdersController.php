@@ -64,6 +64,13 @@ class OrdersController extends Controller
             ->when($creditorId, function ($q) use ($creditorId) {
                 $q->where('order_items.creditor_code', $creditorId);
             })
+            ->when($request->filled('search_term'), function ($q) use ($request) {
+                $searchTerm = $request->search_term;
+                $q->whereHas('medicines', function ($mq) use ($searchTerm) {
+                    $mq->where('name', 'like', '%' . $searchTerm . '%')
+                        ->orWhere('code', 'like', '%' . $searchTerm . '%');
+                });
+            })
             ->orderBy('active_creditors.name', 'asc');
 
         return DataTables::of($query)

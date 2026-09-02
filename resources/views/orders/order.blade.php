@@ -151,6 +151,22 @@
             background-color: #f1f5f9 !important;
         }
 
+        #orderItemsTable tbody td {
+            padding: 8px 12px !important;
+            vertical-align: middle !important;
+            border-bottom: 1px solid #f1f5f9 !important;
+        }
+
+        #orderItemsTable thead th {
+            padding: 10px 12px !important;
+            font-size: 11px !important;
+            white-space: nowrap !important;
+        }
+
+        #orderItemsTable tbody tr:hover {
+            background-color: #f8fafc !important;
+        }
+
         #orderItemsTable tr.selected {
             background-color: #e0f2fe !important;
         }
@@ -174,11 +190,13 @@
                 class="relative w-full p-6 bg-white rounded-xl shadow-sm border border-gray-100 font-poppins text-[#1c1c1c]">
 
                 <!-- HEADER & TOP INFO -->
-                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 pb-4 border-b border-gray-100">
+                <div
+                    class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 pb-4 border-b border-gray-100">
                     <div>
                         <div class="flex items-center gap-3">
                             <h1 class="text-2xl font-bold tracking-tight text-slate-800">Form Pemesanan</h1>
-                            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                            <span
+                                class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
                                 <i class="fas fa-file-invoice text-[11px]"></i> {{ $order_code }}
                             </span>
                         </div>
@@ -186,12 +204,13 @@
                     </div>
 
                     <div class="flex items-center flex-wrap md:flex-nowrap gap-3 w-full md:w-auto">
-                        @if(isset($otherDrafts) && $otherDrafts->count() > 0)
+                        @if (isset($otherDrafts) && $otherDrafts->count() > 0)
                             <div class="relative">
-                                <select onchange="if(this.value) window.location.href=this.value;" 
+                                <select onchange="if(this.value) window.location.href=this.value;"
                                     class="rounded-lg border border-amber-300 bg-amber-50/80 text-amber-900 px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-amber-400">
-                                    <option value="" disabled selected>📁 {{ $otherDrafts->count() }} Draft Lain</option>
-                                    @foreach($otherDrafts as $draft)
+                                    <option value="" disabled selected>📁 {{ $otherDrafts->count() }} Draft Lain
+                                    </option>
+                                    @foreach ($otherDrafts as $draft)
                                         <option value="{{ route('orders.create', ['order_id' => $draft->id]) }}">
                                             {{ $draft->code }} ({{ $draft->date }})
                                         </option>
@@ -200,7 +219,7 @@
                             </div>
                         @endif
 
-                        <a href="{{ route('orders.create', ['new' => 1]) }}" 
+                        <a href="{{ route('orders.create', ['new' => 1]) }}"
                             class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm transition-all hover:shadow hover:-translate-y-0.5 focus:ring-2 focus:ring-emerald-400">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
@@ -461,52 +480,103 @@
                         </button>
                     </div>
 
-                    <!-- Live Sync Indicator -->
-
-                </div>
-
-                <table id="orderItemsTable" class="w-full">
-                    <thead>
-                        <tr>
-                            <th>Nama Obat</th>
-                            <th>Pabrik</th>
-                            <th>Status PBF</th>
-                            <th>Diskon</th>
-                            <th>Satuan</th>
-                            <th>Harga</th>
-                            <th>Qty</th>
-                            <th>Sisa</th>
-                            <th>Keterangan</th>
-                            <th>Total</th>
-                        </tr>
-                    </thead>
-                    <tbody class="text-[11px]"></tbody>
-                </table>
-                <div class="flex justify-end w-full shadow-[0_0_20px_rgba(0,0,0,0.2)] bg-white fixed left-0 bottom-0">
-                    <div class="p-4 rounded-t-2xl gap-2 flex">
-                        <div class="flex items-center">
-                            <p class="font-bold pr-2 font-poppins">HARGA HNA</p>
-                            <input id="d_price" readonly
-                                class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
-                                placeholder="Input">
+                    <!-- LIVE SEARCH BAR & ITEM STATS -->
+                    <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-3">
+                        <div class="relative flex-1 max-w-md">
+                            <span
+                                class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="18" height="18" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                    <path d="M10 10m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0" />
+                                    <path d="M21 21l-6 -6" />
+                                </svg>
+                            </span>
+                            <input type="text" id="orderSearchInput" placeholder="Cari nama atau kode obat..."
+                                class="w-full pl-9 pr-8 py-2 text-xs sm:text-sm bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all placeholder:text-gray-400 shadow-sm">
+                            <button type="button" id="clearOrderSearch"
+                                class="hidden absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-x" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                    <path d="M18 6l-12 12" />
+                                    <path d="M6 6l12 12" />
+                                </svg>
+                            </button>
                         </div>
-                        <div class="flex items-center">
-                            <p class="font-bold pr-2 font-poppins">PPN</p>
-                            <input id="d_ppn" readonly
-                                class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
-                                placeholder="Input">
+                        <div id="orderItemsCountBadge"
+                            class="text-xs font-semibold text-slate-600 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 shrink-0 self-start sm:self-auto flex items-center gap-1.5">
+                            <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+                            <span id="orderItemsCountText">Memuat data...</span>
                         </div>
-                        <div class="flex items-center">
-                            <p class="font-bold pr-2 font-poppins">TOTAL</p>
+                    </div>
 
-                            <input id="d_total" readonly
-                                class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
-                                placeholder="Input">
+                    <!-- SCROLLABLE TABLE WRAPPER -->
+                    <div class="border border-gray-200 !w-full rounded-xl overflow-hidden bg-white shadow-sm mb-24">
+                        <div class="max-h-[500px] overflow-y-auto overflow-x-auto relative">
+                            <table id="orderItemsTable" class="w-full">
+                                <thead
+                                    class="sticky top-0 bg-slate-100/95 backdrop-blur-sm z-10 shadow-[0_1px_2px_rgba(0,0,0,0.06)]">
+                                    <tr>
+                                        <th
+                                            class="py-3 px-3 text-left font-semibold text-slate-700 text-xs whitespace-nowrap">
+                                            Nama Obat</th>
+                                        <th
+                                            class="py-3 px-3 text-left font-semibold text-slate-700 text-xs whitespace-nowrap">
+                                            Pabrik</th>
+                                        <th
+                                            class="py-3 px-3 text-left font-semibold text-slate-700 text-xs whitespace-nowrap">
+                                            Status PBF</th>
+                                        <th
+                                            class="py-3 px-3 text-left font-semibold text-slate-700 text-xs whitespace-nowrap">
+                                            Diskon</th>
+                                        <th
+                                            class="py-3 px-3 text-left font-semibold text-slate-700 text-xs whitespace-nowrap">
+                                            Satuan</th>
+                                        <th
+                                            class="py-3 px-3 text-left font-semibold text-slate-700 text-xs whitespace-nowrap">
+                                            Harga</th>
+                                        <th
+                                            class="py-3 px-3 text-left font-semibold text-slate-700 text-xs whitespace-nowrap">
+                                            Qty</th>
+                                        <th
+                                            class="py-3 px-3 text-left font-semibold text-slate-700 text-xs whitespace-nowrap">
+                                            Sisa</th>
+                                        <th
+                                            class="py-3 px-3 text-left font-semibold text-slate-700 text-xs whitespace-nowrap">
+                                            Keterangan</th>
+                                        <th
+                                            class="py-3 px-3 text-left font-semibold text-slate-700 text-xs whitespace-nowrap">
+                                            Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="text-[11px] divide-y divide-gray-100"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="flex justify-end w-full shadow-[0_0_20px_rgba(0,0,0,0.2)] bg-white fixed left-0 bottom-0">
+                        <div class="p-4 rounded-t-2xl gap-2 flex">
+                            <div class="flex items-center">
+                                <p class="font-bold pr-2 font-poppins">HARGA HNA</p>
+                                <input id="d_price" readonly
+                                    class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
+                                    placeholder="Input">
+                            </div>
+                            <div class="flex items-center">
+                                <p class="font-bold pr-2 font-poppins">PPN</p>
+                                <input id="d_ppn" readonly
+                                    class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
+                                    placeholder="Input">
+                            </div>
+                            <div class="flex items-center">
+                                <p class="font-bold pr-2 font-poppins">TOTAL</p>
+
+                                <input id="d_total" readonly
+                                    class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
+                                    placeholder="Input">
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
     </section>
     <div id="smartOrderModal" class="fixed inset-0 z-[9999] hidden">
         <div class="absolute inset-0 bg-black/40" onclick="closeSmartOrder()"></div>
@@ -625,7 +695,13 @@
                     url: "{{ route('orders.orderitems') }}",
                     data: function(d) {
                         d.order_id = orderid;
+                        d.search_term = $('#orderSearchInput').val();
                     }
+                },
+                drawCallback: function(settings) {
+                    const totalRecords = settings.json ? (settings.json.recordsFiltered ?? settings.json
+                        .recordsTotal ?? 0) : 0;
+                    $('#orderItemsCountText').text(totalRecords + ' Item Obat');
                 },
                 columns: [{
                         data: 'medicines.name',
@@ -677,6 +753,31 @@
                 paging: false,
                 searching: false,
                 info: false,
+            });
+
+            // Live Search Handler with debounce
+            let orderSearchTimer;
+            $('#orderSearchInput').on('keyup input', function() {
+                const val = $(this).val();
+                if (val.length > 0) {
+                    $('#clearOrderSearch').removeClass('hidden');
+                } else {
+                    $('#clearOrderSearch').addClass('hidden');
+                }
+                clearTimeout(orderSearchTimer);
+                orderSearchTimer = setTimeout(function() {
+                    if (typeof orderItemsTable !== 'undefined' && orderItemsTable) {
+                        orderItemsTable.ajax.reload(null, false);
+                    }
+                }, 250);
+            });
+
+            $('#clearOrderSearch').on('click', function() {
+                $('#orderSearchInput').val('');
+                $(this).addClass('hidden');
+                if (typeof orderItemsTable !== 'undefined' && orderItemsTable) {
+                    orderItemsTable.ajax.reload(null, false);
+                }
             });
         });
 
