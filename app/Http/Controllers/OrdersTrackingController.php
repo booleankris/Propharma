@@ -31,6 +31,13 @@ class OrdersTrackingController extends Controller
             ->when($request->order_id, function ($q) use ($request) {
                 $q->where('order_items.order_id', $request->order_id);
             })
+            ->when($request->filled('medicine_name'), function ($q) use ($request) {
+                $term = '%' . trim($request->medicine_name) . '%';
+                $q->whereHas('medicines', function ($mq) use ($term) {
+                    $mq->where('name', 'like', $term)
+                        ->orWhere('code', 'like', $term);
+                });
+            })
             ->when($request->filled('status'), function ($q) use ($request) {
                 if ($request->status == '2') {
                     // Diterima: Item ini memiliki catatan penerimaan dengan batch yang tersimpan di stok
@@ -56,6 +63,24 @@ class OrdersTrackingController extends Controller
             ->orderBy('orders.updated_at', 'desc');
 
         return DataTables::of($query)
+            ->filterColumn('medicine_name', function ($q, $keyword) {
+                $q->whereHas('medicines', function ($mq) use ($keyword) {
+                    $mq->where('name', 'like', "%{$keyword}%")
+                        ->orWhere('code', 'like', "%{$keyword}%");
+                });
+            })
+            ->filterColumn('creditor_name', function ($q, $keyword) {
+                $q->whereHas('creditors', function ($cq) use ($keyword) {
+                    $cq->where('name', 'like', "%{$keyword}%")
+                        ->orWhere('code', 'like', "%{$keyword}%");
+                });
+            })
+            ->filterColumn('sp_code', function ($q, $keyword) {
+                $q->where('order_items.order_items_code', 'like', "%{$keyword}%");
+            })
+            ->filterColumn('order_code', function ($q, $keyword) {
+                $q->where('orders.code', 'like', "%{$keyword}%");
+            })
             ->addColumn('sp_code', fn($row) => $row->order_items_code ?? '-')
             ->addColumn('order_code', fn($row) => $row->orders->code ?? '-')
             ->addColumn('order_date', fn($row) => $row->orders->date ?? '-')

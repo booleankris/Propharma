@@ -120,13 +120,31 @@
             color: #D97706;
         }
 
+        .tp-search-input {
+            border: 1px solid #E2E8F0;
+            border-radius: 10px;
+            padding: 8px 12px 8px 34px;
+            font-size: 13px;
+            color: #0F172A;
+            width: 200px;
+            background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='15' height='15' fill='none' stroke='%2364748B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='6.5' cy='6.5' r='4.5'/%3E%3Cpath d='m10 10 3.5 3.5'/%3E%3C/svg%3E") no-repeat 10px center;
+            transition: all 0.2s ease;
+        }
+
+        .tp-search-input:focus {
+            outline: none;
+            border-color: #0D9488;
+            box-shadow: 0 0 0 3px rgba(13, 148, 136, .12);
+            width: 240px;
+        }
+
         .tp-date-input {
             border: 1px solid #E2E8F0;
             border-radius: 10px;
             padding: 8px 12px;
             font-size: 13px;
             color: #0F172A;
-            width: 220px;
+            width: 200px;
             background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%2364748B' stroke-width='1.6'%3E%3Crect x='2' y='3' width='12' height='11' rx='2'/%3E%3Cpath d='M5 1.5v3M11 1.5v3M2 6.5h12'/%3E%3C/svg%3E") no-repeat right 12px center;
         }
 
@@ -333,8 +351,9 @@
                     <button type="button" class="tp-status-btn" data-status="2">Diterima</button>
                 </div>
 
-                <div style="display:flex; align-items:center; gap:8px;">
-                    <select id="filterCreditor" class="select2" style="width: 220px;">
+                <div style="display:flex; align-items:center; gap:8px; flex-wrap: wrap;">
+                    <input type="text" id="filterMedicine" class="tp-search-input" placeholder="Cari nama obat...">
+                    <select id="filterCreditor" class="select2" style="width: 200px;">
                         <option value="">Semua PBF</option>
                         @foreach($creditors as $creditor)
                             <option value="{{ $creditor->code }}">{{ $creditor->name }}</option>
@@ -415,6 +434,7 @@
             let dateFrom = '';
             let dateTo = '';
             let activeCreditor = '';
+            let activeMedicine = '';
 
             let dateRange = flatpickr("#filterDateRange", {
                 mode: "range",
@@ -456,6 +476,7 @@
                         d.date_from = dateFrom;
                         d.date_to = dateTo;
                         d.creditor_code = activeCreditor;
+                        d.medicine_name = activeMedicine;
                     }
                 },
                 order: [
@@ -508,6 +529,16 @@
                 ]
             });
 
+            let medicineSearchTimer;
+            $('#filterMedicine').on('input', function() {
+                clearTimeout(medicineSearchTimer);
+                const val = $(this).val();
+                medicineSearchTimer = setTimeout(function() {
+                    activeMedicine = val;
+                    table.ajax.reload();
+                }, 300);
+            });
+
             $('#filterStatusGroup .tp-status-btn').on('click', function() {
                 $('#filterStatusGroup .tp-status-btn').removeClass('active');
                 $(this).addClass('active');
@@ -527,6 +558,8 @@
                 $('#filterStatusGroup .tp-status-btn').removeClass('active');
                 $('#filterStatusGroup .tp-status-btn[data-status=""]').addClass('active');
                 $('#filterCreditor').val(null).trigger('change.select2');
+                $('#filterMedicine').val('');
+                activeMedicine = '';
                 activeStatus = '';
                 dateFrom = '';
                 dateTo = '';
