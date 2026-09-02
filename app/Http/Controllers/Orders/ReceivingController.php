@@ -921,7 +921,7 @@ class ReceivingController extends Controller
                     );
                 }
 
-                if ($row->status == 1 || $row->status == 2) {
+                if ($row->status == 1) {
                     return $actionBtn(
                         '/receive/' . $row->id,
                         'Terima',
@@ -930,7 +930,24 @@ class ReceivingController extends Controller
                     );
                 }
 
-                // status == 3 (DITERIMA): tiga aksi, masing-masing warna beda biar cepat dibedain
+                if ($row->status == 2) {
+                    return '<div class="flex items-center gap-2">'
+                        . $actionBtn(
+                            '/receive/' . $row->id,
+                            'Terima',
+                            '<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>',
+                            'text-white bg-emerald-600 hover:bg-emerald-700 border-emerald-600'
+                        )
+                        . $actionBtn(
+                            route('orders.comparison', $row->id),
+                            'Bandingkan',
+                            '<path stroke-linecap="round" stroke-linejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 4v12m0 0l4-4m-4 4l-4-4"/>',
+                            'text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border-indigo-200'
+                        )
+                        . '</div>';
+                }
+
+                // status == 3 (DITERIMA): empat aksi
                 return '<div class="flex items-center gap-2">'
                     . $actionBtn(
                         '/receiving/' . $row->id . '/printspbfinal',
@@ -951,6 +968,12 @@ class ReceivingController extends Controller
                         'Revisi Faktur',
                         '<path d="M7 15h-3a1 1 0 0 1 -1 -1v-8a1 1 0 0 1 1 -1h12a1 1 0 0 1 1 1v3" /><path d="M11 19h-3a1 1 0 0 1 -1 -1v-8a1 1 0 0 1 1 -1h12a1 1 0 0 1 1 1v1.25" /><path d="M18.42 15.61a2.1 2.1 0 1 1 2.97 2.97l-3.39 3.42h-3v-3l3.42 -3.39" />',
                         'text-sky-700 bg-sky-50 hover:bg-sky-100 border-sky-200'
+                    )
+                    . $actionBtn(
+                        route('orders.comparison', $row->id),
+                        'Bandingkan',
+                        '<path stroke-linecap="round" stroke-linejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 4v12m0 0l4-4m-4 4l-4-4"/>',
+                        'text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border-indigo-200'
                     )
                     . '</div>';
             })
@@ -1293,6 +1316,128 @@ class ReceivingController extends Controller
         return view('orders.revision', compact('order'));
     }
 
+    public function orderComparison($orderId)
+    {
+        $order = Order::with([
+            'pharmacy',
+            'user',
+            'order_items' => function ($q) {
+                $q->orderBy('creditor_code')->orderBy('id');
+            },
+            'order_items.medicines',
+            'order_items.creditors',
+            'order_items.receivingItems.receiving_details',
+            'order_items.receivingItems.batches',
+        ])->findOrFail($orderId);
+
+        $orderItems = $order->order_items;
+        $totalItems = $orderItems->count();
+
+        $fullCount = 0;
+        $partialCount = 0;
+        $zeroCount = 0;
+
+        $totalOrderedQty = 0;
+        $totalReceivedQty = 0;
+        $totalOrderedValue = 0;
+        $totalReceivedValue = 0;
+
+        $processedItems = $orderItems->map(function ($item) use (
+            &$fullCount,
+            &$partialCount,
+            &$zeroCount,
+            &$totalOrderedQty,
+            &$totalReceivedQty,
+            &$totalOrderedValue,
+            &$totalReceivedValue
+        ) {
+            $qtyOrdered = floatval($item->quantity ?? 0);
+            // Hanya hitung item yang sudah fix masuk/disimpan ke stok (batches_id tidak null)
+            $savedReceivingItems = $item->receivingItems->whereNotNull('batches_id')->values();
+
+            $qtyReceived = floatval($savedReceivingItems->sum('qty_received') ?? 0);
+            $rawPrice = floatval($item->price ?? 0);
+
+            $orderedSubtotal = $qtyOrdered * $rawPrice;
+            $receivedSubtotal = $savedReceivingItems->sum(function ($ri) use ($rawPrice) {
+                $p = floatval($ri->raw_price ?? $rawPrice);
+                $q = floatval($ri->qty_received ?? 0);
+                return $p * $q;
+            });
+
+            $qtyDiff = $qtyOrdered - $qtyReceived;
+            $valueDiff = $orderedSubtotal - $receivedSubtotal;
+
+            if ($qtyReceived >= $qtyOrdered && $qtyOrdered > 0) {
+                $statusKey = 'full';
+                $statusLabel = 'Lengkap';
+                $fullCount++;
+            } elseif ($qtyReceived > 0 && $qtyReceived < $qtyOrdered) {
+                $statusKey = 'partial';
+                $statusLabel = 'Sebagian';
+                $partialCount++;
+            } else {
+                $statusKey = 'zero';
+                $statusLabel = 'Tidak Datang';
+                $zeroCount++;
+            }
+
+            $totalOrderedQty += $qtyOrdered;
+            $totalReceivedQty += $qtyReceived;
+            $totalOrderedValue += $orderedSubtotal;
+            $totalReceivedValue += $receivedSubtotal;
+
+            $fakturList = $savedReceivingItems->map(function ($ri) {
+                return [
+                    'invoice_number' => $ri->receiving_details->invoice_number ?? '-',
+                    'batch' => $ri->batch ?? '-',
+                    'expired_date' => $ri->expired_date ? date('d/m/Y', strtotime($ri->expired_date)) : '-',
+                    'qty' => floatval($ri->qty_received ?? 0),
+                    'price' => floatval($ri->raw_price ?? 0),
+                    'is_saved' => true,
+                ];
+            })->values();
+
+            return (object) [
+                'id' => $item->id,
+                'sp_code' => $item->order_items_code ?? '-',
+                'creditor_code' => $item->creditor_code ?? '-',
+                'creditor_name' => $item->creditors->name ?? ($item->creditor_code ?? '-'),
+                'medicine_code' => $item->medicines->code ?? '-',
+                'medicine_name' => $item->medicines->name ?? '-',
+                'unit' => $item->medicines->unit ?? 'Satuan',
+                'pack' => (bool) $item->pack,
+                'content' => $item->medicines->content ?? 1,
+                'qty_ordered' => $qtyOrdered,
+                'qty_received' => $qtyReceived,
+                'qty_diff' => $qtyDiff,
+                'raw_price' => $rawPrice,
+                'ordered_subtotal' => $orderedSubtotal,
+                'received_subtotal' => $receivedSubtotal,
+                'value_diff' => $valueDiff,
+                'status_key' => $statusKey,
+                'status_label' => $statusLabel,
+                'fakturs' => $fakturList,
+            ];
+        });
+
+        $creditors = $processedItems->pluck('creditor_name', 'creditor_code')->unique();
+
+        return view('orders.comparison', compact(
+            'order',
+            'processedItems',
+            'totalItems',
+            'fullCount',
+            'partialCount',
+            'zeroCount',
+            'totalOrderedQty',
+            'totalReceivedQty',
+            'totalOrderedValue',
+            'totalReceivedValue',
+            'creditors'
+        ));
+    }
+
     public function index()
     {
         $now = Carbon::now()->format('d/m/Y');
@@ -1410,7 +1555,11 @@ class ReceivingController extends Controller
             $d_total += $detailGrandTotal;
         }
 
-        return view('orders.receiving', compact('order_id', 'd_price', 'd_ppn', 'd_total', 'order_code', 'creditorOption', 'receiving_code', 'transaction', 'now', 'datenow', 'receiving_id', 'allFakturs'));
+        $hasSavedBatches = \App\Models\ReceivingItems::whereHas('order_items', fn($q) => $q->where('order_id', $id))
+            ->whereNotNull('batches_id')
+            ->exists();
+
+        return view('orders.receiving', compact('order_id', 'd_price', 'd_ppn', 'd_total', 'order_code', 'creditorOption', 'receiving_code', 'transaction', 'now', 'datenow', 'receiving_id', 'allFakturs', 'hasSavedBatches'));
     }
 
     public function addReceivingItem(Request $request)
@@ -1649,10 +1798,9 @@ class ReceivingController extends Controller
         try {
             DB::beginTransaction();
 
-            $receiving = Receiving::with(['receiving_details.receiving_items.order_items'])
-                ->findOrFail($request->receivingid);
+            $order = Order::findOrFail($request->orderid);
 
-            if ($receiving->status == 3) {
+            if ($order->status == 3) {
                 DB::rollBack();
                 return response()->json([
                     'success' => false,
@@ -1660,18 +1808,24 @@ class ReceivingController extends Controller
                 ], 422);
             }
 
-            $order = Order::findOrFail($request->orderid);
+            $receiving = Receiving::with(['receiving_details.receiving_items.order_items'])
+                ->find($request->receivingid);
 
-            // Generate Nomor Terima (NT) and SP Code for any ReceivingDetails that doesn't have one yet
-            foreach ($receiving->receiving_details as $details) {
+            // Generate Nomor Terima (NT) and SP Code for any ReceivingDetails on this order that doesn't have one yet
+            $allDetails = ReceivingDetails::whereHas('receiving_items.order_items', fn($q) => $q->where('order_id', $order->id))
+                ->orWhere('receiving_id', $request->receivingid)
+                ->get();
+
+            foreach ($allDetails as $details) {
                 $needsSave = false;
+                $pId = $order->pharmacy_id ?? getPurchasingPharmacyId();
                 if (empty($details->receiving_details_code)) {
-                    $details->receiving_details_code = $this->generateReceivingDetailsCode($receiving->pharmacy_id);
+                    $details->receiving_details_code = $this->generateReceivingDetailsCode($pId);
                     $needsSave = true;
                 }
                 if (empty($details->sp_code)) {
                     $firstItem = $details->receiving_items->first();
-                    $details->sp_code = $firstItem && $firstItem->order_items ? $firstItem->order_items->order_items_code : $this->generateSPCode($receiving->pharmacy_id);
+                    $details->sp_code = $firstItem && $firstItem->order_items ? $firstItem->order_items->order_items_code : $this->generateSPCode($pId);
                     $needsSave = true;
                 }
                 if ($needsSave) {
@@ -1679,24 +1833,22 @@ class ReceivingController extends Controller
                 }
             }
 
-            $receivingItems = $receiving
-                ->receiving_details
-                ->pluck('receiving_items')
-                ->flatten()
-                ->whereNull('batches_id')
-                ->values();
+            // Find all uncommitted receiving items for this order
+            $receivingItems = ReceivingItems::whereNull('batches_id')
+                ->whereHas('order_items', fn($q) => $q->where('order_id', $order->id))
+                ->with(['order_items.medicines', 'receiving_details'])
+                ->get();
 
             if ($receivingItems->isEmpty()) {
                 DB::commit();
                 return response()->json([
                     'success' => true,
-                    'message' => 'Tidak ada item baru untuk disimpan',
+                    'message' => 'Seluruh item faktur telah tersimpan ke stok.',
                 ]);
             }
 
             $now = Carbon::now()->format('Y-m-d');
-            $order = Order::find($request->orderid);
-            $pharmacyId = $order ? $order->pharmacy_id : getPurchasingPharmacyId();
+            $pharmacyId = $order->pharmacy_id ?? getPurchasingPharmacyId();
 
             $medicineIds = $receivingItems->pluck('order_items.medicine_id')->unique()->values();
             $medicines = Medicines::whereIn('id', $medicineIds)->get()->keyBy('id');
@@ -1730,6 +1882,8 @@ class ReceivingController extends Controller
             $baseLogCode = $this->generateItemsLogCode();
             $logPrefix = substr($baseLogCode, 0, -4);
             $currentLogNum = (int) substr($baseLogCode, -4);
+
+            $recCode = $receiving ? $receiving->code : ($order->code ?? 'REC');
 
             foreach ($receivingItems as $index => $item) {
                 $medicineId = $item->order_items->medicine_id;
@@ -1779,7 +1933,7 @@ class ReceivingController extends Controller
                 }
 
                 $itemsLogInserts[] = [
-                    'transaction_code' => $receiving->code,
+                    'transaction_code' => $recCode,
                     'code' => $logPrefix . str_pad($currentLogNum + $index, 4, '0', STR_PAD_LEFT),
                     'type' => 'OR',
                     'medicine_id' => $medicineId,
@@ -1809,34 +1963,28 @@ class ReceivingController extends Controller
 
             collect($itemsLogInserts)
                 ->chunk(500)
-                ->each(fn($chunk) => ItemsLog::insert($chunk->values()->all()));
+                ->each(function ($chunk) {
+                    ItemsLog::insert($chunk->toArray());
+                });
 
-            // Update status only for the order items that are actually received
-            $receivedOrderItemIds = $receivingItems->pluck('order_items.id')->unique()->filter()->values()->all();
-            if (!empty($receivedOrderItemIds)) {
-                OrderItems::whereIn('id', $receivedOrderItemIds)->update(['status' => 2]);
+            // Update receiving status to partially received (2) if still 0
+            if ($receiving && $receiving->status == 0) {
+                $receiving->update(['status' => 2]);
             }
-
-            // Check if all order items for this order have been received (status 2)
-            $totalOrderItems = OrderItems::where('order_id', $order->id)->count();
-            $receivedOrderItems = OrderItems::where('order_id', $order->id)->where('status', 2)->count();
-
-            if ($totalOrderItems > 0 && $totalOrderItems === $receivedOrderItems) {
+            if ($order && $order->status == 1) {
                 $order->update(['status' => 2]);
             }
-
-            $receiving->update(['status' => 2]);
 
             DB::commit();
 
             return response()->json([
                 'success' => true,
-                'message' => 'Item Tersimpan',
+                'message' => 'Faktur berhasil disimpan ke stok!',
             ]);
         } catch (\Throwable $e) {
             DB::rollBack();
 
-            \Log::error('Error saving receiving', [
+            \Log::error('Error saving receiving order', [
                 'message' => $e->getMessage(),
                 'line' => $e->getLine(),
                 'trace' => $e->getTraceAsString(),
@@ -1844,7 +1992,7 @@ class ReceivingController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal menyimpan: ' . $e->getMessage(),
+                'message' => 'Gagal menyimpan faktur: ' . $e->getMessage(),
             ], 500);
         }
     }
@@ -1859,10 +2007,9 @@ class ReceivingController extends Controller
         try {
             DB::beginTransaction();
 
-            $receiving = Receiving::with(['receiving_details.receiving_items'])
-                ->findOrFail($request->receivingid);
+            $order = Order::with(['order_items.receivingItems'])->findOrFail($request->orderid);
 
-            if ($receiving->status == 3) {
+            if ($order->status == 3) {
                 DB::commit();
                 return response()->json([
                     'success' => true,
@@ -1870,31 +2017,29 @@ class ReceivingController extends Controller
                 ]);
             }
 
-            $order = Order::findOrFail($request->orderid);
+            $allOrderReceivingItems = $order->order_items->flatMap->receivingItems;
 
-            $receivingItems = $receiving
-                ->receiving_details
-                ->pluck('receiving_items')
-                ->flatten();
-
-            if ($receivingItems->isEmpty()) {
+            if ($allOrderReceivingItems->whereNull('batches_id')->isNotEmpty()) {
                 DB::rollBack();
                 return response()->json([
                     'success' => false,
-                    'message' => 'Tidak ada item untuk diselesaikan',
+                    'message' => 'Masih ada item faktur yang belum disimpan ke stok. Silakan klik tombol "Simpan Faktur" terlebih dahulu.',
                 ], 422);
             }
 
-            if ($receivingItems->whereNull('batches_id')->isNotEmpty()) {
-                DB::rollBack();
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Masih ada item yang belum disimpan. Klik "Simpan" terlebih dahulu.',
-                ], 422);
-            }
-
+            // Lock and complete the Order
             $order->update(['status' => 3]);
-            $receiving->update(['status' => 3]);
+
+            // Lock and complete all associated Receiving headers for this order
+            if ($order->receiving_id) {
+                Receiving::where('id', $order->receiving_id)->update(['status' => 3]);
+            }
+            if ($request->receivingid) {
+                Receiving::where('id', $request->receivingid)->update(['status' => 3]);
+            }
+            Receiving::whereHas('receiving_details.receiving_items.order_items', function ($q) use ($order) {
+                $q->where('order_id', $order->id);
+            })->update(['status' => 3]);
 
             DB::commit();
 
@@ -1913,7 +2058,7 @@ class ReceivingController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal menyelesaikan receiving',
+                'message' => 'Gagal menyelesaikan pesanan: ' . $e->getMessage(),
             ], 500);
         }
     }

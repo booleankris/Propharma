@@ -421,6 +421,7 @@ Route::middleware(['auth', 'role:Kasir|Gudang PMI|HO|administrator|manager|Onlin
     Route::delete('/receiving-items/{id}', [ReceivingController::class, 'deleteReceivingItem'])->name('receiving.deleteItem');
     Route::delete('/receiving-draft-items/{id}', [ReceivingController::class, 'deleteReceivingDraftItem'])->name('receiving.deleteDraftItem');
     Route::get('/orders/{orderId}/revision', [ReceivingController::class, 'invoiceRevision'])->name('receiving.revision');
+    Route::get('/orders/{orderId}/comparison', [ReceivingController::class, 'orderComparison'])->name('orders.comparison');
 
     // Save Order
     Route::post('/receiving/completeorder', [ReceivingController::class, 'completeOrder'])
