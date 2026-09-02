@@ -1313,16 +1313,14 @@ class ReceivingController extends Controller
             $orderPharmacyId
         )->first();
 
-        $check_order = OrderItems::with('orders')->whereHas('orders', function ($q) use ($id) {
-            $q->where('id', $id);
-        })->first();
-
-        if (!$check_order || !$check_order->orders) {
-            abort(404, 'Order not found.');
+        if ($getOrder->status == 3) {
+            return redirect()->route('receiving.index')->with('success', 'Pesanan ini sudah selesai diterima.');
         }
 
-        if ($check_order->orders->status == 3) {
-            return redirect()->route('receiving.index')->with('success', 'Pesanan Berhasil Diterima');
+        $orderItemCount = OrderItems::where('order_id', $id)->count();
+        if ($orderItemCount === 0) {
+            return redirect()->route('orders.create', ['order_id' => $getOrder->id])
+                ->with('warning', 'Pesanan ini belum memiliki item obat. Silakan isi item obat terlebih dahulu.');
         }
 
         $creditorOption = OrderItems::where('order_id', $id)
@@ -1344,64 +1342,7 @@ class ReceivingController extends Controller
         })->get();
         $allFakturs = $allFakturs->merge($historicalFakturs)->unique('id')->values();
 
-        if ($transaction) {
-            $receiving_id = $transaction->id;
-            if (!$getOrder->receiving_id || $getOrder->receiving_id != $transaction->id) {
-                $getOrder->update(['receiving_id' => $transaction->id]);
-            }
-            $receiving_code = $transaction->code;
-            $order_id = $getOrder->id;
-            $order_code = $getOrder->code;
-
-            $receivingDetails = ReceivingDetails::with(['receiving_items.order_items.medicines', 'creditor'])
-                ->where('receiving_id', $transaction->id)
-                ->get();
-
-            $d_price = 0;
-            $d_ppn = 0;
-            $d_total = 0;
-
-            foreach ($receivingDetails as $detail) {
-                $ppnType = strtoupper(trim($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA'));
-                $detailSubtotal = 0;
-                $detailDiscount = 0;
-
-                foreach ($detail->receiving_items as $rItem) {
-                    $qty = floatval($rItem->qty_received ?? $rItem->qty ?? 0);
-                    $price = floatval($rItem->raw_price ?? $rItem->order_items->price ?? 0);
-                    $gross = $qty * $price;
-                    $disc = floatval($rItem->discount ?? 0);
-                    $extraDisc = floatval($rItem->extra_discount ?? 0);
-                    $nomDisc = ($disc <= 100 && $disc > 0) ? ($gross * $disc / 100) : $disc;
-                    $nomExtraDisc = ($extraDisc <= 100 && $extraDisc > 0) ? ($gross * $extraDisc / 100) : $extraDisc;
-
-                    $detailSubtotal += $gross;
-                    $detailDiscount += ($nomDisc + $nomExtraDisc);
-                }
-
-                $detailDpp = max(0, $detailSubtotal - $detailDiscount);
-
-                if ($ppnType === 'EXCLUDE') {
-                    $detailPpn = floor($detailDpp * 0.11);
-                    $detailGrandTotal = $detailDpp + $detailPpn;
-                    $detailHna = $detailDpp;
-                } elseif ($ppnType === 'INCLUDE') {
-                    $detailGrandTotal = $detailDpp;
-                    $detailHna = floor($detailDpp / 1.11);
-                    $detailPpn = $detailGrandTotal - $detailHna;
-                } else {  // TANPA
-                    $detailPpn = 0;
-                    $detailGrandTotal = $detailDpp;
-                    $detailHna = $detailDpp;
-                }
-
-                $d_price += $detailHna;
-                $d_ppn += $detailPpn;
-                $d_total += $detailGrandTotal;
-            }
-
-            return view('orders.receiving', compact('order_id', 'd_price', 'd_ppn', 'd_total', 'order_code', 'creditorOption', 'receiving_code', 'transaction', 'now', 'datenow', 'receiving_id', 'allFakturs'));
-        } else {
+        if (!$transaction) {
             $year = now()->format('y');
             $month = now()->format('m');
             $prefix = $year . $month . 'RE';
@@ -1410,35 +1351,76 @@ class ReceivingController extends Controller
                 ->orderBy('code', 'desc')
                 ->first();
 
-            if ($last) {
-                $lastNumber = intval(substr($last->code, -4));
-                $nextNumber = $lastNumber + 1;
-            } else {
-                $nextNumber = 0;
-            }
-
+            $nextNumber = $last ? (intval(substr($last->code, -4)) + 1) : 1;
             $serial = str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
             $receiving_code = $prefix . $serial;
 
-            try {
-                DB::beginTransaction();
-
-                $transaction = Receiving::create([
-                    'order_id' => $id,
-                    'creditors_id' => NULL,
-                    'pharmacy_id' => $orderPharmacyId,
-                    'code' => $receiving_code,
-                    'date' => $now,
-                    'status' => 0,
-                ]);
-
-                DB::commit();
-                return redirect()->route('receiving.receive', $id);
-            } catch (\Exception $e) {
-                DB::rollBack();
-                return redirect()->back()->with('message', 'Gagal Menyimpan! ' . $e->getMessage());
-            }
+            $transaction = Receiving::create([
+                'order_id' => $id,
+                'creditors_id' => NULL,
+                'pharmacy_id' => $orderPharmacyId,
+                'code' => $receiving_code,
+                'date' => $now,
+                'status' => 0,
+            ]);
         }
+
+        $receiving_id = $transaction->id;
+        if (!$getOrder->receiving_id || $getOrder->receiving_id != $transaction->id) {
+            $getOrder->update(['receiving_id' => $transaction->id]);
+        }
+        $receiving_code = $transaction->code;
+        $order_id = $getOrder->id;
+        $order_code = $getOrder->code;
+
+        $receivingDetails = ReceivingDetails::with(['receiving_items.order_items.medicines', 'creditor'])
+            ->where('receiving_id', $transaction->id)
+            ->get();
+
+        $d_price = 0;
+        $d_ppn = 0;
+        $d_total = 0;
+
+        foreach ($receivingDetails as $detail) {
+            $ppnType = strtoupper(trim($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA'));
+            $detailSubtotal = 0;
+            $detailDiscount = 0;
+
+            foreach ($detail->receiving_items as $rItem) {
+                $qty = floatval($rItem->qty_received ?? $rItem->qty ?? 0);
+                $price = floatval($rItem->raw_price ?? $rItem->order_items->price ?? 0);
+                $gross = $qty * $price;
+                $disc = floatval($rItem->discount ?? 0);
+                $extraDisc = floatval($rItem->extra_discount ?? 0);
+                $nomDisc = ($disc <= 100 && $disc > 0) ? ($gross * $disc / 100) : $disc;
+                $nomExtraDisc = ($extraDisc <= 100 && $extraDisc > 0) ? ($gross * $extraDisc / 100) : $extraDisc;
+
+                $detailSubtotal += $gross;
+                $detailDiscount += ($nomDisc + $nomExtraDisc);
+            }
+
+            $detailDpp = max(0, $detailSubtotal - $detailDiscount);
+
+            if ($ppnType === 'EXCLUDE') {
+                $detailPpn = floor($detailDpp * 0.11);
+                $detailGrandTotal = $detailDpp + $detailPpn;
+                $detailHna = $detailDpp;
+            } elseif ($ppnType === 'INCLUDE') {
+                $detailGrandTotal = $detailDpp;
+                $detailHna = floor($detailDpp / 1.11);
+                $detailPpn = $detailGrandTotal - $detailHna;
+            } else {  // TANPA
+                $detailPpn = 0;
+                $detailGrandTotal = $detailDpp;
+                $detailHna = $detailDpp;
+            }
+
+            $d_price += $detailHna;
+            $d_ppn += $detailPpn;
+            $d_total += $detailGrandTotal;
+        }
+
+        return view('orders.receiving', compact('order_id', 'd_price', 'd_ppn', 'd_total', 'order_code', 'creditorOption', 'receiving_code', 'transaction', 'now', 'datenow', 'receiving_id', 'allFakturs'));
     }
 
     public function addReceivingItem(Request $request)
