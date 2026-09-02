@@ -922,7 +922,7 @@ class ReceivingController extends Controller
             ->addColumn('action', function ($row) use ($actionBtn) {
                 if ($row->status == 0) {
                     return $actionBtn(
-                        '/createorder',
+                        route('orders.create', ['order_id' => $row->id]),
                         'Lanjutkan',
                         '<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/>',
                         'text-white bg-blue-600 hover:bg-blue-700 border-blue-600'
