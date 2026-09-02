@@ -16,14 +16,32 @@ class OrdersTrackingController extends Controller
 
     public function data(Request $request)
     {
-        $query = OrderItems::with(['medicines', 'creditors', 'orders', 'receiving_items.receiving_details'])
+        $query = OrderItems::with(['medicines', 'creditors', 'orders', 'receivingItems'])
             ->join('orders', 'orders.id', '=', 'order_items.order_id')
             ->select('order_items.*')
             ->when($request->creditor_code, function ($q) use ($request) {
                 $q->where('order_items.creditor_code', $request->creditor_code);
             })
             ->when($request->filled('status'), function ($q) use ($request) {
-                $q->where('order_items.status', $request->status);
+                if ($request->status == '2') {
+                    // Diterima: status item = 2, ATAU punya receiving_items dengan batch, ATAU order sudah diterima/selesai (status 2/3)
+                    $q->where(function ($sq) {
+                        $sq->where('order_items.status', 2)
+                            ->orWhereHas('receivingItems', function ($rq) {
+                                $rq->whereNotNull('batches_id');
+                            })
+                            ->orWhereIn('orders.status', [2, 3]);
+                    });
+                } elseif ($request->status == '0') {
+                    // Dipesan: status item != 2, BELUM punya receiving_items dengan batch, dan order masih status 1 (dipesan)
+                    $q->where('order_items.status', '!=', 2)
+                        ->whereDoesntHave('receivingItems', function ($rq) {
+                            $rq->whereNotNull('batches_id');
+                        })
+                        ->where('orders.status', 1);
+                } else {
+                    $q->where('order_items.status', $request->status);
+                }
             })
             ->when($request->date_from && $request->date_to, function ($q) use ($request) {
                 $q->whereBetween('orders.updated_at', [
@@ -38,18 +56,26 @@ class OrdersTrackingController extends Controller
 
         return DataTables::of($query)
             ->addColumn('sp_code', fn($row) => $row->order_items_code ?? '-')
-            ->addColumn('order_code', fn($row) => $row->orders->code)
-            ->addColumn('order_date', fn($row) => $row->orders->date)
+            ->addColumn('order_code', fn($row) => $row->orders->code ?? '-')
+            ->addColumn('order_date', fn($row) => $row->orders->date ?? '-')
             ->addColumn('medicine_name', fn($row) => $row->medicines->name ?? '-')
             ->addColumn('creditor_name', fn($row) => $row->creditors->name ?? '-')
             ->addColumn('status_label', function ($row) {
-                return $row->status == 2
+                $isReceived = ($row->status == 2)
+                    || ($row->receivingItems && $row->receivingItems->whereNotNull('batches_id')->isNotEmpty())
+                    || ($row->orders && in_array($row->orders->status, [2, 3]));
+
+                return $isReceived
                     ? '<span class="tp-badge received"><span class="dot"></span>Diterima</span>'
                     : '<span class="tp-badge pending"><span class="dot"></span>Dipesan</span>';
             })
             ->addColumn('action', function ($row) {
+                $isReceived = ($row->status == 2)
+                    || ($row->receivingItems && $row->receivingItems->whereNotNull('batches_id')->isNotEmpty())
+                    || ($row->orders && in_array($row->orders->status, [2, 3]));
+
                 $url = route('receiving.receive', $row->order_id);
-                if ($row->status == 2) {
+                if ($isReceived) {
                     return '<a href="' . $url . '" class="text-[12px] font-medium text-gray-600 border border-gray-200 bg-white hover:bg-gray-50 px-3 py-1.5 rounded-lg shadow-sm transition-colors inline-flex items-center gap-1.5 whitespace-nowrap">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
                                 Rincian

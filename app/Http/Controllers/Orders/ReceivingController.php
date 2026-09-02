@@ -1967,6 +1967,12 @@ class ReceivingController extends Controller
                     ItemsLog::insert($chunk->toArray());
                 });
 
+            // Update order items status to received (2) for all items in this save
+            $savedOrderItemIds = $receivingItems->pluck('order_items_id')->filter()->unique();
+            if ($savedOrderItemIds->isNotEmpty()) {
+                OrderItems::whereIn('id', $savedOrderItemIds)->update(['status' => 2]);
+            }
+
             // Update receiving status to partially received (2) if still 0
             if ($receiving && $receiving->status == 0) {
                 $receiving->update(['status' => 2]);
@@ -2027,8 +2033,9 @@ class ReceivingController extends Controller
                 ], 422);
             }
 
-            // Lock and complete the Order
+            // Lock and complete the Order & its items
             $order->update(['status' => 3]);
+            OrderItems::where('order_id', $order->id)->update(['status' => 2]);
 
             // Lock and complete all associated Receiving headers for this order
             if ($order->receiving_id) {
