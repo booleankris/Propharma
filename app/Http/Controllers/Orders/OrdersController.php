@@ -58,7 +58,7 @@ class OrdersController extends Controller
                 $q->where('order_items.order_id', $orderId);
             }, function ($q) {
                 $q->whereHas('orders', function ($sq) {
-                    $sq->where('status', 0)->where('pharmacy_id', getActivePharmacyId());
+                    $sq->where('status', 0)->where('pharmacy_id', getPurchasingPharmacyId());
                 });
             })
             ->when($creditorId, function ($q) use ($creditorId) {
@@ -124,7 +124,7 @@ class OrdersController extends Controller
 
     public function createOrder(Request $request)
     {
-        $pharmacyId = getActivePharmacyId();
+        $pharmacyId = getPurchasingPharmacyId();
         $now = Carbon::now()->format('d/m/Y');
 
         // 1. If explicit order_id is requested

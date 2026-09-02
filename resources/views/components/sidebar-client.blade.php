@@ -524,9 +524,10 @@
             </div>
             <div>
                 @php
-                    $pharmacy = \App\Models\Pharmacies::where('id', getActivePharmacyId())->first();
+                    $pharmacy = \App\Models\Pharmacies::where('id', getActivePharmacyId())->first() ?? auth()->user()->pharmacy;
+                    $brandName = $pharmacy ? $pharmacy->name : 'SAHABAT PMI';
                 @endphp
-                <div class="brand-name font-poppins">{{ $pharmacy->name }}</div>
+                <div class="brand-name font-poppins">{{ $brandName }}</div>
                 <div class="brand-sub"></div>
             </div>
         </div>
@@ -585,8 +586,8 @@
 
         @if (!isOnlineRole())
             <a onclick="openModal('logModal')" class="nav-item {{ request()->is('inventory*') ? 'active' : '' }}">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                    stroke-linecap="round" stroke-linejoin="round">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path
                         d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
                     <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
@@ -811,9 +812,9 @@
                         <select name="pharmacy_id" onchange="this.form.submit()"
                             class="text-xs sm:text-sm w-[110px] sm:w-auto border-gray-200 rounded-lg focus:ring-violet-500 focus:border-violet-500 font-medium text-gray-700 py-1.5 pl-2 pr-6 sm:pl-3 sm:pr-8 text-ellipsis overflow-hidden">
                             @php
-                                // Fetch all active pharmacies excluding "Logistik", "ONLINE", "HO" if we only want 5 branches
-                                // According to user: SAHABAT PMI, SAHABAT MULAWARMAN, SAHABAT MIM, SAHABAT SUTOMO, SAHABAT ANTASARI
-                                $branches = \App\Models\Pharmacies::whereIn('id', [1, 2, 3, 4, 5])->get();
+                                $branches = \App\Models\Pharmacies::whereIn('id', [1, 9, 2, 3, 4, 5])
+                                    ->orderByRaw('FIELD(id, 1, 9, 2, 3, 4, 5)')
+                                    ->get();
                                 $activeId = getActivePharmacyId();
                             @endphp
                             @foreach ($branches as $branch)

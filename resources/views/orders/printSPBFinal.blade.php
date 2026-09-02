@@ -248,12 +248,11 @@
 
                                 @if (!empty($signatureBase64))
                                     <div style="margin: 1px 0;">
-                                        <img src="{{ $signatureBase64 }}"
-                                            style="height:35px; width:auto;">
+                                        <img src="{{ $signatureBase64 }}" style="height:35px; width:auto;">
                                     </div>
-                                @elseif ($pharmacy->signature && file_exists(public_path('img/'.$pharmacy->signature)))
+                                @elseif ($pharmacy->signature && file_exists(public_path('img/' . $pharmacy->signature)))
                                     <div style="margin: 1px 0;">
-                                        <img src="{{ public_path('img/'.$pharmacy->signature) }}"
+                                        <img src="{{ public_path('img/' . $pharmacy->signature) }}"
                                             style="height:35px; width:auto;">
                                     </div>
                                 @else
@@ -419,12 +418,11 @@
 
                             @if (!empty($signatureBase64))
                                 <div style="margin: 1px 0;">
-                                    <img src="{{ $signatureBase64 }}"
-                                        style="height:35px; width:auto;">
+                                    <img src="{{ $signatureBase64 }}" style="height:35px; width:auto;">
                                 </div>
-                            @elseif ($pharmacy->signature && file_exists(public_path('img/'.$pharmacy->signature)))
+                            @elseif ($pharmacy->signature && file_exists(public_path('img/' . $pharmacy->signature)))
                                 <div style="margin: 1px 0;">
-                                    <img src="{{ public_path('img/'.$pharmacy->signature) }}"
+                                    <img src="{{ public_path('img/' . $pharmacy->signature) }}"
                                         style="height:35px; width:auto;">
                                 </div>
                             @else
@@ -522,8 +520,7 @@
                         <tbody>
                             @foreach ($chunkItems as $index => $row)
                                 @php
-                                    $komposisi =
-                                        $row->medicines->component ?: (optional($row->medicines->composition)->name ?? '-');
+                                    $komposisi = $row->medicines->component ?? '-';
                                     $bentukKekuatan = trim(
                                         ($row->medicines->unit ?: $row->medicines->packaging ?: '') .
                                             ' ' .
@@ -586,12 +583,11 @@
                                 Pemesan
                                 @if (!empty($signatureBase64))
                                     <div style="margin: 1px 0;">
-                                        <img src="{{ $signatureBase64 }}"
-                                            style="height:35px; width:auto;">
+                                        <img src="{{ $signatureBase64 }}" style="height:35px; width:auto;">
                                     </div>
-                                @elseif ($pharmacy->signature && file_exists(public_path('img/'.$pharmacy->signature)))
+                                @elseif ($pharmacy->signature && file_exists(public_path('img/' . $pharmacy->signature)))
                                     <div style="margin: 1px 0;">
-                                        <img src="{{ public_path('img/'.$pharmacy->signature) }}"
+                                        <img src="{{ public_path('img/' . $pharmacy->signature) }}"
                                             style="height:35px; width:auto;">
                                     </div>
                                 @else
@@ -677,7 +673,7 @@
                     <tbody>
                         @foreach ($creditorItems as $index => $row)
                             @php
-                                $komposisi = $row->medicines->component ?: (optional($row->medicines->composition)->name ?? '-');
+                                $komposisi = $row->medicines->component ?? '-';
                                 $bentukKekuatan = trim(
                                     ($row->medicines->unit ?: $row->medicines->packaging ?: '') .
                                         ' ' .
@@ -739,12 +735,11 @@
                             Pemesan
                             @if (!empty($signatureBase64))
                                 <div style="margin: 1px 0;">
-                                    <img src="{{ $signatureBase64 }}"
-                                        style="height:35px; width:auto;">
+                                    <img src="{{ $signatureBase64 }}" style="height:35px; width:auto;">
                                 </div>
-                            @elseif ($pharmacy->signature && file_exists(public_path('img/'.$pharmacy->signature)))
+                            @elseif ($pharmacy->signature && file_exists(public_path('img/' . $pharmacy->signature)))
                                 <div style="margin: 1px 0;">
-                                    <img src="{{ public_path('img/'.$pharmacy->signature) }}"
+                                    <img src="{{ public_path('img/' . $pharmacy->signature) }}"
                                         style="height:35px; width:auto;">
                                 </div>
                             @else
@@ -834,8 +829,7 @@
                         <tbody>
                             @foreach ($chunkItems as $index => $row)
                                 @php
-                                    $komposisi =
-                                        $row->medicines->component ?: (optional($row->medicines->composition)->name ?? '-');
+                                    $komposisi = $row->medicines->component ?? '-';
                                     $bentukKekuatan = trim(
                                         ($row->medicines->unit ?: $row->medicines->packaging ?: '') .
                                             ' ' .
@@ -897,12 +891,11 @@
                                 Pemesan
                                 @if (!empty($signatureBase64))
                                     <div style="margin: 1px 0;">
-                                        <img src="{{ $signatureBase64 }}"
-                                            style="height:35px; width:auto;">
+                                        <img src="{{ $signatureBase64 }}" style="height:35px; width:auto;">
                                     </div>
-                                @elseif ($pharmacy->signature && file_exists(public_path('img/'.$pharmacy->signature)))
+                                @elseif ($pharmacy->signature && file_exists(public_path('img/' . $pharmacy->signature)))
                                     <div style="margin: 1px 0;">
-                                        <img src="{{ public_path('img/'.$pharmacy->signature) }}"
+                                        <img src="{{ public_path('img/' . $pharmacy->signature) }}"
                                             style="height:35px; width:auto;">
                                     </div>
                                 @else
