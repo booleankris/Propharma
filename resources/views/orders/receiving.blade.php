@@ -318,9 +318,10 @@
 
                     <!-- Jatuh Tempo (Readonly) -->
                     <div>
-                        <label class="block text-xs font-semibold text-gray-500 mb-1">Tgl Jatuh Tempo</label>
-                        <input id="invoice_due" readonly name="invoice_due" value="{{ $transaction->invoice_due }}"
-                            type="date"
+                        <label for="invoice_due" class="block text-xs font-semibold text-gray-500 mb-1">Tgl Jatuh
+                            Tempo</label>
+                        <input id="invoice_due" name="invoice_due" readonly value="{{ $transaction->invoice_due }}"
+                            placeholder="dd/mm/yyyy"
                             class="w-full rounded-xl border border-gray-200 bg-gray-100 px-3.5 py-2.5 text-xs text-gray-500 cursor-not-allowed">
                     </div>
 
@@ -344,9 +345,13 @@
                             <option value="">-- Pilih Faktur --</option>
                             @if(isset($allFakturs) && $allFakturs->count() > 0)
                                 @foreach($allFakturs as $detail)
-                                    <option value="{{ $detail->id }}" data-creditor="{{ $detail->creditor_code }}">Faktur:
-                                        {{ $detail->invoice_number ?: $detail->receiving_details_code }}
-                                        ({{ $detail->sp_code ?? 'Belum Disimpan' }})</option>
+                                    <option value="{{ $detail->id }}" 
+                                        data-creditor="{{ $detail->creditor_code }}"
+                                        data-code="{{ $detail->receiving_details_code }}"
+                                        data-invoice="{{ $detail->invoice_number }}">
+                                        Faktur: {{ $detail->invoice_number ?: $detail->receiving_details_code }}
+                                        ({{ $detail->receiving_details_code ?: ($detail->sp_code ?? 'Belum Disimpan') }})
+                                    </option>
                                 @endforeach
                             @endif
                         </select>
@@ -870,6 +875,7 @@
         let orderItemsTable;
         let selectedRowData = null;
         let selectedRowIndex = null;
+        let hasSavedDraft = {{ !empty($hasSavedBatches) ? 'true' : 'false' }};
 
         // Functions
         function resetInputs() {
@@ -943,7 +949,15 @@
                 }
             });
             if (lastVisibleOptionVal !== '') {
-                $printFaktur.val(lastVisibleOptionVal);
+                $printFaktur.val(lastVisibleOptionVal).trigger('change');
+            }
+        });
+
+        $('#print_faktur').on('change', function () {
+            const selectedOpt = $(this).find('option:selected');
+            const invNum = selectedOpt.data('invoice');
+            if (invNum) {
+                $('#invoice_number').val(invNum);
             }
         });
 
@@ -1753,6 +1767,7 @@
             })
                 .then(res => {
                     if (res.data.success) {
+                        hasSavedDraft = true;
                         iziToast.success({
                             title: 'Berhasil',
                             message: res.data.message ?? 'Item Tersimpan',
@@ -2029,7 +2044,6 @@
         });
 
         function printReceiving() {
-
             if (!receiving_id) {
                 iziToast.error({
                     title: 'Error',
@@ -2039,14 +2053,21 @@
                 return;
             }
 
-            const url = `/receiving/print/${receiving_id}`;
+            // Validasi ketat: Cegah cetak jika belum ada faktur/barang yang di "Simpan Draft"
+            if (!hasSavedDraft) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Peringatan',
+                    text: 'Belum ada faktur atau barang yang di "Simpan Draft". Silakan klik tombol "Simpan Draft" terlebih dahulu sebelum mencetak.',
+                    confirmButtonColor: '#2563eb',
+                    confirmButtonText: 'Mengerti'
+                });
+                return;
+            }
 
+            const printTarget = (typeof ordersid !== 'undefined' && ordersid) ? ordersid : receiving_id;
+            const url = `/receiving/print/${printTarget}`;
             window.open(url, '_blank');
-            setTimeout(() => {
-                window.location.reload();
-
-            }, 300);
-
         }
     </script>
 

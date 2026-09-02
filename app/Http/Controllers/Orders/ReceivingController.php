@@ -56,7 +56,11 @@ class ReceivingController extends Controller
                 ->where('status', '!=', 2)  // not yet completed order
                 ->first();
 
-            return view('orders.receiving', compact('order_code', 'transaction', 'now', 'order_exist', 'receiving_id', 'receiving_code', 'order_id', 'd_price', 'd_ppn', 'd_total', 'datenow', 'creditorOption', 'allFakturs'));
+            $hasSavedBatches = \App\Models\ReceivingItems::whereHas('receiving_details', fn($q) => $q->where('receiving_id', $transaction->id))
+                ->whereNotNull('batches_id')
+                ->exists();
+
+            return view('orders.receiving', compact('order_code', 'transaction', 'now', 'order_exist', 'receiving_id', 'receiving_code', 'order_id', 'd_price', 'd_ppn', 'd_total', 'datenow', 'creditorOption', 'allFakturs', 'hasSavedBatches'));
         } else {
             $receiving_code = $this->generateReceivingCode();
 
@@ -1453,10 +1457,23 @@ class ReceivingController extends Controller
         $getOrder = Order::findOrFail($id);
         $orderPharmacyId = $getOrder->pharmacy_id;
 
-        $transaction = Receiving::with('receiving_details')->where('status', 0)->where(
-            'pharmacy_id',
-            $orderPharmacyId
-        )->first();
+        $transaction = null;
+        if ($getOrder->receiving_id) {
+            $transaction = Receiving::with('receiving_details')
+                ->where('status', 0)
+                ->where('pharmacy_id', $orderPharmacyId)
+                ->find($getOrder->receiving_id);
+        }
+
+        if (!$transaction) {
+            $transaction = Receiving::with('receiving_details')
+                ->where('status', 0)
+                ->where('pharmacy_id', $orderPharmacyId)
+                ->whereHas('receiving_details.receiving_items.order_items', function ($q) use ($id) {
+                    $q->where('order_id', $id);
+                })
+                ->first();
+        }
 
         if ($getOrder->status == 3) {
             return redirect()->route('receiving.index')->with('success', 'Pesanan ini sudah selesai diterima.');
@@ -1478,20 +1495,28 @@ class ReceivingController extends Controller
             ->unique('code')
             ->values();
 
-        $allFakturs = collect();
-        if ($transaction && $transaction->receiving_details) {
-            $allFakturs = $allFakturs->merge($transaction->receiving_details);
-        }
-        $historicalFakturs = \App\Models\ReceivingDetails::whereHas('receiving_items.order_items', function ($q) use ($id) {
+        $allFakturs = \App\Models\ReceivingDetails::whereHas('receiving_items.order_items', function ($q) use ($id) {
             $q->where('order_id', $id);
-        })->get();
-        $allFakturs = $allFakturs->merge($historicalFakturs)->unique('id')->values();
+        })
+            ->when($transaction, function ($q) use ($transaction) {
+                $q->orWhere('receiving_id', $transaction->id);
+            })
+            ->get()
+            ->unique('id')
+            ->values();
+
+        $pId = $orderPharmacyId ?? getPurchasingPharmacyId();
+        foreach ($allFakturs as $faktur) {
+            if (empty($faktur->receiving_details_code)) {
+                $faktur->receiving_details_code = $this->generateReceivingDetailsCode($pId);
+                $faktur->save();
+            }
+        }
 
         if (!$transaction) {
             $receiving_code = $this->generateReceivingCode();
 
             $transaction = Receiving::create([
-                'order_id' => $id,
                 'creditors_id' => NULL,
                 'pharmacy_id' => $orderPharmacyId,
                 'code' => $receiving_code,
@@ -1691,9 +1716,16 @@ class ReceivingController extends Controller
                 $d_total += $detailGrandTotal;
             }
 
+            if (empty($details->receiving_details_code)) {
+                $pId = $receiving->pharmacy_id ?? getPurchasingPharmacyId();
+                $details->receiving_details_code = $this->generateReceivingDetailsCode($pId);
+                $details->save();
+            }
+
             return response()->json([
                 'success' => true,
                 'receiving' => $receiving,
+                'receiving_details_code' => $details->receiving_details_code,
                 'item' => $item,
                 'summary' => [
                     'price_item' => $d_price,
@@ -1713,10 +1745,80 @@ class ReceivingController extends Controller
 
     public function printReceiving($id)
     {
-        $receiving = Receiving::with([
-            'receiving_details.receiving_items.order_items.medicines',
-            'receiving_details.creditor'
-        ])->findOrFail($id);
+        $order = Order::with('pharmacy')->find($id);
+        $receiving = null;
+
+        if ($order) {
+            $orderId = $order->id;
+            if ($order->receiving_id) {
+                $receiving = Receiving::with('pharmacy')->find($order->receiving_id);
+            }
+        } else {
+            $receiving = Receiving::with('pharmacy')->find($id);
+            if ($receiving) {
+                $order = Order::where('receiving_id', $receiving->id)->first();
+                if (!$order) {
+                    $order = Order::whereHas('order_items.receivingItems.receiving_details', function ($q) use ($receiving) {
+                        $q->where('receiving_id', $receiving->id);
+                    })->first();
+                }
+            }
+            $orderId = $order ? $order->id : null;
+        }
+
+        if (!$receiving && !$order) {
+            abort(404, 'Data penerimaan tidak ditemukan.');
+        }
+
+        if (!$receiving && $order) {
+            $receiving = new Receiving([
+                'pharmacy_id' => $order->pharmacy_id,
+                'code' => $order->code,
+            ]);
+            $receiving->setRelation('pharmacy', $order->pharmacy);
+        }
+
+        if ($orderId) {
+            // Strictly get receiving details and items that belong to THIS ORDER only
+            $allDetails = ReceivingDetails::whereHas('receiving_items.order_items', function ($sub) use ($orderId) {
+                $sub->where('order_id', $orderId);
+            })
+                ->with([
+                    'receiving_items' => function ($q) use ($orderId) {
+                        $q->whereHas('order_items', function ($sub) use ($orderId) {
+                            $sub->where('order_id', $orderId);
+                        })->whereNotNull('batches_id');
+                    },
+                    'receiving_items.order_items.medicines',
+                    'creditor'
+                ])
+                ->get()
+                ->filter(fn($d) => $d->receiving_items->isNotEmpty())
+                ->unique('id')
+                ->values();
+
+            $receiving->setRelation('receiving_details', $allDetails);
+        } else {
+            $allDetails = $receiving->receiving_details()
+                ->with([
+                    'receiving_items.order_items.medicines',
+                    'creditor'
+                ])
+                ->get();
+            $receiving->setRelation('receiving_details', $allDetails);
+        }
+
+        if ($receiving->receiving_details->isEmpty() || $receiving->receiving_details->flatMap->receiving_items->isEmpty()) {
+            return redirect()->back()->with('warning', 'Belum ada faktur atau barang yang tersimpan dalam draft penerimaan ini.');
+        }
+
+        $pId = $receiving->pharmacy_id ?? getPurchasingPharmacyId();
+        foreach ($receiving->receiving_details as $detail) {
+            if (empty($detail->receiving_details_code)) {
+                $detail->receiving_details_code = $this->generateReceivingDetailsCode($pId);
+                $detail->save();
+            }
+        }
 
         $totalDiscount = 0;
         $extraDiscount = 0;
@@ -1813,7 +1915,6 @@ class ReceivingController extends Controller
 
             // Generate Nomor Terima (NT) and SP Code for any ReceivingDetails on this order that doesn't have one yet
             $allDetails = ReceivingDetails::whereHas('receiving_items.order_items', fn($q) => $q->where('order_id', $order->id))
-                ->orWhere('receiving_id', $request->receivingid)
                 ->get();
 
             foreach ($allDetails as $details) {
@@ -2033,9 +2134,12 @@ class ReceivingController extends Controller
                 ], 422);
             }
 
-            // Lock and complete the Order & its items
+            // Lock and complete the Order
             $order->update(['status' => 3]);
-            OrderItems::where('order_id', $order->id)->update(['status' => 2]);
+            $receivedItemIds = $order->order_items->filter(fn($oi) => $oi->receivingItems->whereNotNull('batches_id')->isNotEmpty())->pluck('id');
+            if ($receivedItemIds->isNotEmpty()) {
+                OrderItems::whereIn('id', $receivedItemIds)->update(['status' => 2]);
+            }
 
             // Lock and complete all associated Receiving headers for this order
             if ($order->receiving_id) {

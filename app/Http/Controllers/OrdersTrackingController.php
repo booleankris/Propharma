@@ -20,25 +20,28 @@ class OrdersTrackingController extends Controller
             ->join('orders', 'orders.id', '=', 'order_items.order_id')
             ->select('order_items.*')
             ->when($request->creditor_code, function ($q) use ($request) {
-                $q->where('order_items.creditor_code', $request->creditor_code);
+                $q->where(function ($sub) use ($request) {
+                    $sub->where('order_items.creditor_code', $request->creditor_code)
+                        ->orWhere('order_items.branch_creditor_code', $request->creditor_code);
+                });
+            })
+            ->when($request->order_code, function ($q) use ($request) {
+                $q->where('orders.code', $request->order_code);
+            })
+            ->when($request->order_id, function ($q) use ($request) {
+                $q->where('order_items.order_id', $request->order_id);
             })
             ->when($request->filled('status'), function ($q) use ($request) {
                 if ($request->status == '2') {
-                    // Diterima: status item = 2, ATAU punya receiving_items dengan batch, ATAU order sudah diterima/selesai (status 2/3)
-                    $q->where(function ($sq) {
-                        $sq->where('order_items.status', 2)
-                            ->orWhereHas('receivingItems', function ($rq) {
-                                $rq->whereNotNull('batches_id');
-                            })
-                            ->orWhereIn('orders.status', [2, 3]);
+                    // Diterima: Item ini memiliki catatan penerimaan dengan batch yang tersimpan di stok
+                    $q->whereHas('receivingItems', function ($rq) {
+                        $rq->whereNotNull('batches_id');
                     });
                 } elseif ($request->status == '0') {
-                    // Dipesan: status item != 2, BELUM punya receiving_items dengan batch, dan order masih status 1 (dipesan)
-                    $q->where('order_items.status', '!=', 2)
-                        ->whereDoesntHave('receivingItems', function ($rq) {
-                            $rq->whereNotNull('batches_id');
-                        })
-                        ->where('orders.status', 1);
+                    // Dipesan (Belum Diterima): Item ini BELUM memiliki catatan penerimaan batch di stok
+                    $q->whereDoesntHave('receivingItems', function ($rq) {
+                        $rq->whereNotNull('batches_id');
+                    });
                 } else {
                     $q->where('order_items.status', $request->status);
                 }
@@ -49,9 +52,7 @@ class OrdersTrackingController extends Controller
                     $request->date_to . ' 23:59:59',
                 ]);
             })
-            ->whereHas('orders', function ($d) {
-                $d->where('pharmacy_id', getPurchasingPharmacyId());
-            })
+            ->where('orders.pharmacy_id', getPurchasingPharmacyId())
             ->orderBy('orders.updated_at', 'desc');
 
         return DataTables::of($query)
@@ -61,18 +62,14 @@ class OrdersTrackingController extends Controller
             ->addColumn('medicine_name', fn($row) => $row->medicines->name ?? '-')
             ->addColumn('creditor_name', fn($row) => $row->creditors->name ?? '-')
             ->addColumn('status_label', function ($row) {
-                $isReceived = ($row->status == 2)
-                    || ($row->receivingItems && $row->receivingItems->whereNotNull('batches_id')->isNotEmpty())
-                    || ($row->orders && in_array($row->orders->status, [2, 3]));
+                $isReceived = $row->receivingItems && $row->receivingItems->whereNotNull('batches_id')->isNotEmpty();
 
                 return $isReceived
                     ? '<span class="tp-badge received"><span class="dot"></span>Diterima</span>'
                     : '<span class="tp-badge pending"><span class="dot"></span>Dipesan</span>';
             })
             ->addColumn('action', function ($row) {
-                $isReceived = ($row->status == 2)
-                    || ($row->receivingItems && $row->receivingItems->whereNotNull('batches_id')->isNotEmpty())
-                    || ($row->orders && in_array($row->orders->status, [2, 3]));
+                $isReceived = $row->receivingItems && $row->receivingItems->whereNotNull('batches_id')->isNotEmpty();
 
                 $url = route('receiving.receive', $row->order_id);
                 if ($isReceived) {
