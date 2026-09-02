@@ -58,24 +58,14 @@ class ReceivingController extends Controller
 
             return view('orders.receiving', compact('order_code', 'transaction', 'now', 'order_exist', 'receiving_id', 'receiving_code', 'order_id', 'd_price', 'd_ppn', 'd_total', 'datenow', 'creditorOption', 'allFakturs'));
         } else {
-            $year = now()->format('y');
-            $month = now()->format('m');
-            $prefix = $year . $month . 'RE';
-
-            $last = Receiving::where('pharmacy_id', getActivePharmacyId())
-                ->where('code', 'like', $prefix . '%')
-                ->orderBy('code', 'desc')
-                ->first();
-
-            $nextNumber = $last ? intval(substr($last->code, -4)) + 1 : 0;
-            $serial = str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+            $receiving_code = $this->generateReceivingCode();
 
             try {
                 DB::beginTransaction();
 
                 $transaction = Receiving::create([
                     'pharmacy_id' => getActivePharmacyId(),
-                    'code' => $prefix . $serial,
+                    'code' => $receiving_code,
                     'date' => $now,
                     'status' => 0,
                 ]);
@@ -970,26 +960,27 @@ class ReceivingController extends Controller
             ->make(true);
     }
 
-    function generateReceivingCode()
+    public function generateReceivingCode()
     {
-        $now = Carbon::now();
-
-        $year = $now->format('y');
-        $month = $now->format('m');
-        $prefix = "{$year}{$month}OI";
+        $year = now()->format('y');
+        $month = now()->format('m');
+        $prefix = $year . $month . 'RE';
 
         $lastCode = Receiving::where('code', 'like', "{$prefix}%")
             ->orderBy('code', 'desc')
             ->value('code');
 
-        if ($lastCode) {
-            $lastNumber = (int) substr($lastCode, -4);
-            $nextNumber = $lastNumber + 1;
-        } else {
-            $nextNumber = 1;
+        $nextNumber = $lastCode ? ((int) substr($lastCode, -4) + 1) : 1;
+        $serial = str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+        $code = $prefix . $serial;
+
+        while (Receiving::where('code', $code)->exists()) {
+            $nextNumber++;
+            $serial = str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+            $code = $prefix . $serial;
         }
 
-        return $prefix . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+        return $code;
     }
 
     function generateReceivingDetailsCode($pharmacy_id)
@@ -1343,17 +1334,7 @@ class ReceivingController extends Controller
         $allFakturs = $allFakturs->merge($historicalFakturs)->unique('id')->values();
 
         if (!$transaction) {
-            $year = now()->format('y');
-            $month = now()->format('m');
-            $prefix = $year . $month . 'RE';
-            $last = Receiving::where('pharmacy_id', $orderPharmacyId)
-                ->where('code', 'like', $prefix . '%')
-                ->orderBy('code', 'desc')
-                ->first();
-
-            $nextNumber = $last ? (intval(substr($last->code, -4)) + 1) : 1;
-            $serial = str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
-            $receiving_code = $prefix . $serial;
+            $receiving_code = $this->generateReceivingCode();
 
             $transaction = Receiving::create([
                 'order_id' => $id,
