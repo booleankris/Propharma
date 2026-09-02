@@ -98,23 +98,29 @@ class Medicines extends Model
     }
     public static function generateCode()
     {
-        $last = self::orderBy('id', 'desc')->first();
+        $last = self::whereRaw("code REGEXP '^[0-9]{9}$'")
+            ->orderBy('code', 'desc')
+            ->first();
 
         if (!$last || !$last->code) {
-            return '054000000';
-        }
-
-        $prefix = substr($last->code, 0, 4);
-        $number = (int) substr($last->code, 4);
-
-        if ($number >= 99999) {
-            $prefix = str_pad(((int)$prefix) + 1, 4, '0', STR_PAD_LEFT);
+            $prefix = '0540';
             $number = 0;
         } else {
-            $number++;
+            $prefix = substr($last->code, 0, 4);
+            $number = (int) substr($last->code, 4);
         }
 
-        return $prefix . str_pad($number, 5, '0', STR_PAD_LEFT);
+        do {
+            if ($number >= 99999) {
+                $prefix = str_pad(((int) $prefix) + 1, 4, '0', STR_PAD_LEFT);
+                $number = 1;
+            } else {
+                $number++;
+            }
+            $code = $prefix . str_pad($number, 5, '0', STR_PAD_LEFT);
+        } while (self::where('code', $code)->exists());
+
+        return $code;
     }
     public function medicine_transactions()
     {

@@ -37,23 +37,7 @@ class ReturController extends Controller
 
     public static function generateMedicineCode()
     {
-        $last = self::orderBy('id', 'desc')->first();
-
-        if (!$last || !$last->code) {
-            return '054000000';
-        }
-
-        $prefix = substr($last->code, 0, 4);
-        $number = (int) substr($last->code, 4);
-
-        if ($number >= 99999) {
-            $prefix = str_pad(((int) $prefix) + 1, 4, '0', STR_PAD_LEFT);
-            $number = 0;
-        } else {
-            $number++;
-        }
-
-        return $prefix . str_pad($number, 5, '0', STR_PAD_LEFT);
+        return \App\Models\Medicines::generateCode();
     }
     public function returdata(Request $request)
     {

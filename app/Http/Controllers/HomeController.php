@@ -41,37 +41,56 @@ class HomeController extends Controller
 
         // Dashboard
         $pharmacyId = getActivePharmacyId();
+        $startToday = Carbon::today()->startOfDay();
+        $endToday = Carbon::today()->endOfDay();
+        $startMonth = Carbon::now()->startOfMonth();
+        $endMonth = Carbon::now()->endOfMonth();
 
         if (isOnlineRole()) {
-            $userRole = auth()->user()->getRoleNames()->first();
-            $applyRoleFilter = function ($q) use ($userRole) {
-                $q->role($userRole);
-            };
+            $user = auth()->user();
+            $onlineRoles = array_values(array_intersect($user->getRoleNames()->toArray(), ['Online', 'Online Grab', 'Online Shopee', 'Digital']));
+            if (empty($onlineRoles)) {
+                $onlineRoles = ['Online', 'Online Grab', 'Online Shopee', 'Digital'];
+            }
 
-            $total_sales = MedicineTransactions::where('status', 1)
+            $baseQuery = MedicineTransactions::where('status', 1)
                 ->where('pharmacy_id', $pharmacyId)
-                ->where(function ($query) use ($applyRoleFilter) {
-                    $query->whereHas('user', $applyRoleFilter)
-                        ->orWhereHas('transactions.user', $applyRoleFilter);
-                })
-                ->sum('subtotal');
-
-            $qty_sales = MedicineTransactions::where('status', 1)
-                ->where('pharmacy_id', $pharmacyId)
-                ->where(function ($query) use ($applyRoleFilter) {
-                    $query->whereHas('user', $applyRoleFilter)
-                        ->orWhereHas('transactions.user', $applyRoleFilter);
-                })
-                ->count('id');
+                ->where(function ($query) use ($onlineRoles, $user) {
+                    $query->where('user_id', $user->id)
+                        ->orWhereHas('user', function ($q) use ($onlineRoles) {
+                            $q->whereHas('roles', function ($rq) use ($onlineRoles) {
+                                $rq->whereIn('name', $onlineRoles);
+                            });
+                        })
+                        ->orWhereHas('transactions.user', function ($q) use ($onlineRoles) {
+                            $q->whereHas('roles', function ($rq) use ($onlineRoles) {
+                                $rq->whereIn('name', $onlineRoles);
+                            });
+                        });
+                });
         } else {
-            $total_sales = MedicineTransactions::where('status', 1)
-                ->where('pharmacy_id', $pharmacyId)
-                ->sum('subtotal');
-
-            $qty_sales = MedicineTransactions::where('status', 1)
-                ->where('pharmacy_id', $pharmacyId)
-                ->count('id');
+            $baseQuery = MedicineTransactions::where('status', 1)
+                ->where('pharmacy_id', $pharmacyId);
         }
+
+        $total_sales = (clone $baseQuery)->sum('subtotal');
+        $qty_sales = (clone $baseQuery)->count('id');
+
+        // Tangkap transaksi selesai baik berdasarkan updated_at (waktu checkout) maupun created_at
+        $today_sales = (clone $baseQuery)->where(function ($q) use ($startToday, $endToday) {
+            $q->whereBetween('updated_at', [$startToday, $endToday])
+              ->orWhereBetween('created_at', [$startToday, $endToday]);
+        })->sum('subtotal');
+
+        $today_qty_sales = (clone $baseQuery)->where(function ($q) use ($startToday, $endToday) {
+            $q->whereBetween('updated_at', [$startToday, $endToday])
+              ->orWhereBetween('created_at', [$startToday, $endToday]);
+        })->count('id');
+
+        $month_sales = (clone $baseQuery)->where(function ($q) use ($startMonth, $endMonth) {
+            $q->whereBetween('updated_at', [$startMonth, $endMonth])
+              ->orWhereBetween('created_at', [$startMonth, $endMonth]);
+        })->sum('subtotal');
 
         $total_orders = OrderItems::whereHas('orders', function ($query) use ($pharmacyId) {
             $query->where('status', 2)->where('pharmacy_id', $pharmacyId);
@@ -79,6 +98,8 @@ class HomeController extends Controller
 
         $total_reject = Reject::sum('total');
 
+        $today_sales_rp = formatRupiah($today_sales);
+        $month_sales_rp = formatRupiah($month_sales);
         $total_sales_rp = formatRupiah($total_sales);
         $total_orders_rp = formatRupiah($total_orders);
         $total_reject_rp = formatRupiah($total_reject);
@@ -86,7 +107,16 @@ class HomeController extends Controller
         // 5 barang dengan ED terdekat
         $nearExpiry = $this->queryNearExpiry()->take(5);
 
-        return view('kasir.home', compact('total_sales_rp', 'total_orders_rp', 'total_reject_rp', 'nearExpiry', 'qty_sales'));
+        return view('kasir.home', compact(
+            'today_sales_rp',
+            'today_qty_sales',
+            'month_sales_rp',
+            'total_sales_rp',
+            'total_orders_rp',
+            'total_reject_rp',
+            'nearExpiry',
+            'qty_sales'
+        ));
     }
     public function nearExpiry(Request $request)
     {
