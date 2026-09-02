@@ -349,7 +349,7 @@
                                 <td style="text-align:center;">{{ $index + 1 }}</td>
                                 <td style="text-align:left;">{{ $row->medicines->name ?? '-' }}</td>
                                 <td style="text-align:center;">
-                                    {{ optional($row->medicines->composition)->name ?? '-' }}
+                                    {{ optional($row->medicines->component)->name ?? '-' }}
                                 </td>
                                 <td style="text-align:center;">{{ $row->medicines->packaging ?? '-' }}</td>
                                 <td style="text-align:center;">{{ $row->quantity }}
