@@ -1386,8 +1386,30 @@
         }
 
         function completeOrder() {
+            Swal.fire({
+                title: 'Konfirmasi Simpan Pesanan',
+                text: 'Apakah Anda yakin ingin menyimpan dan menyelesaikan pesanan ini?',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#2563eb',
+                cancelButtonColor: '#64748b',
+                confirmButtonText: 'Ya, Simpan',
+                cancelButtonText: 'Batal',
+                reverseButtons: true
+            }).then((result) => {
+                if (!result.isConfirmed) return;
 
-            axios.post("{{ route('orders.completeOrder') }}", {
+                Swal.fire({
+                    title: 'Menyimpan...',
+                    text: 'Sedang memproses pesanan...',
+                    allowOutsideClick: false,
+                    allowEscapeKey: false,
+                    didOpen: () => {
+                        Swal.showLoading();
+                    }
+                });
+
+                axios.post("{{ route('orders.completeOrder') }}", {
                     order_id: orderid,
                 }, {
                     headers: {
@@ -1398,28 +1420,24 @@
                 }).then(res => {
                     const data = res.data;
 
-                    // SweetAlert
                     Swal.fire({
-                        icon: data.status, // success or error
+                        icon: data.status,
                         title: data.status === 'success' ? 'Berhasil' : 'Gagal',
                         text: data.message,
-                        confirmButtonText: 'OK'
+                        confirmButtonText: 'OK',
+                        confirmButtonColor: '#2563eb'
                     }).then(() => {
                         if (data.redirect) {
-                            window.location.href = data.redirect; // redirect after OK
+                            window.location.href = data.redirect;
                         } else {
-                            // optional fallback: reload table
                             orderItemsTable.ajax.reload(null, false);
                         }
 
-                        // reset inputs only if needed
                         resetInputs();
                         selectedRowData = null;
                         selectedRowIndex = null;
                     });
-
-                })
-                .catch(err => {
+                }).catch(err => {
                     let message = 'Terjadi kesalahan sistem!';
 
                     if (err.response) {
@@ -1433,10 +1451,11 @@
                     Swal.fire({
                         icon: 'error',
                         title: 'Gagal',
-                        text: message
+                        text: message,
+                        confirmButtonColor: '#2563eb'
                     });
                 });
-
+            });
         }
 
         function validateOrderCreditorsBeforePrint() {
