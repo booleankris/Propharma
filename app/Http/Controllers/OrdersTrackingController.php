@@ -32,7 +32,7 @@ class OrdersTrackingController extends Controller
                 ]);
             })
             ->whereHas('orders', function ($d) {
-                $d->where('pharmacy_id', getActivePharmacyId());
+                $d->where('pharmacy_id', getPurchasingPharmacyId());
             })
             ->orderBy('orders.updated_at', 'desc');
 
