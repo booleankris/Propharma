@@ -79,10 +79,9 @@ class ReceivingController extends Controller
         }
     }
 
-    function generateItemsLogCode()
+    public function generateItemsLogCode()
     {
         $now = Carbon::now();
-
         $year = $now->format('y');
         $month = $now->format('m');
         $prefix = "{$year}{$month}LOG-";
@@ -91,14 +90,17 @@ class ReceivingController extends Controller
             ->orderBy('code', 'desc')
             ->value('code');
 
-        if ($lastCode) {
-            $lastNumber = (int) substr($lastCode, -4);
-            $nextNumber = $lastNumber + 1;
-        } else {
-            $nextNumber = 1;
+        $nextNumber = $lastCode ? ((int) substr($lastCode, -4) + 1) : 1;
+        $serial = str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+        $code = $prefix . $serial;
+
+        while (ItemsLog::where('code', $code)->exists()) {
+            $nextNumber++;
+            $serial = str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+            $code = $prefix . $serial;
         }
 
-        return $prefix . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+        return $code;
     }
 
     public function searchBPBA(Request $request)
@@ -983,7 +985,7 @@ class ReceivingController extends Controller
         return $code;
     }
 
-    function generateReceivingDetailsCode($pharmacy_id)
+    public function generateReceivingDetailsCode($pharmacy_id)
     {
         $now = Carbon::now();
         $year = $now->format('y');
@@ -997,14 +999,21 @@ class ReceivingController extends Controller
             ->orderBy('receiving_details_code', 'desc')
             ->value('receiving_details_code');
 
-        if ($lastCode) {
-            $lastNumber = (int) substr($lastCode, -4);
-            $nextNumber = $lastNumber + 1;
-        } else {
-            $nextNumber = 1;
+        $nextNumber = $lastCode ? ((int) substr($lastCode, -4) + 1) : 1;
+        $serial = str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+        $code = $prefix . $serial;
+
+        $existsInPharmacy = fn($c) => ReceivingDetails::whereHas('receiving', function ($q) use ($pharmacy_id) {
+            $q->where('pharmacy_id', $pharmacy_id);
+        })->where('receiving_details_code', $c)->exists();
+
+        while ($existsInPharmacy($code)) {
+            $nextNumber++;
+            $serial = str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+            $code = $prefix . $serial;
         }
 
-        return $prefix . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+        return $code;
     }
 
     public function updateReceivingItem(Request $request, $id)
@@ -1606,26 +1615,28 @@ class ReceivingController extends Controller
         ));
     }
 
-    function generateTransfersCode()
+    public function generateTransfersCode()
     {
         $now = Carbon::now();
-
         $year = $now->format('y');
         $month = $now->format('m');
         $prefix = "{$year}{$month}MUT";
 
-        $lastCode = Transfers::where('code', 'like', "{$prefix}%")
+        $lastCode = MedicineTransfers::where('code', 'like', "{$prefix}%")
             ->orderBy('code', 'desc')
             ->value('code');
 
-        if ($lastCode) {
-            $lastNumber = (int) substr($lastCode, -4);
-            $nextNumber = $lastNumber + 1;
-        } else {
-            $nextNumber = 1;
+        $nextNumber = $lastCode ? ((int) substr($lastCode, -4) + 1) : 1;
+        $serial = str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+        $code = $prefix . $serial;
+
+        while (MedicineTransfers::where('code', $code)->exists()) {
+            $nextNumber++;
+            $serial = str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+            $code = $prefix . $serial;
         }
 
-        return $prefix . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+        return $code;
     }
 
     public function saveOrder(Request $request)
@@ -1716,7 +1727,11 @@ class ReceivingController extends Controller
                 ]);
             }
 
-            foreach ($receivingItems as $item) {
+            $baseLogCode = $this->generateItemsLogCode();
+            $logPrefix = substr($baseLogCode, 0, -4);
+            $currentLogNum = (int) substr($baseLogCode, -4);
+
+            foreach ($receivingItems as $index => $item) {
                 $medicineId = $item->order_items->medicine_id;
                 $medicine = $medicines->get($medicineId);
 
@@ -1765,7 +1780,7 @@ class ReceivingController extends Controller
 
                 $itemsLogInserts[] = [
                     'transaction_code' => $receiving->code,
-                    'code' => $this->generateItemsLogCode(),
+                    'code' => $logPrefix . str_pad($currentLogNum + $index, 4, '0', STR_PAD_LEFT),
                     'type' => 'OR',
                     'medicine_id' => $medicineId,
                     'qty' => $actualStockQty,

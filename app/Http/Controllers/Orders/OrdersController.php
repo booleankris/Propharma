@@ -192,6 +192,12 @@ class OrdersController extends Controller
         $serial = str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
         $transactionCode = $prefix . $serial;
 
+        while (Order::where('code', $transactionCode)->exists()) {
+            $nextNumber++;
+            $serial = str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+            $transactionCode = $prefix . $serial;
+        }
+
         return Order::create([
             'pharmacy_id' => $pharmacyId,
             'user_id' => auth()->user()->id,
