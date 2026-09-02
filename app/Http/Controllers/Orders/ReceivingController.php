@@ -366,7 +366,9 @@ class ReceivingController extends Controller
             }
             return 'REGULER';
         })->map(function ($perCreditor) {
-            return $perCreditor->groupBy('creditor_code');
+            return $perCreditor->groupBy('creditor_code')->sortBy(function ($items) {
+                return $items->first()->order_items_code ?? '';
+            });
         });
 
         $logoPath = $pharmacy->logo && file_exists(public_path('img/' . $pharmacy->logo))
@@ -446,7 +448,9 @@ class ReceivingController extends Controller
             }
             return 'REGULER';
         })->map(function ($perCreditor) {
-            return $perCreditor->groupBy('creditor_code');
+            return $perCreditor->groupBy('creditor_code')->sortBy(function ($items) {
+                return $items->first()->order_items_code ?? '';
+            });
         });
 
         $receivingDetail = \App\Models\ReceivingDetails::where('sp_code', $order->order_items->first()->order_items_code)
@@ -539,7 +543,9 @@ class ReceivingController extends Controller
             }
             return 'REGULER';
         })->map(function ($perCreditor) {
-            return $perCreditor->groupBy('creditor_code');
+            return $perCreditor->groupBy('creditor_code')->sortBy(function ($items) {
+                return $items->first()->order_items_code ?? '';
+            });
         });
 
         $logoPath = $pharmacy->logo && file_exists(public_path('img/' . $pharmacy->logo))
@@ -619,7 +625,9 @@ class ReceivingController extends Controller
             }
             return 'REGULER';
         })->map(function ($perCreditor) {
-            return $perCreditor->groupBy('creditor_code');
+            return $perCreditor->groupBy('creditor_code')->sortBy(function ($items) {
+                return $items->first()->order_items_code ?? '';
+            });
         });
 
         $logoPath = $pharmacy->logo && file_exists(public_path('img/' . $pharmacy->logo))

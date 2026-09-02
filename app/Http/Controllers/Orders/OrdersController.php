@@ -679,7 +679,9 @@ class OrdersController extends Controller
                 }
                 return 'REGULER';
             })->map(function ($perCreditor) {
-                return $perCreditor->groupBy('creditor_code');
+                return $perCreditor->groupBy('creditor_code')->sortBy(function ($items) {
+                    return $items->first()->order_items_code ?? '';
+                });
             });
 
             $logoPath = $pharmacy->logo && file_exists(public_path('img/' . $pharmacy->logo))
@@ -751,7 +753,9 @@ class OrdersController extends Controller
                 }
                 return $type;
             })->map(function ($perCreditor) {
-                return $perCreditor->groupBy('creditor_code') ?? 'Kosong';
+                return $perCreditor->groupBy('creditor_code')->sortBy(function ($items) {
+                    return $items->first()->order_items_code ?? '';
+                });
             });
 
             $text = SuratPesananFormatter::build(
