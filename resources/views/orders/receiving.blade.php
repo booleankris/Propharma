@@ -1785,38 +1785,63 @@
                 return;
             }
 
-            axios.post("{{ route('receiving.completeOrder') }}", {
-                receivingid: receiving_id,
-                orderid: ordersid,
-            }, {
-                headers: {
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-                }
-            })
-                .then(res => {
-                    if (res.data.success) {
-                        iziToast.success({
-                            title: 'Berhasil',
-                            message: res.data.message ?? 'Pesanan Berhasil Diselesaikan',
-                            position: 'topRight'
-                        });
+            Swal.fire({
+                title: 'Selesaikan Penerimaan Pesanan?',
+                text: 'Pastikan seluruh faktur dan barang sudah diperiksa dengan benar. Setelah diselesaikan, data penerimaan ini akan dikunci.',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#059669',
+                cancelButtonColor: '#64748b',
+                confirmButtonText: 'Ya, Selesaikan',
+                cancelButtonText: 'Batal',
+                reverseButtons: true
+            }).then((result) => {
+                if (!result.isConfirmed) return;
 
-                        setTimeout(() => {
-                            window.location.href = "{{ route('receiving.index') }}";
-                        }, 800);
+                Swal.fire({
+                    title: 'Menyelesaikan...',
+                    text: 'Sedang memproses penyelesaian penerimaan...',
+                    allowOutsideClick: false,
+                    allowEscapeKey: false,
+                    didOpen: () => {
+                        Swal.showLoading();
+                    }
+                });
+
+                axios.post("{{ route('receiving.completeOrder') }}", {
+                    receivingid: receiving_id,
+                    orderid: ordersid,
+                }, {
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
                     }
                 })
-                .catch(err => {
-                    let message = 'Gagal menyelesaikan pesanan';
-                    if (err.response?.data?.message) {
-                        message = err.response.data.message;
-                    }
-                    iziToast.error({
-                        title: 'Gagal',
-                        message: message,
-                        position: 'topRight'
+                    .then(res => {
+                        if (res.data.success) {
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Berhasil',
+                                text: res.data.message ?? 'Pesanan Berhasil Diselesaikan',
+                                confirmButtonColor: '#059669',
+                                confirmButtonText: 'OK'
+                            }).then(() => {
+                                window.location.href = "{{ route('receiving.index') }}";
+                            });
+                        }
+                    })
+                    .catch(err => {
+                        let message = 'Gagal menyelesaikan pesanan';
+                        if (err.response?.data?.message) {
+                            message = err.response.data.message;
+                        }
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Gagal',
+                            text: message,
+                            confirmButtonColor: '#059669'
+                        });
                     });
-                });
+            });
         }
 
         // Helper: disable inputs when order is locked (status = 3)
