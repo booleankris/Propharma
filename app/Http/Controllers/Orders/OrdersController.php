@@ -599,7 +599,7 @@ class OrdersController extends Controller
             $receiving_code = $prefix . $serial;
 
             $transaction = Receiving::create([
-                'pharmacy_id' => getActivePharmacyId(),
+                'pharmacy_id' => $order->pharmacy_id ?? getPurchasingPharmacyId(),
                 'code' => $receiving_code,
                 'date' => $now,
                 'status' => 0,

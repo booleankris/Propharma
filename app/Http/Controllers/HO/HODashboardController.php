@@ -92,7 +92,11 @@ class HODashboardController extends Controller
             ->whereHas('orders', function ($q) use ($startDate, $endDate, $pharmacyId, $applyPharmacy) {
                 $q->whereIn('status', [1, 2, 3])
                   ->whereBetween('created_at', [$startDate, $endDate]);
-                $applyPharmacy($q);
+                if ($pharmacyId === '1' || $pharmacyId == 1) {
+                    $q->whereIn('pharmacy_id', [9, 1]);
+                } else {
+                    $applyPharmacy($q);
+                }
             });
 
         $totalPurchaseAmount = (float) $purchasesQuery->sum('total');

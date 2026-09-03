@@ -311,13 +311,17 @@ class ParetoOrdersSheet extends ParetoBaseSheet
         return 'Pareto Pembelian';
     }
 
-    protected function fetchItems(): \Illuminate\Support\Collection
+    private function getOrdersQuery()
     {
+        $targetPharmacyIds = in_array((int) $this->pharmacyId, [1, 6, 9])
+            ? [9, 1]
+            : [(int) $this->pharmacyId];
+
         return DB::table('receiving_items')
             ->join('order_items', 'order_items.id', '=', 'receiving_items.order_items_id')
             ->join('medicines', 'medicines.id', '=', 'order_items.medicine_id')
             ->join('orders', 'orders.id', '=', 'order_items.order_id')
-            ->where('orders.pharmacy_id', $this->pharmacyId)
+            ->whereIn('orders.pharmacy_id', $targetPharmacyIds)
             ->whereBetween('receiving_items.created_at', [$this->startDate, $this->endDate])
             ->select([
                 'medicines.code as medicine_code',

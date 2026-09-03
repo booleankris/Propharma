@@ -23,10 +23,11 @@ class MedicineOrderHistoryController extends Controller
         $perPage = 10;
 
         $pharmacyId = getActivePharmacyId();
+        $targetPharmacyIds = in_array((int) $pharmacyId, [1, 6, 9]) ? [9, 1] : [(int) $pharmacyId];
 
         $query = Medicines::query()
-            ->whereHas('order_items.receivingItems.receiving_details.receiving', function ($q) use ($pharmacyId) {
-                $q->where('pharmacy_id', $pharmacyId);
+            ->whereHas('order_items.receivingItems.receiving_details.receiving', function ($q) use ($targetPharmacyIds) {
+                $q->whereIn('pharmacy_id', $targetPharmacyIds);
             })
             ->when($keyword, function ($q) use ($keyword) {
                 $q->where(function ($sub) use ($keyword) {
@@ -50,14 +51,17 @@ class MedicineOrderHistoryController extends Controller
 
     public function data(Request $request)
     {
+        $pharmacyId = getActivePharmacyId();
+        $targetPharmacyIds = in_array((int) $pharmacyId, [1, 6, 9]) ? [9, 1] : [(int) $pharmacyId];
+
         $items = ReceivingItems::query()
             ->with([
                 'order_items.medicines',
                 'receiving_details.creditor',
                 'receiving_details.receiving',
             ])
-            ->whereHas('receiving_details.receiving', function ($q) {
-                $q->where('pharmacy_id', getActivePharmacyId());
+            ->whereHas('receiving_details.receiving', function ($q) use ($targetPharmacyIds) {
+                $q->whereIn('pharmacy_id', $targetPharmacyIds);
             });
 
         // searchMedicine can be either a medicine id (selected from dropdown)

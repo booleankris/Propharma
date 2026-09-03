@@ -46,7 +46,10 @@ class OrdersExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
 
     private function buildBody(): array
     {
-        // Use DB join to avoid deep whereHas filtering issues
+        $targetPharmacyIds = in_array((int) $this->pharmacyId, [1, 6, 9])
+            ? [9, 1]
+            : [(int) $this->pharmacyId];
+
         $items = DB::table('receiving_items')
             ->join('receiving_details', 'receiving_details.id', '=', 'receiving_items.receiving_details_id')
             ->join('receiving', 'receiving.id', '=', 'receiving_details.receiving_id')
@@ -54,7 +57,7 @@ class OrdersExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
             ->join('medicines', 'medicines.id', '=', 'order_items.medicine_id')
             ->join('orders', 'orders.id', '=', 'order_items.order_id')
             ->leftJoin('creditors', 'creditors.code', '=', 'order_items.creditor_code')
-            ->where('receiving.pharmacy_id', $this->pharmacyId)
+            ->whereIn('receiving.pharmacy_id', $targetPharmacyIds)
             ->whereNotNull('receiving_items.batches_id')
             ->whereBetween('receiving_details.created_at', [$this->startDate, $this->endDate])
             ->select([

@@ -93,7 +93,8 @@ class HomeController extends Controller
         })->sum('subtotal');
 
         $total_orders = OrderItems::whereHas('orders', function ($query) use ($pharmacyId) {
-            $query->where('status', 2)->where('pharmacy_id', $pharmacyId);
+            $targetPharmacyIds = in_array((int) $pharmacyId, [1, 6, 9]) ? [9, 1] : [(int) $pharmacyId];
+            $query->where('status', 2)->whereIn('pharmacy_id', $targetPharmacyIds);
         })->sum('total');
 
         $total_reject = Reject::sum('total');

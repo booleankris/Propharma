@@ -52,16 +52,18 @@ class TransfersExport implements FromQuery, WithHeadings, WithMapping, ShouldAut
             });
         }
 
-        $pharmacyId = $this->pharmacyId;
-        
-        $query->where(function($q) use ($pharmacyId) {
-            $q->whereIn('medicine_transfer_id', function($sub1) use ($pharmacyId) {
+        $targetPharmacyIds = in_array((int) $this->pharmacyId, [1, 6, 9])
+            ? [9, 1, 6]
+            : [(int) $this->pharmacyId];
+
+        $query->where(function ($q) use ($targetPharmacyIds) {
+            $q->whereIn('medicine_transfer_id', function ($sub1) use ($targetPharmacyIds) {
                 $sub1->select('id')->from('medicine_transfers')
-                     ->whereIn('user_id', function($sub2) use ($pharmacyId) {
-                         $sub2->select('id')->from('users')->where('pharmacy_id', $pharmacyId);
-                     });
-            })->orWhereIn('batches_id', function($sub3) use ($pharmacyId) {
-                $sub3->select('id')->from('batches')->where('pharmacy_id', $pharmacyId);
+                    ->whereIn('user_id', function ($sub2) use ($targetPharmacyIds) {
+                        $sub2->select('id')->from('users')->whereIn('pharmacy_id', $targetPharmacyIds);
+                    });
+            })->orWhereIn('batches_id', function ($sub3) use ($targetPharmacyIds) {
+                $sub3->select('id')->from('batches')->whereIn('pharmacy_id', $targetPharmacyIds);
             });
         });
 

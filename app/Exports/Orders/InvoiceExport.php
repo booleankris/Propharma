@@ -52,13 +52,17 @@ class InvoiceExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
     // ── Base query shared by both types ──────────────────────────────────────
     private function baseQuery()
     {
+        $targetPharmacyIds = in_array((int) $this->pharmacyId, [1, 6, 9])
+            ? [9, 1]
+            : [(int) $this->pharmacyId];
+
         return DB::table('receiving_items')
             ->join('receiving_details', 'receiving_details.id', '=', 'receiving_items.receiving_details_id')
             ->join('receiving', 'receiving.id', '=', 'receiving_details.receiving_id')
             ->join('order_items', 'order_items.id', '=', 'receiving_items.order_items_id')
             ->join('orders', 'orders.id', '=', 'order_items.order_id')
             ->leftJoin('creditors', 'creditors.code', '=', 'order_items.creditor_code')
-            ->where('receiving.pharmacy_id', $this->pharmacyId)
+            ->whereIn('receiving.pharmacy_id', $targetPharmacyIds)
             ->whereNotNull('receiving_items.batches_id')
             ->whereBetween('receiving_details.created_at', [$this->startDate, $this->endDate]);
     }

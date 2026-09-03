@@ -76,8 +76,8 @@ class SuppliesController extends Controller
             $pharmacyId = $isWarehouse ? 1 : $activePharmacyId;
             $canSeeWarehouse = canAccessWarehouseStock($activePharmacyId);
 
-            // Jika akun gudang PMI, sertakan pharmacy_id Gudang PMI (9) dan Apotek PMI (1)
-            $targetPharmacyIds = $isWarehouse
+            // Jika akun gudang PMI atau HO/PMI central, sertakan pharmacy_id Gudang PMI (9) dan Apotek PMI (1)
+            $targetPharmacyIds = ($isWarehouse || $canSeeWarehouse || in_array($activePharmacyId, [1, 6, 9]))
                 ? array_unique([$activePharmacyId, $warehouseId, 1])
                 : [$activePharmacyId];
 
@@ -760,7 +760,7 @@ class SuppliesController extends Controller
         if ($request->ajax()) {
             $activePharmacyId = getActivePharmacyId();
             $items = ItemsLog::with(['medicines', 'batches'])->whereHas('batches', function ($batch) use ($activePharmacyId) {
-                if (isWarehousePharmacy($activePharmacyId)) {
+                if (isWarehousePharmacy($activePharmacyId) || canAccessWarehouseStock($activePharmacyId) || in_array($activePharmacyId, [1, 6, 9])) {
                     $batch->whereIn('pharmacy_id', [getWarehousePharmacyId(), 1]);
                 } else {
                     $batch->where('pharmacy_id', $activePharmacyId);

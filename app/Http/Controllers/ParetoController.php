@@ -91,12 +91,13 @@ class ParetoController extends Controller
     public function ordersPareto(Request $request)
     {
         $pharmacyId = getActivePharmacyId();
+        $targetPharmacyIds = in_array((int) $pharmacyId, [1, 6, 9]) ? [9, 1] : [(int) $pharmacyId];
 
         $query = DB::table('receiving_items')
             ->join('order_items', 'order_items.id', '=', 'receiving_items.order_items_id')
             ->join('medicines', 'medicines.id', '=', 'order_items.medicine_id')
             ->join('orders', 'orders.id', '=', 'order_items.order_id')
-            ->where('orders.pharmacy_id', $pharmacyId)
+            ->whereIn('orders.pharmacy_id', $targetPharmacyIds)
             ->select([
                 'medicines.code   as medicine_code',
                 'medicines.name   as medicine_name',

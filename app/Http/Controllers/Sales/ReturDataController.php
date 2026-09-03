@@ -49,9 +49,10 @@ class ReturDataController extends Controller
 
             // Apply active pharmacy filter
             if ($pharmacyId) {
-                $sub->where(function ($q) use ($pharmacyId) {
+                $targetPharmacyIds = in_array((int) $pharmacyId, [1, 6, 9]) ? [9, 1] : [(int) $pharmacyId];
+                $sub->where(function ($q) use ($pharmacyId, $targetPharmacyIds) {
                     $q->where('medicine_transactions.pharmacy_id', $pharmacyId)
-                        ->orWhere('receiving.pharmacy_id', $pharmacyId);
+                        ->orWhereIn('receiving.pharmacy_id', $targetPharmacyIds);
                 });
             }
 

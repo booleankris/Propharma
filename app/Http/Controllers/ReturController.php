@@ -384,6 +384,8 @@ class ReturController extends Controller
     public function returOrderdata(Request $request)
     {
         $search = $request->search;
+        $pharmacyId = getActivePharmacyId();
+        $targetPharmacyIds = in_array((int) $pharmacyId, [1, 6, 9]) ? [9, 1] : [(int) $pharmacyId];
 
         $data = ReceivingDetails::query()
             ->with(['receiving', 'receiving_items.order_items.medicines', 'creditor'])
@@ -391,9 +393,9 @@ class ReturController extends Controller
                 $q->where('receiving_details_code', 'LIKE', "%{$search}%")
                     ->orWhere('invoice_number', 'LIKE', "%{$search}%");
             })
-            ->whereHas('receiving', function ($q) {
+            ->whereHas('receiving', function ($q) use ($targetPharmacyIds) {
                 $q->where('status', '>=', 1)
-                    ->where('pharmacy_id', getActivePharmacyId());
+                    ->whereIn('pharmacy_id', $targetPharmacyIds);
             })
             ->paginate(10);
 

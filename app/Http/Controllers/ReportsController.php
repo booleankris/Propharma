@@ -29,9 +29,23 @@ class ReportsController extends Controller
     // Report Data
     public function reports(Request $request)
     {
-        $activeId = getActivePharmacyId();
-        $pharmacy = Pharmacies::findOrFail($activeId);
+        $activeId = $request->filled('pharmacy_id') ? (int) $request->pharmacy_id : getActivePharmacyId();
         $report = $request->selectedReport;
+
+        // Untuk Laporan Pembelian & Faktur Pembelian:
+        // Pembelian dan penerimaan pusat dicatat di Gudang PMI (pharmacy_id = 9).
+        // Jika user HO atau activeId adalah 1 (Apotek PMI), 6 (HO), atau 9 (Gudang PMI),
+        // gunakan Gudang PMI (9) agar laporan tidak kosong.
+        if (in_array($report, ['Laporan Pembelian', 'Faktur Pembelian']) && !$request->filled('pharmacy_id')) {
+            $purchasingPharmacyId = getPurchasingPharmacyId();
+            if ($purchasingPharmacyId) {
+                $activeId = $purchasingPharmacyId;
+            } elseif (in_array($activeId, [1, 6, 9])) {
+                $activeId = getWarehousePharmacyId();
+            }
+        }
+
+        $pharmacy = Pharmacies::findOrFail($activeId);
 
         [$export, $filename] = $this->resolveReportExport($report, $request, $pharmacy);
 

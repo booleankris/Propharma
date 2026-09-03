@@ -55,7 +55,7 @@ class InitDummyStock extends Command
                 [
                     'medicine_id' => $m->id,
                     'pharmacy_id' => $pharmacyId,
-                    'name' => 'OPN-TEST',
+                    'name' => 'INITIAL_INSERT',
                 ],
                 [
                     'expired_date' => now()->addYears(2)->toDateString(),
