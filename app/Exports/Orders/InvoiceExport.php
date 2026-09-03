@@ -18,15 +18,17 @@ class InvoiceExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
     protected $startDate;
     protected $endDate;
     protected $selectedType;
+    protected $supplier;
  
     const PPN = 0.11;
  
-    public function __construct($pharmacyId, $startDate, $endDate, $selectedType = 'Detail')
+    public function __construct($pharmacyId, $startDate, $endDate, $selectedType = 'Detail', $supplier = null)
     {
         $this->pharmacyId   = $pharmacyId;
         $this->startDate    = Carbon::parse($startDate)->startOfDay();
         $this->endDate      = Carbon::parse($endDate)->endOfDay();
         $this->selectedType = $selectedType;
+        $this->supplier     = $supplier;
     }
  
     public function array(): array
@@ -56,7 +58,7 @@ class InvoiceExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
             ? [9, 1]
             : [(int) $this->pharmacyId];
 
-        return DB::table('receiving_items')
+        $query = DB::table('receiving_items')
             ->join('receiving_details', 'receiving_details.id', '=', 'receiving_items.receiving_details_id')
             ->join('receiving', 'receiving.id', '=', 'receiving_details.receiving_id')
             ->join('order_items', 'order_items.id', '=', 'receiving_items.order_items_id')
@@ -65,6 +67,17 @@ class InvoiceExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
             ->whereIn('receiving.pharmacy_id', $targetPharmacyIds)
             ->whereNotNull('receiving_items.batches_id')
             ->whereBetween('receiving_details.created_at', [$this->startDate, $this->endDate]);
+
+        if ($this->supplier) {
+            $supplier = $this->supplier;
+            $query->where(function ($sq) use ($supplier) {
+                $sq->where('order_items.creditor_code', $supplier)
+                    ->orWhere('creditors.code', $supplier)
+                    ->orWhere('creditors.id', $supplier);
+            });
+        }
+
+        return $query;
     }
  
     // ── DETAIL: one row per invoice_number ───────────────────────────────────

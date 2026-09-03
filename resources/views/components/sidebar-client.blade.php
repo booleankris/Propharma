@@ -524,7 +524,8 @@
             </div>
             <div>
                 @php
-                    $pharmacy = \App\Models\Pharmacies::where('id', getActivePharmacyId())->first() ?? auth()->user()->pharmacy;
+                    $pharmacy =
+                        \App\Models\Pharmacies::where('id', getActivePharmacyId())->first() ?? auth()->user()->pharmacy;
                     $brandName = $pharmacy ? $pharmacy->name : 'SAHABAT PMI';
                 @endphp
                 <div class="brand-name font-poppins">{{ $brandName }}</div>
@@ -934,7 +935,7 @@
                                 <rect x="14" y="14" width="7" height="7" />
                             </svg>
                         </div>
-                        <span class="text-sm font-semibold text-violet-700">Laporan Pembelian</span>
+                        <span class="text-sm font-semibold text-violet-700">Pembelian</span>
                     </button>
 
                     <button onclick="selectOrderReport(this)"
@@ -946,7 +947,44 @@
                                     d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18" />
                             </svg>
                         </div>
-                        <span class="text-sm font-semibold text-slate-600">Faktur Pembelian</span>
+                        <span class="text-sm font-semibold text-slate-600">Pembelian Faktur</span>
+                    </button>
+
+                    <button onclick="selectOrderReport(this)"
+                        class="order-report-btn flex items-center gap-3 p-3 rounded-2xl border border-slate-100 bg-slate-50 text-left transition-all hover:border-slate-200 hover:bg-white">
+                        <div class="w-8 h-8 rounded-xl bg-amber-50 flex items-center justify-center flex-shrink-0">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#d97706"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                                <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+                                <line x1="12" y1="22.08" x2="12" y2="12" />
+                            </svg>
+                        </div>
+                        <span class="text-sm font-semibold text-slate-600">Konsinyasi</span>
+                    </button>
+
+                    <button onclick="selectOrderReport(this)"
+                        class="order-report-btn flex items-center gap-3 p-3 rounded-2xl border border-slate-100 bg-slate-50 text-left transition-all hover:border-slate-200 hover:bg-white">
+                        <div class="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2563eb"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="2" y="5" width="20" height="14" rx="2" />
+                                <line x1="2" y1="10" x2="22" y2="10" />
+                            </svg>
+                        </div>
+                        <span class="text-sm font-semibold text-slate-600">Tunai</span>
+                    </button>
+
+                    <button onclick="selectOrderReport(this)"
+                        class="order-report-btn flex items-center gap-3 p-3 rounded-2xl border border-slate-100 bg-slate-50 text-left transition-all hover:border-slate-200 hover:bg-white">
+                        <div class="w-8 h-8 rounded-xl bg-rose-50 flex items-center justify-center flex-shrink-0">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#e11d48"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10" />
+                                <polyline points="12 6 12 12 16 14" />
+                            </svg>
+                        </div>
+                        <span class="text-sm font-semibold text-slate-600">Jatuh Tempo</span>
                     </button>
 
                 </div>
@@ -1014,14 +1052,14 @@
                 </div>
             </div>
 
-            {{-- Supplier/Creditor select — shown only when Per Supplier + Detail --}}
+            {{-- Supplier/Creditor select --}}
             <div id="order_supplier_select" style="display:none;">
-                @php $getcreditor = \App\Models\Creditor::all(); @endphp
-                <p class="text-xs font-semibold tracking-widest uppercase text-slate-400 mb-3">Pilih Kreditur</p>
+                @php $getcreditor = \App\Models\Creditor::orderBy('name')->get(); @endphp
+                <p class="text-xs font-semibold tracking-widest uppercase text-slate-400 mb-3">Pilih PBF / Kreditur</p>
                 <select id="order_supplier" name="order_supplier" class="w-full select2-order-supplier">
-                    <option></option>
+                    <option value="">Semua PBF / Kreditur</option>
                     @foreach ($getcreditor as $creditor)
-                        <option value="{{ $creditor->id }}">{{ $creditor->name }}</option>
+                        <option value="{{ $creditor->code }}">{{ $creditor->name }} ({{ $creditor->code }})</option>
                     @endforeach
                 </select>
             </div>

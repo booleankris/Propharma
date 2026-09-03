@@ -521,35 +521,40 @@
 
         // ─── Orders Report ────────────────────────────────────────────────────────────
 
-        var selectedOrderReport = "Laporan Pembelian";
+        var selectedOrderReport = "Pembelian";
         var selectedOrderType = "rekap";
 
         // Visibility map: which filters each report type shows
         // Keys match the button label text exactly
         const orderReportFilters = {
+            "Pembelian": {
+                type_filter: false,
+                supplier_select: false
+            },
+            "Pembelian Faktur": {
+                type_filter: true,
+                supplier_select: true
+            },
+            "Konsinyasi": {
+                type_filter: false,
+                supplier_select: true
+            },
+            "Tunai": {
+                type_filter: false,
+                supplier_select: true
+            },
+            "Jatuh Tempo": {
+                type_filter: false,
+                supplier_select: true
+            },
+            // Legacy fallbacks
             "Laporan Pembelian": {
                 type_filter: false,
                 supplier_select: false
             },
             "Faktur Pembelian": {
                 type_filter: true,
-                supplier_select: false
-            },
-            "Per Supplier": {
-                type_filter: true,
-                supplier_select: false
-            }, // supplier shown only on detail
-            "Daftar PO": {
-                type_filter: false,
-                supplier_select: false
-            },
-            "Retur Beli": {
-                type_filter: false,
-                supplier_select: false
-            },
-            "Hutang": {
-                type_filter: false,
-                supplier_select: false
+                supplier_select: true
             },
         };
         // Order Initial Setup
@@ -558,25 +563,18 @@
 
             // Set initial state based on data-active button
             const activeBtn = document.querySelector('.order-report-btn[data-active="true"]');
-            const label = activeBtn.innerText.trim();
-
-            if (label === "Faktur Pembelian") {
-                document.getElementById('order_type_filter').style.display = 'block';
-                document.getElementById('factory-select').style.display = 'none';
-                document.getElementById('doctor-select').style.display = 'none';
-
+            if (activeBtn) {
+                applyOrderFilters(activeBtn.querySelector('span.text-sm')?.textContent.trim());
             }
-            if (activeBtn) applyOrderFilters(activeBtn.querySelector('span.text-sm')?.textContent.trim());
         });
 
         function initOrderSupplierSelect() {
             const el = $('#order_supplier');
             if (el.hasClass("select2-hidden-accessible")) el.select2('destroy');
             el.select2({
-                placeholder: 'Pilih supplier...',
+                placeholder: 'Semua PBF / Kreditur...',
                 allowClear: true,
                 width: '100%',
-
             });
         }
 
@@ -586,8 +584,15 @@
                 supplier_select: false
             };
 
-            document.getElementById('order_type_filter').style.display = config.type_filter ? 'block' : 'none';
-            document.getElementById('order_supplier_select').style.display = config.supplier_select ? 'block' : 'none';
+            const typeFilterEl = document.getElementById('order_type_filter');
+            const supplierSelectEl = document.getElementById('order_supplier_select');
+
+            if (typeFilterEl) typeFilterEl.style.display = config.type_filter ? 'block' : 'none';
+            if (supplierSelectEl) supplierSelectEl.style.display = config.supplier_select ? 'block' : 'none';
+
+            if (config.supplier_select) {
+                setTimeout(() => initOrderSupplierSelect(), 50);
+            }
 
             // Reset type to rekap whenever report changes
             selectedOrderType = 'rekap';
@@ -618,10 +623,6 @@
 
             selectedOrderReport = lbl ? lbl.textContent.trim() : null;
             applyOrderFilters(selectedOrderReport);
-
-            if (selectedOrderReport === "Per Supplier") {
-                setTimeout(() => initOrderSupplierSelect(), 100);
-            }
 
             console.log('Selected order report:', selectedOrderReport);
         }

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Exports\Export\ParetoExport;
 use App\Exports\Orders\InvoiceExport;
 use App\Exports\Orders\OrdersExport;
+use App\Exports\Orders\PurchasePaymentExport;
 use App\Exports\Report\CategoryExport;
 use App\Exports\Report\DoctorExport;
 use App\Exports\Report\FactoryExport;
@@ -32,11 +33,15 @@ class ReportsController extends Controller
         $activeId = $request->filled('pharmacy_id') ? (int) $request->pharmacy_id : getActivePharmacyId();
         $report = $request->selectedReport;
 
-        // Untuk Laporan Pembelian & Faktur Pembelian:
+        // Untuk Laporan Pembelian, Pembelian Faktur, Konsinyasi, Tunai, Jatuh Tempo:
         // Pembelian dan penerimaan pusat dicatat di Gudang PMI (pharmacy_id = 9).
         // Jika user HO atau activeId adalah 1 (Apotek PMI), 6 (HO), atau 9 (Gudang PMI),
         // gunakan Gudang PMI (9) agar laporan tidak kosong.
-        if (in_array($report, ['Laporan Pembelian', 'Faktur Pembelian']) && !$request->filled('pharmacy_id')) {
+        $purchaseReports = [
+            'Pembelian', 'Pembelian Faktur', 'Konsinyasi', 'Tunai', 'Jatuh Tempo',
+            'Laporan Pembelian', 'Faktur Pembelian'
+        ];
+        if (in_array($report, $purchaseReports) && !$request->filled('pharmacy_id')) {
             $purchasingPharmacyId = getPurchasingPharmacyId();
             if ($purchasingPharmacyId) {
                 $activeId = $purchasingPharmacyId;
@@ -177,13 +182,25 @@ class ReportsController extends Controller
                 new ReturExport($pharmacy->id, $request->start_date, $request->end_date),
                 'RETUR_JUAL_' . $pharmacy->name . '_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx',
             ],
-            'Laporan Pembelian' => [
+            'Pembelian', 'Laporan Pembelian' => [
                 new OrdersExport($pharmacy->id, $request->start_date, $request->end_date),
                 'DATA_PEMBELIAN_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx',
             ],
-            'Faktur Pembelian' => [
-                new InvoiceExport($pharmacy->id, $request->start_date, $request->end_date, $request->selectedType),
+            'Pembelian Faktur', 'Faktur Pembelian' => [
+                new InvoiceExport($pharmacy->id, $request->start_date, $request->end_date, $request->selectedType, $request->supplier),
                 'DATA_FAKTUR_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx',
+            ],
+            'Konsinyasi' => [
+                new PurchasePaymentExport($pharmacy->id, $request->start_date, $request->end_date, 'Konsinyasi', $request->supplier),
+                'PEMBELIAN_KONSINYASI_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx',
+            ],
+            'Tunai' => [
+                new PurchasePaymentExport($pharmacy->id, $request->start_date, $request->end_date, 'Tunai', $request->supplier),
+                'PEMBELIAN_TUNAI_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx',
+            ],
+            'Jatuh Tempo' => [
+                new PurchasePaymentExport($pharmacy->id, $request->start_date, $request->end_date, 'Jatuh Tempo', $request->supplier),
+                'PEMBELIAN_JATUH_TEMPO_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx',
             ],
             default => [null, null],
         };
