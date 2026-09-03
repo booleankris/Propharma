@@ -11,6 +11,39 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
+    <style>
+        .select2-container--open {
+            z-index: 9999999 !important;
+        }
+        .select2-dropdown {
+            z-index: 9999999 !important;
+        }
+        #orderReportModal .select2-container,
+        #reportModal .select2-container {
+            width: 100% !important;
+        }
+        #orderReportModal .select2-container .select2-selection--single,
+        #reportModal .select2-container .select2-selection--single {
+            height: 42px !important;
+            border-radius: 0.75rem !important;
+            border: 1px solid #e2e8f0 !important;
+            background-color: #f8fafc !important;
+            display: flex !important;
+            align-items: center !important;
+        }
+        #orderReportModal .select2-container .select2-selection--single .select2-selection__rendered,
+        #reportModal .select2-container .select2-selection--single .select2-selection__rendered {
+            color: #334155 !important;
+            font-size: 0.875rem !important;
+            padding-left: 0.75rem !important;
+            line-height: 40px !important;
+        }
+        #orderReportModal .select2-container .select2-selection--single .select2-selection__arrow,
+        #reportModal .select2-container .select2-selection--single .select2-selection__arrow {
+            height: 40px !important;
+            right: 8px !important;
+        }
+    </style>
     <!-- PWA Settings -->
     <link rel="manifest" href="{{ asset('manifest.json') }}">
     <meta name="theme-color" content="#1d7ed8">
@@ -217,9 +250,15 @@
             if (id === 'reportModal') {
                 setTimeout(() => initFactorySelect(), 100);
             }
-            // ← add this
             if (id === 'orderReportModal') {
-                setTimeout(() => initOrderSupplierSelect(), 100);
+                setTimeout(() => {
+                    const activeBtn = document.querySelector('.order-report-btn[data-active="true"]');
+                    if (activeBtn) {
+                        applyOrderFilters(activeBtn.querySelector('span.text-sm')?.textContent.trim());
+                    } else {
+                        initOrderSupplierSelect();
+                    }
+                }, 150);
             }
         };
         window.closeModals = function() {
@@ -570,11 +609,15 @@
 
         function initOrderSupplierSelect() {
             const el = $('#order_supplier');
-            if (el.hasClass("select2-hidden-accessible")) el.select2('destroy');
+            if (!el.length) return;
+            if (el.hasClass("select2-hidden-accessible")) {
+                el.select2('destroy');
+            }
             el.select2({
-                placeholder: 'Semua PBF / Kreditur...',
+                placeholder: 'Semua PBF / Kreditur',
                 allowClear: true,
                 width: '100%',
+                dropdownParent: $('#orderReportModal')
             });
         }
 
@@ -591,7 +634,8 @@
             if (supplierSelectEl) supplierSelectEl.style.display = config.supplier_select ? 'block' : 'none';
 
             if (config.supplier_select) {
-                setTimeout(() => initOrderSupplierSelect(), 50);
+                initOrderSupplierSelect();
+                setTimeout(() => initOrderSupplierSelect(), 100);
             }
 
             // Reset type to rekap whenever report changes
@@ -603,6 +647,7 @@
         function selectOrderReport(el) {
             // Reset all buttons to inactive style
             document.querySelectorAll('.order-report-btn').forEach(btn => {
+                btn.removeAttribute('data-active');
                 btn.classList.remove('border-violet-200', 'bg-violet-50');
                 btn.classList.add('border-slate-100', 'bg-slate-50');
                 const lbl = btn.querySelector('span.text-sm');
@@ -613,6 +658,7 @@
             });
 
             // Activate clicked button
+            el.setAttribute('data-active', 'true');
             el.classList.remove('border-slate-100', 'bg-slate-50');
             el.classList.add('border-violet-200', 'bg-violet-50');
             const lbl = el.querySelector('span.text-sm');
