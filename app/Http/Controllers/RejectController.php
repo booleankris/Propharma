@@ -80,6 +80,7 @@ class RejectController extends Controller
             'medicine_id'   => 'nullable', // <-- Changed to nullable
             'medicine_name' => 'nullable|string', // <-- New field
             'quantity'      => 'required',
+            'unit'          => 'nullable|string',
             'total'         => 'nullable|numeric', // <-- Allow null or 0
             'reason'        => 'required',
         ]);
@@ -93,6 +94,7 @@ class RejectController extends Controller
             'medicine_id'   => $validated['medicine_id'],
             'medicine_name' => $validated['medicine_name'] ?? null,
             'quantity'      => $validated['quantity'],
+            'unit'          => $validated['unit'] ?? $request->unit ?? null,
             'total'         => $validated['total'] ?? 0, // <-- Set to 0 if null
             'reason'        => $validated['reason'],
         ]);
@@ -123,6 +125,7 @@ class RejectController extends Controller
             )
             ->addColumn('raw_total', fn($data) => $data->total)
             ->addColumn('raw_price', fn($data) => $data->quantity > 0 ? $data->total / $data->quantity : 0)
+            ->addColumn('unit', fn($data) => $data->unit ?? $data->medicines?->unit ?? '')
             ->addColumn('action', function ($data) {
                 return '
                     <div class="flex items-center gap-2">
@@ -148,6 +151,7 @@ class RejectController extends Controller
             'medicine_id'   => 'nullable',
             'medicine_name' => 'nullable|string',
             'quantity'      => 'required',
+            'unit'          => 'nullable|string',
             'total'         => 'nullable|numeric',
             'reason'        => 'required',
         ]);
@@ -157,6 +161,7 @@ class RejectController extends Controller
             'medicine_id'   => $validated['medicine_id'],
             'medicine_name' => $validated['medicine_name'] ?? $item->medicine_name,
             'quantity'      => $validated['quantity'],
+            'unit'          => $validated['unit'] ?? $request->unit ?? $item->unit,
             'total'         => $validated['total'] ?? 0,
             'reason'        => $validated['reason'],
         ]);

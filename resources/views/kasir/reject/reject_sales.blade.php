@@ -283,7 +283,7 @@
 
                             <div class="w-full sm:w-32">
                                 <div class="py-1 text-[13px] font-bold">Satuan</div>
-                                <input id="unit" readonly
+                                <input id="unit"
                                     class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
                                     placeholder="Satuan">
                             </div>
@@ -488,7 +488,11 @@
                 },
                 {
                     data: 'quantity',
-                    name: 'quantity'
+                    name: 'quantity',
+                    render: function (data, type, row) {
+                        const unitStr = row.unit || (row.medicines ? row.medicines.unit : '');
+                        return data + (unitStr ? ' ' + unitStr : '');
+                    }
                 },
                 {
                     data: 'total',
@@ -844,7 +848,7 @@
 
             document.getElementById('medicine_code').value = row.medicines?.code ?? '';
             document.getElementById('medicine_name').value = row.medicines ? row.medicines.name : (row.medicine_name || '');
-            document.getElementById('unit').value = row.medicines?.unit ?? '';
+            document.getElementById('unit').value = row.unit || (row.medicines ? row.medicines.unit : '');
             document.getElementById('item_price').value = formatRupiah(row.raw_price || 0);
             document.getElementById('qty').value = row.quantity ?? '';
             document.getElementById('total').value = formatRupiah(row.raw_total || 0);
@@ -903,6 +907,7 @@
                 medicine_id: medicineSelectedId || null,
                 medicine_name: document.getElementById('medicine_name').value,
                 quantity: itemqty,
+                unit: document.getElementById('unit').value,
                 total: itemtotal || 0, // raw number now, not formatted string
                 reason: document.getElementById('reason').value,
             };

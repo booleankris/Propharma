@@ -16,6 +16,7 @@ class Reject extends Model
         'medicine_id',
         'medicine_name', 
         'quantity',
+        'unit',
         'total',
         'reason',
     ];

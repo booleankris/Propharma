@@ -42,6 +42,7 @@ class RejectSalesExport implements FromQuery, WithHeadings, WithMapping, ShouldA
             'Tanggal',
             'Nama Obat',
             'Jumlah Ditolak',
+            'Satuan',
             'Total (Rp)',
             'Alasan',
         ];
@@ -55,6 +56,7 @@ class RejectSalesExport implements FromQuery, WithHeadings, WithMapping, ShouldA
             $reject->date,
             $reject->medicines ? $reject->medicines->name : ($reject->medicine_name ?? '-'),
             $reject->quantity,
+            $reject->unit ?? $reject->medicines?->unit ?? '-',
             $reject->total,
             $reject->reason,
         ];
