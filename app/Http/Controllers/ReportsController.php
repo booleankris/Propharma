@@ -6,6 +6,7 @@ use App\Exports\Export\ParetoExport;
 use App\Exports\Orders\InvoiceExport;
 use App\Exports\Orders\OrdersExport;
 use App\Exports\Orders\PurchasePaymentExport;
+use App\Exports\Report\BankSalesExport;
 use App\Exports\Report\CategoryExport;
 use App\Exports\Report\DoctorExport;
 use App\Exports\Report\FactoryExport;
@@ -30,6 +31,9 @@ class ReportsController extends Controller
     // Report Data
     public function reports(Request $request)
     {
+        @ini_set('memory_limit', '512M');
+        @ini_set('max_execution_time', '300');
+
         $activeId = $request->filled('pharmacy_id') ? (int) $request->pharmacy_id : getActivePharmacyId();
         $report = $request->selectedReport;
 
@@ -60,12 +64,27 @@ class ReportsController extends Controller
 
         // mode=preview -> render HTML table, mode anything else (or absent) -> download
         if ($request->mode === 'preview') {
-            // Multi-sheet export (e.g. LiphOnlineExport): build tabs data
+            // Multi-sheet export (e.g. LiphOnlineExport / BankSalesExport): build tabs data
             if ($export instanceof WithMultipleSheets) {
                 $sheets = [];
                 foreach ($export->sheets() as $sheet) {
                     $title = method_exists($sheet, 'title') ? $sheet->title() : 'Sheet';
-                    $sheets[$title] = $sheet->array();
+                    $rawRows = $sheet->array();
+
+                    // Cap preview rows to max 100 rows per sheet to prevent memory exhaustion in Blade
+                    if (count($rawRows) > 100) {
+                        $headerRows = array_slice($rawRows, 0, 7); // Title & table headers
+                        $dataRows = array_slice($rawRows, 7, 90);   // First 90 data rows
+                        $lastRow = end($rawRows);                  // Summary total row
+
+                        $totalDataRows = count($rawRows) - 8;
+                        $noticeRow = ['...', 'Menampilkan 90 baris pertama dari total ' . number_format($totalDataRows, 0, ',', '.') . ' data. Unduh file Excel untuk melihat seluruh transaksi lengkap.', '', '', '', '', '', '', '', '', '', '', '', ''];
+
+                        $previewRows = array_merge($headerRows, $dataRows, [$noticeRow], [$lastRow]);
+                        $sheets[$title] = $previewRows;
+                    } else {
+                        $sheets[$title] = $rawRows;
+                    }
                 }
 
                 return view('reports.preview', [
@@ -80,8 +99,20 @@ class ReportsController extends Controller
                 return response()->json(['status' => 'error', 'message' => 'Preview not supported for this report'], 422);
             }
 
+            $rawRows = $export->array();
+            if (count($rawRows) > 150) {
+                $headerRows = array_slice($rawRows, 0, 7);
+                $dataRows = array_slice($rawRows, 7, 140);
+                $lastRow = end($rawRows);
+                $totalDataRows = count($rawRows) - 8;
+                $noticeRow = ['...', 'Menampilkan 140 baris pertama dari total ' . number_format($totalDataRows, 0, ',', '.') . ' data. Unduh file Excel untuk data lengkap.', '', '', '', '', '', '', '', '', '', '', '', ''];
+                $previewRows = array_merge($headerRows, $dataRows, [$noticeRow], [$lastRow]);
+            } else {
+                $previewRows = $rawRows;
+            }
+
             return view('reports.preview', [
-                'rows' => $export->array(),
+                'rows' => $previewRows,
                 'reportTitle' => method_exists($export, 'title') ? $export->title() : $report,
                 'queryParams' => $request->except('mode'),
             ]);
@@ -93,8 +124,8 @@ class ReportsController extends Controller
     private function resolveReportExport(string $report, Request $request, Pharmacies $pharmacy): array
     {
         $request->validate([
-            'start_date' => 'required_if:selectedReport,LIPH,Obat,Golongan,Pabrik,Dokter,Daftar Resep,Retur Jual|date',
-            'end_date' => 'required_if:selectedReport,LIPH,Obat,Golongan,Pabrik,Dokter,Daftar Resep,Retur Jual|date|after_or_equal:start_date',
+            'start_date' => 'required_if:selectedReport,LIPH,Obat,Golongan,Pabrik,Dokter,Daftar Resep,Retur Jual,Bank,Penjualan Bank|date',
+            'end_date' => 'required_if:selectedReport,LIPH,Obat,Golongan,Pabrik,Dokter,Daftar Resep,Retur Jual,Bank,Penjualan Bank|date|after_or_equal:start_date',
         ]);
 
         return match ($report) {
@@ -122,6 +153,18 @@ class ReportsController extends Controller
                     ),
                     'LIPH_' . $pharmacy->name . '_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx',
                 ],
+            'Bank', 'Penjualan Bank' => [
+                new BankSalesExport(
+                    $pharmacy->id,
+                    $request->start_date,
+                    $request->end_date,
+                    $pharmacy->name,
+                    $pharmacy->address,
+                    $request->shift,
+                    $request->shiftType ?? 'semua'
+                ),
+                'LAPORAN_PENJUALAN_BANK_' . $pharmacy->name . '_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx',
+            ],
             'Obat' => [
                 new MedicineExport(
                     $pharmacy->id,

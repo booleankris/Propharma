@@ -1204,7 +1204,7 @@
                     </button>
 
                     <button onclick="selectReport(this)"
-                        class="report-btn col-span-2 flex items-center gap-3 p-3 rounded-2xl border border-slate-100 bg-slate-50 text-left transition-all hover:border-slate-200 hover:bg-white">
+                        class="report-btn flex items-center gap-3 p-3 rounded-2xl border border-slate-100 bg-slate-50 text-left transition-all hover:border-slate-200 hover:bg-white">
                         <div class="w-8 h-8 rounded-xl bg-teal-50 flex items-center justify-center flex-shrink-0">
                             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#0d9488"
                                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1213,6 +1213,25 @@
                             </svg>
                         </div>
                         <span class="text-sm font-semibold text-slate-600">Retur Jual</span>
+                    </button>
+
+                    <button onclick="selectReport(this)"
+                        class="report-btn flex items-center gap-3 p-3 rounded-2xl border border-slate-100 bg-slate-50 text-left transition-all hover:border-slate-200 hover:bg-white">
+                        <div class="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center flex-shrink-0">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4f46e5"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                <path d="M3 21l18 0" />
+                                <path d="M3 10l18 0" />
+                                <path d="M5 6l7 -3l7 3" />
+                                <path d="M4 10l0 11" />
+                                <path d="M20 10l0 11" />
+                                <path d="M8 14l0 3" />
+                                <path d="M12 14l0 3" />
+                                <path d="M16 14l0 3" />
+                            </svg>
+                        </div>
+                        <span class="text-sm font-semibold text-slate-600">Bank</span>
                     </button>
 
                 </div>

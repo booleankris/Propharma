@@ -174,6 +174,20 @@
                 has_factory: false,
                 has_doctor: false
             },
+            "Bank": {
+                date_filter: true,
+                type_filter: false,
+                online_btn: false,
+                has_factory: false,
+                has_doctor: false
+            },
+            "Penjualan Bank": {
+                date_filter: true,
+                type_filter: false,
+                online_btn: false,
+                has_factory: false,
+                has_doctor: false
+            },
         };
 
         var selectedReport = "LIPH";
