@@ -2264,7 +2264,7 @@
         <div class="flex flex-col gap-1.5 min-w-0">
             <div class="font-semibold text-[15px] text-gray-800 tracking-tight truncate">${escapeHtml(it.name)}</div>
             <div class="inline-flex gap-1 items-center font-nunito-bold">
-                <p class='text-blue-600 bg-red text-[11px] tracking-wide px-2 py-0.5 border-solid border-[0.7px] shadow-[0.6px_solid_#048409] rounded-md w-fit'>${escapeHtml(it.factory.name)}</p>    
+                ${it.factory?.name ? `<p class='text-blue-600 bg-red text-[11px] tracking-wide px-2 py-0.5 border-solid border-[0.7px] shadow-[0.6px_solid_#048409] rounded-md w-fit'>${escapeHtml(it.factory.name)}</p>` : ''}    
                 <p class='text-blue-600 bg-blue-50 text-[11px] tracking-wide px-2 py-0.5 rounded-md w-fit'>${escapeHtml(it.code)}</p>    
             </div>
  

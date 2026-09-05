@@ -83,6 +83,7 @@ class OrdersExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                 'order_items.pack as order_pack',
                 'medicines.code as medicine_code',
                 'medicines.name as medicine_name',
+                'medicines.packaging as medicine_packaging',
                 'medicines.unit as medicine_unit',
                 'creditors.name as creditor_name',
             ])
@@ -110,7 +111,7 @@ class OrdersExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
             'Kode Obat',
             'Nama Obat',
             'Qty Beli',
-            'Satuan',
+            'Kemasan',
             'Utuh',
             'HNA',
             'Harga PPN',
@@ -162,6 +163,8 @@ class OrdersExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                 ? Carbon::parse($item->expired_date)->format('d/m/Y')
                 : '-';
 
+            $packaging = $item->medicine_packaging ?: ($item->medicine_unit ?: '-');
+
             $rows[] = [
                 $item->id,
                 $item->receiving_details_code ?? '-',
@@ -177,7 +180,7 @@ class OrdersExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                 $item->medicine_code ?? '-',
                 $item->medicine_name ?? '-',
                 (int) ($item->qty_received ?? 0),
-                $item->medicine_unit ?? '-',
+                $packaging,
                 $item->order_pack ?? '-',
                 $rawPrice,
                 $hargaPpn,
@@ -285,7 +288,7 @@ class OrdersExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
             'L' => 15,
             'M' => 35,
             'N' => 10,
-            'O' => 10,
+            'O' => 18,
             'P' => 10,
             'Q' => 15,
             'R' => 15,
