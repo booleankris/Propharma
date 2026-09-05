@@ -318,7 +318,7 @@
                                     <option value="Harga">Harga</option>
                                     <option value="Pelayanan">Pelayanan</option>
                                     <option value="Hanya Bertanya">Hanya Bertanya</option>
-                                    <option value="Hanya Bertanya">Wajib Resep</option>
+                                    <option value="Wajib Resep">Wajib Resep</option>
                                     <option value="Lain-lain">Lain-lain</option>
                                 </select>
                             </div>
