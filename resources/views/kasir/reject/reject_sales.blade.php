@@ -149,13 +149,130 @@
             background-color: #f1f5f9 !important;
         }
 
+        .table-scroll-container {
+            max-height: 420px;
+            overflow-y: auto;
+            overflow-x: auto;
+            border-radius: 12px;
+            border: 1px solid #edf2f7;
+            position: relative;
+        }
+
+        .table-scroll-container::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        .table-scroll-container::-webkit-scrollbar-track {
+            background: #f8fafc;
+        }
+
+        .table-scroll-container::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+
+        .table-scroll-container::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        #orderItemsTable {
+            border-collapse: separate;
+            border-spacing: 0;
+            width: 100% !important;
+        }
+
+        #orderItemsTable thead th {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background-color: #f8fafc !important;
+            color: #475569;
+            font-weight: 600;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            padding: 12px 14px !important;
+            border-bottom: 2px solid #e2e8f0 !important;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+            white-space: nowrap;
+        }
+
+        #orderItemsTable tbody td {
+            padding: 10px 14px !important;
+            font-size: 13px !important;
+            vertical-align: middle !important;
+            border-bottom: 1px solid #f1f5f9 !important;
+            color: #334155;
+        }
+
+        #orderItemsTable tbody tr:hover {
+            background-color: #f8fafc !important;
+        }
+
         #orderItemsTable tr.selected {
             background-color: #e0f2fe !important;
         }
 
-        .dataTables_paginate .paginate_button {
-            padding: 6px 12px !important;
+        .dataTables_wrapper .dataTables_paginate {
+            display: flex !important;
+            align-items: center !important;
+            gap: 4px !important;
+            margin-top: 8px !important;
+        }
+
+        .dataTables_wrapper .dataTables_paginate .paginate_button {
+            font-size: 12px !important;
+            padding: 4px 10px !important;
             border-radius: 6px !important;
+            border: 1px solid #e2e8f0 !important;
+            background: #ffffff !important;
+            color: #475569 !important;
+            cursor: pointer !important;
+            transition: all 0.15s ease;
+        }
+
+        .dataTables_wrapper .dataTables_paginate .paginate_button:hover {
+            background: #f1f5f9 !important;
+            color: #1e293b !important;
+            border-color: #cbd5e1 !important;
+        }
+
+        .dataTables_wrapper .dataTables_paginate .paginate_button.current,
+        .dataTables_wrapper .dataTables_paginate .paginate_button.current:hover {
+            background: #2563eb !important;
+            color: #ffffff !important;
+            border-color: #2563eb !important;
+            font-weight: 600;
+        }
+
+        .dataTables_wrapper .dataTables_paginate .paginate_button.disabled,
+        .dataTables_wrapper .dataTables_paginate .paginate_button.disabled:hover {
+            opacity: 0.4;
+            cursor: not-allowed !important;
+            background: #f8fafc !important;
+            border-color: #e2e8f0 !important;
+        }
+
+        .dataTables_wrapper .dataTables_info {
+            font-size: 12px;
+            color: #64748b;
+            padding-top: 8px !important;
+        }
+
+        .dataTables_wrapper .dataTables_length {
+            font-size: 12px;
+            color: #64748b;
+            margin-bottom: 8px;
+        }
+
+        .dataTables_wrapper .dataTables_length select {
+            font-size: 12px;
+            padding: 4px 24px 4px 8px !important;
+            border-radius: 6px !important;
+            border: 1px solid #cbd5e1 !important;
+            outline: none !important;
+            background-color: #fff;
         }
 
         .text-end {
@@ -374,53 +491,43 @@
                         </div>
                     </div>
                 </div>
-                <div class="mt-3 relative w-full p-[24px] bg-[#ffffff] rounded-[22px]">
-                    <table id="orderItemsTable" class="w-full">
-                        <thead>
-                            <tr>
-                                <th>Kode Penolakan</th>
-                                <th>Tanggal</th>
-                                <th>Nama Item</th>
-                                <th>Jumlah Ditolak</th>
-                                <th>Total</th>
-                                <th>Alasan</th>
-                                <th>Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody class="text-[11px]"></tbody>
-                    </table>
-                    <div class="flex justify-end w-full shadow-[0_0_20px_rgba(0,0,0,0.2)] bg-white fixed left-0 bottom-0">
-                        <div class="p-4 rounded-t-2xl gap-2 flex">
-                            <div class="flex items-center">
-                                <p class="font-bold pr-2 font-poppins">TOTAL DITOLAK</p>
-
-                                <input id="d_total" readonly
-                                    class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
-                                    placeholder="Input">
-                            </div>
+                <div class="mt-4 relative w-full p-6 bg-white rounded-2xl shadow-sm border border-slate-100 mb-28">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center gap-2">
+                            <span class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-blue-50 text-blue-600">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="2"/><path d="m9 14 2 2 4-4"/></svg>
+                            </span>
+                            <h2 class="text-sm font-bold text-slate-800 tracking-wide">Daftar Item Penolakan</h2>
                         </div>
+                        <span class="text-xs text-slate-400 font-medium">Tabel dapat di-scroll vertikal & horizontal</span>
+                    </div>
+
+                    <div class="table-scroll-container">
+                        <table id="orderItemsTable" class="w-full">
+                            <thead>
+                                <tr>
+                                    <th>Kode Penolakan</th>
+                                    <th>Tanggal</th>
+                                    <th>Nama Item</th>
+                                    <th>Jumlah Ditolak</th>
+                                    <th>Total</th>
+                                    <th>Alasan</th>
+                                    <th>Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-[12px]"></tbody>
+                        </table>
                     </div>
                 </div>
-                <div class="flex justify-end w-full shadow-[0_0_20px_rgba(0,0,0,0.2)] bg-white fixed left-0 bottom-0">
+
+                <div class="flex justify-end w-full shadow-[0_0_20px_rgba(0,0,0,0.15)] bg-white fixed left-0 bottom-0 z-30 border-t border-slate-200">
                     <div class="p-4 rounded-t-2xl gap-2 flex">
                         <div class="flex items-center">
-                            <p class="font-bold pr-2 font-poppins">HARGA HNA</p>
-                            <input id="d_price" readonly
-                                class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
-                                placeholder="Input">
-                        </div>
-                        <div class="flex items-center">
-                            <p class="font-bold pr-2 font-poppins">PPN</p>
-                            <input id="d_ppn" readonly
-                                class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
-                                placeholder="Input">
-                        </div>
-                        <div class="flex items-center">
-                            <p class="font-bold pr-2 font-poppins">TOTAL</p>
+                            <p class="font-bold pr-2 font-poppins text-slate-700">TOTAL</p>
 
                             <input id="d_total" readonly
-                                class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
-                                placeholder="Input">
+                                class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] font-bold text-blue-600 focus:ring-2 focus:ring-blue-200"
+                                placeholder="Total">
                         </div>
                     </div>
                 </div>
@@ -522,9 +629,29 @@
                         searchable: false
                     },
                 ],
-                paging: false,
+                paging: true,
+                pageLength: 10,
+                lengthChange: true,
+                lengthMenu: [
+                    [10, 25, 50, 100],
+                    [10, 25, 50, 100]
+                ],
                 searching: false,
-                info: false,
+                info: true,
+                language: {
+                    lengthMenu: "Tampilkan _MENU_ data",
+                    zeroRecords: "Tidak ada data penolakan",
+                    info: "Menampilkan _START_ - _END_ dari _TOTAL_ data",
+                    infoEmpty: "Menampilkan 0 data",
+                    infoFiltered: "(difilter dari _MAX_ data)",
+                    paginate: {
+                        first: "«",
+                        last: "»",
+                        next: "›",
+                        previous: "‹"
+                    }
+                },
+                dom: '<"flex flex-wrap items-center justify-between gap-2 mb-3"l>rt<"flex flex-wrap items-center justify-between gap-2 mt-3"ip><"clear">',
             });
         });
         document.getElementById('qty').addEventListener('keydown', function(e) {
