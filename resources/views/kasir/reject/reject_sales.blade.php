@@ -172,24 +172,31 @@
                 <div id="searchWrapper" class="flex gap-5" style="position: relative; width: 100%;">
                     <div class="w-11/12">
                         <div class="flex items-center justify-between mb-4">
-                            <h1 class="text-2xl font-semibold tracking-tight font-poppins text-[#1c1c1c]">Penolakan Barang</h1>
-                            
+                            <h1 class="text-2xl font-semibold tracking-tight font-poppins text-[#1c1c1c]">Penolakan Barang
+                            </h1>
+
                             <!-- Export Controls -->
                             <div class="flex items-end gap-3">
                                 <div>
                                     <label class="block text-[11px] font-medium text-slate-500 mb-1">Mulai Tanggal</label>
-                                    <input type="date" id="export_start_date" class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 outline-none focus:border-blue-500 transition">
+                                    <input type="date" id="export_start_date"
+                                        class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 outline-none focus:border-blue-500 transition">
                                 </div>
                                 <div>
                                     <label class="block text-[11px] font-medium text-slate-500 mb-1">Sampai Tanggal</label>
-                                    <input type="date" id="export_end_date" class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 outline-none focus:border-blue-500 transition">
+                                    <input type="date" id="export_end_date"
+                                        class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 outline-none focus:border-blue-500 transition">
                                 </div>
                                 <div>
-                                    <button type="button" id="export-reject-btn" class="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-1.5 rounded-lg text-xs font-semibold transition shadow-sm h-[32px]">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                                            <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                    <button type="button" id="export-reject-btn"
+                                        class="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-1.5 rounded-lg text-xs font-semibold transition shadow-sm h-[32px]">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24"
+                                            stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"
+                                            stroke-linejoin="round">
+                                            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                                             <path d="M14 3v4a1 1 0 0 0 1 1h4" />
-                                            <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" />
+                                            <path
+                                                d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" />
                                             <path d="M8 11h8v7h-8z" />
                                             <path d="M8 15h8" />
                                             <path d="M11 11v7" />
@@ -201,10 +208,12 @@
                         </div>
 
                         {{-- Progress Bar --}}
-                        <div id="progressContainer" class="hidden mb-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm w-full">
+                        <div id="progressContainer"
+                            class="hidden mb-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm w-full">
                             <p class="font-semibold text-slate-700 mb-2 text-sm">Export Progress</p>
                             <div class="w-full bg-slate-200 rounded-full h-3">
-                                <div id="progressBar" class="h-3 bg-emerald-500 rounded-full transition-all duration-300" style="width: 0%;"></div>
+                                <div id="progressBar" class="h-3 bg-emerald-500 rounded-full transition-all duration-300"
+                                    style="width: 0%;"></div>
                             </div>
                             <p id="progressText" class="text-xs mt-2 text-slate-500 font-medium">0%</p>
                         </div>
@@ -213,8 +222,8 @@
                                 <div class="py-1 text-[13px] font-bold">Tanggal Penolakan</div>
                                 <input type="text" id="reject_date"
                                     class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
-                                    placeholder="" value="{{ $now }}" readonly onkeyup="searchMedicineData(this.value)"
-                                    autocomplete="off">
+                                    placeholder="" value="{{ $now }}" readonly
+                                    onkeyup="searchMedicineData(this.value)" autocomplete="off">
                             </div>
                             <div>
                                 <div class="py-1 text-[13px] font-bold" for="reject_number">Nomor Penolakan</div>
@@ -309,6 +318,7 @@
                                     <option value="Harga">Harga</option>
                                     <option value="Pelayanan">Pelayanan</option>
                                     <option value="Hanya Bertanya">Hanya Bertanya</option>
+                                    <option value="Hanya Bertanya">Wajib Resep</option>
                                     <option value="Lain-lain">Lain-lain</option>
                                 </select>
                             </div>
@@ -460,7 +470,7 @@
 
 
         // Datatable
-        document.addEventListener('DOMContentLoaded', function () {
+        document.addEventListener('DOMContentLoaded', function() {
             exitCustomMode();
 
             orderItemsTable = $('#orderItemsTable').DataTable({
@@ -470,59 +480,59 @@
                     url: "{{ route('sales.getreject') }}",
                 },
                 columns: [{
-                    data: 'code',
-                    name: 'code'
-                },
-                {
-                    data: 'date',
-                    name: 'date',
-                    defaultContent: '-'
-                },
-                {
-                    data: null,
-                    name: 'medicine_name',
-                    render: function (data, type, row) {
-                        // If standard medicine exists, show it. Otherwise, show custom name.
-                        return row.medicines ? row.medicines.name : (row.medicine_name || '-');
-                    }
-                },
-                {
-                    data: 'quantity',
-                    name: 'quantity',
-                    render: function (data, type, row) {
-                        const unitStr = row.unit || (row.medicines ? row.medicines.unit : '');
-                        return data + (unitStr ? ' ' + unitStr : '');
-                    }
-                },
-                {
-                    data: 'total',
-                    name: 'total',
-                    render: function (data, type, row) {
-                        return data ? data : 'Rp. 0'; // Handle visual for 0/null
-                    }
-                },
-                {
-                    data: 'reason',
-                    name: 'reason'
-                },
-                {
-                    data: 'action',
-                    name: 'action',
-                    orderable: false,
-                    searchable: false
-                },
+                        data: 'code',
+                        name: 'code'
+                    },
+                    {
+                        data: 'date',
+                        name: 'date',
+                        defaultContent: '-'
+                    },
+                    {
+                        data: null,
+                        name: 'medicine_name',
+                        render: function(data, type, row) {
+                            // If standard medicine exists, show it. Otherwise, show custom name.
+                            return row.medicines ? row.medicines.name : (row.medicine_name || '-');
+                        }
+                    },
+                    {
+                        data: 'quantity',
+                        name: 'quantity',
+                        render: function(data, type, row) {
+                            const unitStr = row.unit || (row.medicines ? row.medicines.unit : '');
+                            return data + (unitStr ? ' ' + unitStr : '');
+                        }
+                    },
+                    {
+                        data: 'total',
+                        name: 'total',
+                        render: function(data, type, row) {
+                            return data ? data : 'Rp. 0'; // Handle visual for 0/null
+                        }
+                    },
+                    {
+                        data: 'reason',
+                        name: 'reason'
+                    },
+                    {
+                        data: 'action',
+                        name: 'action',
+                        orderable: false,
+                        searchable: false
+                    },
                 ],
                 paging: false,
                 searching: false,
                 info: false,
             });
         });
-        document.getElementById('qty').addEventListener('keydown', function (e) {
+        document.getElementById('qty').addEventListener('keydown', function(e) {
             if (e.key !== 'Enter') return;
             e.preventDefault();
             document.getElementById('reason').focus();
         });
-        document.getElementById('reason').addEventListener('keydown', function (e) {
+        document.getElementById('reason').addEventListener('keydown', function(e) {
             if (e.key !== 'Enter') return;
             e.preventDefault();
             addItem();
@@ -633,7 +643,7 @@
             document.getElementById('qty')?.focus();
         }
         // Nav
-        document.addEventListener('keydown', function (e) {
+        document.addEventListener('keydown', function(e) {
             const dropdown = document.getElementById('searchDropdown');
             if (!dropdown || dropdown.offsetParent === null) return;
 
@@ -669,7 +679,7 @@
                 });
             }
         }
-        document.addEventListener('click', function (e) {
+        document.addEventListener('click', function(e) {
             const wrapper = document.getElementById('searchWrapper');
             if (!wrapper.contains(e.target)) {
                 document.getElementById('searchDropdown').style.display = 'none';
@@ -692,7 +702,7 @@
             document.getElementById('total_retur').value = total.toFixed(0);
         }
         // Hover
-        document.getElementById('searchResults').addEventListener('mouseover', function (e) {
+        document.getElementById('searchResults').addEventListener('mouseover', function(e) {
             const row = e.target.closest('tr');
             if (!row) return;
 
@@ -704,7 +714,7 @@
         });
 
         // Click
-        document.getElementById('searchResults').addEventListener('click', function (e) {
+        document.getElementById('searchResults').addEventListener('click', function(e) {
             const row = e.target.closest('tr');
             if (row) {
                 selectRow(row);
@@ -714,7 +724,7 @@
 
         // Select
 
-        document.addEventListener('click', function (e) {
+        document.addEventListener('click', function(e) {
             const wrapper = document.getElementById('searchWrapper');
             if (!wrapper.contains(e.target)) {
                 document.getElementById('searchDropdown').style.display = 'none';
@@ -854,7 +864,10 @@
             document.getElementById('total').value = formatRupiah(row.raw_total || 0);
             document.getElementById('reason').value = row.reason ?? '';
 
-            document.getElementById('medicine_name').scrollIntoView({ block: 'center', behavior: 'smooth' });
+            document.getElementById('medicine_name').scrollIntoView({
+                block: 'center',
+                behavior: 'smooth'
+            });
             document.getElementById('qty').focus();
 
             iziToast.info({
@@ -877,10 +890,10 @@
                 if (!result.isConfirmed) return;
 
                 axios.delete(`{{ url('reject/deleteitemreject') }}/${id}`, {
-                    headers: {
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-                    }
-                })
+                        headers: {
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                        }
+                    })
                     .then(res => {
                         if (res.data.success) {
                             orderItemsTable.ajax.reload(null, false);
@@ -895,7 +908,11 @@
                     })
                     .catch(err => {
                         console.error(err);
-                        iziToast.error({ title: 'Gagal', position: 'topRight', message: 'Gagal menghapus data.' });
+                        iziToast.error({
+                            title: 'Gagal',
+                            position: 'topRight',
+                            message: 'Gagal menghapus data.'
+                        });
                     });
             });
         }
@@ -912,20 +929,20 @@
                 reason: document.getElementById('reason').value,
             };
 
-            const url = editingId
-                ? `{{ url('reject/updateitemreject') }}/${editingId}`
-                : "{{ route('sales.addItemReject') }}";
+            const url = editingId ?
+                `{{ url('reject/updateitemreject') }}/${editingId}` :
+                "{{ route('sales.addItemReject') }}";
 
             const method = editingId ? 'put' : 'post';
 
             axios({
-                method: method,
-                url: url,
-                data: payload,
-                headers: {
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-                }
-            })
+                    method: method,
+                    url: url,
+                    data: payload,
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                    }
+                })
                 .then(res => {
                     if (res.data.success) {
                         const wasEditing = editingId !== null;
@@ -937,7 +954,8 @@
                         iziToast.success({
                             title: 'Berhasil',
                             position: 'topRight',
-                            message: wasEditing ? "Penolakan berhasil diperbarui" : "Penolakan Berhasil Dicatat",
+                            message: wasEditing ? "Penolakan berhasil diperbarui" :
+                                "Penolakan Berhasil Dicatat",
                         });
                     }
                 })
@@ -1006,25 +1024,25 @@
                 btn.disabled = false;
             }, 4000);
         }
-        document.getElementById('medicine_name').addEventListener('keydown', function (e) {
+        document.getElementById('medicine_name').addEventListener('keydown', function(e) {
             if (e.key !== 'Enter') return;
             e.preventDefault();
             document.getElementById('qty').focus();
         });
-        $('#back').click(function () {
+        $('#back').click(function() {
             window.location.href = "{{ route('home') }}";
         });
 
         // --- EXPORT QUEUE LOGIC ---
         document.getElementById('export-reject-btn').addEventListener('click', async function(e) {
             e.preventDefault();
-            
+
             const startDate = document.getElementById('export_start_date').value;
             const endDate = document.getElementById('export_end_date').value;
-            
+
             const exportBtn = this;
             const originalContent = exportBtn.innerHTML;
-            
+
             exportBtn.innerHTML = `
                 <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -1037,15 +1055,17 @@
             let queryParams = new URLSearchParams();
             if (startDate) queryParams.append('start_date', startDate);
             if (endDate) queryParams.append('end_date', endDate);
-            
+
             try {
                 const response = await fetch(`{{ route('sales.reject.export') }}?${queryParams.toString()}`, {
-                    headers: { 'Accept': 'application/json' }
+                    headers: {
+                        'Accept': 'application/json'
+                    }
                 });
-                
+
                 if (!response.ok) throw new Error('Gagal memulai export');
                 const data = await response.json();
-                
+
                 if (data.job_id) {
                     iziToast.info({
                         title: 'Memproses',
@@ -1084,14 +1104,14 @@
         function pollRejectExportStatus(jobId) {
             const progressBar = document.getElementById('progressBar');
             const progressText = document.getElementById('progressText');
-            
+
             let interval = setInterval(() => {
                 fetch(`/reject/export/status/${jobId}`)
                     .then(res => res.json())
                     .then(data => {
                         progressBar.style.width = data.progress + "%";
                         progressText.innerText = data.progress + "%";
-                        
+
                         if (data.status === "completed") {
                             clearInterval(interval);
                             iziToast.success({
@@ -1103,7 +1123,7 @@
                             progressBar.style.width = "0%";
                             progressText.innerText = "0%";
                             resetRejectExportButton();
-                            
+
                             // Trigger download
                             window.location.href = data.file;
                         } else if (data.status === "failed") {
@@ -1125,13 +1145,13 @@
             }, 2000);
         }
 
-        document.getElementById('export_start_date').addEventListener('keydown', function (e) {
+        document.getElementById('export_start_date').addEventListener('keydown', function(e) {
             if (e.key !== 'Enter') return;
             e.preventDefault();
             document.getElementById('export_end_date').focus();
         });
 
-        document.getElementById('export_end_date').addEventListener('keydown', function (e) {
+        document.getElementById('export_end_date').addEventListener('keydown', function(e) {
             if (e.key !== 'Enter') return;
             e.preventDefault();
             document.getElementById('export-reject-btn').click();
