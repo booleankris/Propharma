@@ -655,6 +655,7 @@
         {{-- ========================================================================= --}}
         <div id="tab-denied" class="tab-panel hidden space-y-4">
             @forelse($denied as $transfer)
+                @php try { @endphp
                 @php
                     $firstItem = $transfer->items->first();
                     $fromName = $firstItem?->sourceBatch?->pharmacy?->name 
@@ -792,6 +793,12 @@
                             </table>
                         </div>
                     </div>
+                @php } catch (\Throwable $e) { 
+                    echo '<div class="p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs font-mono break-all">';
+                    echo '<b>ERROR Rendering Transfer (Code: ' . ($transfer->code ?? 'N/A') . ')</b><br>';
+                    echo $e->getMessage() . '<br>Line: ' . $e->getLine() . '<br>File: ' . basename($e->getFile());
+                    echo '</div>'; 
+                } @endphp
                 </div>
             @empty
                 <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm py-16 text-center">
