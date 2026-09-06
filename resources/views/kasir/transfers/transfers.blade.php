@@ -653,7 +653,14 @@
         {{-- ========================================================================= --}}
         {{-- TAB 3: Ditolak (Denied)                                                   --}}
         {{-- ========================================================================= --}}
-        <div id="tab-denied" class="tab-panel hidden space-y-4">
+        
+<script>
+    console.log('--- DEBUG DENIED DATA ---');
+    console.log('Total:', {{ $denied->total() }});
+    console.log('Items Count:', {{ count($denied->items()) }});
+    console.log('Items:', @json($denied->items()));
+</script>
+<div id="tab-denied" class="tab-panel hidden space-y-4">
             @forelse($denied as $transfer)
                 @php try { @endphp
                 @php
