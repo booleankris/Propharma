@@ -347,8 +347,16 @@ class TransfersController extends Controller
             });
 
             $query->when($search, function ($q) use ($search) {
-                $q->whereHas('items.batches.medicines', function ($subQ) use ($search) {
-                    $subQ->where('name', 'like', "%{$search}%");
+                $q->where(function ($sq) use ($search) {
+                    $sq->where('code', 'like', "%{$search}%")
+                        ->orWhereHas('items.batches.medicines', function ($subQ) use ($search) {
+                            $subQ->where('name', 'like', "%{$search}%")
+                                ->orWhere('code', 'like', "%{$search}%");
+                        })
+                        ->orWhereHas('items.sourceBatch.medicines', function ($subQ) use ($search) {
+                            $subQ->where('name', 'like', "%{$search}%")
+                                ->orWhere('code', 'like', "%{$search}%");
+                        });
                 });
             })->when($startDate && $endDate, function ($q) use ($startDate, $endDate) {
                 $q->whereBetween('created_at', [$startDate . ' 00:00:00', $endDate . ' 23:59:59']);
