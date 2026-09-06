@@ -1,22 +1,27 @@
 @extends('layouts.app')
 @section('content')
 @section('style')
-    <link rel="stylesheet" href="{{ asset('css/dashboard.css') }}?v={{ file_exists(public_path('css/dashboard.css')) ? filemtime(public_path('css/dashboard.css')) : '1.0' }}">
+    <link rel="stylesheet"
+        href="{{ asset('css/dashboard.css') }}?v={{ file_exists(public_path('css/dashboard.css')) ? filemtime(public_path('css/dashboard.css')) : '1.0' }}">
     <link rel="stylesheet" href="{{ asset('templates/library/izitoast/dist/css/iziToast.min.css') }}">
     {{-- General Style --}}
     <style>
-        html, body {
+        html,
+        body {
             overflow-x: hidden !important;
             max-width: 100vw;
         }
+
         .payment-option {
             position: relative;
         }
+
         .payment-option:focus-within .payment-card {
             outline: 2.5px solid #3b82f6 !important;
             outline-offset: 2px !important;
             box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.25) !important;
         }
+
         .swal-on-top {
             z-index: 999999 !important;
         }
@@ -126,52 +131,44 @@
             <div class="trx-chips">
 
                 {{-- Resep Credit --}}
-                <a href="{{ url('transaction/kredit/' . ($trx_id != 0 ? $trx_id : 0)) }}"
-                    id="trx-type-kredit"
-                    class="trx-chip @if ($type == 'kredit') active @endif"
-                    title="Shortcut: Alt + 1">
+                <a href="{{ url('transaction/kredit/' . ($trx_id != 0 ? $trx_id : 0)) }}" id="trx-type-kredit"
+                    class="trx-chip @if ($type == 'kredit') active @endif" title="">
                     <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"
                         stroke-linejoin="round">
                         <rect x="2" y="5" width="20" height="14" rx="2" />
                         <line x1="2" y1="10" x2="22" y2="10" />
                     </svg>
                     <span class="trx-chip-lbl">Resep Credit</span>
-                    <span class="text-[9px] opacity-70 ml-1 font-mono font-normal">[Alt+1]</span>
+                    <span class="text-[9px] opacity-70 ml-1 font-mono font-normal"></span>
                 </a>
 
                 {{-- Resep Tunai --}}
-                <a href="{{ url('transaction/resep/' . ($trx_id != 0 ? $trx_id : 0)) }}"
-                    id="trx-type-resep"
-                    class="trx-chip  @if ($type == 'resep') active @endif"
-                    title="Shortcut: Alt + 2">
+                <a href="{{ url('transaction/resep/' . ($trx_id != 0 ? $trx_id : 0)) }}" id="trx-type-resep"
+                    class="trx-chip  @if ($type == 'resep') active @endif" title="">
                     <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"
                         stroke-linejoin="round">
                         <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
                         <rect x="9" y="3" width="6" height="4" rx="1" />
                     </svg>
                     <span class="trx-chip-lbl">Resep Tunai</span>
-                    <span class="text-[9px] opacity-70 ml-1 font-mono font-normal">[Alt+2]</span>
+                    <span class="text-[9px] opacity-70 ml-1 font-mono font-normal"></span>
                 </a>
 
                 {{-- HV/OTC --}}
-                <a href="{{ url('transaction/hv/' . ($trx_id != 0 ? $trx_id : 0)) }}"
-                    id="trx-type-hv"
-                    class="trx-chip @if ($type == 'hv') active @endif"
-                    title="Shortcut: Alt + 3">
+                <a href="{{ url('transaction/hv/' . ($trx_id != 0 ? $trx_id : 0)) }}" id="trx-type-hv"
+                    class="trx-chip @if ($type == 'hv') active @endif" title="">
                     <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"
                         stroke-linejoin="round">
                         <path
                             d="M19.428 15.428a2 2 0 0 0-1.022-.547l-2.387-.477a6 6 0 0 0-3.86.517l-.318.158a6 6 0 0 1-3.86.517L6.05 15.21a2 2 0 0 0-1.806.547M8 4h8l-1 1v5.172a2 2 0 0 0 .586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 0 0 9 10.172V5L8 4z" />
                     </svg>
                     <span class="trx-chip-lbl">HV</span>
-                    <span class="text-[9px] opacity-70 ml-1 font-mono font-normal">[Alt+3]</span>
+                    <span class="text-[9px] opacity-70 ml-1 font-mono font-normal"></span>
                 </a>
 
                 {{-- UPDS --}}
-                <a href="{{ url('transaction/upds/' . ($trx_id != 0 ? $trx_id : 0)) }}"
-                    id="trx-type-upds"
-                    class="trx-chip @if ($type == 'upds') active @endif"
-                    title="Shortcut: Alt + 4">
+                <a href="{{ url('transaction/upds/' . ($trx_id != 0 ? $trx_id : 0)) }}" id="trx-type-upds"
+                    class="trx-chip @if ($type == 'upds') active @endif">
                     <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"
                         stroke-linejoin="round">
                         <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
@@ -179,7 +176,7 @@
                         <path d="M16 10a4 4 0 0 1-8 0" />
                     </svg>
                     <span class="trx-chip-lbl">UPDS</span>
-                    <span class="text-[9px] opacity-70 ml-1 font-mono font-normal">[Alt+4]</span>
+                    <span class="text-[9px] opacity-70 ml-1 font-mono font-normal"></span>
                 </a>
 
             </div>
@@ -221,8 +218,7 @@
 
                                 </div>
                                 <input autofocus required id="debtorSearch" type="text"
-                                    value="{{ $transaction->debtors->name ?? '' }}"
-                                    placeholder="Ketik ID / Nama…"
+                                    value="{{ $transaction->debtors->name ?? '' }}" placeholder="Ketik ID / Nama…"
                                     class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300 text-[11px] font-poppins"
                                     autocomplete="off" />
 
@@ -233,7 +229,8 @@
                                 </div>
 
                                 <!-- Hidden field to hold selection (optional) -->
-                                <input type="hidden" id="selectedDebtorId" value="{{ $transaction->debtor_id ?? '' }}" />
+                                <input type="hidden" id="selectedDebtorId"
+                                    value="{{ $transaction->debtor_id ?? '' }}" />
                             </div>
                             <div class="mr-2 w-full hidden">
                                 <div class="w-full my-1">
@@ -241,8 +238,7 @@
 
                                 </div>
                                 <input id="debtorname" type="text" name="debtorname" readonly
-                                    value="{{ $transaction->debtors->name ?? '' }}"
-                                    placeholder="Nama Debitur"
+                                    value="{{ $transaction->debtors->name ?? '' }}" placeholder="Nama Debitur"
                                     class="w-full rounded-md readonly border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300 text-[11px] font-poppins"
                                     autocomplete="off" />
                             </div>
@@ -355,8 +351,8 @@
 
                         </div>
                         <input id="quantity" required name="quantity"
-                            oninput="this.value = this.value.replace(/[^0-9]/g, ''); count(this.value);" step="1"
-                            onkeyup="count(this.value)" type="number" placeholder="QTY"
+                            oninput="this.value = this.value.replace(/[^0-9]/g, ''); count(this.value);"
+                            step="1" onkeyup="count(this.value)" type="number" placeholder="QTY"
                             class="w-full rounded-md border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300 text-[11px] font-poppins"
                             autocomplete="off" />
                     </div>
@@ -644,7 +640,8 @@
                                             class="text-[10px] leading-normal px-1 py-1 font-semibold text-gray-800">
                                             {{ $cart->medicine->name }}
                                         </td>
-                                        <td class="px-1 py-1 text-center">{{ $cart->medicine->unit ?? $cart->medicine->packaging ?? '' }}</td>
+                                        <td class="px-1 py-1 text-center">
+                                            {{ $cart->medicine->unit ?? ($cart->medicine->packaging ?? '') }}</td>
                                         <td class="px-1 py-1 text-center">Rp
                                             {{ number_format($cart->item_price, 0, ',', '.') }}</td>
                                         <td class="px-1 py-1 text-center">{{ $cart->quantity }}</td>
@@ -1007,8 +1004,8 @@
                             <label class="text-[13px] font-poppins font-semibold pb-1">Cari Dokter</label>
                             <div class="flex items-center">
                                 <div class="searchdoctors w-full">
-                                    <input autofocus required id="doctorSearch"
-                                        type="text" placeholder="Ketik ID / Nama…"
+                                    <input autofocus required id="doctorSearch" type="text"
+                                        placeholder="Ketik ID / Nama…"
                                         class="w-full rounded-xl border my-1 border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
                                         autocomplete="off" />
                                     <!-- Dropdown -->
@@ -1163,10 +1160,13 @@
                     </div>
 
                     {{-- Bank / Channel Selector (QRIS, Debit, Transfer) --}}
-                    <div id="bankNameWrapper" class="hidden mt-3 p-3 bg-slate-50/90 border border-slate-200 rounded-2xl transition-all duration-200">
+                    <div id="bankNameWrapper"
+                        class="hidden mt-3 p-3 bg-slate-50/90 border border-slate-200 rounded-2xl transition-all duration-200">
                         <div class="flex items-center justify-between mb-2">
-                            <label id="bankLabel" class="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
-                                <span id="bankContextBadge" class="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-blue-100 text-blue-700">Bank</span>
+                            <label id="bankLabel"
+                                class="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                                <span id="bankContextBadge"
+                                    class="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-blue-100 text-blue-700">Bank</span>
                                 <span id="bankLabelText">Pilih Bank / Merchant</span>
                             </label>
                             <span class="text-[10px] text-slate-400 font-medium">Navigasi: [Enter] untuk lanjut</span>
@@ -1175,10 +1175,9 @@
                         {{-- Quick-pick Bank Chips --}}
                         <div class="grid grid-cols-3 sm:grid-cols-6 gap-1.5 mb-2.5" id="bankChipsGroup">
                             @foreach (['Mandiri', 'BCA', 'BRI', 'BNI', 'BSI', 'BTN'] as $bankItem)
-                                <button type="button" 
+                                <button type="button"
                                     class="bank-chip-btn py-2 px-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:border-blue-400 hover:bg-blue-50/50 active:scale-95 transition-all text-center flex items-center justify-center gap-1 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                                    data-bank="{{ $bankItem }}"
-                                    onclick="selectBankChip('{{ $bankItem }}')">
+                                    data-bank="{{ $bankItem }}" onclick="selectBankChip('{{ $bankItem }}')">
                                     <span>{{ $bankItem }}</span>
                                 </button>
                             @endforeach
@@ -1216,8 +1215,7 @@
                     <div class="w-full">
                         <label class="text-[13px] font-poppins font-semibold pb-1">Debitur</label>
                         <input id="debtor_name" tabindex="-1" readonly type="text" name="change"
-                            value="{{ $transaction->debtors->name ?? '' }}"
-                            placeholder="Nama Debitur"
+                            value="{{ $transaction->debtors->name ?? '' }}" placeholder="Nama Debitur"
                             class="w-full rounded-xl border my-1 readonly border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
                             autocomplete="off" />
                     </div>
@@ -1253,7 +1251,8 @@
                     <input type="hidden" required name="patient_id" id="patient_id" />
                     <input type="hidden" @if ($transaction->transaction_type == 'RESEP TUNAI') value="0" @endif required
                         name="doctor_id" id="doctor_id" />
-                    <input type="hidden" required name="debtor_id" id="debtor_id" value="{{ $transaction->debtor_id ?? '' }}" />
+                    <input type="hidden" required name="debtor_id" id="debtor_id"
+                        value="{{ $transaction->debtor_id ?? '' }}" />
 
                     @if ($check_transaction != 0)
                         @if ($transaction->transaction_type == 'KREDIT')
@@ -1358,8 +1357,9 @@
                     class="modal-print-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 text-left transition-colors">
                     <div
                         class="modal-btn-icon w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 text-gray-500 flex-shrink-0 transition-colors">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+                            stroke-linejoin="round">
                             <path d="M19 12H5M5 12l7-7M5 12l7 7" />
                         </svg>
                     </div>
@@ -1379,8 +1379,9 @@
                     class="modal-print-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 text-left transition-colors">
                     <div
                         class="modal-btn-icon w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 text-gray-500 flex-shrink-0 transition-colors">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+                            stroke-linejoin="round">
                             <polyline points="6 9 6 2 18 2 18 9" />
                             <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
                             <rect x="6" y="14" width="12" height="8" />
@@ -2300,9 +2301,9 @@
             li.dataset.id = it.id;
 
             const canSeeWarehouse = {{ canAccessWarehouseStock() ? 'true' : 'false' }};
-            const stock = canSeeWarehouse
-                ? ((Number(it.storage_stock) || 0) + (Number(it.counter_stock) || 0))
-                : (Number(it.counter_stock) || 0);
+            const stock = canSeeWarehouse ?
+                ((Number(it.storage_stock) || 0) + (Number(it.counter_stock) || 0)) :
+                (Number(it.counter_stock) || 0);
 
             li.innerHTML = `
         <div class="flex flex-col gap-1.5 min-w-0">
@@ -2676,10 +2677,12 @@
             const chips = document.querySelectorAll('.bank-chip-btn');
             chips.forEach(chip => {
                 if (chip.dataset.bank === selectedBank) {
-                    chip.classList.add('border-blue-600', 'bg-blue-50', 'text-blue-700', 'ring-2', 'ring-blue-500/20', 'shadow-sm');
+                    chip.classList.add('border-blue-600', 'bg-blue-50', 'text-blue-700', 'ring-2',
+                        'ring-blue-500/20', 'shadow-sm');
                     chip.classList.remove('border-slate-200', 'bg-white', 'text-slate-700');
                 } else {
-                    chip.classList.remove('border-blue-600', 'bg-blue-50', 'text-blue-700', 'ring-2', 'ring-blue-500/20', 'shadow-sm');
+                    chip.classList.remove('border-blue-600', 'bg-blue-50', 'text-blue-700', 'ring-2',
+                        'ring-blue-500/20', 'shadow-sm');
                     chip.classList.add('border-slate-200', 'bg-white', 'text-slate-700');
                 }
             });
@@ -2701,7 +2704,9 @@
             // Focus nextInput (Bayar) without scrolling
             const nextInput = document.getElementById('pay');
             if (nextInput) {
-                nextInput.focus({ preventScroll: true });
+                nextInput.focus({
+                    preventScroll: true
+                });
                 if (typeof nextInput.select === 'function') nextInput.select();
             }
         }
@@ -2713,7 +2718,8 @@
 
         function autoFillCashlessAmount() {
             if (paymentType !== 'CASH') {
-                const total = (typeof totaltransaction !== 'undefined' ? totaltransaction : 0) - (typeof subtotal_discount !== 'undefined' ? subtotal_discount : 0);
+                const total = (typeof totaltransaction !== 'undefined' ? totaltransaction : 0) - (
+                    typeof subtotal_discount !== 'undefined' ? subtotal_discount : 0);
                 if (total > 0 && typeof pay === 'function') {
                     pay(total.toString());
                 }
@@ -2736,19 +2742,22 @@
                 if (paymentType === 'QRIS') {
                     if (bankBadge) {
                         bankBadge.textContent = 'QRIS';
-                        bankBadge.className = 'px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-purple-100 text-purple-700';
+                        bankBadge.className =
+                            'px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-purple-100 text-purple-700';
                     }
                     if (bankLabelText) bankLabelText.textContent = 'Pilih Bank / Merchant QRIS';
                 } else if (paymentType === 'DEBIT') {
                     if (bankBadge) {
                         bankBadge.textContent = 'DEBIT';
-                        bankBadge.className = 'px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-blue-100 text-blue-700';
+                        bankBadge.className =
+                            'px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-blue-100 text-blue-700';
                     }
                     if (bankLabelText) bankLabelText.textContent = 'Pilih Mesin EDC / Bank Debit';
                 } else if (paymentType === 'TRANSFER') {
                     if (bankBadge) {
                         bankBadge.textContent = 'TRANSFER';
-                        bankBadge.className = 'px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-700';
+                        bankBadge.className =
+                            'px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-700';
                     }
                     if (bankLabelText) bankLabelText.textContent = 'Pilih Bank Tujuan Transfer';
                 }
@@ -2773,7 +2782,9 @@
                     event.preventDefault();
                     const nextIndex = (index + 1) % paymentRadios.length;
                     paymentRadios[nextIndex].checked = true;
-                    paymentRadios[nextIndex].focus({ preventScroll: true });
+                    paymentRadios[nextIndex].focus({
+                        preventScroll: true
+                    });
                     paymentType = paymentRadios[nextIndex].value;
                     getPaymentType();
                     return;
@@ -2783,7 +2794,9 @@
                     event.preventDefault();
                     const prevIndex = (index - 1 + paymentRadios.length) % paymentRadios.length;
                     paymentRadios[prevIndex].checked = true;
-                    paymentRadios[prevIndex].focus({ preventScroll: true });
+                    paymentRadios[prevIndex].focus({
+                        preventScroll: true
+                    });
                     paymentType = paymentRadios[prevIndex].value;
                     getPaymentType();
                     return;
@@ -2796,18 +2809,25 @@
                     paymentType = radio.value;
                     getPaymentType();
 
-                    if (radio.value === 'TRANSFER' || radio.value === 'DEBIT' || radio.value === 'QRIS') {
+                    if (radio.value === 'TRANSFER' || radio.value === 'DEBIT' || radio.value ===
+                        'QRIS') {
                         setTimeout(() => {
                             const firstChip = document.querySelector('.bank-chip-btn');
                             if (firstChip) {
-                                firstChip.focus({ preventScroll: true });
+                                firstChip.focus({
+                                    preventScroll: true
+                                });
                             } else {
                                 const bankInput = document.getElementById('bank_name');
-                                if (bankInput) bankInput.focus({ preventScroll: true });
+                                if (bankInput) bankInput.focus({
+                                    preventScroll: true
+                                });
                             }
                         }, 50);
                     } else {
-                        nextInput.focus({ preventScroll: true });
+                        nextInput.focus({
+                            preventScroll: true
+                        });
                         if (typeof nextInput.select === 'function') nextInput.select();
                     }
                 }
@@ -2820,11 +2840,15 @@
                 if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
                     e.preventDefault();
                     const nextC = (cIndex + 1) % bankChips.length;
-                    bankChips[nextC].focus({ preventScroll: true });
+                    bankChips[nextC].focus({
+                        preventScroll: true
+                    });
                 } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
                     e.preventDefault();
                     const prevC = (cIndex - 1 + bankChips.length) % bankChips.length;
-                    bankChips[prevC].focus({ preventScroll: true });
+                    bankChips[prevC].focus({
+                        preventScroll: true
+                    });
                 } else if (e.key === 'Enter') {
                     e.preventDefault();
                     selectBankChip(chip.dataset.bank);
@@ -2837,7 +2861,9 @@
                 if (event.key === 'Enter') {
                     event.preventDefault();
                     autoFillCashlessAmount();
-                    nextInput.focus({ preventScroll: true });
+                    nextInput.focus({
+                        preventScroll: true
+                    });
                     if (typeof nextInput.select === 'function') nextInput.select();
                 }
             });
@@ -2848,17 +2874,25 @@
         if (modalPaymentElem) {
             modalPaymentElem.addEventListener('keydown', function(e) {
                 const activeId = document.activeElement?.id;
-                if (activeId !== 'patientSearch' && activeId !== 'doctorSearch' && activeId !== 'pay' && activeId !== 'discounsubtotal') {
+                if (activeId !== 'patientSearch' && activeId !== 'doctorSearch' && activeId !== 'pay' &&
+                    activeId !== 'discounsubtotal') {
                     if (['1', '2', '3', '4'].includes(e.key)) {
                         e.preventDefault();
-                        const map = { '1': 'CASH', '2': 'QRIS', '3': 'DEBIT', '4': 'TRANSFER' };
+                        const map = {
+                            '1': 'CASH',
+                            '2': 'QRIS',
+                            '3': 'DEBIT',
+                            '4': 'TRANSFER'
+                        };
                         const val = map[e.key];
                         const targetRadio = paymentRadios.find(r => r.value === val);
                         if (targetRadio) {
                             targetRadio.checked = true;
                             paymentType = val;
                             getPaymentType();
-                            targetRadio.focus({ preventScroll: true });
+                            targetRadio.focus({
+                                preventScroll: true
+                            });
                         }
                     }
                 }
@@ -2870,11 +2904,15 @@
         document.getElementById('patient_id').value = it.id;
         if (currenttransaction == 'RESEP TUNAI' || currenttransaction == 'KREDIT') {
             const docInput = document.getElementById('doctorSearch');
-            if (docInput) docInput.focus({ preventScroll: true });
+            if (docInput) docInput.focus({
+                preventScroll: true
+            });
         } else {
             const payType = document.getElementById('payment_type');
             if (payType) {
-                payType.focus({ preventScroll: true });
+                payType.focus({
+                    preventScroll: true
+                });
                 payType.checked = true;
             }
         }
@@ -3003,7 +3041,9 @@
         if (currenttransaction == 'RESEP TUNAI') {
             const payType = document.getElementById('payment_type');
             if (payType) {
-                payType.focus({ preventScroll: true });
+                payType.focus({
+                    preventScroll: true
+                });
                 payType.checked = true;
             }
         }
@@ -3181,7 +3221,8 @@
         }
 
         totalprice.value = formatRupiah(final_price);
-        console.log("count() => subtotal:", subtotal, "grossprice:", grossprice, "final_price:", final_price, "pharmacy_price:", pharmacy_price);
+        console.log("count() => subtotal:", subtotal, "grossprice:", grossprice, "final_price:", final_price,
+            "pharmacy_price:", pharmacy_price);
 
     }
 
@@ -3246,7 +3287,8 @@
         raw_total, total_price, final_price, racikstatus) {
 
         var medicine_type = currenttransaction;
-        const debtor_id = document.getElementById('debtor_id')?.value || document.getElementById('selectedDebtorId')?.value || null;
+        const debtor_id = document.getElementById('debtor_id')?.value || document.getElementById('selectedDebtorId')
+            ?.value || null;
 
         if (document.getElementById('quantity').value != "") {
             if (edit_status != 0) {
@@ -4359,19 +4401,33 @@
         if (e.altKey && !e.ctrlKey && !e.metaKey) {
             if (e.key === '1') {
                 const el = document.getElementById('trx-type-kredit');
-                if (el) { e.preventDefault(); el.click(); }
+                if (el) {
+                    e.preventDefault();
+                    el.click();
+                }
             } else if (e.key === '2') {
                 const el = document.getElementById('trx-type-resep');
-                if (el) { e.preventDefault(); el.click(); }
+                if (el) {
+                    e.preventDefault();
+                    el.click();
+                }
             } else if (e.key === '3') {
                 const el = document.getElementById('trx-type-hv');
-                if (el) { e.preventDefault(); el.click(); }
+                if (el) {
+                    e.preventDefault();
+                    el.click();
+                }
             } else if (e.key === '4') {
                 const el = document.getElementById('trx-type-upds');
-                if (el) { e.preventDefault(); el.click(); }
+                if (el) {
+                    e.preventDefault();
+                    el.click();
+                }
             }
         }
-    }, { capture: true });
+    }, {
+        capture: true
+    });
 
     // Navigasi Arrow pada Jenis Transaksi
     const topTrxChips = Array.from(document.querySelectorAll('.trx-chips .trx-chip'));
@@ -4380,10 +4436,14 @@
         chip.addEventListener('keydown', function(e) {
             if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
                 e.preventDefault();
-                topTrxChips[(idx + 1) % topTrxChips.length].focus({ preventScroll: true });
+                topTrxChips[(idx + 1) % topTrxChips.length].focus({
+                    preventScroll: true
+                });
             } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
                 e.preventDefault();
-                topTrxChips[(idx - 1 + topTrxChips.length) % topTrxChips.length].focus({ preventScroll: true });
+                topTrxChips[(idx - 1 + topTrxChips.length) % topTrxChips.length].focus({
+                    preventScroll: true
+                });
             } else if (e.key === 'Enter') {
                 e.preventDefault();
                 chip.click();
@@ -5227,7 +5287,9 @@
             e.preventDefault();
             const payType = document.getElementById('payment_type');
             if (payType) {
-                payType.focus({ preventScroll: true });
+                payType.focus({
+                    preventScroll: true
+                });
                 payType.checked = true;
             }
         }
