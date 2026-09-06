@@ -383,13 +383,7 @@ class TransfersController extends Controller
         };
 
         // ── Mutasi Keluar: transfers WHERE source batch belongs to this pharmacy ──
-        $pendingQuery = MedicineTransfers::with([
-            'items.batches.medicines',
-            'items.batches.pharmacy',
-            'items.sourceBatch.pharmacy',
-            'items.etalases',
-            'users.pharmacy',
-        ])
+        $pendingQuery = MedicineTransfers::with(['users.pharmacy'])
             ->where(function ($q) use ($pharmacyId) {
                 $q->whereHas('items.sourceBatch', fn($sb) => $sb->where('pharmacy_id', $pharmacyId))
                     ->orWhere(function ($q2) use ($pharmacyId) {
@@ -405,13 +399,7 @@ class TransfersController extends Controller
             ->withQueryString();
 
         // ── Mutasi Masuk: transfers WHERE destination batch belongs to this pharmacy ──
-        $acceptedQuery = MedicineTransfers::with([
-            'items.batches.medicines',
-            'items.batches.pharmacy',
-            'items.sourceBatch.pharmacy',
-            'items.etalases',
-            'users.pharmacy',
-        ])
+        $acceptedQuery = MedicineTransfers::with(['users.pharmacy'])
             ->whereHas('items.batches', fn($q) => $q->where('pharmacy_id', $pharmacyId))
             ->whereIn('status', [0, 1])
             ->latest();
@@ -422,13 +410,7 @@ class TransfersController extends Controller
             ->withQueryString();
 
         // ── Ditolak: transfers with denied status involving this pharmacy ──
-        $deniedQuery = MedicineTransfers::with([
-            'items.batches.medicines',
-            'items.batches.pharmacy',
-            'items.sourceBatch.pharmacy',
-            'items.etalases',
-            'users.pharmacy',
-        ])
+        $deniedQuery = MedicineTransfers::with(['users.pharmacy'])
             ->where(function ($q) {
                 $q->where('status', 2)
                     ->orWhereHas('items', fn($i) => $i->where('status', 2));
@@ -573,6 +555,19 @@ class TransfersController extends Controller
         } catch (\Throwable $e) {
             return redirect(url()->previous() . '#accepted')->with('message', 'Gagal: ' . $e->getMessage());
         }
+    }
+
+    public function getTransferItems($id)
+    {
+        $transfer = MedicineTransfers::with(['users.pharmacy'])->findOrFail($id);
+
+        $statusMap = [
+            0 => ['Menunggu', 'bg-amber-50 text-amber-700 border-amber-200'],
+            1 => ['Diterima', 'bg-emerald-50 text-emerald-700 border-emerald-200'],
+            2 => ['Ditolak', 'bg-rose-50 text-rose-700 border-rose-200'],
+        ];
+
+        return view('kasir.transfers.partials.items_table', compact('transfer', 'statusMap'));
     }
 
     public function acceptItem(MedicineTransferItems $item)

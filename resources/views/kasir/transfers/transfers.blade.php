@@ -218,7 +218,7 @@
             };
             function switchTab(key) { window.switchTab(key); }
 
-            window.toggleDetails = function(id) {
+            window.toggleDetails = async function(id) {
                 const detailEl = document.getElementById('details-' + id);
                 const chevronEl = document.getElementById('chevron-' + id);
 
@@ -228,11 +228,74 @@
                 if (isHidden) {
                     detailEl.classList.remove('hidden');
                     if (chevronEl) chevronEl.classList.add('rotate-180');
+                    
+                    // AJAX Load
+                    const container = detailEl.querySelector('.ajax-items-container');
+                    if (container && !container.dataset.loaded) {
+                        try {
+                            const url = container.dataset.url;
+                            const response = await fetch(url, {
+                                headers: {
+                                    'X-Requested-With': 'XMLHttpRequest',
+                                    'Accept': 'text/html'
+                                }
+                            });
+                            
+                            if (response.ok) {
+                                const html = await response.text();
+                                container.innerHTML = html;
+                                container.dataset.loaded = 'true';
+                                // Re-bind form submits if necessary
+                            } else {
+                                container.innerHTML = '<div class="text-rose-500 p-4 text-center">Gagal memuat item mutasi.</div>';
+                            }
+                        } catch (e) {
+                            container.innerHTML = '<div class="text-rose-500 p-4 text-center">Terjadi kesalahan koneksi.</div>';
+                        }
+                    }
                 } else {
                     detailEl.classList.add('hidden');
                     if (chevronEl) chevronEl.classList.remove('rotate-180');
                 }
             };
+
+            // Global delegation for ajax forms inside dynamically loaded content
+            document.addEventListener('submit', function(e) {
+                if (e.target && e.target.classList.contains('ajax-form')) {
+                    // Let normal form submission happen, just disable button
+                    const btn = e.target.querySelector('button[type="button"], button[type="submit"]');
+                    if (btn && btn.dataset.confirm) {
+                        e.preventDefault();
+                        if (confirm(btn.dataset.confirm)) {
+                            btn.innerHTML = 'Memproses...';
+                            btn.classList.add('opacity-50', 'pointer-events-none');
+                            e.target.submit();
+                        }
+                    } else if (btn) {
+                        btn.innerHTML = 'Memproses...';
+                        btn.classList.add('opacity-50', 'pointer-events-none');
+                    }
+                }
+            });
+
+            document.addEventListener('click', function(e) {
+                const btn = e.target.closest('.ajax-submit-btn');
+                if (btn) {
+                    e.preventDefault();
+                    const form = btn.closest('form');
+                    if (btn.dataset.confirm) {
+                        if (confirm(btn.dataset.confirm)) {
+                            btn.innerHTML = 'Memproses...';
+                            btn.classList.add('opacity-50', 'pointer-events-none');
+                            form.submit();
+                        }
+                    } else {
+                        btn.innerHTML = 'Memproses...';
+                        btn.classList.add('opacity-50', 'pointer-events-none');
+                        form.submit();
+                    }
+                }
+            });
             function toggleDetails(id) { window.toggleDetails(id); }
 
             window.initActiveTab = function() {
@@ -382,64 +445,16 @@
 
                     {{-- Collapsible Items Table --}}
                     <div id="details-pending-{{ $transfer->id }}" class="hidden border-t border-slate-100 bg-slate-50/40">
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-xs">
-                                <thead class="bg-slate-100/60 border-b border-slate-200/60 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                                    <tr>
-                                        <th class="py-3 px-5 text-left">Obat</th>
-                                        <th class="py-3 px-4 text-left">Batch & Expired</th>
-                                        <th class="py-3 px-4 text-left">Etalase</th>
-                                        <th class="py-3 px-4 text-center">Jumlah Qty</th>
-                                        <th class="py-3 px-4 text-center">Status Item</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-slate-100 bg-white">
-                                    @forelse($transfer->items as $item)
-                                        <tr class="hover:bg-slate-50/60 transition">
-                                            <td class="py-3 px-5">
-                                                <div class="font-semibold text-slate-800">
-                                                    {{ $item->batches?->medicines?->name ?? '—' }}
-                                                </div>
-                                                <div class="text-[10px] text-slate-400 font-mono mt-0.5">
-                                                    {{ $item->batches?->medicines?->code ?? '—' }}
-                                                    @if($item->batches?->medicines?->unit)
-                                                        · <span class="text-slate-500">{{ $item->batches->medicines->unit }}</span>
-                                                    @endif
-                                                </div>
-                                            </td>
-                                            <td class="py-3 px-4 text-slate-600">
-                                                <div class="font-medium text-slate-700">{{ $item->batches?->name ?? '—' }}</div>
-                                                <div class="text-[10px] text-slate-400">
-                                                    Exp: {{ safeDateFormat($item->batches?->expired_date) }}
-                                                </div>
-                                            </td>
-                                            <td class="py-3 px-4 text-slate-600">
-                                                <span class="px-2 py-0.5 bg-slate-100 rounded text-slate-700 text-[11px]">
-                                                    {{ $item->etalases?->name ?? '—' }}
-                                                </span>
-                                            </td>
-                                            <td class="py-3 px-4 text-center">
-                                                <span class="inline-flex items-center px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 font-mono text-xs font-bold border border-emerald-200">
-                                                    {{ $item->qty }}
-                                                </span>
-                                            </td>
-                                            <td class="py-3 px-4 text-center">
-                                                @php [$iLabel, $iClass] = $statusMap[$item->status] ?? ['—', '']; @endphp
-                                                <span class="text-[10px] font-semibold px-2.5 py-0.5 rounded-full border {{ $iClass }}">
-                                                    {{ $iLabel }}
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    @empty
-                                        <tr>
-                                            <td colspan="5" class="py-6 text-center text-slate-400 text-xs">Tidak ada item obat pada transfer ini</td>
-                                        </tr>
-                                    @endforelse
-                                </tbody>
-                            </table>
+                        <div class="ajax-items-container p-6 flex justify-center" data-url="{{ route('transfers.items', $transfer->id) }}">
+                            <div class="flex flex-col items-center gap-3 text-slate-400">
+                                <svg class="animate-spin w-6 h-6 text-emerald-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                <span class="text-xs font-medium">Memuat data item...</span>
+                            </div>
                         </div>
-                    </div>
-                </div>
+                    </div></div>
             @empty
                 <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm py-16 text-center">
                     <div class="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-3 text-slate-400">
@@ -469,7 +484,7 @@
         {{-- TAB 2: Mutasi Masuk (Accepted)                                            --}}
         {{-- ========================================================================= --}}
         <div id="tab-accepted" class="tab-panel hidden space-y-4">
-@php try { @endphp
+
             @forelse($accepted as $transfer)
                 @php
                     $firstItem = $transfer->items->first();
@@ -570,96 +585,16 @@
 
                     {{-- Collapsible Items Table --}}
                     <div id="details-accepted-{{ $transfer->id }}" class="hidden border-t border-slate-100 bg-slate-50/40">
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-xs">
-                                <thead class="bg-slate-100/60 border-b border-slate-200/60 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                                    <tr>
-                                        <th class="py-3 px-5 text-left">Obat</th>
-                                        <th class="py-3 px-4 text-left">Batch & Expired</th>
-                                        <th class="py-3 px-4 text-left">Etalase</th>
-                                        <th class="py-3 px-4 text-center">Jumlah Qty</th>
-                                        <th class="py-3 px-4 text-center">Status Item</th>
-                                        <th class="py-3 px-4 text-center w-48">Aksi Konfirmasi</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-slate-100 bg-white">
-                                    @forelse($transfer->items as $item)
-                                        <tr class="hover:bg-slate-50/60 transition">
-                                            <td class="py-3 px-5">
-                                                <div class="font-semibold text-slate-800">
-                                                    {{ $item->batches?->medicines?->name ?? '—' }}
-                                                </div>
-                                                <div class="text-[10px] text-slate-400 font-mono mt-0.5">
-                                                    {{ $item->batches?->medicines?->code ?? '—' }}
-                                                    @if($item->batches?->medicines?->unit)
-                                                        · <span class="text-slate-500">{{ $item->batches->medicines->unit }}</span>
-                                                    @endif
-                                                </div>
-                                            </td>
-                                            <td class="py-3 px-4 text-slate-600">
-                                                <div class="font-medium text-slate-700">{{ $item->batches?->name ?? '—' }}</div>
-                                                <div class="text-[10px] text-slate-400">
-                                                    Exp: {{ safeDateFormat($item->batches?->expired_date) }}
-                                                </div>
-                                            </td>
-                                            <td class="py-3 px-4 text-slate-600">
-                                                <span class="px-2 py-0.5 bg-slate-100 rounded text-slate-700 text-[11px]">
-                                                    {{ $item->etalases?->name ?? '—' }}
-                                                </span>
-                                            </td>
-                                            <td class="py-3 px-4 text-center">
-                                                <span class="inline-flex items-center px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 font-mono text-xs font-bold border border-emerald-200">
-                                                    {{ $item->qty }}
-                                                </span>
-                                            </td>
-                                            <td class="py-3 px-4 text-center">
-                                                @php [$iLabel, $iClass] = $statusMap[$item->status] ?? ['—', '']; @endphp
-                                                <span class="text-[10px] font-semibold px-2.5 py-0.5 rounded-full border {{ $iClass }}">
-                                                    {{ $iLabel }}
-                                                </span>
-                                            </td>
-                                            <td class="py-3 px-4 text-center">
-                                                @if ($item->status === 0)
-                                                    <div class="flex items-center justify-center gap-2">
-                                                        <form method="POST" action="{{ route('transfers.acceptItem', $item) }}">
-                                                            @csrf
-                                                            <button type="submit"
-                                                                class="inline-flex items-center gap-1 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-semibold rounded-lg transition shadow-sm"
-                                                                onclick="return confirm('Terima obat {{ $item->batches?->medicines?->name }} (Qty: {{ $item->qty }})?')">
-                                                                <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
-                                                                    <polyline points="20 6 9 17 4 12" />
-                                                                </svg>
-                                                                Terima
-                                                            </button>
-                                                        </form>
-                                                        <form method="POST" action="{{ route('transfers.denyItem', $item) }}">
-                                                            @csrf
-                                                            <button type="submit"
-                                                                class="inline-flex items-center gap-1 px-3 py-1.5 bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 text-[11px] font-semibold rounded-lg transition shadow-sm"
-                                                                onclick="return confirm('Tolak obat {{ $item->batches?->medicines?->name }}?')">
-                                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
-                                                                    <line x1="18" y1="6" x2="6" y2="18" />
-                                                                    <line x1="6" y1="6" x2="18" y2="18" />
-                                                                </svg>
-                                                                Tolak
-                                                            </button>
-                                                        </form>
-                                                    </div>
-                                                @else
-                                                    <span class="text-[11px] text-slate-400 font-medium italic">Telah diproses</span>
-                                                @endif
-                                            </td>
-                                        </tr>
-                                    @empty
-                                        <tr>
-                                            <td colspan="6" class="py-6 text-center text-slate-400 text-xs">Tidak ada item obat pada transfer ini</td>
-                                        </tr>
-                                    @endforelse
-                                </tbody>
-                            </table>
+                        <div class="ajax-items-container p-6 flex justify-center" data-url="{{ route('transfers.items', $transfer->id) }}">
+                            <div class="flex flex-col items-center gap-3 text-slate-400">
+                                <svg class="animate-spin w-6 h-6 text-emerald-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                <span class="text-xs font-medium">Memuat data item...</span>
+                            </div>
                         </div>
-                    </div>
-                </div>
+                    </div></div>
             @empty
                 <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm py-16 text-center">
                     <div class="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-3 text-slate-400">
@@ -699,7 +634,7 @@
 </script>
 <div id="tab-denied" class="tab-panel hidden space-y-4">
             @forelse($denied as $transfer)
-                @php try { @endphp
+                
                 @php
                     $firstItem = $transfer->items->first();
                     $fromName = $firstItem?->sourceBatch?->pharmacy?->name 
@@ -781,61 +716,16 @@
 
                     {{-- Collapsible Items Table --}}
                     <div id="details-denied-{{ $transfer->id }}" class="hidden border-t border-slate-100 bg-slate-50/40">
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-xs">
-                                <thead class="bg-slate-100/60 border-b border-slate-200/60 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                                    <tr>
-                                        <th class="py-3 px-5 text-left">Obat</th>
-                                        <th class="py-3 px-4 text-left">Batch & Expired</th>
-                                        <th class="py-3 px-4 text-left">Etalase</th>
-                                        <th class="py-3 px-4 text-center">Jumlah Qty</th>
-                                        <th class="py-3 px-4 text-center">Status Item</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-slate-100 bg-white">
-                                    @forelse($deniedItemsList as $item)
-                                        <tr class="hover:bg-slate-50/60 transition">
-                                            <td class="py-3 px-5">
-                                                <div class="font-semibold text-slate-800">
-                                                    {{ $item->batches?->medicines?->name ?? '—' }}
-                                                </div>
-                                                <div class="text-[10px] text-slate-400 font-mono mt-0.5">
-                                                    {{ $item->batches?->medicines?->code ?? '—' }}
-                                                    @if($item->batches?->medicines?->unit)
-                                                        · <span class="text-slate-500">{{ $item->batches->medicines->unit }}</span>
-                                                    @endif
-                                                </div>
-                                            </td>
-                                            <td class="py-3 px-4 text-slate-600">
-                                                <div class="font-medium text-slate-700">{{ $item->batches?->name ?? '—' }}</div>
-                                                <div class="text-[10px] text-slate-400">
-                                                    Exp: {{ safeDateFormat($item->batches?->expired_date) }}
-                                                </div>
-                                            </td>
-                                            <td class="py-3 px-4 text-slate-600">
-                                                <span class="px-2 py-0.5 bg-slate-100 rounded text-slate-700 text-[11px]">
-                                                    {{ $item->etalases?->name ?? '—' }}
-                                                </span>
-                                            </td>
-                                            <td class="py-3 px-4 text-center">
-                                                <span class="inline-flex items-center px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 font-mono text-xs font-bold border border-rose-200">
-                                                    {{ $item->qty }}
-                                                </span>
-                                            </td>
-                                            <td class="py-3 px-4 text-center">
-                                                <span class="text-[10px] font-semibold px-2.5 py-0.5 rounded-full border bg-rose-50 text-rose-700 border-rose-200">
-                                                    Ditolak
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    @empty
-                                        <tr>
-                                            <td colspan="5" class="py-6 text-center text-slate-400 text-xs">Tidak ada item yang ditolak</td>
-                                        </tr>
-                                    @endforelse
-                                </tbody>
-                            </table>
+                        <div class="ajax-items-container p-6 flex justify-center" data-url="{{ route('transfers.items', $transfer->id) }}">
+                            <div class="flex flex-col items-center gap-3 text-slate-400">
+                                <svg class="animate-spin w-6 h-6 text-emerald-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                <span class="text-xs font-medium">Memuat data item...</span>
+                            </div>
                         </div>
+                    </div>
                     </div>
                 @php } catch (\Throwable $e) { 
                     echo '<div class="p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs font-mono break-all">';

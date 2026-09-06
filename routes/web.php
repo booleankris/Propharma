@@ -322,6 +322,7 @@ Route::middleware(['auth', 'role:Kasir|Gudang PMI|HO|administrator|manager|Onlin
     Route::post('/transfers/{transfer}/deny', [TransfersController::class, 'denyTransfer'])->name('transfers.deny');
     Route::get('/transfers/{id}/print', [TransfersController::class, 'printReceipt'])
         ->name('transfers.print');
+    Route::get('/transfers/{id}/items', [TransfersController::class, 'getTransferItems'])->name('transfers.items');
     Route::post('/transfers/{item}/accept-item', [TransfersController::class, 'acceptItem'])->name('transfers.acceptItem');
     Route::post('/transfers/{item}/deny-item', [TransfersController::class, 'denyItem'])->name('transfers.denyItem');
     // Reports  
