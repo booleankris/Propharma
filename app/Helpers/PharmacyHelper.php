@@ -14,8 +14,8 @@ if (!function_exists('getActivePharmacyId')) {
             return 0;
         }
 
-        // Jika user HO dan memilih cabang spesifik di session
-        if ($user->hasRole('HO') && session()->has('ho_pharmacy_id')) {
+        // Jika user HO atau Administrator dan memilih cabang spesifik di session
+        if (($user->hasRole('HO') || $user->hasRole('administrator')) && session()->has('ho_pharmacy_id')) {
             return (int) session('ho_pharmacy_id');
         }
 
@@ -61,8 +61,8 @@ if (!function_exists('getPurchasingPharmacyId')) {
             return 0;
         }
 
-        // Jika user HO dan memilih cabang spesifik di session
-        if ($user->hasRole('HO') && session()->has('ho_pharmacy_id')) {
+        // Jika user HO atau Administrator dan memilih cabang spesifik di session
+        if (($user->hasRole('HO') || $user->hasRole('administrator')) && session()->has('ho_pharmacy_id')) {
             $hoSelected = (int) session('ho_pharmacy_id');
             if ($hoSelected === 1 || $hoSelected === 9) {
                 return 9; // Gudang PMI

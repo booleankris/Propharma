@@ -141,9 +141,8 @@ class TransfersController extends Controller
                 }
             } else {
                 $currentPelayanan = (int) $item->medicine_transfer_items
-                    ->where('status', 1)
-                    ->where(function ($q) {
-                        return is_null($q->source_type) || $q->source_type !== 'retur_gudang';
+                    ->filter(function ($mti) {
+                        return (int) $mti->status === 1 && (empty($mti->source_type) || $mti->source_type !== 'retur_gudang');
                     })
                     ->sum('qty');
                 $pendingOutgoing = (int) MedicineTransferItems::where('source_batches_id', $item->id)
@@ -462,6 +461,11 @@ class TransfersController extends Controller
     {
         $destBatch = $item->batches;
         $srcBatch = $item->sourceBatch;
+        if (!$srcBatch) {
+            $srcBatch = Batches::where('medicine_id', $destBatch->medicine_id)
+                ->where('pharmacy_id', 9)
+                ->first() ?? $destBatch;
+        }
         $medicine = Medicines::findOrFail($destBatch->medicine_id);
         $sourceType = $item->source_type ?? 'gudang';
 
