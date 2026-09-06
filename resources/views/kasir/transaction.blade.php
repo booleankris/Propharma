@@ -5,6 +5,18 @@
     <link rel="stylesheet" href="{{ asset('templates/library/izitoast/dist/css/iziToast.min.css') }}">
     {{-- General Style --}}
     <style>
+        html, body {
+            overflow-x: hidden !important;
+            max-width: 100vw;
+        }
+        .payment-option {
+            position: relative;
+        }
+        .payment-option:focus-within .payment-card {
+            outline: 2.5px solid #3b82f6 !important;
+            outline-offset: 2px !important;
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.25) !important;
+        }
         .swal-on-top {
             z-index: 999999 !important;
         }
@@ -559,45 +571,36 @@
                     <div class="w-1/2">
                         <div class="flex gap-2 justify-end flex-col w-full">
                             <div class="mr-2 flex items-center justify-end">
-
-                                <div class="w-[40%] text-right">
-                                    <label
-                                        class="text-[13px] font-poppins font-semibold text-right pr-2">Jumlah</label>
-
+                                <div class="w-28 shrink-0 text-right">
+                                    <label class="text-[13px] font-poppins font-semibold pr-2">Jumlah</label>
                                 </div>
-                                <div class="w-[100%]">
+                                <div class="flex-1 min-w-0">
                                     <input type="text" readonly id="payment_total" name="payment_total"
                                         placeholder="Total"
-                                        class="w-full text-right rounded-md text-[20px] font-bold readonly border border-gray-300 bg-white px-3 py-2  focus:outline-none focus:ring-2 focus:ring-gray-300  font-poppins"
+                                        class="w-full text-right rounded-md text-[20px] font-bold readonly border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300 font-poppins"
                                         autocomplete="off" />
                                 </div>
                             </div>
 
                             <div class="mr-2 flex items-center justify-end">
-
-                                <div class="w-[40%] text-right">
-                                    <label class="text-[13px] font-poppins font-semibold text-right pr-2">Total
-                                        Diskon</label>
-
+                                <div class="w-28 shrink-0 text-right">
+                                    <label class="text-[13px] font-poppins font-semibold pr-2">Total Diskon</label>
                                 </div>
-                                <div class="w-[100%]">
+                                <div class="flex-1 min-w-0">
                                     <input type="text" readonly id="discount_total" name="discount_total"
                                         placeholder="Total"
-                                        class="w-full text-right rounded-md text-[20px] font-bold readonly border border-gray-300 bg-white px-3 py-2  focus:outline-none focus:ring-2 focus:ring-gray-300  font-poppins"
+                                        class="w-full text-right rounded-md text-[20px] font-bold readonly border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300 font-poppins"
                                         autocomplete="off" />
                                 </div>
                             </div>
 
                             <div class="mr-2 flex items-center justify-end">
-
-                                <div class="w-[40%] text-right">
-                                    <label class="text-[13px] font-poppins font-semibold text-right pr-2">Total
-                                        Beli</label>
+                                <div class="w-28 shrink-0 text-right">
+                                    <label class="text-[13px] font-poppins font-semibold pr-2">Total Beli</label>
                                 </div>
-
-                                <div class="w-[100%]">
+                                <div class="flex-1 min-w-0">
                                     <input type="text" readonly id="price2" name="price2" placeholder="Total"
-                                        class="w-full text-right rounded-md text-[20px] font-bold readonly border border-gray-300 bg-white px-3 py-2  focus:outline-none focus:ring-2 focus:ring-gray-300  font-poppins"
+                                        class="w-full text-right rounded-md text-[20px] font-bold readonly border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300 font-poppins"
                                         autocomplete="off" />
                                 </div>
                             </div>
@@ -607,7 +610,7 @@
                 </div>
                 <h2 class="text-xl font-semibold mb-3 mt-2">Barang Dibeli</h2>
                 <div
-                    class="mt-4 rounded-2xl @if ($transaction->transaction_type == 'UPDS') bg-[#eff8ef] @elseif($transaction->transaction_type == 'HV/OTC') bg-[#e8f5ff] @elseif($transaction->transaction_type == 'KREDIT') bg-[#f8f4e3] @else bg-[#ffeaea] @endif h-[40vh] overflow-y-scroll md:h-[53vh]">
+                    class="mt-4 rounded-2xl @if ($transaction->transaction_type == 'UPDS') bg-[#eff8ef] @elseif($transaction->transaction_type == 'HV/OTC') bg-[#e8f5ff] @elseif($transaction->transaction_type == 'KREDIT') bg-[#f8f4e3] @else bg-[#ffeaea] @endif h-[40vh] overflow-y-auto overflow-x-auto md:h-[53vh]">
                     <div class="flex flex-col justify-between">
                         <table class="min-w-full text-sm text-left font-poppins text-gray-700">
                             <thead class="text-gray-600 uppercase text-xs border-b border-[#d6d6d6]">
@@ -2695,10 +2698,10 @@
             updateBankChipsVisual(bankName);
             autoFillCashlessAmount();
 
-            // Focus nextInput (Bayar)
+            // Focus nextInput (Bayar) without scrolling
             const nextInput = document.getElementById('pay');
             if (nextInput) {
-                nextInput.focus();
+                nextInput.focus({ preventScroll: true });
                 if (typeof nextInput.select === 'function') nextInput.select();
             }
         }
@@ -2751,9 +2754,6 @@
                 }
 
                 autoFillCashlessAmount();
-                setTimeout(() => {
-                    if (bankInput) bankInput.focus();
-                }, 50);
             } else {
                 bankWrapper.classList.add('hidden');
                 if (bankInput) bankInput.value = '';
@@ -2773,7 +2773,7 @@
                     event.preventDefault();
                     const nextIndex = (index + 1) % paymentRadios.length;
                     paymentRadios[nextIndex].checked = true;
-                    paymentRadios[nextIndex].focus();
+                    paymentRadios[nextIndex].focus({ preventScroll: true });
                     paymentType = paymentRadios[nextIndex].value;
                     getPaymentType();
                     return;
@@ -2783,7 +2783,7 @@
                     event.preventDefault();
                     const prevIndex = (index - 1 + paymentRadios.length) % paymentRadios.length;
                     paymentRadios[prevIndex].checked = true;
-                    paymentRadios[prevIndex].focus();
+                    paymentRadios[prevIndex].focus({ preventScroll: true });
                     paymentType = paymentRadios[prevIndex].value;
                     getPaymentType();
                     return;
@@ -2797,12 +2797,17 @@
                     getPaymentType();
 
                     if (radio.value === 'TRANSFER' || radio.value === 'DEBIT' || radio.value === 'QRIS') {
-                        const bankInput = document.getElementById('bank_name');
                         setTimeout(() => {
-                            if (bankInput) bankInput.focus();
+                            const firstChip = document.querySelector('.bank-chip-btn');
+                            if (firstChip) {
+                                firstChip.focus({ preventScroll: true });
+                            } else {
+                                const bankInput = document.getElementById('bank_name');
+                                if (bankInput) bankInput.focus({ preventScroll: true });
+                            }
                         }, 50);
                     } else {
-                        nextInput.focus();
+                        nextInput.focus({ preventScroll: true });
                         if (typeof nextInput.select === 'function') nextInput.select();
                     }
                 }
@@ -2815,11 +2820,11 @@
                 if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
                     e.preventDefault();
                     const nextC = (cIndex + 1) % bankChips.length;
-                    bankChips[nextC].focus();
+                    bankChips[nextC].focus({ preventScroll: true });
                 } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
                     e.preventDefault();
                     const prevC = (cIndex - 1 + bankChips.length) % bankChips.length;
-                    bankChips[prevC].focus();
+                    bankChips[prevC].focus({ preventScroll: true });
                 } else if (e.key === 'Enter') {
                     e.preventDefault();
                     selectBankChip(chip.dataset.bank);
@@ -2832,8 +2837,30 @@
                 if (event.key === 'Enter') {
                     event.preventDefault();
                     autoFillCashlessAmount();
-                    nextInput.focus();
+                    nextInput.focus({ preventScroll: true });
                     if (typeof nextInput.select === 'function') nextInput.select();
+                }
+            });
+        }
+
+        // Modal level shortcuts (1: CASH, 2: QRIS, 3: DEBIT, 4: TRANSFER)
+        const modalPaymentElem = document.getElementById('paymentModal');
+        if (modalPaymentElem) {
+            modalPaymentElem.addEventListener('keydown', function(e) {
+                const activeId = document.activeElement?.id;
+                if (activeId !== 'patientSearch' && activeId !== 'doctorSearch' && activeId !== 'pay' && activeId !== 'discounsubtotal') {
+                    if (['1', '2', '3', '4'].includes(e.key)) {
+                        e.preventDefault();
+                        const map = { '1': 'CASH', '2': 'QRIS', '3': 'DEBIT', '4': 'TRANSFER' };
+                        const val = map[e.key];
+                        const targetRadio = paymentRadios.find(r => r.value === val);
+                        if (targetRadio) {
+                            targetRadio.checked = true;
+                            paymentType = val;
+                            getPaymentType();
+                            targetRadio.focus({ preventScroll: true });
+                        }
+                    }
                 }
             });
         }
@@ -2842,12 +2869,14 @@
     function selectPatient(it) {
         document.getElementById('patient_id').value = it.id;
         if (currenttransaction == 'RESEP TUNAI' || currenttransaction == 'KREDIT') {
-            document.getElementById('doctorSearch').focus();
+            const docInput = document.getElementById('doctorSearch');
+            if (docInput) docInput.focus({ preventScroll: true });
         } else {
-            document.getElementById('payment_type').focus();
-            document.getElementById('payment_type').checked = true;
-
-
+            const payType = document.getElementById('payment_type');
+            if (payType) {
+                payType.focus({ preventScroll: true });
+                payType.checked = true;
+            }
         }
         document.getElementById('patientSearch').value = it.name;
         closepatientBox();
@@ -2972,8 +3001,11 @@
     function selectDoctor(it) {
 
         if (currenttransaction == 'RESEP TUNAI') {
-            document.getElementById('payment_type').focus();
-            document.getElementById('payment_type').checked = true;
+            const payType = document.getElementById('payment_type');
+            if (payType) {
+                payType.focus({ preventScroll: true });
+                payType.checked = true;
+            }
         }
         document.getElementById('doctor_id').value = it.id;
         document.getElementById('doctorSearch').value = it.name;
@@ -4348,10 +4380,10 @@
         chip.addEventListener('keydown', function(e) {
             if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
                 e.preventDefault();
-                topTrxChips[(idx + 1) % topTrxChips.length].focus();
+                topTrxChips[(idx + 1) % topTrxChips.length].focus({ preventScroll: true });
             } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
                 e.preventDefault();
-                topTrxChips[(idx - 1 + topTrxChips.length) % topTrxChips.length].focus();
+                topTrxChips[(idx - 1 + topTrxChips.length) % topTrxChips.length].focus({ preventScroll: true });
             } else if (e.key === 'Enter') {
                 e.preventDefault();
                 chip.click();
@@ -5193,8 +5225,11 @@
     discounsubtotal.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
             e.preventDefault();
-            document.getElementById('payment_type').focus();
-            document.getElementById('payment_type').checked = true;
+            const payType = document.getElementById('payment_type');
+            if (payType) {
+                payType.focus({ preventScroll: true });
+                payType.checked = true;
+            }
         }
     })
     payInput.addEventListener('keydown', (e) => {

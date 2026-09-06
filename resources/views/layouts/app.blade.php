@@ -43,6 +43,10 @@
             height: 40px !important;
             right: 8px !important;
         }
+        html, body {
+            overflow-x: hidden !important;
+            max-width: 100vw;
+        }
     </style>
     <!-- Favicon & PWA Settings -->
     <link rel="icon" type="image/x-icon" href="{{ asset('favicon.ico') }}">
