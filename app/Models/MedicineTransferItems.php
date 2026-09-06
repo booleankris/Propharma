@@ -16,6 +16,11 @@ class MedicineTransferItems extends Model
         'etalases_id',
         'qty',
         'status',
+        'stock_deducted_at',
+    ];
+
+    protected $casts = [
+        'stock_deducted_at' => 'datetime',
     ];
 
     public function sourceBatch()

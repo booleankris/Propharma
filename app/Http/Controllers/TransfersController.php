@@ -88,18 +88,12 @@ class TransfersController extends Controller
                     );
             });
 
-        // Warehouse: show batches with gudang stock
-        // Cabang / Pelayanan: show batches with pelayanan stock only
+        // Warehouse: stock is directly in batches.stock (already deducted on create)
+        // Cabang / Pelayanan: stock is sum of accepted MTI records
         $isWarehouse = isWarehousePharmacy($pharmacyId);
 
         if ($isWarehouse) {
-            $query->whereRaw('batches.stock > (
-                SELECT COALESCE(SUM(mti.qty), 0)
-                FROM medicine_transfer_items mti
-                WHERE mti.source_batches_id = batches.id
-                  AND mti.source_type = "gudang"
-                  AND mti.status = 0
-            )');
+            $query->where('stock', '>', 0);
         } else {
             $query->whereRaw('(
                 SELECT COALESCE(SUM(mti1.qty), 0)
@@ -107,13 +101,7 @@ class TransfersController extends Controller
                 WHERE mti1.batches_id = batches.id
                   AND mti1.status = 1
                   AND (mti1.source_type IS NULL OR mti1.source_type != "retur_gudang")
-            ) > (
-                SELECT COALESCE(SUM(mti0.qty), 0)
-                FROM medicine_transfer_items mti0
-                WHERE mti0.source_batches_id = batches.id
-                  AND mti0.source_type = "pelayanan"
-                  AND mti0.status = 0
-            )');
+            ) > 0');
         }
 
         $data = $query->paginate(20);
@@ -122,11 +110,7 @@ class TransfersController extends Controller
         $results = collect();
         $data->getCollection()->each(function ($item) use ($isWarehouse, &$results) {
             if ($isWarehouse) {
-                $pendingOutgoing = (int) MedicineTransferItems::where('source_batches_id', $item->id)
-                    ->where('source_type', 'gudang')
-                    ->where('status', 0)
-                    ->sum('qty');
-                $availStock = max(0, (int) $item->stock - $pendingOutgoing);
+                $availStock = max(0, (int) $item->stock);
 
                 if ($availStock > 0) {
                     $results->push([
@@ -145,11 +129,7 @@ class TransfersController extends Controller
                         return (int) $mti->status === 1 && (empty($mti->source_type) || $mti->source_type !== 'retur_gudang');
                     })
                     ->sum('qty');
-                $pendingOutgoing = (int) MedicineTransferItems::where('source_batches_id', $item->id)
-                    ->where('source_type', 'pelayanan')
-                    ->where('status', 0)
-                    ->sum('qty');
-                $availStock = max(0, $currentPelayanan - $pendingOutgoing);
+                $availStock = max(0, $currentPelayanan);
 
                 if ($availStock > 0) {
                     $results->push([
@@ -203,6 +183,7 @@ class TransfersController extends Controller
 
         try {
             DB::transaction(function () use ($request) {
+                $now = Carbon::now();
                 $transfer = MedicineTransfers::create([
                     'code' => $request->code,
                     'user_id' => auth()->id(),
@@ -212,22 +193,22 @@ class TransfersController extends Controller
                 $pharmacyId = getActivePharmacyId();
 
                 if (isWarehousePharmacy($pharmacyId)) {
-                    // Validate: Gudang PMI can only transfer to SAHABAT PMI (id = 1)
                     if ((int) $request->pharmacy !== 1) {
                         throw new \Exception("Gudang PMI hanya dapat melakukan mutasi ke Apotek SAHABAT PMI.");
                     }
                 } else {
-                    // Validate: Branch cannot transfer to itself
                     if ((int) $request->pharmacy === (int) $pharmacyId) {
                         throw new \Exception("Apotek tujuan tidak boleh sama dengan apotek asal.");
                     }
                 }
 
                 foreach ($request->items as $line) {
-                    $sourceBatch = Batches::findOrFail($line['batches_id']);
+                    $sourceBatch = Batches::lockForUpdate()->findOrFail($line['batches_id']);
                     $sourceType = $line['source_type'];
+                    $qty = (int) $line['qty'];
+                    $medicine = $sourceBatch->medicines;
 
-                    // Validate: only warehouse can use gudang source
+                    // Validate source_type vs pharmacy role
                     if ($sourceType === 'gudang' && !isWarehousePharmacy($pharmacyId)) {
                         throw new \Exception("Hanya gudang yang bisa transfer dari stok gudang.");
                     }
@@ -235,33 +216,45 @@ class TransfersController extends Controller
                         throw new \Exception("Gudang hanya dapat mentransfer dari stok gudang.");
                     }
 
-                    // Check available stock based on source_type, accounting for pending outgoing transfers
+                    // ── Check & Immediately Deduct Source Stock ───────────────
                     if ($sourceType === 'gudang') {
-                        $pendingOutgoing = (int) MedicineTransferItems::where('source_batches_id', $sourceBatch->id)
-                            ->where('source_type', 'gudang')
-                            ->where('status', 0)
-                            ->sum('qty');
-                        $availStock = max(0, (int) $sourceBatch->stock - $pendingOutgoing);
+                        // Gudang: deduct directly from batches.stock
+                        $availStock = (int) $sourceBatch->stock;
+                        if ($qty > $availStock) {
+                            throw new \Exception("Qty untuk {$sourceBatch->name} ({$medicine?->name}) melebihi stok gudang tersedia ({$availStock}).");
+                        }
+                        $srcQtyBefore = $sourceBatch->stock;
+                        $sourceBatch->decrement('stock', $qty);
+                        $srcQtyAfter = $sourceBatch->fresh()->stock;
                     } else {
-                        $currentStock = (int) MedicineTransferItems::where('batches_id', $sourceBatch->id)
+                        // Pelayanan: deduct from MTI records (FIFO)
+                        $mtiList = MedicineTransferItems::where('batches_id', $sourceBatch->id)
                             ->where('qty', '>', 0)
                             ->where('status', 1)
                             ->where(function ($q) {
                                 $q->whereNull('source_type')->orWhere('source_type', '!=', 'retur_gudang');
                             })
-                            ->sum('qty');
-                        $pendingOutgoing = (int) MedicineTransferItems::where('source_batches_id', $sourceBatch->id)
-                            ->where('source_type', 'pelayanan')
-                            ->where('status', 0)
-                            ->sum('qty');
-                        $availStock = max(0, $currentStock - $pendingOutgoing);
+                            ->orderBy('id', 'asc')
+                            ->lockForUpdate()
+                            ->get();
+                        $totalMtiQty = $mtiList->sum('qty');
+
+                        if ($qty > $totalMtiQty) {
+                            throw new \Exception("Qty untuk {$sourceBatch->name} ({$medicine?->name}) melebihi stok pelayanan tersedia ({$totalMtiQty}).");
+                        }
+
+                        $srcQtyBefore = $totalMtiQty;
+                        $toDeduct = $qty;
+                        foreach ($mtiList as $mtiRow) {
+                            if ($toDeduct <= 0) break;
+                            $deduct = min($mtiRow->qty, $toDeduct);
+                            $mtiRow->decrement('qty', $deduct);
+                            $toDeduct -= $deduct;
+                        }
+                        $srcQtyAfter = max(0, $srcQtyBefore - $qty);
                     }
 
-                    if ((int) $line['qty'] > $availStock) {
-                        throw new \Exception("Qty untuk {$sourceBatch->name} ({$sourceBatch->medicines?->name}) melebihi stok tersedia ({$availStock}).");
-                    }
-
-                    // Find or create destination batch
+                    // ── Find or create destination batch ──────────────────────
                     $destBatch = Batches::firstOrCreate(
                         [
                             'pharmacy_id' => $request->pharmacy,
@@ -272,19 +265,37 @@ class TransfersController extends Controller
                         ['status' => 0, 'stock' => 0]
                     );
 
+                    // ── Create transfer item with stock_deducted_at ───────────
                     MedicineTransferItems::create([
                         'medicine_transfer_id' => $transfer->id,
                         'batches_id' => $destBatch->id,
                         'source_batches_id' => $sourceBatch->id,
                         'source_type' => $sourceType,
                         'etalases_id' => $line['etalases_id'],
-                        'qty' => $line['qty'],
+                        'qty' => $qty,
                         'status' => 0,
+                        'stock_deducted_at' => $now,
+                    ]);
+
+                    // ── Log source outgoing ───────────────────────────────────
+                    ItemsLog::create([
+                        'transaction_code' => $transfer->code,
+                        'code' => $this->generateItemsLogCode(),
+                        'type' => 'MU',
+                        'medicine_id' => $sourceBatch->medicine_id,
+                        'qty' => $qty,
+                        'qty_before' => $srcQtyBefore,
+                        'qty_after' => $srcQtyAfter,
+                        'total' => 0,
+                        'date' => $now,
+                        'status' => 7,
+                        'batches_id' => $sourceBatch->id,
+                        'user_id' => auth()->id(),
                     ]);
                 }
             });
 
-            return response()->json(['success' => true, 'message' => 'Transfer disimpan.']);
+            return response()->json(['success' => true, 'message' => 'Transfer disimpan. Stok telah dikurangi.']);
         } catch (\Throwable $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
         }
@@ -346,8 +357,8 @@ class TransfersController extends Controller
                 $q->whereNotNull('receiving_items_id');
             });
 
-            $query->when($search, function ($q) use ($search) {
-                $q->where(function ($sq) use ($search) {
+            if ($search) {
+                $query->where(function ($sq) use ($search) {
                     $sq->where('code', 'like', "%{$search}%")
                         ->orWhereHas('items.batches.medicines', function ($subQ) use ($search) {
                             $subQ->where('name', 'like', "%{$search}%")
@@ -358,16 +369,21 @@ class TransfersController extends Controller
                                 ->orWhere('code', 'like', "%{$search}%");
                         });
                 });
-            })->when($startDate && $endDate, function ($q) use ($startDate, $endDate) {
-                $q->whereBetween('created_at', [$startDate . ' 00:00:00', $endDate . ' 23:59:59']);
-            })->when($expiredDate, function ($q) use ($expiredDate) {
-                $q->whereHas('items.batches', function ($subQ) use ($expiredDate) {
+            }
+
+            if ($startDate && $endDate) {
+                $query->whereBetween('created_at', [$startDate . ' 00:00:00', $endDate . ' 23:59:59']);
+            }
+
+            if ($expiredDate) {
+                $query->whereHas('items.batches', function ($subQ) use ($expiredDate) {
                     $subQ->whereDate('expired_date', $expiredDate);
                 });
-            });
+            }
         };
 
-        $pending = MedicineTransfers::with([
+        // ── Mutasi Keluar: transfers WHERE source batch belongs to this pharmacy ──
+        $pendingQuery = MedicineTransfers::with([
             'items.batches.medicines',
             'items.batches.pharmacy',
             'items.sourceBatch.pharmacy',
@@ -381,13 +397,15 @@ class TransfersController extends Controller
                             ->whereHas('users', fn($u) => $u->where('pharmacy_id', $pharmacyId));
                     });
             })
-            ->where($applyFilters)
-            ->latest()
+            ->latest();
+        $applyFilters($pendingQuery);
+        $pending = $pendingQuery
             ->paginate(10, ['*'], 'pending_page')
             ->fragment('pending')
             ->withQueryString();
 
-        $accepted = MedicineTransfers::with([
+        // ── Mutasi Masuk: transfers WHERE destination batch belongs to this pharmacy ──
+        $acceptedQuery = MedicineTransfers::with([
             'items.batches.medicines',
             'items.batches.pharmacy',
             'items.sourceBatch.pharmacy',
@@ -396,13 +414,15 @@ class TransfersController extends Controller
         ])
             ->whereHas('items.batches', fn($q) => $q->where('pharmacy_id', $pharmacyId))
             ->whereIn('status', [0, 1])
-            ->where($applyFilters)
-            ->latest()
+            ->latest();
+        $applyFilters($acceptedQuery);
+        $accepted = $acceptedQuery
             ->paginate(10, ['*'], 'accepted_page')
             ->fragment('accepted')
             ->withQueryString();
 
-        $denied = MedicineTransfers::with([
+        // ── Ditolak: transfers with denied status involving this pharmacy ──
+        $deniedQuery = MedicineTransfers::with([
             'items.batches.medicines',
             'items.batches.pharmacy',
             'items.sourceBatch.pharmacy',
@@ -417,8 +437,9 @@ class TransfersController extends Controller
                 $q->whereHas('items.sourceBatch', fn($sb) => $sb->where('pharmacy_id', $pharmacyId))
                     ->orWhereHas('items.batches', fn($b) => $b->where('pharmacy_id', $pharmacyId));
             })
-            ->where($applyFilters)
-            ->latest()
+            ->latest();
+        $applyFilters($deniedQuery);
+        $denied = $deniedQuery
             ->paginate(10, ['*'], 'denied_page')
             ->fragment('denied')
             ->withQueryString();
@@ -465,6 +486,10 @@ class TransfersController extends Controller
             'file' => $job->file_path ? asset('storage/' . $job->file_path) : null
         ]);
     }
+    /**
+     * Process item acceptance: ONLY increment destination stock.
+     * Source stock was already deducted at transfer creation time.
+     */
     private function processItemTransferStock($item, $transfer, $now)
     {
         $destBatch = $item->batches;
@@ -477,58 +502,25 @@ class TransfersController extends Controller
         $medicine = Medicines::findOrFail($destBatch->medicine_id);
         $sourceType = $item->source_type ?? 'gudang';
 
-        $srcPharmacyId = $srcBatch->pharmacy_id;
         $destPharmacyId = $destBatch->pharmacy_id;
+        $srcPharmacyId = $srcBatch->pharmacy_id;
 
         // Determine if this is a "return to gudang" (pelayanan → gudang destination)
         $isReturnToGudang = ($sourceType === 'pelayanan' && (isWarehousePharmacy($destPharmacyId) || ($srcPharmacyId == $destPharmacyId && $destPharmacyId == 1)));
 
-        // ── Decrement source ──────────────────────────────────────
-        if ($sourceType === 'gudang') {
-            // Decrement from batches.stock (gudang)
-            if ($srcBatch->stock < $item->qty) {
-                throw new \Exception("Stok gudang tidak mencukupi untuk item " . $medicine->name . ".");
-            }
-            $srcQtyBefore = $srcBatch->stock;
-            $srcBatch->decrement('stock', $item->qty);
-            $srcQtyAfter = $srcBatch->stock;
-        } else {
-            // Decrement from medicine_transfer_items (pelayanan)
-            $mtiList = MedicineTransferItems::where('batches_id', $srcBatch->id)
-                ->where('qty', '>', 0)
-                ->where('status', 1)
-                ->where('id', '!=', $item->id) // exclude current transfer item
-                ->get();
-            $totalMtiQty = $mtiList->sum('qty');
-
-            if ($totalMtiQty < $item->qty) {
-                throw new \Exception("Stok pelayanan tidak mencukupi untuk item " . $medicine->name . ".");
-            }
-
-            $srcQtyBefore = $totalMtiQty;
-            $toDeduct = $item->qty;
-            foreach ($mtiList as $mtiRow) {
-                if ($toDeduct <= 0) break;
-                $deduct = min($mtiRow->qty, $toDeduct);
-                $mtiRow->decrement('qty', $deduct);
-                $toDeduct -= $deduct;
-            }
-            $srcQtyAfter = max(0, $srcQtyBefore - $item->qty);
-        }
-
-        // ── Increment destination ─────────────────────────────────
+        // ── Increment destination ONLY (source already deducted on create) ──
         if ($isReturnToGudang) {
             // Return to gudang: increment batches.stock
             $destQtyBefore = $destBatch->stock;
             $destBatch->increment('stock', $item->qty);
-            $destQtyAfter = $destBatch->stock;
+            $destQtyAfter = $destBatch->fresh()->stock;
 
             $item->update([
                 'status' => 1,
                 'source_type' => 'retur_gudang',
             ]);
         } else {
-            // Add to pelayanan: $item itself is the record in destination batch
+            // Add to pelayanan: $item itself becomes the stock record at destination
             $destQtyBefore = (int) MedicineTransferItems::where('batches_id', $destBatch->id)
                 ->where('status', 1)
                 ->where('id', '!=', $item->id)
@@ -541,22 +533,6 @@ class TransfersController extends Controller
 
             $destQtyAfter = $destQtyBefore + $item->qty;
         }
-
-        // ── Log source (outgoing) ─────────────────────────────────
-        ItemsLog::create([
-            'transaction_code' => $transfer->code,
-            'code' => $this->generateItemsLogCode(),
-            'type' => 'MU',
-            'medicine_id' => $medicine->id,
-            'qty' => $item->qty,
-            'qty_before' => $srcQtyBefore,
-            'qty_after' => $srcQtyAfter,
-            'total' => 0,
-            'date' => $now,
-            'status' => 7,
-            'batches_id' => $srcBatch->id,
-            'user_id' => auth()->id(),
-        ]);
 
         // ── Log destination (incoming) ────────────────────────────
         ItemsLog::create([
@@ -623,19 +599,29 @@ class TransfersController extends Controller
     public function denyItem(MedicineTransferItems $item)
     {
         try {
-            $item->update(['status' => 2]);
+            DB::transaction(function () use ($item) {
+                $now = Carbon::now();
+                $transfer = $item->transfer;
 
-            $transfer = $item->transfer;
-            if ($transfer->items()->where('status', 0)->doesntExist()) {
-                $hasAccepted = $transfer->items()->where('status', 1)->exists();
-                $transfer->update(['status' => $hasAccepted ? 1 : 2]);
-            }
+                // Rollback source stock if it was deducted on create
+                if ($item->stock_deducted_at && $item->status === 0) {
+                    $this->rollbackSourceStock($item, $transfer, $now);
+                }
 
+                $item->update(['status' => 2]);
+
+                if ($transfer->items()->where('status', 0)->doesntExist()) {
+                    $hasAccepted = $transfer->items()->where('status', 1)->exists();
+                    $transfer->update(['status' => $hasAccepted ? 1 : 2]);
+                }
+            });
+
+            $transfer = $item->transfer->fresh();
             if ($transfer->status == 2) {
-                return redirect(url()->previous() . '#denied')->with('success', 'Semua item ditolak.');
+                return redirect(url()->previous() . '#denied')->with('success', 'Semua item ditolak. Stok dikembalikan.');
             }
 
-            return redirect(url()->previous() . '#accepted')->with('success', 'Item ditolak.');
+            return redirect(url()->previous() . '#accepted')->with('success', 'Item ditolak. Stok dikembalikan.');
         } catch (\Throwable $e) {
             return redirect(url()->previous() . '#accepted')->with('message', 'Gagal: ' . $e->getMessage());
         }
@@ -645,13 +631,95 @@ class TransfersController extends Controller
     {
         try {
             DB::transaction(function () use ($transfer) {
-                $transfer->items()->where('status', 0)->update(['status' => 2]);
-                $transfer->update(['status' => 2]);
+                $now = Carbon::now();
+                $pendingItems = $transfer->items()->where('status', 0)->get();
+
+                foreach ($pendingItems as $item) {
+                    // Rollback source stock if it was deducted on create
+                    if ($item->stock_deducted_at) {
+                        $this->rollbackSourceStock($item, $transfer, $now);
+                    }
+                    $item->update(['status' => 2]);
+                }
+
+                $hasAccepted = $transfer->items()->where('status', 1)->exists();
+                $transfer->update(['status' => $hasAccepted ? 1 : 2]);
             });
 
-            return redirect(url()->previous() . '#denied')->with('success', 'Semua item mutasi ditolak.');
+            return redirect(url()->previous() . '#denied')->with('success', 'Mutasi ditolak. Stok telah dikembalikan.');
         } catch (\Throwable $e) {
             return redirect(url()->previous() . '#accepted')->with('message', 'Gagal: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Rollback source stock that was deducted at transfer creation time.
+     */
+    private function rollbackSourceStock($item, $transfer, $now)
+    {
+        $srcBatch = $item->sourceBatch;
+        if (!$srcBatch) return;
+
+        $medicine = Medicines::find($srcBatch->medicine_id);
+        $sourceType = $item->source_type ?? 'gudang';
+
+        if ($sourceType === 'gudang') {
+            // Return stock to batches.stock
+            $srcQtyBefore = $srcBatch->stock;
+            $srcBatch->increment('stock', $item->qty);
+            $srcQtyAfter = $srcBatch->fresh()->stock;
+        } else {
+            // Return stock to pelayanan MTI records:
+            // Create a new accepted MTI record to restore the pelayanan stock
+            $srcQtyBefore = (int) MedicineTransferItems::where('batches_id', $srcBatch->id)
+                ->where('qty', '>', 0)
+                ->where('status', 1)
+                ->where(function ($q) {
+                    $q->whereNull('source_type')->orWhere('source_type', '!=', 'retur_gudang');
+                })
+                ->sum('qty');
+
+            // Find an existing accepted MTI for this batch and increment it back
+            $existingMti = MedicineTransferItems::where('batches_id', $srcBatch->id)
+                ->where('status', 1)
+                ->where(function ($q) {
+                    $q->whereNull('source_type')->orWhere('source_type', '!=', 'retur_gudang');
+                })
+                ->orderBy('id', 'desc')
+                ->first();
+
+            if ($existingMti) {
+                $existingMti->increment('qty', $item->qty);
+            } else {
+                // Edge case: no existing MTI record, create a restoration record
+                MedicineTransferItems::create([
+                    'medicine_transfer_id' => $transfer->id,
+                    'batches_id' => $srcBatch->id,
+                    'source_batches_id' => $srcBatch->id,
+                    'source_type' => 'pelayanan',
+                    'etalases_id' => $item->etalases_id,
+                    'qty' => $item->qty,
+                    'status' => 1, // accepted = stok tersedia
+                ]);
+            }
+
+            $srcQtyAfter = $srcQtyBefore + $item->qty;
+        }
+
+        // ── Log rollback (stock returned to source) ───────────────
+        ItemsLog::create([
+            'transaction_code' => $transfer->code,
+            'code' => $this->generateItemsLogCode(),
+            'type' => 'MU',
+            'medicine_id' => $srcBatch->medicine_id,
+            'qty' => $item->qty,
+            'qty_before' => $srcQtyBefore,
+            'qty_after' => $srcQtyAfter,
+            'total' => 0,
+            'date' => $now,
+            'status' => 7,
+            'batches_id' => $srcBatch->id,
+            'user_id' => auth()->id(),
+        ]);
     }
 }
