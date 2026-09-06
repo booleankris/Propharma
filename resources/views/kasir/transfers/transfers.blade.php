@@ -621,18 +621,9 @@
         </div>
 
         {{-- ========================================================================= --}}
-        @php } catch (\Throwable $e) { \Log::error('Crash in tab-accepted: ' . $e->getMessage()); echo '<div class="text-red-500">Crash: ' . $e->getMessage() . '</div>'; } @endphp
         {{-- TAB 3: Ditolak (Denied)                                                   --}}
         {{-- ========================================================================= --}}
-        
-<script>    console.log('ANDA TOLOL')</script>
-<script>
-    console.log('--- DEBUG DENIED DATA ---');
-    console.log('Total:', {{ $denied->total() }});
-    console.log('Items Count:', {{ count($denied->items()) }});
-    console.log('Items:', @json($denied->items()));
-</script>
-<div id="tab-denied" class="tab-panel hidden space-y-4">
+        <div id="tab-denied" class="tab-panel hidden space-y-4">
             @forelse($denied as $transfer)
                 
                 @php
@@ -726,13 +717,6 @@
                             </div>
                         </div>
                     </div>
-                    </div>
-                @php } catch (\Throwable $e) { 
-                    echo '<div class="p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs font-mono break-all">';
-                    echo '<b>ERROR Rendering Transfer (Code: ' . ($transfer->code ?? 'N/A') . ')</b><br>';
-                    echo $e->getMessage() . '<br>Line: ' . $e->getLine() . '<br>File: ' . basename($e->getFile());
-                    echo '</div>'; 
-                } @endphp
                 </div>
             @empty
                 <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm py-16 text-center">
@@ -761,38 +745,7 @@
 
     </div>
 
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        console.log('DOM Loaded');
-        const deniedTab = document.getElementById('tab-denied');
-        if (deniedTab) {
-            console.log('tab-denied found in DOM. Children count:', deniedTab.children.length);
-            console.log('tab-denied HTML:', deniedTab.innerHTML.substring(0, 500));
-        } else {
-            console.log('tab-denied NOT FOUND IN DOM!');
-        }
-    });
-</script>
 
-
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        console.log('--- ADVANCED DOM CHECK ---');
-        const panels = document.querySelectorAll('.tab-panel');
-        console.log('Found ' + panels.length + ' tab-panels');
-        panels.forEach(p => console.log('Panel ID:', p.id));
-        console.log('Body length:', document.body.innerHTML.length);
-    });
-</script>
-
-
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        console.log('--- LAST 1000 CHARS OF BODY ---');
-        const html = document.body.innerHTML;
-        console.log(html.substring(html.length - 1000));
-    });
-</script>
 
 @endsection
 
