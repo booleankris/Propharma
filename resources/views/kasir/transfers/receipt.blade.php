@@ -95,7 +95,7 @@
         <tr>
             <td width="70%">
                 <div style="padding-top:6px"><span class="label">Nomor Terima</span>: {{ $transfer->code }}</div>
-                <div style="padding-top:6px"><span class="label">Apotek Asal</span>: {{ $transfer->users?->pharmacy?->name ?? '—' }}</div>
+                <div style="padding-top:6px"><span class="label">Apotek Asal</span>: {{ $transfer->items->first()?->sourceBatch?->pharmacy?->name ?? ($transfer->items->first()?->source_type === 'gudang' ? 'GUDANG PMI' : ($transfer->users?->pharmacy?->name ?? '—')) }}</div>
                 <div style="padding-top:6px"><span class="label">Apotek Tujuan</span>: {{ $transfer->items->first()?->batches?->pharmacy?->name ?? '—' }}</div>
             </td>
             <td width="30%" class="date-box">

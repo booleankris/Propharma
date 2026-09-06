@@ -259,8 +259,10 @@
         <div id="tab-pending" class="tab-panel space-y-4">
             @forelse($pending as $transfer)
                 @php
-                    $fromName = $transfer->users?->pharmacy?->name ?? $transfer->items->first()?->sourceBatch?->pharmacy?->name ?? 'Gudang / Asal';
-                    $toName = $transfer->items->first()?->batches?->pharmacy?->name ?? 'Apotek Tujuan';
+                    $firstItem = $transfer->items->first();
+                    $fromName = $firstItem?->sourceBatch?->pharmacy?->name 
+                        ?? ($firstItem?->source_type === 'gudang' ? 'GUDANG PMI' : ($transfer->users?->pharmacy?->name ?? 'Gudang / Asal'));
+                    $toName = $firstItem?->batches?->pharmacy?->name ?? 'Apotek Tujuan';
                     [$statusLabel, $statusClass] = $statusMap[$transfer->status] ?? ['—', ''];
                     $hasPendingItems = $transfer->items->contains('status', 0);
                 @endphp
@@ -435,8 +437,10 @@
         <div id="tab-accepted" class="tab-panel hidden space-y-4">
             @forelse($accepted as $transfer)
                 @php
-                    $fromName = $transfer->users?->pharmacy?->name ?? $transfer->items->first()?->sourceBatch?->pharmacy?->name ?? 'Gudang / Asal';
-                    $toName = $transfer->items->first()?->batches?->pharmacy?->name ?? 'Apotek Tujuan';
+                    $firstItem = $transfer->items->first();
+                    $fromName = $firstItem?->sourceBatch?->pharmacy?->name 
+                        ?? ($firstItem?->source_type === 'gudang' ? 'GUDANG PMI' : ($transfer->users?->pharmacy?->name ?? 'Gudang / Asal'));
+                    $toName = $firstItem?->batches?->pharmacy?->name ?? 'Apotek Tujuan';
                     [$statusLabel, $statusClass] = $statusMap[$transfer->status] ?? ['—', ''];
                     $hasPendingItems = $transfer->items->contains('status', 0);
                 @endphp
@@ -652,8 +656,10 @@
         <div id="tab-denied" class="tab-panel hidden space-y-4">
             @forelse($denied as $transfer)
                 @php
-                    $fromName = $transfer->users?->pharmacy?->name ?? $transfer->items->first()?->sourceBatch?->pharmacy?->name ?? 'Gudang / Asal';
-                    $toName = $transfer->items->first()?->batches?->pharmacy?->name ?? 'Apotek Tujuan';
+                    $firstItem = $transfer->items->first();
+                    $fromName = $firstItem?->sourceBatch?->pharmacy?->name 
+                        ?? ($firstItem?->source_type === 'gudang' ? 'GUDANG PMI' : ($transfer->users?->pharmacy?->name ?? 'Gudang / Asal'));
+                    $toName = $firstItem?->batches?->pharmacy?->name ?? 'Apotek Tujuan';
                 @endphp
 
                 <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm transition-all hover:shadow-md overflow-hidden">
