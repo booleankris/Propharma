@@ -176,12 +176,15 @@ class TransfersController extends Controller
         $code = $this->generateTransfersCode();
         $currentPharmacyId = getActivePharmacyId();
 
-        $pharmaciesQuery = Pharmacies::where('id', '!=', $currentPharmacyId)
-            ->where('status', 1);
+        $pharmaciesQuery = Pharmacies::where('status', 1);
 
         if (isWarehousePharmacy($currentPharmacyId)) {
             // Gudang PMI hanya bisa mutasi ke Apotek SAHABAT PMI (id = 1)
             $pharmaciesQuery->where('id', 1);
+        } else {
+            // Cabang / Pelayanan bisa transfer ke Gudang PMI (id = 9) dan ke cabang fisik lain
+            $pharmaciesQuery->whereIn('id', [1, 2, 3, 4, 5, 9])
+                ->where('id', '!=', $currentPharmacyId);
         }
 
         $pharmacies = $pharmaciesQuery->get();
@@ -209,9 +212,16 @@ class TransfersController extends Controller
 
                 $pharmacyId = getActivePharmacyId();
 
-                // Validate: Gudang PMI can only transfer to SAHABAT PMI (id = 1)
-                if (isWarehousePharmacy($pharmacyId) && (int) $request->pharmacy !== 1) {
-                    throw new \Exception("Gudang PMI hanya dapat melakukan mutasi ke Apotek SAHABAT PMI.");
+                if (isWarehousePharmacy($pharmacyId)) {
+                    // Validate: Gudang PMI can only transfer to SAHABAT PMI (id = 1)
+                    if ((int) $request->pharmacy !== 1) {
+                        throw new \Exception("Gudang PMI hanya dapat melakukan mutasi ke Apotek SAHABAT PMI.");
+                    }
+                } else {
+                    // Validate: Branch cannot transfer to itself
+                    if ((int) $request->pharmacy === (int) $pharmacyId) {
+                        throw new \Exception("Apotek tujuan tidak boleh sama dengan apotek asal.");
+                    }
                 }
 
                 foreach ($request->items as $line) {
@@ -221,6 +231,9 @@ class TransfersController extends Controller
                     // Validate: only warehouse can use gudang source
                     if ($sourceType === 'gudang' && !isWarehousePharmacy($pharmacyId)) {
                         throw new \Exception("Hanya gudang yang bisa transfer dari stok gudang.");
+                    }
+                    if ($sourceType === 'pelayanan' && isWarehousePharmacy($pharmacyId)) {
+                        throw new \Exception("Gudang hanya dapat mentransfer dari stok gudang.");
                     }
 
                     // Check available stock based on source_type, accounting for pending outgoing transfers
@@ -354,7 +367,13 @@ class TransfersController extends Controller
             'items.etalases',
             'users.pharmacy',
         ])
-            ->whereHas('users', fn($q) => $q->where('pharmacy_id', $pharmacyId))
+            ->where(function ($q) use ($pharmacyId) {
+                $q->whereHas('items.sourceBatch', fn($sb) => $sb->where('pharmacy_id', $pharmacyId))
+                    ->orWhere(function ($q2) use ($pharmacyId) {
+                        $q2->whereDoesntHave('items.sourceBatch')
+                            ->whereHas('users', fn($u) => $u->where('pharmacy_id', $pharmacyId));
+                    });
+            })
             ->where($applyFilters)
             ->latest()
             ->paginate(10, ['*'], 'pending_page')
@@ -385,10 +404,10 @@ class TransfersController extends Controller
         ])
             ->where(function ($q) {
                 $q->where('status', 2)
-                  ->orWhereHas('items', fn($i) => $i->where('status', 2));
+                    ->orWhereHas('items', fn($i) => $i->where('status', 2));
             })
             ->where(function ($q) use ($pharmacyId) {
-                $q->whereHas('users', fn($u) => $u->where('pharmacy_id', $pharmacyId))
+                $q->whereHas('items.sourceBatch', fn($sb) => $sb->where('pharmacy_id', $pharmacyId))
                     ->orWhereHas('items.batches', fn($b) => $b->where('pharmacy_id', $pharmacyId));
             })
             ->where($applyFilters)
@@ -605,6 +624,20 @@ class TransfersController extends Controller
             }
 
             return redirect(url()->previous() . '#accepted')->with('success', 'Item ditolak.');
+        } catch (\Throwable $e) {
+            return redirect(url()->previous() . '#accepted')->with('message', 'Gagal: ' . $e->getMessage());
+        }
+    }
+
+    public function denyTransfer(MedicineTransfers $transfer)
+    {
+        try {
+            DB::transaction(function () use ($transfer) {
+                $transfer->items()->where('status', 0)->update(['status' => 2]);
+                $transfer->update(['status' => 2]);
+            });
+
+            return redirect(url()->previous() . '#denied')->with('success', 'Semua item mutasi ditolak.');
         } catch (\Throwable $e) {
             return redirect(url()->previous() . '#accepted')->with('message', 'Gagal: ' . $e->getMessage());
         }

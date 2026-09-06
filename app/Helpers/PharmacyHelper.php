@@ -14,22 +14,25 @@ if (!function_exists('getActivePharmacyId')) {
             return 0;
         }
 
-        // Jika user HO dan memilih cabang di session
+        // Jika user HO dan memilih cabang spesifik di session
+        if ($user->hasRole('HO') && session()->has('ho_pharmacy_id')) {
+            return (int) session('ho_pharmacy_id');
+        }
+
+        // Jika staf / akun memiliki role Gudang PMI -> selalu ke Gudang PMI (9)
+        if ($user->hasRole('Gudang PMI')) {
+            return 9;
+        }
+
+        // Jika user HO (tanpa role Gudang PMI dan tanpa session cabang)
         if ($user->hasRole('HO')) {
-            if (session()->has('ho_pharmacy_id')) {
-                return (int) session('ho_pharmacy_id');
-            }
             if ($user->pharmacy_id && (int) $user->pharmacy_id !== 6 && (int) $user->pharmacy_id !== 1) {
                 return (int) $user->pharmacy_id;
             }
             return 1;
         }
 
-        // Jika staf khusus Gudang PMI
-        if ($user->hasRole('Gudang PMI')) {
-            return 9;
-        }
-
+        // Untuk cabang lain atau kasir/pelayanan PMI
         return (int) ($user->pharmacy_id ?? 1);
     }
 }

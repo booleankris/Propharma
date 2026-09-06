@@ -404,7 +404,7 @@
                                 {{ $statusLabel }}
                             </span>
 
-                            {{-- Terima Semua Button --}}
+                            {{-- Terima Semua & Tolak Semua Button --}}
                             @if ($hasPendingItems)
                                 <form method="POST" action="{{ route('transfers.accept', $transfer) }}" class="inline">
                                     @csrf
@@ -413,6 +413,15 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
                                         </svg>
                                         Terima Semua
+                                    </button>
+                                </form>
+                                <form method="POST" action="{{ route('transfers.deny', $transfer) }}" class="inline">
+                                    @csrf
+                                    <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-lg transition shadow-sm" onclick="return confirm('Apakah Anda yakin ingin menolak semua obat pada mutasi ini?')">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                        Tolak Semua
                                     </button>
                                 </form>
                             @endif
@@ -620,9 +629,15 @@
                             </a>
 
                             {{-- Extend / Collapse Button --}}
+                            @php
+                                $deniedItemsList = $transfer->items->where('status', 2);
+                                if ($deniedItemsList->isEmpty()) {
+                                    $deniedItemsList = $transfer->items;
+                                }
+                            @endphp
                             <button type="button" onclick="toggleDetails('denied-{{ $transfer->id }}')"
                                 class="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition">
-                                <span id="label-denied-{{ $transfer->id }}">Lihat Barang ({{ $transfer->items->where('status', 2)->count() }})</span>
+                                <span id="label-denied-{{ $transfer->id }}">Lihat Barang ({{ $deniedItemsList->count() }})</span>
                                 <svg id="chevron-denied-{{ $transfer->id }}" class="w-4 h-4 text-slate-500 transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
                                 </svg>
@@ -644,7 +659,7 @@
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-100 bg-white">
-                                    @forelse($transfer->items->where('status', 2) as $item)
+                                    @forelse($deniedItemsList as $item)
                                         <tr class="hover:bg-slate-50/60 transition">
                                             <td class="py-3 px-5">
                                                 <div class="font-semibold text-slate-800">
