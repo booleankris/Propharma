@@ -49,6 +49,17 @@
     });
 </script>
 
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('--- ADVANCED DOM CHECK ---');
+        const panels = document.querySelectorAll('.tab-panel');
+        console.log('Found ' + panels.length + ' tab-panels');
+        panels.forEach(p => console.log('Panel ID:', p.id));
+        console.log('Body length:', document.body.innerHTML.length);
+    });
+</script>
+
 @endsection
 
 @section('content')
@@ -862,6 +873,17 @@
     });
 </script>
 
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('--- ADVANCED DOM CHECK ---');
+        const panels = document.querySelectorAll('.tab-panel');
+        console.log('Found ' + panels.length + ' tab-panels');
+        panels.forEach(p => console.log('Panel ID:', p.id));
+        console.log('Body length:', document.body.innerHTML.length);
+    });
+</script>
+
 @endsection
 
 @section('scripts')
@@ -981,6 +1003,17 @@
         } else {
             console.log('tab-denied NOT FOUND IN DOM!');
         }
+    });
+</script>
+
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('--- ADVANCED DOM CHECK ---');
+        const panels = document.querySelectorAll('.tab-panel');
+        console.log('Found ' + panels.length + ' tab-panels');
+        panels.forEach(p => console.log('Panel ID:', p.id));
+        console.log('Body length:', document.body.innerHTML.length);
     });
 </script>
 
