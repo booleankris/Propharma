@@ -469,6 +469,7 @@
         {{-- TAB 2: Mutasi Masuk (Accepted)                                            --}}
         {{-- ========================================================================= --}}
         <div id="tab-accepted" class="tab-panel hidden space-y-4">
+@php try { @endphp
             @forelse($accepted as $transfer)
                 @php
                     $firstItem = $transfer->items->first();
@@ -685,6 +686,7 @@
         </div>
 
         {{-- ========================================================================= --}}
+        @php } catch (\Throwable $e) { \Log::error('Crash in tab-accepted: ' . $e->getMessage()); echo '<div class="text-red-500">Crash: ' . $e->getMessage() . '</div>'; } @endphp
         {{-- TAB 3: Ditolak (Denied)                                                   --}}
         {{-- ========================================================================= --}}
         
