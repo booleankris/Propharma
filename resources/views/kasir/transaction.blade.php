@@ -115,40 +115,51 @@
 
                 {{-- Resep Credit --}}
                 <a href="{{ url('transaction/kredit/' . ($trx_id != 0 ? $trx_id : 0)) }}"
-                    class="trx-chip @if ($type == 'kredit') active @endif">
+                    id="trx-type-kredit"
+                    class="trx-chip @if ($type == 'kredit') active @endif"
+                    title="Shortcut: Alt + 1">
                     <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"
                         stroke-linejoin="round">
                         <rect x="2" y="5" width="20" height="14" rx="2" />
                         <line x1="2" y1="10" x2="22" y2="10" />
                     </svg>
                     <span class="trx-chip-lbl">Resep Credit</span>
+                    <span class="text-[9px] opacity-70 ml-1 font-mono font-normal">[Alt+1]</span>
                 </a>
 
                 {{-- Resep Tunai --}}
                 <a href="{{ url('transaction/resep/' . ($trx_id != 0 ? $trx_id : 0)) }}"
-                    class="trx-chip  @if ($type == 'resep') active @endif">
+                    id="trx-type-resep"
+                    class="trx-chip  @if ($type == 'resep') active @endif"
+                    title="Shortcut: Alt + 2">
                     <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"
                         stroke-linejoin="round">
                         <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
                         <rect x="9" y="3" width="6" height="4" rx="1" />
                     </svg>
                     <span class="trx-chip-lbl">Resep Tunai</span>
+                    <span class="text-[9px] opacity-70 ml-1 font-mono font-normal">[Alt+2]</span>
                 </a>
 
                 {{-- HV/OTC --}}
                 <a href="{{ url('transaction/hv/' . ($trx_id != 0 ? $trx_id : 0)) }}"
-                    class="trx-chip @if ($type == 'hv') active @endif">
+                    id="trx-type-hv"
+                    class="trx-chip @if ($type == 'hv') active @endif"
+                    title="Shortcut: Alt + 3">
                     <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"
                         stroke-linejoin="round">
                         <path
                             d="M19.428 15.428a2 2 0 0 0-1.022-.547l-2.387-.477a6 6 0 0 0-3.86.517l-.318.158a6 6 0 0 1-3.86.517L6.05 15.21a2 2 0 0 0-1.806.547M8 4h8l-1 1v5.172a2 2 0 0 0 .586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 0 0 9 10.172V5L8 4z" />
                     </svg>
                     <span class="trx-chip-lbl">HV</span>
+                    <span class="text-[9px] opacity-70 ml-1 font-mono font-normal">[Alt+3]</span>
                 </a>
 
                 {{-- UPDS --}}
                 <a href="{{ url('transaction/upds/' . ($trx_id != 0 ? $trx_id : 0)) }}"
-                    class="trx-chip @if ($type == 'upds') active @endif">
+                    id="trx-type-upds"
+                    class="trx-chip @if ($type == 'upds') active @endif"
+                    title="Shortcut: Alt + 4">
                     <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"
                         stroke-linejoin="round">
                         <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
@@ -156,6 +167,7 @@
                         <path d="M16 10a4 4 0 0 1-8 0" />
                     </svg>
                     <span class="trx-chip-lbl">UPDS</span>
+                    <span class="text-[9px] opacity-70 ml-1 font-mono font-normal">[Alt+4]</span>
                 </a>
 
             </div>
@@ -2754,26 +2766,65 @@
             return paymentType;
         }
 
-        const paymentRadios = document.querySelectorAll('input[name="payment_type"]');
+        const paymentRadios = Array.from(document.querySelectorAll('input[name="payment_type"]'));
         const nextInput = document.getElementById('pay');
 
-        paymentRadios.forEach(radio => {
+        paymentRadios.forEach((radio, index) => {
             radio.addEventListener('keydown', function(event) {
-                if (event.key !== 'Enter') return;
-                event.preventDefault();
+                if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+                    event.preventDefault();
+                    const nextIndex = (index + 1) % paymentRadios.length;
+                    paymentRadios[nextIndex].checked = true;
+                    paymentRadios[nextIndex].focus();
+                    paymentType = paymentRadios[nextIndex].value;
+                    getPaymentType();
+                    return;
+                }
 
-                radio.checked = true;
-                paymentType = radio.value;
-                getPaymentType();
+                if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+                    event.preventDefault();
+                    const prevIndex = (index - 1 + paymentRadios.length) % paymentRadios.length;
+                    paymentRadios[prevIndex].checked = true;
+                    paymentRadios[prevIndex].focus();
+                    paymentType = paymentRadios[prevIndex].value;
+                    getPaymentType();
+                    return;
+                }
 
-                if (radio.value === 'TRANSFER' || radio.value === 'DEBIT' || radio.value === 'QRIS') {
-                    const bankInput = document.getElementById('bank_name');
-                    setTimeout(() => {
-                        if (bankInput) bankInput.focus();
-                    }, 50);
-                } else {
-                    nextInput.focus();
-                    if (typeof nextInput.select === 'function') nextInput.select();
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+
+                    radio.checked = true;
+                    paymentType = radio.value;
+                    getPaymentType();
+
+                    if (radio.value === 'TRANSFER' || radio.value === 'DEBIT' || radio.value === 'QRIS') {
+                        const bankInput = document.getElementById('bank_name');
+                        setTimeout(() => {
+                            if (bankInput) bankInput.focus();
+                        }, 50);
+                    } else {
+                        nextInput.focus();
+                        if (typeof nextInput.select === 'function') nextInput.select();
+                    }
+                }
+            });
+        });
+
+        const bankChips = Array.from(document.querySelectorAll('.bank-chip-btn'));
+        bankChips.forEach((chip, cIndex) => {
+            chip.addEventListener('keydown', function(e) {
+                if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    const nextC = (cIndex + 1) % bankChips.length;
+                    bankChips[nextC].focus();
+                } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    const prevC = (cIndex - 1 + bankChips.length) % bankChips.length;
+                    bankChips[prevC].focus();
+                } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    selectBankChip(chip.dataset.bank);
                 }
             });
         });
@@ -4269,6 +4320,45 @@
     });
     window.addEventListener('keydown', onF10Key, {
         capture: true
+    });
+
+    // ===============================
+    // Shortcut Alt + 1/2/3/4 untuk Ganti Jenis Transaksi
+    // ===============================
+    window.addEventListener('keydown', function(e) {
+        if (e.altKey && !e.ctrlKey && !e.metaKey) {
+            if (e.key === '1') {
+                const el = document.getElementById('trx-type-kredit');
+                if (el) { e.preventDefault(); el.click(); }
+            } else if (e.key === '2') {
+                const el = document.getElementById('trx-type-resep');
+                if (el) { e.preventDefault(); el.click(); }
+            } else if (e.key === '3') {
+                const el = document.getElementById('trx-type-hv');
+                if (el) { e.preventDefault(); el.click(); }
+            } else if (e.key === '4') {
+                const el = document.getElementById('trx-type-upds');
+                if (el) { e.preventDefault(); el.click(); }
+            }
+        }
+    }, { capture: true });
+
+    // Navigasi Arrow pada Jenis Transaksi
+    const topTrxChips = Array.from(document.querySelectorAll('.trx-chips .trx-chip'));
+    topTrxChips.forEach((chip, idx) => {
+        chip.setAttribute('tabindex', '0');
+        chip.addEventListener('keydown', function(e) {
+            if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                e.preventDefault();
+                topTrxChips[(idx + 1) % topTrxChips.length].focus();
+            } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                e.preventDefault();
+                topTrxChips[(idx - 1 + topTrxChips.length) % topTrxChips.length].focus();
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                chip.click();
+            }
+        });
     });
 
     document.addEventListener('click', (e) => {
