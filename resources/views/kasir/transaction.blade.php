@@ -1147,20 +1147,51 @@
                         </label>
                     </div>
 
-                    {{-- Bank name input — only visible when Transfer is selected --}}
-                    <div id="bankNameWrapper" class="hidden mt-3">
-                        <label class="block text-[12px] font-medium text-gray-500 mb-1">Nama bank</label>
-                        <select
-                            class="w-full rounded-xl border my-1 border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                            name="bank_name" id="bank_name">
-                            <option value="">-- Pilih Bank --</option>
-                            <option value="Mandiri">Mandiri</option>
-                            <option value="BCA">BCA</option>
-                            <option value="BRI">BRI</option>
-                            <option value="BSI">BSI</option>
-                            <option value="BNI">BNI</option>
-                            <option value="BTN">BTN</option>
-                        </select>
+                    {{-- Bank / Channel Selector (QRIS, Debit, Transfer) --}}
+                    <div id="bankNameWrapper" class="hidden mt-3 p-3 bg-slate-50/90 border border-slate-200 rounded-2xl transition-all duration-200">
+                        <div class="flex items-center justify-between mb-2">
+                            <label id="bankLabel" class="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                                <span id="bankContextBadge" class="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-blue-100 text-blue-700">Bank</span>
+                                <span id="bankLabelText">Pilih Bank / Merchant</span>
+                            </label>
+                            <span class="text-[10px] text-slate-400 font-medium">Navigasi: [Enter] untuk lanjut</span>
+                        </div>
+
+                        {{-- Quick-pick Bank Chips --}}
+                        <div class="grid grid-cols-3 sm:grid-cols-6 gap-1.5 mb-2.5" id="bankChipsGroup">
+                            @foreach (['Mandiri', 'BCA', 'BRI', 'BNI', 'BSI', 'BTN'] as $bankItem)
+                                <button type="button" 
+                                    class="bank-chip-btn py-2 px-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:border-blue-400 hover:bg-blue-50/50 active:scale-95 transition-all text-center flex items-center justify-center gap-1 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                    data-bank="{{ $bankItem }}"
+                                    onclick="selectBankChip('{{ $bankItem }}')">
+                                    <span>{{ $bankItem }}</span>
+                                </button>
+                            @endforeach
+                        </div>
+
+                        {{-- Standard Select Dropdown for keyboard accessibility and other banks --}}
+                        <div class="relative">
+                            <select
+                                class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm transition"
+                                name="bank_name" id="bank_name" onchange="syncChipFromSelect(this.value)">
+                                <option value="">-- Pilih Bank / Merchant Lainnya --</option>
+                                <option value="Mandiri">Bank Mandiri</option>
+                                <option value="BCA">Bank BCA</option>
+                                <option value="BRI">Bank BRI</option>
+                                <option value="BNI">Bank BNI</option>
+                                <option value="BSI">Bank Syariah Indonesia (BSI)</option>
+                                <option value="BTN">Bank BTN</option>
+                                <option value="Bank Kaltimtara">Bank Kaltimtara</option>
+                                <option value="CIMB Niaga">Bank CIMB Niaga</option>
+                                <option value="Permata">Bank Permata</option>
+                                <option value="Danamon">Bank Danamon</option>
+                                <option value="ShopeePay">ShopeePay / SPay</option>
+                                <option value="GoPay">GoPay</option>
+                                <option value="OVO">OVO</option>
+                                <option value="DANA">DANA</option>
+                                <option value="Lainnya">Bank / Merchant Lainnya</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
             @endif
@@ -2628,6 +2659,54 @@
     if (bank_name_input) {
         // ================ Pilih Tipe Pembayaran =========================
 
+        function updateBankChipsVisual(selectedBank) {
+            const chips = document.querySelectorAll('.bank-chip-btn');
+            chips.forEach(chip => {
+                if (chip.dataset.bank === selectedBank) {
+                    chip.classList.add('border-blue-600', 'bg-blue-50', 'text-blue-700', 'ring-2', 'ring-blue-500/20', 'shadow-sm');
+                    chip.classList.remove('border-slate-200', 'bg-white', 'text-slate-700');
+                } else {
+                    chip.classList.remove('border-blue-600', 'bg-blue-50', 'text-blue-700', 'ring-2', 'ring-blue-500/20', 'shadow-sm');
+                    chip.classList.add('border-slate-200', 'bg-white', 'text-slate-700');
+                }
+            });
+        }
+
+        function selectBankChip(bankName) {
+            const bankSelect = document.getElementById('bank_name');
+            if (bankSelect) {
+                bankSelect.value = bankName;
+                if (!bankSelect.value && bankName) {
+                    const opt = new Option(bankName, bankName, true, true);
+                    bankSelect.add(opt);
+                    bankSelect.value = bankName;
+                }
+            }
+            updateBankChipsVisual(bankName);
+            autoFillCashlessAmount();
+
+            // Focus nextInput (Bayar)
+            const nextInput = document.getElementById('pay');
+            if (nextInput) {
+                nextInput.focus();
+                if (typeof nextInput.select === 'function') nextInput.select();
+            }
+        }
+
+        function syncChipFromSelect(val) {
+            updateBankChipsVisual(val);
+            autoFillCashlessAmount();
+        }
+
+        function autoFillCashlessAmount() {
+            if (paymentType !== 'CASH') {
+                const total = (typeof totaltransaction !== 'undefined' ? totaltransaction : 0) - (typeof subtotal_discount !== 'undefined' ? subtotal_discount : 0);
+                if (total > 0 && typeof pay === 'function') {
+                    pay(total.toString());
+                }
+            }
+        }
+
         function getPaymentType() {
             const selected = document.querySelector('input[name="payment_type"]:checked');
             paymentType = selected ? selected.value : "CASH";
@@ -2635,14 +2714,40 @@
             // Show / hide bank name field
             const bankWrapper = document.getElementById('bankNameWrapper');
             const bankInput = document.getElementById('bank_name');
+            const bankBadge = document.getElementById('bankContextBadge');
+            const bankLabelText = document.getElementById('bankLabelText');
 
-            if (paymentType === 'TRANSFER') {
+            if (paymentType === 'TRANSFER' || paymentType === 'DEBIT' || paymentType === 'QRIS') {
                 bankWrapper.classList.remove('hidden');
-                // Small delay so the element is visible before focusing
-                setTimeout(() => bankInput.focus(), 50);
+
+                if (paymentType === 'QRIS') {
+                    if (bankBadge) {
+                        bankBadge.textContent = 'QRIS';
+                        bankBadge.className = 'px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-purple-100 text-purple-700';
+                    }
+                    if (bankLabelText) bankLabelText.textContent = 'Pilih Bank / Merchant QRIS';
+                } else if (paymentType === 'DEBIT') {
+                    if (bankBadge) {
+                        bankBadge.textContent = 'DEBIT';
+                        bankBadge.className = 'px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-blue-100 text-blue-700';
+                    }
+                    if (bankLabelText) bankLabelText.textContent = 'Pilih Mesin EDC / Bank Debit';
+                } else if (paymentType === 'TRANSFER') {
+                    if (bankBadge) {
+                        bankBadge.textContent = 'TRANSFER';
+                        bankBadge.className = 'px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-700';
+                    }
+                    if (bankLabelText) bankLabelText.textContent = 'Pilih Bank Tujuan Transfer';
+                }
+
+                autoFillCashlessAmount();
+                setTimeout(() => {
+                    if (bankInput) bankInput.focus();
+                }, 50);
             } else {
                 bankWrapper.classList.add('hidden');
-                bankInput.value = '';
+                if (bankInput) bankInput.value = '';
+                updateBankChipsVisual('');
             }
 
             console.log('Payment type:', paymentType);
@@ -2657,29 +2762,32 @@
                 if (event.key !== 'Enter') return;
                 event.preventDefault();
 
+                radio.checked = true;
                 paymentType = radio.value;
-                console.log('Payment type:', radio.value);
+                getPaymentType();
 
-                // If Transfer is selected via Enter, focus the bank name field instead of pay
-                if (radio.value === 'TRANSFER') {
-                    const bankWrapper = document.getElementById('bankNameWrapper');
+                if (radio.value === 'TRANSFER' || radio.value === 'DEBIT' || radio.value === 'QRIS') {
                     const bankInput = document.getElementById('bank_name');
-                    bankWrapper.classList.remove('hidden');
-                    setTimeout(() => bankInput.focus(), 50);
+                    setTimeout(() => {
+                        if (bankInput) bankInput.focus();
+                    }, 50);
                 } else {
-                    document.getElementById('bankNameWrapper').classList.add('hidden');
-                    document.getElementById('bank_name').value = '';
                     nextInput.focus();
+                    if (typeof nextInput.select === 'function') nextInput.select();
                 }
             });
         });
 
-        bank_name_input.addEventListener('keydown', function(event) {
-            if (event.key === 'Enter') {
-                event.preventDefault();
-                nextInput.focus();
-            }
-        });
+        if (bank_name_input) {
+            bank_name_input.addEventListener('keydown', function(event) {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    autoFillCashlessAmount();
+                    nextInput.focus();
+                    if (typeof nextInput.select === 'function') nextInput.select();
+                }
+            });
+        }
     }
 
     function selectPatient(it) {
@@ -3688,6 +3796,25 @@
             });
 
             return;
+        }
+
+        if (paymentType !== 'CASH' && transaction_type !== 'KREDIT') {
+            const bankVal = bank_name_input ? bank_name_input.value : '';
+            if (!bankVal) {
+                iziToast.warning({
+                    title: 'Peringatan',
+                    message: 'Silahkan Pilih Bank / Merchant Terlebih Dahulu untuk ' + paymentType,
+                    position: 'topRight'
+                });
+                const bankWrapper = document.getElementById('bankNameWrapper');
+                if (bankWrapper) {
+                    bankWrapper.classList.remove('hidden');
+                    bankWrapper.classList.add('ring-2', 'ring-red-400');
+                    setTimeout(() => bankWrapper.classList.remove('ring-2', 'ring-red-400'), 2000);
+                }
+                if (bank_name_input) bank_name_input.focus();
+                return;
+            }
         }
 
         // PREVENT DOUBLE CLICK

@@ -39,25 +39,25 @@ class BankSalesExport implements WithMultipleSheets
     public static function resolveCategory($trx): string
     {
         $bank = trim($trx->transfer_bank_name ?? '');
-        if (!empty($bank) && !is_numeric($bank)) {
-            return $bank;
-        }
-
         $method = strtoupper(trim($trx->payment_method ?? ''));
-        if ($method === 'QRIS') {
-            return 'QRIS';
-        }
-        if ($method === 'DEBIT') {
-            return 'DEBIT';
-        }
-        if ($method === 'TRANSFER') {
-            return !empty($bank) ? $bank : 'Transfer Lainnya';
-        }
+
         if ($method === 'CASH') {
             return 'CASH';
         }
 
-        if (!empty($bank)) {
+        if ($method === 'QRIS') {
+            return !empty($bank) && !is_numeric($bank) ? "QRIS {$bank}" : 'QRIS';
+        }
+
+        if ($method === 'DEBIT') {
+            return !empty($bank) && !is_numeric($bank) ? "DEBIT {$bank}" : 'DEBIT';
+        }
+
+        if ($method === 'TRANSFER') {
+            return !empty($bank) && !is_numeric($bank) ? $bank : 'Transfer Lainnya';
+        }
+
+        if (!empty($bank) && !is_numeric($bank)) {
             return $bank;
         }
 

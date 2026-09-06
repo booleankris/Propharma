@@ -116,7 +116,12 @@ class SalesDataController extends Controller
                     return 'Rp ' . number_format($row->totaldiscount + $row->cart_discount, 0, ',', '.');
                 })
                 ->addColumn('payment_method', function ($row) {
-                    return $row->transactions?->payment_method;
+                    $method = $row->transactions?->payment_method ?? 'CASH';
+                    $bank = $row->transactions?->transfer_bank_name;
+                    if ($bank && in_array(strtoupper($method), ['QRIS', 'DEBIT', 'TRANSFER'])) {
+                        return "{$method} ({$bank})";
+                    }
+                    return $method;
                 })
 
                 ->rawColumns(['final_price'])
@@ -227,7 +232,12 @@ class SalesDataController extends Controller
                     return 'Rp ' . number_format($row->totaldiscount + $row->cart_discount, 0, ',', '.');
                 })
                 ->addColumn('payment_method', function ($row) {
-                    return $row->transactions?->payment_method;
+                    $method = $row->transactions?->payment_method ?? 'CASH';
+                    $bank = $row->transactions?->transfer_bank_name;
+                    if ($bank && in_array(strtoupper($method), ['QRIS', 'DEBIT', 'TRANSFER'])) {
+                        return "{$method} ({$bank})";
+                    }
+                    return $method;
                 })
 
                 ->rawColumns(['final_price'])
