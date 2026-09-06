@@ -262,6 +262,7 @@
                     $fromName = $transfer->users?->pharmacy?->name ?? $transfer->items->first()?->sourceBatch?->pharmacy?->name ?? 'Gudang / Asal';
                     $toName = $transfer->items->first()?->batches?->pharmacy?->name ?? 'Apotek Tujuan';
                     [$statusLabel, $statusClass] = $statusMap[$transfer->status] ?? ['—', ''];
+                    $hasPendingItems = $transfer->items->contains('status', 0);
                 @endphp
 
                 <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm transition-all hover:shadow-md overflow-hidden">
@@ -309,6 +310,19 @@
                             <span class="text-[11px] font-semibold px-2.5 py-1 rounded-full border {{ $statusClass }}">
                                 {{ $statusLabel }}
                             </span>
+
+                            {{-- Batalkan Mutasi (Sender Cancel) --}}
+                            @if ($hasPendingItems)
+                                <form method="POST" action="{{ route('transfers.deny', $transfer) }}" class="inline">
+                                    @csrf
+                                    <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-semibold rounded-lg transition shadow-sm" onclick="return confirm('Apakah Anda yakin ingin membatalkan pengiriman mutasi ini? Stok obat akan dikembalikan.')">
+                                        <svg class="w-3.5 h-3.5 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                        Batalkan Mutasi
+                                    </button>
+                                </form>
+                            @endif
 
                             {{-- Print Button --}}
                             <a href="{{ route('transfers.print', $transfer->id) }}" target="_blank"
