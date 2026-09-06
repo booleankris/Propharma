@@ -35,6 +35,20 @@
             border: none !important;
         }
     </style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('DOM Loaded');
+        const deniedTab = document.getElementById('tab-denied');
+        if (deniedTab) {
+            console.log('tab-denied found in DOM. Children count:', deniedTab.children.length);
+            console.log('tab-denied HTML:', deniedTab.innerHTML.substring(0, 500));
+        } else {
+            console.log('tab-denied NOT FOUND IN DOM!');
+        }
+    });
+</script>
+
 @endsection
 
 @section('content')
@@ -834,6 +848,20 @@
         </div>
 
     </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('DOM Loaded');
+        const deniedTab = document.getElementById('tab-denied');
+        if (deniedTab) {
+            console.log('tab-denied found in DOM. Children count:', deniedTab.children.length);
+            console.log('tab-denied HTML:', deniedTab.innerHTML.substring(0, 500));
+        } else {
+            console.log('tab-denied NOT FOUND IN DOM!');
+        }
+    });
+</script>
+
 @endsection
 
 @section('scripts')
@@ -942,4 +970,18 @@
             }
         });
     </script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('DOM Loaded');
+        const deniedTab = document.getElementById('tab-denied');
+        if (deniedTab) {
+            console.log('tab-denied found in DOM. Children count:', deniedTab.children.length);
+            console.log('tab-denied HTML:', deniedTab.innerHTML.substring(0, 500));
+        } else {
+            console.log('tab-denied NOT FOUND IN DOM!');
+        }
+    });
+</script>
+
 @endsection
