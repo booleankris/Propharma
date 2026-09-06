@@ -160,6 +160,75 @@
             <p id="progressText" class="text-[11px] mt-2 text-slate-500 font-medium">0%</p>
         </div>
 
+        <script>
+            window.switchTab = function(key) {
+                document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+                document.querySelectorAll('.tab-btn').forEach(b => {
+                    b.classList.remove('bg-white', 'text-slate-900', 'shadow-sm');
+                    b.classList.add('text-slate-500');
+                });
+
+                const panel = document.getElementById('tab-' + key);
+                if (panel) panel.classList.remove('hidden');
+
+                const activeBtn = document.getElementById('tab-btn-' + key);
+                if (activeBtn) {
+                    activeBtn.classList.add('bg-white', 'text-slate-900', 'shadow-sm');
+                    activeBtn.classList.remove('text-slate-500');
+                }
+
+                // Save active tab to URL hash
+                if (window.location.hash !== '#' + key) {
+                    history.replaceState(null, null, '#' + key + window.location.search);
+                }
+            };
+            function switchTab(key) { window.switchTab(key); }
+
+            window.toggleDetails = function(id) {
+                const detailEl = document.getElementById('details-' + id);
+                const chevronEl = document.getElementById('chevron-' + id);
+
+                if (!detailEl) return;
+
+                const isHidden = detailEl.classList.contains('hidden');
+                if (isHidden) {
+                    detailEl.classList.remove('hidden');
+                    if (chevronEl) chevronEl.classList.add('rotate-180');
+                } else {
+                    detailEl.classList.add('hidden');
+                    if (chevronEl) chevronEl.classList.remove('rotate-180');
+                }
+            };
+            function toggleDetails(id) { window.toggleDetails(id); }
+
+            window.initActiveTab = function() {
+                let activeTab = 'pending';
+                const hash = window.location.hash.replace('#', '');
+                const validTabs = ['pending', 'accepted', 'denied'];
+                
+                if (validTabs.includes(hash)) {
+                    activeTab = hash;
+                } else {
+                    const urlParams = new URLSearchParams(window.location.search);
+                    if (urlParams.has('accepted_page')) {
+                        activeTab = 'accepted';
+                    } else if (urlParams.has('denied_page')) {
+                        activeTab = 'denied';
+                    } else if (urlParams.has('pending_page')) {
+                        activeTab = 'pending';
+                    }
+                }
+                window.switchTab(activeTab);
+            };
+
+            window.addEventListener('hashchange', window.initActiveTab);
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', window.initActiveTab);
+            } else {
+                window.initActiveTab();
+            }
+        </script>
+
         {{-- Tabs --}}
         <div class="flex gap-1.5 mb-6 bg-slate-100/80 p-1.5 rounded-2xl w-fit overflow-x-auto max-w-full">
             @foreach ([['pending', 'Mutasi Keluar', $pending->total()], ['accepted', 'Mutasi Masuk', $accepted->total()], ['denied', 'Ditolak', $denied->total()]] as [$key, $label, $totalCount])
@@ -735,72 +804,7 @@
 @section('scripts')
     <script src="{{ asset('templates/library/izitoast/dist/js/iziToast.min.js') }}"></script>
     <script>
-        // Tab switching
-        function switchTab(key) {
-            document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
-            document.querySelectorAll('.tab-btn').forEach(b => {
-                b.classList.remove('bg-white', 'text-slate-900', 'shadow-sm');
-                b.classList.add('text-slate-500');
-            });
-
-            const panel = document.getElementById('tab-' + key);
-            if (panel) panel.classList.remove('hidden');
-
-            const activeBtn = document.getElementById('tab-btn-' + key);
-            if (activeBtn) {
-                activeBtn.classList.add('bg-white', 'text-slate-900', 'shadow-sm');
-                activeBtn.classList.remove('text-slate-500');
-            }
-
-            // Save active tab to URL hash
-            if (window.location.hash !== '#' + key) {
-                history.replaceState(null, null, '#' + key + window.location.search);
-            }
-        }
-
-        // Toggle Details / Expand items
-        function toggleDetails(id) {
-            const detailEl = document.getElementById('details-' + id);
-            const chevronEl = document.getElementById('chevron-' + id);
-
-            if (!detailEl) return;
-
-            const isHidden = detailEl.classList.contains('hidden');
-            if (isHidden) {
-                detailEl.classList.remove('hidden');
-                if (chevronEl) chevronEl.classList.add('rotate-180');
-            } else {
-                detailEl.classList.add('hidden');
-                if (chevronEl) chevronEl.classList.remove('rotate-180');
-            }
-        }
-
-        // Restore and sync active tab on page load and hash change
-        function initActiveTab() {
-            let activeTab = 'pending';
-            const hash = window.location.hash.replace('#', '');
-            const validTabs = ['pending', 'accepted', 'denied'];
-            
-            if (validTabs.includes(hash)) {
-                activeTab = hash;
-            } else {
-                const urlParams = new URLSearchParams(window.location.search);
-                if (urlParams.has('accepted_page')) {
-                    activeTab = 'accepted';
-                } else if (urlParams.has('denied_page')) {
-                    activeTab = 'denied';
-                } else if (urlParams.has('pending_page')) {
-                    activeTab = 'pending';
-                }
-            }
-            switchTab(activeTab);
-        }
-
-        window.addEventListener('hashchange', initActiveTab);
-
         document.addEventListener('DOMContentLoaded', function() {
-            initActiveTab();
-
             // Export Loading State
             const exportBtn = document.getElementById('export-excel-btn');
             if (exportBtn) {
