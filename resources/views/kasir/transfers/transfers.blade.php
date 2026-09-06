@@ -60,6 +60,15 @@
     });
 </script>
 
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('--- LAST 1000 CHARS OF BODY ---');
+        const html = document.body.innerHTML;
+        console.log(html.substring(html.length - 1000));
+    });
+</script>
+
 @endsection
 
 @section('content')
@@ -884,6 +893,15 @@
     });
 </script>
 
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('--- LAST 1000 CHARS OF BODY ---');
+        const html = document.body.innerHTML;
+        console.log(html.substring(html.length - 1000));
+    });
+</script>
+
 @endsection
 
 @section('scripts')
@@ -1014,6 +1032,15 @@
         console.log('Found ' + panels.length + ' tab-panels');
         panels.forEach(p => console.log('Panel ID:', p.id));
         console.log('Body length:', document.body.innerHTML.length);
+    });
+</script>
+
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('--- LAST 1000 CHARS OF BODY ---');
+        const html = document.body.innerHTML;
+        console.log(html.substring(html.length - 1000));
     });
 </script>
 
