@@ -842,7 +842,7 @@
             <div class="flex items-center gap-1.5">
                 <button
                     class="topbar-btn rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-all focus:outline-none"
-                    onclick="toggleModal('notif-modal')" aria-label="Notifikasi stok">
+                    onclick="toggleModal('notif-modal'); loadStockNotifications();" aria-label="Notifikasi stok">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
@@ -1054,7 +1054,11 @@
 
             {{-- Supplier/Creditor select --}}
             <div id="order_supplier_select" style="display:none;">
-                @php $getcreditor = \App\Models\Creditor::orderBy('name')->get(); @endphp
+                @php
+                    $getcreditor = \Illuminate\Support\Facades\Cache::remember('sidebar_creditors', 3600, function () {
+                        return \App\Models\Creditor::select('code', 'name')->orderBy('name')->get();
+                    });
+                @endphp
                 <p class="text-xs font-semibold tracking-widest uppercase text-slate-400 mb-3">Pilih PBF / Kreditur</p>
                 <select id="order_supplier" name="order_supplier" class="w-full select2-order-supplier">
                     <option value="">Semua PBF / Kreditur</option>
@@ -1276,7 +1280,9 @@
                     </div>
                 </div>
                 @php
-                    $getshift = \App\Models\Shifts::all();
+                    $getshift = \Illuminate\Support\Facades\Cache::remember('sidebar_shifts', 3600, function () {
+                        return \App\Models\Shifts::select('id', 'name')->get();
+                    });
                 @endphp
                 <div id="shift-select">
                     <select id="shift" name="shift"
@@ -1343,7 +1349,9 @@
 
                 <div id="factory-select" style="display:none;" class="mt-3">
                     @php
-                        $getfactory = \App\Models\Factory::all();
+                        $getfactory = \Illuminate\Support\Facades\Cache::remember('sidebar_factories', 3600, function () {
+                            return \App\Models\Factory::select('id', 'name')->orderBy('name')->get();
+                        });
                     @endphp
                     <p class="text-xs font-semibold tracking-widest uppercase text-slate-400 mb-3">Pilih Pabrik</p>
                     <select id="factory" name="factory" class="w-full select2-factory">
@@ -1355,7 +1363,9 @@
                 </div>
                 <div id="doctor-select" style="display:none;" class="mt-3">
                     @php
-                        $getdoctor = \App\Models\Doctors::all();
+                        $getdoctor = \Illuminate\Support\Facades\Cache::remember('sidebar_doctors', 3600, function () {
+                            return \App\Models\Doctors::select('id', 'name')->orderBy('name')->get();
+                        });
                     @endphp
                     <p class="text-xs font-semibold tracking-widest uppercase text-slate-400 mb-3">Pilih Dokter</p>
                     <select id="doctor" name="doctor" class="w-full py-3 select2-doctor">
@@ -2008,61 +2018,48 @@
         <button class="notif-close"
             onclick="document.getElementById('notif-modal').classList.add('hidden')">×</button>
     </div>
-    <div class="notif-list">
-        @php
-            $logs = \App\Models\ItemsLog::with('medicines')
-                ->where('status', '!=', 7)
-                ->orderBy('created_at', 'desc')
-                ->take(30)
-                ->get();
-            $typeMap = [
-                1 => ['label' => 'Penjualan', 'icon' => '↓', 'sign' => '-', 'class' => 'qty-out', 'color' => 1],
-                2 => ['label' => 'Pembelian', 'icon' => '↑', 'sign' => '+', 'class' => 'qty-in', 'color' => 2],
-                3 => ['label' => 'Retur Penjualan', 'icon' => '↩', 'sign' => '+', 'class' => 'qty-in', 'color' => 3],
-                4 => ['label' => 'Retur Pembelian', 'icon' => '↪', 'sign' => '-', 'class' => 'qty-out', 'color' => 4],
-                5 => [
-                    'label' => 'Stock Opname (+)',
-                    'icon' => '↑',
-                    'sign' => '+',
-                    'class' => 'qty-neutral',
-                    'color' => 5,
-                ],
-                6 => [
-                    'label' => 'Stock Opname (-)',
-                    'icon' => '↓',
-                    'sign' => '-',
-                    'class' => 'qty-neutral',
-                    'color' => 6,
-                ],
-            ];
-        @endphp
-
-        @forelse ($logs as $log)
-            @php
-                $info = $typeMap[$log->status] ?? [
-                    'label' => 'Lainnya',
-                    'icon' => '•',
-                    'sign' => '',
-                    'class' => 'qty-neutral',
-                    'color' => 0,
-                ];
-            @endphp
-            <div class="notif-item">
-                <div class="notif-dot dot-{{ $info['color'] }}">{{ $info['icon'] }}</div>
-                <div style="flex:1; min-width:0;">
-                    <div class="notif-name">{{ $log->medicines->name ?? '-' }}</div>
-                    <div style="display:flex; align-items:center; gap:6px; margin-bottom:2px;">
-                        <span class="notif-badge badge-{{ $info['color'] }}">{{ $info['label'] }}</span>
-                    </div>
-                    <div class="notif-meta">{{ safeDateFormat($log->created_at, 'd M Y H:i') }}</div>
-                </div>
-                <div class="notif-qty {{ $info['class'] }}">{{ $info['sign'] }} {{ $log->qty }}</div>
-            </div>
-        @empty
-            <div class="notif-empty">Belum ada aktivitas stok</div>
-        @endforelse
+    <div class="notif-list" id="notif-list-container">
+        <div class="notif-empty" id="notif-loading">Memuat aktivitas stok...</div>
     </div>
 </div>
+
+<script>
+    let stockNotifsLoaded = false;
+    function loadStockNotifications() {
+        if (stockNotifsLoaded) return;
+        const container = document.getElementById('notif-list-container');
+        if (!container) return;
+
+        fetch('{{ route("kasir.stockNotifications") }}')
+            .then(res => res.json())
+            .then(data => {
+                stockNotifsLoaded = true;
+                if (!data || data.length === 0) {
+                    container.innerHTML = '<div class="notif-empty">Belum ada aktivitas stok</div>';
+                    return;
+                }
+                let html = '';
+                data.forEach(item => {
+                    html += `
+                    <div class="notif-item">
+                        <div class="notif-dot dot-${item.color}">${item.icon}</div>
+                        <div style="flex:1; min-width:0;">
+                            <div class="notif-name">${item.name}</div>
+                            <div style="display:flex; align-items:center; gap:6px; margin-bottom:2px;">
+                                <span class="notif-badge badge-${item.color}">${item.label}</span>
+                            </div>
+                            <div class="notif-meta">${item.time}</div>
+                        </div>
+                        <div class="notif-qty ${item.class}">${item.sign} ${item.qty}</div>
+                    </div>`;
+                });
+                container.innerHTML = html;
+            })
+            .catch(err => {
+                container.innerHTML = '<div class="notif-empty text-red-500">Gagal memuat notifikasi</div>';
+            });
+    }
+</script>
 
 {{-- Expiry Modal --}}
 <div id="expiry-modal" class="notif-overlay hidden">

@@ -253,6 +253,47 @@ class HomeController extends Controller
 
         User::where('id', Auth::id())->update($data);
 
-        return redirect()->route('account.profile')->with('success', 'Profil Akun Berhasil Diupdat');;
+        return redirect()->route('account.profile')->with('success', 'Profil Akun Berhasil Diupdat');
+    }
+
+    public function stockNotifications()
+    {
+        $typeMap = [
+            1 => ['label' => 'Penjualan', 'icon' => '↓', 'sign' => '-', 'class' => 'qty-out', 'color' => 1],
+            2 => ['label' => 'Pembelian', 'icon' => '↑', 'sign' => '+', 'class' => 'qty-in', 'color' => 2],
+            3 => ['label' => 'Retur Penjualan', 'icon' => '↩', 'sign' => '+', 'class' => 'qty-in', 'color' => 3],
+            4 => ['label' => 'Retur Pembelian', 'icon' => '↪', 'sign' => '-', 'class' => 'qty-out', 'color' => 4],
+            5 => ['label' => 'Stock Opname (+)', 'icon' => '↑', 'sign' => '+', 'class' => 'qty-neutral', 'color' => 5],
+            6 => ['label' => 'Stock Opname (-)', 'icon' => '↓', 'sign' => '-', 'class' => 'qty-neutral', 'color' => 6],
+        ];
+
+        $logs = \App\Models\ItemsLog::with('medicines:id,name')
+            ->where('status', '!=', 7)
+            ->orderBy('id', 'desc')
+            ->take(30)
+            ->get();
+
+        $formatted = $logs->map(function ($log) use ($typeMap) {
+            $info = $typeMap[$log->status] ?? [
+                'label' => 'Lainnya',
+                'icon' => '•',
+                'sign' => '',
+                'class' => 'qty-neutral',
+                'color' => 0,
+            ];
+            return [
+                'id' => $log->id,
+                'name' => $log->medicines->name ?? '-',
+                'label' => $info['label'],
+                'icon' => $info['icon'],
+                'sign' => $info['sign'],
+                'class' => $info['class'],
+                'color' => $info['color'],
+                'qty' => $log->qty,
+                'time' => safeDateFormat($log->created_at, 'd M Y H:i'),
+            ];
+        });
+
+        return response()->json($formatted);
     }
 }

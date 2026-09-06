@@ -299,6 +299,11 @@
                 if (m.id !== id) m.classList.add('hidden');
             });
             target.classList.toggle('hidden');
+            if (id === 'notif-modal' && !target.classList.contains('hidden')) {
+                if (typeof loadStockNotifications === 'function') {
+                    loadStockNotifications();
+                }
+            }
         }
 
         document.addEventListener('click', function(e) {

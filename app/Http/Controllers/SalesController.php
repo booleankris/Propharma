@@ -165,35 +165,28 @@ class SalesController extends Controller
         }
 
         // 5. Collect view data───────────────
-        $totaltransaction = MedicineCart::where('user_id', $user_id)
-            ->where('transaction_id', $trx_id)
-            ->where('status', '0')
-            ->sum('final_price');
-
-        $total_price = MedicineCart::where('user_id', $user_id)
-            ->where('transaction_id', $trx_id)
-            ->where('status', '0')
-            ->selectRaw('SUM(total_price) as total_price, SUM(embalase) as embalase')
-            ->first();
-        $existingpackage = MedicineCart::where('user_id', $user_id)
-            ->where('transaction_id', $trx_id)
-            ->where('recipe_status', '0')
-            ->whereNotNull('package')
-            ->first();
-
-        $discount_total = MedicineCart::where('user_id', $user_id)
-            ->where('status', '0')
-            ->where('transaction_id', $trx_id)
-            ->sum('discount');
-
-        $check_transaction = MedicineTransactions::where('pharmacy_id', $pharmacy_id)
-            ->where('status', 0)
-            ->count();
-
         $itemInCart = MedicineCart::with('medicine')
             ->where('transaction_id', $trx_id)
             ->where('user_id', $user_id)
             ->get();
+
+        $activeCart = $itemInCart->where('status', '0');
+        $totaltransaction = $activeCart->sum('final_price');
+
+        $total_price = (object)[
+            'total_price' => (float)$activeCart->sum('total_price'),
+            'embalase' => (float)$activeCart->sum('embalase'),
+        ];
+
+        $existingpackage = $itemInCart->first(function ($cartItem) {
+            return $cartItem->recipe_status == '0' && !empty($cartItem->package);
+        });
+
+        $discount_total = $activeCart->sum('discount');
+
+        $check_transaction = MedicineTransactions::where('pharmacy_id', $pharmacy_id)
+            ->where('status', 0)
+            ->count();
 
         return view('kasir.transaction', compact(
             'transaction_code',
