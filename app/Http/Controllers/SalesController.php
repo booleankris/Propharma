@@ -844,13 +844,13 @@ class SalesController extends Controller
                 'discount' => $validated['discounsubtotalvalue'],
                 'subtotal' => $validated['totaltransaction'],
                 'changes' => $validated['changes'],
-                'patient_id' => $validated['patient_id'],
-                'doctor_id' => $validated['doctor_id'],
-                'debtor_id' => $validated['debtor_id'],
-                'payment_method' => $validated['paymentType'],
-                'transfer_bank_name' => $validated['bank_name'],
-                'user_id' => $validated['user_id'],
-                'shift_logs_id' => $validated['shift_logs_id'],
+                'patient_id' => $validated['patient_id'] ?? null,
+                'doctor_id' => $validated['doctor_id'] ?? null,
+                'debtor_id' => $validated['debtor_id'] ?? null,
+                'payment_method' => $validated['paymentType'] ?? 'CASH',
+                'transfer_bank_name' => $validated['bank_name'] ?? null,
+                'user_id' => $validated['user_id'] ?? null,
+                'shift_logs_id' => $validated['shift_logs_id'] ?? null,
             ]);
 
             MedicineCart::where('transaction_id', $validated['transaction_id'])
