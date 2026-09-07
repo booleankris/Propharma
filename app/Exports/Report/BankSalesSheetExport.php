@@ -186,7 +186,7 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
             ])
                 ->where('pharmacy_id', $this->pharmacyId)
                 ->where('status', 1)
-                ->whereBetween('created_at', [$this->startDate, $this->endDate]);
+                ->whereBetween('updated_at', [$this->startDate, $this->endDate]);
 
             if ($this->shiftType === 'shift' && !empty($this->shift)) {
                 $query->whereHas('shift_logs', function ($q) {
@@ -205,7 +205,7 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
                 $query->where('transfer_bank_name', $this->bankName);
             }
 
-            $transactions = $query->orderBy('created_at', 'asc')->get();
+            $transactions = $query->orderBy('updated_at', 'asc')->get();
         }
 
         $rows = [];
@@ -217,7 +217,8 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
         $totalAmount = 0;
 
         foreach ($transactions as $trx) {
-            $tgl = $trx->created_at ? $trx->created_at->format('d/m/Y H:i') : '-';
+            $dateCol = $trx->updated_at ?? $trx->created_at;
+            $tgl = $dateCol ? $dateCol->format('d/m/Y H:i') : '-';
             $code = $trx->transaction_code ?? '-';
             $type = $trx->transaction_type ?? '-';
             $pasien = $trx->patients->name ?? '-';

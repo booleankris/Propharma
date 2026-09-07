@@ -839,6 +839,7 @@ class SalesController extends Controller
 
             $transaction->update([
                 'status' => 1,
+                'created_at' => Carbon::now(),
                 'paid' => $validated['paid'],
                 'transaction_code' => $this->generateTransactionCode($meta['code']),
                 'discount' => $validated['discounsubtotalvalue'],

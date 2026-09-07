@@ -74,6 +74,7 @@ class BankSalesExport implements WithMultipleSheets
             'pharmacy_id',
             'status',
             'created_at',
+            'updated_at',
             'transaction_code',
             'transaction_type',
             'payment_method',
@@ -108,7 +109,7 @@ class BankSalesExport implements WithMultipleSheets
             ])
             ->where('pharmacy_id', $this->pharmacyId)
             ->where('status', 1)
-            ->whereBetween('created_at', [$this->startDate, $this->endDate]);
+            ->whereBetween('updated_at', [$this->startDate, $this->endDate]);
 
         if ($this->shiftType === 'shift' && !empty($this->shift)) {
             $query->whereHas('shift_logs', function ($q) {
@@ -116,7 +117,7 @@ class BankSalesExport implements WithMultipleSheets
             });
         }
 
-        $allTransactions = $query->orderBy('created_at', 'asc')->get();
+        $allTransactions = $query->orderBy('updated_at', 'asc')->get();
 
         // 2. Classify transactions by bank/category
         $grouped = [];
