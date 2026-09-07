@@ -40,6 +40,7 @@ use App\Http\Controllers\Master\LocationsController;
 use App\Http\Controllers\Master\MedicineController;
 use App\Http\Controllers\Master\ParametersController;
 use App\Http\Controllers\Master\PatientsController;
+use App\Http\Controllers\Master\ReportedMedicineController;
 use App\Http\Controllers\MedicineOrderHistoryController;
 use App\Http\Controllers\Orders\OrdersController;
 use App\Http\Controllers\Orders\ReceivingController;
@@ -145,6 +146,16 @@ Route::middleware(['auth', 'role:HO|administrator'])->group(function () {
     Route::post('/pharmacy/switch', [\App\Http\Controllers\PharmacySelectorController::class, 'switch'])->name('pharmacy.switch');
     Route::get('/ho/analytics', [\App\Http\Controllers\HO\HODashboardController::class, 'index'])->name('ho.analytics');
     Route::get('/ho/analytics/data', [\App\Http\Controllers\HO\HODashboardController::class, 'getData'])->name('ho.analytics.data');
+
+    // Master Pelaporan Obat (Role HO Only)
+    Route::prefix('reported-medicines')->name('reported-medicines.')->group(function () {
+        Route::get('/', [ReportedMedicineController::class, 'index'])->name('index');
+        Route::get('/search', [ReportedMedicineController::class, 'searchMedicines'])->name('search');
+        Route::post('/', [ReportedMedicineController::class, 'store'])->name('store');
+        Route::put('/{id}', [ReportedMedicineController::class, 'update'])->name('update');
+        Route::delete('/{id}', [ReportedMedicineController::class, 'destroy'])->name('destroy');
+        Route::get('/export', [ReportedMedicineController::class, 'export'])->name('export');
+    });
 });
 Route::middleware(['auth', 'role:Kasir|Gudang PMI|HO|administrator|manager|Online|Online Grab|Online Shopee|Digital|UMKM|operator'])->group(function () {
     Route::get('/home', [HomeController::class, 'index'])->name('home');
