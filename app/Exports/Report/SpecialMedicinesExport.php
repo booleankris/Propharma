@@ -27,29 +27,60 @@ class SpecialMedicinesExport implements WithMultipleSheets
     public const CATEGORIES = [
         'NARKOTIKA' => [
             'title'      => 'NARKOTIKA',
+            'filter_by'  => 'type',
             'type_query' => ['NARKOTIKA'],
             'color'      => 'FFA07A', // Salmon Orange
             'textColor'  => '991B1B',
         ],
         'PSIKOTROPIKA' => [
             'title'      => 'PSIKOTROPIKA',
+            'filter_by'  => 'type',
             'type_query' => ['PSIKOTROPIKA'],
             'color'      => '93C5FD', // Light Blue
             'textColor'  => '1E3A8A',
         ],
         'OBAT TERTENTU' => [
-            'title'      => 'OBAT OBAT TERTENTU',
-            'type_query' => ['OBAT-OBAT TERTENTU (OOT)', 'OBAT TERTENTU', 'OBAT-OBAT TERTENTU', 'OOT'],
-            'color'      => 'A7F3D0', // Mint Green
-            'textColor'  => '065F46',
+            'title'          => 'OBAT OBAT TERTENTU',
+            'filter_by'      => 'category',
+            'category_names' => ['OBAT-OBAT TERTENTU (OOT)', 'OBAT TERTENTU', 'OBAT-OBAT TERTENTU', 'OOT'],
+            'color'          => 'A7F3D0', // Mint Green
+            'textColor'      => '065F46',
         ],
         'PREKURSOR' => [
-            'title'      => 'PREKURSOR',
-            'type_query' => ['PREKURSOR'],
-            'color'      => 'FDE047', // Light Yellow
-            'textColor'  => '854D0E',
+            'title'          => 'PREKURSOR',
+            'filter_by'      => 'category',
+            'category_names' => ['OBAT PREKURSOR', 'PREKURSOR'],
+            'color'          => 'FDE047', // Light Yellow
+            'textColor'      => '854D0E',
         ],
     ];
+
+    /**
+     * Get query for medicines based on category configuration
+     */
+    public static function getMedicinesQuery(array $config)
+    {
+        $query = Medicines::where('status', 1);
+
+        if (($config['filter_by'] ?? 'type') === 'category') {
+            $catNames = $config['category_names'] ?? [];
+            $categoryIds = \App\Models\MedicineCategory::where(function ($q) use ($catNames) {
+                foreach ($catNames as $name) {
+                    $q->orWhere('name', 'LIKE', "%{$name}%");
+                }
+            })->pluck('id')->toArray();
+
+            $query->whereIn('medicine_category_id', $categoryIds);
+        } else {
+            $query->where(function ($q) use ($config) {
+                foreach ($config['type_query'] ?? [] as $t) {
+                    $q->orWhere('type', 'LIKE', "%{$t}%");
+                }
+            });
+        }
+
+        return $query->orderBy('name', 'asc');
+    }
 
     public function __construct($pharmacyId, $startDate, $endDate)
     {
@@ -115,7 +146,6 @@ class SpecialCategoryAllInOneSheet implements FromArray, WithStyles, WithColumnW
     public function array(): array
     {
         $rows = [];
-        $currentRow = 1;
 
         // Top Document Header
         $rows[] = [$this->pharmacyName];
@@ -171,29 +201,18 @@ class SpecialCategoryAllInOneSheet implements FromArray, WithStyles, WithColumnW
             });
 
         foreach (SpecialMedicinesExport::CATEGORIES as $key => $config) {
-            $sectionStartRow = $currentRow;
-
             // Section Banner (e.g. NARKOTIKA)
             $rows[] = [$config['title'], '', '', '', '', '', '', '', ''];
-            $bannerRow = $currentRow;
-            $currentRow++;
+            $bannerRow = count($rows);
 
             // Table Column Headers
             $rows[] = ['NO', 'NAMA OBAT', 'AWAL', 'MASUK', 'KELUAR', 'JUMLAH', 'FISIK', 'SELISIH', 'KETERANGAN'];
-            $colHeaderRow = $currentRow;
-            $currentRow++;
+            $colHeaderRow = count($rows);
 
-            $medicines = Medicines::where(function ($q) use ($config) {
-                foreach ($config['type_query'] as $t) {
-                    $q->orWhere('type', 'LIKE', "%{$t}%");
-                }
-            })
-            ->where('status', 1)
-            ->orderBy('name', 'asc')
-            ->get();
+            $medicines = SpecialMedicinesExport::getMedicinesQuery($config)->get();
 
             $no = 1;
-            $startDataRow = $currentRow;
+            $startDataRow = count($rows) + 1;
 
             foreach ($medicines as $med) {
                 $inBefore  = (int) ($inBeforeGroup[$med->id] ?? 0);
@@ -235,10 +254,9 @@ class SpecialCategoryAllInOneSheet implements FromArray, WithStyles, WithColumnW
                     $selisih,
                     $keterangan,
                 ];
-                $currentRow++;
             }
 
-            $endDataRow = $currentRow - 1;
+            $endDataRow = count($rows);
 
             $this->headerRows[] = [
                 'bannerRow'     => $bannerRow,
@@ -251,10 +269,9 @@ class SpecialCategoryAllInOneSheet implements FromArray, WithStyles, WithColumnW
 
             // Space between tables
             $rows[] = ['', '', '', '', '', '', '', '', ''];
-            $currentRow++;
         }
 
-        $this->totalDataRows = $currentRow;
+        $this->totalDataRows = count($rows);
         return $rows;
     }
 
@@ -450,14 +467,7 @@ class SpecialCategorySingleSheet implements FromArray, WithStyles, WithColumnWid
                 return $items->first()->expired_date ?? null;
             });
 
-        $medicines = Medicines::where(function ($q) {
-            foreach ($this->config['type_query'] as $t) {
-                $q->orWhere('type', 'LIKE', "%{$t}%");
-            }
-        })
-        ->where('status', 1)
-        ->orderBy('name', 'asc')
-        ->get();
+        $medicines = SpecialMedicinesExport::getMedicinesQuery($this->config)->get();
 
         $no = 1;
         foreach ($medicines as $med) {
