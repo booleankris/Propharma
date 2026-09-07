@@ -940,7 +940,7 @@ class SalesController extends Controller
                     'total' => $cart->final_price,
                     'date' => $now,
                     'status' => 1,
-                    'batches_id' => $transfer->batches_id,
+                    'batches_id' => $transfer?->batches_id ?? null,
                     'user_id' => auth()->user()->id,
                 ]);
             }
