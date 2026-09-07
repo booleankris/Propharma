@@ -16,7 +16,7 @@ class BankSalesExport implements WithMultipleSheets
     protected $shift;
     protected $shiftType;
 
-    public const STANDARD_BANKS = ['CASH', 'BNI', 'Mandiri', 'BCA', 'BRI', 'BSI', 'BTN', 'QRIS', 'DEBIT'];
+    public const STANDARD_BANKS = ['CASH', 'Mandiri', 'BNI', 'BCA', 'BRI', 'BTN', 'QRIS', 'DEBIT'];
 
     public function __construct(
         $pharmacyId,

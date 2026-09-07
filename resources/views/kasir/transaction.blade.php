@@ -1167,14 +1167,14 @@
                                 class="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
                                 <span id="bankContextBadge"
                                     class="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-blue-100 text-blue-700">Bank</span>
-                                <span id="bankLabelText">Pilih Bank / Merchant</span>
+                                <span id="bankLabelText">Pilih Bank</span>
                             </label>
                             <span class="text-[10px] text-slate-400 font-medium">Navigasi: [Enter] untuk lanjut</span>
                         </div>
 
                         {{-- Quick-pick Bank Chips --}}
-                        <div class="grid grid-cols-3 sm:grid-cols-6 gap-1.5 mb-2.5" id="bankChipsGroup">
-                            @foreach (['Mandiri', 'BCA', 'BRI', 'BNI', 'BSI', 'BTN'] as $bankItem)
+                        <div class="grid grid-cols-5 gap-1.5 mb-2.5" id="bankChipsGroup">
+                            @foreach (['Mandiri', 'BNI', 'BCA', 'BRI', 'BTN'] as $bankItem)
                                 <button type="button"
                                     class="bank-chip-btn py-2 px-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:border-blue-400 hover:bg-blue-50/50 active:scale-95 transition-all text-center flex items-center justify-center gap-1 focus:outline-none focus:ring-2 focus:ring-blue-400"
                                     data-bank="{{ $bankItem }}" onclick="selectBankChip('{{ $bankItem }}')">
@@ -1188,22 +1188,12 @@
                             <select
                                 class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm transition"
                                 name="bank_name" id="bank_name" onchange="syncChipFromSelect(this.value)">
-                                <option value="">-- Pilih Bank / Merchant Lainnya --</option>
+                                <option value="">-- Pilih Bank --</option>
                                 <option value="Mandiri">Bank Mandiri</option>
+                                <option value="BNI">Bank BNI</option>
                                 <option value="BCA">Bank BCA</option>
                                 <option value="BRI">Bank BRI</option>
-                                <option value="BNI">Bank BNI</option>
-                                <option value="BSI">Bank Syariah Indonesia (BSI)</option>
                                 <option value="BTN">Bank BTN</option>
-                                <option value="Bank Kaltimtara">Bank Kaltimtara</option>
-                                <option value="CIMB Niaga">Bank CIMB Niaga</option>
-                                <option value="Permata">Bank Permata</option>
-                                <option value="Danamon">Bank Danamon</option>
-                                <option value="ShopeePay">ShopeePay / SPay</option>
-                                <option value="GoPay">GoPay</option>
-                                <option value="OVO">OVO</option>
-                                <option value="DANA">DANA</option>
-                                <option value="Lainnya">Bank / Merchant Lainnya</option>
                             </select>
                         </div>
                     </div>
@@ -2745,7 +2735,7 @@
                         bankBadge.className =
                             'px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-purple-100 text-purple-700';
                     }
-                    if (bankLabelText) bankLabelText.textContent = 'Pilih Bank / Merchant QRIS';
+                    if (bankLabelText) bankLabelText.textContent = 'Pilih Bank QRIS';
                 } else if (paymentType === 'DEBIT') {
                     if (bankBadge) {
                         bankBadge.textContent = 'DEBIT';
