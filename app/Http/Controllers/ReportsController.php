@@ -73,15 +73,33 @@ class ReportsController extends Controller
 
                     // Cap preview rows to max 100 rows per sheet to prevent memory exhaustion in Blade
                     if (count($rawRows) > 100) {
-                        $headerRows = array_slice($rawRows, 0, 7); // Title & table headers
-                        $dataRows = array_slice($rawRows, 7, 90);   // First 90 data rows
-                        $lastRow = end($rawRows);                  // Summary total row
+                        // Dynamically find table header row (usually contains 'No' / 'No.')
+                        $headerEndIndex = 6;
+                        foreach ($rawRows as $idx => $r) {
+                            if (is_array($r) && count($r) > 1 && in_array(strtolower(trim((string)($r[0] ?? ''))), ['no', 'no.', 'no '])) {
+                                $headerEndIndex = $idx;
+                                break;
+                            }
+                        }
 
-                        $totalDataRows = count($rawRows) - 8;
-                        $noticeRow = ['...', 'Menampilkan 90 baris pertama dari total ' . number_format($totalDataRows, 0, ',', '.') . ' data. Unduh file Excel untuk melihat seluruh transaksi lengkap.', '', '', '', '', '', '', '', '', '', '', '', ''];
+                        $headerRows = array_slice($rawRows, 0, $headerEndIndex + 1);
+                        $dataRows = array_slice($rawRows, $headerEndIndex + 1, 90);
 
-                        $previewRows = array_merge($headerRows, $dataRows, [$noticeRow], [$lastRow]);
-                        $sheets[$title] = $previewRows;
+                        $lastRow = end($rawRows);
+                        $hasSummaryRow = false;
+                        if (is_array($lastRow)) {
+                            foreach ($lastRow as $cell) {
+                                if (is_string($cell) && (stripos($cell, 'total') !== false || stripos($cell, 'jumlah') !== false)) {
+                                    $hasSummaryRow = true;
+                                    break;
+                                }
+                            }
+                        }
+
+                        $totalDataRows = count($rawRows) - count($headerRows) - ($hasSummaryRow ? 1 : 0);
+                        $noticeRow = ['Menampilkan ' . count($dataRows) . ' baris pertama dari total ' . number_format(max(0, $totalDataRows), 0, ',', '.') . ' data. Unduh file Excel untuk melihat seluruh transaksi lengkap.'];
+
+                        $sheets[$title] = array_merge($headerRows, $dataRows, [$noticeRow]);
                     } else {
                         $sheets[$title] = $rawRows;
                     }
@@ -101,12 +119,33 @@ class ReportsController extends Controller
 
             $rawRows = $export->array();
             if (count($rawRows) > 150) {
-                $headerRows = array_slice($rawRows, 0, 7);
-                $dataRows = array_slice($rawRows, 7, 140);
+                // Dynamically find table header row (usually contains 'No' / 'No.')
+                $headerEndIndex = 6;
+                foreach ($rawRows as $idx => $r) {
+                    if (is_array($r) && count($r) > 1 && in_array(strtolower(trim((string)($r[0] ?? ''))), ['no', 'no.', 'no '])) {
+                        $headerEndIndex = $idx;
+                        break;
+                    }
+                }
+
+                $headerRows = array_slice($rawRows, 0, $headerEndIndex + 1);
+                $dataRows = array_slice($rawRows, $headerEndIndex + 1, 140);
+
                 $lastRow = end($rawRows);
-                $totalDataRows = count($rawRows) - 8;
-                $noticeRow = ['...', 'Menampilkan 140 baris pertama dari total ' . number_format($totalDataRows, 0, ',', '.') . ' data. Unduh file Excel untuk data lengkap.', '', '', '', '', '', '', '', '', '', '', '', ''];
-                $previewRows = array_merge($headerRows, $dataRows, [$noticeRow], [$lastRow]);
+                $hasSummaryRow = false;
+                if (is_array($lastRow)) {
+                    foreach ($lastRow as $cell) {
+                        if (is_string($cell) && (stripos($cell, 'total') !== false || stripos($cell, 'jumlah') !== false)) {
+                            $hasSummaryRow = true;
+                            break;
+                        }
+                    }
+                }
+
+                $totalDataRows = count($rawRows) - count($headerRows) - ($hasSummaryRow ? 1 : 0);
+                $noticeRow = ['Menampilkan ' . count($dataRows) . ' baris pertama dari total ' . number_format(max(0, $totalDataRows), 0, ',', '.') . ' data. Unduh file Excel untuk data lengkap.'];
+
+                $previewRows = array_merge($headerRows, $dataRows, [$noticeRow]);
             } else {
                 $previewRows = $rawRows;
             }
