@@ -63,6 +63,7 @@ class SalesController extends Controller
         $rounding = $dbType === 'KREDIT' ? '0' : $paymentParams->rounding;
         $parameters = $dbType === 'KREDIT' ? '0' : $paymentParams->{$paramKey};
         $transaction_code = $this->generateTransactionCode($meta['code']);
+
         // 3. Resolve which transaction to use
         if ($id !== null) {
             // Tab already has a specific transaction, load it, guard status
@@ -75,45 +76,13 @@ class SalesController extends Controller
             if (!$transaction) {
                 // Transaction finished or doesn't belong to this user id
                 // Fall back to opening a fresh transaction of the requested type
-                try {
-                    DB::beginTransaction();
-
-                    $transaction = MedicineTransactions::create([
-                        'pharmacy_id' => $pharmacy_id,
-                        'user_id' => Auth()->user()->id,
-                        'debtor_id' => null,
-                        'transaction_type' => $dbType,
-                        'subtotal' => null,
-                        'discount' => null,
-                        'status' => 0,
-                    ]);
-
-                    DB::commit();
-                } catch (\Exception $e) {
-                    DB::rollBack();
-                    return redirect()->back()->with('message', 'Gagal membuat transaksi: ' . $e->getMessage());
-                }
+                return redirect()->route('transaction', ['type' => $type])->with('message', 'Transaksi sudah selesai atau tidak ditemukan. Membuka transaksi baru.');
             }
 
             $trx_id = $transaction->id;
         } else {
-            // No ID supplied — look for ANY pending transaction for this pharmacy
-            $transaction = MedicineTransactions::where('pharmacy_id', $pharmacy_id)
-                ->where('status', 0)
-                ->where('user_id', Auth()->user()->id)
-                ->latest()
-                ->first();
-
-            if ($transaction) {
-                // Resume existing pending transaction; redirect WITH id so each
-                // tab gets a stable URL it can bookmark / re-open
-                return redirect()->route('transaction', [
-                    'type' => $this->dbTypeToRouteType($transaction->transaction_type),
-                    'id' => $transaction->id,
-                ]);
-            }
-
-            // No pending transaction at all — create a new one
+            // No ID supplied — DO NOT look for ANY pending transaction.
+            // Create a NEW transaction unconditionally to isolate tabs.
             try {
                 DB::beginTransaction();
 
@@ -483,7 +452,7 @@ class SalesController extends Controller
         if ($request->get('type') == 'resep') {
             $typenew = "RESEP TUNAI";
         } else if ($request->get('type') == 'kredit') {
-            $typenew = "RESEP KREDIT";
+            $typenew = "KREDIT";
         } else if ($request->get('type') == 'upds') {
             $typenew = "UPDS";
         } else if ($request->get('type') == 'hv') {

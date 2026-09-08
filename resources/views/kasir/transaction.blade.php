@@ -5316,5 +5316,76 @@
     }
 </script>
 
+<script>
+    // [ANTI-TAB DUPLICATION SYSTEM]
+    // Prevent data bleed when user duplicates a tab (which copies the same URL and transaction ID)
+    (function() {
+        if (typeof BroadcastChannel === 'undefined') return;
+
+        const myTabId = Math.random().toString(36).substring(2, 10);
+        const myTxId = "{{ $trx_id ?? '' }}";
+        if (!myTxId) return;
+
+        const channel = new BroadcastChannel('kasir_tx_isolation');
+        let isEstablished = false;
+
+        // Become established after 1.5 seconds of living
+        setTimeout(() => {
+            isEstablished = true;
+        }, 1500);
+
+        channel.onmessage = function(event) {
+            const data = event.data;
+            if (data.tx_id !== myTxId) return;
+
+            if (data.type === 'PING') {
+                // Someone is asking if this ID is in use.
+                // We reply with PONG, and tell them if we are established.
+                channel.postMessage({
+                    type: 'PONG',
+                    tx_id: myTxId,
+                    sender: myTabId,
+                    established: isEstablished
+                });
+            } else if (data.type === 'PONG') {
+                // We received a PONG. Someone is using this ID.
+                if (data.sender !== myTabId) {
+                    // If they are established, we must leave!
+                    // If neither of us is established (race condition), we use sender string comparison to tie-break.
+                    if (data.established || myTabId < data.sender) {
+                        // They win. We redirect to a new transaction.
+                        iziToast.warning({
+                            title: 'Tab Ganda Terdeteksi',
+                            message: 'Transaksi ini sedang dibuka di tab lain. Membuat transaksi baru...',
+                            position: 'topRight'
+                        });
+                        // Prevent sending more messages
+                        channel.onmessage = null; 
+                        setTimeout(() => {
+                            window.location.href = "{{ route('transaction', ['type' => $type ?? 'resep']) }}";
+                        }, 1200);
+                    }
+                }
+            }
+        };
+
+        // Ping others immediately
+        channel.postMessage({
+            type: 'PING',
+            tx_id: myTxId,
+            sender: myTabId
+        });
+        
+        // Ping again after a short delay in case the other tab was busy
+        setTimeout(() => {
+            channel.postMessage({
+                type: 'PING',
+                tx_id: myTxId,
+                sender: myTabId
+            });
+        }, 500);
+    })();
+</script>
+
 {{-- ------------------- Fixed Cart Card --------------------- --}}
 @endsection
