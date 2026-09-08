@@ -1075,8 +1075,8 @@
     {{-- Footer submit — outside scroll area, always visible --}}
     <div class="mb-5 mx-5 grid grid-cols-2 gap-3">
         <button onclick="getOrderReport('preview')"
-            class="w-full flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 active:scale-[0.98] text-slate-700 text-sm font-semibold py-3 rounded-2xl transition-all">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            class="group w-full flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 active:scale-[0.98] text-slate-700 text-sm font-semibold py-3 rounded-2xl transition-all duration-200 border border-slate-200/60">
+            <svg class="w-4 h-4 text-slate-500 transition-transform duration-200 group-hover:scale-110" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
                 <circle cx="12" cy="12" r="3"></circle>
@@ -1084,14 +1084,14 @@
             Preview
         </button>
         <button onclick="getOrderReport('download')"
-            class="w-full flex items-center justify-center gap-2 bg-[linear-gradient(45deg,_#41a8f4,_#7cd086)] active:scale-[0.98] text-white text-sm font-semibold py-3 rounded-2xl transition-all">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"
+            class="group w-full flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-md shadow-emerald-600/20 hover:shadow-lg hover:shadow-emerald-600/30 active:scale-[0.98] text-white text-sm font-semibold py-3 rounded-2xl transition-all duration-200">
+            <svg class="w-4 h-4 transition-transform duration-200 group-hover:translate-y-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
                 stroke-linecap="round" stroke-linejoin="round">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                 <polyline points="7 10 12 15 17 10"></polyline>
                 <line x1="12" y1="15" x2="12" y2="3"></line>
             </svg>
-            Download
+            <span>Download</span>
         </button>
     </div>
 </div>
@@ -1386,8 +1386,8 @@
     </div>
     <div class="mb-5 mx-5 grid grid-cols-2 gap-3">
         <button onclick="getReport('preview')"
-            class="w-full flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 active:scale-[0.98] text-slate-700 text-sm font-semibold py-3 rounded-2xl transition-all">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            class="group w-full flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 active:scale-[0.98] text-slate-700 text-sm font-semibold py-3 rounded-2xl transition-all duration-200 border border-slate-200/60">
+            <svg class="w-4 h-4 text-slate-500 transition-transform duration-200 group-hover:scale-110" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
                 <circle cx="12" cy="12" r="3"></circle>
@@ -1395,14 +1395,14 @@
             Preview
         </button>
         <button onclick="getReport('download')"
-            class="w-full flex items-center justify-center gap-2 bg-[linear-gradient(45deg,_#41a8f4,_#7cd086)] hover:opacity-90 active:scale-[0.98] text-white text-sm font-semibold py-3 rounded-2xl transition-all">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"
+            class="group w-full flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-md shadow-emerald-600/20 hover:shadow-lg hover:shadow-emerald-600/30 active:scale-[0.98] text-white text-sm font-semibold py-3 rounded-2xl transition-all duration-200">
+            <svg class="w-4 h-4 transition-transform duration-200 group-hover:translate-y-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
                 stroke-linecap="round" stroke-linejoin="round">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                 <polyline points="7 10 12 15 17 10"></polyline>
                 <line x1="12" y1="15" x2="12" y2="3"></line>
             </svg>
-            Download
+            <span>Download</span>
         </button>
     </div>
 </div>

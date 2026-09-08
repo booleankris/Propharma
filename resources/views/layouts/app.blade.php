@@ -849,10 +849,16 @@
         </div>
         <div class="p-5 border-t border-slate-100 flex justify-end gap-3 bg-white flex-shrink-0">
             <button onclick="closePreviewModal()"
-                class="px-5 py-2.5 rounded-xl font-semibold text-slate-500 bg-slate-100 hover:bg-slate-200 transition-colors">Tutup</button>
+                class="px-5 py-2.5 rounded-xl font-semibold text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 active:scale-[0.98] transition-all duration-200">Tutup</button>
             <button id="previewModalDownloadBtn" onclick="getOrderReport('download')"
-                class="px-5 py-2.5 rounded-xl font-semibold text-white bg-[linear-gradient(45deg,_#41a8f4,_#7cd086)] hover:opacity-90 transition-all">Download
-                Excel</button>
+                class="group relative inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl font-semibold text-sm text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-md shadow-emerald-600/20 hover:shadow-lg hover:shadow-emerald-600/30 active:scale-[0.98] transition-all duration-200">
+                <svg class="w-4 h-4 transition-transform duration-200 group-hover:translate-y-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                <span>Download Excel</span>
+            </button>
         </div>
     </div>
     {{-- =========== --}}
