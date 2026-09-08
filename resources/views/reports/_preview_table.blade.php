@@ -61,19 +61,25 @@
                                         'kode', 'code', 'struk', 'faktur', 'nomor', 'no.', 'no ', 'batch',
                                         'rekening', 'telepon', 'telp', 'hp', 'nik', 'transaksi', 'waktu',
                                         'tanggal', 'tgl', 'shift', 'tipe', 'jenis', 'nama', 'pasien', 'dokter',
-                                        'kasir', 'user', 'resep', 'ed', 'barcode', 'satuan', 'kategori'
+                                        'kasir', 'user', 'resep', 'ed', 'barcode', 'satuan', 'kategori', 'pabrik', 'alamat'
                                     ];
-                                    foreach ($codeKeywords as $keyword) {
-                                        if (stripos($colHeader, $keyword) !== false) {
-                                            $numericKeywords = ['total', 'diskon', 'discount', 'harga', 'price', 'qty', 'jumlah', 'nominal', 'subtotal', 'sub total', 'bayar', 'kembali', 'netto', 'bruto', 'dpp', 'ppn', 'lembar'];
-                                            $isNumericKeyword = false;
-                                            foreach ($numericKeywords as $numKey) {
-                                                if (stripos($colHeader, $numKey) !== false) {
-                                                    $isNumericKeyword = true;
+                                    $numericKeywords = [
+                                        'total', 'diskon', 'discount', 'potongan', 'harga', 'price', 'qty', 'jumlah',
+                                        'nominal', 'subtotal', 'sub total', 'bayar', 'kembali', 'netto', 'bruto',
+                                        'dpp', 'ppn', 'lembar', 'r/', 'jasa', 'embalase', 'nilai', 'omzet', 'saldo',
+                                        'uang', 'kurang', 'masuk', 'keluar', 'awal', 'fisik', 'selisih', 'kredit', 'penjualan', 'pembelian'
+                                    ];
+
+                                    foreach ($codeKeywords as $ck) {
+                                        if (stripos($colHeader, $ck) !== false) {
+                                            $isNum = false;
+                                            foreach ($numericKeywords as $nk) {
+                                                if (stripos($colHeader, $nk) !== false) {
+                                                    $isNum = true;
                                                     break;
                                                 }
                                             }
-                                            if (!$isNumericKeyword) {
+                                            if (!$isNum) {
                                                 $isCodeOrTextHeader = true;
                                                 break;
                                             }
@@ -83,10 +89,7 @@
                                     // Cek apakah string memiliki leading zero (seperti "000100012") yang bukan angka desimal 0.x
                                     $hasLeadingZero = (strlen($colStr) > 1 && $colStr[0] === '0' && $colStr[1] !== '.');
 
-                                    // String panjang berisi digit murni (seperti nomor transaksi "26092000801")
-                                    $isLongDigitCode = (strlen($colStr) >= 9 && ctype_digit($colStr) && stripos($colHeader, 'total') === false && stripos($colHeader, 'harga') === false);
-
-                                    $shouldNotFormat = $isHeader || $isCodeOrTextHeader || $hasLeadingZero || $isLongDigitCode;
+                                    $shouldNotFormat = $isHeader || $isCodeOrTextHeader || $hasLeadingZero;
                                     $isNumeric = is_numeric($col) && $colStr !== '' && !$shouldNotFormat;
                                     $isNoCol = ($colIndex === 0 && !$isHeader && $colStr !== '');
                                     $isCenterCol = $isHeader || $isNoCol || stripos($colHeader, 'kode') !== false || stripos($colHeader, 'struk') !== false || stripos($colHeader, 'tanggal') !== false || stripos($colHeader, 'shift') !== false;

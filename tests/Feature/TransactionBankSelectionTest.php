@@ -162,4 +162,32 @@ class TransactionBankSelectionTest extends TestCase
         $this->assertStringContainsString('17.496', $html);
         $this->assertStringContainsString('17.000', $html);
     }
+
+    public function test_preview_table_formats_billions_and_trillions_correctly()
+    {
+        $mockRows = [
+            ['SAHABAT PMI'],
+            ['LAPORAN PENJUALAN : BCA'],
+            ['No', 'Tanggal & Waktu', 'No. Struk', 'Jenis Transaksi', 'Kode Obat', 'Nama Obat', 'Qty', 'Harga Satuan', 'Diskon Item', 'Total Item'],
+            [1, '08/09/2026 08:00', '26092000801', 'UPDS', '000100012', 'Mesin CT Scan', 2, 1500000000, 0, 3000000000],
+            [2, '08/09/2026 08:30', '26092000802', 'Bebas', '000999888', 'Alat Radiologi RS', 1, 1500000000000, 0, 1500000000000],
+            ['', 'TOTAL BCA', '', '', '', '', 3, '', 0, 1503000000000],
+        ];
+
+        $html = view('reports._preview_table', ['rows' => $mockRows])->render();
+
+        // Must display raw codes correctly
+        $this->assertStringContainsString('26092000801', $html);
+        $this->assertStringContainsString('26092000802', $html);
+        $this->assertStringContainsString('000100012', $html);
+        $this->assertStringContainsString('000999888', $html);
+
+        // Must format billions (1.500.000.000 & 3.000.000.000)
+        $this->assertStringContainsString('1.500.000.000', $html);
+        $this->assertStringContainsString('3.000.000.000', $html);
+
+        // Must format trillions (1.500.000.000.000 & 1.503.000.000.000)
+        $this->assertStringContainsString('1.500.000.000.000', $html);
+        $this->assertStringContainsString('1.503.000.000.000', $html);
+    }
 }
