@@ -10,6 +10,7 @@
                         $maxCols = count($r);
                     }
                 }
+                $headerMap = [];
             @endphp
             @foreach($rows as $rowIndex => $row)
                 @php
@@ -25,6 +26,7 @@
 
                         if (in_array(strtolower($firstCell), ['no', 'no.', 'no '])) {
                             $isHeader = true;
+                            $headerMap = array_map(fn($c) => strtolower(trim((string)$c)), $row);
                         }
 
                         if (stripos($secondCell, 'sub total') !== false || stripos($firstCell, 'sub total') !== false) {
@@ -51,11 +53,46 @@
                             @foreach($row as $colIndex => $col)
                                 @php
                                     $colStr = trim((string)$col);
-                                    $isNumeric = is_numeric($col) && $colStr !== '';
+                                    $colHeader = $headerMap[$colIndex] ?? '';
+
+                                    // Kolom yang merupakan kode/ID/teks tidak boleh diformat angka:
+                                    $isCodeOrTextHeader = false;
+                                    $codeKeywords = [
+                                        'kode', 'code', 'struk', 'faktur', 'nomor', 'no.', 'no ', 'batch',
+                                        'rekening', 'telepon', 'telp', 'hp', 'nik', 'transaksi', 'waktu',
+                                        'tanggal', 'tgl', 'shift', 'tipe', 'jenis', 'nama', 'pasien', 'dokter',
+                                        'kasir', 'user', 'resep', 'ed', 'barcode', 'satuan', 'kategori'
+                                    ];
+                                    foreach ($codeKeywords as $keyword) {
+                                        if (stripos($colHeader, $keyword) !== false) {
+                                            $numericKeywords = ['total', 'diskon', 'discount', 'harga', 'price', 'qty', 'jumlah', 'nominal', 'subtotal', 'sub total', 'bayar', 'kembali', 'netto', 'bruto', 'dpp', 'ppn', 'lembar'];
+                                            $isNumericKeyword = false;
+                                            foreach ($numericKeywords as $numKey) {
+                                                if (stripos($colHeader, $numKey) !== false) {
+                                                    $isNumericKeyword = true;
+                                                    break;
+                                                }
+                                            }
+                                            if (!$isNumericKeyword) {
+                                                $isCodeOrTextHeader = true;
+                                                break;
+                                            }
+                                        }
+                                    }
+
+                                    // Cek apakah string memiliki leading zero (seperti "000100012") yang bukan angka desimal 0.x
+                                    $hasLeadingZero = (strlen($colStr) > 1 && $colStr[0] === '0' && $colStr[1] !== '.');
+
+                                    // String panjang berisi digit murni (seperti nomor transaksi "26092000801")
+                                    $isLongDigitCode = (strlen($colStr) >= 9 && ctype_digit($colStr) && stripos($colHeader, 'total') === false && stripos($colHeader, 'harga') === false);
+
+                                    $shouldNotFormat = $isHeader || $isCodeOrTextHeader || $hasLeadingZero || $isLongDigitCode;
+                                    $isNumeric = is_numeric($col) && $colStr !== '' && !$shouldNotFormat;
                                     $isNoCol = ($colIndex === 0 && !$isHeader && $colStr !== '');
+                                    $isCenterCol = $isHeader || $isNoCol || stripos($colHeader, 'kode') !== false || stripos($colHeader, 'struk') !== false || stripos($colHeader, 'tanggal') !== false || stripos($colHeader, 'shift') !== false;
                                 @endphp
-                                <td class="px-3 py-1.5 border border-slate-200 {{ $isHeader ? 'text-center' : ($isNoCol ? 'text-center' : ($isNumeric ? 'text-right' : 'text-left')) }}">
-                                    @if($isHeader || $isNoCol)
+                                <td class="px-3 py-1.5 border border-slate-200 {{ $isCenterCol ? 'text-center' : ($isNumeric ? 'text-right' : 'text-left') }}">
+                                    @if($shouldNotFormat)
                                         {{ $col }}
                                     @elseif($isNumeric)
                                         {{ number_format((float)$col, str_contains($colStr, '.') && fmod((float)$col, 1) !== 0.0 ? 2 : 0, ',', '.') }}

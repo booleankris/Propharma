@@ -365,8 +365,9 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
                 $sheet->getStyle("D8:D{$highestRow}")->getNumberFormat()->setFormatCode('#,##0');
                 $sheet->getStyle("E8:G{$highestRow}")->getNumberFormat()->setFormatCode('#,##0');
                 $sheet->getStyle("A8:A{$highestRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-            } else {
                 // Detail numeric format
+                $sheet->getStyle("C8:C{$highestRow}")->getNumberFormat()->setFormatCode(\PhpOffice\PhpSpreadsheet\Style\NumberFormat::FORMAT_TEXT);
+                $sheet->getStyle("E8:E{$highestRow}")->getNumberFormat()->setFormatCode(\PhpOffice\PhpSpreadsheet\Style\NumberFormat::FORMAT_TEXT);
                 $sheet->getStyle("G8:G{$highestRow}")->getNumberFormat()->setFormatCode('#,##0');
                 $sheet->getStyle("H8:J{$highestRow}")->getNumberFormat()->setFormatCode('#,##0');
                 $sheet->getStyle("A8:A{$highestRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);

@@ -137,4 +137,29 @@ class TransactionBankSelectionTest extends TestCase
         // Assert BSI is NOT in STANDARD_BANKS unless historical data exists
         $this->assertNotContains('BSI', BankSalesExport::STANDARD_BANKS);
     }
+
+    public function test_preview_table_preserves_raw_codes_and_leading_zeros()
+    {
+        $mockRows = [
+            ['SAHABAT PMI'],
+            ['LAPORAN PENJUALAN : BRI'],
+            ['No', 'Tanggal & Waktu', 'No. Struk', 'Jenis Transaksi', 'Kode Obat', 'Nama Obat', 'Qty', 'Harga Satuan', 'Diskon Item', 'Total Item'],
+            [1, '08/09/2026 07:24', '26092000801', 'UPDS', '000100012', 'BETASERC TAB 24MG', 1, 17496, 0, 17000],
+            ['', 'TOTAL BRI', '', '', '', '', 1, '', 0, 17000],
+        ];
+
+        $html = view('reports._preview_table', ['rows' => $mockRows])->render();
+
+        // Must display raw codes correctly
+        $this->assertStringContainsString('26092000801', $html);
+        $this->assertStringContainsString('000100012', $html);
+
+        // Must NOT format codes as numbers with dots or strip leading zeroes
+        $this->assertStringNotContainsString('26.092.000.801', $html);
+        $this->assertStringNotContainsString('100.012', $html);
+
+        // Currency/numeric amounts MUST be formatted properly
+        $this->assertStringContainsString('17.496', $html);
+        $this->assertStringContainsString('17.000', $html);
+    }
 }
