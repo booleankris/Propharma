@@ -2602,7 +2602,7 @@
 </script>
 
 <div id="loading-overlay"
-    class="hidden fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+    class="hidden fixed inset-0 z-[100000] flex items-center justify-center bg-black/50 backdrop-blur-sm">
 
     <div
         class="bg-white/90 backdrop-blur-xl rounded-2xl shadow-2xl px-10 py-8 flex flex-col items-center gap-5 animate-fadeIn">

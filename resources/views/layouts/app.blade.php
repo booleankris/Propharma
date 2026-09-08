@@ -47,6 +47,9 @@
             overflow-x: hidden !important;
             max-width: 100vw;
         }
+        .iziToast-wrapper {
+            z-index: 100001 !important;
+        }
     </style>
     <!-- Favicon & PWA Settings -->
     <link rel="icon" type="image/x-icon" href="{{ asset('favicon.ico') }}">
@@ -463,8 +466,8 @@
                     document.getElementById('previewModal').classList.add('modal-show');
 
                     // Update download button inside modal to trigger the sales report download instead
-                    const modalDownloadBtn = document.querySelector(
-                        '#previewModal button[onclick="getOrderReport(\\\'download\\\')"]');
+                    const modalDownloadBtn = document.getElementById('previewModalDownloadBtn') || document.querySelector(
+                        '#previewModal button[onclick*="Report"]');
                     if (modalDownloadBtn) {
                         // Change it to use getReport for sales reports
                         modalDownloadBtn.setAttribute('onclick', "getReport('download')");
@@ -779,6 +782,12 @@
                     previewContent.innerHTML = result.data;
                     document.getElementById('previewModal').classList.remove('modal-hide');
                     document.getElementById('previewModal').classList.add('modal-show');
+
+                    const modalDownloadBtn = document.getElementById('previewModalDownloadBtn') || document.querySelector(
+                        '#previewModal button[onclick*="Report"]');
+                    if (modalDownloadBtn) {
+                        modalDownloadBtn.setAttribute('onclick', "getOrderReport('download')");
+                    }
                 }
             }).catch((err) => {
                 if (err.response && err.response.data && err.response.data.message) {
@@ -841,7 +850,7 @@
         <div class="p-5 border-t border-slate-100 flex justify-end gap-3 bg-white flex-shrink-0">
             <button onclick="closePreviewModal()"
                 class="px-5 py-2.5 rounded-xl font-semibold text-slate-500 bg-slate-100 hover:bg-slate-200 transition-colors">Tutup</button>
-            <button onclick="getOrderReport('download')"
+            <button id="previewModalDownloadBtn" onclick="getOrderReport('download')"
                 class="px-5 py-2.5 rounded-xl font-semibold text-white bg-[linear-gradient(45deg,_#41a8f4,_#7cd086)] hover:opacity-90 transition-all">Download
                 Excel</button>
         </div>
