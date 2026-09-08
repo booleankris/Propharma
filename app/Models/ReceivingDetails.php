@@ -27,7 +27,7 @@ class ReceivingDetails extends Model
     }
     public function receiving_items()
     {
-        return $this->hasMany(ReceivingItems::class);
+        return $this->hasMany(ReceivingItems::class, 'receiving_details_id');
     }
     public function creditor()
     {

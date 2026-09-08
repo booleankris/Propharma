@@ -84,21 +84,45 @@ class SuppliesController extends Controller
             $baseQuery = ItemsLog::query();
 
             $baseQuery->where(function ($q) use ($targetPharmacyIds, $isWarehouse, $activePharmacyId) {
+                // 1. Pembelian (Status 2)
                 $q->where(function ($sub) use ($targetPharmacyIds) {
                     $sub->where('status', 2)
                         ->whereHas('receiving', function ($r) use ($targetPharmacyIds) {
                             $r->whereIn('pharmacy_id', $targetPharmacyIds)
                                 ->whereIn('status', [1, 2, 3, 4]);
                         });
-                })->orWhere(function ($sub) use ($targetPharmacyIds) {
+                })
+                // 2. Retur Beli (Status 4)
+                ->orWhere(function ($sub) use ($targetPharmacyIds) {
+                    $sub->where('status', 4)
+                        ->where(function ($returQ) use ($targetPharmacyIds) {
+                            $returQ->whereHas('receiving', function ($r) use ($targetPharmacyIds) {
+                                $r->whereIn('pharmacy_id', $targetPharmacyIds);
+                            })->orWhereHas('batches', function ($b) use ($targetPharmacyIds) {
+                                $b->whereIn('pharmacy_id', $targetPharmacyIds);
+                            })->orWhereHas('users', function ($u) use ($targetPharmacyIds) {
+                                $u->whereIn('pharmacy_id', $targetPharmacyIds);
+                                if (in_array(9, $targetPharmacyIds)) {
+                                    $u->orWhereHas('roles', fn($rq) => $rq->where('name', 'Gudang PMI'));
+                                }
+                            });
+                        });
+                })
+                // 3. Mutasi Stok (Status 7)
+                ->orWhere(function ($sub) use ($targetPharmacyIds) {
                     $sub->where('status', 7)
                         ->whereHas('batches', function ($b) use ($targetPharmacyIds) {
                             $b->whereIn('pharmacy_id', $targetPharmacyIds);
                         });
-                })->orWhere(function ($sub) use ($targetPharmacyIds) {
-                    $sub->whereNotIn('status', [2, 7])
+                })
+                // 4. Status lainnya (Penjualan = 1, Retur Jual = 3, dll)
+                ->orWhere(function ($sub) use ($targetPharmacyIds) {
+                    $sub->whereNotIn('status', [2, 4, 7])
                         ->whereHas('users', function ($u) use ($targetPharmacyIds) {
                             $u->whereIn('pharmacy_id', $targetPharmacyIds);
+                            if (in_array(9, $targetPharmacyIds)) {
+                                $u->orWhereHas('roles', fn($rq) => $rq->where('name', 'Gudang PMI'));
+                            }
                         });
                 });
             });
@@ -141,7 +165,8 @@ class SuppliesController extends Controller
                 'medicines',
                 'batches',                              // Fetch batches for batch name display
                 'receiving.receiving_details.creditor', // Fetch creditor through receiving details
-                'medicine_transaction.user'             // Fetch cashier user through transactions
+                'medicine_transaction.user',            // Fetch cashier user through transactions
+                'users'                                 // Fetch user for creator display
             ])->whereNotIn('status', [5, 6])
               ->orderBy('updated_at', 'asc')
               ->orderBy('id', 'asc');
@@ -183,14 +208,15 @@ class SuppliesController extends Controller
                     return $row->medicines->name;
                 })
                 ->addColumn('batch_name', function ($row) {
-                    if (in_array($row->status, [2, 7]) && $row->batches) {
+                    if (in_array($row->status, [2, 4, 7]) && $row->batches) {
                         return $row->batches->name;
                     }
                     return '-';
                 })
                 ->addColumn('transaction_code', function ($row) {
-                    if ($row->status == 2) {
-                        $codeStr = $row->receiving?->receiving_details?->first()?->receiving_details_code ?? $row->transaction_code;
+                    if (in_array($row->status, [2, 4])) {
+                        $detail = $row->receiving?->receiving_details?->first();
+                        $codeStr = $detail?->receiving_details_code ?: ($detail?->invoice_number ?: $row->transaction_code);
                     } else {
                         $codeStr = $row->transaction_code;
                     }
@@ -214,9 +240,12 @@ class SuppliesController extends Controller
                 })
                 // ----- UPDATED 'NAME' COLUMN LOGIC -----
                 ->addColumn('name', function ($row) {
-                    // Case 1: Purchase / Pembelian (Status = 2) -> Show Creditor Name
-                    if ($row->status == 2) {
-                        return $row->receiving?->receiving_details?->first()?->creditor?->name ?? '-';
+                    // Case 1: Purchase (Status = 2) or Retur Beli (Status = 4) -> Show Creditor / PBF Name
+                    if (in_array($row->status, [2, 4])) {
+                        $creditorName = $row->receiving?->receiving_details?->first()?->creditor?->name;
+                        if ($creditorName) {
+                            return $creditorName;
+                        }
                     }
 
                     // Case 2: From medicine transaction cashier user
@@ -337,7 +366,7 @@ class SuppliesController extends Controller
             $warehouseId = getWarehousePharmacyId();
 
             $items = ItemsLog::with('medicines')
-                ->whereIn('status', [2, 5, 6, 7])
+                ->whereIn('status', [2, 4, 5, 6, 7])
                 ->whereHas('batches', function ($q) use ($warehouseId) {
                     $q->where('pharmacy_id', $warehouseId);
                 });
@@ -371,6 +400,10 @@ class SuppliesController extends Controller
                         $sign = $row->qty > 0 ? '+' : '';
                         $color = $row->qty >= 0 ? '#854F0B' : '#A32D2D';
                         return "<div style='color:{$color};font-weight:600;'>{$sign}{$row->qty}</div>";
+                    }
+                    // status 4 — Retur Beli (Stok keluar gudang kembali ke supplier)
+                    if ($row->status == 4) {
+                        return "<div style='color:#A32D2D;font-weight:600;'>-{$row->qty}</div>";
                     }
                     // status 5 — Stock Opname
                     if ($row->status == 5) {
@@ -411,6 +444,7 @@ class SuppliesController extends Controller
                 ->addColumn('status', function ($row) {
                     $map = [
                         2 => ['label' => 'Pembelian', 'bg' => '#caffc5', 'color' => '#457b00'],
+                        4 => ['label' => 'Retur Beli', 'bg' => '#FFE4D6', 'color' => '#C17800'],
                         5 => ['label' => 'Stock Opname', 'bg' => '#FAEEDA', 'color' => '#633806'],
                         6 => ['label' => 'Adjustment', 'bg' => '#E6F1FB', 'color' => '#0C447C'],
                         7 => ['label' => 'Mutasi Stok', 'bg' => '#E1F5EE', 'color' => '#085041'],

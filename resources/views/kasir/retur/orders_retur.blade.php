@@ -131,20 +131,26 @@
                     <input id="transaction_id" type="hidden">
                     <input id="old_qty"        type="hidden">
                     <input id="content"        type="hidden">
+                    <input id="retur_type"     type="hidden" value="packaging">
 
                     {{-- Detail Obat --}}
                     <p class="text-[11px] font-medium text-gray-400 uppercase tracking-widest mb-3">Detail Obat</p>
 
-                    <div class="grid grid-cols-2 gap-3 mb-3">
+                    <div class="grid grid-cols-3 gap-2.5 mb-3">
                         <div>
                             <label class="block text-[12px] font-medium text-gray-500 mb-1">Kode obat</label>
                             <input id="medicine_code" type="text" readonly placeholder="Kode Obat" tabindex="-1"
                                 class="w-full rounded-lg border border-gray-200 bg-gray-50 text-gray-500 px-3 py-2 text-[13px] focus:outline-none">
                         </div>
                         <div>
-                            <label class="block text-[12px] font-medium text-gray-500 mb-1">Satuan</label>
+                            <label class="block text-[12px] font-medium text-gray-500 mb-1">Kemasan</label>
+                            <input id="packaging_display" type="text" readonly placeholder="—" tabindex="-1"
+                                class="w-full rounded-lg border border-gray-200 bg-gray-50 text-gray-700 font-medium px-3 py-2 text-[13px] focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-[12px] font-medium text-gray-500 mb-1">Satuan Eceran</label>
                             <input id="unit" type="text" readonly placeholder="—" tabindex="-1"
-                                class="w-full rounded-lg border border-gray-200 bg-gray-50 text-gray-500 px-3 py-2 text-[13px] focus:outline-none">
+                                class="w-full rounded-lg border border-gray-200 bg-gray-50 text-gray-700 font-medium px-3 py-2 text-[13px] focus:outline-none">
                         </div>
                     </div>
 
@@ -156,44 +162,76 @@
 
                     <div class="grid grid-cols-2 gap-3 mb-3">
                         <div>
-                            <label class="block text-[12px] font-medium text-gray-500 mb-1">Harga satuan</label>
+                            <div class="flex items-center justify-between mb-1">
+                                <label class="block text-[12px] font-medium text-gray-500">Harga satuan</label>
+                                <span id="price_type_label" class="text-[10px] font-semibold text-blue-600 uppercase"></span>
+                            </div>
                             <input id="item_price" type="text" readonly placeholder="Rp 0" tabindex="-1"
                                 class="w-full rounded-lg border border-gray-200 bg-gray-50 text-gray-500 px-3 py-2 text-[13px] focus:outline-none">
                         </div>
                         <div>
-                            <label class="block text-[12px] font-medium text-gray-500 mb-1">Isi</label>
+                            <label class="block text-[12px] font-medium text-gray-500 mb-1">Isi per kemasan</label>
                             <input id="content_display" type="text" readonly placeholder="—" tabindex="-1"
                                 class="w-full rounded-lg border border-gray-200 bg-gray-50 text-gray-500 px-3 py-2 text-[13px] focus:outline-none">
                         </div>
                     </div>
 
                     {{-- Rincian Retur --}}
-                    <p class="text-[11px] font-medium text-gray-400 uppercase tracking-widest mb-3">Rincian Retur</p>
+                    <p class="text-[11px] font-medium text-gray-400 uppercase tracking-widest mb-2">Rincian Retur</p>
 
-                    <div class="grid grid-cols-2 gap-3 mb-3">
-                        <div>
-                            <label class="block text-[12px] font-medium text-gray-500 mb-1">Qty beli</label>
-                            <input id="qty_in" type="number" placeholder="0" tabindex="-1" readonly
-                                class="w-full rounded-lg border border-gray-200 bg-gray-50 text-gray-500 px-3 py-2 text-[13px] focus:outline-none">
-                        </div>
-                        <div>
-                            <label class="block text-[12px] font-medium text-gray-500 mb-1">Qty retur</label>
-                            <input id="qty" type="number" placeholder="0"
-                                oninput="calculateReturTotal()"
-                                class="retur-input w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-[13px] focus:outline-none">
+                    {{-- Opsi Tipe Retur: Kemasan vs Eceran --}}
+                    <div class="mb-3">
+                        <label class="block text-[12px] font-medium text-gray-500 mb-1.5">Pilihan Satuan Retur</label>
+                        <div class="grid grid-cols-2 gap-2 p-1 bg-gray-100 rounded-lg border border-gray-200" id="returTypeContainer">
+                            <button type="button" id="btnTypePackaging" onclick="setReturType('packaging')"
+                                class="flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-md text-[12px] font-semibold transition-all duration-150 bg-white text-blue-700 shadow-sm border border-blue-200">
+                                <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                                </svg>
+                                <span id="labelPackaging">Per Kemasan</span>
+                            </button>
+                            <button type="button" id="btnTypeUnit" onclick="setReturType('unit')"
+                                class="flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-md text-[12px] font-medium transition-all duration-150 text-gray-600 hover:text-gray-900 border border-transparent">
+                                <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                                </svg>
+                                <span id="labelUnit">Eceran</span>
+                            </button>
                         </div>
                     </div>
 
                     <div class="grid grid-cols-2 gap-3 mb-3">
                         <div>
-                            <label class="block text-[12px] font-medium text-gray-500 mb-1">Harga resep</label>
+                            <label class="block text-[12px] font-medium text-gray-500 mb-1">Qty beli</label>
+                            <input id="qty_in" type="text" placeholder="0" tabindex="-1" readonly
+                                class="w-full rounded-lg border border-gray-200 bg-gray-50 text-gray-700 font-medium px-3 py-2 text-[13px] focus:outline-none">
+                        </div>
+                        <div>
+                            <div class="flex items-center justify-between mb-1">
+                                <label class="block text-[12px] font-medium text-gray-500">Qty retur</label>
+                                <span id="qty_unit_badge" class="text-[10px] font-semibold text-blue-600 uppercase"></span>
+                            </div>
+                            <div class="relative">
+                                <input id="qty" type="number" step="any" placeholder="0"
+                                    oninput="calculateReturTotal()"
+                                    class="retur-input w-full rounded-lg border border-gray-200 bg-white pl-3 pr-14 py-2 text-[13px] font-medium focus:outline-none">
+                                <span id="qty_unit_suffix" class="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-semibold text-gray-400 pointer-events-none"></span>
+                            </div>
+                            <p id="qty_hint" class="text-[11px] text-gray-400 mt-1 truncate"></p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3 mb-3">
+                        <div>
+                            <label class="block text-[12px] font-medium text-gray-500 mb-1">Total faktur</label>
                             <input id="price" type="text" readonly placeholder="Rp 0" tabindex="-1"
                                 class="w-full rounded-lg border border-gray-200 bg-gray-50 text-gray-500 px-3 py-2 text-[13px] focus:outline-none">
                         </div>
                         <div>
                             <label class="block text-[12px] font-medium text-gray-500 mb-1">Jumlah retur</label>
-                            <input id="total_retur" type="text" readonly placeholder="Rp 0" tabindex="-1"
-                                class="w-full rounded-lg border border-gray-200 bg-gray-50 text-gray-500 px-3 py-2 text-[13px] focus:outline-none">
+                            <input id="total_retur" type="text" readonly placeholder="Rp 0" tabindex="-1" data-raw="0"
+                                class="w-full rounded-lg border border-gray-200 bg-gray-50 text-gray-700 font-semibold px-3 py-2 text-[13px] focus:outline-none">
+                            <p id="calc_hint" class="hidden text-[11px] text-blue-600 font-medium mt-1"></p>
                         </div>
                     </div>
 
@@ -280,6 +318,7 @@
         let selectedTransactionCode = null;
         let medicineTable           = null;
         let batchesReady            = false;    // true once batch select is populated
+        let currentMedicine         = null;     // currently selected medicine row data
 
         axios.defaults.headers.common['X-CSRF-TOKEN'] = '{{ csrf_token() }}';
 
@@ -388,16 +427,107 @@
         }
 
         // ═════════════════════════════════════════════════════════════════════════════
-        // CALCULATE
+        // TIPE RETUR (KEMASAN vs ECERAN) & KALKULASI
         // ═════════════════════════════════════════════════════════════════════════════
 
+        function setReturType(type) {
+            if (!currentMedicine) return;
+
+            // Jika obat tidak memiliki kemasan atau isi <= 1, paksa unit (eceran)
+            if (type === 'packaging' && (currentMedicine.content <= 1 || !currentMedicine.packaging)) {
+                iziToast.info({ title: 'Info', message: 'Obat ini tidak memiliki kemasan (hanya tersedia satuan eceran).', position: 'topRight' });
+                type = 'unit';
+            }
+
+            document.getElementById('retur_type').value = type;
+
+            const btnPackaging = document.getElementById('btnTypePackaging');
+            const btnUnit      = document.getElementById('btnTypeUnit');
+
+            if (type === 'packaging') {
+                btnPackaging.className = 'flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-md text-[12px] font-semibold transition-all duration-150 bg-white text-blue-700 shadow-sm border border-blue-200';
+                btnUnit.className      = 'flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-md text-[12px] font-medium transition-all duration-150 text-gray-600 hover:text-gray-900 border border-transparent';
+            } else {
+                btnUnit.className      = 'flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-md text-[12px] font-semibold transition-all duration-150 bg-white text-blue-700 shadow-sm border border-blue-200';
+                btnPackaging.className = 'flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-md text-[12px] font-medium transition-all duration-150 text-gray-600 hover:text-gray-900 border border-transparent';
+            }
+
+            updateFormForSelectedType();
+            calculateReturTotal();
+        }
+
+        function updateFormForSelectedType() {
+            if (!currentMedicine) return;
+
+            const type          = document.getElementById('retur_type').value;
+            const packagingName = currentMedicine.packaging || 'Kemasan';
+            const unitName      = currentMedicine.unit || 'Eceran';
+
+            if (type === 'packaging') {
+                const packPrice = parseFloat(currentMedicine.pack_price) || 0;
+                const maxQty    = parseFloat(currentMedicine.remaining_pack !== undefined ? currentMedicine.remaining_pack : currentMedicine.qty_received_pack) || 0;
+
+                $('#item_price').val('Rp ' + Number(packPrice).toLocaleString('id-ID'));
+                document.getElementById('item_price').dataset.raw = packPrice;
+                $('#price_type_label').text('/ ' + packagingName);
+
+                $('#qty_in').val(currentMedicine.qty_received_pack + ' ' + packagingName);
+                $('#old_qty').val(maxQty);
+                $('#qty_unit_badge').text(packagingName);
+                $('#qty_unit_suffix').text(packagingName);
+
+                const totalEquiv = maxQty * currentMedicine.content;
+                $('#qty_hint').text(`Maks. retur: ${maxQty} ${packagingName} (= ${Number(totalEquiv).toLocaleString('id-ID')} ${unitName})`);
+            } else {
+                const unitPrice = parseFloat(currentMedicine.unit_price) || 0;
+                const maxQty    = parseFloat(currentMedicine.remaining_unit !== undefined ? currentMedicine.remaining_unit : currentMedicine.qty_received_unit) || 0;
+
+                $('#item_price').val('Rp ' + Number(unitPrice).toLocaleString('id-ID'));
+                document.getElementById('item_price').dataset.raw = unitPrice;
+                $('#price_type_label').text('/ ' + unitName);
+
+                $('#qty_in').val(currentMedicine.qty_received_unit + ' ' + unitName);
+                $('#old_qty').val(maxQty);
+                $('#qty_unit_badge').text(unitName);
+                $('#qty_unit_suffix').text(unitName);
+
+                if (currentMedicine.content > 1) {
+                    const packEquiv = (maxQty / currentMedicine.content).toFixed(1).replace(/\.0$/, '');
+                    $('#qty_hint').text(`Maks. retur: ${Number(maxQty).toLocaleString('id-ID')} ${unitName} (${packEquiv} ${packagingName})`);
+                } else {
+                    $('#qty_hint').text(`Maks. retur: ${Number(maxQty).toLocaleString('id-ID')} ${unitName}`);
+                }
+            }
+        }
+
         function calculateReturTotal() {
-            const returQty  = parseFloat(document.getElementById('qty').value) || 0;
-            const itemPrice = parseFloat(
-                (document.getElementById('item_price').value || '0').replace(/[^\d.-]/g, '')
-            ) || 0;
-            document.getElementById('total_retur').value =
-                'Rp ' + (returQty * itemPrice).toLocaleString('id-ID');
+            if (!currentMedicine) return;
+
+            const oldQty = parseFloat(document.getElementById('old_qty').value) || 0;
+            let returQty = parseFloat(document.getElementById('qty').value) || 0;
+
+            if (oldQty > 0 && returQty > oldQty) {
+                returQty = oldQty;
+                document.getElementById('qty').value = returQty;
+            }
+
+            const type = document.getElementById('retur_type').value;
+            const pricePerUnit = type === 'packaging'
+                ? parseFloat(currentMedicine.pack_price || 0)
+                : parseFloat(currentMedicine.unit_price || 0);
+
+            const rawTotal = Math.round(returQty * pricePerUnit);
+            document.getElementById('total_retur').value = 'Rp ' + Number(rawTotal).toLocaleString('id-ID');
+            document.getElementById('total_retur').dataset.raw = rawTotal;
+
+            const calcHint = document.getElementById('calc_hint');
+            if (returQty > 0) {
+                const unitLabel = type === 'packaging' ? (currentMedicine.packaging || 'Kemasan') : (currentMedicine.unit || 'Eceran');
+                calcHint.textContent = `${returQty} ${unitLabel} × Rp ${Number(pricePerUnit).toLocaleString('id-ID')} = Rp ${Number(rawTotal).toLocaleString('id-ID')}`;
+                calcHint.classList.remove('hidden');
+            } else {
+                calcHint.classList.add('hidden');
+            }
         }
 
         // ═════════════════════════════════════════════════════════════════════════════
@@ -437,20 +567,34 @@
                         const expFormatted = b.expired_date
                             ? new Date(b.expired_date).toLocaleDateString('id-ID', { day:'2-digit', month:'short', year:'numeric' })
                             : '-';
-                        opt.textContent      = `${b.name}  |  Exp: ${expFormatted}  |  Stok: ${b.stock}`;
+                        let phTag = '';
+                        if (b.pharmacy_id == 9) phTag = '[Gudang] ';
+                        else if (b.pharmacy_id == 1) phTag = '[Pelayanan] ';
+
+                        let stockText = `${b.stock} ${currentMedicine?.unit || ''}`;
+                        if (currentMedicine && currentMedicine.content > 1) {
+                            const packCount = Math.floor(b.stock / currentMedicine.content);
+                            const remainder = b.stock % currentMedicine.content;
+                            let packText = `${packCount} ${currentMedicine.packaging || 'BOX'}`;
+                            if (remainder > 0) packText += ` + ${remainder} ${currentMedicine.unit || 'TAB'}`;
+                            stockText = `${b.stock} ${currentMedicine.unit || 'TAB'} (${packText})`;
+                        }
+
+                        opt.textContent         = `${phTag}${b.name}  |  Exp: ${expFormatted}  |  Stok: ${stockText}`;
                         opt.dataset.batchName   = b.name;
                         opt.dataset.expiredDate = b.expired_date ?? '';
+                        opt.dataset.stock       = b.stock;
                         select.appendChild(opt);
                     });
 
                     select.disabled = false;
                     batchesReady    = true;
 
-                    // Auto-select first batch and focus select so Enter-flow can continue
+                    // Auto-select first batch and focus qty
                     if (batches.length === 1) {
-                        select.selectedIndex = 1; // skip placeholder, select only option
+                        select.selectedIndex = 1;
                     }
-                    select.focus();
+                    document.getElementById('qty').focus();
                 })
                 .catch(() => {
                     select.innerHTML = '<option value="">Gagal memuat batch</option>';
@@ -466,17 +610,37 @@
         function submitRetur() {
             const medicineId    = document.getElementById('medicine_id').value;
             const transactionId = document.getElementById('transaction_id').value;
-            const qtyRetur      = document.getElementById('qty').value;
-            const oldQty        = document.getElementById('old_qty').value;
-            const totalRetur    = document.getElementById('total_retur').value.replace(/[^\d.-]/g, '');
+            const returType     = document.getElementById('retur_type').value || 'unit';
+            const qtyRetur      = parseFloat(document.getElementById('qty').value) || 0;
+            const oldQty        = parseFloat(document.getElementById('old_qty').value) || 0;
             const batchSelect   = document.getElementById('batch_select');
             const batchId       = batchSelect.value;
+            const content       = parseInt(document.getElementById('content').value) || 1;
 
             if (!transactionId) return iziToast.warning({ title: 'Perhatian', message: 'Pilih transaksi pembelian terlebih dahulu.', position: 'topRight' });
             if (!medicineId)    return iziToast.warning({ title: 'Perhatian', message: 'Pilih obat dari tabel kanan.', position: 'topRight' });
             if (!batchId)       return iziToast.warning({ title: 'Perhatian', message: 'Pilih batch obat.', position: 'topRight' });
-            if (!qtyRetur || parseFloat(qtyRetur) < 1)            return iziToast.warning({ title: 'Perhatian', message: 'Qty retur harus minimal 1.', position: 'topRight' });
-            if (parseFloat(qtyRetur) > parseFloat(oldQty))        return iziToast.warning({ title: 'Perhatian', message: 'Qty retur tidak boleh melebihi qty beli.', position: 'topRight' });
+            if (qtyRetur <= 0)  return iziToast.warning({ title: 'Perhatian', message: 'Qty retur harus lebih dari 0.', position: 'topRight' });
+            if (qtyRetur > oldQty) return iziToast.warning({ title: 'Perhatian', message: 'Qty retur tidak boleh melebihi batas retur.', position: 'topRight' });
+
+            const selectedOption = batchSelect.options[batchSelect.selectedIndex];
+            const batchStock     = selectedOption ? parseFloat(selectedOption.dataset.stock || 0) : 0;
+            const actualDeduct   = returType === 'packaging' ? (qtyRetur * content) : qtyRetur;
+
+            if (batchStock < actualDeduct) {
+                const unitName = currentMedicine?.unit || 'satuan';
+                return iziToast.warning({ 
+                    title: 'Perhatian', 
+                    message: `Stok batch (${batchStock} ${unitName}) tidak mencukupi untuk retur (${actualDeduct} ${unitName}).`, 
+                    position: 'topRight' 
+                });
+            }
+
+            const rawTotalAttr = document.getElementById('total_retur').dataset.raw;
+            const pricePerUnit = returType === 'packaging' ? (currentMedicine?.pack_price || 0) : (currentMedicine?.unit_price || 0);
+            let totalRetur = (rawTotalAttr !== undefined && rawTotalAttr !== '' && !isNaN(rawTotalAttr))
+                ? parseFloat(rawTotalAttr)
+                : Math.round(qtyRetur * pricePerUnit);
 
             const btnSimpan = document.getElementById('btnSimpan');
             const btnLabel  = document.getElementById('btnSimpanLabel');
@@ -484,9 +648,10 @@
             btnLabel.textContent = 'Menyimpan...';
 
             axios.post('{{ route('returdata.returorderitems') }}', {
-                transaction_id: transactionId,
-                medicine_id:    medicineId,
-                batch_id:       batchId,
+                transaction_id: parseInt(transactionId),
+                medicine_id:    parseInt(medicineId),
+                batch_id:       parseInt(batchId),
+                retur_type:     returType,
                 qty_retur:      qtyRetur,
                 total_retur:    totalRetur,
                 old_qty:        oldQty,
@@ -494,6 +659,9 @@
             .then(res => {
                 iziToast.success({ title: 'Berhasil', message: res.data.message ?? 'Retur berhasil disimpan.', position: 'topRight' });
                 medicineTable?.ajax.reload(null, false);
+                if (res.data.retur_code) {
+                    document.getElementById('returnumber').value = res.data.retur_code;
+                }
                 resetReturForm();
             })
             .catch(err => {
@@ -510,9 +678,28 @@
         // ═════════════════════════════════════════════════════════════════════════════
 
         function resetReturForm() {
-            ['medicine_id','cart_id','old_qty','content','medicine_code','unit',
+            currentMedicine = null;
+            ['medicine_id','cart_id','old_qty','content','medicine_code','unit','packaging_display',
              'medicine_name','item_price','content_display','qty_in','qty','price','total_retur', 'invoice_number']
-                .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+                .forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) {
+                        el.value = '';
+                        delete el.dataset.raw;
+                    }
+                });
+
+            $('#labelPackaging').text('Per Kemasan');
+            $('#labelUnit').text('Eceran');
+            $('#price_type_label').text('');
+            $('#qty_unit_badge').text('');
+            $('#qty_unit_suffix').text('');
+            $('#qty_hint').text('');
+            document.getElementById('calc_hint').classList.add('hidden');
+
+            const btnPackaging = document.getElementById('btnTypePackaging');
+            btnPackaging.disabled = false;
+            btnPackaging.classList.remove('opacity-50', 'cursor-not-allowed');
 
             const batchSelect        = document.getElementById('batch_select');
             batchSelect.innerHTML    = '<option value="">— Pilih obat terlebih dahulu —</option>';
@@ -531,23 +718,45 @@
         // ═════════════════════════════════════════════════════════════════════════════
 
         function loadMedicineForRetur(data) {
+            currentMedicine = data;
+
             $('#medicine_code').val(data.code);
             $('#medicine_id').val(data.medicine_id);
             $('#medicine_name').val(data.name);
             $('#transaction_id').val(data.receiving_id);
             $('#unit').val(data.unit);
+            $('#packaging_display').val(data.packaging || '—');
             $('#price').val('Rp ' + Number(data.total).toLocaleString('id-ID'));
-            $('#item_price').val(data.raw_price);
-            $('#old_qty').val(data.qty_received);
             $('#cart_id').val(data.id);
-            $('#qty_in').val(data.qty_received);
             $('#content_display').val(data.content);
             $('#content').val(data.content);
+
+            // Update button labels with actual packaging & unit names
+            const packLabel = data.packaging ? `Per Kemasan (${data.packaging})` : 'Per Kemasan';
+            const unitLabel = data.unit ? `Eceran (${data.unit})` : 'Eceran';
+            $('#labelPackaging').text(packLabel);
+            $('#labelUnit').text(unitLabel);
+
+            const btnPackaging = document.getElementById('btnTypePackaging');
+            if (data.content <= 1 || !data.packaging) {
+                btnPackaging.disabled = true;
+                btnPackaging.classList.add('opacity-50', 'cursor-not-allowed');
+                btnPackaging.title = 'Obat ini tidak memiliki kemasan (hanya satuan eceran)';
+                setReturType('unit');
+            } else {
+                btnPackaging.disabled = false;
+                btnPackaging.classList.remove('opacity-50', 'cursor-not-allowed');
+                btnPackaging.title = '';
+                // Default to packaging if original order was pack, or packaging if content > 1
+                setReturType('packaging');
+            }
+
             $('#qty').val('');
             $('#total_retur').val('');
+            document.getElementById('total_retur').dataset.raw = '0';
+            document.getElementById('calc_hint').classList.add('hidden');
 
             if (data.medicine_id) loadBatches(data.medicine_id);
-            // qty gets focus AFTER batches load (loadBatches calls select.focus() at end)
         }
 
         // ═════════════════════════════════════════════════════════════════════════════
@@ -721,10 +930,29 @@
                 columns: [
                     { data: null, render: (d, t, r, m) => m.row + 1 },
                     { data: 'name', render: function(data, type, row) {
-                        return `<div><div class="font-medium text-gray-800">${data}</div>
-                                <div class="text-[11px] text-gray-400 mt-0.5">Kode: ${row.code || '-'} &nbsp;&bull;&nbsp; Satuan: ${row.unit || '-'}</div></div>`;
+                        let ratioBadge = '';
+                        if (row.content > 1) {
+                            ratioBadge = `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">1 ${row.packaging || 'Kemasan'} = ${row.content} ${row.unit || 'Eceran'}</span>`;
+                        }
+                        return `<div>
+                                    <div class="font-medium text-gray-800">${data}</div>
+                                    <div class="text-[11px] text-gray-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                                        <span>Kode: ${row.code || '-'}</span>
+                                        <span>&bull;</span>
+                                        <span>${row.unit || '-'}</span>
+                                        ${ratioBadge ? `<span>&bull;</span>` + ratioBadge : ''}
+                                    </div>
+                                </div>`;
                     }},
-                    { data: 'qty_received', className: 'text-end', render: (data, type, row) => `<span class="font-medium text-gray-700">${data}</span> <span class="text-[11px] text-gray-400">${row.unit || ''}</span>` },
+                    { data: 'qty_received', className: 'text-end', render: function(data, type, row) {
+                        if (row.is_pack || row.content > 1) {
+                            return `<div class="text-right">
+                                        <div class="font-semibold text-gray-800">${row.qty_received_pack} <span class="text-[11px] font-normal text-gray-500">${row.packaging || 'BOX'}</span></div>
+                                        <div class="text-[11px] text-gray-400">(${Number(row.qty_received_unit).toLocaleString('id-ID')} ${row.unit || 'TAB'})</div>
+                                    </div>`;
+                        }
+                        return `<span class="font-semibold text-gray-800">${data}</span> <span class="text-[11px] text-gray-400">${row.unit || ''}</span>`;
+                    }},
                     { data: 'total', className: 'text-end', render: val => '<span class="font-medium text-gray-700">Rp ' + Number(val).toLocaleString('id-ID') + '</span>' },
                 ],
 
