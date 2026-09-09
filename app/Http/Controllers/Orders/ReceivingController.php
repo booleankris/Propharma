@@ -378,7 +378,7 @@ class ReceivingController extends Controller
         $signatureBase64 = $sigPath ? imageToBase64($sigPath, 70) : null;
 
         $pdf = Pdf::loadView('orders.printSPBFinal', compact('order', 'date', 'grouped', 'pharmacy', 'logoBase64', 'signatureBase64'))
-            ->setPaper('A7', 'portrait')
+            ->setPaper([0, 0, 396, 612])
             ->setOptions([
                 'isHtml5ParserEnabled' => true,
                 'isRemoteEnabled' => false,
@@ -463,7 +463,7 @@ class ReceivingController extends Controller
         $signatureBase64 = $sigPath ? imageToBase64($sigPath, 70) : null;
 
         $pdf = Pdf::loadView('orders.printSPBFinal', compact('order', 'date', 'grouped', 'pharmacy', 'receivingDetail', 'logoBase64', 'signatureBase64'))
-            ->setPaper('A7', 'portrait')
+            ->setPaper([0, 0, 396, 612])
             ->setOptions([
                 'isHtml5ParserEnabled' => true,
                 'isRemoteEnabled' => false,
@@ -555,7 +555,7 @@ class ReceivingController extends Controller
         $signatureBase64 = $sigPath ? imageToBase64($sigPath, 70) : null;
 
         $pdf = Pdf::loadView('orders.printSPBFinal', compact('order', 'date', 'grouped', 'pharmacy', 'receivingDetail', 'logoBase64', 'signatureBase64'))
-            ->setPaper('A7', 'portrait')
+            ->setPaper([0, 0, 396, 612])
             ->setOptions([
                 'isHtml5ParserEnabled' => true,
                 'isRemoteEnabled' => false,
@@ -637,7 +637,7 @@ class ReceivingController extends Controller
         $signatureBase64 = $sigPath ? imageToBase64($sigPath, 70) : null;
 
         $pdf = Pdf::loadView('orders.printSPBFinal', compact('order', 'date', 'grouped', 'pharmacy', 'logoBase64', 'signatureBase64'))
-            ->setPaper('A7', 'portrait')
+            ->setPaper([0, 0, 396, 612])
             ->setOptions([
                 'isHtml5ParserEnabled' => true,
                 'isRemoteEnabled' => false,

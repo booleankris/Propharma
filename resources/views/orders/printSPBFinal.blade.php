@@ -6,13 +6,13 @@
     <title>Surat Pesanan Final</title>
     <style>
         @page {
-            margin: 15px 35px;
+            margin: 12px 20px 12px 20px;
         }
 
         body {
             font-family: Arial, Helvetica, sans-serif;
-            font-size: 6px;
-            line-height: 1.2;
+            font-size: 10px;
+            line-height: 1.3;
             color: #000;
         }
 
@@ -38,36 +38,39 @@
 
         /* Garis Pemisah Kop */
         .line {
-            border-top: 1px solid #000;
-            margin-top: 3px;
-            margin-bottom: 4px;
+            border-top: 1.5px solid #000;
+            margin-top: 5px;
+            margin-bottom: 6px;
         }
 
         /* Styling Tabel Utama */
         table.form-table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 3px;
+            margin-top: 5px;
         }
 
         table.form-table th,
         table.form-table td {
-            border: 0.3px solid #000;
-            padding: 2.5px;
-            font-size: 4px;
+            border: 0.8px solid #000;
+            padding: 5.5px 4px;
+            font-size: 9.5px;
+            line-height: 1.25;
         }
 
         table.form-table th {
             background-color: #f2f2f2;
             font-weight: bold;
+            font-size: 10.5px;
             text-align: center;
+            padding: 6px 4px;
         }
 
         /* Identitas / Form List */
         .id-table td {
-            padding: 1px 0;
+            padding: 2.5px 0;
             vertical-align: top;
-            font-size: 5px;
+            font-size: 9.5px;
         }
 
         .id-table td.dotted {
@@ -77,39 +80,42 @@
 
         /* Catatan Kaki */
         .notes {
-            font-size: 5.5px;
-            margin-top: 4px;
+            font-size: 9px;
+            margin-top: 6px;
             padding-top: 2px;
         }
 
         /* Mencegah TTD terpotong ke halaman baru */
         .signature-block {
-            margin-top: 8px;
+            margin-top: 10px;
             page-break-inside: avoid;
-            font-size: 4.8px;
+            font-size: 9.5px;
         }
 
         .signature-block td {
-            font-size: 4.8px;
-            line-height: 1.2;
+            font-size: 9.5px;
+            line-height: 1.3;
         }
 
         .section-gap {
-            margin-top: 3px;
-            margin-bottom: 2px;
+            margin-top: 6px;
+            margin-bottom: 5px;
+            font-size: 10px;
         }
 
         .title-main {
             text-align: center;
             font-weight: bold;
-            font-size: 9px;
+            font-size: 16px;
             text-decoration: underline;
-            margin-top: 3px;
-            margin-bottom: 5px;
+            margin-top: 6px;
+            margin-bottom: 4px;
+            letter-spacing: 1px;
         }
 
         .subtitle {
             text-align: center;
+            font-size: 10px;
             margin-top: 1px;
         }
     </style>
@@ -127,7 +133,7 @@
         ========================================================== --}}
         @if ($type == 'REGULER')
             @foreach ($items as $creditorCode => $creditorItems)
-                @foreach ($creditorItems->chunk(15) as $chunkIndex => $chunkItems)
+                @foreach ($creditorItems->chunk(17) as $chunkIndex => $chunkItems)
                     @if (!$isFirstPage)
                         <div style="page-break-before: always;"></div>
                     @endif
@@ -135,27 +141,29 @@
 
                     <table style="width:100%; border-collapse:collapse;">
                         <tr>
-                            <td style="width:38px; vertical-align:middle;">
+                            <td style="width:72px; vertical-align:middle;">
                                 @if (!empty($logoBase64))
-                                    <img src="{{ $logoBase64 }}" style="width:40px; height:auto;">
+                                    <img src="{{ $logoBase64 }}" style="width:66px; margin-right:6px;">
                                 @elseif ($pharmacy->logo && file_exists(public_path('img/' . $pharmacy->logo)))
                                     <img src="{{ public_path('img/' . $pharmacy->logo) }}"
-                                        style="width:40px; height:auto;">
+                                        style="width:66px; margin-right:6px;">
                                 @else
-                                    <img src="{{ public_path('img/logo-shb.png') }}" style="width:40px; height:auto;">
+                                    <img src="{{ public_path('img/logo-sahabat.png') }}" style="width:44px;">
                                 @endif
                             </td>
-                            <td style="vertical-align:top; padding-left:3px;">
-                                <h2 style="margin:0; font-size:8px;">{{ strtoupper($pharmacy->name) }}</h2>
-                                <div>{{ $pharmacy->address }}</div>
-                                <div>HP. {{ $pharmacy->phone }}</div>
-                                <div>Apoteker : {{ $pharmacy->pharmacist }}</div>
-                                <div>No. SIPA : {{ $pharmacy->pharmacist_permit }}</div>
-                                @if ($pharmacy->permit)
-                                    <div>No. SIA : {{ $pharmacy->permit }}</div>
-                                @elseif ($pharmacy->pharmacy_registration)
-                                    <div>No. STR : {{ $pharmacy->pharmacy_registration }}</div>
-                                @endif
+                            <td style="vertical-align:top; padding-left:6px;">
+                                <div style="font-size:14.5px; font-weight:bold; margin-bottom:3px; letter-spacing:0.4px;">{{ strtoupper($pharmacy->name) }}</div>
+                                <div style="font-size:9.8px; line-height:1.28;">
+                                    <div>{{ $pharmacy->address }}</div>
+                                    <div>HP. {{ $pharmacy->phone }}</div>
+                                    <div>Apoteker : {{ $pharmacy->pharmacist }}</div>
+                                    <div>No. SIPA : {{ $pharmacy->pharmacist_permit }}</div>
+                                    @if ($pharmacy->permit)
+                                        <div>No. SIA : {{ $pharmacy->permit }}</div>
+                                    @elseif ($pharmacy->pharmacy_registration)
+                                        <div>No. STR : {{ $pharmacy->pharmacy_registration }}</div>
+                                    @endif
+                                </div>
                             </td>
                         </tr>
                     </table>
@@ -166,20 +174,22 @@
                     @php
                         $spCode = $creditorItems->first()->order_items_code;
                     @endphp
-                    <table style="width:100%; margin-top:2px;">
+                    <table style="width:100%; margin-top:4px; font-size:10.5px;">
                         <tr>
-                            <td style="width:50%; vertical-align:top;">
+                            <td style="width:46%; vertical-align:top;">
                                 <b>No :</b>
                                 {{ $spCode }}{{ $chunkIndex > 0 ? ' (Hal ' . ($chunkIndex + 1) . ')' : '' }}
                             </td>
-                            <td style="width:50%; text-align:right; font-size: 6px; vertical-align:top;">
+                            <td style="width:54%; text-align:right; vertical-align:top;">
                                 <b>Kepada Yth :</b> {{ optional($creditorItems->first()->creditors)->name ?? '-' }}
                             </td>
                         </tr>
                         <tr>
                             <td></td>
-                            <td style="text-align:right;font-size:6px;">
-                                Di- {{ optional($creditorItems->first()->creditors)->address ?? '-' }}
+                            <td style="text-align:right; font-size:9.8px; vertical-align:top;">
+                                <div style="height:38px; max-height:38px; overflow:hidden; line-height:12.5px;">
+                                    Di- {{ optional($creditorItems->first()->creditors)->address ?? '-' }}
+                                </div>
                             </td>
                         </tr>
                     </table>
@@ -195,23 +205,30 @@
                     <table class="form-table">
                         <thead>
                             <tr>
-                                <th style="width:20%;">Jumlah</th>
-                                <th style="width:55%;">Nama Obat</th>
-                                <th style="width:25%;">Keterangan</th>
+                                <th style="width:7%;">No.</th>
+                                <th style="width:47%;">Nama Obat</th>
+                                <th style="width:18%;">Jumlah</th>
+                                <th style="width:14%;">Satuan</th>
+                                <th style="width:14%;">Keterangan</th>
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach ($chunkItems as $row)
+                            @foreach ($chunkItems as $index => $row)
                                 <tr>
                                     <td style="text-align:center;">
-                                        {{ $row->receivingItems->sum('qty_received') }}
-                                        ({{ ucfirst(terbilang($row->receivingItems->sum('qty_received'))) }})
-                                        {{ $row->medicines->packaging ?? '-' }}
+                                        {{ $chunkIndex * 17 + $index + 1 }}
                                     </td>
                                     <td>
                                         {{ $row->medicines->name ?? '-' }}
                                     </td>
-                                    <td>
+                                    <td style="text-align:center;">
+                                        {{ $row->receivingItems->sum('qty_received') }}
+                                        ({{ ucfirst(terbilang($row->receivingItems->sum('qty_received'))) }})
+                                    </td>
+                                    <td style="text-align:center;">
+                                        {{ $row->medicines->packaging ?? '-' }}
+                                    </td>
+                                    <td style="text-align:center;">
                                         @php
                                             $credCode = $row->creditor_code ?? optional($row->creditors)->code;
                                             $medCred =
@@ -224,9 +241,11 @@
                                 </tr>
                             @endforeach
 
-                            @for ($i = count($chunkItems); $i < 15; $i++)
+                            @for ($i = count($chunkItems); $i < 17; $i++)
                                 <tr>
-                                    <td>&nbsp;</td>
+                                    <td style="text-align:center;">&nbsp;</td>
+                                    <td></td>
+                                    <td></td>
                                     <td></td>
                                     <td></td>
                                 </tr>
@@ -237,26 +256,26 @@
                     {{-- FOOTER --}}
                     <table class="signature-block" style="width:100%;">
                         <tr>
-                            <td style="width:35%; vertical-align:top; color:#444;">
+                            <td style="width:38%; vertical-align:top; color:#333;">
                                 Asli : Arsip PBF <br>
                                 Copy : Arsip Apotek
                             </td>
-                            <td style="width:65%; text-align:right; vertical-align:top;">
+                            <td style="width:62%; text-align:right; vertical-align:top;">
                                 {{ $pharmacy->city }}, {{ $date }}
                                 <br>
                                 Penanggung Jawab,
 
                                 @if (!empty($signatureBase64))
-                                    <div style="margin: 1px 0;">
-                                        <img src="{{ $signatureBase64 }}" style="height:35px; width:auto;">
+                                    <div style="margin: 2px 0;">
+                                        <img src="{{ $signatureBase64 }}" style="height:42px; width:auto;">
                                     </div>
                                 @elseif ($pharmacy->signature && file_exists(public_path('img/' . $pharmacy->signature)))
-                                    <div style="margin: 1px 0;">
+                                    <div style="margin: 2px 0;">
                                         <img src="{{ public_path('img/' . $pharmacy->signature) }}"
-                                            style="height:35px; width:auto;">
+                                            style="height:42px; width:auto;">
                                     </div>
                                 @else
-                                    <div style="height:35px;"></div> {{-- blank space to sign by hand --}}
+                                    <div style="height:42px;"></div> {{-- blank space to sign by hand --}}
                                 @endif
                                 <b><u>{{ $pharmacy->pharmacist }}</u></b><br>
                                 SIPA : {{ $pharmacy->pharmacist_permit }}
