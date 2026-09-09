@@ -6,10 +6,12 @@
     <title>Surat Pesanan</title>
     <style>
         @page {
-            margin: 12px 20px 12px 20px;
+            margin: 0px 20px 10px 20px;
         }
 
         body {
+            margin: 0;
+            padding: 0;
             font-family: Arial, Helvetica, sans-serif;
             font-size: 10px;
             line-height: 1.3;
@@ -301,7 +303,7 @@
 
                 <table class="id-table" style="width:100%; border-collapse:collapse;">
                     <tr>
-                        <td style="width:60px;">Nama Apoteker</td>
+                        <td style="width:75px;">Nama Apoteker</td>
                         <td style="width:8px;">:</td>
                         <td><b>{{ $pharmacy->pharmacist }}</b></td>
                     </tr>
@@ -323,7 +325,7 @@
 
                 <table class="id-table" style="width:100%; border-collapse:collapse;">
                     <tr>
-                        <td style="width:60px;">Nama PBF</td>
+                        <td style="width:75px;">Nama PBF</td>
                         <td style="width:8px;">:</td>
                         <td class="dotted">
                             <b>{{ optional($creditorItems->first()->creditors)->name ?? '-' }}</b>
@@ -377,7 +379,7 @@
                             </tr>
                         @endforeach
 
-                        @for ($i = count($creditorItems); $i < 8; $i++)
+                        @for ($i = count($creditorItems); $i < 12; $i++)
                             <tr>
                                 <td>&nbsp;</td>
                                 <td></td>
@@ -396,7 +398,7 @@
 
                 <table class="id-table" style="width:100%; border-collapse:collapse;">
                     <tr>
-                        <td style="width:60px;">Nama Apotek</td>
+                        <td style="width:75px;">Nama Apotek</td>
                         <td style="width:8px;">:</td>
                         <td><b>{{ $pharmacy->name }}</b></td>
                     </tr>
@@ -477,7 +479,7 @@
 
                     <table class="id-table" style="width:100%; border-collapse:collapse;">
                         <tr>
-                            <td style="width:60px;">N a m a</td>
+                            <td style="width:75px;">N a m a</td>
                             <td style="width:8px;">:</td>
                             <td>
                                 <b>{{ $pharmacy->pharmacist }}</b>
@@ -553,7 +555,7 @@
                                 </tr>
                             @endforeach
 
-                            @for ($i = count($chunkItems); $i < 8; $i++)
+                            @for ($i = count($chunkItems); $i < 12; $i++)
                                 <tr>
                                     <td>&nbsp;</td>
                                     <td></td>
@@ -637,7 +639,7 @@
                 <div class="section-gap">Yang bertanda tangan dibawah ini :</div>
                 <table class="id-table" style="width:100%; border-collapse:collapse;">
                     <tr>
-                        <td style="width:60px;">N a m a</td>
+                        <td style="width:75px;">N a m a</td>
                         <td style="width:8px;">:</td>
                         <td><b>{{ $pharmacy->pharmacist }}</b></td>
                     </tr>
@@ -706,7 +708,7 @@
                             </tr>
                         @endforeach
 
-                        @for ($i = count($creditorItems); $i < 8; $i++)
+                        @for ($i = count($creditorItems); $i < 12; $i++)
                             <tr>
                                 <td>&nbsp;</td>
                                 <td></td>
@@ -792,7 +794,7 @@
                     <div class="section-gap">Yang bertanda tangan dibawah ini :</div>
                     <table class="id-table" style="width:100%; border-collapse:collapse;">
                         <tr>
-                            <td style="width:60px;">N a m a</td>
+                            <td style="width:75px;">N a m a</td>
                             <td style="width:8px;">:</td>
                             <td><b>{{ $pharmacy->pharmacist }}</b></td>
                         </tr>
@@ -862,7 +864,7 @@
                                 </tr>
                             @endforeach
 
-                            @for ($i = count($chunkItems); $i < 8; $i++)
+                            @for ($i = count($chunkItems); $i < 12; $i++)
                                 <tr>
                                     <td>&nbsp;</td>
                                     <td></td>
