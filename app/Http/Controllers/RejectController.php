@@ -113,11 +113,34 @@ class RejectController extends Controller
             ]
         ]);
     }
-    public function getReject()
+    public function getReject(Request $request)
     {
+        $filters = $request->validate([
+            'medicine_search' => 'nullable|string|max:255',
+            'start_date' => 'nullable|date_format:Y-m-d',
+            'end_date' => 'nullable|date_format:Y-m-d' . ($request->filled('start_date') ? '|after_or_equal:start_date' : ''),
+        ]);
+
         $query = Reject::with('medicines')->where('pharmacy_id', getActivePharmacyId());
 
         return DataTables::of($query)
+            ->filter(function ($query) use ($filters) {
+                $name = trim($filters['medicine_search'] ?? '');
+                if ($name !== '') {
+                    $query->where(function ($names) use ($name) {
+                        $names->whereHas('medicines', fn($medicine) => $medicine->where('name', 'like', '%' . $name . '%'))
+                            ->orWhere(function ($custom) use ($name) {
+                                $custom->whereDoesntHave('medicines')->where('medicine_name', 'like', '%' . $name . '%');
+                            });
+                    });
+                }
+                if (!empty($filters['start_date'])) {
+                    $query->whereDate('date', '>=', $filters['start_date']);
+                }
+                if (!empty($filters['end_date'])) {
+                    $query->whereDate('date', '<=', $filters['end_date']);
+                }
+            })
             ->addColumn(
                 'total',
                 fn($data) =>

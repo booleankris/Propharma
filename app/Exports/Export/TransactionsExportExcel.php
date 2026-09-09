@@ -39,7 +39,9 @@ class TransactionsExportExcel implements FromCollection, WithHeadings
         $query = MedicineCart::with(['medicine', 'transactions']);
 
         if ($this->start && $this->end) {
-            $query->whereBetween('created_at', [$this->start, $this->end]);
+            $start = \Illuminate\Support\Carbon::parse($this->start)->startOfDay();
+            $end   = \Illuminate\Support\Carbon::parse($this->end)->endOfDay();
+            $query->whereBetween('created_at', [$start, $end]);
         }
 
         return $query->get()->map(function ($row) {

@@ -28,11 +28,11 @@
                 <div class="flex gap-4 items-end flex-wrap">
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-1">Start Date</label>
-                        <input type="date" id="start_date" class="border rounded-lg px-3 py-2 text-sm w-40">
+                        <input type="text" id="patient_start_date" value="{{ now()->format('Y-m-d') }}" autocomplete="off" class="flatpickr-date border rounded-lg px-3 py-2 text-sm w-40 cursor-pointer">
                     </div>
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-1">End Date</label>
-                        <input type="date" id="end_date" class="border rounded-lg px-3 py-2 text-sm w-40">
+                        <input type="text" id="patient_end_date" value="{{ now()->format('Y-m-d') }}" autocomplete="off" class="flatpickr-date border rounded-lg px-3 py-2 text-sm w-40 cursor-pointer">
                     </div>
 
                     <div class="flex gap-2">
@@ -70,13 +70,20 @@
         }
         document.addEventListener("DOMContentLoaded", function() {
 
-            const startInput = document.getElementById("start_date");
-            const endInput = document.getElementById("end_date");
+            const startInput = document.getElementById("patient_start_date");
+            const endInput = document.getElementById("patient_end_date");
             const exportBtn = document.getElementById("btnExport");
             const progressBox = document.getElementById("progress-box");
             const progressBar = document.getElementById("progress-bar");
             const progressText = document.getElementById("progress-text");
 
+            function getVal(el) {
+                if (!el) return '';
+                if (el._flatpickr && el._flatpickr.selectedDates && el._flatpickr.selectedDates.length > 0) {
+                    return el._flatpickr.formatDate(el._flatpickr.selectedDates[0], 'Y-m-d');
+                }
+                return el.value || '';
+            }
 
             function setDisabled(state) {
                 exportBtn.disabled = state;
@@ -85,8 +92,8 @@
             }
 
             function updateButton() {
-                const start = startInput.value;
-                const end = endInput.value;
+                const start = getVal(startInput);
+                const end = getVal(endInput);
 
                 if (!start && !end) {
                     exportBtn.textContent = "Export Semua";
@@ -100,16 +107,22 @@
                 }
             }
 
-            startInput.addEventListener("input", updateButton);
-            endInput.addEventListener("input", updateButton);
+            if (startInput) {
+                startInput.addEventListener("input", updateButton);
+                startInput.addEventListener("change", updateButton);
+            }
+            if (endInput) {
+                endInput.addEventListener("input", updateButton);
+                endInput.addEventListener("change", updateButton);
+            }
             updateButton();
 
             // EXPORT CLICK
             exportBtn.addEventListener("click", function() {
 
                 let payload = {
-                    start_date: startInput.value,
-                    end_date: endInput.value
+                    start_date: getVal(startInput),
+                    end_date: getVal(endInput)
                 };
 
                 setDisabled(true);

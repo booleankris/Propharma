@@ -288,21 +288,21 @@
             <div class="relative w-full p-[24px] bg-[#ffffff] rounded-[22px]">
                 <div id="searchWrapper" class="flex gap-5" style="position: relative; width: 100%;">
                     <div class="w-11/12">
-                        <div class="flex items-center justify-between mb-4">
+                        <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
                             <h1 class="text-2xl font-semibold tracking-tight font-poppins text-[#1c1c1c]">Penolakan Barang
                             </h1>
 
                             <!-- Export Controls -->
-                            <div class="flex items-end gap-3">
+                            <div class="flex flex-wrap items-end gap-3 max-w-full">
                                 <div>
                                     <label class="block text-[11px] font-medium text-slate-500 mb-1">Mulai Tanggal</label>
-                                    <input type="date" id="export_start_date"
-                                        class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 outline-none focus:border-blue-500 transition">
+                                    <input type="text" id="export_start_date" value="{{ now()->format('Y-m-d') }}" autocomplete="off"
+                                        class="flatpickr-date w-40 max-w-full text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 outline-none focus:border-blue-500 transition cursor-pointer">
                                 </div>
                                 <div>
                                     <label class="block text-[11px] font-medium text-slate-500 mb-1">Sampai Tanggal</label>
-                                    <input type="date" id="export_end_date"
-                                        class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 outline-none focus:border-blue-500 transition">
+                                    <input type="text" id="export_end_date" value="{{ now()->format('Y-m-d') }}" autocomplete="off"
+                                        class="flatpickr-date w-40 max-w-full text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 outline-none focus:border-blue-500 transition cursor-pointer">
                                 </div>
                                 <div>
                                     <button type="button" id="export-reject-btn"
@@ -502,6 +502,26 @@
                         <span class="text-xs text-slate-400 font-medium">Tabel dapat di-scroll vertikal & horizontal</span>
                     </div>
 
+                    <div class="flex flex-wrap items-end gap-3 mb-4">
+                        <div class="flex-1 min-w-[200px]">
+                            <label for="reject_medicine_search" class="block text-xs font-medium text-slate-500 mb-1">Cari nama obat</label>
+                            <input type="search" id="reject_medicine_search" maxlength="255" autocomplete="off"
+                                placeholder="Nama obat atau obat custom..."
+                                class="w-full text-sm border border-slate-200 rounded-lg px-3 py-2">
+                        </div>
+                        <div>
+                            <label for="reject_filter_start_date" class="block text-xs font-medium text-slate-500 mb-1">Dicatat mulai tanggal</label>
+                            <input type="text" id="reject_filter_start_date" autocomplete="off" placeholder="Semua tanggal"
+                                class="flatpickr-date w-40 text-sm border border-slate-200 rounded-lg px-3 py-2 cursor-pointer">
+                        </div>
+                        <div>
+                            <label for="reject_filter_end_date" class="block text-xs font-medium text-slate-500 mb-1">Sampai tanggal</label>
+                            <input type="text" id="reject_filter_end_date" autocomplete="off" placeholder="Semua tanggal"
+                                class="flatpickr-date w-40 text-sm border border-slate-200 rounded-lg px-3 py-2 cursor-pointer">
+                        </div>
+                        <button type="button" id="reset-reject-filters" class="text-sm border border-slate-200 rounded-lg px-3 py-2">Reset filter</button>
+                    </div>
+
                     <div class="table-scroll-container">
                         <table id="orderItemsTable" class="w-full">
                             <thead>
@@ -585,6 +605,11 @@
                 serverSide: true,
                 ajax: {
                     url: "{{ route('sales.getreject') }}",
+                    data: function(data) {
+                        data.medicine_search = document.getElementById('reject_medicine_search').value.trim();
+                        data.start_date = window.getDatePickerValue('reject_filter_start_date');
+                        data.end_date = window.getDatePickerValue('reject_filter_end_date');
+                    },
                 },
                 columns: [{
                         data: 'code',
@@ -654,6 +679,29 @@
                 dom: '<"flex flex-wrap items-center justify-between gap-2 mb-3"l>rt<"flex flex-wrap items-center justify-between gap-2 mt-3"ip><"clear">',
             });
         });
+        let rejectFilterTimer;
+        function reloadRejectFilters() {
+            clearTimeout(rejectFilterTimer);
+            rejectFilterTimer = setTimeout(function() {
+                selectedRowData = null;
+                selectedRowIndex = null;
+                orderItemsTable?.ajax.reload();
+            }, 300);
+        }
+        document.getElementById('reject_medicine_search').addEventListener('input', reloadRejectFilters);
+        ['reject_filter_start_date', 'reject_filter_end_date'].forEach(function(id) {
+            document.getElementById(id).addEventListener('change', reloadRejectFilters);
+        });
+        document.getElementById('reset-reject-filters').addEventListener('click', function() {
+            document.getElementById('reject_medicine_search').value = '';
+            ['reject_filter_start_date', 'reject_filter_end_date'].forEach(function(id) {
+                const input = document.getElementById(id);
+                if (input._flatpickr) input._flatpickr.clear();
+                else input.value = '';
+            });
+            reloadRejectFilters();
+        });
+
         document.getElementById('qty').addEventListener('keydown', function(e) {
             if (e.key !== 'Enter') return;
             e.preventDefault();
@@ -1164,8 +1212,17 @@
         document.getElementById('export-reject-btn').addEventListener('click', async function(e) {
             e.preventDefault();
 
-            const startDate = document.getElementById('export_start_date').value;
-            const endDate = document.getElementById('export_end_date').value;
+            const startDate = window.getDatePickerValue('export_start_date');
+            const endDate = window.getDatePickerValue('export_end_date');
+
+            if (startDate && endDate && endDate < startDate) {
+                iziToast.error({
+                    title: 'Rentang tanggal tidak valid',
+                    message: 'Tanggal akhir harus sama atau setelah tanggal awal.',
+                    position: 'topRight'
+                });
+                return;
+            }
 
             const exportBtn = this;
             const originalContent = exportBtn.innerHTML;
@@ -1272,16 +1329,22 @@
             }, 2000);
         }
 
-        document.getElementById('export_start_date').addEventListener('keydown', function(e) {
+        // Flatpickr displays an alternate input; the original input is hidden.
+        document.addEventListener('keydown', function(e) {
             if (e.key !== 'Enter') return;
+            const start = document.getElementById('export_start_date');
+            const end = document.getElementById('export_end_date');
+            const startDisplay = start._flatpickr?.altInput || start;
+            const endDisplay = end._flatpickr?.altInput || end;
+            if (e.target !== startDisplay && e.target !== endDisplay) return;
+            const picker = e.target === startDisplay ? start._flatpickr : end._flatpickr;
+            if (picker?.isOpen) return;
             e.preventDefault();
-            document.getElementById('export_end_date').focus();
-        });
-
-        document.getElementById('export_end_date').addEventListener('keydown', function(e) {
-            if (e.key !== 'Enter') return;
-            e.preventDefault();
-            document.getElementById('export-reject-btn').click();
+            if (e.target === startDisplay) {
+                endDisplay.focus();
+            } else {
+                document.getElementById('export-reject-btn').click();
+            }
         });
     </script>
 

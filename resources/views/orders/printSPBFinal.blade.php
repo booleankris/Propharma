@@ -385,7 +385,7 @@
                             </tr>
                         @endforeach
 
-                        @for ($i = count($creditorItems); $i < 14; $i++)
+                        @for ($i = count($creditorItems); $i < 12; $i++)
                             <tr>
                                 <td>&nbsp;</td>
                                 <td></td>
