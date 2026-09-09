@@ -320,7 +320,7 @@
                         <div class="md:col-span-2">
                             <label class="block mb-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">QTY
                                 BPBA</label>
-                            <input id="qty" type="number" name="qty"
+                            <input id="qty" type="number" name="qty" min="1" step="any"
                                 class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                                 placeholder="0" onkeyup="counttotal()">
                         </div>
@@ -829,8 +829,31 @@
         document.getElementById('qty').addEventListener('keydown', function(e) {
             if (e.key !== 'Enter') return;
             e.preventDefault();
+            const val = parseFloat(this.value) || 0;
+            if (val <= 0) {
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'QTY Tidak Valid',
+                        text: 'QTY BPBA harus lebih besar dari 0 (tidak boleh 0 atau kosong).',
+                        confirmButtonColor: '#2563eb'
+                    });
+                } else {
+                    alert('QTY BPBA harus lebih besar dari 0 (tidak boleh 0 atau kosong).');
+                }
+                this.focus();
+                return;
+            }
             document.getElementById('creditor').focus();
         });
+
+        document.getElementById('qty').addEventListener('blur', function() {
+            if (this.value !== '' && parseFloat(this.value) <= 0) {
+                this.value = '';
+                counttotal();
+            }
+        });
+
         document.getElementById('creditor').addEventListener('keydown', function(e) {
             if (e.key !== 'Enter') return;
             e.preventDefault();
@@ -850,6 +873,23 @@
 
         function submit_data() {
             if (isSubmitting) return;
+
+            const qtyVal = parseFloat(document.getElementById('qty').value) || 0;
+            if (qtyVal <= 0) {
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'QTY Tidak Valid',
+                        text: 'QTY BPBA harus lebih besar dari 0 (tidak boleh 0 atau kosong).',
+                        confirmButtonColor: '#2563eb'
+                    });
+                } else {
+                    alert('QTY BPBA harus lebih besar dari 0 (tidak boleh 0 atau kosong).');
+                }
+                document.getElementById('qty').focus();
+                return;
+            }
+
             isSubmitting = true;
 
             if (selectedRowData) {

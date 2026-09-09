@@ -179,6 +179,9 @@ class ReceivingController extends Controller
         foreach ($orderItems as $orderItem) {
             $qtyReceived = $orderItem->qty_received_total ?? 0;
             $qtyRemaining = max(0, $orderItem->quantity - $qtyReceived);
+            if ((float) $orderItem->quantity <= 0 && $orderItem->original_quantity !== null && $orderItem->receivingItems->isEmpty()) {
+                continue;
+            }
             $creditorPpn = $orderItem->creditors?->ppn_type ?? 'TANPA';
 
             $medCred = $orderItem->medicines?->creditors?->firstWhere('code', $creditorCode) ?? $orderItem->medicines?->creditors?->first();
@@ -1060,6 +1063,12 @@ class ReceivingController extends Controller
             DB::beginTransaction();
 
             $item = ReceivingItems::with('order_items')->findOrFail($id);
+            $lockedOrderItem = OrderItems::whereKey($item->order_items_id)->lockForUpdate()->firstOrFail();
+            if (($lockedOrderItem->original_quantity !== null || $lockedOrderItem->incomingMovement()->exists())
+                && (float) $request->qty_received + (float) $lockedOrderItem->receivingItems()->where('id', '!=', $id)->sum('qty_received') > (float) $lockedOrderItem->quantity) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'message' => 'Jumlah penerimaan melampaui kuantitas aktif setelah konsolidasi.'], 422);
+            }
             $medicineId = $item->order_items->medicine_id;
             $pharmacyId = getActivePharmacyId();
 
@@ -1179,15 +1188,28 @@ class ReceivingController extends Controller
                 $item->batches_id = $newBatch->id;
             }
 
-            $item->update([
+            $itemData = [
                 'qty_received' => $newQty,
                 'qty' => $newQty,
                 'raw_price' => $request->raw_price,
                 'discount' => $request->discount,
+                'extra_discount' => $request->extra_discount ?? 0,
                 'subtotal' => $request->total,
+                'total' => $request->total,
                 'batch' => $request->batch,
                 'expired_date' => $request->expired_date,
-            ]);
+            ];
+            if ($request->filled('receiving_details_id')) {
+                $oldDetailId = $item->receiving_details_id;
+                $itemData['receiving_details_id'] = $request->receiving_details_id;
+            }
+            $item->update($itemData);
+
+            if (!empty($oldDetailId) && $oldDetailId != $request->receiving_details_id) {
+                if (ReceivingItems::where('receiving_details_id', $oldDetailId)->count() === 0) {
+                    ReceivingDetails::where('id', $oldDetailId)->delete();
+                }
+            }
 
             DB::commit();
 
@@ -1313,11 +1335,353 @@ class ReceivingController extends Controller
     {
         $order = Order::with([
             'order_items.medicines',
+            'order_items.receivingItems.batches',
             'order_items.receivingItems.locations',
             'order_items.receivingItems.etalases',
         ])->findOrFail($orderId);
 
-        return view('orders.revision', compact('order'));
+        $rdIdsFromItems = ReceivingItems::whereIn('order_items_id', $order->order_items->pluck('id'))
+            ->pluck('receiving_details_id')
+            ->unique()
+            ->filter();
+
+        $orderSpCodes = $order->order_items->pluck('order_items_code')->filter();
+
+        $allReceivingDetails = ReceivingDetails::where(function ($q) use ($rdIdsFromItems, $order, $orderSpCodes) {
+            $q->whereIn('id', $rdIdsFromItems);
+            if ($order->receiving_id) {
+                $q->orWhere('receiving_id', $order->receiving_id);
+            }
+            if ($orderSpCodes->isNotEmpty()) {
+                $q->orWhereIn('sp_code', $orderSpCodes);
+            }
+        })
+        ->with([
+            'receiving_items' => function ($q) use ($order) {
+                $q->whereIn('order_items_id', $order->order_items->pluck('id'))
+                  ->with(['order_items.medicines', 'batches', 'locations', 'etalases']);
+            },
+            'creditor'
+        ])
+        ->orderBy('id', 'asc')
+        ->get();
+
+        $knownItemIds = $allReceivingDetails->flatMap->receiving_items->pluck('id');
+        $orphanedItems = ReceivingItems::whereIn('order_items_id', $order->order_items->pluck('id'))
+            ->whereNotIn('id', $knownItemIds)
+            ->with(['order_items.medicines', 'batches', 'locations', 'etalases'])
+            ->get();
+
+        $orderItemsData = $order->order_items->map(function ($oi) {
+            $receivedQty = $oi->receivingItems->whereNotNull('batches_id')->sum('qty_received');
+            $remainingQty = max(0, (float) $oi->quantity - (float) $receivedQty);
+            return [
+                'id' => $oi->id,
+                'medicine_id' => $oi->medicine_id,
+                'medicine_name' => $oi->medicines->name ?? '-',
+                'ordered_qty' => (float) $oi->quantity,
+                'received_qty' => (float) $receivedQty,
+                'remaining_qty' => (float) $remainingQty,
+                'price' => (float) ($oi->price ?? 0),
+                'discount' => (float) ($oi->discount ?? 0),
+                'pack' => (bool) $oi->pack,
+            ];
+        });
+
+        $allMedicines = Medicines::select('id', 'name', 'raw_price')->orderBy('name')->get();
+
+        return view('orders.revision', compact('order', 'allReceivingDetails', 'orphanedItems', 'orderItemsData', 'allMedicines'));
+    }
+
+    public function addRevisionItem(Request $request, $orderId)
+    {
+        $request->validate([
+            'receiving_details_id' => 'required|exists:receiving_details,id',
+            'batch' => 'required|string',
+            'expired_date' => 'required|date',
+            'qty_received' => 'required|numeric|min:0.01',
+            'raw_price' => 'required',
+        ]);
+
+        try {
+            DB::beginTransaction();
+
+            $order = Order::with('order_items')->findOrFail($orderId);
+            $detail = ReceivingDetails::findOrFail($request->receiving_details_id);
+
+            if ($request->filled('order_items_id')) {
+                $orderItem = OrderItems::with('medicines')->where('order_id', $orderId)->findOrFail($request->order_items_id);
+            } elseif ($request->filled('medicine_id')) {
+                $medicine = Medicines::findOrFail($request->medicine_id);
+                $firstItem = $order->order_items->first();
+                $orderItem = OrderItems::create([
+                    'order_items_code' => $firstItem->order_items_code ?? ('SP-' . $order->id),
+                    'order_id' => $order->id,
+                    'medicine_id' => $medicine->id,
+                    'creditor_code' => $detail->creditor_code ?? $firstItem?->creditor_code,
+                    'pack' => 0,
+                    'price' => (float) preg_replace('/[^\d.]/', '', (string) $request->raw_price),
+                    'quantity' => (float) $request->qty_received,
+                    'total' => (float) preg_replace('/[^\d.]/', '', (string) ($request->total ?? 0)),
+                    'note' => 'Item susulan/pengganti saat revisi faktur',
+                    'status' => 1,
+                ]);
+            } else {
+                DB::rollBack();
+                return response()->json(['success' => false, 'message' => 'Pilih obat terlebih dahulu.'], 422);
+            }
+
+            $medicineId = $orderItem->medicine_id;
+            $medicine = Medicines::findOrFail($medicineId);
+            $pharmacyId = getActivePharmacyId();
+
+            $isPack = ($orderItem->pack == 1);
+            $content = $isPack ? (int) ($medicine->content ?? 1) : 1;
+            $qtyReceived = (float) $request->qty_received;
+            $actualQty = $qtyReceived * $content;
+
+            $rawPrice = (float) preg_replace('/[^\d.]/', '', (string) $request->raw_price);
+            $discount = (float) preg_replace('/[^\d.]/', '', (string) ($request->discount ?? 0));
+            $extraDiscount = (float) preg_replace('/[^\d.]/', '', (string) ($request->extra_discount ?? 0));
+
+            $gross = $qtyReceived * $rawPrice;
+            $totalDiscount = $discount + $extraDiscount;
+            $total = max(0, $gross - $totalDiscount);
+
+            $batch = Batches::firstOrCreate(
+                [
+                    'medicine_id' => $medicineId,
+                    'name' => $request->batch,
+                    'expired_date' => $request->expired_date,
+                    'pharmacy_id' => $pharmacyId,
+                ],
+                [
+                    'status' => 0,
+                    'stock' => 0,
+                ]
+            );
+
+            $qtyBefore = $medicine->stock;
+            $medicine->increment('stock', $actualQty);
+
+            if (!isWarehousePharmacy($pharmacyId)) {
+                $transferHeader = MedicineTransfers::create([
+                    'code' => $this->generateTransfersCode(),
+                    'status' => 1,
+                    'user_id' => auth()->user()->id ?? 1,
+                ]);
+            } else {
+                Batches::where('id', $batch->id)->increment('stock', $actualQty);
+            }
+
+            $receivingItem = ReceivingItems::create([
+                'receiving_details_id' => $detail->id,
+                'order_items_id' => $orderItem->id,
+                'qty_received' => $qtyReceived,
+                'qty' => $qtyReceived,
+                'raw_price' => $rawPrice,
+                'discount' => $discount,
+                'extra_discount' => $extraDiscount,
+                'expired_date' => $request->expired_date,
+                'batch' => $request->batch,
+                'total' => $total,
+                'status' => $request->status ?? 1,
+                'batches_id' => $batch->id,
+            ]);
+
+            if (!isWarehousePharmacy($pharmacyId) && isset($transferHeader)) {
+                MedicineTransferItems::create([
+                    'medicine_transfer_id' => $transferHeader->id,
+                    'batches_id' => $batch->id,
+                    'receiving_items_id' => $receivingItem->id,
+                    'etalases_id' => 99,
+                    'qty' => $actualQty,
+                    'status' => 1,
+                ]);
+            }
+
+            ItemsLog::create([
+                'transaction_code' => 'REV-ADD-' . $receivingItem->id,
+                'code' => $this->generateItemsLogCode(),
+                'type' => 'RV',
+                'medicine_id' => $medicineId,
+                'qty' => $actualQty,
+                'qty_before' => $qtyBefore,
+                'qty_after' => $medicine->stock,
+                'total' => $total,
+                'date' => Carbon::now()->format('Y-m-d H:i:s'),
+                'status' => 8,
+                'batches_id' => $batch->id,
+                'user_id' => auth()->user()->id,
+            ]);
+
+            $allComplete = true;
+            foreach ($order->fresh()->order_items as $oi) {
+                $totalRcv = ReceivingItems::where('order_items_id', $oi->id)->whereNotNull('batches_id')->sum('qty_received');
+                if ($totalRcv < $oi->quantity) {
+                    $allComplete = false;
+                    break;
+                }
+            }
+            if ($allComplete && $order->status != 3) {
+                $order->status = 3;
+                $order->save();
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => "Obat {$medicine->name} berhasil ditambahkan ke Nomor Terima {$detail->receiving_details_code}.",
+            ]);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            \Log::error('Revision add item error', ['message' => $e->getMessage(), 'line' => $e->getLine()]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal menambahkan item: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function mergeRevisionDetails(Request $request, $orderId)
+    {
+        $request->validate([
+            'source_details_id' => 'required|exists:receiving_details,id',
+            'target_details_id' => 'required|exists:receiving_details,id|different:source_details_id',
+        ]);
+
+        try {
+            DB::beginTransaction();
+
+            $source = ReceivingDetails::findOrFail($request->source_details_id);
+            $target = ReceivingDetails::findOrFail($request->target_details_id);
+
+            $sourceCode = $source->receiving_details_code;
+            $targetCode = $target->receiving_details_code;
+
+            $count = ReceivingItems::where('receiving_details_id', $source->id)->count();
+
+            ReceivingItems::where('receiving_details_id', $source->id)
+                ->update(['receiving_details_id' => $target->id]);
+
+            $source->delete();
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => "Berhasil memindahkan {$count} item dari {$sourceCode} ke {$targetCode}.",
+            ]);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            \Log::error('Merge revision details error', ['message' => $e->getMessage(), 'line' => $e->getLine()]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal menggabungkan nomor terima: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function moveRevisionItem(Request $request, $orderId)
+    {
+        $request->validate([
+            'receiving_item_id' => 'nullable|exists:receiving_items,id',
+            'receiving_item_ids' => 'nullable|array',
+            'receiving_item_ids.*' => 'exists:receiving_items,id',
+            'target_details_id' => 'required|exists:receiving_details,id',
+        ]);
+
+        $itemIds = $request->input('receiving_item_ids', []);
+        if (empty($itemIds) && $request->filled('receiving_item_id')) {
+            $itemIds = [$request->input('receiving_item_id')];
+        }
+
+        if (empty($itemIds)) {
+            return response()->json(['success' => false, 'message' => 'Pilih minimal satu item obat untuk dipindahkan.'], 422);
+        }
+
+        try {
+            DB::beginTransaction();
+
+            $targetDetail = ReceivingDetails::findOrFail($request->target_details_id);
+            $items = ReceivingItems::with('order_items.medicines', 'receiving_details')
+                ->whereIn('id', $itemIds)
+                ->get();
+
+            $movedCount = 0;
+            $oldDetailIds = [];
+
+            foreach ($items as $item) {
+                if ($item->receiving_details_id == $targetDetail->id) {
+                    continue;
+                }
+
+                if ($item->receiving_details_id) {
+                    $oldDetailIds[] = $item->receiving_details_id;
+                }
+
+                $item->receiving_details_id = $targetDetail->id;
+                $item->save();
+                $movedCount++;
+            }
+
+            // Cleanup any source receiving_details that have 0 items left
+            $oldDetailIds = array_unique($oldDetailIds);
+            foreach ($oldDetailIds as $oldId) {
+                if ($oldId != $targetDetail->id && ReceivingItems::where('receiving_details_id', $oldId)->count() === 0) {
+                    ReceivingDetails::where('id', $oldId)->delete();
+                }
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => "{$movedCount} item berhasil dipindahkan / digabung ke Nomor Terima {$targetDetail->receiving_details_code}.",
+            ]);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            \Log::error('Move revision item error', ['message' => $e->getMessage(), 'line' => $e->getLine()]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal memindahkan item: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function deleteEmptyRevisionDetails($orderId, $detailsId)
+    {
+        try {
+            DB::beginTransaction();
+
+            $detail = ReceivingDetails::findOrFail($detailsId);
+            $itemCount = ReceivingItems::where('receiving_details_id', $detail->id)->count();
+
+            if ($itemCount > 0) {
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Nomor terima ini masih memiliki item obat. Hapus atau pindahkan obatnya terlebih dahulu.',
+                ], 422);
+            }
+
+            $code = $detail->receiving_details_code;
+            $detail->delete();
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => "Nomor terima {$code} berhasil dihapus.",
+            ]);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal menghapus nomor terima: ' . $e->getMessage(),
+            ], 500);
+        }
     }
 
     public function orderComparison($orderId)
@@ -1619,6 +1983,25 @@ class ReceivingController extends Controller
         DB::beginTransaction();
 
         try {
+            $orderItem = OrderItems::whereKey($request->order_items_id)->lockForUpdate()->firstOrFail();
+            $sourceOrder = Order::findOrFail($orderItem->order_id);
+            $otherQty = $orderItem->receivingItems()
+                ->when($request->filled('receiving_items_id'), fn ($q) => $q->where('id', '!=', $request->receiving_items_id))
+                ->sum('qty_received');
+            $protectedItem = $orderItem->original_quantity !== null || $orderItem->incomingMovement()->exists();
+            $wrongEdit = $request->filled('receiving_items_id') && !$orderItem->receivingItems()
+                ->whereKey($request->receiving_items_id)->whereNull('batches_id')
+                ->whereHas('receiving_details', fn ($q) => $q->where('receiving_id', $receiving->id))->exists();
+            if ((int) $sourceOrder->pharmacy_id !== getPurchasingPharmacyId()
+                || (int) $sourceOrder->receiving_id !== (int) $receiving->id
+                || (int) $sourceOrder->status === 3
+                || (string) $orderItem->creditor_code !== (string) $request->creditor_code
+                || $wrongEdit
+                || ($protectedItem && ((float) $request->qty_received + (float) $otherQty > (float) $orderItem->quantity
+                    || ($request->has('pack') && (bool) $request->pack !== (bool) $orderItem->pack)))) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'message' => 'BPBA/PBF tidak sesuai atau jumlah/satuan melampaui pesanan konsolidasi. Muat ulang penerimaan.'], 422);
+            }
             $details = ReceivingDetails::updateOrCreate(
                 [
                     'receiving_id' => $request->receiving_id,

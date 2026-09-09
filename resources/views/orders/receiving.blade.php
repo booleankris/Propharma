@@ -196,7 +196,19 @@
             <div class="flex items-center justify-between bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                 <div>
                     <h1 class="text-2xl font-bold uppercase font-poppins text-gray-800">Penerimaan Barang</h1>
-                    <p class="text-xs text-gray-500 mt-1">Kelola penerimaan obat dari kreditur dan input detail faktur</p>
+                    @if(isset($order_id) && \App\Models\Order::find($order_id)?->is_consolidation)
+                        <div class="mt-3 flex flex-wrap items-center justify-between gap-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                            <div class="text-xs text-amber-800">
+                                <strong>BPBA Konsolidasi:</strong> Khusus penerimaan faktur fisik gabungan — bukan pesanan ulang ke PBF. Sisa pesanan tercatat di BPBA asal.
+                            </div>
+                            @hasanyrole('HO|administrator|manager|Manager|operator|Operator|Gudang PMI')
+                                <button type="button" onclick="cancelConsolidation({{ $order_id }})" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg shadow-xs transition-all">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                    Batalkan Konsolidasi
+                                </button>
+                            @endhasanyrole
+                        </div>
+                    @endif
                 </div>
                 <span
                     class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">
@@ -2068,6 +2080,50 @@
             const printTarget = (typeof ordersid !== 'undefined' && ordersid) ? ordersid : receiving_id;
             const url = `/receiving/print/${printTarget}`;
             window.open(url, '_blank');
+        }
+
+        async function cancelConsolidation(orderId) {
+            const result = await Swal.fire({
+                title: 'Batalkan Konsolidasi BPBA?',
+                text: 'Kuantitas pesanan akan dikembalikan ke BPBA asal dan BPBA konsolidasi ini akan dihapus.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#dc2626',
+                cancelButtonColor: '#6b7280',
+                confirmButtonText: 'Ya, Batalkan',
+                cancelButtonText: 'Kembali'
+            });
+
+            if (!result.isConfirmed) return;
+
+            try {
+                const response = await fetch('{{ route('orders-tracking.cancel-consolidation') }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    },
+                    body: JSON.stringify({ order_id: orderId })
+                });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.message || (data.errors ? Object.values(data.errors).flat().join(' ') : 'Gagal membatalkan konsolidasi.'));
+
+                await Swal.fire({
+                    icon: 'success',
+                    title: 'Berhasil',
+                    text: data.message,
+                    confirmButtonColor: '#2563eb'
+                });
+                window.location.href = data.redirect || '{{ route('orders-tracking.index') }}';
+            } catch (error) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Gagal',
+                    text: error.message,
+                    confirmButtonColor: '#2563eb'
+                });
+            }
         }
     </script>
 

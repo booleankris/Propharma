@@ -434,6 +434,10 @@ Route::middleware(['auth', 'role:Kasir|Gudang PMI|HO|administrator|manager|Onlin
     Route::delete('/receiving-items/{id}', [ReceivingController::class, 'deleteReceivingItem'])->name('receiving.deleteItem');
     Route::delete('/receiving-draft-items/{id}', [ReceivingController::class, 'deleteReceivingDraftItem'])->name('receiving.deleteDraftItem');
     Route::get('/orders/{orderId}/revision', [ReceivingController::class, 'invoiceRevision'])->name('receiving.revision');
+    Route::post('/orders/{orderId}/revision/add-item', [ReceivingController::class, 'addRevisionItem'])->name('receiving.revision.addItem');
+    Route::post('/orders/{orderId}/revision/merge-details', [ReceivingController::class, 'mergeRevisionDetails'])->name('receiving.revision.mergeDetails');
+    Route::post('/orders/{orderId}/revision/move-item', [ReceivingController::class, 'moveRevisionItem'])->name('receiving.revision.moveItem');
+    Route::delete('/orders/{orderId}/revision/details/{detailsId}', [ReceivingController::class, 'deleteEmptyRevisionDetails'])->name('receiving.revision.deleteDetails');
     Route::get('/orders/{orderId}/comparison', [ReceivingController::class, 'orderComparison'])->name('orders.comparison');
 
     // Save Order
@@ -468,6 +472,12 @@ Route::middleware(['auth', 'role:Kasir|Gudang PMI|HO|administrator|manager|Onlin
         ->name('orderfinal.printorders');
     Route::get('/orders-tracking', [OrdersTrackingController::class, 'index'])->name('orders-tracking.index');
     Route::get('/orders-tracking/data', [OrdersTrackingController::class, 'data'])->name('orders-tracking.data');
+    Route::post('/orders-tracking/consolidate', [OrdersTrackingController::class, 'consolidate'])
+        ->middleware('role:HO|administrator|manager|Manager|operator|Operator|Gudang PMI')
+        ->name('orders-tracking.consolidate');
+    Route::post('/orders-tracking/cancel-consolidation', [OrdersTrackingController::class, 'cancelConsolidation'])
+        ->middleware('role:HO|administrator|manager|Manager|operator|Operator|Gudang PMI')
+        ->name('orders-tracking.cancel-consolidation');
     // ================================ Statistic ================================
 
     // INVOICES (Tagihan)

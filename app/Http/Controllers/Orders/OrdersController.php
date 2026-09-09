@@ -329,8 +329,10 @@ class OrdersController extends Controller
             'creditor_code' => 'nullable',
             'pack' => 'required',
             'price' => 'required',
-            'quantity' => 'required',
+            'quantity' => 'required|numeric|gt:0',
             'total' => 'required',
+        ], [
+            'quantity.gt' => 'QTY BPBA harus lebih besar dari 0.',
         ]);
 
         $itemCode = $this->getOrdersCode($validated['medicine_id'], $validated['order_id'], $validated['creditor_code'] ?? null);
@@ -374,13 +376,18 @@ class OrdersController extends Controller
     {
         $request->validate([
             'medicine_id' => 'required|exists:medicines,id',
-            'pack' => 'required|',
-            'price' => 'required|',
-            'quantity' => 'required|',
-            'total' => 'required|',
+            'pack' => 'required',
+            'price' => 'required',
+            'quantity' => 'required|numeric|gt:0',
+            'total' => 'required',
+        ], [
+            'quantity.gt' => 'QTY BPBA harus lebih besar dari 0.',
         ]);
 
         $item = OrderItems::findOrFail($request->order_id);
+        if ($item->original_quantity !== null || $item->incomingMovement()->exists()) {
+            return response()->json(['success' => false, 'message' => 'Item konsolidasi tidak dapat diubah melalui editor pesanan.'], 422);
+        }
 
         $user = auth()->user();
         $hasCreditor = !empty($request->creditor_code);
@@ -481,6 +488,9 @@ class OrdersController extends Controller
         ]);
 
         $item = OrderItems::findOrFail($request->id);
+        if ($item->original_quantity !== null || $item->incomingMovement()->exists()) {
+            return response()->json(['success' => false, 'message' => 'Item memiliki riwayat konsolidasi dan tidak dapat dihapus.'], 422);
+        }
         $item->delete();
 
         $price_total = OrderItems::where('order_id', $item->order_id)->where('status', '0')->sum('total') ?? '';

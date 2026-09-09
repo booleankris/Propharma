@@ -11,6 +11,16 @@ class OrderItems extends Model
 
     protected $table = 'order_items';
 
+    public function outgoingMovements()
+    {
+        return $this->hasMany(OrderItemMovement::class, 'source_item_id');
+    }
+
+    public function incomingMovement()
+    {
+        return $this->hasOne(OrderItemMovement::class, 'target_item_id');
+    }
+
     protected $fillable = [
         'order_items_code',
         'order_id',
@@ -23,7 +33,9 @@ class OrderItems extends Model
         'pack',
         'price',
         'quantity',
+        'original_quantity',
         'total',
+        'original_total',
         'note',
         'status'
     ];

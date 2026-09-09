@@ -17,6 +17,9 @@ class Order extends Model
         'date',
         'status',
         'receiving_id',
+        'is_consolidation',
+        'consolidation_key',
+        'note',
     ];
     public function order_items()
     {
