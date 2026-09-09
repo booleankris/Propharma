@@ -379,7 +379,7 @@
                             </tr>
                         @endforeach
 
-                        @for ($i = count($creditorItems); $i < 12; $i++)
+                        @for ($i = count($creditorItems); $i < 14; $i++)
                             <tr>
                                 <td>&nbsp;</td>
                                 <td></td>
@@ -555,7 +555,7 @@
                                 </tr>
                             @endforeach
 
-                            @for ($i = count($chunkItems); $i < 12; $i++)
+                            @for ($i = count($chunkItems); $i < 14; $i++)
                                 <tr>
                                     <td>&nbsp;</td>
                                     <td></td>
@@ -708,7 +708,7 @@
                             </tr>
                         @endforeach
 
-                        @for ($i = count($creditorItems); $i < 12; $i++)
+                        @for ($i = count($creditorItems); $i < 14; $i++)
                             <tr>
                                 <td>&nbsp;</td>
                                 <td></td>
@@ -864,7 +864,7 @@
                                 </tr>
                             @endforeach
 
-                            @for ($i = count($chunkItems); $i < 12; $i++)
+                            @for ($i = count($chunkItems); $i < 14; $i++)
                                 <tr>
                                     <td>&nbsp;</td>
                                     <td></td>
