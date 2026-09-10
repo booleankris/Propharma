@@ -194,7 +194,7 @@
             const dropdown = document.getElementById('master_search_dropdown');
             const keyword = (value || '').trim();
 
-            if (keyword.length < 1) {
+            if (keyword.length < 2) {
                 dropdown.classList.add('hidden');
                 return;
             }
@@ -209,7 +209,7 @@
             const dropdown = document.getElementById('master_search_dropdown');
             try {
                 const res = await axios.get(SEARCH_MEDICINE_URL, {
-                    params: { search: keyword, page: 1 }
+                    params: { search: keyword }
                 });
                 const items = res.data.data || [];
 

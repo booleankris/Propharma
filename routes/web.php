@@ -434,6 +434,7 @@ Route::middleware(['auth', 'role:Kasir|Gudang PMI|HO|administrator|manager|Onlin
     Route::delete('/receiving-items/{id}', [ReceivingController::class, 'deleteReceivingItem'])->name('receiving.deleteItem');
     Route::delete('/receiving-draft-items/{id}', [ReceivingController::class, 'deleteReceivingDraftItem'])->name('receiving.deleteDraftItem');
     Route::get('/orders/{orderId}/revision', [ReceivingController::class, 'invoiceRevision'])->name('receiving.revision');
+    Route::get('/orders/revision/search-master-medicine', [ReceivingController::class, 'searchMasterMedicine'])->name('receiving.revision.searchMasterMedicine');
     Route::post('/orders/{orderId}/revision/add-item', [ReceivingController::class, 'addRevisionItem'])->name('receiving.revision.addItem');
     Route::post('/orders/{orderId}/revision/merge-details', [ReceivingController::class, 'mergeRevisionDetails'])->name('receiving.revision.mergeDetails');
     Route::post('/orders/{orderId}/revision/move-item', [ReceivingController::class, 'moveRevisionItem'])->name('receiving.revision.moveItem');

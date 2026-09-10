@@ -591,7 +591,7 @@
 
         $revisionPageData = [
             'orderId' => $order->id,
-            'searchMedicineUrl' => route('sales.searchmedicine'),
+            'searchMedicineUrl' => route('receiving.revision.searchMasterMedicine'),
             'details' => $detailsData,
             'orderItems' => collect($orderItemsData)->values(),
             'items' => $allItemsData->values(),
