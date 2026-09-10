@@ -473,13 +473,13 @@ Route::middleware(['auth', 'role:Kasir|Gudang PMI|HO|administrator|manager|Onlin
     Route::get('/orders-tracking', [OrdersTrackingController::class, 'index'])->name('orders-tracking.index');
     Route::get('/orders-tracking/data', [OrdersTrackingController::class, 'data'])->name('orders-tracking.data');
     Route::get('/orders-tracking/target-orders', [OrdersTrackingController::class, 'targetOrders'])
-        ->middleware('role:HO|administrator|manager|Manager|operator|Operator|Gudang PMI')
+        ->middleware('role:HO|administrator|manager|Manager|operator|Operator|Gudang PMI|Kasir|kasir')
         ->name('orders-tracking.target-orders');
     Route::post('/orders-tracking/consolidate', [OrdersTrackingController::class, 'consolidate'])
-        ->middleware('role:HO|administrator|manager|Manager|operator|Operator|Gudang PMI')
+        ->middleware('role:HO|administrator|manager|Manager|operator|Operator|Gudang PMI|Kasir|kasir')
         ->name('orders-tracking.consolidate');
     Route::post('/orders-tracking/cancel-consolidation', [OrdersTrackingController::class, 'cancelConsolidation'])
-        ->middleware('role:HO|administrator|manager|Manager|operator|Operator|Gudang PMI')
+        ->middleware('role:HO|administrator|manager|Manager|operator|Operator|Gudang PMI|Kasir|kasir')
         ->name('orders-tracking.cancel-consolidation');
     // ================================ Statistic ================================
 

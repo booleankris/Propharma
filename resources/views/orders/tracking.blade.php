@@ -364,7 +364,7 @@
                 </div>
             </div>
 
-            @hasanyrole('HO|administrator|manager|Manager|operator|Operator|Gudang PMI')
+            @hasanyrole('HO|administrator|manager|Manager|operator|Operator|Gudang PMI|Kasir|kasir')
                 <div class="px-6 py-4 bg-slate-50/70 border-b border-slate-200" id="consolidationPanel">
                     <div class="flex items-start gap-3" id="consolidationHint">
                         <div
@@ -467,7 +467,7 @@
             auth()->check() &&
             auth()
                 ->user()
-                ->hasAnyRole(['HO', 'administrator', 'manager', 'Manager', 'operator', 'Operator', 'Gudang PMI']);
+                ->hasAnyRole(['HO', 'administrator', 'manager', 'Manager', 'operator', 'Operator', 'Gudang PMI', 'Kasir', 'kasir']);
     @endphp
     <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
