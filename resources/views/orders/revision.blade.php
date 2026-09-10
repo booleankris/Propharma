@@ -546,39 +546,41 @@
         const ORDER_ID = {{ $order->id }};
         const ALL_DETAILS = @json($allReceivingDetails->map(fn($d) => ['id' => $d->id, 'code' => $d->receiving_details_code, 'invoice' => $d->invoice_number]));
         const BPBA_ITEMS = @json($orderItemsData->values());
-        const ALL_ITEMS = [
-            @foreach ($allReceivingDetails as $rd)
-                @foreach ($rd->receiving_items as $ri)
-                    {
-                        id: {{ $ri->id }},
-                        details_id: {{ $rd->id }},
-                        order_items_id: {{ $ri->order_items_id }},
-                        details_code: '{{ $rd->receiving_details_code }}',
-                        details_invoice: '{{ $rd->invoice_number ?? '' }}',
-                        medicine_name: '{{ addslashes($ri->order_items->medicines->name ?? '-') }}',
-                        batch: '{{ addslashes($ri->batch ?? '-') }}',
-                        expired_date: '{{ $ri->expired_date ?? '-' }}',
-                        qty: {{ (float) $ri->qty_received }},
-                        total: {{ (float) $ri->total }}
-                    },
-                @endforeach
-            @endforeach
-            @if (isset($orphanedItems) && $orphanedItems->isNotEmpty())
-                @foreach ($orphanedItems as $ri)
-                    {
-                        id: {{ $ri->id }},
-                        details_id: null,
-                        details_code: 'Tanpa NT',
-                        details_invoice: '',
-                        medicine_name: '{{ addslashes($ri->order_items->medicines->name ?? '-') }}',
-                        batch: '{{ addslashes($ri->batch ?? '-') }}',
-                        expired_date: '{{ $ri->expired_date ?? '-' }}',
-                        qty: {{ (float) $ri->qty_received }},
-                        total: {{ (float) $ri->total }}
-                    },
-                @endforeach
-            @endif
-        ];
+        @php
+            $allItemsData = collect();
+            foreach ($allReceivingDetails as $rd) {
+                foreach ($rd->receiving_items as $ri) {
+                    $allItemsData->push([
+                        'id' => $ri->id,
+                        'details_id' => $rd->id,
+                        'order_items_id' => $ri->order_items_id,
+                        'details_code' => $rd->receiving_details_code,
+                        'details_invoice' => $rd->invoice_number ?? '',
+                        'medicine_name' => $ri->order_items->medicines->name ?? ($ri->medicines->name ?? '-'),
+                        'batch' => $ri->batch ?? '-',
+                        'expired_date' => $ri->expired_date ?? '-',
+                        'qty' => (float) $ri->qty_received,
+                        'total' => (float) $ri->total,
+                    ]);
+                }
+            }
+            if (isset($orphanedItems) && $orphanedItems->isNotEmpty()) {
+                foreach ($orphanedItems as $ri) {
+                    $allItemsData->push([
+                        'id' => $ri->id,
+                        'details_id' => null,
+                        'details_code' => 'Tanpa NT',
+                        'details_invoice' => '',
+                        'medicine_name' => $ri->order_items->medicines->name ?? ($ri->medicines->name ?? '-'),
+                        'batch' => $ri->batch ?? '-',
+                        'expired_date' => $ri->expired_date ?? '-',
+                        'qty' => (float) $ri->qty_received,
+                        'total' => (float) $ri->total,
+                    ]);
+                }
+            }
+        @endphp
+        const ALL_ITEMS = @json($allItemsData);
         let currentAddMode = 'bpba';
 
         function parseRupiah(value) {
@@ -602,51 +604,52 @@
 
         // ================== RECALC TOTALS ==================
         function recalcEditTotal() {
-            const qty = parseFloat(document.getElementById('edit_qty_received').value) || 0;
-            const price = parseRupiah(document.getElementById('edit_raw_price').value);
-            const disc = parseRupiah(document.getElementById('edit_discount').value);
-            const extraDisc = parseRupiah(document.getElementById('edit_extra_discount').value);
+            const qtyEl = document.getElementById('edit_qty_received');
+            const priceEl = document.getElementById('edit_raw_price');
+            const discEl = document.getElementById('edit_discount');
+            const extraDiscEl = document.getElementById('edit_extra_discount');
+            const totalEl = document.getElementById('edit_total');
+
+            const qty = qtyEl ? (parseFloat(qtyEl.value) || 0) : 0;
+            const price = priceEl ? parseRupiah(priceEl.value) : 0;
+            const disc = discEl ? parseRupiah(discEl.value) : 0;
+            const extraDisc = extraDiscEl ? parseRupiah(extraDiscEl.value) : 0;
             const gross = qty * price;
             const net = Math.max(0, gross - disc - extraDisc);
-            document.getElementById('edit_total').value = formatRupiah(net);
+            if (totalEl) totalEl.value = formatRupiah(net);
         }
-
-        document.getElementById('edit_qty_received').addEventListener('input', recalcEditTotal);
-        document.getElementById('edit_raw_price').addEventListener('input', function(e) {
-            formatInputRupiah(e);
-            recalcEditTotal();
-        });
-        document.getElementById('edit_discount').addEventListener('input', function(e) {
-            formatInputRupiah(e);
-            recalcEditTotal();
-        });
-        document.getElementById('edit_extra_discount').addEventListener('input', function(e) {
-            formatInputRupiah(e);
-            recalcEditTotal();
-        });
 
         function recalcAddTotal() {
-            const qty = parseFloat(document.getElementById('add_qty_received').value) || 0;
-            const price = parseRupiah(document.getElementById('add_raw_price').value);
-            const disc = parseRupiah(document.getElementById('add_discount').value);
-            const extraDisc = parseRupiah(document.getElementById('add_extra_discount').value);
+            const qtyEl = document.getElementById('add_qty_received');
+            const priceEl = document.getElementById('add_raw_price');
+            const discEl = document.getElementById('add_discount');
+            const extraDiscEl = document.getElementById('add_extra_discount');
+            const totalEl = document.getElementById('add_total');
+
+            const qty = qtyEl ? (parseFloat(qtyEl.value) || 0) : 0;
+            const price = priceEl ? parseRupiah(priceEl.value) : 0;
+            const disc = discEl ? parseRupiah(discEl.value) : 0;
+            const extraDisc = extraDiscEl ? parseRupiah(extraDiscEl.value) : 0;
             const gross = qty * price;
             const net = Math.max(0, gross - disc - extraDisc);
-            document.getElementById('add_total').value = formatRupiah(net);
+            if (totalEl) totalEl.value = formatRupiah(net);
         }
 
-        document.getElementById('add_qty_received').addEventListener('input', recalcAddTotal);
-        document.getElementById('add_raw_price').addEventListener('input', function(e) {
-            formatInputRupiah(e);
-            recalcAddTotal();
-        });
-        document.getElementById('add_discount').addEventListener('input', function(e) {
-            formatInputRupiah(e);
-            recalcAddTotal();
-        });
-        document.getElementById('add_extra_discount').addEventListener('input', function(e) {
-            formatInputRupiah(e);
-            recalcAddTotal();
+        document.addEventListener('DOMContentLoaded', function() {
+            const bindRecalc = (id, event, fn) => {
+                const el = document.getElementById(id);
+                if (el) el.addEventListener(event, fn);
+            };
+
+            bindRecalc('edit_qty_received', 'input', recalcEditTotal);
+            bindRecalc('edit_raw_price', 'input', e => { formatInputRupiah(e); recalcEditTotal(); });
+            bindRecalc('edit_discount', 'input', e => { formatInputRupiah(e); recalcEditTotal(); });
+            bindRecalc('edit_extra_discount', 'input', e => { formatInputRupiah(e); recalcEditTotal(); });
+
+            bindRecalc('add_qty_received', 'input', recalcAddTotal);
+            bindRecalc('add_raw_price', 'input', e => { formatInputRupiah(e); recalcAddTotal(); });
+            bindRecalc('add_discount', 'input', e => { formatInputRupiah(e); recalcAddTotal(); });
+            bindRecalc('add_extra_discount', 'input', e => { formatInputRupiah(e); recalcAddTotal(); });
         });
 
         // ================== MODAL TAMBAH OBAT ==================
