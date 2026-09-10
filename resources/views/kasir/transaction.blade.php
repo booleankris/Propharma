@@ -1157,6 +1157,18 @@
                                 <span class="payment-label text-[12px] font-medium">Transfer</span>
                             </div>
                         </label>
+                        <label class="payment-option flex-1 cursor-pointer">
+                            <input type="radio" name="payment_type" onclick="getPaymentType()" value="BELUM BAYAR"
+                                class="sr-only">
+                            <div class="payment-card unpaid-card flex flex-col items-center gap-2 py-3 px-2 rounded-xl border text-center">
+                                <div class="payment-icon w-9 h-9 rounded-lg flex items-center justify-center">
+                                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                                        <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" />
+                                    </svg>
+                                </div>
+                                <span class="payment-label text-[12px] font-medium">Belum Bayar</span>
+                            </div>
+                        </label>
                     </div>
 
                     {{-- Bank / Channel Selector (QRIS, Debit, Transfer) --}}
@@ -2707,7 +2719,7 @@
         }
 
         function autoFillCashlessAmount() {
-            if (paymentType !== 'CASH') {
+            if (['TRANSFER', 'DEBIT', 'QRIS'].includes(paymentType)) {
                 const total = (typeof totaltransaction !== 'undefined' ? totaltransaction : 0) - (
                     typeof subtotal_discount !== 'undefined' ? subtotal_discount : 0);
                 if (total > 0 && typeof pay === 'function') {
@@ -2759,7 +2771,20 @@
                 updateBankChipsVisual('');
             }
 
+            pay(document.getElementById('pay').value || '0');
             console.log('Payment type:', paymentType);
+
+            // Auto-focus and select Bayar input when Belum Bayar is chosen so cashier can immediately type nominal
+            if (paymentType === 'BELUM BAYAR') {
+                setTimeout(() => {
+                    const payEl = document.getElementById('pay');
+                    if (payEl) {
+                        payEl.focus({ preventScroll: true });
+                        if (typeof payEl.select === 'function') payEl.select();
+                    }
+                }, 50);
+            }
+
             return paymentType;
         }
 
@@ -2866,13 +2891,14 @@
                 const activeId = document.activeElement?.id;
                 if (activeId !== 'patientSearch' && activeId !== 'doctorSearch' && activeId !== 'pay' &&
                     activeId !== 'discounsubtotal') {
-                    if (['1', '2', '3', '4'].includes(e.key)) {
+                    if (['1', '2', '3', '4', '5'].includes(e.key)) {
                         e.preventDefault();
                         const map = {
                             '1': 'CASH',
                             '2': 'QRIS',
                             '3': 'DEBIT',
-                            '4': 'TRANSFER'
+                            '4': 'TRANSFER',
+                            '5': 'BELUM BAYAR'
                         };
                         const val = map[e.key];
                         const targetRadio = paymentRadios.find(r => r.value === val);
@@ -2880,9 +2906,18 @@
                             targetRadio.checked = true;
                             paymentType = val;
                             getPaymentType();
-                            targetRadio.focus({
-                                preventScroll: true
-                            });
+                            if (val === 'BELUM BAYAR') {
+                                setTimeout(() => {
+                                    if (nextInput) {
+                                        nextInput.focus({ preventScroll: true });
+                                        if (typeof nextInput.select === 'function') nextInput.select();
+                                    }
+                                }, 50);
+                            } else {
+                                targetRadio.focus({
+                                    preventScroll: true
+                                });
+                            }
                         }
                     }
                 }
@@ -3911,7 +3946,7 @@
             return;
         }
 
-        if (paymentType !== 'CASH' && transaction_type !== 'KREDIT') {
+        if (['TRANSFER', 'DEBIT', 'QRIS'].includes(paymentType) && transaction_type !== 'KREDIT') {
             const bankVal = bank_name_input ? bank_name_input.value : '';
             if (!bankVal) {
                 iziToast.warning({
@@ -4163,7 +4198,11 @@
         let price = totaltransaction - subtotal_discount;
         value = "Rp. " + bayar.toLocaleString("id-ID");
         payInput.value = value;
-        if (bayar < price) {
+        if (paymentType === 'BELUM BAYAR') {
+            final_price = Math.max(0, bayar - price);
+            document.getElementById('trchange').value = formatRupiah(final_price);
+            activeButton();
+        } else if (bayar < price) {
             document.getElementById('trchange').value = "Pembayaran Kurang";
             resetButton();
             final_price = "";
@@ -5290,7 +5329,7 @@
             let price = totaltransaction - subtotal_discount;
             let raw = payInput.value.replace(/\D/g, "");
             let bayar = parseInt(raw) || 0;
-            if (price > bayar) {
+            if (paymentType !== 'BELUM BAYAR' && price > bayar) {
                 alert("Pembayaran Kurang");
             } else {
                 checkoutItem();
@@ -5298,6 +5337,12 @@
         } else if (e.key === 'Tab') {
             e.preventDefault();
             discounsubtotal.focus();
+        }
+    });
+
+    payInput.addEventListener('focus', function() {
+        if (typeof this.select === 'function') {
+            this.select();
         }
     });
 

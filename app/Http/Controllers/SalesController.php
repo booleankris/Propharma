@@ -806,6 +806,9 @@ class SalesController extends Controller
                 ]);
             }
 
+            $paymentMethod = strtoupper(trim($validated['paymentType'] ?? 'CASH'));
+            $isUnpaid = $paymentMethod === 'BELUM BAYAR';
+
             $transaction->update([
                 'status' => 1,
                 'created_at' => Carbon::now(),
@@ -817,8 +820,8 @@ class SalesController extends Controller
                 'patient_id' => $validated['patient_id'] ?? null,
                 'doctor_id' => $validated['doctor_id'] ?? null,
                 'debtor_id' => $validated['debtor_id'] ?? null,
-                'payment_method' => $validated['paymentType'] ?? 'CASH',
-                'transfer_bank_name' => $validated['bank_name'] ?? null,
+                'payment_method' => $paymentMethod,
+                'transfer_bank_name' => $isUnpaid ? null : ($validated['bank_name'] ?? null),
                 'user_id' => $validated['user_id'] ?? null,
                 'shift_logs_id' => $validated['shift_logs_id'] ?? null,
             ]);

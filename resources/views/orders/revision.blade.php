@@ -7,29 +7,33 @@
         <div class="mx-auto space-y-6">
 
             <!-- Header Card -->
-            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+            <div
+                class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                 <div>
                     <div class="flex items-center gap-2.5">
                         <h1 class="text-2xl font-bold uppercase font-poppins text-gray-800">Revisi Faktur</h1>
-                        @if($order->is_consolidation)
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                        @if ($order->is_consolidation)
+                            <span
+                                class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
                                 BPBA Konsolidasi
                             </span>
                         @endif
                     </div>
                     <p class="text-xs text-gray-500 mt-1">
                         Pesanan: <span class="font-semibold text-gray-700">{{ $order->code }}</span>
-                        @if($order->order_items->first() && $order->order_items->first()->creditors)
-                            &bull; PBF: <span class="font-semibold text-gray-700">{{ $order->order_items->first()->creditors->name }}</span>
+                        @if ($order->order_items->first() && $order->order_items->first()->creditors)
+                            &bull; PBF: <span
+                                class="font-semibold text-gray-700">{{ $order->order_items->first()->creditors->name }}</span>
                         @endif
                     </p>
                 </div>
                 <div class="flex items-center gap-2">
-                    @if($allReceivingDetails->count() > 1 || (isset($orphanedItems) && $orphanedItems->isNotEmpty()))
+                    @if ($allReceivingDetails->count() > 1 || (isset($orphanedItems) && $orphanedItems->isNotEmpty()))
                         <button type="button" onclick="openUnifiedMergeModal()"
                             class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
                             </svg>
                             <span>Gabung / Pindah Item</span>
                         </button>
@@ -46,13 +50,15 @@
                 <div class="flex items-center justify-between">
                     <div>
                         <h2 class="text-sm font-bold text-gray-800">Daftar Penerimaan & Rincian Faktur</h2>
-                        <p class="text-xs text-gray-500">Kelola item obat, tambahkan obat ke nomor terima tertentu, atau gabungkan nomor terima yang terpisah.</p>
+                        <p class="text-xs text-gray-500">Kelola item obat, tambahkan obat ke nomor terima tertentu, atau
+                            gabungkan nomor terima yang terpisah.</p>
                     </div>
                 </div>
 
                 <div class="overflow-x-auto rounded-xl border border-gray-200">
                     <table id="revisiTable" class="w-full text-left text-xs text-gray-700">
-                        <thead class="bg-gray-50 text-[11px] uppercase font-semibold text-gray-600 border-b border-gray-200">
+                        <thead
+                            class="bg-gray-50 text-[11px] uppercase font-semibold text-gray-600 border-b border-gray-200">
                             <tr>
                                 <th class="px-4 py-3">Nama Obat</th>
                                 <th class="px-3 py-3 text-center">Batch</th>
@@ -77,12 +83,13 @@
                                             <span class="text-xs font-bold text-blue-900 font-mono tracking-wide">
                                                 Nomor Terima: {{ $rd->receiving_details_code }}
                                             </span>
-                                            @if($rd->invoice_number)
-                                                <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-blue-100 text-blue-800">
+                                            @if ($rd->invoice_number)
+                                                <span
+                                                    class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-blue-100 text-blue-800">
                                                     No Faktur: {{ $rd->invoice_number }}
                                                 </span>
                                             @endif
-                                            @if($rd->invoice_date)
+                                            @if ($rd->invoice_date)
                                                 <span class="text-[11px] text-gray-500">
                                                     (Tgl: {{ $rd->invoice_date }})
                                                 </span>
@@ -98,31 +105,39 @@
                                             <button type="button"
                                                 onclick="openAddModal({{ $rd->id }}, '{{ $rd->receiving_details_code }}')"
                                                 class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-semibold rounded-lg shadow-xs transition-all flex items-center gap-1">
-                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor"
+                                                    viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                        d="M12 4v16m8-8H4" />
                                                 </svg>
                                                 Tambah Obat
                                             </button>
 
                                             <!-- Gabungkan ke... (if multiple receiving details exist) -->
-                                            @if($allReceivingDetails->count() > 1)
+                                            @if ($allReceivingDetails->count() > 1)
                                                 <button type="button"
                                                     onclick="openUnifiedMergeModal(null, {{ $rd->id }})"
                                                     class="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-semibold rounded-lg shadow-xs transition-all flex items-center gap-1">
-                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor"
+                                                        viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                                            stroke-width="2"
+                                                            d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
                                                     </svg>
                                                     Gabungkan
                                                 </button>
                                             @endif
 
                                             <!-- Hapus Nomor Terima Kosong (if 0 items) -->
-                                            @if($itemsCount === 0)
+                                            @if ($itemsCount === 0)
                                                 <button type="button"
                                                     onclick="deleteEmptyDetails({{ $rd->id }}, '{{ $rd->receiving_details_code }}')"
                                                     class="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white text-[11px] font-semibold rounded-lg shadow-xs transition-all flex items-center gap-1">
-                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor"
+                                                        viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                                            stroke-width="2"
+                                                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                                     </svg>
                                                     Hapus NT Kosong
                                                 </button>
@@ -131,10 +146,13 @@
                                     </td>
                                 </tr>
 
-                                @if($itemsCount === 0)
+                                @if ($itemsCount === 0)
                                     <tr class="bg-gray-50/60">
                                         <td colspan="9" class="px-4 py-5 text-center text-xs text-gray-500 italic">
-                                            Belum ada obat di Nomor Terima ini. Klik tombol <button type="button" onclick="openAddModal({{ $rd->id }}, '{{ $rd->receiving_details_code }}')" class="font-semibold text-emerald-600 hover:underline">+ Tambah Obat</button> untuk memasukkan item.
+                                            Belum ada obat di Nomor Terima ini. Klik tombol <button type="button"
+                                                onclick="openAddModal({{ $rd->id }}, '{{ $rd->receiving_details_code }}')"
+                                                class="font-semibold text-emerald-600 hover:underline">+ Tambah
+                                                Obat</button> untuk memasukkan item.
                                         </td>
                                     </tr>
                                 @else
@@ -147,16 +165,21 @@
                                             <td class="px-3 py-3 text-center font-mono">{{ $ri->batch ?? '-' }}</td>
                                             <td class="px-3 py-3 text-center">{{ $ri->expired_date ?? '-' }}</td>
                                             <td class="px-3 py-3 text-center font-semibold">{{ $ri->qty_received }}</td>
-                                            <td class="px-4 py-3 text-right">Rp {{ number_format($ri->raw_price, 0, ',', '.') }}</td>
-                                            <td class="px-3 py-3 text-center">Rp {{ number_format($ri->discount, 0, ',', '.') }}</td>
-                                            <td class="px-3 py-3 text-center">Rp {{ number_format($ri->extra_discount, 0, ',', '.') }}</td>
-                                            <td class="px-4 py-3 text-right font-semibold text-gray-900">Rp {{ number_format($ri->total, 0, ',', '.') }}</td>
+                                            <td class="px-4 py-3 text-right">Rp
+                                                {{ number_format($ri->raw_price, 0, ',', '.') }}</td>
+                                            <td class="px-3 py-3 text-center">Rp
+                                                {{ number_format($ri->discount, 0, ',', '.') }}</td>
+                                            <td class="px-3 py-3 text-center">Rp
+                                                {{ number_format($ri->extra_discount, 0, ',', '.') }}</td>
+                                            <td class="px-4 py-3 text-right font-semibold text-gray-900">Rp
+                                                {{ number_format($ri->total, 0, ',', '.') }}</td>
                                             <td class="px-3 py-3 text-center whitespace-nowrap">
                                                 <button onclick="editRow(this)"
                                                     class="text-blue-600 hover:text-blue-800 font-semibold text-xs">Edit</button>
 
-                                                @if($allReceivingDetails->count() > 1)
-                                                    <button onclick="openMoveItemModal({{ $ri->id }}, '{{ addslashes($ri->medicine_name) }}', {{ $rd->id }})"
+                                                @if ($allReceivingDetails->count() > 1)
+                                                    <button
+                                                        onclick="openMoveItemModal({{ $ri->id }}, '{{ addslashes($ri->medicine_name) }}', {{ $rd->id }})"
                                                         class="text-indigo-600 hover:text-indigo-800 font-semibold text-xs ml-2">Pindah</button>
                                                 @endif
 
@@ -175,13 +198,13 @@
                             @endforelse
 
                             <!-- Orphaned items if any -->
-                            @if(isset($orphanedItems) && $orphanedItems->isNotEmpty())
+                            @if (isset($orphanedItems) && $orphanedItems->isNotEmpty())
                                 <tr class="bg-amber-50 border-t border-b border-amber-200">
                                     <td colspan="9" class="px-4 py-2.5 text-xs font-bold text-amber-800">
                                         Item Tanpa Nomor Terima (Belum Terkait)
                                     </td>
                                 </tr>
-                                @foreach($orphanedItems as $ri)
+                                @foreach ($orphanedItems as $ri)
                                     @php
                                         $ri->medicine_name = $ri->order_items->medicines->name ?? '-';
                                     @endphp
@@ -190,16 +213,22 @@
                                         <td class="px-3 py-3 text-center font-mono">{{ $ri->batch ?? '-' }}</td>
                                         <td class="px-3 py-3 text-center">{{ $ri->expired_date ?? '-' }}</td>
                                         <td class="px-3 py-3 text-center font-semibold">{{ $ri->qty_received }}</td>
-                                        <td class="px-4 py-3 text-right">Rp {{ number_format($ri->raw_price, 0, ',', '.') }}</td>
-                                        <td class="px-3 py-3 text-center">Rp {{ number_format($ri->discount, 0, ',', '.') }}</td>
-                                        <td class="px-3 py-3 text-center">Rp {{ number_format($ri->extra_discount, 0, ',', '.') }}</td>
-                                        <td class="px-4 py-3 text-right font-semibold text-gray-900">Rp {{ number_format($ri->total, 0, ',', '.') }}</td>
+                                        <td class="px-4 py-3 text-right">Rp
+                                            {{ number_format($ri->raw_price, 0, ',', '.') }}</td>
+                                        <td class="px-3 py-3 text-center">Rp
+                                            {{ number_format($ri->discount, 0, ',', '.') }}</td>
+                                        <td class="px-3 py-3 text-center">Rp
+                                            {{ number_format($ri->extra_discount, 0, ',', '.') }}</td>
+                                        <td class="px-4 py-3 text-right font-semibold text-gray-900">Rp
+                                            {{ number_format($ri->total, 0, ',', '.') }}</td>
                                         <td class="px-3 py-3 text-center whitespace-nowrap">
                                             <button onclick="editRow(this)"
                                                 class="text-blue-600 hover:text-blue-800 font-semibold text-xs">Edit</button>
-                                            @if($allReceivingDetails->isNotEmpty())
-                                                <button onclick="openMoveItemModal({{ $ri->id }}, '{{ addslashes($ri->medicine_name) }}', null)"
-                                                    class="text-indigo-600 hover:text-indigo-800 font-semibold text-xs ml-2">Tautkan ke NT</button>
+                                            @if ($allReceivingDetails->isNotEmpty())
+                                                <button
+                                                    onclick="openMoveItemModal({{ $ri->id }}, '{{ addslashes($ri->medicine_name) }}', null)"
+                                                    class="text-indigo-600 hover:text-indigo-800 font-semibold text-xs ml-2">Tautkan
+                                                    ke NT</button>
                                             @endif
                                             <button onclick="deleteRow({{ $ri->id }})"
                                                 class="text-red-600 hover:text-red-800 font-semibold text-xs ml-2">Hapus</button>
@@ -225,9 +254,11 @@
                     <div class="flex items-center justify-between border-b pb-3">
                         <div>
                             <h2 class="text-lg font-bold text-gray-800">Tambah Obat ke Penerimaan</h2>
-                            <p class="text-xs text-gray-500">Target Nomor Terima: <span id="add_target_code" class="font-bold text-blue-600 font-mono">-</span></p>
+                            <p class="text-xs text-gray-500">Target Nomor Terima: <span id="add_target_code"
+                                    class="font-bold text-blue-600 font-mono">-</span></p>
                         </div>
-                        <button type="button" onclick="closeAddModal()" class="text-gray-400 hover:text-gray-600 text-lg font-bold">&times;</button>
+                        <button type="button" onclick="closeAddModal()"
+                            class="text-gray-400 hover:text-gray-600 text-lg font-bold">&times;</button>
                     </div>
 
                     <input type="hidden" id="add_receiving_details_id">
@@ -238,80 +269,88 @@
                             class="flex-1 py-1.5 rounded-lg bg-white shadow-xs text-blue-700 transition-all">
                             Dari Pesanan / BPBA Ini
                         </button>
-                        <button type="button" id="tab_mode_master" onclick="switchAddMode('master')"
-                            class="flex-1 py-1.5 rounded-lg text-gray-600 hover:text-gray-900 transition-all">
-                            Obat Lain / Pengganti (Master)
-                        </button>
                     </div>
 
                     <!-- Medicine Selection: BPBA Mode -->
                     <div id="section_bpba_select" class="space-y-1">
-                        <label class="text-xs font-semibold text-gray-700">Pilih Obat dari BPBA <span class="text-red-500">*</span></label>
-                        <select id="add_order_items_id" onchange="onSelectOrderItem()" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                            <option value="">-- Pilih Obat dari Pesanan --</option>
-                            @foreach ($orderItemsData as $item)
-                                <option value="{{ $item['id'] }}"
-                                    data-price="{{ $item['price'] }}"
-                                    data-disc="{{ $item['discount'] }}"
-                                    data-rem="{{ $item['remaining_qty'] }}"
-                                    data-pack="{{ $item['pack'] ? 1 : 0 }}">
-                                    {{ $item['medicine_name'] }} (Pesan: {{ $item['ordered_qty'] }}, Diterima: {{ $item['received_qty'] }}, Sisa: {{ $item['remaining_qty'] }})
-                                </option>
-                            @endforeach
+                        <label class="text-xs font-semibold text-gray-700">Pilih Obat dari BPBA <span
+                                class="text-red-500">*</span></label>
+                        <select id="add_order_items_id" onchange="onSelectOrderItem()"
+                            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                            <option value="">-- Pilih Obat dari Faktur Ini --</option>
+
                         </select>
                     </div>
 
                     <!-- Medicine Selection: Master Mode -->
                     <div id="section_master_select" class="space-y-1 hidden">
-                        <label class="text-xs font-semibold text-gray-700">Pilih Obat dari Master <span class="text-red-500">*</span></label>
-                        <select id="add_medicine_id" onchange="onSelectMasterMedicine()" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                        <label class="text-xs font-semibold text-gray-700">Pilih Obat dari Master <span
+                                class="text-red-500">*</span></label>
+                        <select id="add_medicine_id" onchange="onSelectMasterMedicine()"
+                            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
                             <option value="">-- Pilih Obat dari Master Obat --</option>
                             @foreach ($allMedicines as $m)
-                                <option value="{{ $m->id }}" data-price="{{ $m->raw_price ?? 0 }}">{{ $m->name }}</option>
+                                <option value="{{ $m->id }}" data-price="{{ $m->raw_price ?? 0 }}">
+                                    {{ $m->name }}</option>
                             @endforeach
                         </select>
                     </div>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
-                            <label class="text-xs font-semibold text-gray-700">No. Batch <span class="text-red-500">*</span></label>
-                            <input id="add_batch" placeholder="Contoh: B12345" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                            <label class="text-xs font-semibold text-gray-700">No. Batch <span
+                                    class="text-red-500">*</span></label>
+                            <input id="add_batch" placeholder="Contoh: B12345"
+                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
                         </div>
                         <div>
-                            <label class="text-xs font-semibold text-gray-700">Exp Date <span class="text-red-500">*</span></label>
-                            <input id="add_expired_date" type="date" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                            <label class="text-xs font-semibold text-gray-700">Exp Date <span
+                                    class="text-red-500">*</span></label>
+                            <input id="add_expired_date" type="date"
+                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
                         </div>
                         <div>
-                            <label class="text-xs font-semibold text-gray-700">QTY Diterima <span class="text-red-500">*</span></label>
-                            <input id="add_qty_received" type="number" min="0.01" step="any" placeholder="0" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                            <label class="text-xs font-semibold text-gray-700">QTY Diterima <span
+                                    class="text-red-500">*</span></label>
+                            <input id="add_qty_received" type="number" min="0.01" step="any" placeholder="0"
+                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
                         </div>
                         <div>
-                            <label class="text-xs font-semibold text-gray-700">HNA / Raw Price <span class="text-red-500">*</span></label>
-                            <input id="add_raw_price" type="text" placeholder="Rp 0" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                            <label class="text-xs font-semibold text-gray-700">HNA / Raw Price <span
+                                    class="text-red-500">*</span></label>
+                            <input id="add_raw_price" type="text" placeholder="Rp 0"
+                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
                         </div>
                         <div>
                             <label class="text-xs font-semibold text-gray-700">Diskon (Rp)</label>
-                            <input id="add_discount" type="text" placeholder="Rp 0" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                            <input id="add_discount" type="text" placeholder="Rp 0"
+                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
                         </div>
                         <div>
                             <label class="text-xs font-semibold text-gray-700">Extra Diskon (Rp)</label>
-                            <input id="add_extra_discount" type="text" placeholder="Rp 0" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                            <input id="add_extra_discount" type="text" placeholder="Rp 0"
+                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
                         </div>
                         <div>
                             <label class="text-xs font-semibold text-gray-700">Status Barang</label>
-                            <input id="add_status" value="1" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                            <input id="add_status" value="1"
+                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
                         </div>
                         <div>
                             <label class="text-xs font-semibold text-gray-700">Total</label>
-                            <input id="add_total" type="text" readonly class="w-full rounded-lg border border-gray-200 bg-gray-100 px-3 py-2 text-xs font-bold text-gray-800">
+                            <input id="add_total" type="text" readonly
+                                class="w-full rounded-lg border border-gray-200 bg-gray-100 px-3 py-2 text-xs font-bold text-gray-800">
                         </div>
                     </div>
 
                     <div class="flex justify-end gap-2 pt-3 border-t">
-                        <button type="button" onclick="closeAddModal()" class="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-xs font-semibold text-gray-700">Batal</button>
-                        <button type="button" onclick="submitAddMedicine()" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5">
+                        <button type="button" onclick="closeAddModal()"
+                            class="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-xs font-semibold text-gray-700">Batal</button>
+                        <button type="button" onclick="submitAddMedicine()"
+                            class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M5 13l4 4L19 7" />
                             </svg>
                             Simpan ke Nomor Terima
                         </button>
@@ -324,7 +363,8 @@
                 <div class="bg-white rounded-2xl p-6 w-full max-w-2xl space-y-4 max-h-[90vh] overflow-y-auto shadow-2xl">
                     <div class="flex items-center justify-between border-b pb-3">
                         <h2 class="text-lg font-bold text-gray-800">Edit Item Penerimaan</h2>
-                        <button type="button" onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-lg font-bold">&times;</button>
+                        <button type="button" onclick="closeModal()"
+                            class="text-gray-400 hover:text-gray-600 text-lg font-bold">&times;</button>
                     </div>
 
                     <input type="hidden" id="edit_id">
@@ -332,54 +372,68 @@
                     <!-- Pindah Nomor Terima Dropdown in Edit -->
                     <div>
                         <label class="text-xs font-semibold text-gray-700">Nomor Terima</label>
-                        <select id="edit_receiving_details_id" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                        <select id="edit_receiving_details_id"
+                            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
                             @foreach ($allReceivingDetails as $rd)
                                 <option value="{{ $rd->id }}">
-                                    {{ $rd->receiving_details_code }} {{ $rd->invoice_number ? "({$rd->invoice_number})" : '' }}
+                                    {{ $rd->receiving_details_code }}
+                                    {{ $rd->invoice_number ? "({$rd->invoice_number})" : '' }}
                                 </option>
                             @endforeach
                         </select>
-                        <p class="text-[11px] text-gray-400 mt-0.5">Ubah pilihan di atas jika ingin memindahkan item ini ke nomor terima lain.</p>
+                        <p class="text-[11px] text-gray-400 mt-0.5">Ubah pilihan di atas jika ingin memindahkan item ini ke
+                            nomor terima lain.</p>
                     </div>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <label class="text-xs font-semibold text-gray-700">Batch</label>
-                            <input id="edit_batch" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                            <input id="edit_batch"
+                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
                         </div>
                         <div>
                             <label class="text-xs font-semibold text-gray-700">Exp Date</label>
-                            <input id="edit_expired_date" type="date" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                            <input id="edit_expired_date" type="date"
+                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
                         </div>
                         <div>
                             <label class="text-xs font-semibold text-gray-700">QTY Diterima</label>
-                            <input id="edit_qty_received" type="number" min="0.01" step="any" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                            <input id="edit_qty_received" type="number" min="0.01" step="any"
+                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
                         </div>
                         <div>
                             <label class="text-xs font-semibold text-gray-700">HNA</label>
-                            <input id="edit_raw_price" type="text" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                            <input id="edit_raw_price" type="text"
+                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
                         </div>
                         <div>
                             <label class="text-xs font-semibold text-gray-700">Diskon (Rp)</label>
-                            <input id="edit_discount" type="text" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                            <input id="edit_discount" type="text"
+                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
                         </div>
                         <div>
                             <label class="text-xs font-semibold text-gray-700">Extra Diskon (Rp)</label>
-                            <input id="edit_extra_discount" type="text" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                            <input id="edit_extra_discount" type="text"
+                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
                         </div>
                         <div>
                             <label class="text-xs font-semibold text-gray-700">Status Barang</label>
-                            <input id="edit_status" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                            <input id="edit_status"
+                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
                         </div>
                         <div>
                             <label class="text-xs font-semibold text-gray-700">Total</label>
-                            <input id="edit_total" type="text" readonly class="w-full rounded-lg border border-gray-200 bg-gray-100 px-3 py-2 text-xs font-bold text-gray-800">
+                            <input id="edit_total" type="text" readonly
+                                class="w-full rounded-lg border border-gray-200 bg-gray-100 px-3 py-2 text-xs font-bold text-gray-800">
                         </div>
                     </div>
 
                     <div class="flex justify-end gap-2 pt-3 border-t">
-                        <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-xs font-semibold text-gray-700">Batal</button>
-                        <button type="button" onclick="submitEdit()" class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs">Simpan Revisi</button>
+                        <button type="button" onclick="closeModal()"
+                            class="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-xs font-semibold text-gray-700">Batal</button>
+                        <button type="button" onclick="submitEdit()"
+                            class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs">Simpan
+                            Revisi</button>
                     </div>
                 </div>
             </div>
@@ -391,15 +445,18 @@
                         <div class="flex items-center gap-2">
                             <div class="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
                                 </svg>
                             </div>
                             <div>
                                 <h2 class="text-base font-bold text-gray-800">Gabung / Pindahkan Item</h2>
-                                <p class="text-xs text-gray-500">Pilih nomor terima tujuan dan tentukan obat-obat yang ingin dipindahkan</p>
+                                <p class="text-xs text-gray-500">Pilih nomor terima tujuan dan tentukan obat-obat yang
+                                    ingin dipindahkan</p>
                             </div>
                         </div>
-                        <button type="button" onclick="closeUnifiedMergeModal()" class="text-gray-400 hover:text-gray-600 text-lg font-bold">&times;</button>
+                        <button type="button" onclick="closeUnifiedMergeModal()"
+                            class="text-gray-400 hover:text-gray-600 text-lg font-bold">&times;</button>
                     </div>
 
                     <div class="space-y-4 overflow-y-auto pr-1 flex-1">
@@ -413,7 +470,8 @@
                                 <!-- Populated dynamically -->
                             </select>
                             <p class="text-[11px] text-gray-500">
-                                Item-item yang Anda centang di bawah ini akan dipindahkan dan digabungkan ke nomor terima ini.
+                                Item-item yang Anda centang di bawah ini akan dipindahkan dan digabungkan ke nomor terima
+                                ini.
                             </p>
                         </div>
 
@@ -443,12 +501,16 @@
                             </div>
                         </div>
 
-                        <div class="p-3 bg-blue-50 rounded-xl border border-blue-200 text-[11px] text-blue-900 leading-relaxed flex items-start gap-2">
-                            <svg class="w-4 h-4 text-blue-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        <div
+                            class="p-3 bg-blue-50 rounded-xl border border-blue-200 text-[11px] text-blue-900 leading-relaxed flex items-start gap-2">
+                            <svg class="w-4 h-4 text-blue-600 shrink-0 mt-0.5" fill="none" stroke="currentColor"
+                                viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                             <div>
-                                <strong>Pembersihan Otomatis:</strong> Jika semua item dalam nomor terima asal habis dipindahkan, nomor terima asal tersebut akan otomatis dihapus/dibersihkan dari sistem.
+                                <strong>Pembersihan Otomatis:</strong> Jika semua item dalam nomor terima asal habis
+                                dipindahkan, nomor terima asal tersebut akan otomatis dihapus/dibersihkan dari sistem.
                             </div>
                         </div>
                     </div>
@@ -464,7 +526,8 @@
                                 class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer">
                                 <span>Pindahkan Item</span>
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M14 5l7 7m0 0l-7 7m7-7H3" />
                                 </svg>
                             </button>
                         </div>
@@ -482,12 +545,14 @@
     <script>
         const ORDER_ID = {{ $order->id }};
         const ALL_DETAILS = @json($allReceivingDetails->map(fn($d) => ['id' => $d->id, 'code' => $d->receiving_details_code, 'invoice' => $d->invoice_number]));
+        const BPBA_ITEMS = @json($orderItemsData->values());
         const ALL_ITEMS = [
-            @foreach($allReceivingDetails as $rd)
-                @foreach($rd->receiving_items as $ri)
+            @foreach ($allReceivingDetails as $rd)
+                @foreach ($rd->receiving_items as $ri)
                     {
                         id: {{ $ri->id }},
                         details_id: {{ $rd->id }},
+                        order_items_id: {{ $ri->order_items_id }},
                         details_code: '{{ $rd->receiving_details_code }}',
                         details_invoice: '{{ $rd->invoice_number ?? '' }}',
                         medicine_name: '{{ addslashes($ri->order_items->medicines->name ?? '-') }}',
@@ -498,8 +563,8 @@
                     },
                 @endforeach
             @endforeach
-            @if(isset($orphanedItems) && $orphanedItems->isNotEmpty())
-                @foreach($orphanedItems as $ri)
+            @if (isset($orphanedItems) && $orphanedItems->isNotEmpty())
+                @foreach ($orphanedItems as $ri)
                     {
                         id: {{ $ri->id }},
                         details_id: null,
@@ -547,9 +612,18 @@
         }
 
         document.getElementById('edit_qty_received').addEventListener('input', recalcEditTotal);
-        document.getElementById('edit_raw_price').addEventListener('input', function(e) { formatInputRupiah(e); recalcEditTotal(); });
-        document.getElementById('edit_discount').addEventListener('input', function(e) { formatInputRupiah(e); recalcEditTotal(); });
-        document.getElementById('edit_extra_discount').addEventListener('input', function(e) { formatInputRupiah(e); recalcEditTotal(); });
+        document.getElementById('edit_raw_price').addEventListener('input', function(e) {
+            formatInputRupiah(e);
+            recalcEditTotal();
+        });
+        document.getElementById('edit_discount').addEventListener('input', function(e) {
+            formatInputRupiah(e);
+            recalcEditTotal();
+        });
+        document.getElementById('edit_extra_discount').addEventListener('input', function(e) {
+            formatInputRupiah(e);
+            recalcEditTotal();
+        });
 
         function recalcAddTotal() {
             const qty = parseFloat(document.getElementById('add_qty_received').value) || 0;
@@ -562,14 +636,50 @@
         }
 
         document.getElementById('add_qty_received').addEventListener('input', recalcAddTotal);
-        document.getElementById('add_raw_price').addEventListener('input', function(e) { formatInputRupiah(e); recalcAddTotal(); });
-        document.getElementById('add_discount').addEventListener('input', function(e) { formatInputRupiah(e); recalcAddTotal(); });
-        document.getElementById('add_extra_discount').addEventListener('input', function(e) { formatInputRupiah(e); recalcAddTotal(); });
+        document.getElementById('add_raw_price').addEventListener('input', function(e) {
+            formatInputRupiah(e);
+            recalcAddTotal();
+        });
+        document.getElementById('add_discount').addEventListener('input', function(e) {
+            formatInputRupiah(e);
+            recalcAddTotal();
+        });
+        document.getElementById('add_extra_discount').addEventListener('input', function(e) {
+            formatInputRupiah(e);
+            recalcAddTotal();
+        });
 
         // ================== MODAL TAMBAH OBAT ==================
+        function populateInvoiceMedicineOptions(detailsId) {
+            const select = document.getElementById('add_order_items_id');
+            const invoiceItemIds = new Set(ALL_ITEMS
+                .filter(item => String(item.details_id) === String(detailsId))
+                .map(item => String(item.order_items_id)));
+            const items = BPBA_ITEMS.filter(item => invoiceItemIds.has(String(item.id)));
+
+            select.replaceChildren(new Option(items.length
+                ? '-- Pilih Obat dari Faktur Ini --'
+                : '-- Tidak ada obat pada faktur ini --', ''));
+            select.disabled = items.length === 0;
+
+            items.forEach(item => {
+                const option = new Option(
+                    `${item.medicine_name} (Pesan: ${item.ordered_qty}, Diterima: ${item.received_qty}, Sisa: ${item.remaining_qty})`,
+                    item.id
+                );
+                option.dataset.price = item.price;
+                option.dataset.disc = item.discount;
+                option.dataset.rem = item.remaining_qty;
+                option.dataset.pack = item.pack ? '1' : '0';
+                select.add(option);
+            });
+        }
+
         function openAddModal(detailsId, detailsCode) {
             document.getElementById('add_receiving_details_id').value = detailsId;
             document.getElementById('add_target_code').innerText = detailsCode;
+
+            populateInvoiceMedicineOptions(detailsId);
 
             // Reset inputs
             switchAddMode('bpba');
@@ -596,17 +706,16 @@
         function switchAddMode(mode) {
             currentAddMode = mode;
             const btnBpba = document.getElementById('tab_mode_bpba');
-            const btnMaster = document.getElementById('tab_mode_master');
             const secBpba = document.getElementById('section_bpba_select');
             const secMaster = document.getElementById('section_master_select');
 
             if (mode === 'bpba') {
-                btnBpba.className = 'flex-1 py-1.5 rounded-lg bg-white shadow-xs text-blue-700 font-semibold transition-all';
-                btnMaster.className = 'flex-1 py-1.5 rounded-lg text-gray-600 hover:text-gray-900 transition-all';
+                btnBpba.className =
+                    'flex-1 py-1.5 rounded-lg bg-white shadow-xs text-blue-700 font-semibold transition-all';
                 secBpba.classList.remove('hidden');
                 secMaster.classList.add('hidden');
             } else {
-                btnMaster.className = 'flex-1 py-1.5 rounded-lg bg-white shadow-xs text-blue-700 font-semibold transition-all';
+
                 btnBpba.className = 'flex-1 py-1.5 rounded-lg text-gray-600 hover:text-gray-900 transition-all';
                 secMaster.classList.remove('hidden');
                 secBpba.classList.add('hidden');
@@ -649,10 +758,22 @@
             const qty = parseFloat(document.getElementById('add_qty_received').value) || 0;
             const rawPrice = parseRupiah(document.getElementById('add_raw_price').value);
 
-            if (!batch) { alert('Harap isi No. Batch.'); return; }
-            if (!expDate) { alert('Harap pilih Exp Date.'); return; }
-            if (qty <= 0) { alert('Kuantitas diterima harus lebih dari 0.'); return; }
-            if (rawPrice <= 0) { alert('HNA / Raw Price harus diisi.'); return; }
+            if (!batch) {
+                alert('Harap isi No. Batch.');
+                return;
+            }
+            if (!expDate) {
+                alert('Harap pilih Exp Date.');
+                return;
+            }
+            if (qty <= 0) {
+                alert('Kuantitas diterima harus lebih dari 0.');
+                return;
+            }
+            if (rawPrice <= 0) {
+                alert('HNA / Raw Price harus diisi.');
+                return;
+            }
 
             const payload = {
                 receiving_details_id: detailsId,
@@ -668,22 +789,35 @@
 
             if (currentAddMode === 'bpba') {
                 const oiId = document.getElementById('add_order_items_id').value;
-                if (!oiId) { alert('Pilih obat dari pesanan terlebih dahulu.'); return; }
+                if (!oiId) {
+                    alert('Pilih obat dari faktur ini terlebih dahulu.');
+                    return;
+                }
                 payload.order_items_id = oiId;
             } else {
                 const medId = document.getElementById('add_medicine_id').value;
-                if (!medId) { alert('Pilih obat dari master terlebih dahulu.'); return; }
+                if (!medId) {
+                    alert('Pilih obat dari master terlebih dahulu.');
+                    return;
+                }
                 payload.medicine_id = medId;
             }
 
             try {
                 const res = await axios.post(`/orders/${ORDER_ID}/revision/add-item`, payload, {
-                    headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content }
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                    }
                 });
 
                 if (res.data.success) {
                     if (typeof Swal !== 'undefined') {
-                        await Swal.fire({ icon: 'success', title: 'Berhasil', text: res.data.message, confirmButtonColor: '#2563eb' });
+                        await Swal.fire({
+                            icon: 'success',
+                            title: 'Berhasil',
+                            text: res.data.message,
+                            confirmButtonColor: '#2563eb'
+                        });
                     } else {
                         alert(res.data.message);
                     }
@@ -692,7 +826,12 @@
             } catch (err) {
                 const msg = err.response?.data?.message || 'Gagal menambahkan obat ke nomor terima.';
                 if (typeof Swal !== 'undefined') {
-                    Swal.fire({ icon: 'error', title: 'Gagal', text: msg, confirmButtonColor: '#2563eb' });
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Gagal',
+                        text: msg,
+                        confirmButtonColor: '#2563eb'
+                    });
                 } else {
                     alert(msg);
                 }
@@ -869,7 +1008,8 @@
                 }
 
                 const row = document.createElement('label');
-                row.className = 'flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50/80 cursor-pointer transition-colors';
+                row.className =
+                    'flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50/80 cursor-pointer transition-colors';
                 row.innerHTML = `
                     <input type="checkbox" name="unified_item_checkbox" value="${item.id}"
                         ${isChecked ? 'checked' : ''}
@@ -898,7 +1038,9 @@
 
         function toggleSelectAllItems(selectAll) {
             const checkboxes = document.querySelectorAll('input[name="unified_item_checkbox"]');
-            checkboxes.forEach(cb => { cb.checked = selectAll; });
+            checkboxes.forEach(cb => {
+                cb.checked = selectAll;
+            });
             updateUnifiedSelectedCount();
         }
 
@@ -928,7 +1070,8 @@
             const targetDetail = ALL_DETAILS.find(d => d.id == targetId);
             const targetName = targetDetail ? `${targetDetail.code}` : 'nomor terima tujuan';
 
-            const confirmMsg = `Pindahkan ${selectedIds.length} item obat ke ${targetName}? Nomor terima asal yang kosong akan otomatis dibersihkan.`;
+            const confirmMsg =
+                `Pindahkan ${selectedIds.length} item obat ke ${targetName}? Nomor terima asal yang kosong akan otomatis dibersihkan.`;
             if (!confirm(confirmMsg)) {
                 return;
             }
@@ -938,7 +1081,9 @@
                     receiving_item_ids: selectedIds,
                     target_details_id: targetId,
                 }, {
-                    headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content }
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                    }
                 });
 
                 if (res.data.success) {
@@ -957,7 +1102,12 @@
             } catch (err) {
                 const msg = err.response?.data?.message || 'Gagal memindahkan item obat.';
                 if (typeof Swal !== 'undefined') {
-                    Swal.fire({ icon: 'error', title: 'Gagal', text: msg, confirmButtonColor: '#2563eb' });
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Gagal',
+                        text: msg,
+                        confirmButtonColor: '#2563eb'
+                    });
                 } else {
                     alert(msg);
                 }
@@ -980,12 +1130,19 @@
 
             try {
                 const res = await axios.delete(`/orders/${ORDER_ID}/revision/details/${detailsId}`, {
-                    headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content }
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                    }
                 });
 
                 if (res.data.success) {
                     if (typeof Swal !== 'undefined') {
-                        await Swal.fire({ icon: 'success', title: 'Berhasil', text: res.data.message, confirmButtonColor: '#2563eb' });
+                        await Swal.fire({
+                            icon: 'success',
+                            title: 'Berhasil',
+                            text: res.data.message,
+                            confirmButtonColor: '#2563eb'
+                        });
                     } else {
                         alert(res.data.message);
                     }
@@ -994,7 +1151,12 @@
             } catch (err) {
                 const msg = err.response?.data?.message || 'Gagal menghapus nomor terima.';
                 if (typeof Swal !== 'undefined') {
-                    Swal.fire({ icon: 'error', title: 'Gagal', text: msg, confirmButtonColor: '#2563eb' });
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Gagal',
+                        text: msg,
+                        confirmButtonColor: '#2563eb'
+                    });
                 } else {
                     alert(msg);
                 }

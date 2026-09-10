@@ -129,7 +129,7 @@ class TransactionBankSelectionTest extends TestCase
 
         $sheetTitles = array_map(fn($s) => $s->title(), $sheets);
 
-        $expectedBanks = ['Mandiri', 'BNI', 'BCA', 'BRI', 'BTN'];
+        $expectedBanks = BankSalesExport::STANDARD_BANKS;
         foreach ($expectedBanks as $bank) {
             $this->assertContains($bank, $sheetTitles);
         }

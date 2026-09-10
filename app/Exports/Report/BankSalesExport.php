@@ -16,7 +16,10 @@ class BankSalesExport implements WithMultipleSheets
     protected $shift;
     protected $shiftType;
 
-    public const STANDARD_BANKS = ['CASH', 'Mandiri', 'BNI', 'BCA', 'BRI', 'BTN', 'QRIS', 'DEBIT'];
+    public const STANDARD_BANKS = ['CASH', 'BELUM BAYAR',
+        'TRANSFER MANDIRI', 'TRANSFER BNI', 'TRANSFER BCA', 'TRANSFER BRI', 'TRANSFER BTN',
+        'DEBIT MANDIRI', 'DEBIT BNI', 'DEBIT BCA', 'DEBIT BRI', 'DEBIT BTN',
+        'QRIS MANDIRI', 'QRIS BNI', 'QRIS BCA', 'QRIS BRI', 'QRIS BTN'];
 
     public function __construct(
         $pharmacyId,
@@ -38,30 +41,7 @@ class BankSalesExport implements WithMultipleSheets
 
     public static function resolveCategory($trx): string
     {
-        $bank = trim($trx->transfer_bank_name ?? '');
-        $method = strtoupper(trim($trx->payment_method ?? ''));
-
-        if ($method === 'CASH') {
-            return 'CASH';
-        }
-
-        if ($method === 'QRIS') {
-            return !empty($bank) && !is_numeric($bank) ? "QRIS {$bank}" : 'QRIS';
-        }
-
-        if ($method === 'DEBIT') {
-            return !empty($bank) && !is_numeric($bank) ? "DEBIT {$bank}" : 'DEBIT';
-        }
-
-        if ($method === 'TRANSFER') {
-            return !empty($bank) && !is_numeric($bank) ? $bank : 'Transfer Lainnya';
-        }
-
-        if (!empty($bank) && !is_numeric($bank)) {
-            return $bank;
-        }
-
-        return 'CASH';
+        return \App\Support\PaymentMethod::label($trx->payment_method ?? null, $trx->transfer_bank_name ?? null);
     }
 
     public function sheets(): array

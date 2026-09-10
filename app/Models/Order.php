@@ -25,6 +25,10 @@ class Order extends Model
     {
         return $this->hasMany(OrderItems::class);
     }
+    public function orderItems()
+    {
+        return $this->order_items();
+    }
     public function receiving()
     {
         return $this->hasMany(Receiving::class);

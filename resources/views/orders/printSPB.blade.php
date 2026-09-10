@@ -68,11 +68,23 @@
             padding: 6px 4px;
         }
 
+        .table-fixed-wrap table.form-table th,
+        .table-fixed-wrap table.form-table td {
+            padding: 3px 3px;
+            font-size: 8.5px;
+            line-height: 1.2;
+        }
+
+        .table-fixed-wrap table.form-table th {
+            font-size: 9.5px;
+            padding: 4px 3px;
+        }
+
         /* Identitas / Form List */
         .id-table td {
-            padding: 2.5px 0;
+            padding: 1.5px 0;
             vertical-align: top;
-            font-size: 9.5px;
+            font-size: 9px;
         }
 
         .id-table td.dotted {
@@ -82,43 +94,71 @@
 
         /* Catatan Kaki */
         .notes {
-            font-size: 9px;
-            margin-top: 6px;
+            font-size: 8.5px;
+            margin-top: 4px;
             padding-top: 2px;
         }
 
         /* Mencegah TTD terpotong ke halaman baru */
         .signature-block {
-            margin-top: 10px;
+            margin-top: 6px;
             page-break-inside: avoid;
-            font-size: 9.5px;
+            font-size: 9px;
         }
 
         .signature-block td {
-            font-size: 9.5px;
-            line-height: 1.3;
+            font-size: 9px;
+            line-height: 1.25;
         }
 
         .section-gap {
-            margin-top: 6px;
-            margin-bottom: 5px;
-            font-size: 10px;
+            margin-top: 3px;
+            margin-bottom: 2px;
+            font-size: 9px;
         }
 
         .title-main {
             text-align: center;
             font-weight: bold;
-            font-size: 16px;
+            font-size: 13.5px;
             text-decoration: underline;
-            margin-top: 6px;
-            margin-bottom: 4px;
+            margin-top: 4px;
+            margin-bottom: 2px;
             letter-spacing: 1px;
         }
 
         .subtitle {
             text-align: center;
-            font-size: 10px;
+            font-size: 9.5px;
             margin-top: 1px;
+        }
+
+        /* Satu chunk non-REGULER adalah satu formulir lengkap. */
+        .non-regular-page {
+            page-break-inside: avoid;
+            break-inside: avoid-page;
+        }
+
+        .table-fixed-wrap {
+            margin-top: 3px;
+            margin-bottom: 3px;
+        }
+
+        .table-fixed-wrap table.form-table {
+            table-layout: fixed;
+            page-break-inside: avoid;
+        }
+
+        .table-fixed-wrap table.form-table tbody td {
+            height: 30px;
+            padding: 2px 3px;
+            vertical-align: middle;
+            overflow-wrap: break-word;
+            word-wrap: break-word;
+        }
+
+        .table-fixed-wrap table.form-table tr {
+            page-break-inside: avoid;
         }
     </style>
 </head>
@@ -154,7 +194,9 @@
                                 @endif
                             </td>
                             <td style="vertical-align:top; padding-left:6px;">
-                                <div style="font-size:14.5px; font-weight:bold; margin-bottom:3px; letter-spacing:0.4px;">{{ strtoupper($pharmacy->name) }}</div>
+                                <div
+                                    style="font-size:14.5px; font-weight:bold; margin-bottom:3px; letter-spacing:0.4px;">
+                                    {{ strtoupper($pharmacy->name) }}</div>
                                 <div style="font-size:9.8px; line-height:1.28;">
                                     <div>{{ $pharmacy->address }}</div>
                                     <div>HP. {{ $pharmacy->phone }}</div>
@@ -176,7 +218,8 @@
                     <table style="width:100%; margin-top:4px; font-size:10.5px;">
                         <tr>
                             <td style="width:46%; vertical-align:top;">
-                                <b>No :</b> {{ $creditorItems->first()->order_items_code }}{{ $chunkIndex > 0 ? ' (Hal ' . ($chunkIndex + 1) . ')' : '' }}
+                                <b>No :</b>
+                                {{ $creditorItems->first()->order_items_code }}{{ $chunkIndex > 0 ? ' (Hal ' . ($chunkIndex + 1) . ')' : '' }}
                             </td>
                             <td style="width:54%; text-align:right; vertical-align:top;">
                                 <b>Kepada Yth :</b> {{ optional($creditorItems->first()->creditors)->name ?? '-' }}
@@ -287,168 +330,183 @@
             ========================================================== --}}
         @elseif ($type == 'PREKURSOR')
             @foreach ($items as $creditorCode => $creditorItems)
-                @if (!$isFirstPage)
-                    <div style="page-break-before: always;"></div>
-                @endif
-                @php $isFirstPage = false; @endphp
+                @php
+                    $spCode = $creditorItems->first()->order_items_code;
+                    $itemsPerPage = 11;
+                    $chunks = $creditorItems->chunk($itemsPerPage);
+                    $totalChunks = $chunks->count();
+                @endphp
+                @foreach ($chunks as $chunkIndex => $chunkItems)
+                    @if (!$isFirstPage)
+                        <div style="page-break-before: always;"></div>
+                    @endif
+                    @php $isFirstPage = false; @endphp
 
-                <div class="title-main">
-                    SURAT PESANAN OBAT MENGANDUNG PREKURSOR FARMASI
-                </div>
-                <div class="subtitle">
-                    Nomor SP : {{ $creditorItems->first()->order_items_code }}
-                </div>
+                    <div class="non-regular-page">
 
-                <div class="section-gap">Yang bertanda tangan dibawah ini :</div>
+                        <div class="title-main">
+                            SURAT PESANAN OBAT MENGANDUNG PREKURSOR FARMASI
+                        </div>
+                        <div class="subtitle">
+                            Nomor SP :
+                            {{ $spCode }}{{ $totalChunks > 1 ? ' (Hal ' . ($chunkIndex + 1) . ')' : '' }}
+                        </div>
 
-                <table class="id-table" style="width:100%; border-collapse:collapse;">
-                    <tr>
-                        <td style="width:75px;">Nama Apoteker</td>
-                        <td style="width:8px;">:</td>
-                        <td><b>{{ $pharmacy->pharmacist }}</b></td>
-                    </tr>
-                    <tr>
-                        <td>Jabatan</td>
-                        <td>:</td>
-                        <td>Apoteker Pengelola Apotek</td>
-                    </tr>
-                    <tr>
-                        <td>No. SIPA</td>
-                        <td>:</td>
-                        <td>{{ $pharmacy->pharmacist_permit }}</td>
-                    </tr>
-                </table>
+                        <div class="section-gap">Yang bertanda tangan dibawah ini :</div>
 
-                <div class="section-gap">
-                    Mengajukan pesanan obat mengandung Prekursor Farmasi kepada :
-                </div>
-
-                <table class="id-table" style="width:100%; border-collapse:collapse;">
-                    <tr>
-                        <td style="width:75px;">Nama PBF</td>
-                        <td style="width:8px;">:</td>
-                        <td class="dotted">
-                            <b>{{ optional($creditorItems->first()->creditors)->name ?? '-' }}</b>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>Alamat</td>
-                        <td>:</td>
-                        <td class="dotted">
-                            {{ optional($creditorItems->first()->creditors)->address ?? '-' }}
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>No. Telp.</td>
-                        <td>:</td>
-                        <td class="dotted">
-                            {{ optional($creditorItems->first()->creditors)->phone ?? '-' }}
-                        </td>
-                    </tr>
-                </table>
-
-                <div class="section-gap">
-                    Obat mengandung Prekursor Farmasi tersebut akan digunakan untuk memenuhi kebutuhan :
-                </div>
-
-                {{-- TABLE --}}
-                <table class="form-table">
-                    <thead>
-                        <tr>
-                            <th style="width:5%;">No.</th>
-                            <th style="width:30%;">Nama Obat Mengandung Prekursor Farmasi</th>
-                            <th style="width:25%;">Zat Aktif Prekursor Farmasi</th>
-                            <th style="width:15%;">Satuan</th>
-                            <th style="width:12%;">Jumlah</th>
-                            <th style="width:13%;">Ket.</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach ($creditorItems as $index => $row)
+                        <table class="id-table" style="width:100%; border-collapse:collapse;">
                             <tr>
-                                <td style="text-align:center;">{{ $index + 1 }}</td>
-                                <td style="text-align:left;">{{ $row->medicines->name ?? '-' }}</td>
-                                <td style="text-align:center;">
-                                    {{ $row->medicines->component ?? '-' }}
-                                </td>
-                                <td style="text-align:center;">{{ $row->medicines->packaging ?? '-' }}</td>
-                                <td style="text-align:center;">{{ $row->quantity }}
-                                    ({{ ucfirst(terbilang($row->quantity)) }})
-                                </td>
-                                <td></td>
+                                <td style="width:75px;">Nama Apoteker</td>
+                                <td style="width:8px;">:</td>
+                                <td><b>{{ $pharmacy->pharmacist }}</b></td>
                             </tr>
-                        @endforeach
-
-                        @for ($i = count($creditorItems); $i < 12; $i++)
                             <tr>
-                                <td>&nbsp;</td>
-                                <td></td>
-                                <td></td>
-                                <td></td>
-                                <td></td>
-                                <td></td>
+                                <td>Jabatan</td>
+                                <td>:</td>
+                                <td>Apoteker Pengelola Apotek</td>
                             </tr>
-                        @endfor
-                    </tbody>
-                </table>
+                            <tr>
+                                <td>No. SIPA</td>
+                                <td>:</td>
+                                <td>{{ $pharmacy->pharmacist_permit }}</td>
+                            </tr>
+                        </table>
 
-                <div class="section-gap">
-                    Obat tersebut mengandung Prekursor tersebut akan digunakan untuk memenuhi kebutuhan:
-                </div>
+                        <div class="section-gap">
+                            Mengajukan pesanan obat mengandung Prekursor Farmasi kepada :
+                        </div>
 
-                <table class="id-table" style="width:100%; border-collapse:collapse;">
-                    <tr>
-                        <td style="width:75px;">Nama Apotek</td>
-                        <td style="width:8px;">:</td>
-                        <td><b>{{ $pharmacy->name }}</b></td>
-                    </tr>
-                    <tr>
-                        <td>Alamat</td>
-                        <td>:</td>
-                        <td>{{ $pharmacy->address }}</td>
-                    </tr>
-                    <tr>
-                        <td>
-                            @if ($pharmacy->permit)
-                                No. SIA : {{ $pharmacy->permit }}
-                            @elseif ($pharmacy->pharmacy_registration)
-                                STR
-                            @endif
-                        </td>
-                        <td>:</td>
-                        <td>
-                            {{ $pharmacy->permit ?? $pharmacy->pharmacy_registration }}
-                        </td>
-                    </tr>
-                </table>
+                        <table class="id-table" style="width:100%; border-collapse:collapse;">
+                            <tr>
+                                <td style="width:75px;">Nama PBF</td>
+                                <td style="width:8px;">:</td>
+                                <td class="dotted">
+                                    <b>{{ optional($chunkItems->first()->creditors)->name ?? '-' }}</b>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Alamat</td>
+                                <td>:</td>
+                                <td class="dotted">
+                                    {{ optional($chunkItems->first()->creditors)->address ?? '-' }}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>No. Telp.</td>
+                                <td>:</td>
+                                <td class="dotted">
+                                    {{ optional($chunkItems->first()->creditors)->phone ?? '-' }}
+                                </td>
+                            </tr>
+                        </table>
 
-                {{-- SIGNATURE --}}
-                <table class="signature-block" style="width:100%;">
-                    <tr>
-                        <td style="width:42%;"></td>
-                        <td style="width:58%; text-align:center;">
-                            {{ $pharmacy->city }}, {{ $date }}
-                            <br>
-                            Pemesan,
+                        <div class="section-gap">
+                            Obat mengandung Prekursor Farmasi tersebut akan digunakan untuk memenuhi kebutuhan :
+                        </div>
 
-                            @if (!empty($signatureBase64))
-                                <div style="margin: 1px 0;">
-                                    <img src="{{ $signatureBase64 }}" style="height:35px; width:auto;">
-                                </div>
-                            @elseif ($pharmacy->signature && file_exists(public_path('img/' . $pharmacy->signature)))
-                                <div style="margin: 1px 0;">
-                                    <img src="{{ public_path('img/' . $pharmacy->signature) }}"
-                                        style="height:35px; width:auto;">
-                                </div>
-                            @else
-                                <div style="height:35px;"></div> {{-- blank space to sign by hand --}}
-                            @endif
+                        {{-- TABLE WRAPPER FIXED HEIGHT --}}
+                        <div class="table-fixed-wrap">
+                            <table class="form-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width:5%;">No.</th>
+                                        <th style="width:28%;">Nama Obat Mengandung Prekursor Farmasi</th>
+                                        <th style="width:36%;">Zat Aktif Prekursor Farmasi</th>
+                                        <th style="width:10%;">Satuan</th>
+                                        <th style="width:12%;">Jumlah</th>
+                                        <th style="width:9%;">Ket.</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach ($chunkItems as $index => $row)
+                                        <tr>
+                                            <td style="text-align:center;">{{ $chunkIndex * $itemsPerPage + $loop->iteration }}
+                                            </td>
+                                            <td style="text-align:left;">{{ $row->medicines->name ?? '-' }}</td>
+                                            <td style="text-align:center; font-size:8px; line-height:1.15;">
+                                                {{ $row->medicines->component ?? '-' }}
+                                            </td>
+                                            <td style="text-align:center;">{{ $row->medicines->packaging ?? '-' }}</td>
+                                            <td style="text-align:center;">{{ $row->quantity }}
+                                                ({{ ucfirst(terbilang($row->quantity)) }})
+                                            </td>
+                                            <td></td>
+                                        </tr>
+                                    @endforeach
 
-                            <b><u>{{ $pharmacy->pharmacist }}</u></b><br>
-                            SIPA : {{ $pharmacy->pharmacist_permit }}
-                        </td>
-                    </tr>
-                </table>
+                                    @for ($i = count($chunkItems); $i < 11; $i++)
+                                        <tr>
+                                            <td>&nbsp;</td>
+                                            <td></td>
+                                            <td></td>
+                                            <td></td>
+                                            <td></td>
+                                            <td></td>
+                                        </tr>
+                                    @endfor
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="section-gap">
+                            Obat tersebut mengandung Prekursor tersebut akan digunakan untuk memenuhi kebutuhan:
+                        </div>
+
+                        <table class="id-table" style="width:100%; border-collapse:collapse;">
+                            <tr>
+                                <td style="width:75px;">Nama Apotek</td>
+                                <td style="width:8px;">:</td>
+                                <td><b>{{ $pharmacy->name }}</b></td>
+                            </tr>
+                            <tr>
+                                <td>Alamat</td>
+                                <td>:</td>
+                                <td>{{ $pharmacy->address }}</td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    @if ($pharmacy->permit)
+                                        No. SIA
+                                    @elseif ($pharmacy->pharmacy_registration)
+                                        STR
+                                    @endif
+                                </td>
+                                <td>:</td>
+                                <td>
+                                    {{ $pharmacy->permit ?? $pharmacy->pharmacy_registration }}
+                                </td>
+                            </tr>
+                        </table>
+
+                        {{-- SIGNATURE --}}
+                        <table class="signature-block" style="width:100%;">
+                            <tr>
+                                <td style="width:42%;"></td>
+                                <td style="width:58%; text-align:center;">
+                                    {{ $pharmacy->city }}, {{ $date }}
+                                    <br>
+                                    Pemesan,
+
+                                    @if (!empty($signatureBase64))
+                                        <div style="margin: 1px 0;">
+                                            <img src="{{ $signatureBase64 }}" style="height:35px; width:auto;">
+                                        </div>
+                                    @elseif ($pharmacy->signature && file_exists(public_path('img/' . $pharmacy->signature)))
+                                        <div style="margin: 1px 0;">
+                                            <img src="{{ public_path('img/' . $pharmacy->signature) }}"
+                                                style="height:35px; width:auto;">
+                                        </div>
+                                    @else
+                                        <div style="height:35px;"></div> {{-- blank space to sign by hand --}}
+                                    @endif
+
+                                    <b><u>{{ $pharmacy->pharmacist }}</u></b><br>
+                                    SIPA : {{ $pharmacy->pharmacist_permit }}
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                @endforeach
             @endforeach
 
             {{-- =========================================================
@@ -458,7 +516,8 @@
             @foreach ($items as $creditorCode => $creditorItems)
                 @php
                     $spCode = $creditorItems->first()->order_items_code;
-                    $chunks = $creditorItems->chunk(3);
+                    $itemsPerPage = 11;
+                    $chunks = $creditorItems->chunk($itemsPerPage);
                     $totalChunks = $chunks->count();
                 @endphp
                 @foreach ($chunks as $chunkIndex => $chunkItems)
@@ -467,152 +526,163 @@
                     @endif
                     @php $isFirstPage = false; @endphp
 
-                    <div class="title-main">
-                        SURAT PESANAN OBAT-OBAT TERTENTU
-                    </div>
+                    <div class="non-regular-page">
 
-                    <div class="subtitle">
-                        Nomor : {{ $spCode }}{{ $totalChunks > 1 ? ' (Hal ' . ($chunkIndex + 1) . ')' : '' }}
-                    </div>
+                        <div class="title-main">
+                            SURAT PESANAN OBAT-OBAT TERTENTU
+                        </div>
 
-                    <div class="section-gap">Yang bertanda tangan dibawah ini :</div>
+                        <div class="subtitle">
+                            Nomor :
+                            {{ $spCode }}{{ $totalChunks > 1 ? ' (Hal ' . ($chunkIndex + 1) . ')' : '' }}
+                        </div>
 
-                    <table class="id-table" style="width:100%; border-collapse:collapse;">
-                        <tr>
-                            <td style="width:75px;">N a m a</td>
-                            <td style="width:8px;">:</td>
-                            <td>
-                                <b>{{ $pharmacy->pharmacist }}</b>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td>Jabatan</td>
-                            <td>:</td>
-                            <td>
-                                Apoteker Pengelola Apotek
-                            </td>
-                        </tr>
-                    </table>
+                        <div class="section-gap">Yang bertanda tangan dibawah ini :</div>
 
-                    <div class="section-gap">Mengajukan pesanan Obat-Obat Tertentu kepada :</div>
-
-                    <table class="id-table" style="width:100%; border-collapse:collapse;">
-                        <tr>
-                            <td style="width:90px;">Nama Distributor</td>
-                            <td style="width:8px;">:</td>
-                            <td class="dotted">
-                                <b>{{ optional($chunkItems->first()->creditors)->name ?? '-' }}</b>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td>Alamat</td>
-                            <td>:</td>
-                            <td class="dotted">
-                                {{ optional($chunkItems->first()->creditors)->address ?? '-' }}
-                            </td>
-                        </tr>
-                        <tr>
-                            <td>Telp.</td>
-                            <td>:</td>
-                            <td class="dotted">
-                                {{ optional($chunkItems->first()->creditors)->phone ?? '-' }}
-                            </td>
-                        </tr>
-                    </table>
-
-                    <div class="section-gap">Dengan Obat-Obat Tertentu yang dipesan adalah :</div>
-
-                    <table class="form-table">
-                        <thead>
+                        <table class="id-table" style="width:100%; border-collapse:collapse;">
                             <tr>
-                                <th style="width:5%;">No.</th>
-                                <th style="width:30%;">NAMA OBAT</th>
-                                <th style="width:25%;">KOMPOSISI</th>
-                                <th style="width:20%;">BENTUK & KEKUATAN SEDIAAN</th>
-                                <th style="width:20%;">JUMLAH</th>
+                                <td style="width:75px;">N a m a</td>
+                                <td style="width:8px;">:</td>
+                                <td>
+                                    <b>{{ $pharmacy->pharmacist }}</b>
+                                </td>
                             </tr>
-                        </thead>
-                        <tbody>
-                            @foreach ($chunkItems as $index => $row)
-                                @php
-                                    $komposisi = $row->medicines->component ?? '-';
-                                    $bentukKekuatan = trim(
-                                        ($row->medicines->unit ?: $row->medicines->packaging ?: '') .
-                                            ' ' .
-                                            ($row->medicines->dosage ?? ''),
-                                    );
-                                    $qty = $row->quantity;
-                                    $kemasan = $row->medicines->packaging ? ' ' . $row->medicines->packaging : '';
-                                    $terbilang = strtolower(terbilang($qty));
-                                @endphp
-                                <tr>
-                                    <td style="text-align:center;">{{ $chunkIndex * 3 + $index + 1 }}</td>
-                                    <td style="text-align:left;">{{ $row->medicines->name ?? '-' }}</td>
-                                    <td style="text-align:center;">{{ $komposisi }}</td>
-                                    <td style="text-align:center;">{{ $bentukKekuatan ?: '-' }}</td>
-                                    <td style="text-align:center;">{{ $qty }}
-                                        ({{ $terbilang }}){{ $kemasan }}</td>
-                                </tr>
-                            @endforeach
+                            <tr>
+                                <td>Jabatan</td>
+                                <td>:</td>
+                                <td>
+                                    Apoteker Pengelola Apotek
+                                </td>
+                            </tr>
+                        </table>
 
-                            @for ($i = count($chunkItems); $i < 14; $i++)
-                                <tr>
-                                    <td>&nbsp;</td>
-                                    <td></td>
-                                    <td></td>
-                                    <td></td>
-                                    <td></td>
-                                </tr>
-                            @endfor
-                        </tbody>
-                    </table>
+                        <div class="section-gap">Mengajukan pesanan Obat-Obat Tertentu kepada :</div>
 
-                    <div class="section-gap">Obat-Obat Tertentu tersebut akan dipergunakan untuk :</div>
+                        <table class="id-table" style="width:100%; border-collapse:collapse;">
+                            <tr>
+                                <td style="width:90px;">Nama Distributor</td>
+                                <td style="width:8px;">:</td>
+                                <td class="dotted">
+                                    <b>{{ optional($chunkItems->first()->creditors)->name ?? '-' }}</b>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Alamat</td>
+                                <td>:</td>
+                                <td class="dotted">
+                                    {{ optional($chunkItems->first()->creditors)->address ?? '-' }}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Telp.</td>
+                                <td>:</td>
+                                <td class="dotted">
+                                    {{ optional($chunkItems->first()->creditors)->phone ?? '-' }}
+                                </td>
+                            </tr>
+                        </table>
 
-                    <table class="id-table" style="width:100%; border-collapse:collapse;">
-                        <tr>
-                            <td style="width:75px; vertical-align:top;">Nama Sarana</td>
-                            <td style="width:8px; vertical-align:top;">:</td>
-                            <td>
-                                <b>{{ $pharmacy->name }}</b>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td style="vertical-align:top;">Alamat Sarana</td>
-                            <td style="vertical-align:top;">:</td>
-                            <td>{{ $pharmacy->address }}{{ $pharmacy->city ? ' ' . $pharmacy->city : '' }}</td>
-                        </tr>
-                        <tr>
-                            <td style="vertical-align:top;">No. SIA</td>
-                            <td style="vertical-align:top;">:</td>
-                            <td>{{ $pharmacy->permit }}</td>
-                        </tr>
-                    </table>
+                        <div class="section-gap">Dengan Obat-Obat Tertentu yang dipesan adalah :</div>
 
-                    <table class="signature-block" style="width:100%;">
-                        <tr>
-                            <td style="width:42%;"></td>
-                            <td style="width:58%; text-align:center;">
-                                {{ $pharmacy->city }}, {{ $date }}
-                                <br>
-                                Pemesan
-                                @if (!empty($signatureBase64))
-                                    <div style="margin: 1px 0;">
-                                        <img src="{{ $signatureBase64 }}" style="height:35px; width:auto;">
-                                    </div>
-                                @elseif ($pharmacy->signature && file_exists(public_path('img/' . $pharmacy->signature)))
-                                    <div style="margin: 1px 0;">
-                                        <img src="{{ public_path('img/' . $pharmacy->signature) }}"
-                                            style="height:35px; width:auto;">
-                                    </div>
-                                @else
-                                    <div style="height:35px;"></div> {{-- blank space to sign by hand --}}
-                                @endif
-                                <b><u>( {{ $pharmacy->pharmacist }} )</u></b><br>
-                                SIPA : {{ $pharmacy->pharmacist_permit }}
-                            </td>
-                        </tr>
-                    </table>
+                        {{-- TABLE WRAPPER FIXED HEIGHT --}}
+                        <div class="table-fixed-wrap">
+                            <table class="form-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width:5%;">No.</th>
+                                        <th style="width:28%;">NAMA OBAT</th>
+                                        <th style="width:36%;">KOMPOSISI</th>
+                                        <th style="width:16%;">BENTUK & KEKUATAN SEDIAAN</th>
+                                        <th style="width:15%;">JUMLAH</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach ($chunkItems as $index => $row)
+                                        @php
+                                            $komposisi = $row->medicines->component ?? '-';
+                                            $bentukKekuatan = trim(
+                                                ($row->medicines->unit ?: $row->medicines->packaging ?: '') .
+                                                    ' ' .
+                                                    ($row->medicines->dosage ?? ''),
+                                            );
+                                            $qty = $row->quantity;
+                                            $kemasan = $row->medicines->packaging
+                                                ? ' ' . $row->medicines->packaging
+                                                : '';
+                                            $terbilang = strtolower(terbilang($qty));
+                                        @endphp
+                                        <tr>
+                                            <td style="text-align:center;">{{ $chunkIndex * $itemsPerPage + $loop->iteration }}
+                                            </td>
+                                            <td style="text-align:left;">{{ $row->medicines->name ?? '-' }}</td>
+                                            <td style="text-align:center; font-size:8px; line-height:1.15;">
+                                                {{ $komposisi }}</td>
+                                            <td style="text-align:center;">{{ $bentukKekuatan ?: '-' }}</td>
+                                            <td style="text-align:center;">{{ $qty }}
+                                                ({{ $terbilang }}){{ $kemasan }}</td>
+                                        </tr>
+                                    @endforeach
+
+                                    @for ($i = count($chunkItems); $i < 11; $i++)
+                                        <tr>
+                                            <td>&nbsp;</td>
+                                            <td></td>
+                                            <td></td>
+                                            <td></td>
+                                            <td></td>
+                                        </tr>
+                                    @endfor
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="section-gap">Obat-Obat Tertentu tersebut akan dipergunakan untuk :</div>
+
+                        <table class="id-table" style="width:100%; border-collapse:collapse;">
+                            <tr>
+                                <td style="width:75px; vertical-align:top;">Nama Sarana</td>
+                                <td style="width:8px; vertical-align:top;">:</td>
+                                <td>
+                                    <b>{{ $pharmacy->name }}</b>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="vertical-align:top;">Alamat Sarana</td>
+                                <td style="vertical-align:top;">:</td>
+                                <td>{{ $pharmacy->address }}{{ $pharmacy->city ? ' ' . $pharmacy->city : '' }}</td>
+                            </tr>
+                            <tr>
+                                <td style="vertical-align:top;">No. SIA</td>
+                                <td style="vertical-align:top;">:</td>
+                                <td>{{ $pharmacy->permit }}</td>
+                            </tr>
+                        </table>
+
+                        <table class="signature-block" style="width:100%;">
+                            <tr>
+                                <td style="width:42%;"></td>
+                                <td style="width:58%; text-align:center;">
+                                    {{ $pharmacy->city }}, {{ $date }}
+                                    <br>
+                                    Pemesan
+                                    @if (!empty($signatureBase64))
+                                        <div style="margin: 1px 0;">
+                                            <img src="{{ $signatureBase64 }}" style="height:35px; width:auto;">
+                                        </div>
+                                    @elseif ($pharmacy->signature && file_exists(public_path('img/' . $pharmacy->signature)))
+                                        <div style="margin: 1px 0;">
+                                            <img src="{{ public_path('img/' . $pharmacy->signature) }}"
+                                                style="height:35px; width:auto;">
+                                        </div>
+                                    @else
+                                        <div style="height:35px;"></div> {{-- blank space to sign by hand --}}
+                                    @endif
+                                    <b><u>( {{ $pharmacy->pharmacist }} )</u></b><br>
+                                    SIPA : {{ $pharmacy->pharmacist_permit }}
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
                 @endforeach
             @endforeach
 
@@ -628,166 +698,12 @@
                     $isFirstPage = false;
                     $spCode = $creditorItems->first()->order_items_code;
                 @endphp
-                <div class="title-main">
-                    SURAT PESANAN NARKOTIKA
-                </div>
-                <div class="subtitle">
-                    Nomor : {{ $spCode }}
-                </div>
-
-                {{-- IDENTITAS --}}
-                <div class="section-gap">Yang bertanda tangan dibawah ini :</div>
-                <table class="id-table" style="width:100%; border-collapse:collapse;">
-                    <tr>
-                        <td style="width:75px;">N a m a</td>
-                        <td style="width:8px;">:</td>
-                        <td><b>{{ $pharmacy->pharmacist }}</b></td>
-                    </tr>
-                    <tr>
-                        <td>Jabatan</td>
-                        <td>:</td>
-                        <td>Apoteker Pengelola Apotek</td>
-                    </tr>
-                </table>
-
-                <div class="section-gap">Mengajukan pesanan Narkotika kepada :</div>
-                <table class="id-table" style="width:100%; border-collapse:collapse;">
-                    <tr>
-                        <td style="width:90px;">Nama Distributor</td>
-                        <td style="width:8px;">:</td>
-                        <td class="dotted"><b>{{ optional($creditorItems->first()->creditors)->name ?? '-' }}</b></td>
-                    </tr>
-                    <tr>
-                        <td>Alamat</td>
-                        <td>:</td>
-                        <td class="dotted">{{ optional($creditorItems->first()->creditors)->address ?? '-' }}</td>
-                    </tr>
-                    <tr>
-                        <td>Telp.</td>
-                        <td>:</td>
-                        <td class="dotted">{{ optional($creditorItems->first()->creditors)->phone ?? '-' }}</td>
-                    </tr>
-                </table>
-
-                {{-- TABLE TITLE --}}
-                <div class="section-gap">
-                    Dengan Narkotika yang dipesan adalah :
-                </div>
-
-                {{-- TABLE --}}
-                <table class="form-table">
-                    <thead>
-                        <tr>
-                            <th style="width:5%;">No.</th>
-                            <th style="width:30%;">NAMA OBAT</th>
-                            <th style="width:25%;">KOMPOSISI</th>
-                            <th style="width:20%;">BENTUK & KEKUATAN SEDIAAN</th>
-                            <th style="width:20%;">JUMLAH</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach ($creditorItems as $index => $row)
-                            @php
-                                $komposisi = $row->medicines->component ?? '-';
-                                $bentukKekuatan = trim(
-                                    ($row->medicines->unit ?: $row->medicines->packaging ?: '') .
-                                        ' ' .
-                                        ($row->medicines->dosage ?? ''),
-                                );
-                                $qty = $row->quantity;
-                                $kemasan = $row->medicines->packaging ? ' ' . $row->medicines->packaging : '';
-                                $terbilang = strtolower(terbilang($qty));
-                            @endphp
-                            <tr>
-                                <td style="text-align:center;">{{ $index + 1 }}</td>
-                                <td style="text-align:left;">{{ $row->medicines->name ?? '-' }}</td>
-                                <td style="text-align:center;">{{ $komposisi }}</td>
-                                <td style="text-align:center;">{{ $bentukKekuatan ?: '-' }}</td>
-                                <td style="text-align:center;">{{ $qty }}
-                                    ({{ $terbilang }}){{ $kemasan }}</td>
-                            </tr>
-                        @endforeach
-
-                        @for ($i = count($creditorItems); $i < 14; $i++)
-                            <tr>
-                                <td>&nbsp;</td>
-                                <td></td>
-                                <td></td>
-                                <td></td>
-                                <td></td>
-                            </tr>
-                        @endfor
-                    </tbody>
-                </table>
-
-                {{-- SARANA --}}
-                <div class="section-gap">Narkotika tersebut akan dipergunakan untuk :</div>
-                <table class="id-table" style="width:100%; border-collapse:collapse;">
-                    <tr>
-                        <td style="width:75px; vertical-align:top;">Nama Sarana</td>
-                        <td style="width:8px; vertical-align:top;">:</td>
-                        <td><b>{{ $pharmacy->name }}</b></td>
-                    </tr>
-                    <tr>
-                        <td style="vertical-align:top;">Alamat Sarana</td>
-                        <td style="vertical-align:top;">:</td>
-                        <td>{{ $pharmacy->address }}{{ $pharmacy->city ? ' ' . $pharmacy->city : '' }}</td>
-                    </tr>
-                    <tr>
-                        <td style="vertical-align:top;">No. SIA</td>
-                        <td style="vertical-align:top;">:</td>
-                        <td>{{ $pharmacy->permit }}</td>
-                    </tr>
-                </table>
-
-                {{-- SIGNATURE --}}
-                <table class="signature-block" style="width:100%;">
-                    <tr>
-                        <td style="width:42%;"></td>
-                        <td style="width:58%; text-align:center;">
-                            {{ $pharmacy->city }}, {{ $date }}
-                            <br>
-                            Pemesan
-                            @if (!empty($signatureBase64))
-                                <div style="margin: 1px 0;">
-                                    <img src="{{ $signatureBase64 }}" style="height:35px; width:auto;">
-                                </div>
-                            @elseif ($pharmacy->signature && file_exists(public_path('img/' . $pharmacy->signature)))
-                                <div style="margin: 1px 0;">
-                                    <img src="{{ public_path('img/' . $pharmacy->signature) }}"
-                                        style="height:35px; width:auto;">
-                                </div>
-                            @else
-                                <div style="height:35px;"></div> {{-- blank space to sign by hand --}}
-                            @endif
-                            <b><u>( {{ $pharmacy->pharmacist }} )</u></b><br>
-                            SIPA : {{ $pharmacy->pharmacist_permit }}
-                        </td>
-                    </tr>
-                </table>
-            @endforeach
-
-            {{-- =========================================================
-            5) PSIKOTROPIKA
-            ========================================================== --}}
-        @elseif ($type == 'Psikotropika' || $type == 'PSIKOTROPIKA')
-            @foreach ($items as $creditorCode => $creditorItems)
-                @php
-                    $spCode = $creditorItems->first()->order_items_code;
-                    $chunks = $creditorItems->chunk(3);
-                    $totalChunks = $chunks->count();
-                @endphp
-                @foreach ($chunks as $chunkIndex => $chunkItems)
-                    @if (!$isFirstPage)
-                        <div style="page-break-before: always;"></div>
-                    @endif
-                    @php $isFirstPage = false; @endphp
-
+                <div class="non-regular-page">
                     <div class="title-main">
-                        SURAT PESANAN PSIKOTROPIKA
+                        SURAT PESANAN NARKOTIKA
                     </div>
                     <div class="subtitle">
-                        Nomor : {{ $spCode }}{{ $totalChunks > 1 ? ' (Hal ' . ($chunkIndex + 1) . ')' : '' }}
+                        Nomor : {{ $spCode }}
                     </div>
 
                     {{-- IDENTITAS --}}
@@ -805,79 +721,82 @@
                         </tr>
                     </table>
 
-                    <div class="section-gap">Mengajukan pesanan Psikotropika kepada :</div>
+                    <div class="section-gap">Mengajukan pesanan Narkotika kepada :</div>
                     <table class="id-table" style="width:100%; border-collapse:collapse;">
                         <tr>
                             <td style="width:90px;">Nama Distributor</td>
                             <td style="width:8px;">:</td>
-                            <td class="dotted"><b>{{ optional($chunkItems->first()->creditors)->name ?? '-' }}</b>
+                            <td class="dotted"><b>{{ optional($creditorItems->first()->creditors)->name ?? '-' }}</b>
                             </td>
                         </tr>
                         <tr>
                             <td>Alamat</td>
                             <td>:</td>
-                            <td class="dotted">{{ optional($chunkItems->first()->creditors)->address ?? '-' }}</td>
+                            <td class="dotted">{{ optional($creditorItems->first()->creditors)->address ?? '-' }}</td>
                         </tr>
                         <tr>
                             <td>Telp.</td>
                             <td>:</td>
-                            <td class="dotted">{{ optional($chunkItems->first()->creditors)->phone ?? '-' }}</td>
+                            <td class="dotted">{{ optional($creditorItems->first()->creditors)->phone ?? '-' }}</td>
                         </tr>
                     </table>
 
                     {{-- TABLE TITLE --}}
                     <div class="section-gap">
-                        Dengan Psikotropika yang dipesan adalah :
+                        Dengan Narkotika yang dipesan adalah :
                     </div>
 
-                    {{-- TABLE --}}
-                    <table class="form-table">
-                        <thead>
-                            <tr>
-                                <th style="width:5%;">No.</th>
-                                <th style="width:30%;">NAMA OBAT</th>
-                                <th style="width:25%;">KOMPOSISI</th>
-                                <th style="width:20%;">BENTUK & KEKUATAN SEDIAAN</th>
-                                <th style="width:20%;">JUMLAH</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach ($chunkItems as $index => $row)
-                                @php
-                                    $komposisi = $row->medicines->component ?? '-';
-                                    $bentukKekuatan = trim(
-                                        ($row->medicines->unit ?: $row->medicines->packaging ?: '') .
-                                            ' ' .
-                                            ($row->medicines->dosage ?? ''),
-                                    );
-                                    $qty = $row->quantity;
-                                    $kemasan = $row->medicines->packaging ? ' ' . $row->medicines->packaging : '';
-                                    $terbilang = strtolower(terbilang($qty));
-                                @endphp
+                    {{-- TABLE WRAPPER FIXED HEIGHT --}}
+                    <div class="table-fixed-wrap">
+                        <table class="form-table">
+                            <thead>
                                 <tr>
-                                    <td style="text-align:center;">{{ $chunkIndex * 3 + $index + 1 }}</td>
-                                    <td style="text-align:left;">{{ $row->medicines->name ?? '-' }}</td>
-                                    <td style="text-align:center;">{{ $komposisi }}</td>
-                                    <td style="text-align:center;">{{ $bentukKekuatan ?: '-' }}</td>
-                                    <td style="text-align:center;">{{ $qty }}
-                                        ({{ $terbilang }}){{ $kemasan }}</td>
+                                    <th style="width:5%;">No.</th>
+                                    <th style="width:28%;">NAMA OBAT</th>
+                                    <th style="width:36%;">KOMPOSISI</th>
+                                    <th style="width:16%;">BENTUK & KEKUATAN SEDIAAN</th>
+                                    <th style="width:15%;">JUMLAH</th>
                                 </tr>
-                            @endforeach
+                            </thead>
+                            <tbody>
+                                @foreach ($creditorItems as $index => $row)
+                                    @php
+                                        $komposisi = $row->medicines->component ?? '-';
+                                        $bentukKekuatan = trim(
+                                            ($row->medicines->unit ?: $row->medicines->packaging ?: '') .
+                                                ' ' .
+                                                ($row->medicines->dosage ?? ''),
+                                        );
+                                        $qty = $row->quantity;
+                                        $kemasan = $row->medicines->packaging ? ' ' . $row->medicines->packaging : '';
+                                        $terbilang = strtolower(terbilang($qty));
+                                    @endphp
+                                    <tr>
+                                        <td style="text-align:center;">{{ $index + 1 }}</td>
+                                        <td style="text-align:left;">{{ $row->medicines->name ?? '-' }}</td>
+                                        <td style="text-align:center; font-size:8px; line-height:1.15;">
+                                            {{ $komposisi }}</td>
+                                        <td style="text-align:center;">{{ $bentukKekuatan ?: '-' }}</td>
+                                        <td style="text-align:center;">{{ $qty }}
+                                            ({{ $terbilang }}){{ $kemasan }}</td>
+                                    </tr>
+                                @endforeach
 
-                            @for ($i = count($chunkItems); $i < 14; $i++)
-                                <tr>
-                                    <td>&nbsp;</td>
-                                    <td></td>
-                                    <td></td>
-                                    <td></td>
-                                    <td></td>
-                                </tr>
-                            @endfor
-                        </tbody>
-                    </table>
+                                @for ($i = count($creditorItems); $i < 7; $i++)
+                                    <tr>
+                                        <td>&nbsp;</td>
+                                        <td></td>
+                                        <td></td>
+                                        <td></td>
+                                        <td></td>
+                                    </tr>
+                                @endfor
+                            </tbody>
+                        </table>
+                    </div>
 
                     {{-- SARANA --}}
-                    <div class="section-gap">Psikotropika tersebut akan dipergunakan untuk :</div>
+                    <div class="section-gap">Narkotika tersebut akan dipergunakan untuk :</div>
                     <table class="id-table" style="width:100%; border-collapse:collapse;">
                         <tr>
                             <td style="width:75px; vertical-align:top;">Nama Sarana</td>
@@ -921,6 +840,176 @@
                             </td>
                         </tr>
                     </table>
+                </div>
+            @endforeach
+
+            {{-- =========================================================
+            5) PSIKOTROPIKA
+            ========================================================== --}}
+        @elseif ($type == 'Psikotropika' || $type == 'PSIKOTROPIKA')
+            @foreach ($items as $creditorCode => $creditorItems)
+                @php
+                    $spCode = $creditorItems->first()->order_items_code;
+                    $itemsPerPage = 11;
+                    $chunks = $creditorItems->chunk($itemsPerPage);
+                    $totalChunks = $chunks->count();
+                @endphp
+                @foreach ($chunks as $chunkIndex => $chunkItems)
+                    @if (!$isFirstPage)
+                        <div style="page-break-before: always;"></div>
+                    @endif
+                    @php $isFirstPage = false; @endphp
+
+                    <div class="non-regular-page">
+
+                        <div class="title-main">
+                            SURAT PESANAN PSIKOTROPIKA
+                        </div>
+                        <div class="subtitle">
+                            Nomor :
+                            {{ $spCode }}{{ $totalChunks > 1 ? ' (Hal ' . ($chunkIndex + 1) . ')' : '' }}
+                        </div>
+
+                        {{-- IDENTITAS --}}
+                        <div class="section-gap">Yang bertanda tangan dibawah ini :</div>
+                        <table class="id-table" style="width:100%; border-collapse:collapse;">
+                            <tr>
+                                <td style="width:75px;">N a m a</td>
+                                <td style="width:8px;">:</td>
+                                <td><b>{{ $pharmacy->pharmacist }}</b></td>
+                            </tr>
+                            <tr>
+                                <td>Jabatan</td>
+                                <td>:</td>
+                                <td>Apoteker Pengelola Apotek</td>
+                            </tr>
+                        </table>
+
+                        <div class="section-gap">Mengajukan pesanan Psikotropika kepada :</div>
+                        <table class="id-table" style="width:100%; border-collapse:collapse;">
+                            <tr>
+                                <td style="width:90px;">Nama Distributor</td>
+                                <td style="width:8px;">:</td>
+                                <td class="dotted"><b>{{ optional($chunkItems->first()->creditors)->name ?? '-' }}</b>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Alamat</td>
+                                <td>:</td>
+                                <td class="dotted">{{ optional($chunkItems->first()->creditors)->address ?? '-' }}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>Telp.</td>
+                                <td>:</td>
+                                <td class="dotted">{{ optional($chunkItems->first()->creditors)->phone ?? '-' }}</td>
+                            </tr>
+                        </table>
+
+                        {{-- TABLE TITLE --}}
+                        <div class="section-gap">
+                            Dengan Psikotropika yang dipesan adalah :
+                        </div>
+
+                        {{-- TABLE --}}
+                        {{-- TABLE WRAPPER FIXED HEIGHT --}}
+                        <div class="table-fixed-wrap">
+                            <table class="form-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width:5%;">No.</th>
+                                        <th style="width:28%;">NAMA OBAT</th>
+                                        <th style="width:36%;">KOMPOSISI</th>
+                                        <th style="width:16%;">BENTUK & KEKUATAN SEDIAAN</th>
+                                        <th style="width:15%;">JUMLAH</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach ($chunkItems as $index => $row)
+                                        @php
+                                            $komposisi = $row->medicines->component ?? '-';
+                                            $bentukKekuatan = trim(
+                                                ($row->medicines->unit ?: $row->medicines->packaging ?: '') .
+                                                    ' ' .
+                                                    ($row->medicines->dosage ?? ''),
+                                            );
+                                            $qty = $row->quantity;
+                                            $kemasan = $row->medicines->packaging
+                                                ? ' ' . $row->medicines->packaging
+                                                : '';
+                                            $terbilang = strtolower(terbilang($qty));
+                                        @endphp
+                                        <tr>
+                                            <td style="text-align:center;">{{ $chunkIndex * $itemsPerPage + $loop->iteration }}
+                                            </td>
+                                            <td style="text-align:left;">{{ $row->medicines->name ?? '-' }}</td>
+                                            <td style="text-align:center; font-size:8px; line-height:1.15;">
+                                                {{ $komposisi }}</td>
+                                            <td style="text-align:center;">{{ $bentukKekuatan ?: '-' }}</td>
+                                            <td style="text-align:center;">{{ $qty }}
+                                                ({{ $terbilang }}){{ $kemasan }}</td>
+                                        </tr>
+                                    @endforeach
+
+                                    @for ($i = count($chunkItems); $i < 11; $i++)
+                                        <tr>
+                                            <td>&nbsp;</td>
+                                            <td></td>
+                                            <td></td>
+                                            <td></td>
+                                            <td></td>
+                                        </tr>
+                                    @endfor
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {{-- SARANA --}}
+                        <div class="section-gap">Psikotropika tersebut akan dipergunakan untuk :</div>
+                        <table class="id-table" style="width:100%; border-collapse:collapse;">
+                            <tr>
+                                <td style="width:75px; vertical-align:top;">Nama Sarana</td>
+                                <td style="width:8px; vertical-align:top;">:</td>
+                                <td><b>{{ $pharmacy->name }}</b></td>
+                            </tr>
+                            <tr>
+                                <td style="vertical-align:top;">Alamat Sarana</td>
+                                <td style="vertical-align:top;">:</td>
+                                <td>{{ $pharmacy->address }}{{ $pharmacy->city ? ' ' . $pharmacy->city : '' }}</td>
+                            </tr>
+                            <tr>
+                                <td style="vertical-align:top;">No. SIA</td>
+                                <td style="vertical-align:top;">:</td>
+                                <td>{{ $pharmacy->permit }}</td>
+                            </tr>
+                        </table>
+
+                        {{-- SIGNATURE --}}
+                        <table class="signature-block" style="width:100%;">
+                            <tr>
+                                <td style="width:42%;"></td>
+                                <td style="width:58%; text-align:center;">
+                                    {{ $pharmacy->city }}, {{ $date }}
+                                    <br>
+                                    Pemesan
+                                    @if (!empty($signatureBase64))
+                                        <div style="margin: 1px 0;">
+                                            <img src="{{ $signatureBase64 }}" style="height:35px; width:auto;">
+                                        </div>
+                                    @elseif ($pharmacy->signature && file_exists(public_path('img/' . $pharmacy->signature)))
+                                        <div style="margin: 1px 0;">
+                                            <img src="{{ public_path('img/' . $pharmacy->signature) }}"
+                                                style="height:35px; width:auto;">
+                                        </div>
+                                    @else
+                                        <div style="height:35px;"></div> {{-- blank space to sign by hand --}}
+                                    @endif
+                                    <b><u>( {{ $pharmacy->pharmacist }} )</u></b><br>
+                                    SIPA : {{ $pharmacy->pharmacist_permit }}
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
                 @endforeach
             @endforeach
         @endif

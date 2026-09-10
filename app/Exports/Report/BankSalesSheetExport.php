@@ -38,7 +38,7 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
         $bankName = null,
         $isRecap = false,
         $allBanksData = [],
-        $transactions = []
+        $transactions = null
     ) {
         $this->pharmacyId      = $pharmacyId;
         $this->startDate       = Carbon::parse($startDate)->startOfDay();
@@ -174,7 +174,7 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
             'Shift',
         ];
 
-        if (!empty($this->transactions)) {
+        if ($this->transactions !== null) {
             $transactions = is_array($this->transactions) ? collect($this->transactions) : $this->transactions;
         } else {
             $query = MedicineTransactions::with([
@@ -194,18 +194,9 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
                 });
             }
 
-            if (empty($this->bankName) || $this->bankName === 'Lainnya' || $this->bankName === 'Transfer Lainnya') {
-                $query->where(function ($q) {
-                    $q->whereNull('transfer_bank_name')
-                        ->orWhere('transfer_bank_name', '')
-                        ->orWhere('transfer_bank_name', 'Lainnya')
-                        ->orWhere('transfer_bank_name', 'Transfer Lainnya');
-                });
-            } else {
-                $query->where('transfer_bank_name', $this->bankName);
-            }
+            $transactions = $query->orderBy('updated_at', 'asc')->get()
+                ->filter(fn ($trx) => BankSalesExport::resolveCategory($trx) === $this->bankName);
 
-            $transactions = $query->orderBy('updated_at', 'asc')->get();
         }
 
         $rows = [];

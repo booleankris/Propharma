@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Order;
 use App\Models\OrderItems;
 use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
@@ -12,23 +13,66 @@ class OrdersTrackingController extends Controller
     {
         $validated = $request->validate([
             'request_key' => 'required|uuid',
-            'items' => 'required|array|min:2|max:500',
+            'target_order_id' => 'required|integer|exists:orders,id',
+            'items' => 'required|array|min:1|max:500',
             'items.*.id' => 'required|integer|distinct',
             'items.*.quantity' => 'required|numeric|min:0.0001',
         ]);
-        $order = $service->create($validated['items'], getPurchasingPharmacyId(), (int) $request->user()->id, $validated['request_key']);
+        $order = $service->create(
+            $validated['items'],
+            (int) $validated['target_order_id'],
+            getPurchasingPharmacyId(),
+            (int) $request->user()->id,
+            $validated['request_key']
+        );
         return response()->json(['redirect' => route('receiving.receive', $order->id)]);
+    }
+
+    public function targetOrders(Request $request)
+    {
+        $validated = $request->validate([
+            'creditor_code' => 'required|string',
+        ]);
+
+        $creditorCode = $validated['creditor_code'];
+        $pharmacyId = getPurchasingPharmacyId();
+
+        $orders = Order::where('pharmacy_id', $pharmacyId)
+            ->whereIn('status', [1, 2])
+            ->where('is_consolidation', false)
+            ->whereHas('order_items', function ($q) use ($creditorCode) {
+                $q->where('creditor_code', $creditorCode)
+                    ->orWhere('branch_creditor_code', $creditorCode);
+            })
+            ->withCount(['order_items as active_items_count' => function ($q) {
+                $q->where('quantity', '>', 0);
+            }])
+            ->orderBy('id', 'desc')
+            ->get(['id', 'code', 'date', 'status']);
+
+        return response()->json(['orders' => $orders]);
     }
 
     public function cancelConsolidation(Request $request, \App\Services\OrderConsolidation $service)
     {
         $validated = $request->validate([
-            'order_id' => 'required|integer|exists:orders,id',
+            'order_item_id' => 'nullable|integer|exists:order_items,id',
+            'order_id' => 'nullable|integer|exists:orders,id',
         ]);
-        $service->cancel((int) $validated['order_id'], getPurchasingPharmacyId(), (int) $request->user()->id);
+
+        if (!empty($validated['order_item_id'])) {
+            $service->rollbackItem((int) $validated['order_item_id'], getPurchasingPharmacyId(), (int) $request->user()->id);
+            $message = 'Pemindahan item berhasil dibatalkan. Kuantitas pesanan telah dikembalikan ke BPBA asal.';
+        } elseif (!empty($validated['order_id'])) {
+            $service->cancel((int) $validated['order_id'], getPurchasingPharmacyId(), (int) $request->user()->id);
+            $message = 'Konsolidasi BPBA berhasil dibatalkan. Kuantitas pesanan telah dikembalikan ke BPBA asal.';
+        } else {
+            return response()->json(['message' => 'Parameter order_item_id atau order_id harus disertakan.'], 422);
+        }
+
         return response()->json([
             'success' => true,
-            'message' => 'Konsolidasi BPBA berhasil dibatalkan. Kuantitas pesanan telah dikembalikan ke BPBA asal.',
+            'message' => $message,
             'redirect' => route('orders-tracking.index'),
         ]);
     }
@@ -89,7 +133,7 @@ class OrdersTrackingController extends Controller
 
         return DataTables::of($query)
             ->addColumn('remaining', fn ($row) => max(0, (float) $row->quantity - (float) $row->receivingItems->sum('qty_received')))
-            ->addColumn('can_consolidate', fn ($row) => in_array((int) $row->orders->status, [1, 2]) && $row->creditor_code && !$row->receivingItems->contains(fn ($item) => $item->batches_id === null) && (float) $row->quantity > (float) $row->receivingItems->sum('qty_received'))
+            ->addColumn('can_consolidate', fn ($row) => in_array((int) $row->orders->status, [1, 2]) && $row->creditor_code && !$row->receivingItems->contains(fn ($item) => $item->batches_id === null) && (float) $row->quantity > (float) $row->receivingItems->sum('qty_received') && empty($row->orders->is_consolidation))
             ->addColumn('movement_note', function ($row) {
                 $notes = $row->outgoingMovements->map(fn ($m) => 'Dipindahkan ' . (float) $m->quantity . ' ke ' . $m->targetItem->orders->code)->all();
                 if ($row->incomingMovement) {
@@ -137,17 +181,39 @@ class OrdersTrackingController extends Controller
                     : '<span class="tp-badge pending"><span class="dot"></span>Dipesan</span>';
             })
             ->addColumn('action', function ($row) {
-                if ((float) $row->quantity === 0 && $row->outgoingMovements->isNotEmpty()) {
-                    return 'Lihat BPBA tujuan pada kolom kode order';
-                }
+                $hasOutgoing = (float) $row->quantity === 0 && $row->outgoingMovements->isNotEmpty();
+                $hasIncoming = (bool) $row->incomingMovement;
                 $isReceived = $row->receivingItems && $row->receivingItems->whereNotNull('batches_id')->isNotEmpty();
-
                 $url = route('receiving.receive', $row->order_id);
+
+                // If already stored in stock:
                 if ($isReceived) {
                     return '<a href="' . $url . '" class="text-[12px] font-medium text-gray-600 border border-gray-200 bg-white hover:bg-gray-50 px-3 py-1.5 rounded-lg shadow-sm transition-colors inline-flex items-center gap-1.5 whitespace-nowrap">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
                                 Rincian
                             </a>';
+                }
+
+                // If source item completely moved:
+                if ($hasOutgoing) {
+                    return '<button type="button" onclick="rollbackItem(' . $row->id . ')" class="text-[12px] font-medium text-amber-700 hover:text-amber-800 border border-amber-300 bg-amber-50 hover:bg-amber-100 px-2.5 py-1.5 rounded-lg shadow-sm transition-colors inline-flex items-center gap-1 whitespace-nowrap" title="Batalkan pemindahan dan kembalikan kuantitas ke BPBA ini">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                                Batalkan Pemindahan
+                            </button>';
+                }
+
+                // If incoming movement (target item) and not received to stock yet:
+                if ($hasIncoming) {
+                    return '<div class="inline-flex items-center gap-1.5 flex-wrap">
+                                <a href="' . $url . '" class="text-[12px] font-medium bg-blue-600 text-white border border-blue-600 px-2.5 py-1.5 rounded-lg shadow-sm hover:bg-blue-700 hover:border-blue-700 transition-colors inline-flex items-center gap-1 whitespace-nowrap">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                                    Terima
+                                </a>
+                                <button type="button" onclick="rollbackItem(' . $row->id . ')" class="text-[12px] font-medium text-red-600 hover:text-red-700 border border-red-200 bg-red-50 hover:bg-red-100 px-2.5 py-1.5 rounded-lg shadow-sm transition-colors inline-flex items-center gap-1 whitespace-nowrap" title="Batalkan pemindahan item ini dan kembalikan ke BPBA asal">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                                    Batalkan
+                                </button>
+                            </div>';
                 }
 
                 if (!empty($row->orders->is_consolidation)) {

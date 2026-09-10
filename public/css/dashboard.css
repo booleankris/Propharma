@@ -553,3 +553,38 @@
 .payment-card.cash-card .payment-label {
     color: #059669;
 }
+
+/* Belum Bayar: merah lembut dengan kontras teks yang tetap jelas. */
+.payment-card.unpaid-card {
+    border-color: #ecd5d5;
+    background: #fdf7f7;
+}
+
+.payment-card.unpaid-card .payment-icon {
+    background: #f5e3e3;
+}
+
+.payment-card.unpaid-card .payment-icon svg,
+.payment-card.unpaid-card .payment-label {
+    color: #a34f4f;
+}
+
+.payment-option input[type="radio"]:checked + .payment-card.unpaid-card {
+    border-color: #c58b8b;
+    background: #faeeee;
+}
+
+.payment-option input[type="radio"]:checked + .payment-card.unpaid-card .payment-icon {
+    background: #ecd0d0;
+}
+
+.payment-option input[type="radio"]:checked + .payment-card.unpaid-card .payment-label {
+    color: #8f4040;
+    font-weight: 600;
+}
+
+.payment-option:focus-within .payment-card.unpaid-card {
+    outline: 2.5px solid #c58b8b !important;
+    outline-offset: 2px !important;
+    box-shadow: 0 0 0 4px rgba(197, 139, 139, 0.16) !important;
+}
