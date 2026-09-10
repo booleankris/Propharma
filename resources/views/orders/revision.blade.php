@@ -3,23 +3,6 @@
 @section('title', 'Revisi Faktur')
 
 @section('content')
-    <script>
-        // Early definition so clicks during page streaming/loading never throw ReferenceError
-        ['openAddModal', 'closeAddModal', 'openUnifiedMergeModal', 'closeUnifiedMergeModal', 'openMoveItemModal', 'openMergeModal', 'editRow', 'deleteEmptyDetails'].forEach(fn => {
-            if (typeof window[fn] === 'undefined') {
-                window[fn] = function(...args) {
-                    const check = () => {
-                        if (typeof window['_' + fn] === 'function') {
-                            window['_' + fn](...args);
-                        } else {
-                            setTimeout(check, 50);
-                        }
-                    };
-                    check();
-                };
-            }
-        });
-    </script>
     <section class="section py-4 px-[18px] bg-gray-50 min-h-screen">
         <div class="mx-auto space-y-6">
 
@@ -558,11 +541,7 @@
 
         </div>
     </section>
-@endsection
-
-@section('scripts')
-    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-    <script src="{{ asset('templates/library/izitoast/dist/js/iziToast.min.js') }}"></script>
+    {{-- Register page actions before the layout's external scripts can block loading. --}}
     <script>
         const ORDER_ID = {{ $order->id }};
         @php
@@ -1192,21 +1171,17 @@
         }
 
         // Bind real implementations to window
-        window._openAddModal = openAddModal;
         window.openAddModal = openAddModal;
-        window._closeAddModal = closeAddModal;
         window.closeAddModal = closeAddModal;
-        window._openUnifiedMergeModal = openUnifiedMergeModal;
         window.openUnifiedMergeModal = openUnifiedMergeModal;
-        window._closeUnifiedMergeModal = closeUnifiedMergeModal;
         window.closeUnifiedMergeModal = closeUnifiedMergeModal;
-        window._openMoveItemModal = openMoveItemModal;
         window.openMoveItemModal = openMoveItemModal;
-        window._openMergeModal = openMergeModal;
         window.openMergeModal = openMergeModal;
-        window._editRow = editRow;
         window.editRow = editRow;
-        window._deleteEmptyDetails = deleteEmptyDetails;
         window.deleteEmptyDetails = deleteEmptyDetails;
     </script>
+@endsection
+
+@section('scripts')
+    <script src="{{ asset('templates/library/izitoast/dist/js/iziToast.min.js') }}"></script>
 @endsection
