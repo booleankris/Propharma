@@ -1074,27 +1074,29 @@
         $(document).ready(function() {
 
             // JS
-            new Swiper('.productSwiper', {
-                slidesPerView: 2,
-                spaceBetween: 8,
-                grabCursor: true,
-                loop: true,
-                navigation: {
-                    nextEl: '.swiper-button-next',
-                    prevEl: '.swiper-button-prev',
-                },
-                breakpoints: {
-                    640: {
-                        slidesPerView: 2,
+            if (typeof Swiper !== 'undefined' && document.querySelector('.productSwiper')) {
+                new Swiper('.productSwiper', {
+                    slidesPerView: 2,
+                    spaceBetween: 8,
+                    grabCursor: true,
+                    loop: true,
+                    navigation: {
+                        nextEl: '.swiper-button-next',
+                        prevEl: '.swiper-button-prev',
                     },
-                    768: {
-                        slidesPerView: 2,
+                    breakpoints: {
+                        640: {
+                            slidesPerView: 2,
+                        },
+                        768: {
+                            slidesPerView: 2,
+                        },
+                        1024: {
+                            slidesPerView: 3,
+                        },
                     },
-                    1024: {
-                        slidesPerView: 3,
-                    },
-                },
-            });
+                });
+            }
 
         });
     </script>
