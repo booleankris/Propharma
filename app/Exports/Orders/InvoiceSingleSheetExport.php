@@ -1,0 +1,410 @@
+<?php
+
+namespace App\Exports\Orders;
+
+use App\Models\Pharmacies;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
+use Maatwebsite\Excel\Concerns\FromArray;
+use Maatwebsite\Excel\Concerns\WithColumnWidths;
+use Maatwebsite\Excel\Concerns\WithStyles;
+use Maatwebsite\Excel\Concerns\WithTitle;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
+
+class InvoiceSingleSheetExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
+{
+    protected $pharmacyId;
+    protected $startDate;
+    protected $endDate;
+    protected $selectedType;
+    protected $supplier;
+    protected $paymentType;
+    protected $sheetTitle;
+
+    const PPN = 0.11;
+
+    public function __construct(
+        $pharmacyId,
+        $startDate,
+        $endDate,
+        $selectedType = 'Detail',
+        $supplier = null,
+        $paymentType = null,
+        $sheetTitle = 'Semua'
+    ) {
+        $this->pharmacyId   = $pharmacyId;
+        $this->startDate    = $startDate instanceof Carbon ? $startDate : Carbon::parse($startDate)->startOfDay();
+        $this->endDate      = $endDate instanceof Carbon ? $endDate : Carbon::parse($endDate)->endOfDay();
+        $this->selectedType = $selectedType ?: 'detail';
+        $this->supplier     = $supplier;
+        $this->paymentType  = $paymentType;
+        $this->sheetTitle   = $sheetTitle;
+    }
+
+    public function title(): string
+    {
+        return $this->sheetTitle;
+    }
+
+    public function array(): array
+    {
+        $pharmacy = Pharmacies::find($this->pharmacyId);
+
+        $typeLabel = ucfirst(strtolower($this->selectedType));
+        $paymentLabel = $this->paymentType !== null ? ' - ' . strtoupper($this->sheetTitle) : ' - SEMUA';
+
+        $header = [
+            [$pharmacy->name ?? 'APOTEK'],
+            [$pharmacy->address ?? ''],
+            [''],
+            ['Laporan Data Faktur Pembelian (' . $typeLabel . $paymentLabel . ')'],
+            ['Tanggal : ' . $this->startDate->format('d/m/Y') . ' s/d ' . $this->endDate->format('d/m/Y')],
+            [''],
+        ];
+
+        $body = strtolower($this->selectedType) === 'rekap'
+            ? $this->buildRekap()
+            : $this->buildDetail();
+
+        return array_merge($header, $body);
+    }
+
+    private function baseQuery()
+    {
+        $targetPharmacyIds = in_array((int) $this->pharmacyId, [1, 6, 9])
+            ? [9, 1]
+            : [(int) $this->pharmacyId];
+
+        $query = DB::table('receiving_items')
+            ->join('receiving_details', 'receiving_details.id', '=', 'receiving_items.receiving_details_id')
+            ->join('receiving', 'receiving.id', '=', 'receiving_details.receiving_id')
+            ->join('order_items', 'order_items.id', '=', 'receiving_items.order_items_id')
+            ->join('orders', 'orders.id', '=', 'order_items.order_id')
+            ->leftJoin('creditors', 'creditors.code', '=', 'order_items.creditor_code')
+            ->whereIn('receiving.pharmacy_id', $targetPharmacyIds)
+            ->whereNotNull('receiving_items.batches_id')
+            ->whereBetween('receiving_details.created_at', [$this->startDate, $this->endDate]);
+
+        if ($this->paymentType !== null) {
+            if ($this->paymentType === 'OTHER') {
+                $query->where(function ($q) {
+                    $q->whereNull('receiving_details.invoice_payment')
+                      ->orWhere('receiving_details.invoice_payment', '')
+                      ->orWhereNotIn(DB::raw('UPPER(TRIM(receiving_details.invoice_payment))'), ['KREDIT', 'TUNAI', 'KONSINYASI']);
+                });
+            } else {
+                $query->where(DB::raw('UPPER(TRIM(receiving_details.invoice_payment))'), strtoupper(trim($this->paymentType)));
+            }
+        }
+
+        if ($this->supplier) {
+            $supplier = $this->supplier;
+            $query->where(function ($sq) use ($supplier) {
+                $sq->where('order_items.creditor_code', $supplier)
+                    ->orWhere('creditors.code', $supplier)
+                    ->orWhere('creditors.id', $supplier);
+            });
+        }
+
+        return $query;
+    }
+
+    private function buildDetail(): array
+    {
+        $items = $this->baseQuery()
+            ->select([
+                'receiving_details.invoice_number',
+                'receiving_details.invoice_date',
+                'receiving_details.invoice_due',
+                'receiving_details.invoice_times',
+                'receiving_details.invoice_payment',
+                'receiving_details.invoice_ppn',
+                'receiving_details.receiving_id',
+                'receiving_details.receiving_details_code',
+                'receiving.updated_at as receiving_updated_at',
+                'receiving_details.created_at as receiving_details_created_at',
+                'order_items.creditor_code',
+                'creditors.name as creditor_name',
+                'receiving_items.qty_received',
+                'receiving_items.qty',
+                'receiving_items.discount',
+                'receiving_items.extra_discount',
+                'receiving_items.raw_price as receiving_raw_price',
+                'order_items.price as order_items_price',
+            ])
+            ->orderBy('receiving.updated_at', 'asc')
+            ->orderBy('receiving_details.invoice_number', 'asc')
+            ->get();
+
+        $tableHeaders = [
+            'No.', 'Nama Kreditur', 'Kode Kreditur', 'No Faktur',
+            'Tgl Faktur', 'No Terima', 'Tgl Terima',
+            'DPP', 'PPN', 'Jumlah', 'Jatuh Tempo', 'Waktu Kredit', 'Jenis Bayar'
+        ];
+
+        if ($items->isEmpty()) {
+            $rows = [$tableHeaders];
+            $emptyRow = array_fill(0, count($tableHeaders), '');
+            $emptyRow[0] = 'Tidak ada data untuk periode yang dipilih.';
+            $rows[] = $emptyRow;
+            return $rows;
+        }
+
+        $invoices = [];
+        foreach ($items as $item) {
+            $key = $item->invoice_number . '_' . $item->receiving_id;
+            if (!isset($invoices[$key])) {
+                $invoices[$key] = [
+                    'invoice_number'               => $item->invoice_number,
+                    'invoice_date'                 => $item->invoice_date,
+                    'invoice_due'                  => $item->invoice_due,
+                    'invoice_times'                => $item->invoice_times,
+                    'invoice_payment'              => $item->invoice_payment,
+                    'receiving_details_code'       => $item->receiving_details_code,
+                    'receiving_updated_at'         => $item->receiving_updated_at,
+                    'receiving_details_created_at' => $item->receiving_details_created_at,
+                    'creditor_code'                => $item->creditor_code,
+                    'creditor_name'                => $item->creditor_name,
+                    'dpp'                          => 0,
+                    'ppn'                          => 0,
+                    'jumlah'                       => 0,
+                ];
+            }
+
+            $qty          = (float) ($item->qty_received ?? $item->qty ?? 0);
+            $rawPrice     = (float) ($item->receiving_raw_price ?? $item->order_items_price ?? 0);
+            $gross        = $qty * $rawPrice;
+            $disc         = (float) ($item->discount ?? 0);
+            $extraDisc    = (float) ($item->extra_discount ?? 0);
+            $nomDisc      = ($disc <= 100 && $disc > 0) ? ($gross * $disc / 100) : $disc;
+            $nomExtraDisc = ($extraDisc <= 100 && $extraDisc > 0) ? ($gross * $extraDisc / 100) : $extraDisc;
+
+            $dpp = max(0, $gross - $nomDisc - $nomExtraDisc);
+            $ppnType = strtoupper(trim($item->invoice_ppn ?? 'TANPA'));
+            $ppn = 0;
+
+            if ($ppnType === 'EXCLUDE') {
+                $ppn = floor($dpp * self::PPN);
+            } else if ($ppnType === 'INCLUDE') {
+                $ppn = floor($dpp - ($dpp / (1 + self::PPN)));
+                $dpp = $dpp - $ppn;
+            }
+
+            $jumlah = $dpp + $ppn;
+            $invoices[$key]['dpp']    += $dpp;
+            $invoices[$key]['ppn']    += $ppn;
+            $invoices[$key]['jumlah'] += $jumlah;
+        }
+
+        $rows   = [$tableHeaders];
+        $no         = 1;
+        $grandDpp   = 0.0;
+        $grandPpn   = 0.0;
+        $grandTotal = 0.0;
+
+        foreach ($invoices as $inv) {
+            $tglFaktur  = $inv['invoice_date']
+                ? Carbon::parse($inv['invoice_date'])->format('d/m/Y') : '-';
+            $tglTerima  = $inv['receiving_details_created_at']
+                ? Carbon::parse($inv['receiving_details_created_at'])->format('d/m/Y') : '-';
+            $jatuhTempo = $inv['invoice_due']
+                ? Carbon::parse($inv['invoice_due'])->format('d/m/Y') : '-';
+
+            $rows[] = [
+                (int)   $no++,
+                        $inv['creditor_name']  ?? '-',
+                        $inv['creditor_code']  ?? '-',
+                        $inv['invoice_number'] ?? '-',
+                        $tglFaktur,
+                        $inv['receiving_details_code'] ?? '-',
+                        $tglTerima,
+                (float) $inv['dpp'],
+                (float) $inv['ppn'],
+                (float) $inv['jumlah'],
+                        $jatuhTempo,
+                        $inv['invoice_times']   ?? '-',
+                        $inv['invoice_payment'] ?? '-',
+            ];
+
+            $grandDpp   += $inv['dpp'];
+            $grandPpn   += $inv['ppn'];
+            $grandTotal += $inv['jumlah'];
+        }
+
+        $rows[] = [
+            '', '', '', '', '', '', 'TOTAL',
+            (float) $grandDpp,
+            (float) $grandPpn,
+            (float) $grandTotal,
+            '', '', '',
+        ];
+
+        return $rows;
+    }
+
+    private function buildRekap(): array
+    {
+        $items = $this->baseQuery()
+            ->select([
+                'order_items.creditor_code',
+                'creditors.name as creditor_name',
+                'receiving_details.invoice_ppn',
+                'receiving_items.qty_received',
+                'receiving_items.qty',
+                'receiving_items.discount',
+                'receiving_items.extra_discount',
+                'receiving_items.raw_price as receiving_raw_price',
+                'order_items.price as order_items_price',
+            ])
+            ->orderBy('creditors.name', 'asc')
+            ->get();
+
+        $tableHeaders = ['No.', 'Kreditur', 'DPP', 'PPN', 'Jumlah'];
+
+        if ($items->isEmpty()) {
+            $rows = [$tableHeaders];
+            $emptyRow = array_fill(0, count($tableHeaders), '');
+            $emptyRow[0] = 'Tidak ada data untuk periode yang dipilih.';
+            $rows[] = $emptyRow;
+            return $rows;
+        }
+
+        $creditorsArr = [];
+        foreach ($items as $item) {
+            $key = $item->creditor_code;
+            if (!isset($creditorsArr[$key])) {
+                $creditorsArr[$key] = [
+                    'creditor_code' => $item->creditor_code,
+                    'creditor_name' => $item->creditor_name,
+                    'dpp'           => 0,
+                    'ppn'           => 0,
+                    'jumlah'        => 0,
+                ];
+            }
+
+            $qty          = (float) ($item->qty_received ?? $item->qty ?? 0);
+            $rawPrice     = (float) ($item->receiving_raw_price ?? $item->order_items_price ?? 0);
+            $gross        = $qty * $rawPrice;
+            $disc         = (float) ($item->discount ?? 0);
+            $extraDisc    = (float) ($item->extra_discount ?? 0);
+            $nomDisc      = ($disc <= 100 && $disc > 0) ? ($gross * $disc / 100) : $disc;
+            $nomExtraDisc = ($extraDisc <= 100 && $extraDisc > 0) ? ($gross * $extraDisc / 100) : $extraDisc;
+
+            $dpp = max(0, $gross - $nomDisc - $nomExtraDisc);
+            $ppnType = strtoupper(trim($item->invoice_ppn ?? 'TANPA'));
+            $ppn = 0;
+
+            if ($ppnType === 'EXCLUDE') {
+                $ppn = floor($dpp * self::PPN);
+            } else if ($ppnType === 'INCLUDE') {
+                $ppn = floor($dpp - ($dpp / (1 + self::PPN)));
+                $dpp = $dpp - $ppn;
+            }
+
+            $jumlah = $dpp + $ppn;
+            $creditorsArr[$key]['dpp']    += $dpp;
+            $creditorsArr[$key]['ppn']    += $ppn;
+            $creditorsArr[$key]['jumlah'] += $jumlah;
+        }
+
+        $rows   = [$tableHeaders];
+        $no         = 1;
+        $grandDpp   = 0.0;
+        $grandPpn   = 0.0;
+        $grandTotal = 0.0;
+
+        foreach ($creditorsArr as $cred) {
+            $rows[] = [
+                (int)   $no++,
+                        $cred['creditor_name'] ?? '-',
+                (float) $cred['dpp'],
+                (float) $cred['ppn'],
+                (float) $cred['jumlah'],
+            ];
+
+            $grandDpp   += $cred['dpp'];
+            $grandPpn   += $cred['ppn'];
+            $grandTotal += $cred['jumlah'];
+        }
+
+        $rows[] = [
+            '', 'TOTAL',
+            (float) $grandDpp,
+            (float) $grandPpn,
+            (float) $grandTotal,
+        ];
+
+        return $rows;
+    }
+
+    public function styles(Worksheet $sheet)
+    {
+        $lastRow      = $sheet->getHighestRow();
+        $dataStartRow = 7;
+        $isRekap      = strtolower($this->selectedType) === 'rekap';
+
+        $lastCol     = $isRekap ? 'E' : 'M';
+        $numericCols = $isRekap ? ['C', 'D', 'E'] : ['H', 'I', 'J'];
+
+        $sheet->mergeCells("A1:{$lastCol}1");
+        $sheet->mergeCells("A2:{$lastCol}2");
+        $sheet->mergeCells("A4:{$lastCol}4");
+        $sheet->mergeCells("A5:{$lastCol}5");
+
+        $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(13);
+        $sheet->getStyle('A4')->getFont()->setBold(true);
+
+        $sheet->getStyle("A{$dataStartRow}:{$lastCol}{$dataStartRow}")
+            ->getFont()->setBold(true);
+
+        $sheet->getStyle("A{$dataStartRow}:{$lastCol}{$lastRow}")
+            ->getBorders()->getAllBorders()
+            ->setBorderStyle(Border::BORDER_THIN);
+
+        for ($i = $dataStartRow; $i <= $lastRow; $i++) {
+            $sheet->getRowDimension($i)->setRowHeight(22);
+        }
+
+        // Left-align everything within data range
+        $sheet->getStyle("A{$dataStartRow}:{$lastCol}{$lastRow}")
+            ->getAlignment()
+            ->setHorizontal(Alignment::HORIZONTAL_LEFT);
+
+        // Right-align & number format numeric cols
+        foreach ($numericCols as $col) {
+            $sheet->getStyle("{$col}{$dataStartRow}:{$col}{$lastRow}")
+                ->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+            $sheet->getStyle("{$col}{$dataStartRow}:{$col}{$lastRow}")
+                ->getNumberFormat()->setFormatCode('#,##0');
+        }
+    }
+
+    public function columnWidths(): array
+    {
+        return strtolower($this->selectedType) === 'rekap'
+            ? [
+                'A' => 5,
+                'B' => 30,
+                'C' => 20,
+                'D' => 20,
+                'E' => 20,
+            ]
+            : [
+                'A' => 5,
+                'B' => 25,
+                'C' => 15,
+                'D' => 20,
+                'E' => 13,
+                'F' => 15,
+                'G' => 13,
+                'H' => 18,
+                'I' => 18,
+                'J' => 18,
+                'K' => 13,
+                'L' => 13,
+                'M' => 14,
+            ];
+    }
+}

@@ -33,7 +33,7 @@
                         $firstCell = trim((string)($row[0] ?? ''));
                         $secondCell = trim((string)($row[1] ?? ''));
 
-                        if (in_array(strtolower($firstCell), ['no', 'no.', 'no '])) {
+                        if (in_array(strtolower($firstCell), ['no', 'no.', 'no ', 'id'])) {
                             $isHeader = true;
                             $headerMap = array_map(fn($c) => strtolower(trim((string)$c)), $row);
                         }
@@ -44,7 +44,7 @@
                         if (stripos($secondCell, 'total') !== false || stripos($secondCell, 'grand total') !== false || stripos($firstCell, 'total') !== false) {
                             $isGrandTotal = true;
                         }
-                        if ($firstCell !== '' && !in_array(strtolower($firstCell), ['no', 'no.']) && $secondCell === '') {
+                        if ($firstCell !== '' && !in_array(strtolower($firstCell), ['no', 'no.', 'no ', 'id']) && $secondCell === '') {
                             $isGroupHeader = true;
                         }
                     }
