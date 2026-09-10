@@ -6,7 +6,6 @@
     const ALL_DETAILS = config.details;
     const BPBA_ITEMS = config.orderItems;
     const ALL_ITEMS = config.items;
-        let currentAddMode = 'bpba';
 
         function parseRupiah(value) {
             if (!value) return 0;
@@ -111,9 +110,7 @@
             populateInvoiceMedicineOptions(detailsId);
 
             // Reset inputs
-            switchAddMode('bpba');
             document.getElementById('add_order_items_id').value = '';
-            document.getElementById('add_medicine_id').value = '';
             document.getElementById('add_batch').value = '';
             document.getElementById('add_expired_date').value = '';
             document.getElementById('add_qty_received').value = '';
@@ -132,25 +129,6 @@
             document.getElementById('addModal').classList.remove('flex');
         }
 
-        function switchAddMode(mode) {
-            currentAddMode = mode;
-            const btnBpba = document.getElementById('tab_mode_bpba');
-            const secBpba = document.getElementById('section_bpba_select');
-            const secMaster = document.getElementById('section_master_select');
-
-            if (mode === 'bpba') {
-                btnBpba.className =
-                    'flex-1 py-1.5 rounded-lg bg-white shadow-xs text-blue-700 font-semibold transition-all';
-                secBpba.classList.remove('hidden');
-                secMaster.classList.add('hidden');
-            } else {
-
-                btnBpba.className = 'flex-1 py-1.5 rounded-lg text-gray-600 hover:text-gray-900 transition-all';
-                secMaster.classList.remove('hidden');
-                secBpba.classList.add('hidden');
-            }
-        }
-
         function onSelectOrderItem() {
             const select = document.getElementById('add_order_items_id');
             const opt = select.options[select.selectedIndex];
@@ -167,16 +145,6 @@
             if (disc > 0) {
                 document.getElementById('add_discount').value = formatRupiah(disc);
             }
-            recalcAddTotal();
-        }
-
-        function onSelectMasterMedicine() {
-            const select = document.getElementById('add_medicine_id');
-            const opt = select.options[select.selectedIndex];
-            if (!opt || !opt.value) return;
-
-            const price = parseFloat(opt.dataset.price) || 0;
-            document.getElementById('add_raw_price').value = formatRupiah(price);
             recalcAddTotal();
         }
 
@@ -216,21 +184,12 @@
                 total: parseRupiah(document.getElementById('add_total').value),
             };
 
-            if (currentAddMode === 'bpba') {
-                const oiId = document.getElementById('add_order_items_id').value;
-                if (!oiId) {
-                    alert('Pilih obat dari faktur ini terlebih dahulu.');
-                    return;
-                }
-                payload.order_items_id = oiId;
-            } else {
-                const medId = document.getElementById('add_medicine_id').value;
-                if (!medId) {
-                    alert('Pilih obat dari master terlebih dahulu.');
-                    return;
-                }
-                payload.medicine_id = medId;
+            const oiId = document.getElementById('add_order_items_id').value;
+            if (!oiId) {
+                alert('Pilih obat dari faktur ini terlebih dahulu.');
+                return;
             }
+            payload.order_items_id = oiId;
 
             try {
                 const res = await axios.post(`/orders/${ORDER_ID}/revision/add-item`, payload, {
@@ -602,9 +561,7 @@
         populateInvoiceMedicineOptions,
         openAddModal,
         closeAddModal,
-        switchAddMode,
         onSelectOrderItem,
-        onSelectMasterMedicine,
         submitAddMedicine,
         editRow,
         closeModal,

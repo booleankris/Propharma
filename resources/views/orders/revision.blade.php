@@ -267,14 +267,6 @@
 
                     <input type="hidden" id="add_receiving_details_id">
 
-                    <!-- Mode Toggle -->
-                    <div class="flex rounded-xl bg-gray-100 p-1 text-xs font-semibold">
-                        <button type="button" id="tab_mode_bpba" onclick="switchAddMode('bpba')"
-                            class="flex-1 py-1.5 rounded-lg bg-white shadow-xs text-blue-700 transition-all">
-                            Dari Pesanan / BPBA Ini
-                        </button>
-                    </div>
-
                     <!-- Medicine Selection: BPBA Mode -->
                     <div id="section_bpba_select" class="space-y-1">
                         <label class="text-xs font-semibold text-gray-700">Pilih Obat dari BPBA <span
@@ -283,20 +275,6 @@
                             class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
                             <option value="">-- Pilih Obat dari Faktur Ini --</option>
 
-                        </select>
-                    </div>
-
-                    <!-- Medicine Selection: Master Mode -->
-                    <div id="section_master_select" class="space-y-1 hidden">
-                        <label class="text-xs font-semibold text-gray-700">Pilih Obat dari Master <span
-                                class="text-red-500">*</span></label>
-                        <select id="add_medicine_id" onchange="onSelectMasterMedicine()"
-                            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                            <option value="">-- Pilih Obat dari Master Obat --</option>
-                            @foreach ($allMedicines as $m)
-                                <option value="{{ $m->id }}" data-price="{{ $m->raw_price ?? 0 }}">
-                                    {{ $m->name }}</option>
-                            @endforeach
                         </select>
                     </div>
 

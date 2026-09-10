@@ -1388,9 +1388,7 @@ class ReceivingController extends Controller
             ];
         });
 
-        $allMedicines = Medicines::select('id', 'name', 'raw_price')->orderBy('name')->get();
-
-        return view('orders.revision', compact('order', 'allReceivingDetails', 'orphanedItems', 'orderItemsData', 'allMedicines'));
+        return view('orders.revision', compact('order', 'allReceivingDetails', 'orphanedItems', 'orderItemsData'));
     }
 
     public function addRevisionItem(Request $request, $orderId)
