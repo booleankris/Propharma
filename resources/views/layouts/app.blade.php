@@ -86,7 +86,7 @@
         @yield('content')
     </main>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
@@ -237,6 +237,7 @@
         // ─── Sidebar (mobile) ─────────────────────────────────────────────────────────
         function initFactorySelect() {
             const el = $('#factory');
+            if (!el.length || typeof el.select2 !== 'function') return;
 
             if (el.hasClass("select2-hidden-accessible")) {
                 el.select2('destroy');
@@ -252,6 +253,7 @@
 
         function initDoctorSelect() {
             const el = $('#doctor');
+            if (!el.length || typeof el.select2 !== 'function') return;
 
             if (el.hasClass("select2-hidden-accessible")) {
                 el.select2('destroy');
@@ -723,7 +725,7 @@
 
         function initOrderSupplierSelect() {
             const el = $('#order_supplier');
-            if (!el.length) return;
+            if (!el.length || typeof el.select2 !== 'function') return;
             if (el.hasClass("select2-hidden-accessible")) {
                 el.select2('destroy');
             }
