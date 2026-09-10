@@ -38,7 +38,7 @@ class OrderConsolidation
             if ((int) $targetOrder->pharmacy_id !== $pharmacyId) {
                 $fail('Apotek/Gudang penerima BPBA target tidak sesuai.');
             }
-            if (!in_array((int) $targetOrder->status, [1, 2])) {
+            if (!in_array((int) $targetOrder->status, [0, 1, 2]) || (int) $targetOrder->status === 3) {
                 $fail('BPBA target harus berstatus Dipesan atau Diterima Sebagian.');
             }
             if (!empty($targetOrder->is_consolidation)) {
@@ -53,14 +53,14 @@ class OrderConsolidation
             }
 
             // Creditor validation: all items must belong to the same PBF
-            $creditors = $items->pluck('creditor_code')->filter()->unique();
-            if ($creditors->count() !== 1 || $items->contains(fn ($item) => !$item->creditor_code)) {
+            $creditors = $items->map(fn ($i) => $i->creditor_code ?: $i->branch_creditor_code)->filter()->unique();
+            if ($creditors->count() !== 1 || $items->contains(fn ($item) => !($item->creditor_code ?: $item->branch_creditor_code))) {
                 $fail('Semua item harus berasal dari satu PBF yang sama.');
             }
             $sourceCreditor = $creditors->first();
 
             // Validate that target order belongs to the same PBF
-            $targetCreditors = OrderItems::where('order_id', $targetOrder->id)->pluck('creditor_code')->filter()->unique();
+            $targetCreditors = OrderItems::where('order_id', $targetOrder->id)->get()->map(fn ($i) => $i->creditor_code ?: $i->branch_creditor_code)->filter()->unique();
             if ($targetCreditors->isNotEmpty() && !$targetCreditors->contains($sourceCreditor)) {
                 $fail('BPBA target harus berasal dari PBF yang sama dengan item yang dipindahkan.');
             }
@@ -75,7 +75,7 @@ class OrderConsolidation
             $sourceOrderIds = $itemsToMove->pluck('order_id')->unique();
             $sourceOrders = Order::whereIn('id', $sourceOrderIds)->lockForUpdate()->get()->keyBy('id');
             foreach ($sourceOrders as $sourceOrder) {
-                if ((int) $sourceOrder->pharmacy_id !== $pharmacyId || !in_array((int) $sourceOrder->status, [1, 2])) {
+                if ((int) $sourceOrder->pharmacy_id !== $pharmacyId || !in_array((int) $sourceOrder->status, [0, 1, 2]) || (int) $sourceOrder->status === 3) {
                     $fail('BPBA asal harus masih terbuka dan memiliki apotek/gudang yang sama.');
                 }
                 if (!empty($sourceOrder->is_consolidation)) {
