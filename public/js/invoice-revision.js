@@ -28,6 +28,10 @@
         }
 
         // ================== RECALC TOTALS ==================
+        function nominalDiscount(gross, value) {
+            return (value <= 100 && value > 0) ? (gross * value / 100) : value;
+        }
+
         function recalcEditTotal() {
             const qtyEl = document.getElementById('edit_qty_received');
             const priceEl = document.getElementById('edit_raw_price');
@@ -37,10 +41,10 @@
 
             const qty = qtyEl ? (parseFloat(qtyEl.value) || 0) : 0;
             const price = priceEl ? parseRupiah(priceEl.value) : 0;
-            const disc = discEl ? parseRupiah(discEl.value) : 0;
-            const extraDisc = extraDiscEl ? parseRupiah(extraDiscEl.value) : 0;
+            const disc = discEl ? (parseFloat(discEl.value) || 0) : 0;
+            const extraDisc = extraDiscEl ? (parseFloat(extraDiscEl.value) || 0) : 0;
             const gross = qty * price;
-            const net = Math.max(0, gross - disc - extraDisc);
+            const net = Math.max(0, gross - nominalDiscount(gross, disc) - nominalDiscount(gross, extraDisc));
             if (totalEl) totalEl.value = formatRupiah(net);
         }
 
@@ -53,10 +57,10 @@
 
             const qty = qtyEl ? (parseFloat(qtyEl.value) || 0) : 0;
             const price = priceEl ? parseRupiah(priceEl.value) : 0;
-            const disc = discEl ? parseRupiah(discEl.value) : 0;
-            const extraDisc = extraDiscEl ? parseRupiah(extraDiscEl.value) : 0;
+            const disc = discEl ? (parseFloat(discEl.value) || 0) : 0;
+            const extraDisc = extraDiscEl ? (parseFloat(extraDiscEl.value) || 0) : 0;
             const gross = qty * price;
-            const net = Math.max(0, gross - disc - extraDisc);
+            const net = Math.max(0, gross - nominalDiscount(gross, disc) - nominalDiscount(gross, extraDisc));
             if (totalEl) totalEl.value = formatRupiah(net);
         }
 
@@ -68,13 +72,13 @@
 
             bindRecalc('edit_qty_received', 'input', recalcEditTotal);
             bindRecalc('edit_raw_price', 'input', e => { formatInputRupiah(e); recalcEditTotal(); });
-            bindRecalc('edit_discount', 'input', e => { formatInputRupiah(e); recalcEditTotal(); });
-            bindRecalc('edit_extra_discount', 'input', e => { formatInputRupiah(e); recalcEditTotal(); });
+            bindRecalc('edit_discount', 'input', recalcEditTotal);
+            bindRecalc('edit_extra_discount', 'input', recalcEditTotal);
 
             bindRecalc('add_qty_received', 'input', recalcAddTotal);
             bindRecalc('add_raw_price', 'input', e => { formatInputRupiah(e); recalcAddTotal(); });
-            bindRecalc('add_discount', 'input', e => { formatInputRupiah(e); recalcAddTotal(); });
-            bindRecalc('add_extra_discount', 'input', e => { formatInputRupiah(e); recalcAddTotal(); });
+            bindRecalc('add_discount', 'input', recalcAddTotal);
+            bindRecalc('add_extra_discount', 'input', recalcAddTotal);
         });
 
         // ================== MODAL TAMBAH OBAT ==================
@@ -97,6 +101,8 @@
                     item.id
                 );
                 option.dataset.price = item.price;
+                option.dataset.rawPrice = item.raw_price;
+                option.dataset.content = item.content;
                 option.dataset.disc = item.discount;
                 option.dataset.rem = item.remaining_qty;
                 option.dataset.pack = item.pack ? '1' : '0';
@@ -120,6 +126,10 @@
             document.getElementById('add_extra_discount').value = '';
             document.getElementById('add_total').value = '';
             document.getElementById('add_status').value = '1';
+            document.getElementById('add_content').value = '';
+            document.getElementById('add_pack').checked = false;
+            addBasePrice = 0;
+            addContent = 1;
             setAddMode('bpba');
 
             document.getElementById('addModal').classList.remove('hidden');
@@ -136,17 +146,38 @@
             const opt = select.options[select.selectedIndex];
             if (!opt || !opt.value) return;
 
-            const price = parseFloat(opt.dataset.price) || 0;
-            const rem = parseFloat(opt.dataset.rem) || 0;
+            const basePrice = parseFloat(opt.dataset.rawPrice) || 0;
             const disc = parseFloat(opt.dataset.disc) || 0;
+            const rem = parseFloat(opt.dataset.rem) || 0;
 
-            document.getElementById('add_raw_price').value = formatRupiah(price);
+            addBasePrice = basePrice;
+            addContent = parseFloat(opt.dataset.content) || 1;
+            document.getElementById('add_content').value = addContent;
+            document.getElementById('add_pack').checked = opt.dataset.pack === '1';
+            applyAddPackPrice();
+
             if (rem > 0) {
                 document.getElementById('add_qty_received').value = rem;
             }
             if (disc > 0) {
-                document.getElementById('add_discount').value = formatRupiah(disc);
+                document.getElementById('add_discount').value = disc;
             }
+            recalcAddTotal();
+        }
+
+        function applyAddPackPrice() {
+            const pack = document.getElementById('add_pack').checked;
+            const price = pack && addContent > 1 ? (addBasePrice * addContent) : addBasePrice;
+            document.getElementById('add_raw_price').value = formatRupiah(price);
+
+            const boxInfo = document.getElementById('add_box_price_info');
+            if (boxInfo) {
+                boxInfo.textContent = pack && addContent > 1 ? `(Box: ${formatRupiah(price)})` : '';
+            }
+        }
+
+        function onAddPackChange() {
+            applyAddPackPrice();
             recalcAddTotal();
         }
 
@@ -154,6 +185,8 @@
         let addMode = 'bpba';
         let masterCache = {};
         let masterSearchTimer = null;
+        let addBasePrice = 0;
+        let addContent = 1;
 
         function setAddMode(mode) {
             addMode = mode;
@@ -245,15 +278,17 @@
             const item = masterCache[id];
             if (!item) return;
 
+            addBasePrice = parseFloat(item.raw_price) || 0;
+            addContent = parseInt(item.content) || 1;
+
             document.getElementById('add_medicine_id').value = item.id;
             document.getElementById('master_selected_medicine_name').textContent = `${item.name} (${item.code})`;
             document.getElementById('master_selected_medicine').classList.remove('hidden');
             document.getElementById('master_search_input').value = item.name;
             document.getElementById('master_search_dropdown').classList.add('hidden');
-
-            if (item.raw_price) {
-                document.getElementById('add_raw_price').value = formatRupiah(item.raw_price);
-            }
+            document.getElementById('add_content').value = addContent;
+            document.getElementById('add_pack').checked = false;
+            applyAddPackPrice();
             recalcAddTotal();
         }
 
@@ -295,9 +330,10 @@
                 expired_date: expDate,
                 qty_received: qty,
                 raw_price: rawPrice,
-                discount: parseRupiah(document.getElementById('add_discount').value),
-                extra_discount: parseRupiah(document.getElementById('add_extra_discount').value),
+                discount: parseFloat(document.getElementById('add_discount').value) || 0,
+                extra_discount: parseFloat(document.getElementById('add_extra_discount').value) || 0,
                 status: document.getElementById('add_status').value || 1,
+                pack: document.getElementById('add_pack').checked ? 1 : 0,
                 total: parseRupiah(document.getElementById('add_total').value),
             };
 
@@ -362,8 +398,8 @@
             document.getElementById('edit_expired_date').value = data.expired_date;
             document.getElementById('edit_qty_received').value = data.qty_received;
             document.getElementById('edit_raw_price').value = formatRupiah(data.raw_price);
-            document.getElementById('edit_discount').value = formatRupiah(data.discount);
-            document.getElementById('edit_extra_discount').value = formatRupiah(data.extra_discount);
+            document.getElementById('edit_discount').value = data.discount;
+            document.getElementById('edit_extra_discount').value = data.extra_discount;
             document.getElementById('edit_status').value = data.status;
             document.getElementById('edit_total').value = formatRupiah(data.total);
 
@@ -389,8 +425,8 @@
                 expired_date: document.getElementById('edit_expired_date').value,
                 qty_received: document.getElementById('edit_qty_received').value,
                 raw_price: parseRupiah(document.getElementById('edit_raw_price').value),
-                discount: parseRupiah(document.getElementById('edit_discount').value),
-                extra_discount: parseRupiah(document.getElementById('edit_extra_discount').value),
+                discount: parseFloat(document.getElementById('edit_discount').value) || 0,
+                extra_discount: parseFloat(document.getElementById('edit_extra_discount').value) || 0,
                 status: document.getElementById('edit_status').value,
                 total: parseRupiah(document.getElementById('edit_total').value),
             };
@@ -688,6 +724,8 @@
         openAddModal,
         closeAddModal,
         onSelectOrderItem,
+        applyAddPackPrice,
+        onAddPackChange,
         setAddMode,
         searchMasterMedicine,
         selectMasterMedicine,

@@ -1383,6 +1383,8 @@ class ReceivingController extends Controller
                 'received_qty' => (float) $receivedQty,
                 'remaining_qty' => (float) $remainingQty,
                 'price' => (float) ($oi->price ?? 0),
+                'raw_price' => (float) ($oi->medicines->raw_price ?? 0),
+                'content' => (int) ($oi->medicines->content ?? 1),
                 'discount' => (float) ($oi->discount ?? 0),
                 'pack' => (bool) $oi->pack,
             ];
@@ -1406,6 +1408,8 @@ class ReceivingController extends Controller
                 'medicines.code',
                 'medicines.name',
                 'medicines.raw_price',
+                'medicines.content',
+                'medicines.unit',
                 'factories.name as factory_name',
             ])
             ->leftJoin('factories', 'factories.id', '=', 'medicines.factory_id')
@@ -1422,6 +1426,8 @@ class ReceivingController extends Controller
                 'code' => $m->code,
                 'name' => $m->name,
                 'raw_price' => (float) $m->raw_price,
+                'content' => (int) ($m->content ?? 1),
+                'unit' => $m->unit,
                 'factory_name' => $m->factory_name,
             ]),
         ]);
@@ -1435,6 +1441,7 @@ class ReceivingController extends Controller
             'expired_date' => 'required|date',
             'qty_received' => 'required|numeric|min:0.01',
             'raw_price' => 'required',
+            'pack' => 'nullable|boolean',
         ]);
 
         try {
@@ -1445,6 +1452,10 @@ class ReceivingController extends Controller
 
             if ($request->filled('order_items_id')) {
                 $orderItem = OrderItems::with('medicines')->where('order_id', $orderId)->findOrFail($request->order_items_id);
+
+                if ($request->has('pack')) {
+                    $orderItem->update(['pack' => $request->boolean('pack') ? 1 : 0]);
+                }
             } elseif ($request->filled('medicine_id')) {
                 $medicine = Medicines::findOrFail($request->medicine_id);
                 $firstItem = $order->order_items->first();
@@ -1453,7 +1464,7 @@ class ReceivingController extends Controller
                     'order_id' => $order->id,
                     'medicine_id' => $medicine->id,
                     'creditor_code' => $detail->creditor_code ?? $firstItem?->creditor_code,
-                    'pack' => 0,
+                    'pack' => $request->boolean('pack') ? 1 : 0,
                     'price' => (float) preg_replace('/[^\d.]/', '', (string) $request->raw_price),
                     'quantity' => (float) $request->qty_received,
                     'total' => (float) preg_replace('/[^\d.]/', '', (string) ($request->total ?? 0)),
@@ -1479,8 +1490,9 @@ class ReceivingController extends Controller
             $extraDiscount = (float) preg_replace('/[^\d.]/', '', (string) ($request->extra_discount ?? 0));
 
             $gross = $qtyReceived * $rawPrice;
-            $totalDiscount = $discount + $extraDiscount;
-            $total = max(0, $gross - $totalDiscount);
+            $nomDiscount = ($discount <= 100 && $discount > 0) ? ($gross * $discount / 100) : $discount;
+            $nomExtraDiscount = ($extraDiscount <= 100 && $extraDiscount > 0) ? ($gross * $extraDiscount / 100) : $extraDiscount;
+            $total = max(0, $gross - $nomDiscount - $nomExtraDiscount);
 
             $batch = Batches::firstOrCreate(
                 [
@@ -1548,19 +1560,6 @@ class ReceivingController extends Controller
                 'batches_id' => $batch->id,
                 'user_id' => auth()->user()->id,
             ]);
-
-            $allComplete = true;
-            foreach ($order->fresh()->order_items as $oi) {
-                $totalRcv = ReceivingItems::where('order_items_id', $oi->id)->whereNotNull('batches_id')->sum('qty_received');
-                if ($totalRcv < $oi->quantity) {
-                    $allComplete = false;
-                    break;
-                }
-            }
-            if ($allComplete && $order->status != 3) {
-                $order->status = 3;
-                $order->save();
-            }
 
             DB::commit();
 

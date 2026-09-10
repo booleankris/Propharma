@@ -102,8 +102,7 @@
                                     <td colspan="3" class="px-4 py-2.5 text-right">
                                         <div class="inline-flex items-center gap-1.5">
                                             <!-- Tambah Obat button -->
-                                            <button type="button"
-                                                data-details-id="{{ $rd->id }}"
+                                            <button type="button" data-details-id="{{ $rd->id }}"
                                                 data-details-code="{{ $rd->receiving_details_code }}"
                                                 onclick="openAddModal(this.dataset.detailsId, this.dataset.detailsCode)"
                                                 class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-semibold rounded-lg shadow-xs transition-all flex items-center gap-1">
@@ -312,6 +311,20 @@
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
+                            <label class="text-xs font-semibold text-gray-700">Kemasan Utuh</label>
+                            <label
+                                class="flex items-center gap-2 mt-1 bg-white px-3 py-2 rounded-lg border border-gray-300 cursor-pointer hover:bg-gray-50 transition-colors">
+                                <input type="checkbox" id="add_pack" onchange="onAddPackChange()"
+                                    class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer">
+                                <span class="text-xs font-medium text-gray-700 select-none">Utuh (Box)</span>
+                            </label>
+                        </div>
+                        <div>
+                            <label class="text-xs font-semibold text-gray-700">Isi Obat</label>
+                            <input id="add_content" readonly placeholder="-"
+                                class="w-full rounded-lg border border-gray-200 bg-gray-100 px-3 py-2 text-xs text-gray-600">
+                        </div>
+                        <div>
                             <label class="text-xs font-semibold text-gray-700">No. Batch <span
                                     class="text-red-500">*</span></label>
                             <input id="add_batch" placeholder="Contoh: B12345"
@@ -330,20 +343,23 @@
                                 class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
                         </div>
                         <div>
-                            <label class="text-xs font-semibold text-gray-700">HNA / Raw Price <span
-                                    class="text-red-500">*</span></label>
+                            <label class="text-xs font-semibold text-gray-700">HNA<span class="text-red-500">*</span>
+                                <span id="add_box_price_info"
+                                    class="text-[10px] text-blue-600 font-normal"></span></label>
                             <input id="add_raw_price" type="text" placeholder="Rp 0"
                                 class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
                         </div>
                         <div>
-                            <label class="text-xs font-semibold text-gray-700">Diskon (Rp)</label>
-                            <input id="add_discount" type="text" placeholder="Rp 0"
+                            <label class="text-xs font-semibold text-gray-700">Diskon (%/Rp)</label>
+                            <input id="add_discount" type="number" min="0" step="any" placeholder="≤100 = %, >100 = Rp"
                                 class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                            <p class="text-[10px] text-gray-400 mt-0.5">≤ 100 dianggap persen, &gt; 100 dianggap nominal.</p>
                         </div>
                         <div>
-                            <label class="text-xs font-semibold text-gray-700">Extra Diskon (Rp)</label>
-                            <input id="add_extra_discount" type="text" placeholder="Rp 0"
+                            <label class="text-xs font-semibold text-gray-700">Extra Diskon (%/Rp)</label>
+                            <input id="add_extra_discount" type="number" min="0" step="any" placeholder="≤100 = %, >100 = Rp"
                                 class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                            <p class="text-[10px] text-gray-400 mt-0.5">≤ 100 dianggap persen, &gt; 100 dianggap nominal.</p>
                         </div>
                         <div>
                             <label class="text-xs font-semibold text-gray-700">Status Barang</label>
@@ -421,13 +437,13 @@
                                 class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
                         </div>
                         <div>
-                            <label class="text-xs font-semibold text-gray-700">Diskon (Rp)</label>
-                            <input id="edit_discount" type="text"
+                            <label class="text-xs font-semibold text-gray-700">Diskon (%/Rp)</label>
+                            <input id="edit_discount" type="number" min="0" step="any" placeholder="≤100 = %, >100 = Rp"
                                 class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
                         </div>
                         <div>
-                            <label class="text-xs font-semibold text-gray-700">Extra Diskon (Rp)</label>
-                            <input id="edit_extra_discount" type="text"
+                            <label class="text-xs font-semibold text-gray-700">Extra Diskon (%/Rp)</label>
+                            <input id="edit_extra_discount" type="number" min="0" step="any" placeholder="≤100 = %, >100 = Rp"
                                 class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
                         </div>
                         <div>
@@ -553,41 +569,42 @@
     </section>
     @php
 
-            $detailsData = $allReceivingDetails->map(fn($d) => ['id' => $d->id, 'code' => $d->receiving_details_code, 'invoice' => $d->invoice_number])->values();
+        $detailsData = $allReceivingDetails
+            ->map(fn($d) => ['id' => $d->id, 'code' => $d->receiving_details_code, 'invoice' => $d->invoice_number])
+            ->values();
 
-
-            $allItemsData = collect();
-            foreach ($allReceivingDetails as $rd) {
-                foreach ($rd->receiving_items as $ri) {
-                    $allItemsData->push([
-                        'id' => $ri->id,
-                        'details_id' => $rd->id,
-                        'order_items_id' => $ri->order_items_id,
-                        'details_code' => $rd->receiving_details_code,
-                        'details_invoice' => $rd->invoice_number ?? '',
-                        'medicine_name' => $ri->order_items->medicines->name ?? ($ri->medicines->name ?? '-'),
-                        'batch' => $ri->batch ?? '-',
-                        'expired_date' => $ri->expired_date ?? '-',
-                        'qty' => (float) $ri->qty_received,
-                        'total' => (float) $ri->total,
-                    ]);
-                }
+        $allItemsData = collect();
+        foreach ($allReceivingDetails as $rd) {
+            foreach ($rd->receiving_items as $ri) {
+                $allItemsData->push([
+                    'id' => $ri->id,
+                    'details_id' => $rd->id,
+                    'order_items_id' => $ri->order_items_id,
+                    'details_code' => $rd->receiving_details_code,
+                    'details_invoice' => $rd->invoice_number ?? '',
+                    'medicine_name' => $ri->order_items->medicines->name ?? ($ri->medicines->name ?? '-'),
+                    'batch' => $ri->batch ?? '-',
+                    'expired_date' => $ri->expired_date ?? '-',
+                    'qty' => (float) $ri->qty_received,
+                    'total' => (float) $ri->total,
+                ]);
             }
-            if (isset($orphanedItems) && $orphanedItems->isNotEmpty()) {
-                foreach ($orphanedItems as $ri) {
-                    $allItemsData->push([
-                        'id' => $ri->id,
-                        'details_id' => null,
-                        'details_code' => 'Tanpa NT',
-                        'details_invoice' => '',
-                        'medicine_name' => $ri->order_items->medicines->name ?? ($ri->medicines->name ?? '-'),
-                        'batch' => $ri->batch ?? '-',
-                        'expired_date' => $ri->expired_date ?? '-',
-                        'qty' => (float) $ri->qty_received,
-                        'total' => (float) $ri->total,
-                    ]);
-                }
+        }
+        if (isset($orphanedItems) && $orphanedItems->isNotEmpty()) {
+            foreach ($orphanedItems as $ri) {
+                $allItemsData->push([
+                    'id' => $ri->id,
+                    'details_id' => null,
+                    'details_code' => 'Tanpa NT',
+                    'details_invoice' => '',
+                    'medicine_name' => $ri->order_items->medicines->name ?? ($ri->medicines->name ?? '-'),
+                    'batch' => $ri->batch ?? '-',
+                    'expired_date' => $ri->expired_date ?? '-',
+                    'qty' => (float) $ri->qty_received,
+                    'total' => (float) $ri->total,
+                ]);
             }
+        }
 
         $revisionPageData = [
             'orderId' => $order->id,
@@ -598,7 +615,8 @@
         ];
     @endphp
     <script id="revision-page-data" type="application/json">@json($revisionPageData)</script>
-    <script data-cfasync="false" src="{{ asset('js/invoice-revision.js') }}?v={{ filemtime(public_path('js/invoice-revision.js')) }}"></script>
+    <script data-cfasync="false"
+        src="{{ asset('js/invoice-revision.js') }}?v={{ filemtime(public_path('js/invoice-revision.js')) }}"></script>
 @endsection
 
 @section('scripts')
