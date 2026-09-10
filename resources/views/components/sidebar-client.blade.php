@@ -997,11 +997,13 @@
             <div>
                 <p class="text-xs font-semibold tracking-widest uppercase text-slate-400 mb-3">Rentang Tanggal</p>
                 <div class="flex items-center gap-2">
-                    <input type="date" value="{{ \Carbon\Carbon::now()->format('Y-m-d') }}" id="order_start_date"
-                        class="flex-1 text-sm border border-slate-200 rounded-xl px-3 py-2 text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300" />
+                    <input type="text" value="{{ \Carbon\Carbon::now()->format('Y-m-d') }}" id="order_start_date"
+                        autocomplete="off"
+                        class="flatpickr-date flex-1 text-sm border border-slate-200 rounded-xl px-3 py-2 text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300 cursor-pointer" />
                     <span class="text-slate-400 text-sm font-medium">—</span>
-                    <input type="date" value="{{ \Carbon\Carbon::now()->format('Y-m-d') }}" id="order_end_date"
-                        class="flex-1 text-sm border border-slate-200 rounded-xl px-3 py-2 text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300" />
+                    <input type="text" value="{{ \Carbon\Carbon::now()->format('Y-m-d') }}" id="order_end_date"
+                        autocomplete="off"
+                        class="flatpickr-date flex-1 text-sm border border-slate-200 rounded-xl px-3 py-2 text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300 cursor-pointer" />
                 </div>
             </div>
 
@@ -1247,13 +1249,13 @@
             <div>
                 <p class="text-xs font-semibold tracking-widest uppercase text-slate-400 mb-3">Rentang Tanggal</p>
                 <div class="flex items-center gap-2">
-                    <input type="date" value="{{ \Carbon\Carbon::now()->format('Y-m-d') }}" id="start_date"
-                        name="start_date"
-                        class="flex-1 text-sm border border-slate-200 rounded-xl px-3 py-2 text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300" />
+                    <input type="text" value="{{ \Carbon\Carbon::now()->format('Y-m-d') }}" id="sales_start_date"
+                        name="start_date" autocomplete="off"
+                        class="flatpickr-date flex-1 text-sm border border-slate-200 rounded-xl px-3 py-2 text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300 cursor-pointer" />
                     <span class="text-slate-400 text-sm font-medium">—</span>
-                    <input type="date" value="{{ \Carbon\Carbon::now()->format('Y-m-d') }}" id="end_date"
-                        name="end_date"
-                        class="flex-1 text-sm border border-slate-200 rounded-xl px-3 py-2 text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300" />
+                    <input type="text" value="{{ \Carbon\Carbon::now()->format('Y-m-d') }}" id="sales_end_date"
+                        name="end_date" autocomplete="off"
+                        class="flatpickr-date flex-1 text-sm border border-slate-200 rounded-xl px-3 py-2 text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300 cursor-pointer" />
                 </div>
             </div>
 
@@ -2183,12 +2185,12 @@
                 Periode Laporan
             </div>
             <div class="flex items-center gap-2 w-full sm:w-auto">
-                <input type="date" id="export_center_start_date"
-                    value="{{ now()->startOfMonth()->format('Y-m-d') }}"
-                    class="rounded-xl border-slate-200 text-xs font-semibold py-2 px-3 focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 shadow-xs">
+                <input type="text" id="export_center_start_date"
+                    value="{{ now()->format('Y-m-d') }}" autocomplete="off"
+                    class="flatpickr-date rounded-xl border-slate-200 text-xs font-semibold py-2 px-3 focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 shadow-xs cursor-pointer">
                 <span class="text-xs text-slate-400 font-medium">s/d</span>
-                <input type="date" id="export_center_end_date" value="{{ now()->format('Y-m-d') }}"
-                    class="rounded-xl border-slate-200 text-xs font-semibold py-2 px-3 focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 shadow-xs">
+                <input type="text" id="export_center_end_date" value="{{ now()->format('Y-m-d') }}" autocomplete="off"
+                    class="flatpickr-date rounded-xl border-slate-200 text-xs font-semibold py-2 px-3 focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 shadow-xs cursor-pointer">
             </div>
         </div>
 
@@ -2453,8 +2455,8 @@
     let exportPollInterval = null;
 
     async function triggerExportCenter(type) {
-        const startDate = document.getElementById('export_center_start_date')?.value || '';
-        const endDate = document.getElementById('export_center_end_date')?.value || '';
+        const startDate = window.getDatePickerValue ? window.getDatePickerValue('export_center_start_date') : (document.getElementById('export_center_start_date')?.value || '');
+        const endDate = window.getDatePickerValue ? window.getDatePickerValue('export_center_end_date') : (document.getElementById('export_center_end_date')?.value || '');
         const token = '{{ csrf_token() }}';
 
         let url = '';

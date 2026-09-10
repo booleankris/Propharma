@@ -29,11 +29,11 @@
                     <div class="flex gap-4 items-end flex-wrap">
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 mb-1">Start Date</label>
-                            <input type="date" id="start_date" class="border rounded-lg px-3 py-2 text-sm w-40">
+                            <input type="text" id="tx_start_date" value="{{ now()->format('Y-m-d') }}" autocomplete="off" class="flatpickr-date border rounded-lg px-3 py-2 text-sm w-40 cursor-pointer">
                         </div>
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 mb-1">End Date</label>
-                            <input type="date" id="end_date" class="border rounded-lg px-3 py-2 text-sm w-40">
+                            <input type="text" id="tx_end_date" value="{{ now()->format('Y-m-d') }}" autocomplete="off" class="flatpickr-date border rounded-lg px-3 py-2 text-sm w-40 cursor-pointer">
                         </div>
 
                         <div class="flex gap-2">
@@ -67,24 +67,38 @@
         function back() {
             window.location.href = "{{ route('home') }}";
         }
-        const startInput = document.getElementById("start_date");
-        const endInput = document.getElementById("end_date");
+        const startInput = document.getElementById("tx_start_date");
+        const endInput = document.getElementById("tx_end_date");
         const exportBtn = document.getElementById("exportBtn");
 
         const progressContainer = document.getElementById("progressContainer");
         const progressBar = document.getElementById("progressBar");
         const progressText = document.getElementById("progressText");
 
+        function getVal(el) {
+            if (!el) return '';
+            if (el._flatpickr && el._flatpickr.selectedDates && el._flatpickr.selectedDates.length > 0) {
+                return el._flatpickr.formatDate(el._flatpickr.selectedDates[0], 'Y-m-d');
+            }
+            return el.value || '';
+        }
+
         // Validate on load
         updateExportButton();
 
         // Monitor input changes
-        startInput.addEventListener("input", updateExportButton);
-        endInput.addEventListener("input", updateExportButton);
+        if (startInput) {
+            startInput.addEventListener("input", updateExportButton);
+            startInput.addEventListener("change", updateExportButton);
+        }
+        if (endInput) {
+            endInput.addEventListener("input", updateExportButton);
+            endInput.addEventListener("change", updateExportButton);
+        }
 
         function updateExportButton() {
-            const start = startInput.value;
-            const end = endInput.value;
+            const start = getVal(startInput);
+            const end = getVal(endInput);
 
             // No dates → Export Semua
             if (!start && !end) {
@@ -111,8 +125,8 @@
         // Export button click
         exportBtn.addEventListener("click", function() {
 
-            const start = startInput.value;
-            const end = endInput.value;
+            const start = getVal(startInput);
+            const end = getVal(endInput);
 
             fetch("/reports/export/transactions", {
                     method: "POST",

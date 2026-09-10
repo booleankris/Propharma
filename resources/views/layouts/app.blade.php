@@ -11,7 +11,22 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
     <style>
+        .report-date-input {
+            min-width: 0;
+            max-width: 100%;
+        }
+        .flatpickr-calendar {
+            z-index: 99999999 !important;
+            border-radius: 1rem !important;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+            border: 1px solid #e2e8f0 !important;
+        }
+        .flatpickr-day.selected, .flatpickr-day.startRange, .flatpickr-day.endRange {
+            background: #1d7ed8 !important;
+            border-color: #1d7ed8 !important;
+        }
         .select2-container--open {
             z-index: 9999999 !important;
         }
@@ -76,6 +91,8 @@
     <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://npmcdn.com/flatpickr/dist/l10n/id.js"></script>
 
     <!-- Global Session Expired Handler (419 / 401) -->
     <script>
@@ -284,7 +301,75 @@
                     }
                 }, 150);
             }
+            if (id === 'reportModal' || id === 'orderReportModal' || id === 'exportCenterModal') {
+                setTimeout(() => {
+                    initReportDatePickers();
+                }, 50);
+            }
         };
+
+        window.getDatePickerValue = function(id) {
+            const el = document.getElementById(id);
+            if (!el) return '';
+            if (el._flatpickr && el._flatpickr.selectedDates && el._flatpickr.selectedDates.length > 0) {
+                return el._flatpickr.formatDate(el._flatpickr.selectedDates[0], 'Y-m-d');
+            }
+            return el.value || '';
+        };
+
+        function initReportDatePickers() {
+            if (typeof flatpickr === 'undefined') return;
+            document.querySelectorAll('.flatpickr-date').forEach(function(el) {
+                if (el.classList.contains('flatpickr-input') && el.type === 'text' && !el._flatpickr && el.previousElementSibling?._flatpickr) {
+                    return;
+                }
+                if (el._flatpickr) return;
+
+                let initialDate = null;
+                if (el.value && /^\d{4}-\d{2}-\d{2}$/.test(el.value.trim())) {
+                    initialDate = el.value.trim();
+                }
+
+                flatpickr(el, {
+                    defaultDate: initialDate,
+                    dateFormat: "Y-m-d",
+                    altInput: true,
+                    // Keep the display input out of the initializer and Bootstrap form-control styles.
+                    altInputClass: el.className.split(/\s+/).filter(name => name !== 'flatpickr-date').join(' ') + ' report-date-input',
+                    altFormat: "d/m/Y",
+                    locale: (typeof flatpickr.l10ns !== 'undefined' && flatpickr.l10ns.id) ? flatpickr.l10ns.id : 'default',
+                    allowInput: false,
+                    disableMobile: true,
+                    onOpen: function(selectedDates, dateStr, instance) {
+                        if (instance.calendarContainer) {
+                            instance.calendarContainer.style.zIndex = "99999999";
+                        }
+                    }
+                });
+            });
+
+            ['order', 'sales', 'export_center', 'tx', 'patient', 'export', 'reject_filter'].forEach(function(prefix) {
+                const start = document.getElementById(prefix + '_start_date')?._flatpickr;
+                const end = document.getElementById(prefix + '_end_date')?._flatpickr;
+                if (!start || !end || start._reportRangeLinked) return;
+                start._reportRangeLinked = true;
+
+                function syncRange() {
+                    const first = start.selectedDates[0];
+                    const last = end.selectedDates[0];
+                    // Move the end forward before minDate can clear an earlier selection.
+                    if (first && last && last < first) end.setDate(first, true);
+                    end.set('minDate', first || null);
+                }
+
+                start.config.onChange.push(syncRange);
+                syncRange();
+            });
+        }
+
+        $(document).ready(function() {
+            initReportDatePickers();
+        });
         window.closeModals = function() {
             document.querySelectorAll('.modal-show').forEach(modal => {
                 modal.classList.remove('modal-show');
@@ -428,8 +513,8 @@
         }
 
         function getReport(mode = 'download') {
-            const start_date = document.getElementById('start_date').value;
-            const end_date = document.getElementById('end_date').value;
+            const start_date = getDatePickerValue('sales_start_date');
+            const end_date = getDatePickerValue('sales_end_date');
             const shift = document.getElementById('shift').value;
             const factory = document.getElementById('factory').value;
             const doctor = document.getElementById('doctor').value;
@@ -752,8 +837,8 @@
         }
 
         function getOrderReport(mode = 'download') {
-            const start_date = document.getElementById('order_start_date').value;
-            const end_date = document.getElementById('order_end_date').value;
+            const start_date = getDatePickerValue('order_start_date');
+            const end_date = getDatePickerValue('order_end_date');
             const supplier = document.getElementById('order_supplier').value;
 
             const overlay = document.getElementById('loading-overlay');

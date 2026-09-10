@@ -67,7 +67,8 @@ class OrdersController extends Controller
             ->when($request->filled('search_term'), function ($q) use ($request) {
                 $searchTerm = $request->search_term;
                 $q->whereHas('medicines', function ($mq) use ($searchTerm) {
-                    $mq->where('name', 'like', '%' . $searchTerm . '%')
+                    $mq
+                        ->where('name', 'like', '%' . $searchTerm . '%')
                         ->orWhere('code', 'like', '%' . $searchTerm . '%');
                 });
             })
@@ -715,12 +716,12 @@ class OrdersController extends Controller
             }
 
             $pdf = Pdf::loadView('orders.printSPB', compact('order', 'date', 'grouped', 'pharmacy', 'logoBase64', 'signatureBase64'))
-                ->setPaper('A7', 'portrait')
+                ->setPaper([0, 0, 396, 612])  // [kiri, atas, lebar, tinggi]
                 ->setOptions([
                     'isHtml5ParserEnabled' => true,
                     'isRemoteEnabled' => false,
                     'isFontSubsettingEnabled' => true,
-                    'dpi' => 96,
+                    'dpi' => 96,  // Opsional: naikkan ke 300 jika logo/ttd buram
                     'defaultFont' => 'sans-serif'
                 ]);
 
