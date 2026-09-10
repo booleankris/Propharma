@@ -364,7 +364,7 @@
                 </div>
             </div>
 
-            @hasanyrole('HO|administrator|manager|Manager|operator|Operator|Gudang PMI|Kasir|kasir')
+            @auth
                 <div class="px-6 py-4 bg-slate-50/70 border-b border-slate-200" id="consolidationPanel">
                     <div class="flex items-start gap-3" id="consolidationHint">
                         <div
@@ -439,7 +439,7 @@
                             class="text-xs text-red-600 font-medium mt-2 empty:hidden"></p>
                     </div>
                 </div>
-            @endhasanyrole
+            @endauth
             <table id="ordersTrackingTable">
                 <thead>
                     <tr>
@@ -463,11 +463,7 @@
 
 @section('scripts')
     @php
-        $canConsolidate =
-            auth()->check() &&
-            auth()
-                ->user()
-                ->hasAnyRole(['HO', 'administrator', 'manager', 'Manager', 'operator', 'Operator', 'Gudang PMI', 'Kasir', 'kasir']);
+        $canConsolidate = auth()->check();
     @endphp
     <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>

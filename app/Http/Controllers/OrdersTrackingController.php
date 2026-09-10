@@ -133,7 +133,15 @@ class OrdersTrackingController extends Controller
 
         return DataTables::of($query)
             ->addColumn('remaining', fn ($row) => max(0, (float) $row->quantity - (float) $row->receivingItems->sum('qty_received')))
-            ->addColumn('can_consolidate', fn ($row) => in_array((int) $row->orders->status, [1, 2]) && $row->creditor_code && !$row->receivingItems->contains(fn ($item) => $item->batches_id === null) && (float) $row->quantity > (float) $row->receivingItems->sum('qty_received') && empty($row->orders->is_consolidation))
+            ->addColumn('can_consolidate', function ($row) {
+                $remaining = max(0, (float) $row->quantity - (float) $row->receivingItems->sum('qty_received'));
+                $hasCreditor = !empty($row->creditor_code) || !empty($row->branch_creditor_code);
+                $orderStatusValid = (int) ($row->orders->status ?? 0) !== 3;
+                $notConsolidationOrder = empty($row->orders->is_consolidation);
+
+                return $remaining > 0 && $hasCreditor && $orderStatusValid && $notConsolidationOrder;
+            })
+            ->addColumn('creditor_code', fn ($row) => $row->creditor_code ?: $row->branch_creditor_code)
             ->addColumn('movement_note', function ($row) {
                 $notes = $row->outgoingMovements->map(fn ($m) => 'Dipindahkan ' . (float) $m->quantity . ' ke ' . $m->targetItem->orders->code)->all();
                 if ($row->incomingMovement) {
