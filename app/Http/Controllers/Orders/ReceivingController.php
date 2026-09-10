@@ -1391,6 +1391,42 @@ class ReceivingController extends Controller
         return view('orders.revision', compact('order', 'allReceivingDetails', 'orphanedItems', 'orderItemsData'));
     }
 
+    public function searchMasterMedicine(Request $request)
+    {
+        $search = trim((string) $request->input('search', ''));
+        $search = preg_replace('/\s+/', ' ', $search);
+
+        if (mb_strlen($search) < 2) {
+            return response()->json(['data' => []]);
+        }
+
+        $items = Medicines::query()
+            ->select([
+                'medicines.id',
+                'medicines.code',
+                'medicines.name',
+                'medicines.raw_price',
+                'factories.name as factory_name',
+            ])
+            ->leftJoin('factories', 'factories.id', '=', 'medicines.factory_id')
+            ->where(function ($q) use ($search) {
+                $q->where('medicines.name', 'like', $search . '%')
+                    ->orWhere('medicines.code', 'like', $search . '%');
+            })
+            ->limit(20)
+            ->get();
+
+        return response()->json([
+            'data' => $items->map(fn ($m) => [
+                'id' => $m->id,
+                'code' => $m->code,
+                'name' => $m->name,
+                'raw_price' => (float) $m->raw_price,
+                'factory_name' => $m->factory_name,
+            ]),
+        ]);
+    }
+
     public function addRevisionItem(Request $request, $orderId)
     {
         $request->validate([

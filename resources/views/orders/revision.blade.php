@@ -266,6 +266,19 @@
                     </div>
 
                     <input type="hidden" id="add_receiving_details_id">
+                    <input type="hidden" id="add_medicine_id">
+
+                    <!-- Mode Toggle: BPBA vs Master -->
+                    <div class="grid grid-cols-2 gap-2 p-1 bg-gray-100 rounded-xl">
+                        <button type="button" id="add_mode_bpba_btn" onclick="setAddMode('bpba')"
+                            class="px-3 py-2 rounded-lg text-xs font-semibold transition-all bg-blue-600 text-white shadow-sm">
+                            Dari BPBA (Faktur Ini)
+                        </button>
+                        <button type="button" id="add_mode_master_btn" onclick="setAddMode('master')"
+                            class="px-3 py-2 rounded-lg text-xs font-semibold transition-all bg-white text-gray-700">
+                            Dari Master Obat
+                        </button>
+                    </div>
 
                     <!-- Medicine Selection: BPBA Mode -->
                     <div id="section_bpba_select" class="space-y-1">
@@ -276,6 +289,25 @@
                             <option value="">-- Pilih Obat dari Faktur Ini --</option>
 
                         </select>
+                    </div>
+
+                    <!-- Medicine Selection: Master Mode -->
+                    <div id="section_master_select" class="space-y-2 hidden">
+                        <label class="text-xs font-semibold text-gray-700">Pilih Obat dari Master <span
+                                class="text-red-500">*</span></label>
+                        <div class="relative">
+                            <input id="master_search_input" type="text" placeholder="Ketik nama / kode obat..."
+                                autocomplete="off" oninput="searchMasterMedicine(this.value)"
+                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                            <div id="master_search_dropdown"
+                                class="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg hidden max-h-56 overflow-y-auto">
+                            </div>
+                        </div>
+                        <div id="master_selected_medicine"
+                            class="hidden p-2 bg-emerald-50 border border-emerald-200 rounded-lg">
+                            <div class="text-[11px] text-emerald-700 font-semibold">Obat Terpilih:</div>
+                            <div class="text-xs text-gray-700" id="master_selected_medicine_name">-</div>
+                        </div>
                     </div>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -559,6 +591,7 @@
 
         $revisionPageData = [
             'orderId' => $order->id,
+            'searchMedicineUrl' => route('sales.searchmedicine'),
             'details' => $detailsData,
             'orderItems' => collect($orderItemsData)->values(),
             'items' => $allItemsData->values(),

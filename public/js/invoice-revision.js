@@ -3,6 +3,7 @@
 
     const config = JSON.parse(document.getElementById('revision-page-data').textContent);
     const ORDER_ID = config.orderId;
+    const SEARCH_MEDICINE_URL = config.searchMedicineUrl;
     const ALL_DETAILS = config.details;
     const BPBA_ITEMS = config.orderItems;
     const ALL_ITEMS = config.items;
@@ -119,6 +120,7 @@
             document.getElementById('add_extra_discount').value = '';
             document.getElementById('add_total').value = '';
             document.getElementById('add_status').value = '1';
+            setAddMode('bpba');
 
             document.getElementById('addModal').classList.remove('hidden');
             document.getElementById('addModal').classList.add('flex');
@@ -147,6 +149,121 @@
             }
             recalcAddTotal();
         }
+
+        // ================== MODE TAMBAH OBAT DARI MASTER ==================
+        let addMode = 'bpba';
+        let masterCache = {};
+        let masterSearchTimer = null;
+
+        function setAddMode(mode) {
+            addMode = mode;
+            const bpbaBtn = document.getElementById('add_mode_bpba_btn');
+            const masterBtn = document.getElementById('add_mode_master_btn');
+            const bpbaSection = document.getElementById('section_bpba_select');
+            const masterSection = document.getElementById('section_master_select');
+
+            const active = 'px-3 py-2 rounded-lg text-xs font-semibold transition-all bg-blue-600 text-white shadow-sm';
+            const inactive = 'px-3 py-2 rounded-lg text-xs font-semibold transition-all bg-white text-gray-700';
+
+            if (mode === 'master') {
+                bpbaBtn.className = inactive;
+                masterBtn.className = active;
+                bpbaSection.classList.add('hidden');
+                masterSection.classList.remove('hidden');
+                document.getElementById('add_order_items_id').value = '';
+            } else {
+                masterBtn.className = inactive;
+                bpbaBtn.className = active;
+                masterSection.classList.add('hidden');
+                bpbaSection.classList.remove('hidden');
+                resetMasterSelection();
+            }
+        }
+
+        function resetMasterSelection() {
+            document.getElementById('add_medicine_id').value = '';
+            document.getElementById('master_search_input').value = '';
+            document.getElementById('master_selected_medicine_name').textContent = '-';
+            document.getElementById('master_selected_medicine').classList.add('hidden');
+            document.getElementById('master_search_dropdown').classList.add('hidden');
+            masterCache = {};
+        }
+
+        function searchMasterMedicine(value) {
+            clearTimeout(masterSearchTimer);
+            const dropdown = document.getElementById('master_search_dropdown');
+            const keyword = (value || '').trim();
+
+            if (keyword.length < 1) {
+                dropdown.classList.add('hidden');
+                return;
+            }
+
+            dropdown.innerHTML = '<div class="p-3 text-xs text-gray-400 italic text-center">Mencari...</div>';
+            dropdown.classList.remove('hidden');
+
+            masterSearchTimer = setTimeout(() => fetchMasterMedicine(keyword), 300);
+        }
+
+        async function fetchMasterMedicine(keyword) {
+            const dropdown = document.getElementById('master_search_dropdown');
+            try {
+                const res = await axios.get(SEARCH_MEDICINE_URL, {
+                    params: { search: keyword, page: 1 }
+                });
+                const items = res.data.data || [];
+
+                items.forEach(item => {
+                    masterCache[item.id] = item;
+                });
+
+                if (items.length === 0) {
+                    dropdown.innerHTML = '<div class="p-3 text-xs text-gray-400 italic text-center">Tidak ditemukan</div>';
+                } else {
+                    dropdown.innerHTML = items.map(item => {
+                        const sub = [item.code, item.factory_name].filter(Boolean).join(' &bull; ');
+                        return `
+                            <button type="button" onclick="selectMasterMedicine(${item.id})"
+                                class="w-full text-left px-3 py-2 hover:bg-blue-50 flex items-center justify-between gap-2 border-b border-gray-50 last:border-0">
+                                <div class="min-w-0">
+                                    <div class="text-xs font-semibold text-gray-800 truncate">${item.name}</div>
+                                    <div class="text-[11px] text-gray-500">${sub}</div>
+                                </div>
+                                <span class="text-[11px] font-bold text-gray-700 whitespace-nowrap">${formatRupiah(item.raw_price)}</span>
+                            </button>
+                        `;
+                    }).join('');
+                }
+                dropdown.classList.remove('hidden');
+            } catch (err) {
+                dropdown.innerHTML = '<div class="p-3 text-xs text-red-500 italic text-center">Gagal memuat data</div>';
+                dropdown.classList.remove('hidden');
+            }
+        }
+
+        function selectMasterMedicine(id) {
+            const item = masterCache[id];
+            if (!item) return;
+
+            document.getElementById('add_medicine_id').value = item.id;
+            document.getElementById('master_selected_medicine_name').textContent = `${item.name} (${item.code})`;
+            document.getElementById('master_selected_medicine').classList.remove('hidden');
+            document.getElementById('master_search_input').value = item.name;
+            document.getElementById('master_search_dropdown').classList.add('hidden');
+
+            if (item.raw_price) {
+                document.getElementById('add_raw_price').value = formatRupiah(item.raw_price);
+            }
+            recalcAddTotal();
+        }
+
+        document.addEventListener('click', function (e) {
+            const wrapper = document.getElementById('section_master_select');
+            if (wrapper && !wrapper.contains(e.target)) {
+                const dropdown = document.getElementById('master_search_dropdown');
+                if (dropdown) dropdown.classList.add('hidden');
+            }
+        }, true);
 
         async function submitAddMedicine() {
             const detailsId = document.getElementById('add_receiving_details_id').value;
@@ -184,12 +301,21 @@
                 total: parseRupiah(document.getElementById('add_total').value),
             };
 
-            const oiId = document.getElementById('add_order_items_id').value;
-            if (!oiId) {
-                alert('Pilih obat dari faktur ini terlebih dahulu.');
-                return;
+            if (addMode === 'master') {
+                const medicineId = document.getElementById('add_medicine_id').value;
+                if (!medicineId) {
+                    alert('Pilih obat dari master terlebih dahulu.');
+                    return;
+                }
+                payload.medicine_id = medicineId;
+            } else {
+                const oiId = document.getElementById('add_order_items_id').value;
+                if (!oiId) {
+                    alert('Pilih obat dari faktur ini terlebih dahulu.');
+                    return;
+                }
+                payload.order_items_id = oiId;
             }
-            payload.order_items_id = oiId;
 
             try {
                 const res = await axios.post(`/orders/${ORDER_ID}/revision/add-item`, payload, {
@@ -562,6 +688,9 @@
         openAddModal,
         closeAddModal,
         onSelectOrderItem,
+        setAddMode,
+        searchMasterMedicine,
+        selectMasterMedicine,
         submitAddMedicine,
         editRow,
         closeModal,
