@@ -120,7 +120,9 @@
                                         <div class="inline-flex items-center gap-1.5">
                                             <!-- Tambah Obat button -->
                                             <button type="button"
-                                                onclick="openAddModal({{ $rd->id }}, '{{ $rd->receiving_details_code }}')"
+                                                data-details-id="{{ $rd->id }}"
+                                                data-details-code="{{ $rd->receiving_details_code }}"
+                                                onclick="openAddModal(this.dataset.detailsId, this.dataset.detailsCode)"
                                                 class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-semibold rounded-lg shadow-xs transition-all flex items-center gap-1">
                                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor"
                                                     viewBox="0 0 24 24">
@@ -167,7 +169,9 @@
                                     <tr class="bg-gray-50/60">
                                         <td colspan="9" class="px-4 py-5 text-center text-xs text-gray-500 italic">
                                             Belum ada obat di Nomor Terima ini. Klik tombol <button type="button"
-                                                onclick="openAddModal({{ $rd->id }}, '{{ $rd->receiving_details_code }}')"
+                                                data-details-id="{{ $rd->id }}"
+                                                data-details-code="{{ $rd->receiving_details_code }}"
+                                                onclick="openAddModal(this.dataset.detailsId, this.dataset.detailsCode)"
                                                 class="font-semibold text-emerald-600 hover:underline">+ Tambah
                                                 Obat</button> untuk memasukkan item.
                                         </td>
@@ -561,8 +565,11 @@
     <script src="{{ asset('templates/library/izitoast/dist/js/iziToast.min.js') }}"></script>
     <script>
         const ORDER_ID = {{ $order->id }};
-        const ALL_DETAILS = @json($allReceivingDetails->map(fn($d) => ['id' => $d->id, 'code' => $d->receiving_details_code, 'invoice' => $d->invoice_number]));
-        const BPBA_ITEMS = @json($orderItemsData->values());
+        @php
+            $detailsData = $allReceivingDetails->map(fn($d) => ['id' => $d->id, 'code' => $d->receiving_details_code, 'invoice' => $d->invoice_number])->values();
+        @endphp
+        const ALL_DETAILS = {{ Illuminate\Support\Js::from($detailsData) }};
+        const BPBA_ITEMS = {{ Illuminate\Support\Js::from(collect($orderItemsData)->values()) }};
         @php
             $allItemsData = collect();
             foreach ($allReceivingDetails as $rd) {
@@ -597,7 +604,7 @@
                 }
             }
         @endphp
-        const ALL_ITEMS = @json($allItemsData);
+        const ALL_ITEMS = {{ Illuminate\Support\Js::from($allItemsData->values()) }};
         let currentAddMode = 'bpba';
 
         function parseRupiah(value) {
@@ -677,7 +684,8 @@
                 .map(item => String(item.order_items_id)));
             const items = BPBA_ITEMS.filter(item => invoiceItemIds.has(String(item.id)));
 
-            select.replaceChildren(new Option(items.length
+            select.options.length = 0;
+            select.add(new Option(items.length
                 ? '-- Pilih Obat dari Faktur Ini --'
                 : '-- Tidak ada obat pada faktur ini --', ''));
             select.disabled = items.length === 0;
