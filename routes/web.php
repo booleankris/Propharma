@@ -350,6 +350,7 @@ Route::middleware(['auth', 'role:Kasir|Gudang PMI|HO|administrator|manager|Onlin
     Route::get('/getparetoorders', [ParetoController::class, 'ordersPareto'])->name('pareto.orders.get');
     Route::get('/exportpareto', [ParetoController::class, 'export'])->name('pareto.export');
     Route::get('/exportpareto/status/{id}', [ParetoController::class, 'exportStatus'])->name('pareto.export.status');
+    Route::get('/exportpareto/download/{id}', [ParetoController::class, 'download'])->name('pareto.export.download');
 
 
     // Patient Export

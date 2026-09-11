@@ -10,6 +10,7 @@ use App\Models\Pareto;
 use App\Models\Pharmacies;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use DataTables;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -205,8 +206,39 @@ class ParetoController extends Controller
         return response()->json([
             'status'   => $job->status,
             'progress' => (int) $job->progress,
-            'file'     => $job->file_path ? asset('storage/' . $job->file_path) : null,
+            'file'     => ($job->status === 'completed' || $job->status === 'finished')
+                ? route('pareto.export.download', $job->id)
+                : null,
         ]);
+    }
+
+    public function download($id, Request $request)
+    {
+        $job = ExportJob::findOrFail($id);
+
+        if ($job->file_path && Storage::disk('public')->exists($job->file_path)) {
+            return Storage::disk('public')->download($job->file_path);
+        }
+
+        if ($job->file_path && file_exists(storage_path('app/public/' . $job->file_path))) {
+            return response()->download(storage_path('app/public/' . $job->file_path));
+        }
+
+        // Fallback: Generate and stream directly if background file not found
+        $pharmacyId = getActivePharmacyId();
+        $pharmacy = $pharmacyId ? Pharmacies::find($pharmacyId) : null;
+        if (!$pharmacy) {
+            $pharmacy = auth()->user()?->pharmacy ?? Pharmacies::first();
+        }
+        return Excel::download(
+            new ParetoExport(
+                $pharmacy->id,
+                $request->start_date,
+                $request->end_date,
+                $request->search_medicine,
+            ),
+            'pareto-' . now()->format('Ymd_His') . '.xlsx'
+        );
     }
     // ================================ ================== ===================================
 

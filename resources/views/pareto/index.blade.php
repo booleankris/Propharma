@@ -653,12 +653,7 @@
                             });
 
                             if (data.file) {
-                                const dlLink = document.createElement('a');
-                                dlLink.href = data.file;
-                                dlLink.setAttribute('download', '');
-                                document.body.appendChild(dlLink);
-                                dlLink.click();
-                                dlLink.remove();
+                                window.location.href = data.file;
                             }
 
                             setTimeout(() => {
