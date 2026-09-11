@@ -258,16 +258,53 @@
                         </button>
                     </div>
                     <div>
-                        <a id="btnExport" href="{{ route('pareto.export') }}"
-                            class="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-medium transition">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24"
+                        <button id="btnExport" type="button" onclick="startExportExcel(event)"
+                            class="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-medium transition cursor-pointer shadow-sm">
+                            <svg id="btnExportIcon" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24"
                                 stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round"
                                     d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
                             </svg>
-                            Export Excel
-                        </a>
+                            <span id="btnExportText">Export Excel</span>
+                        </button>
                     </div>
+                </div>
+            </div>
+
+            {{-- ─── Export Progress Container ─── --}}
+            <div id="progressContainer"
+                class="hidden bg-white rounded-2xl border border-blue-200/90 shadow-sm p-5 transition-all duration-300">
+                <div class="flex items-center justify-between mb-2">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0">
+                            <svg class="w-5 h-5 text-blue-600 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none"
+                                viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                                    stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor"
+                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                </path>
+                            </svg>
+                        </div>
+                        <div>
+                            <span class="text-sm font-bold text-slate-800" id="progressStatus">Memulai antrean export...</span>
+                            <p class="text-xs text-slate-500 mt-0.5">Memproses analisis Pareto (Penjualan & Pembelian) di server...</p>
+                        </div>
+                    </div>
+                    <span class="text-xs font-extrabold text-blue-700 bg-blue-100/80 border border-blue-200 px-3 py-1 rounded-full" id="progressText">0%</span>
+                </div>
+                <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden mt-3">
+                    <div id="progressBar"
+                        class="bg-gradient-to-r from-blue-500 to-indigo-600 h-2.5 rounded-full transition-all duration-300"
+                        style="width: 0%"></div>
+                </div>
+                <div class="flex items-center justify-between mt-2.5 text-xs text-slate-400">
+                    <span class="flex items-center gap-1.5">
+                        <svg class="w-3.5 h-3.5 text-amber-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <span>Mohon menunggu, file Excel otomatis terunduh begitu proses di server selesai.</span>
+                    </span>
                 </div>
             </div>
 
@@ -499,17 +536,157 @@
             updateExportUrl();
         });
 
-        function updateExportUrl() {
-            const params = new URLSearchParams();
-            if (startDate) params.set('start_date', startDate);
-            if (endDate) params.set('end_date', endDate);
-            if ($('#searchMedicine').val()) params.set('search_medicine', $('#searchMedicine').val());
+        let exportInterval = null;
 
-            const base = '{{ route('pareto.export') }}';
-            $('#btnExport').attr('href', base + (params.toString() ? '?' + params.toString() : ''));
+        function resetExportState() {
+            const btn = document.getElementById('btnExport');
+            const btnText = document.getElementById('btnExportText');
+            const btnIcon = document.getElementById('btnExportIcon');
+
+            if (btn) {
+                btn.disabled = false;
+                btn.classList.remove('opacity-60', 'cursor-not-allowed');
+            }
+            if (btnText) btnText.innerText = 'Export Excel';
+            if (btnIcon) {
+                btnIcon.innerHTML = `
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
+                `;
+            }
+        }
+
+        async function startExportExcel(e) {
+            if (e) e.preventDefault();
+
+            const btn = document.getElementById('btnExport');
+            const btnText = document.getElementById('btnExportText');
+            const btnIcon = document.getElementById('btnExportIcon');
+            const progressContainer = document.getElementById('progressContainer');
+            const progressBar = document.getElementById('progressBar');
+            const progressText = document.getElementById('progressText');
+            const progressStatus = document.getElementById('progressStatus');
+
+            // Button loading state
+            btn.disabled = true;
+            btn.classList.add('opacity-60', 'cursor-not-allowed');
+            btnText.innerText = 'Memproses...';
+            btnIcon.innerHTML = `
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            `;
+
+            // Reset and show progress bar
+            progressBar.style.width = '10%';
+            progressText.innerText = '10%';
+            progressStatus.innerText = 'Memulai proses export di latar belakang...';
+            progressContainer.classList.remove('hidden');
+
+            try {
+                const params = new URLSearchParams();
+                if (startDate) params.set('start_date', startDate);
+                if (endDate) params.set('end_date', endDate);
+                const searchVal = $('#searchMedicine').val();
+                if (searchVal) params.set('search_medicine', searchVal);
+
+                const response = await fetch("{{ route('pareto.export') }}?" + params.toString(), {
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+
+                if (!response.ok) throw new Error('Gagal menginisiasi export');
+                const data = await response.json();
+
+                if (data.job_id) {
+                    pollExportStatus(data.job_id);
+                } else {
+                    throw new Error('ID antrean export tidak valid');
+                }
+            } catch (error) {
+                iziToast.error({
+                    title: 'Gagal',
+                    message: error.message || 'Terjadi kesalahan saat memulai export.',
+                    position: 'topRight'
+                });
+                progressContainer.classList.add('hidden');
+                resetExportState();
+            }
+        }
+
+        function pollExportStatus(jobId) {
+            const progressBar = document.getElementById('progressBar');
+            const progressText = document.getElementById('progressText');
+            const progressStatus = document.getElementById('progressStatus');
+            const progressContainer = document.getElementById('progressContainer');
+
+            if (exportInterval) clearInterval(exportInterval);
+
+            exportInterval = setInterval(() => {
+                fetch(`/exportpareto/status/${jobId}`)
+                    .then(res => {
+                        if (!res.ok) throw new Error('Gagal memeriksa status');
+                        return res.json();
+                    })
+                    .then(data => {
+                        let prog = data.progress || 0;
+                        progressBar.style.width = prog + "%";
+                        progressText.innerText = prog + "%";
+
+                        if (prog <= 20) {
+                            progressStatus.innerText = 'Mempersiapkan data transaksi penjualan & pembelian...';
+                        } else if (prog < 100) {
+                            progressStatus.innerText = 'Menyusun spreadsheet Excel (Sheet Penjualan & Pembelian)...';
+                        }
+
+                        if (data.status === "completed" || data.status === "finished") {
+                            clearInterval(exportInterval);
+                            progressBar.style.width = "100%";
+                            progressText.innerText = "100%";
+                            progressStatus.innerText = 'Selesai! Mengunduh file Excel...';
+
+                            iziToast.success({
+                                title: 'Export Berhasil',
+                                message: 'File Excel Pareto berhasil digenerate dan sedang diunduh.',
+                                position: 'topRight'
+                            });
+
+                            if (data.file) {
+                                const dlLink = document.createElement('a');
+                                dlLink.href = data.file;
+                                dlLink.setAttribute('download', '');
+                                document.body.appendChild(dlLink);
+                                dlLink.click();
+                                dlLink.remove();
+                            }
+
+                            setTimeout(() => {
+                                progressContainer.classList.add('hidden');
+                                resetExportState();
+                            }, 2500);
+
+                        } else if (data.status === "failed") {
+                            clearInterval(exportInterval);
+                            iziToast.error({
+                                title: 'Gagal',
+                                message: 'Terjadi kesalahan saat memproses file Excel Pareto.',
+                                position: 'topRight'
+                            });
+                            progressContainer.classList.add('hidden');
+                            resetExportState();
+                        }
+                    })
+                    .catch(err => {
+                        console.error("Export poll error:", err);
+                    });
+            }, 1000);
+        }
+
+        function updateExportUrl() {
+            // State helper
         }
         // ── Initial load ──────────────────────────────
         loadTable();
-        updateExportUrl();
     </script>
 @endsection

@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Exports\Export\ParetoExport;
+use App\Jobs\ProcessParetoExport;
+use App\Models\ExportJob;
 use App\Models\MedicineCart;
 use App\Models\Pareto;
 use App\Models\Pharmacies;
@@ -163,6 +165,28 @@ class ParetoController extends Controller
     public function export(Request $request)
     {
         $pharmacy = Pharmacies::findOrFail(getActivePharmacyId());
+
+        if ($request->ajax() || $request->wantsJson()) {
+            $job = ExportJob::create([
+                'type'     => 'pareto',
+                'status'   => 'pending',
+                'progress' => 0,
+            ]);
+
+            dispatch(new ProcessParetoExport(
+                $job->id,
+                $pharmacy->id,
+                $request->start_date,
+                $request->end_date,
+                $request->search_medicine
+            ));
+
+            return response()->json([
+                'job_id'  => $job->id,
+                'message' => 'Proses export pareto telah dimulai.',
+            ]);
+        }
+
         return Excel::download(
             new ParetoExport(
                 $pharmacy->id,
@@ -172,6 +196,17 @@ class ParetoController extends Controller
             ),
             'pareto-' . now()->format('Ymd') . '.xlsx'
         );
+    }
+
+    public function exportStatus($id)
+    {
+        $job = ExportJob::findOrFail($id);
+
+        return response()->json([
+            'status'   => $job->status,
+            'progress' => (int) $job->progress,
+            'file'     => $job->file_path ? asset('storage/' . $job->file_path) : null,
+        ]);
     }
     // ================================ ================== ===================================
 
