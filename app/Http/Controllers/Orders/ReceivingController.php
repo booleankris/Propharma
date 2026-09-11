@@ -168,7 +168,8 @@ class ReceivingController extends Controller
             ->where('creditor_code', $creditorCode)
             ->when($searchMedicine, function ($q) use ($searchMedicine) {
                 $q->whereHas('medicines', function ($mq) use ($searchMedicine) {
-                    $mq->where('name', 'like', '%' . $searchMedicine . '%')
+                    $mq
+                        ->where('name', 'like', '%' . $searchMedicine . '%')
                         ->orWhere('code', 'like', '%' . $searchMedicine . '%');
                 });
             })
@@ -391,7 +392,9 @@ class ReceivingController extends Controller
             ]);
 
         $pdfContent = $pdf->output();
-        while (ob_get_level() > 0) { ob_end_clean(); }
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
 
         $tmpFile = tempnam(sys_get_temp_dir(), 'spbf_') . '.pdf';
         file_put_contents($tmpFile, $pdfContent);
@@ -476,7 +479,9 @@ class ReceivingController extends Controller
             ]);
 
         $pdfContent = $pdf->output();
-        while (ob_get_level() > 0) { ob_end_clean(); }
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
 
         $tmpFile = tempnam(sys_get_temp_dir(), 'spbfc_') . '.pdf';
         file_put_contents($tmpFile, $pdfContent);
@@ -568,7 +573,9 @@ class ReceivingController extends Controller
             ]);
 
         $pdfContent = $pdf->output();
-        while (ob_get_level() > 0) { ob_end_clean(); }
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
 
         $tmpFile = tempnam(sys_get_temp_dir(), 'spbff_') . '.pdf';
         file_put_contents($tmpFile, $pdfContent);
@@ -650,7 +657,9 @@ class ReceivingController extends Controller
             ]);
 
         $pdfContent = $pdf->output();
-        while (ob_get_level() > 0) { ob_end_clean(); }
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
 
         $tmpFile = tempnam(sys_get_temp_dir(), 'spbi_') . '.pdf';
         file_put_contents($tmpFile, $pdfContent);
@@ -926,88 +935,99 @@ class ReceivingController extends Controller
                     . $v['label']
                     . '</span>';
             })
-            // Action buttons — warna balik lagi, icon lebih kecil & konsisten, tanpa glow
-            ->addColumn('action', function ($row) use ($actionBtn) {
+            // Action buttons — Split Button Group (Primary + ••• Dropdown)
+            ->addColumn('action', function ($row) {
                 $isEmpty = (($row->order_items_count ?? 0) == 0) || (($row->active_items_count ?? 0) == 0);
 
-                $deleteBtn = '<button type="button" onclick="deleteEmptyOrder(' . $row->id . ', \'' . e($row->code) . '\')" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border rounded-lg transition-colors text-rose-700 bg-rose-50 hover:bg-rose-100 border-rose-200" title="Hapus BPBA Kosong">'
-                    . '<svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"/></svg>'
-                    . '<span>Hapus</span>'
+                // Helper untuk action item di dalam dropdown menu
+                $menuItem = function (string $href, string $label, string $iconSvg, string $colorClass = 'text-slate-700 hover:bg-slate-50', bool $blank = false) {
+                    $target = $blank ? ' target="_blank"' : '';
+                    return '<a href="' . $href . '"' . $target . ' class="flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold ' . $colorClass . ' transition-colors">'
+                        . '<svg class="w-4 h-4 shrink-0 text-slate-500" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">' . $iconSvg . '</svg>'
+                        . '<span>' . $label . '</span>'
+                        . '</a>';
+                };
+
+                $deleteMenuItem = '<button type="button" onclick="deleteEmptyOrder(' . $row->id . ", '" . e($row->code) . '\')" class="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors text-left">'
+                    . '<svg class="w-4 h-4 shrink-0 text-rose-500" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"/></svg>'
+                    . '<span>Hapus BPBA Kosong</span>'
                     . '</button>';
 
+                $compareItem = $menuItem(
+                    route('orders.comparison', $row->id),
+                    'Bandingkan',
+                    '<path stroke-linecap="round" stroke-linejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 4v12m0 0l4-4m-4 4l-4-4"/>'
+                );
+
+                // STATUS 0: PENDING (Blue Solid Split Button)
                 if ($row->status == 0) {
-                    $btn = $actionBtn(
-                        route('orders.create', ['order_id' => $row->id]),
-                        'Lanjutkan',
-                        '<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/>',
-                        'text-white bg-blue-600 hover:bg-blue-700 border-blue-600'
-                    );
-                    if ($isEmpty) {
-                        return '<div class="flex items-center gap-2">' . $btn . $deleteBtn . '</div>';
-                    }
-                    return $btn;
-                }
+                    $dropdownItems = ($isEmpty ? $deleteMenuItem : $menuItem(route('orders.create', ['order_id' => $row->id]), 'Buka Pesanan', '<path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.964-7.178Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/>'));
 
-                if ($row->status == 1) {
-                    $btn = $actionBtn(
-                        '/receive/' . $row->id,
-                        'Terima',
-                        '<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>',
-                        'text-white bg-emerald-600 hover:bg-emerald-700 border-emerald-600'
-                    );
-                    if ($isEmpty) {
-                        return '<div class="flex items-center gap-2">' . $btn . $deleteBtn . '</div>';
-                    }
-                    return $btn;
-                }
-
-                if ($row->status == 2) {
-                    return '<div class="flex items-center gap-2">'
-                        . $actionBtn(
-                            '/receive/' . $row->id,
-                            'Terima',
-                            '<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>',
-                            'text-white bg-emerald-600 hover:bg-emerald-700 border-emerald-600'
-                        )
-                        . $actionBtn(
-                            route('orders.comparison', $row->id),
-                            'Bandingkan',
-                            '<path stroke-linecap="round" stroke-linejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 4v12m0 0l4-4m-4 4l-4-4"/>',
-                            'text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border-indigo-200'
-                        )
-                        . ($isEmpty ? $deleteBtn : '')
+                    return '<div class="btn-split-group btn-split-blue inline-flex items-stretch rounded-lg shadow-xs overflow-hidden">'
+                        . '<a href="' . route('orders.create', ['order_id' => $row->id]) . '" class="btn-split-main inline-flex items-center gap-2 px-3.5 py-1.5 text-xs font-bold text-white transition-colors">'
+                        . '<svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/></svg>'
+                        . '<span>Lanjutkan</span>'
+                        . '</a>'
+                        . '<div class="relative action-dropdown-container inline-flex">'
+                        . '<button type="button" class="btn-split-toggle btn-action-dropdown inline-flex items-center justify-center px-2.5 transition-colors" title="Aksi Lainnya">'
+                        . '<svg class="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 24 24"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>'
+                        . '</button>'
+                        . '<div class="action-dropdown-menu hidden fixed bg-white rounded-xl shadow-xl border border-slate-200/90 py-1.5 min-w-[175px] z-[99999]">'
+                        . $dropdownItems
+                        . '</div>'
+                        . '</div>'
                         . '</div>';
                 }
 
-                // status == 3 (DITERIMA): empat aksi
-                return '<div class="flex items-center gap-2">'
-                    . $actionBtn(
-                        '/receiving/' . $row->id . '/printspbfinal',
-                        'Cetak SPB',
-                        '<path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0 1 10.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0 .229 2.523a1.125 1.125 0 0 1-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0 0 21 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 0 0-1.913-.247M6.34 18H5.25A2.25 2.25 0 0 1 3 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 0 1 1.913-.247m10.5 0a48.536 48.536 0 0 0-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.656"/>',
-                        'text-amber-700 bg-amber-50 hover:bg-amber-100 border-amber-200',
-                        true
-                    )
-                    . $actionBtn(
-                        '/receiving/' . $row->id . '/printorders',
-                        'Invoice',
-                        '<path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m8.25-2.142V8.25"/>',
-                        'text-pink-700 bg-pink-50 hover:bg-pink-100 border-pink-200',
-                        true
-                    )
-                    . $actionBtn(
-                        '/orders/' . $row->id . '/revision',
-                        'Revisi Faktur',
-                        '<path d="M7 15h-3a1 1 0 0 1 -1 -1v-8a1 1 0 0 1 1 -1h12a1 1 0 0 1 1 1v3" /><path d="M11 19h-3a1 1 0 0 1 -1 -1v-8a1 1 0 0 1 1 -1h12a1 1 0 0 1 1 1v1.25" /><path d="M18.42 15.61a2.1 2.1 0 1 1 2.97 2.97l-3.39 3.42h-3v-3l3.42 -3.39" />',
-                        'text-sky-700 bg-sky-50 hover:bg-sky-100 border-sky-200'
-                    )
-                    . $actionBtn(
-                        route('orders.comparison', $row->id),
-                        'Bandingkan',
-                        '<path stroke-linecap="round" stroke-linejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 4v12m0 0l4-4m-4 4l-4-4"/>',
-                        'text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border-indigo-200'
-                    )
-                    . ($isEmpty ? $deleteBtn : '')
+                // STATUS 1 & 2: DIPESAN (Emerald Solid Split Button - Sesuai Mockup Pengguna)
+                if ($row->status == 1 || $row->status == 2) {
+                    $dropdownItems = $compareItem . ($isEmpty ? '<div class="my-1 border-t border-slate-100"></div>' . $deleteMenuItem : '');
+
+                    return '<div class="btn-split-group btn-split-emerald inline-flex items-stretch rounded-lg shadow-xs overflow-hidden">'
+                        . '<a href="/receive/' . $row->id . '" class="btn-split-main inline-flex items-center gap-2 px-3.5 py-1.5 text-xs font-bold text-white transition-colors">'
+                        . '<svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m9 12 2 2 4-4"/></svg>'
+                        . '<span>Terima</span>'
+                        . '</a>'
+                        . '<div class="relative action-dropdown-container inline-flex">'
+                        . '<button type="button" class="btn-split-toggle btn-action-dropdown inline-flex items-center justify-center px-2.5 transition-colors" title="Aksi Lainnya">'
+                        . '<svg class="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 24 24"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>'
+                        . '</button>'
+                        . '<div class="action-dropdown-menu hidden fixed bg-white rounded-xl shadow-xl border border-slate-200/90 py-1.5 min-w-[175px] z-[99999]">'
+                        . $dropdownItems
+                        . '</div>'
+                        . '</div>'
+                        . '</div>';
+                }
+
+                // STATUS 3: DITERIMA (Crisp White/Slate Split Button - Sesuai Mockup Pengguna)
+                $invoiceItem = $menuItem(
+                    '/receiving/' . $row->id . '/printorders',
+                    'Cetak Invoice',
+                    '<path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m8.25-2.142V8.25"/>',
+                    'text-slate-700 hover:bg-slate-50',
+                    true
+                );
+
+                $revisionItem = $menuItem(
+                    '/orders/' . $row->id . '/revision',
+                    'Revisi Faktur',
+                    '<path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"/>'
+                );
+
+                $dropdownItems = $invoiceItem . $revisionItem . $compareItem . ($isEmpty ? '<div class="my-1 border-t border-slate-100"></div>' . $deleteMenuItem : '');
+
+                return '<div class="btn-split-group btn-split-white inline-flex items-stretch rounded-lg shadow-xs overflow-hidden">'
+                    . '<a href="/receiving/' . $row->id . '/printspbfinal" target="_blank" class="btn-split-main inline-flex items-center gap-2 px-3.5 py-1.5 text-xs font-bold text-slate-800 transition-colors">'
+                    . '<svg class="w-4 h-4 shrink-0 text-slate-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 17h2a2 2 0 0 0 2 -2v-4a2 2 0 0 0 -2 -2h-14a2 2 0 0 0 -2 2v4a2 2 0 0 0 2 2h2"/><path d="M17 9v-4a2 2 0 0 0 -2 -2h-6a2 2 0 0 0 -2 2v4"/><path d="M7 13m0 2a2 2 0 1 1 2 -2h6a2 2 0 1 1 2 2v4a2 2 0 0 1 -2 2h-6a2 2 0 0 1 -2 -2z"/></svg>'
+                    . '<span>Cetak SPB</span>'
+                    . '</a>'
+                    . '<div class="relative action-dropdown-container inline-flex">'
+                    . '<button type="button" class="btn-split-toggle btn-action-dropdown inline-flex items-center justify-center px-2.5 transition-colors" title="Menu Aksi Lainnya">'
+                    . '<svg class="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 24 24"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>'
+                    . '</button>'
+                    . '<div class="action-dropdown-menu hidden fixed bg-white rounded-xl shadow-xl border border-slate-200/90 py-1.5 min-w-[175px] z-[99999]">'
+                    . $dropdownItems
+                    . '</div>'
                     . '</div>';
             })
             // Total & Total PPN — font-size 13px (sengaja sedikit lebih besar dari 12px karena ini
@@ -1090,8 +1110,8 @@ class ReceivingController extends Controller
 
             $item = ReceivingItems::with('order_items')->findOrFail($id);
             $lockedOrderItem = OrderItems::whereKey($item->order_items_id)->lockForUpdate()->firstOrFail();
-            if (($lockedOrderItem->original_quantity !== null || $lockedOrderItem->incomingMovement()->exists())
-                && (float) $request->qty_received + (float) $lockedOrderItem->receivingItems()->where('id', '!=', $id)->sum('qty_received') > (float) $lockedOrderItem->quantity) {
+            if (($lockedOrderItem->original_quantity !== null || $lockedOrderItem->incomingMovement()->exists()) &&
+                    (float) $request->qty_received + (float) $lockedOrderItem->receivingItems()->where('id', '!=', $id)->sum('qty_received') > (float) $lockedOrderItem->quantity) {
                 DB::rollBack();
                 return response()->json(['success' => false, 'message' => 'Jumlah penerimaan melampaui kuantitas aktif setelah konsolidasi.'], 422);
             }
@@ -1115,7 +1135,7 @@ class ReceivingController extends Controller
                 DB::rollBack();
                 return response()->json([
                     'success' => false,
-                    'message' => "Gagal mengurangi kuantiti: Stok saat ini tersisa {$medicine->stock}, tidak mencukupi untuk dikurangi sebesar " . abs($deltaActual) . ". Sebagian barang kemungkinan telah terjual di kasir.",
+                    'message' => "Gagal mengurangi kuantiti: Stok saat ini tersisa {$medicine->stock}, tidak mencukupi untuk dikurangi sebesar " . abs($deltaActual) . '. Sebagian barang kemungkinan telah terjual di kasir.',
                 ], 422);
             }
 
@@ -1312,9 +1332,9 @@ class ReceivingController extends Controller
 
             // Clean up the order item if it was created as a revision "susulan" item
             // (added from master) and no longer has any receiving items.
-            if ($orderItem
-                && ($orderItem->status == 1 || $orderItem->note === 'Item susulan/pengganti saat revisi faktur')
-                && ReceivingItems::where('order_items_id', $orderItem->id)->count() === 0) {
+            if ($orderItem &&
+                    ($orderItem->status == 1 || $orderItem->note === 'Item susulan/pengganti saat revisi faktur') &&
+                    ReceivingItems::where('order_items_id', $orderItem->id)->count() === 0) {
                 $orderItem->delete();
             }
 
@@ -1392,15 +1412,16 @@ class ReceivingController extends Controller
                 $q->orWhereIn('sp_code', $orderSpCodes);
             }
         })
-        ->with([
-            'receiving_items' => function ($q) use ($order) {
-                $q->whereIn('order_items_id', $order->order_items->pluck('id'))
-                  ->with(['order_items.medicines', 'batches', 'locations', 'etalases']);
-            },
-            'creditor'
-        ])
-        ->orderBy('id', 'asc')
-        ->get();
+            ->with([
+                'receiving_items' => function ($q) use ($order) {
+                    $q
+                        ->whereIn('order_items_id', $order->order_items->pluck('id'))
+                        ->with(['order_items.medicines', 'batches', 'locations', 'etalases']);
+                },
+                'creditor'
+            ])
+            ->orderBy('id', 'asc')
+            ->get();
 
         $knownItemIds = $allReceivingDetails->flatMap->receiving_items->pluck('id');
         $orphanedItems = ReceivingItems::whereIn('order_items_id', $order->order_items->pluck('id'))
@@ -1450,14 +1471,15 @@ class ReceivingController extends Controller
             ])
             ->leftJoin('factories', 'factories.id', '=', 'medicines.factory_id')
             ->where(function ($q) use ($search) {
-                $q->where('medicines.name', 'like', $search . '%')
+                $q
+                    ->where('medicines.name', 'like', $search . '%')
                     ->orWhere('medicines.code', 'like', $search . '%');
             })
             ->limit(20)
             ->get();
 
         return response()->json([
-            'data' => $items->map(fn ($m) => [
+            'data' => $items->map(fn($m) => [
                 'id' => $m->id,
                 'code' => $m->code,
                 'name' => $m->name,
@@ -1914,7 +1936,8 @@ class ReceivingController extends Controller
 
         $orderItemCount = OrderItems::where('order_id', $id)->count();
         if ($orderItemCount === 0) {
-            return redirect()->route('orders.create', ['order_id' => $getOrder->id])
+            return redirect()
+                ->route('orders.create', ['order_id' => $getOrder->id])
                 ->with('warning', 'Pesanan ini belum memiliki item obat. Silakan isi item obat terlebih dahulu.');
         }
 
@@ -2054,20 +2077,24 @@ class ReceivingController extends Controller
         try {
             $orderItem = OrderItems::whereKey($request->order_items_id)->lockForUpdate()->firstOrFail();
             $sourceOrder = Order::findOrFail($orderItem->order_id);
-            $otherQty = $orderItem->receivingItems()
-                ->when($request->filled('receiving_items_id'), fn ($q) => $q->where('id', '!=', $request->receiving_items_id))
+            $otherQty = $orderItem
+                ->receivingItems()
+                ->when($request->filled('receiving_items_id'), fn($q) => $q->where('id', '!=', $request->receiving_items_id))
                 ->sum('qty_received');
             $protectedItem = $orderItem->original_quantity !== null || $orderItem->incomingMovement()->exists();
-            $wrongEdit = $request->filled('receiving_items_id') && !$orderItem->receivingItems()
-                ->whereKey($request->receiving_items_id)->whereNull('batches_id')
-                ->whereHas('receiving_details', fn ($q) => $q->where('receiving_id', $receiving->id))->exists();
-            if ((int) $sourceOrder->pharmacy_id !== getPurchasingPharmacyId()
-                || (int) $sourceOrder->receiving_id !== (int) $receiving->id
-                || (int) $sourceOrder->status === 3
-                || (string) $orderItem->creditor_code !== (string) $request->creditor_code
-                || $wrongEdit
-                || ($protectedItem && ((float) $request->qty_received + (float) $otherQty > (float) $orderItem->quantity
-                    || ($request->has('pack') && (bool) $request->pack !== (bool) $orderItem->pack)))) {
+            $wrongEdit = $request->filled('receiving_items_id') && !$orderItem
+                ->receivingItems()
+                ->whereKey($request->receiving_items_id)
+                ->whereNull('batches_id')
+                ->whereHas('receiving_details', fn($q) => $q->where('receiving_id', $receiving->id))
+                ->exists();
+            if ((int) $sourceOrder->pharmacy_id !== getPurchasingPharmacyId() ||
+                (int) $sourceOrder->receiving_id !== (int) $receiving->id ||
+                (int) $sourceOrder->status === 3 ||
+                (string) $orderItem->creditor_code !== (string) $request->creditor_code ||
+                $wrongEdit ||
+                ($protectedItem && ((float) $request->qty_received + (float) $otherQty > (float) $orderItem->quantity ||
+                    ($request->has('pack') && (bool) $request->pack !== (bool) $orderItem->pack)))) {
                 DB::rollBack();
                 return response()->json(['success' => false, 'message' => 'BPBA/PBF tidak sesuai atau jumlah/satuan melampaui pesanan konsolidasi. Muat ulang penerimaan.'], 422);
             }
@@ -2251,7 +2278,8 @@ class ReceivingController extends Controller
 
             $receiving->setRelation('receiving_details', $allDetails);
         } else {
-            $allDetails = $receiving->receiving_details()
+            $allDetails = $receiving
+                ->receiving_details()
                 ->with([
                     'receiving_items.order_items.medicines',
                     'creditor'

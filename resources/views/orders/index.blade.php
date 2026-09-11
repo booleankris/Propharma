@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Sales Data')
+@section('title', 'Daftar Pesanan')
 
 @section('style')
     <!-- CSS Libraries -->
@@ -17,97 +17,170 @@
             box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
         }
 
-        .dropdown-table {
-            width: 100%;
-            position: absolute;
-            z-index: 999999;
-            margin-top: 0;
-            background: #ffffff;
-            border-radius: 10px;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, .12);
-            border: 1px solid #e5e7eb;
-            max-height: 320px;
-            overflow-y: auto;
-            display: none;
-            z-index: 9999;
-        }
-
-        .dropdown-table tbody tr.active {
-            background-color: #dbeafe;
-        }
-
-        .dropdown-table table {
-            width: 100%;
-            border-collapse: separate;
-            border-spacing: 0;
-            font-size: 14px;
-        }
-
-        .dropdown-table thead th {
-            position: sticky;
-            top: 0;
-            background: #f9fafb;
-            color: #374151;
-            font-weight: 600;
-            padding: 10px 12px;
-            border-bottom: 1px solid #e5e7eb;
-            text-transform: uppercase;
-            font-size: 12px;
-            letter-spacing: .04em;
-        }
-
-        .dropdown-table tbody tr {
-            transition: background-color .15s ease, transform .05s ease;
-            cursor: pointer;
-        }
-
-        .dropdown-table tbody tr:hover {
-            background-color: #f3f4f6;
-        }
-
-        .dropdown-table tbody tr:active {
-            transform: scale(0.995);
-        }
-
-        .dropdown-table td {
-            padding: 10px 12px;
-            border-bottom: 1px solid #f1f5f9;
-            color: #111827;
-            vertical-align: middle;
-        }
-
-        .dropdown-table tbody tr:last-child td {
-            border-bottom: none;
-        }
-
-        .dropdown-table td:first-child {
-            width: 40px;
-            color: #6b7280;
-            font-size: 13px;
-        }
-
-        .dropdown-table td:nth-child(4) {
-            font-weight: 600;
-            color: #16a34a;
-        }
-
-        .dropdown-table td:last-child {
-            color: #6b7280;
-            font-size: 13px;
-        }
-
-        .dropdown-table .empty-row {
-            text-align: center;
-            padding: 16px;
-            color: #9ca3af;
-            font-style: italic;
-        }
-
-
-
-
         .text-end {
             text-align: right !important;
+        }
+
+        #orderItemsTable tbody td {
+            vertical-align: middle !important;
+            padding-top: 10px !important;
+            padding-bottom: 10px !important;
+        }
+
+        /* Split Button Group Base (Lebih tegas dan jelas di atas background putih) */
+        .btn-split-group {
+            display: inline-flex;
+            align-items: stretch;
+            border-radius: 9px;
+            overflow: hidden;
+            font-family: inherit;
+            vertical-align: middle;
+            transition: all 0.15s ease-in-out;
+            white-space: nowrap;
+        }
+
+        /* AKSI SEKUNDER (DITERIMA) - Kontras Tinggi di Background Putih Sesuai Mockup */
+        .btn-split-white {
+            background-color: #ffffff !important;
+            border: 1.5px solid #cbd5e1 !important; /* Border slate-300 yang tegas & jelas */
+            box-shadow: 0 1px 2px 0 rgba(15, 23, 42, 0.06);
+        }
+        .btn-split-white:hover {
+            border-color: #94a3b8 !important; /* Slate-400 saat hover */
+            box-shadow: 0 2px 5px 0 rgba(15, 23, 42, 0.1);
+        }
+        .btn-split-white .btn-split-main {
+            color: #1e293b !important; /* Slate-800 gelap tebal */
+            font-weight: 700 !important;
+            font-size: 13px !important;
+            padding: 6px 13px !important;
+            background-color: #ffffff;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            transition: background-color 0.15s;
+        }
+        .btn-split-white .btn-split-main:hover {
+            background-color: #f8fafc !important;
+        }
+        .btn-split-white .btn-split-main svg {
+            color: #334155 !important;
+        }
+        .btn-split-white .btn-split-toggle {
+            background-color: #ffffff !important;
+            border: none;
+            border-left: 1.5px solid #cbd5e1 !important; /* Divider vertikal tegas */
+            color: #334155 !important;
+            padding: 0 10px !important;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.15s, color 0.15s;
+        }
+        .btn-split-white .btn-split-toggle:hover {
+            background-color: #f1f5f9 !important;
+            color: #0f172a !important;
+        }
+
+        /* AKSI PRIMER (DIPESAN) - Emerald Solid Sesuai Mockup */
+        .btn-split-emerald {
+            background-color: #10b981 !important;
+            border: 1px solid #059669 !important;
+            box-shadow: 0 1px 3px 0 rgba(16, 185, 129, 0.25), 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        }
+        .btn-split-emerald:hover {
+            background-color: #059669 !important;
+            border-color: #047857 !important;
+            box-shadow: 0 2px 5px 0 rgba(16, 185, 129, 0.35);
+        }
+        .btn-split-emerald .btn-split-main {
+            color: #ffffff !important;
+            font-weight: 700 !important;
+            font-size: 13px !important;
+            padding: 6px 13px !important;
+            background-color: transparent;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            transition: background-color 0.15s;
+        }
+        .btn-split-emerald .btn-split-main:hover {
+            background-color: rgba(0, 0, 0, 0.06);
+        }
+        .btn-split-emerald .btn-split-toggle {
+            background-color: rgba(0, 0, 0, 0.09) !important;
+            border: none;
+            border-left: 1px solid rgba(255, 255, 255, 0.25) !important;
+            color: #ffffff !important;
+            padding: 0 10px !important;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.15s;
+        }
+        .btn-split-emerald .btn-split-toggle:hover {
+            background-color: rgba(0, 0, 0, 0.2) !important;
+        }
+
+        /* STATUS PENDING - Blue Solid */
+        .btn-split-blue {
+            background-color: #2563eb !important;
+            border: 1px solid #1d4ed8 !important;
+            box-shadow: 0 1px 3px 0 rgba(37, 99, 235, 0.25);
+        }
+        .btn-split-blue:hover {
+            background-color: #1d4ed8 !important;
+            border-color: #1e40af !important;
+            box-shadow: 0 2px 5px 0 rgba(37, 99, 235, 0.35);
+        }
+        .btn-split-blue .btn-split-main {
+            color: #ffffff !important;
+            font-weight: 700 !important;
+            font-size: 13px !important;
+            padding: 6px 13px !important;
+            background-color: transparent;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            transition: background-color 0.15s;
+        }
+        .btn-split-blue .btn-split-main:hover {
+            background-color: rgba(0, 0, 0, 0.06);
+        }
+        .btn-split-blue .btn-split-toggle {
+            background-color: rgba(0, 0, 0, 0.09) !important;
+            border: none;
+            border-left: 1px solid rgba(255, 255, 255, 0.25) !important;
+            color: #ffffff !important;
+            padding: 0 10px !important;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.15s;
+        }
+        .btn-split-blue .btn-split-toggle:hover {
+            background-color: rgba(0, 0, 0, 0.2) !important;
+        }
+
+        /* Action Dropdown Menu */
+        .action-dropdown-menu {
+            animation: fadeInDropdown 0.12s ease-out;
+        }
+        @keyframes fadeInDropdown {
+            from {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
         }
     </style>
 @endsection
@@ -185,10 +258,9 @@
                     <div>
                         <label
                             class="block mb-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Tanggal</label>
-                        <input type="text" id="returdate"
-                            class="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm transition-all focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            value="{{ $now }}" readonly onkeyup="searchMedicineData(this.value)"
-                            autocomplete="off">
+                        <input type="text" id="todayDate"
+                            class="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm transition-all focus:outline-none"
+                            value="{{ $now }}" readonly autocomplete="off">
                     </div>
                     <div>
                         <label class="block mb-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Cari Nomor
@@ -230,10 +302,7 @@
 @section('scripts')
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
-    <script src="{{ asset('templates/js/page/modules-datatables.js') }}"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-    <script src="{{ asset('templates/library/izitoast/dist/js/iziToast.min.js') }}"></script>
-    <script src="https://unpkg.com/sweetalert/dist/sweetalert.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script>
         let startDate = '';
@@ -260,30 +329,7 @@
         });
     </script>
     <script>
-        let page = 1;
-        let keyword = '';
-        let loading = false;
-        let hasMore = true;
-        let activeIndex = -1;
-        let selectedTransactionCode = null;
-        let medicineTable = null;
-        let medicineSelectedId = '';
-        let orderid = null;
-        let itemcode = '';
-        let itemprice = '';
-        let itemcontent = '';
-        let itemqty = '';
-        let itemtotal = '';
-        let total_transaction = '';
-        let itempack = '0';
-        var itemcreditor = '';
-
-
-        var pack = document.getElementById('pack');
         let orderItemsTable;
-        let selectedRowData = null;
-        let selectedRowIndex = null;
-
 
         document.addEventListener('DOMContentLoaded', function() {
             orderItemsTable = $('#orderItemsTable').DataTable({
@@ -297,451 +343,78 @@
                         d.end_date = endDate;
                     }
                 },
-                columns: [{
+                columns: [
+                    {
                         data: 'DT_RowIndex',
                         orderable: false,
                         searchable: false
                     },
                     {
                         data: 'date',
-                        name: 'date'
+                        name: 'updated_at'
                     },
                     {
                         data: 'code',
                         name: 'code',
                         defaultContent: '-'
                     },
-
                     {
-                        data: 'status_order'
+                        data: 'status_order',
+                        name: 'status',
+                        orderable: false,
+                        searchable: false
                     },
                     {
                         data: 'total',
-                        name: 'total'
+                        name: 'total',
+                        orderable: false,
+                        searchable: false
                     },
                     {
                         data: 'total_ppn',
-                        name: 'total_ppn'
+                        name: 'total_ppn',
+                        orderable: false,
+                        searchable: false
                     },
                     {
                         data: 'action',
-                        name: 'action'
+                        name: 'action',
+                        orderable: false,
+                        searchable: false
                     },
                 ],
+                order: [[1, 'desc']],
                 searching: false,
                 info: false,
             });
         });
-        // $('#orderItemsTable').on('click', 'tbody tr', function() {
-        //     $('#orderItemsTable tbody tr').removeClass('selected');
-        //     $(this).addClass('selected');
 
-        //     selectedRowData = orderItemsTable.row(this).data();
+        // Search SPB with debouncing
+        let searchTimeout = null;
+        function searchOrderCode(data) {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                if (orderItemsTable) {
+                    orderItemsTable.ajax.reload();
+                }
+            }, 300);
+        }
 
-        //     console.log('ROW SELECTED:', selectedRowData);
-        // });
+        // Double click row to open order based on its status
+        $('#orderItemsTable tbody').on('dblclick', 'tr', function(e) {
+            if ($(e.target).closest('button, a, .action-dropdown-container, .action-dropdown-menu').length) return;
 
-        $('#orderItemsTable tbody').on('dblclick', 'tr', function() {
-            const data = orderItemsTable.row(this).data();
+            const data = orderItemsTable ? orderItemsTable.row(this).data() : null;
             if (!data) return;
 
-            selectedRowIndex = orderItemsTable.row(this).index();
-            selectedRowData = data;
-
-            // Fill inputs
-            document.getElementById('medicine_name').value = data.medicines.name ?? '';
-            document.getElementById('unit').value = data.medicines.unit ?? '';
-            document.getElementById('content').value = data.medicines.content ?? '';
-            document.getElementById('item_price').value = formatRupiah(data.medicines.raw_price);
-            document.getElementById('qty').value = data.quantity;
-            document.getElementById('medicine_code').value = data.medicines.code;
-            document.getElementById('total_price').value = formatRupiah(data.total);
-            if (data.pack == "1") {
-                pack.checked = true;
-            }
-            console.log(data);
-            // IMPORTANT: store for update
-            itemcode = data.medicine_id;
-            itemprice = data.medicines.raw_price;
-            itemqty = data.quantity;
-            itemcontent = data.medicines.content;
-            totalprice = data.total;
-            document.getElementById('qty').focus();
-        });
-        document.getElementById('qty').addEventListener('keydown', function(e) {
-            if (e.key !== 'Enter') return;
-            e.preventDefault();
-
-            if (selectedRowData) {
-                updateItem();
-            } else {
-                addItem(); // your existing function
+            if (data.status == 0) {
+                window.location.href = "{{ route('orders.create') }}?order_id=" + data.id;
+            } else if (data.status == 1 || data.status == 2) {
+                window.location.href = "/receive/" + data.id;
+            } else if (data.status == 3) {
+                window.location.href = "/orders/" + data.id + "/revision";
             }
         });
-
-        function updateItem() {
-            const qty = parseInt(document.getElementById('qty').value);
-            const total = qty * itemprice;
-            axios.post("{{ route('orders.updateOrderItem') }}", {
-                order_id: selectedRowData.order_item_id,
-                medicine_id: selectedRowData.medicines.id,
-                pack: itempack,
-                price: itemprice,
-                quantity: itemqty,
-                total: itemtotal,
-            }, {
-                headers: {
-                    'X-CSRF-TOKEN': document
-                        .querySelector('meta[name="csrf-token"]')
-                        .content
-                }
-            }).then(res => {
-                if (res.data.success) {
-                    orderItemsTable.ajax.reload(null, false);
-                    resetInputs();
-                    selectedRowData = null;
-                    selectedRowIndex = null;
-                }
-            }).catch(err => {
-                console.error(err);
-                alert('Update failed');
-            });
-        }
-
-        document.addEventListener('keydown', function(e) {
-            const isDeleteKey =
-                e.key === 'Delete' ||
-                e.key === 'Del' ||
-                e.key === 'Backspace';
-
-            if (!isDeleteKey) return;
-            if (!selectedRowData) return;
-
-            // prevent deleting while typing
-            const tag = document.activeElement.tagName;
-            if (tag === 'INPUT' || tag === 'TEXTAREA') return;
-
-            e.preventDefault();
-
-            const name = selectedRowData.medicines?.name ?? 'item';
-
-            if (!confirm(`Hapus item "${name}" ?`)) return;
-
-            axios.post("{{ route('orders.deleteOrderItem') }}", {
-                id: selectedRowData.order_item_id
-            }, {
-                headers: {
-                    'X-CSRF-TOKEN': document
-                        .querySelector('meta[name="csrf-token"]')
-                        .content
-                }
-            }).then(res => {
-                if (res.data.success) {
-                    orderItemsTable.ajax.reload(null, false);
-                    selectedRowData = null;
-                    selectedRowIndex = null;
-                }
-            }).catch(err => {
-                console.error(err);
-                alert('Delete failed');
-            });
-        });
-
-
-
-        function formatRupiah(value) {
-            const number = Number(value) || 0;
-            return new Intl.NumberFormat('id-ID', {
-                style: 'currency',
-                currency: 'IDR',
-                minimumFractionDigits: 0
-            }).format(number);
-        }
-
-        function searchOrderCode(data) {
-            orderItemsTable.ajax.reload();
-        }
-
-        function searchMedicineData(value) {
-            keyword = value.trim();
-            page = 1;
-            hasMore = true;
-            activeIndex = -1;
-
-            const tbody = document.getElementById('searchResults');
-            tbody.innerHTML = '';
-            resetInputs();
-
-            if (keyword.length < 1) {
-                document.getElementById('searchDropdown').style.display = 'none';
-                return;
-            }
-
-            fetchData();
-        }
-
-        // Fetch   
-        function fetchData() {
-            if (loading || !hasMore) return;
-
-            loading = true;
-
-            fetch(`{{ route('orders.searchmedicine') }}?search=${keyword}&page=${page}`)
-                .then(res => res.json())
-                .then(res => {
-                    const tbody = document.getElementById('searchResults');
-
-                    if (page === 1 && res.data.length === 0) {
-                        tbody.innerHTML = `
-                            <tr>
-                                <td colspan="4" class="text-center">No data found</td>
-                            </tr>`;
-                        hasMore = false;
-                        return;
-                    }
-
-                    res.data.forEach((item, index) => {
-                        tbody.insertAdjacentHTML('beforeend', `
-                            <tr 
-                                data-item='${JSON.stringify(item)}'
-                                tabindex="0"
-                            >
-                                <td>${((page - 1) * res.per_page) + index + 1}</td>
-                                <td>${item.name}</td>
-                            </tr>
-                        `);
-                    });
-
-                    hasMore = res.current_page < res.last_page;
-                    page++;
-
-                    document.getElementById('searchDropdown').style.display = 'block';
-                })
-                .finally(() => loading = false);
-        }
-
-        // Scroll
-        function handleScroll() {
-            const container = document.getElementById('tableScroll');
-            if (container.scrollTop + container.clientHeight >= container.scrollHeight - 5) {
-                fetchData();
-            }
-        }
-
-        // Nav
-        document.addEventListener('keydown', function(e) {
-            const dropdown = document.getElementById('searchDropdown');
-            if (!dropdown || dropdown.offsetParent === null) return;
-
-            const rows = document.querySelectorAll('#searchResults tr');
-            if (!rows.length) return;
-
-            // allow arrow navigation even when input is focused
-            if (['ArrowDown', 'ArrowUp', 'Enter'].includes(e.key)) {
-                e.preventDefault();
-            }
-
-            if (e.key === 'ArrowDown') {
-                activeIndex = Math.min(activeIndex + 1, rows.length - 1);
-                updateActiveRow(rows);
-            }
-
-            if (e.key === 'ArrowUp') {
-                activeIndex = Math.max(activeIndex - 1, 0);
-                updateActiveRow(rows);
-            }
-
-            if (e.key === 'Enter' && activeIndex >= 0) {
-                selectRow(rows[activeIndex]);
-            }
-        });
-
-
-        function calculateReturTotal() {
-            const oldQty = parseFloat(document.getElementById('old_qty').value) || 0;
-            const returQty = parseFloat(document.getElementById('qty').value) || 0;
-
-            // item_price may contain formatting, strip non-numeric
-            const priceRaw = document.getElementById('item_price').value || '0';
-            const itemPrice = parseFloat(priceRaw.replace(/[^\d.-]/g, '')) || 0;
-
-
-
-            const total = (oldQty - returQty) * itemPrice;
-
-            document.getElementById('total_retur').value = total.toFixed(0);
-        }
-        // Hover
-        document.getElementById('searchResults').addEventListener('mouseover', function(e) {
-            const row = e.target.closest('tr');
-            if (!row) return;
-
-            const rows = [...this.children];
-            rows.forEach(r => r.classList.remove('active'));
-
-            row.classList.add('active');
-            activeIndex = rows.indexOf(row);
-        });
-
-        // Click
-        document.getElementById('searchResults').addEventListener('click', function(e) {
-            const row = e.target.closest('tr');
-            if (row) {
-                selectRow(row);
-                e.stopPropagation();
-            }
-        });
-
-        // Select
-        function selectRow(row) {
-            const item = JSON.parse(row.dataset.item);
-            itemprice = item.raw_price;
-            itemcontent = item.content;
-            itemcreditor = item.creditors_id;
-            itemcode = item.id;
-
-            document.getElementById('medicine_code').value = item.code ?? '';
-            document.getElementById('medicine_name').value = item.name ?? '';
-            document.getElementById('unit').value = item.unit ?? '';
-            document.getElementById('content').value = item.content ?? '';
-            document.getElementById('item_price').value = formatRupiah(item.raw_price ?? 0);
-
-            document.getElementById('searchDropdown').style.display = 'none';
-            document.getElementById('searchInput').value = "";
-            document.getElementById('qty')?.focus();
-
-        }
-
-        // Update
-        function updateActiveRow(rows) {
-            rows.forEach(r => r.classList.remove('active'));
-            if (activeIndex >= 0) {
-                rows[activeIndex].classList.add('active');
-                rows[activeIndex].scrollIntoView({
-                    block: 'nearest'
-                });
-            }
-        }
-        document.addEventListener('click', function(e) {
-            const wrapper = document.getElementById('searchWrapper');
-            if (!wrapper.contains(e.target)) {
-                document.getElementById('searchDropdown').style.display = 'none';
-            }
-        }, true);
-
-        pack.addEventListener('change', function() {
-            if (this.checked) {
-                itempack = 1;
-            } else {
-                itempack = 0;
-            }
-
-            counttotal();
-        });
-
-        pack.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') {
-                document.getElementById('qty').focus();
-            }
-        })
-
-        function counttotal() {
-            let qty = document.getElementById('qty').value;
-            itemqty = qty;
-
-            if (pack.checked) {
-                itemtotal = qty * itemcontent * itemprice;
-                total_transaction += itemtotal;
-                document.getElementById('total_price').value = formatRupiah(itemtotal);
-
-            } else {
-                itemtotal = qty * itemprice;
-                total_transaction += itemtotal;
-                document.getElementById('total_price').value = formatRupiah(itemtotal);
-
-
-            }
-        }
-
-        function resetInputs() {
-            document.getElementById('medicine_code').value = '';
-            document.getElementById('medicine_name').value = '';
-            document.getElementById('unit').value = '';
-            document.getElementById('qty').value = '';
-            document.getElementById('content').value = '';
-            document.getElementById('item_price').value = '';
-            document.getElementById('total_price').value = '';
-            const isActive = document.getElementById('is_active');
-            pack.checked = false;
-
-            if (isActive && isActive.checked) {
-                isActive.checked = false;
-            }
-
-            // reset JS
-            itemcode = '';
-            itemprice = '';
-            itemqty = '';
-            itemtotal = '';
-            itemcreditor = null;
-            selectedRowData = null;
-            document.getElementById('searchInput').focus();
-        }
-
-        function addItem() {
-            const payload = {
-                order_id: orderid,
-                medicine_id: itemcode,
-                creditor_id: itemcreditor ?? null,
-                pack: itempack,
-                price: itemprice,
-                quantity: itemqty,
-                total: itemtotal,
-            };
-
-            axios.post("{{ route('orders.addItemOrder') }}", payload, {
-                    headers: {
-                        'X-CSRF-TOKEN': document
-                            .querySelector('meta[name="csrf-token"]')
-                            .content
-                    }
-                })
-                .then(res => {
-                    if (res.data.success) {
-                        orderItemsTable.ajax.reload(null, false);
-                        resetInputs();
-
-                    }
-                })
-                .catch(err => {
-                    console.error(err);
-                    alert('Error adding item');
-                });
-        }
-
-        function completeOrder() {
-
-            axios.post("{{ route('orders.completeOrder') }}", {
-                order_id: orderid,
-            }, {
-                headers: {
-                    'X-CSRF-TOKEN': document
-                        .querySelector('meta[name="csrf-token"]')
-                        .content
-                }
-            }).then(res => {
-                if (res.data.success) {
-                    orderItemsTable.ajax.reload(null, false);
-                    resetInputs();
-                    selectedRowData = null;
-                    selectedRowIndex = null;
-                    location.reload();
-                }
-            }).catch(err => {
-                console.error(err);
-                alert('Update failed');
-            });
-        }
 
         function deleteEmptyOrder(orderId, orderCode) {
             const title = 'Hapus BPBA / Pesanan?';
@@ -822,7 +495,50 @@
                 }
             }
         }
+
+        // Dropdown menu handler for action buttons in DataTable
+        $(document).on('click', '.btn-action-dropdown', function(e) {
+            e.stopPropagation();
+            const btn = $(this);
+            const menu = btn.siblings('.action-dropdown-menu');
+            const isVisible = !menu.hasClass('hidden');
+
+            // Close all other dropdowns first
+            $('.action-dropdown-menu').addClass('hidden');
+
+            if (!isVisible) {
+                // Position fixed menu right below button, aligned to the right edge
+                const rect = btn[0].getBoundingClientRect();
+                const menuWidth = 180;
+                
+                let top = rect.bottom + 6;
+                let left = rect.right - menuWidth;
+
+                // Ensure it stays within viewport
+                if (left < 10) left = 10;
+                if (top + 200 > window.innerHeight) {
+                    top = rect.top - 180; // open upwards if close to bottom
+                }
+
+                menu.css({
+                    top: top + 'px',
+                    left: left + 'px',
+                    width: menuWidth + 'px'
+                }).removeClass('hidden');
+            }
+        });
+
+        // Close dropdown when clicking outside or scrolling
+        $(document).on('click', function() {
+            $('.action-dropdown-menu').addClass('hidden');
+        });
+
+        $(window).on('scroll resize', function() {
+            $('.action-dropdown-menu').addClass('hidden');
+        });
+
+        $('#orderItemsTable').closest('.overflow-x-auto').on('scroll', function() {
+            $('.action-dropdown-menu').addClass('hidden');
+        });
     </script>
-
-
 @endsection

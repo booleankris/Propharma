@@ -728,12 +728,12 @@
             itemcontent = parseFloat(data.medicines?.content) || 1;
             itemqty = data.quantity;
 
-            document.getElementById('medicine_name').value = data.medicines.name ?? '';
-            document.getElementById('unit').value = data.medicines.unit ?? '';
-            document.getElementById('content').value = data.medicines.content ?? '';
+            document.getElementById('medicine_name').value = data.medicines?.name ?? '';
+            document.getElementById('unit').value = data.medicines?.unit ?? '';
+            document.getElementById('content').value = data.medicines?.content ?? '';
             document.getElementById('item_price').value = formatRupiah(itemrawprice);
             document.getElementById('qty').value = data.quantity;
-            document.getElementById('medicine_code').value = data.medicines.code;
+            document.getElementById('medicine_code').value = data.medicines?.code ?? '';
             document.getElementById('total_price').value = data.total;
             document.getElementById('qty_received').value = data.qty_received ?? '';
             document.getElementById('batch').value = data.receiving_items?.batch ?? '';
