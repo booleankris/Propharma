@@ -824,6 +824,10 @@ class ReceivingController extends Controller
         $items = Order::query()
             ->where('pharmacy_id', getPurchasingPharmacyId())
             ->with(['order_items.receivingItems.receiving_details'])
+            ->withCount('order_items')
+            ->withCount(['order_items as active_items_count' => function ($q) {
+                $q->where('quantity', '>', 0);
+            }])
             ->withSum('order_items', 'total')
             ->orderByDesc('id');
 
@@ -862,6 +866,11 @@ class ReceivingController extends Controller
             ->addColumn('code', function ($row) {
                 $code = e($row->code ?? '0');
                 $html = '<span style="font-size:10px" class="inline-flex items-center px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 font-nunito-bold tracking-wide border border-slate-200">' . $code . '</span>';
+
+                $isEmpty = (($row->order_items_count ?? 0) == 0) || (($row->active_items_count ?? 0) == 0);
+                if ($isEmpty) {
+                    $html .= ' <span style="font-size:10px" class="inline-flex items-center px-2 py-0.5 rounded font-nunito font-semibold bg-rose-50 text-rose-600 border border-rose-200">Kosong</span>';
+                }
 
                 $codes = collect();
                 if ($row->relationLoaded('order_items')) {
@@ -919,22 +928,37 @@ class ReceivingController extends Controller
             })
             // Action buttons — warna balik lagi, icon lebih kecil & konsisten, tanpa glow
             ->addColumn('action', function ($row) use ($actionBtn) {
+                $isEmpty = (($row->order_items_count ?? 0) == 0) || (($row->active_items_count ?? 0) == 0);
+
+                $deleteBtn = '<button type="button" onclick="deleteEmptyOrder(' . $row->id . ', \'' . e($row->code) . '\')" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border rounded-lg transition-colors text-rose-700 bg-rose-50 hover:bg-rose-100 border-rose-200" title="Hapus BPBA Kosong">'
+                    . '<svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"/></svg>'
+                    . '<span>Hapus</span>'
+                    . '</button>';
+
                 if ($row->status == 0) {
-                    return $actionBtn(
+                    $btn = $actionBtn(
                         route('orders.create', ['order_id' => $row->id]),
                         'Lanjutkan',
                         '<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/>',
                         'text-white bg-blue-600 hover:bg-blue-700 border-blue-600'
                     );
+                    if ($isEmpty) {
+                        return '<div class="flex items-center gap-2">' . $btn . $deleteBtn . '</div>';
+                    }
+                    return $btn;
                 }
 
                 if ($row->status == 1) {
-                    return $actionBtn(
+                    $btn = $actionBtn(
                         '/receive/' . $row->id,
                         'Terima',
                         '<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>',
                         'text-white bg-emerald-600 hover:bg-emerald-700 border-emerald-600'
                     );
+                    if ($isEmpty) {
+                        return '<div class="flex items-center gap-2">' . $btn . $deleteBtn . '</div>';
+                    }
+                    return $btn;
                 }
 
                 if ($row->status == 2) {
@@ -951,6 +975,7 @@ class ReceivingController extends Controller
                             '<path stroke-linecap="round" stroke-linejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 4v12m0 0l4-4m-4 4l-4-4"/>',
                             'text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border-indigo-200'
                         )
+                        . ($isEmpty ? $deleteBtn : '')
                         . '</div>';
                 }
 
@@ -982,6 +1007,7 @@ class ReceivingController extends Controller
                         '<path stroke-linecap="round" stroke-linejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 4v12m0 0l4-4m-4 4l-4-4"/>',
                         'text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border-indigo-200'
                     )
+                    . ($isEmpty ? $deleteBtn : '')
                     . '</div>';
             })
             // Total & Total PPN — font-size 13px (sengaja sedikit lebih besar dari 12px karena ini
@@ -1280,7 +1306,17 @@ class ReceivingController extends Controller
                 'user_id' => auth()->user()->id,
             ]);
 
+            $orderItem = $item->order_items;
+
             $item->delete();
+
+            // Clean up the order item if it was created as a revision "susulan" item
+            // (added from master) and no longer has any receiving items.
+            if ($orderItem
+                && ($orderItem->status == 1 || $orderItem->note === 'Item susulan/pengganti saat revisi faktur')
+                && ReceivingItems::where('order_items_id', $orderItem->id)->count() === 0) {
+                $orderItem->delete();
+            }
 
             DB::commit();
 

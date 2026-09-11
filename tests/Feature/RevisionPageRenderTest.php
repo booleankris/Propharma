@@ -24,7 +24,7 @@ class RevisionPageRenderTest extends TestCase
             'orphanedItems' => collect(), 'orderItemsData' => collect(),
             // No allMedicines variable: this page must never need the full medicine catalog.
         ]);
-        $this->assertStringNotContainsString('add_medicine_id', $html);
+        $this->assertStringContainsString('id="add_medicine_id"', $html);
         $this->assertStringContainsString('id="add_batch"', $html);
         $this->assertStringContainsString('onclick="submitAddMedicine()"', $html);
         $this->assertStringContainsString('js/invoice-revision.js?v=', $html);

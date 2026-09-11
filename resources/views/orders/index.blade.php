@@ -736,12 +736,91 @@
                     selectedRowData = null;
                     selectedRowIndex = null;
                     location.reload();
-
                 }
             }).catch(err => {
                 console.error(err);
                 alert('Update failed');
             });
+        }
+
+        function deleteEmptyOrder(orderId, orderCode) {
+            const title = 'Hapus BPBA / Pesanan?';
+            const text = 'Apakah Anda yakin ingin menghapus ' + (orderCode && orderCode !== '0' ? orderCode : 'pesanan ini') + ' yang kosong? Data yang sudah dihapus tidak dapat dikembalikan.';
+
+            const proceedDelete = () => {
+                const token = document.querySelector('meta[name="csrf-token"]')?.content || '{{ csrf_token() }}';
+
+                fetch(`/orders/${orderId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': token,
+                        'Accept': 'application/json'
+                    }
+                })
+                .then(response => response.json().then(data => ({ status: response.status, body: data })))
+                .then(({ status, body }) => {
+                    if (body.success) {
+                        if (typeof Swal !== 'undefined') {
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Berhasil',
+                                text: body.message,
+                                timer: 1500,
+                                showConfirmButton: false
+                            });
+                        } else {
+                            alert(body.message);
+                        }
+                        if (typeof orderItemsTable !== 'undefined') {
+                            orderItemsTable.ajax.reload(null, false);
+                        }
+                    } else {
+                        if (typeof Swal !== 'undefined') {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Gagal',
+                                text: body.message || 'Gagal menghapus pesanan.'
+                            });
+                        } else {
+                            alert(body.message || 'Gagal menghapus pesanan.');
+                        }
+                    }
+                })
+                .catch(err => {
+                    console.error('Error deleting order:', err);
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Kesalahan Sistem',
+                            text: 'Terjadi kesalahan saat menghapus pesanan.'
+                        });
+                    } else {
+                        alert('Terjadi kesalahan saat menghapus pesanan.');
+                    }
+                });
+            };
+
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    title: title,
+                    text: text,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#e11d48',
+                    cancelButtonColor: '#64748b',
+                    confirmButtonText: 'Ya, Hapus!',
+                    cancelButtonText: 'Batal'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        proceedDelete();
+                    }
+                });
+            } else {
+                if (confirm(text)) {
+                    proceedDelete();
+                }
+            }
         }
     </script>
 

@@ -99,7 +99,7 @@ class ReportsController extends Controller
                         $totalDataRows = count($rawRows) - count($headerRows) - ($hasSummaryRow ? 1 : 0);
                         $noticeRow = ['Menampilkan ' . count($dataRows) . ' baris pertama dari total ' . number_format(max(0, $totalDataRows), 0, ',', '.') . ' data. Unduh file Excel untuk melihat seluruh transaksi lengkap.'];
 
-                        $sheets[$title] = array_merge($headerRows, $dataRows, [$noticeRow]);
+                        $sheets[$title] = array_merge($headerRows, $dataRows, [$noticeRow], $hasSummaryRow ? [$lastRow] : []);
                     } else {
                         $sheets[$title] = $rawRows;
                     }
@@ -145,7 +145,7 @@ class ReportsController extends Controller
                 $totalDataRows = count($rawRows) - count($headerRows) - ($hasSummaryRow ? 1 : 0);
                 $noticeRow = ['Menampilkan ' . count($dataRows) . ' baris pertama dari total ' . number_format(max(0, $totalDataRows), 0, ',', '.') . ' data. Unduh file Excel untuk data lengkap.'];
 
-                $previewRows = array_merge($headerRows, $dataRows, [$noticeRow]);
+                $previewRows = array_merge($headerRows, $dataRows, [$noticeRow], $hasSummaryRow ? [$lastRow] : []);
             } else {
                 $previewRows = $rawRows;
             }

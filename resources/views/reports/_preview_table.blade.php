@@ -38,11 +38,16 @@
                             $headerMap = array_map(fn($c) => strtolower(trim((string)$c)), $row);
                         }
 
-                        if (stripos($secondCell, 'sub total') !== false || stripos($firstCell, 'sub total') !== false) {
-                            $isSubTotal = true;
-                        }
-                        if (stripos($secondCell, 'total') !== false || stripos($secondCell, 'grand total') !== false || stripos($firstCell, 'total') !== false) {
-                            $isGrandTotal = true;
+                        foreach ($row as $cVal) {
+                            if (is_string($cVal) && trim($cVal) !== '') {
+                                $cLower = strtolower(trim($cVal));
+                                if (str_starts_with($cLower, 'sub total') || str_starts_with($cLower, 'subtotal')) {
+                                    $isSubTotal = true;
+                                }
+                                if ($cLower === 'total' || str_starts_with($cLower, 'grand total') || $cLower === 'jumlah total') {
+                                    $isGrandTotal = true;
+                                }
+                            }
                         }
                         if ($firstCell !== '' && !in_array(strtolower($firstCell), ['no', 'no.', 'no ', 'id']) && $secondCell === '') {
                             $isGroupHeader = true;

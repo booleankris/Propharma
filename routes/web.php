@@ -413,6 +413,7 @@ Route::middleware(['auth', 'role:Kasir|Gudang PMI|HO|administrator|manager|Onlin
         ->name('orders.print.dotmatrix');
     Route::get('/orders/printorder/{id}', [OrdersController::class, 'printOrder'])->name('orders.printorder');
     Route::get('/orders/print-preview/{order_id}', [OrdersController::class, 'printPreview']);
+    Route::delete('/orders/{id}', [OrdersController::class, 'destroy'])->name('orders.destroy');
 
     Route::put('ordercreditors/{id}/sync-creditors', [MedicineController::class, 'syncCreditors'])->name('syncCreditors');
     Route::get('/creditors/all', [MedicineController::class, 'getAll'])->name('creditors.all');

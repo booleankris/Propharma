@@ -9,8 +9,11 @@ use App\Models\MedicineCart;
 use App\Models\Medicines;
 use App\Models\MedicineTransfers;
 use App\Models\Order;
+use App\Models\OrderItemMovement;
 use App\Models\OrderItems;
 use App\Models\Receiving;
+use App\Models\ReceivingDetails;
+use App\Models\ReceivingItems;
 use App\Models\Transfers;
 use App\Services\DotMatrixPrinter;
 use App\Services\SuratPesananFormatter;
@@ -18,6 +21,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Maatwebsite\Excel\Facades\Excel;
 use DataTables;
 
@@ -928,5 +932,115 @@ class OrdersController extends Controller
                 'price_total' => $price_total + $ppn,
             ]
         ]);
+    }
+
+    /**
+     * Hapus BPBA / Order jika isinya kosong
+     */
+    public function destroy($id)
+    {
+        $order = Order::where('id', $id)->withCount([
+            'order_items',
+            'order_items as active_items_count' => function ($q) {
+                $q->where('quantity', '>', 0);
+            },
+        ])->first();
+        if (!$order) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pesanan tidak ditemukan.'
+            ], 404);
+        }
+
+        // Cek apotek aktif
+        $activePharmacyId = getPurchasingPharmacyId();
+        if ($activePharmacyId && $order->pharmacy_id != $activePharmacyId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda tidak memiliki akses untuk menghapus pesanan ini.'
+            ], 403);
+        }
+
+        // Pastikan order benar-benar kosong (tidak memiliki item obat aktif)
+        if ($order->active_items_count > 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pesanan / BPBA tidak kosong karena masih memiliki ' . $order->active_items_count . ' item obat.'
+            ], 422);
+        }
+
+        // Jangan hapus BPBA yang masih memiliki riwayat konsolidasi/penggabungan,
+        // karena pembatalan konsolidasi harus bisa mengembalikan kuantitas ke BPBA asal.
+        $orderItemIds = OrderItems::where('order_id', $order->id)->pluck('id');
+        if ($orderItemIds->isNotEmpty()) {
+            $hasConsolidation = OrderItemMovement::whereIn('source_item_id', $orderItemIds)
+                ->orWhereIn('target_item_id', $orderItemIds)
+                ->exists();
+
+            if ($hasConsolidation) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'BPBA ini masih memiliki riwayat konsolidasi. Batalkan pemindahan/konsolidasi terlebih dahulu sebelum menghapus BPBA.'
+                ], 422);
+            }
+        }
+
+        // Jika memiliki receiving_id, pastikan tidak ada receiving_items
+        if ($order->receiving_id) {
+            $hasReceivingItems = ReceivingItems::whereIn(
+                'receiving_details_id',
+                ReceivingDetails::where('receiving_id', $order->receiving_id)->pluck('id')
+            )->exists();
+
+            if ($hasReceivingItems) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Pesanan / BPBA tidak dapat dihapus karena sudah memiliki riwayat penerimaan obat.'
+                ], 422);
+            }
+        }
+
+        DB::beginTransaction();
+        try {
+            // Jika ada receiving_id yang hanya digunakan oleh order ini dan tidak memiliki items
+            if ($order->receiving_id) {
+                $otherOrdersCount = Order::where('receiving_id', $order->receiving_id)
+                    ->where('id', '!=', $order->id)
+                    ->count();
+
+                if ($otherOrdersCount === 0) {
+                    $receivingDetails = ReceivingDetails::where('receiving_id', $order->receiving_id)->get();
+                    foreach ($receivingDetails as $rd) {
+                        $rd->delete();
+                    }
+                    $receiving = Receiving::find($order->receiving_id);
+                    if ($receiving) {
+                        $receiving->delete();
+                    }
+                }
+            }
+
+            $orderCode = $order->code ?? ('ID #' . $order->id);
+
+            $order->delete();
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => "Pesanan / BPBA {$orderCode} yang kosong berhasil dihapus."
+            ]);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            Log::error('Gagal menghapus pesanan kosong: ' . $e->getMessage(), [
+                'order_id' => $id,
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan saat menghapus pesanan: ' . $e->getMessage()
+            ], 500);
+        }
     }
 }
