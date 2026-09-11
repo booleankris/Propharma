@@ -11,6 +11,12 @@ class Items extends Model
     protected $table = 'etalases';
     protected $fillable = [
         'name',
+        'pharmacy_id',
         'status',
     ];
+
+    public function pharmacy()
+    {
+        return $this->belongsTo(Pharmacies::class, 'pharmacy_id');
+    }
 }

@@ -240,7 +240,7 @@ Route::middleware(['auth', 'role:Kasir|Gudang PMI|HO|administrator|manager|Onlin
         });
 
         Route::resource('parameters', ParametersController::class)->except(['show']);
-        Route::resource('items', ItemsController::class)->except(['show']);
+        Route::resource('items', ItemsController::class)->except(['show', 'store']);
         Route::resource('locations', LocationsController::class)->except(['show']);
 
         // Master Addition
@@ -505,6 +505,7 @@ Route::middleware(['auth', 'role:Kasir|Gudang PMI|HO|administrator|manager|Onlin
     Route::get('/creditors/select', [CreditorsController::class, 'select'])->name('creditors.select');
     Route::get('locations/select', [LocationsController::class, 'select'])->name('locations.select');
     Route::get('/items/select', [ItemsController::class, 'select'])->name('items.select');
+    Route::post('/items', [ItemsController::class, 'store'])->name('items.store');
 
     // ================================ Profile & Staff Stats ================================
     Route::get('/profile', [ProfileController::class, 'index'])->name('profile.index');

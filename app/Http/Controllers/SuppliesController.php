@@ -161,7 +161,7 @@ class SuppliesController extends Controller
             $lastRecord = (clone $baseQuery)->orderBy('date', 'desc')->orderBy('id', 'desc')->first();
 
             // 4. TABLE QUERY: Eager load relations nested deep to prevent performance issues
-            $items = (clone $baseQuery)->with([
+            $itemsQuery = (clone $baseQuery)->with([
                 'medicines',
                 'batches',                              // Fetch batches for batch name display
                 'receiving.receiving_details.creditor', // Fetch creditor through receiving details
@@ -170,6 +170,54 @@ class SuppliesController extends Controller
             ])->whereNotIn('status', [5, 6])
               ->orderBy('updated_at', 'asc')
               ->orderBy('id', 'asc');
+
+            // Hitung running balance sekuensial jika ada filter spesifik obat
+            $runningMap = [];
+            $initialStartBalance = 0;
+            $allRows = (clone $itemsQuery)->get();
+            $firstRow = $allRows->first();
+
+            if ($firstRow) {
+                $prevRecord = (clone $baseQuery)
+                    ->where(function ($q) use ($firstRow) {
+                        $q->where('updated_at', '<', $firstRow->updated_at)
+                          ->orWhere(function ($sq) use ($firstRow) {
+                              $sq->where('updated_at', '=', $firstRow->updated_at)
+                                ->where('id', '<', $firstRow->id);
+                          });
+                    })
+                    ->orderBy('updated_at', 'desc')
+                    ->orderBy('id', 'desc')
+                    ->first();
+
+                $initialStartBalance = $prevRecord ? (int) $prevRecord->qty_after : (int) $firstRow->qty_before;
+
+                $currRunning = $initialStartBalance;
+                foreach ($allRows as $r) {
+                    $delta = 0;
+                    if ($r->status == 1) { // Penjualan (-)
+                        $delta = -$r->qty;
+                    } else if ($r->status == 2) { // Pembelian (+)
+                        $delta = $r->qty;
+                    } else if ($r->status == 3) { // Retur Jual (+)
+                        $delta = $r->qty;
+                    } else if ($r->status == 4) { // Retur Beli (-)
+                        $delta = -$r->qty;
+                    } else if ($r->status == 7) { // Mutasi
+                        $isOutgoing = (int) $r->qty_after < (int) $r->qty_before;
+                        $delta = $isOutgoing ? -$r->qty : $r->qty;
+                    }
+
+                    $rowStart = $currRunning;
+                    $rowEnd = $rowStart + $delta;
+                    $currRunning = $rowEnd;
+
+                    $runningMap[$r->id] = [
+                        'start' => $rowStart,
+                        'end'   => $rowEnd,
+                    ];
+                }
+            }
 
             // Balance calculation: Real-time stock if medicine is selected, otherwise last record's qty_after
             $balance = 0;
@@ -199,7 +247,7 @@ class SuppliesController extends Controller
             }
 
             // 5. RETURN DATATABLES RESPONSE
-            return DataTables::eloquent($items)
+            return DataTables::eloquent($itemsQuery)
                 ->addIndexColumn()
                 ->addColumn('date', function ($row) {
                     return $row->date;
@@ -291,19 +339,25 @@ class SuppliesController extends Controller
                     }
                     return "";
                 })
-                ->addColumn('qty_before', function ($row) {
-                    return "<div style='color:#000000;font-weight:bold;'><span></span><b>" . $row->qty_before . "</b></div>";
+                ->addColumn('qty_before', function ($row) use (&$runningMap) {
+                    $val = isset($runningMap[$row->id]) ? $runningMap[$row->id]['start'] : $row->qty_before;
+                    return "<div style='color:#000000;font-weight:bold;'><span></span><b>" . $val . "</b></div>";
                 })
-                ->addColumn('qty_after', function ($row) {
-                    return "<div style='color:#000000;font-weight:bold;'><span></span><b>" . $row->qty_after . "</b></div>";
+                ->addColumn('qty_after', function ($row) use (&$runningMap) {
+                    $val = isset($runningMap[$row->id]) ? $runningMap[$row->id]['end'] : $row->qty_after;
+                    return "<div style='color:#000000;font-weight:bold;'><span></span><b>" . $val . "</b></div>";
                 })
-                ->addColumn('qty_before_number', function ($row) {
-                    return $row->qty_before;
+                ->addColumn('qty_before_number', function ($row) use (&$runningMap) {
+                    return isset($runningMap[$row->id]) ? $runningMap[$row->id]['start'] : $row->qty_before;
                 })
-                ->addColumn('qty_after_number', function ($row) {
-                    return $row->qty_after;
+                ->addColumn('qty_after_number', function ($row) use (&$runningMap) {
+                    return isset($runningMap[$row->id]) ? $runningMap[$row->id]['end'] : $row->qty_after;
                 })
-                ->addColumn('supply', function ($row) use ($pharmacyId) {
+                ->addColumn('supply', function ($row) use ($pharmacyId, &$runningMap) {
+                    if (isset($runningMap[$row->id])) {
+                        return $runningMap[$row->id]['end'];
+                    }
+
                     static $stockCache = [];
                     $medId = $row->medicine_id;
                     if (!$medId) return '-';
@@ -333,7 +387,7 @@ class SuppliesController extends Controller
                 ->rawColumns(['status', 'stock', 'qty_before', 'qty_after', 'transaction_code'])
                 ->with([
                     'stats' => [
-                        'stat_before' => $firstRecord ? $firstRecord->qty_before : 0,
+                        'stat_before' => !empty($runningMap) ? $initialStartBalance : ($firstRecord ? $firstRecord->qty_before : 0),
                         'stat_bought' => $stats->qty_bought ?? 0,
                         'stat_bought_rt' => $stats->qty_bought_rt ?? 0,
                         'stat_sold' => $stats->qty_sold ?? 0,
@@ -468,21 +522,29 @@ class SuppliesController extends Controller
     // Data Stok
     public function stockData()
     {
-        if (!canAccessWarehouseStock() && !isWarehousePharmacy()) {
-            return redirect()->route('dashboard')->with('error', 'Halaman Data Stok hanya dapat diakses oleh Gudang PMI.');
-        }
+        $pharmacyId = getActivePharmacyId();
+        $canSeeWarehouse = canAccessWarehouseStock($pharmacyId);
+        $pharmacy = \App\Models\Pharmacies::find($pharmacyId);
 
-        return view('supply.stockData');
+        return view('supply.stockData', compact('canSeeWarehouse', 'pharmacy'));
     }
+
     public function getStockData(Request $request)
     {
         if ($request->ajax()) {
-            if (!canAccessWarehouseStock() && !isWarehousePharmacy()) {
-                return response()->json(['error' => 'Unauthorized'], 403);
-            }
-
+            $pharmacyId = getActivePharmacyId();
             $warehouseId = getWarehousePharmacyId(); // 9 (Gudang PMI)
             $pmiPharmacyId = 1; // SAHABAT PMI
+            $canSeeWarehouse = canAccessWarehouseStock($pharmacyId);
+
+            $startDate = $request->filled('start_date') ? Carbon::parse($request->start_date)->toDateString() : null;
+            $endDate = $request->filled('end_date') ? Carbon::parse($request->end_date)->toDateString() : null;
+
+            // Tentukan target pharmacy_id untuk filter pembelian, penjualan, saldo awal, dan stok counter
+            $ordersPharmacyId = $canSeeWarehouse ? $warehouseId : $pharmacyId;
+            $salesPharmacyId = $canSeeWarehouse ? $pmiPharmacyId : $pharmacyId;
+            $startPharmacyIds = $canSeeWarehouse ? [$warehouseId, $pmiPharmacyId] : [$pharmacyId];
+            $counterPharmacyId = $canSeeWarehouse ? $pmiPharmacyId : $pharmacyId;
 
             $medicines = Medicines::query()
                 ->select([
@@ -492,43 +554,67 @@ class SuppliesController extends Controller
                     'medicines.unit',
                 ])
                 ->addSelect([
-                    // Qty Beli dari Gudang PMI (pharmacy_id = 9)
+                    // Qty Beli: Gudang PMI jika ada akses gudang, atau Pembelian cabang
                     'qty_orders' => ItemsLog::select(DB::raw('COALESCE(SUM(CAST(items_log.qty AS UNSIGNED)), 0)'))
                         ->join('batches', 'batches.id', '=', 'items_log.batches_id')
                         ->whereColumn('items_log.medicine_id', 'medicines.id')
                         ->where('items_log.status', 2)
-                        ->where('batches.pharmacy_id', $warehouseId)
+                        ->where('batches.pharmacy_id', $ordersPharmacyId)
                         ->when($request->filled('start_date'), fn($q) => $q->whereDate('items_log.date', '>=', $request->start_date))
                         ->when($request->filled('end_date'), fn($q) => $q->whereDate('items_log.date', '<=', $request->end_date)),
 
-                    // Qty Jual dari SAHABAT PMI (pharmacy_id = 1)
+                    // Qty Jual: Sahabat PMI jika ada akses gudang, atau Penjualan cabang
                     'qty_sales' => ItemsLog::select(DB::raw('COALESCE(SUM(CAST(items_log.qty AS UNSIGNED)), 0)'))
                         ->join('batches', 'batches.id', '=', 'items_log.batches_id')
                         ->whereColumn('items_log.medicine_id', 'medicines.id')
                         ->where('items_log.status', 1)
-                        ->where('batches.pharmacy_id', $pmiPharmacyId)
+                        ->where('batches.pharmacy_id', $salesPharmacyId)
                         ->when($request->filled('start_date'), fn($q) => $q->whereDate('items_log.date', '>=', $request->start_date))
                         ->when($request->filled('end_date'), fn($q) => $q->whereDate('items_log.date', '<=', $request->end_date)),
 
-                    // Qty Awal
-                    'qty_start' => ItemsLog::select('qty_before')
-                        ->whereColumn('medicine_id', 'medicines.id')
-                        ->when($request->filled('start_date'), fn($q) => $q->whereDate('date', '>=', $request->start_date))
-                        ->when($request->filled('end_date'), fn($q) => $q->whereDate('date', '<=', $request->end_date))
-                        ->orderBy('date')
-                        ->orderBy('id')
-                        ->limit(1),
+                    // Qty Retur Beli cabang
+                    'qty_orders_rt' => ItemsLog::select(DB::raw('COALESCE(SUM(CAST(items_log.qty AS UNSIGNED)), 0)'))
+                        ->join('batches', 'batches.id', '=', 'items_log.batches_id')
+                        ->whereColumn('items_log.medicine_id', 'medicines.id')
+                        ->where('items_log.status', 4)
+                        ->where('batches.pharmacy_id', $ordersPharmacyId)
+                        ->when($request->filled('start_date'), fn($q) => $q->whereDate('items_log.date', '>=', $request->start_date))
+                        ->when($request->filled('end_date'), fn($q) => $q->whereDate('items_log.date', '<=', $request->end_date)),
 
-                    // Stok Gudang (pharmacy_id = 9)
-                    'qty_storage' => Batches::select(DB::raw('COALESCE(SUM(stock), 0)'))
-                        ->whereColumn('medicine_id', 'medicines.id')
-                        ->where('pharmacy_id', $warehouseId),
+                    // Qty Retur Jual cabang
+                    'qty_sales_rt' => ItemsLog::select(DB::raw('COALESCE(SUM(CAST(items_log.qty AS UNSIGNED)), 0)'))
+                        ->join('batches', 'batches.id', '=', 'items_log.batches_id')
+                        ->whereColumn('items_log.medicine_id', 'medicines.id')
+                        ->where('items_log.status', 3)
+                        ->where('batches.pharmacy_id', $salesPharmacyId)
+                        ->when($request->filled('start_date'), fn($q) => $q->whereDate('items_log.date', '>=', $request->start_date))
+                        ->when($request->filled('end_date'), fn($q) => $q->whereDate('items_log.date', '<=', $request->end_date)),
 
-                    // Stok Pelayanan PMI (pharmacy_id = 1)
+                    // Qty Awal untuk Gudang PMI (Opname/Log awal)
+                    'qty_start' => $canSeeWarehouse
+                        ? ItemsLog::select(DB::raw("CASE WHEN items_log.type = 'SO' THEN items_log.qty_after ELSE items_log.qty_before END"))
+                            ->join('batches', 'batches.id', '=', 'items_log.batches_id')
+                            ->whereColumn('items_log.medicine_id', 'medicines.id')
+                            ->whereIn('batches.pharmacy_id', $startPharmacyIds)
+                            ->when($request->filled('start_date'), fn($q) => $q->whereDate('items_log.date', '>=', $request->start_date))
+                            ->when($request->filled('end_date'), fn($q) => $q->whereDate('items_log.date', '<=', $request->end_date))
+                            ->orderBy('items_log.date', 'asc')
+                            ->orderBy('items_log.id', 'asc')
+                            ->limit(1)
+                        : DB::raw('0'),
+
+                    // Stok Gudang (hanya jika cabang memiliki/mengakses Gudang PMI)
+                    'qty_storage' => $canSeeWarehouse
+                        ? Batches::select(DB::raw('COALESCE(SUM(stock), 0)'))
+                            ->whereColumn('medicine_id', 'medicines.id')
+                            ->where('pharmacy_id', $warehouseId)
+                        : DB::raw('0'),
+
+                    // Stok Pelayanan / Etalase (Cabang atau Sahabat PMI)
                     'qty_counter' => MedicineTransferItems::select(DB::raw('COALESCE(SUM(medicine_transfer_items.qty), 0)'))
                         ->join('batches', 'batches.id', '=', 'medicine_transfer_items.batches_id')
                         ->whereColumn('batches.medicine_id', 'medicines.id')
-                        ->where('batches.pharmacy_id', $pmiPharmacyId)
+                        ->where('batches.pharmacy_id', $counterPharmacyId)
                         ->where('medicine_transfer_items.status', 1)
                         ->where(function ($q) {
                             $q->whereNull('medicine_transfer_items.source_type')
@@ -542,13 +628,21 @@ class SuppliesController extends Controller
 
             return DataTables::of($medicines)
                 ->addIndexColumn()
-                ->editColumn('qty_start', fn($m) => (int) ($m->qty_start ?? 0))
+                ->editColumn('qty_start', function ($m) use ($canSeeWarehouse) {
+                    if ($canSeeWarehouse) {
+                        return (int) ($m->qty_start ?? 0);
+                    }
+                    $counter = (int) ($m->qty_counter ?? 0);
+                    $netIn = (int) ($m->qty_orders ?? 0) - (int) ($m->qty_orders_rt ?? 0);
+                    $netOut = (int) ($m->qty_sales ?? 0) - (int) ($m->qty_sales_rt ?? 0);
+                    return $counter - $netIn + $netOut;
+                })
                 ->editColumn('qty_orders', fn($m) => (int) ($m->qty_orders ?? 0))
                 ->editColumn('qty_sales', fn($m) => (int) ($m->qty_sales ?? 0))
                 ->editColumn('qty_storage', fn($m) => (int) ($m->qty_storage ?? 0))
                 ->editColumn('qty_counter', fn($m) => (int) ($m->qty_counter ?? 0))
-                ->addColumn('qty_now', function ($m) {
-                    $storage = (int) ($m->qty_storage ?? 0);
+                ->addColumn('qty_now', function ($m) use ($canSeeWarehouse) {
+                    $storage = $canSeeWarehouse ? (int) ($m->qty_storage ?? 0) : 0;
                     $counter = (int) ($m->qty_counter ?? 0);
                     return $storage + $counter;
                 })
@@ -572,25 +666,22 @@ class SuppliesController extends Controller
     }
     public function printStockData(Request $request)
     {
-        if (!canAccessWarehouseStock() && !isWarehousePharmacy()) {
-            abort(403, 'Unauthorized');
-        }
-        return Excel::download(new StockDataExport($request), 'stock_data_gudang.xlsx');
+        return Excel::download(new StockDataExport($request), 'stock_data.xlsx');
     }
 
     public function exportStockData(Request $request)
     {
-        if (!canAccessWarehouseStock() && !isWarehousePharmacy()) {
-            return response()->json(['error' => 'Unauthorized'], 403);
-        }
-
         $job = ExportJob::create([
             'type' => 'stock_data',
             'status' => 'pending',
             'progress' => 0,
         ]);
 
-        dispatch(new ProcessStockDataExport($job->id, $request->only(['start_date', 'end_date', 'medicine_id'])));
+        $pharmacyId = getActivePharmacyId();
+        dispatch(new ProcessStockDataExport($job->id, array_merge(
+            $request->only(['start_date', 'end_date', 'medicine_id']),
+            ['active_pharmacy_id' => $pharmacyId]
+        )));
 
         return response()->json([
             'job_id' => $job->id,
@@ -1272,16 +1363,25 @@ class SuppliesController extends Controller
         $canSeeWarehouse = canAccessWarehouseStock($pharmacyId);
         $counterPharmacyId = isWarehousePharmacy($pharmacyId) ? 1 : $pharmacyId;
 
+        // target_mode: 'pelayanan' (default) or 'gudang'
+        $targetMode = $request->input('target_mode', 'pelayanan');
+        if (!$canSeeWarehouse && $targetMode === 'gudang') {
+            $targetMode = 'pelayanan';
+        }
+
         $rules = [
-            'medicine_id' => 'required|exists:medicines,id',
-            'counter_stock_physic' => 'nullable|integer|min:0',
-            'batches_id' => 'nullable|exists:batches,id',
+            'medicine_id'          => 'required|exists:medicines,id',
+            'batches_id'           => 'nullable|exists:batches,id',
+            'custom_batch_name'    => 'nullable|string|max:255',
+            'custom_expired_date'  => 'nullable|string',
+            'etalases_id'          => 'nullable|exists:etalases,id',
+            'target_mode'          => 'nullable|in:pelayanan,gudang',
         ];
 
-        if ($canSeeWarehouse) {
+        if ($targetMode === 'gudang') {
             $rules['stock_physic'] = 'required|integer|min:0';
         } else {
-            $rules['stock_physic'] = 'nullable|integer|min:0';
+            $rules['counter_stock_physic'] = 'required|integer|min:0';
         }
 
         $request->validate($rules);
@@ -1289,20 +1389,22 @@ class SuppliesController extends Controller
         DB::beginTransaction();
 
         try {
-            // 1. Resolve which batch to use (Custom batch if provided, selected batch, or FEFO default)
+            // 1. Resolve target batch
             if ($request->filled('custom_batch_name')) {
                 $customName = trim($request->custom_batch_name);
                 $customEd = $request->filled('custom_expired_date')
                     ? Carbon::parse(str_replace('/', '-', $request->custom_expired_date))->toDateString()
                     : now()->addYears(2)->toDateString();
 
+                $batchTargetPharmacyId = ($targetMode === 'gudang') ? $warehouseId : $counterPharmacyId;
+
                 $batch = Batches::lockForUpdate()->firstOrCreate([
                     'medicine_id' => $request->medicine_id,
-                    'pharmacy_id' => $canSeeWarehouse ? $warehouseId : $pharmacyId,
-                    'name' => $customName,
+                    'pharmacy_id' => $batchTargetPharmacyId,
+                    'name'        => $customName,
                 ], [
                     'expired_date' => $customEd,
-                    'stock' => 0,
+                    'stock'        => 0,
                 ]);
 
                 if ($request->filled('custom_expired_date')) {
@@ -1314,163 +1416,211 @@ class SuppliesController extends Controller
             } else {
                 $batch = Batches::lockForUpdate()
                     ->where('medicine_id', $request->medicine_id)
-                    ->where(function ($q) use ($pharmacyId, $warehouseId, $canSeeWarehouse) {
-                        $q->where('pharmacy_id', $pharmacyId);
-                        if ($canSeeWarehouse) {
-                            $q->orWhere('pharmacy_id', $warehouseId);
-                            $q->orWhere('pharmacy_id', 1);
+                    ->where(function ($q) use ($pharmacyId, $warehouseId, $counterPharmacyId, $targetMode) {
+                        if ($targetMode === 'gudang') {
+                            $q->where('pharmacy_id', $warehouseId);
+                        } else {
+                            $q->where('pharmacy_id', $counterPharmacyId);
                         }
                     })
                     ->orderBy('expired_date', 'asc')
                     ->first();
 
                 if (!$batch) {
+                    $batchTargetPharmacyId = ($targetMode === 'gudang') ? $warehouseId : $counterPharmacyId;
                     $batch = Batches::create([
-                        'medicine_id' => $request->medicine_id,
-                        'pharmacy_id' => $canSeeWarehouse ? $warehouseId : $pharmacyId,
-                        'name' => 'OPN-' . date('Ymd'),
+                        'medicine_id'  => $request->medicine_id,
+                        'pharmacy_id'  => $batchTargetPharmacyId,
+                        'name'         => 'OPN-' . date('Ymd'),
                         'expired_date' => now()->addYears(2)->toDateString(),
-                        'stock' => 0,
+                        'stock'        => 0,
                     ]);
                 }
             }
 
-            // Resolusi batch khusus Gudang PMI (pharmacy_id = 9) untuk stok gudang
-            $storageBatch = null;
-            if ($canSeeWarehouse) {
+            // 2. Resolve etalases_id for Pelayanan
+            $etalasesId = $request->etalases_id;
+            if ($targetMode === 'pelayanan' && empty($etalasesId)) {
+                $defaultEtalase = Etalases::where('pharmacy_id', $counterPharmacyId)->first();
+                $etalasesId = $defaultEtalase ? $defaultEtalase->id : 99;
+            }
+
+            // 3. Process according to target_mode
+            if ($targetMode === 'gudang') {
+                // Resolusi batch khusus Gudang PMI (pharmacy_id = 9)
+                $storageBatch = null;
                 if ($batch->pharmacy_id == $warehouseId) {
                     $storageBatch = $batch;
                 } else {
                     $storageBatch = Batches::firstOrCreate([
                         'medicine_id' => $request->medicine_id,
                         'pharmacy_id' => $warehouseId,
-                        'name' => $batch->name,
+                        'name'        => $batch->name,
                     ], [
                         'expired_date' => $batch->expired_date ?? now()->addYears(2)->toDateString(),
-                        'stock' => 0,
+                        'stock'        => 0,
                     ]);
                 }
+
                 $storageBefore = (int) $storageBatch->stock;
-            } else {
-                $storageBefore = 0;
-            }
+                $storagePhysic = (int) $request->stock_physic;
+                $discrepancy   = $storagePhysic - $storageBefore;
+                $status        = $discrepancy >= 0 ? 5 : 6;
 
-            // Resolusi batch counter / pelayanan (pharmacy_id = 1 untuk PMI, atau pharmacy_id cabang)
-            $counterBatch = null;
-            if ($batch->pharmacy_id == $counterPharmacyId) {
-                $counterBatch = $batch;
-            } else {
-                $counterBatch = Batches::firstOrCreate([
-                    'medicine_id' => $request->medicine_id,
-                    'pharmacy_id' => $counterPharmacyId,
-                    'name' => $batch->name,
-                ], [
-                    'expired_date' => $batch->expired_date ?? now()->addYears(2)->toDateString(),
-                    'stock' => 0,
-                ]);
-            }
-
-            $transfer = MedicineTransferItems::where('batches_id', $counterBatch->id)
-                ->where('status', 1)
-                ->where(function ($q) {
-                    $q->whereNull('source_type')->orWhere('source_type', '!=', 'retur_gudang');
-                })
-                ->first();
-
-            $counterBefore = $transfer ? (int) $transfer->qty : 0;
-            $stockBeforeTotal = $storageBefore + $counterBefore;
-
-            $storagePhysic = $canSeeWarehouse ? (int) ($request->stock_physic ?? 0) : $storageBefore;
-            $hasCounterInput = $request->filled('counter_stock_physic') || !$canSeeWarehouse;
-            $counterPhysic = $request->filled('counter_stock_physic')
-                ? (int) $request->counter_stock_physic
-                : ($canSeeWarehouse ? $counterBefore : (int) ($request->stock_physic ?? 0));
-
-            $stockAfterTotal = $storagePhysic + $counterPhysic;
-            $discrepancy = $stockAfterTotal - $stockBeforeTotal;
-
-            // status 5 = surplus or equal, status 6 = deficit
-            $status = $discrepancy >= 0 ? 5 : 6;
-
-            // 2. Update batch storage stock (hanya di batch Gudang PMI pharmacy_id = 9)
-            if ($canSeeWarehouse && $storageBatch) {
+                // Update gudang batch stock
                 $storageBatch->stock = $storagePhysic;
                 $storageBatch->save();
 
-                // Jika $batch awal bukan batch gudang (misal pharmacy_id = 1), pastikan batches.stock di apotek bernilai 0
-                if ($batch->id != $storageBatch->id && $batch->pharmacy_id != $warehouseId) {
-                    $batch->stock = 0;
-                    $batch->save();
+                // Update master medicine stock
+                $medicine = Medicines::find($request->medicine_id);
+                if ($medicine) {
+                    $totalRealStock = $this->calculateRealtimeStock($medicine->id, $pharmacyId, 'total');
+                    $medicine->update(['stock' => $totalRealStock]);
                 }
-            }
 
-            // 3. Update counter stock if input provided (hanya di medicine_transfer_items dengan batches_id = counterBatch)
-            if ($hasCounterInput) {
-                if ($transfer) {
-                    $transfer->qty = $counterPhysic;
-                    $transfer->save();
+                // Log Opname
+                StockOpname::create([
+                    'users_id'          => auth()->id(),
+                    'batches_id'        => $storageBatch->id,
+                    'stock_physical'    => $storagePhysic,
+                    'stock_discrepancy' => $discrepancy,
+                    'stock_total'       => $storagePhysic,
+                    'date'              => now()->toDateString(),
+                    'status'            => $status,
+                ]);
+
+                ItemsLog::create([
+                    'batches_id'       => $storageBatch->id,
+                    'transaction_code' => $this->generateOpnameCode(),
+                    'code'             => $this->generateItemsLogCode(),
+                    'type'             => "SO",
+                    'medicine_id'      => $request->medicine_id,
+                    'qty'              => abs($discrepancy),
+                    'qty_before'       => $storageBefore,
+                    'qty_after'        => $storagePhysic,
+                    'total'            => $discrepancy,
+                    'date'             => now()->toDateTimeString(),
+                    'status'           => $status,
+                    'user_id'          => auth()->id(),
+                ]);
+
+                DB::commit();
+
+                return response()->json([
+                    'message'     => 'Stock opname Gudang berhasil disimpan.',
+                    'target_mode' => 'gudang',
+                    'batch'       => $storageBatch->fresh(),
+                    'qty_before'  => $storageBefore,
+                    'qty_after'   => $storagePhysic,
+                    'discrepancy' => $discrepancy,
+                    'status'      => $status,
+                ]);
+            } else {
+                // Mode: Pelayanan
+                $counterBatch = null;
+                if ($batch->pharmacy_id == $counterPharmacyId) {
+                    $counterBatch = $batch;
+                } else {
+                    $counterBatch = Batches::firstOrCreate([
+                        'medicine_id' => $request->medicine_id,
+                        'pharmacy_id' => $counterPharmacyId,
+                        'name'        => $batch->name,
+                    ], [
+                        'expired_date' => $batch->expired_date ?? now()->addYears(2)->toDateString(),
+                        'stock'        => 0,
+                    ]);
+                }
+
+                $transfers = MedicineTransferItems::where('batches_id', $counterBatch->id)
+                    ->where('status', 1)
+                    ->where(function ($q) {
+                        $q->whereNull('source_type')->orWhere('source_type', '!=', 'retur_gudang');
+                    })
+                    ->get();
+
+                $counterBefore = (int) $transfers->sum('qty');
+                $counterPhysic = (int) $request->counter_stock_physic;
+                $discrepancy   = $counterPhysic - $counterBefore;
+                $status        = $discrepancy >= 0 ? 5 : 6;
+
+                if ($transfers->isNotEmpty()) {
+                    $primary = $transfers->first();
+                    $primary->qty = $counterPhysic;
+                    if ($etalasesId) {
+                        $primary->etalases_id = $etalasesId;
+                    }
+                    $primary->save();
+
+                    // Set secondary records to 0
+                    foreach ($transfers->slice(1) as $secondary) {
+                        if ($secondary->qty != 0) {
+                            $secondary->qty = 0;
+                            $secondary->save();
+                        }
+                    }
                 } else {
                     $transferHeader = MedicineTransfers::create([
-                        'code' => $this->generateTransfersCode(),
-                        'status' => 1,
+                        'code'    => $this->generateTransfersCode(),
+                        'status'  => 1,
                         'user_id' => auth()->id(),
                     ]);
 
                     MedicineTransferItems::create([
                         'medicine_transfer_id' => $transferHeader->id,
-                        'batches_id' => $counterBatch->id,
-                        'source_batches_id' => $storageBatch ? $storageBatch->id : $counterBatch->id,
-                        'qty' => $counterPhysic,
-                        'status' => 1,
-                        'source_type' => 'pelayanan',
-                        'etalases_id' => 99,
+                        'batches_id'           => $counterBatch->id,
+                        'source_batches_id'    => $counterBatch->id,
+                        'qty'                  => $counterPhysic,
+                        'status'               => 1,
+                        'source_type'          => 'pelayanan',
+                        'etalases_id'          => $etalasesId,
                     ]);
                 }
+
+                // Update master medicine stock
+                $medicine = Medicines::find($request->medicine_id);
+                if ($medicine) {
+                    $totalRealStock = $this->calculateRealtimeStock($medicine->id, $pharmacyId, 'total');
+                    $medicine->update(['stock' => $totalRealStock]);
+                }
+
+                // Log Opname
+                StockOpname::create([
+                    'users_id'          => auth()->id(),
+                    'batches_id'        => $counterBatch->id,
+                    'stock_physical'    => $counterPhysic,
+                    'stock_discrepancy' => $discrepancy,
+                    'stock_total'       => $counterPhysic,
+                    'date'              => now()->toDateString(),
+                    'status'            => $status,
+                ]);
+
+                ItemsLog::create([
+                    'batches_id'       => $counterBatch->id,
+                    'transaction_code' => $this->generateOpnameCode(),
+                    'code'             => $this->generateItemsLogCode(),
+                    'type'             => "SO",
+                    'medicine_id'      => $request->medicine_id,
+                    'qty'              => abs($discrepancy),
+                    'qty_before'       => $counterBefore,
+                    'qty_after'        => $counterPhysic,
+                    'total'            => $discrepancy,
+                    'date'             => now()->toDateTimeString(),
+                    'status'           => $status,
+                    'user_id'          => auth()->id(),
+                ]);
+
+                DB::commit();
+
+                return response()->json([
+                    'message'     => 'Stock opname Pelayanan berhasil disimpan.',
+                    'target_mode' => 'pelayanan',
+                    'batch'       => $counterBatch->fresh(),
+                    'qty_before'  => $counterBefore,
+                    'qty_after'   => $counterPhysic,
+                    'discrepancy' => $discrepancy,
+                    'status'      => $status,
+                ]);
             }
-
-            // 4. Update master medicine stock
-            $medicine = Medicines::find($request->medicine_id);
-            if ($medicine) {
-                $totalRealStock = $this->calculateRealtimeStock($medicine->id, $pharmacyId, 'total');
-                $medicine->update(['stock' => $totalRealStock]);
-            }
-
-            // 5. Write StockOpname and ItemsLog
-            StockOpname::create([
-                'users_id' => auth()->id(),
-                'batches_id' => $storageBatch ? $storageBatch->id : $batch->id,
-                'stock_physical' => $stockAfterTotal,
-                'stock_discrepancy' => $discrepancy,
-                'stock_total' => $stockAfterTotal,
-                'date' => now()->toDateString(),
-                'status' => $status,
-            ]);
-
-            ItemsLog::create([
-                'batches_id' => $storageBatch ? $storageBatch->id : $batch->id,
-                'transaction_code' => $this->generateOpnameCode(),
-                'code' => $this->generateItemsLogCode(),
-                'type' => "SO",
-                'medicine_id' => $request->medicine_id,
-                'qty' => abs($discrepancy),
-                'qty_before' => $stockBeforeTotal,
-                'qty_after' => $stockAfterTotal,
-                'total' => $discrepancy,
-                'date' => now()->toDateTimeString(),
-                'status' => $status,
-                'user_id' => auth()->id(),
-            ]);
-
-            DB::commit();
-
-            return response()->json([
-                'message' => 'Stock opname berhasil disimpan.',
-                'batch' => ($storageBatch ?? $batch)->fresh(),
-                'qty_before' => $stockBeforeTotal,
-                'qty_after' => $stockAfterTotal,
-                'discrepancy' => $discrepancy,
-                'status' => $status,
-            ]);
         } catch (\Throwable $e) {
             DB::rollBack();
             return response()->json(['message' => $e->getMessage()], 422);

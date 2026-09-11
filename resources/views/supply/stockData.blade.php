@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Data Stok - Gudang PMI')
+@section('title', 'Data Stok - ' . ($pharmacy->name ?? 'Apotek'))
 
 @section('style')
     <link rel="stylesheet" href="{{ asset('templates/library/datatables/media/css/jquery.dataTables.min.css') }}">
@@ -114,11 +114,17 @@
                         <div class="flex items-center gap-2">
                             <h2 class="text-base font-bold text-slate-800 leading-tight">Data Stok</h2>
                             <span
-                                class="px-2 py-0.5 text-[10px] font-semibold bg-violet-50 text-violet-600 border border-violet-100 rounded-full">Gudang
-                                PMI</span>
+                                class="px-2 py-0.5 text-[10px] font-semibold bg-violet-50 text-violet-600 border border-violet-100 rounded-full">
+                                {{ $pharmacy->name ?? ($canSeeWarehouse ? 'Gudang PMI' : 'Cabang') }}
+                            </span>
                         </div>
-                        <p class="text-xs text-slate-400">Konsolidasi Beli Gudang PMI, Jual Sahabat PMI, dan Total Stok
-                            Real-time</p>
+                        <p class="text-xs text-slate-400">
+                            @if($canSeeWarehouse)
+                                Konsolidasi Beli Gudang PMI, Jual Sahabat PMI, dan Total Stok Real-time
+                            @else
+                                Ringkasan Pembelian, Penjualan, dan Stok Fisik Real-time Cabang
+                            @endif
+                        </p>
                     </div>
                 </div>
 
@@ -186,9 +192,15 @@
                                 <th class="px-4 py-3">Satuan</th>
                                 <th class="px-4 py-3 text-center">QTY Awal</th>
                                 <th class="px-4 py-3 text-center">QTY Beli</th>
-                                <th class="px-4 py-3 text-center">QTY Jual (PMI)</th>
-                                <th class="px-4 py-3 text-center">Stok Gudang</th>
-                                <th class="px-4 py-3 text-center">Stok Pelayanan PMI</th>
+                                <th class="px-4 py-3 text-center">
+                                    {{ $canSeeWarehouse ? 'QTY Jual (PMI)' : 'QTY Jual' }}
+                                </th>
+                                @if($canSeeWarehouse)
+                                    <th class="px-4 py-3 text-center">Stok Gudang</th>
+                                    <th class="px-4 py-3 text-center">Stok Pelayanan PMI</th>
+                                @else
+                                    <th class="px-4 py-3 text-center">Stok Etalase</th>
+                                @endif
                                 <th class="px-4 py-3 text-center">Total Stok</th>
                             </tr>
                         </thead>
@@ -405,7 +417,8 @@
                         d.end_date = endDate;
                     }
                 },
-                columns: [{
+                columns: [
+                    {
                         data: 'DT_RowIndex',
                         orderable: false,
                         searchable: false
@@ -431,6 +444,7 @@
                         data: 'qty_sales',
                         className: 'text-center font-semibold text-blue-600'
                     },
+                    @if($canSeeWarehouse)
                     {
                         data: 'qty_storage',
                         className: 'text-center font-bold text-amber-600'
@@ -439,6 +453,12 @@
                         data: 'qty_counter',
                         className: 'text-center font-bold text-indigo-600'
                     },
+                    @else
+                    {
+                        data: 'qty_counter',
+                        className: 'text-center font-bold text-indigo-600'
+                    },
+                    @endif
                     {
                         data: 'qty_now',
                         className: 'text-center font-bold text-slate-800'

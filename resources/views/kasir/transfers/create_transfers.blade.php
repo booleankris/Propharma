@@ -702,11 +702,15 @@
         let editingEtalaseId = null;
 
         function loadEtalases() {
-            axios.get('{{ route('etalases.index') }}')
+            const destPharmacyId = document.getElementById('pharmacySelect')?.value || '';
+            axios.get('{{ route('etalases.index') }}', {
+                    params: { pharmacy_id: destPharmacyId }
+                })
                 .then(res => {
                     etalaseList = res.data ?? [];
                     renderEtalaseOptions(document.getElementById('stageEtalase'), document.getElementById(
                         'stageEtalase').value);
+                    checkAddItemBtn();
                     document.querySelectorAll('.cart-etalase-select').forEach(sel => {
                         renderEtalaseOptions(sel, sel.value);
                     });
@@ -721,25 +725,8 @@
             if (!selectEl) return;
             selectEl.innerHTML = '<option value="">— Pilih etalase —</option>';
 
-            let autoSelectedId = selectedId;
-            if (!autoSelectedId) {
-                const destSelect = document.getElementById('pharmacySelect');
-                let isGudangDest = false;
-                if (destSelect && destSelect.value !== '') {
-                    const destName = destSelect.options[destSelect.selectedIndex]?.text?.toLowerCase() || '';
-                    isGudangDest = destSelect.value == 9 || destName.includes('gudang') || destName.includes('logistik');
-                }
-
-                if (isGudangDest) {
-                    // Default to etalase id 134 ("Gudang") for Warehouse destination
-                    const gudangEtalase = etalaseList.find(e => e.id == 134 || e.name.toLowerCase() === 'gudang');
-                    autoSelectedId = gudangEtalase ? gudangEtalase.id : 134;
-                } else {
-                    // Default to etalase id 99 ("Apotek Cabang") for Pelayanan / Cabang destination
-                    const cabangEtalase = etalaseList.find(e => e.id == 99 || e.name.toLowerCase().includes('cabang'));
-                    autoSelectedId = cabangEtalase ? cabangEtalase.id : 99;
-                }
-            }
+            // Default ke etalase paling awal jika belum ada yang terpilih
+            let autoSelectedId = selectedId || (etalaseList.length > 0 ? etalaseList[0].id : '');
 
             etalaseList.forEach(e => {
                 const opt = document.createElement('option');
@@ -777,6 +764,7 @@
 
         function saveEtalase() {
             const name = document.getElementById('etalaseNameInput').value.trim();
+            const destPharmacyId = document.getElementById('pharmacySelect')?.value || '';
 
             if (!name) {
                 iziToast.warning({
@@ -791,6 +779,7 @@
 
             axios.post('{{ route('etalases.store') }}', {
                     name,
+                    pharmacy_id: destPharmacyId || null,
                     _token: '{{ csrf_token() }}'
                 })
                 .then(res => {
@@ -825,6 +814,7 @@
 
         // ── Submit ────────────────────────────────────────────────────────
         function onPharmacyChange() {
+            loadEtalases();
             checkSubmit();
             if (stagedBatch) {
                 renderEtalaseOptions(document.getElementById('stageEtalase'), '');

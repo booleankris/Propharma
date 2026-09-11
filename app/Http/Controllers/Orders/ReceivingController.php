@@ -1459,6 +1459,8 @@ class ReceivingController extends Controller
             return response()->json(['data' => []]);
         }
 
+        $tokens = array_values(array_filter(explode(' ', $search)));
+
         $items = Medicines::query()
             ->select([
                 'medicines.id',
@@ -1470,11 +1472,22 @@ class ReceivingController extends Controller
                 'factories.name as factory_name',
             ])
             ->leftJoin('factories', 'factories.id', '=', 'medicines.factory_id')
-            ->where(function ($q) use ($search) {
-                $q
-                    ->where('medicines.name', 'like', $search . '%')
-                    ->orWhere('medicines.code', 'like', $search . '%');
+            ->where(function ($q) use ($tokens) {
+                foreach ($tokens as $token) {
+                    $q->where(function ($tq) use ($token) {
+                        $tq->where('medicines.name', 'like', "%{$token}%")
+                            ->orWhere('medicines.code', 'like', "%{$token}%");
+                    });
+                }
             })
+            ->orderByRaw("
+                CASE 
+                    WHEN medicines.name LIKE ? THEN 1
+                    WHEN medicines.name LIKE ? THEN 2
+                    WHEN medicines.code LIKE ? THEN 3
+                    ELSE 4
+                END, medicines.name ASC
+            ", [$search . '%', '%-' . $search . '%', $search . '%'])
             ->limit(20)
             ->get();
 

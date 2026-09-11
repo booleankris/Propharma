@@ -36,7 +36,10 @@ class ProcessStockDataExport implements ShouldQueue
             'started_at' => now(),
         ]);
 
-        $fileName = 'Data_Stok_Gudang_PMI_' . date('Ymd_His') . '.xlsx';
+        $requestObj = new \Illuminate\Http\Request($this->requestData);
+        $pharmacyId = $this->requestData['active_pharmacy_id'] ?? null;
+        $suffix = $pharmacyId ? "Cabang_{$pharmacyId}_" : "Gudang_PMI_";
+        $fileName = 'Data_Stok_' . $suffix . date('Ymd_His') . '.xlsx';
         $path = 'exports/' . $fileName;
 
         try {
@@ -47,10 +50,8 @@ class ProcessStockDataExport implements ShouldQueue
 
             $job->update(['progress' => 40]);
 
-            $requestObj = new \Illuminate\Http\Request($this->requestData);
-
             Excel::store(
-                new StockDataExport($requestObj),
+                new StockDataExport($requestObj, $pharmacyId),
                 $path,
                 'public'
             );

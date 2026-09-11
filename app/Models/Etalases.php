@@ -12,6 +12,12 @@ class Etalases extends Model
 
     protected $fillable = [
         'name',
+        'pharmacy_id',
         'status',
     ];
+
+    public function pharmacy()
+    {
+        return $this->belongsTo(Pharmacies::class, 'pharmacy_id');
+    }
 }

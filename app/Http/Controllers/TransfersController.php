@@ -277,6 +277,12 @@ class TransfersController extends Controller
                         'stock_deducted_at' => $now,
                     ]);
 
+                    // Sync medicines master stock
+                    $medRecord = Medicines::find($sourceBatch->medicine_id);
+                    if ($medRecord) {
+                        $medRecord->decrement('stock', $qty);
+                    }
+
                     // ── Log source outgoing ───────────────────────────────────
                     ItemsLog::create([
                         'transaction_code' => $transfer->code,
@@ -316,18 +322,38 @@ class TransfersController extends Controller
         // use ->download(...) instead of ->stream(...) if you want a forced download
     }
 
-    public function index()
+    public function index(Request $request)
     {
+        $pharmacyId = $request->query('pharmacy_id') ?: getActivePharmacyId();
+
+        $query = Items::query();
+        if ($pharmacyId) {
+            $hasSpecific = Items::where('pharmacy_id', $pharmacyId)->exists();
+            if ($hasSpecific) {
+                $query->where('pharmacy_id', $pharmacyId);
+            } else {
+                $query->where(function ($q) use ($pharmacyId) {
+                    $q->where('pharmacy_id', $pharmacyId)
+                      ->orWhereNull('pharmacy_id');
+                });
+            }
+        }
+
         return response()->json(
-            Items::orderBy('name')->get(['id', 'name'])
+            $query->orderBy('name')->get(['id', 'name'])
         );
     }
 
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'name' => 'required|string|',
+            'name' => 'required|string',
+            'pharmacy_id' => 'nullable|integer',
         ]);
+
+        if (empty($validated['pharmacy_id'])) {
+            $validated['pharmacy_id'] = getActivePharmacyId() ?: null;
+        }
 
         $etalase = Items::create($validated);
 
@@ -535,6 +561,14 @@ class TransfersController extends Controller
 
     public function acceptTransfer(MedicineTransfers $transfer)
     {
+        $currentPharmacyId = getActivePharmacyId();
+        $firstItem = $transfer->items()->first();
+        $destinationPharmacyId = $firstItem?->batches?->pharmacy_id;
+
+        if ($destinationPharmacyId && $destinationPharmacyId != $currentPharmacyId) {
+            return redirect(url()->previous())->with('message', 'Hanya apotek tujuan yang berhak menerima mutasi ini.');
+        }
+
         try {
             DB::transaction(function () use ($transfer) {
                 $now = Carbon::now();
@@ -572,6 +606,13 @@ class TransfersController extends Controller
 
     public function acceptItem(MedicineTransferItems $item)
     {
+        $currentPharmacyId = getActivePharmacyId();
+        $destinationPharmacyId = $item->batches?->pharmacy_id;
+
+        if ($destinationPharmacyId && $destinationPharmacyId != $currentPharmacyId) {
+            return redirect(url()->previous())->with('message', 'Hanya apotek tujuan yang berhak menerima obat ini.');
+        }
+
         try {
             DB::transaction(function () use ($item) {
                 $now = Carbon::now();
@@ -699,6 +740,12 @@ class TransfersController extends Controller
             }
 
             $srcQtyAfter = $srcQtyBefore + $item->qty;
+        }
+
+        // Restore medicines master stock
+        $medRecord = Medicines::find($srcBatch->medicine_id);
+        if ($medRecord) {
+            $medRecord->increment('stock', $item->qty);
         }
 
         // ── Log rollback (stock returned to source) ───────────────

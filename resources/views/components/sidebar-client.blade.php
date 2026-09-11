@@ -1078,8 +1078,9 @@
     <div class="mb-5 mx-5 grid grid-cols-2 gap-3">
         <button onclick="getOrderReport('preview')"
             class="group w-full flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 active:scale-[0.98] text-slate-700 text-sm font-semibold py-3 rounded-2xl transition-all duration-200 border border-slate-200/60">
-            <svg class="w-4 h-4 text-slate-500 transition-transform duration-200 group-hover:scale-110" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg class="w-4 h-4 text-slate-500 transition-transform duration-200 group-hover:scale-110"
+                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                stroke-linejoin="round">
                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
                 <circle cx="12" cy="12" r="3"></circle>
             </svg>
@@ -1087,8 +1088,9 @@
         </button>
         <button onclick="getOrderReport('download')"
             class="group w-full flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-md shadow-emerald-600/20 hover:shadow-lg hover:shadow-emerald-600/30 active:scale-[0.98] text-white text-sm font-semibold py-3 rounded-2xl transition-all duration-200">
-            <svg class="w-4 h-4 transition-transform duration-200 group-hover:translate-y-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
-                stroke-linecap="round" stroke-linejoin="round">
+            <svg class="w-4 h-4 transition-transform duration-200 group-hover:translate-y-0.5" viewBox="0 0 24 24"
+                fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
+                stroke-linejoin="round">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                 <polyline points="7 10 12 15 17 10"></polyline>
                 <line x1="12" y1="15" x2="12" y2="3"></line>
@@ -1389,8 +1391,9 @@
     <div class="mb-5 mx-5 grid grid-cols-2 gap-3">
         <button onclick="getReport('preview')"
             class="group w-full flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 active:scale-[0.98] text-slate-700 text-sm font-semibold py-3 rounded-2xl transition-all duration-200 border border-slate-200/60">
-            <svg class="w-4 h-4 text-slate-500 transition-transform duration-200 group-hover:scale-110" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg class="w-4 h-4 text-slate-500 transition-transform duration-200 group-hover:scale-110"
+                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                stroke-linejoin="round">
                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
                 <circle cx="12" cy="12" r="3"></circle>
             </svg>
@@ -1398,8 +1401,9 @@
         </button>
         <button onclick="getReport('download')"
             class="group w-full flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-md shadow-emerald-600/20 hover:shadow-lg hover:shadow-emerald-600/30 active:scale-[0.98] text-white text-sm font-semibold py-3 rounded-2xl transition-all duration-200">
-            <svg class="w-4 h-4 transition-transform duration-200 group-hover:translate-y-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
-                stroke-linecap="round" stroke-linejoin="round">
+            <svg class="w-4 h-4 transition-transform duration-200 group-hover:translate-y-0.5" viewBox="0 0 24 24"
+                fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
+                stroke-linejoin="round">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                 <polyline points="7 10 12 15 17 10"></polyline>
                 <line x1="12" y1="15" x2="12" y2="3"></line>
@@ -1677,24 +1681,22 @@
                 </a>
             @endif
 
-            @if (isWarehousePharmacy() || canAccessWarehouseStock())
-                <a href="{{ route('supplies.stockData') }}"
-                    class="group flex items-center gap-3 p-3.5 rounded-2xl bg-orange-50 hover:bg-orange-500 border border-orange-100 hover:border-orange-500 transition-all duration-200 hover:-translate-y-0.5">
-                    <div
-                        class="w-9 h-9 rounded-xl bg-orange-100 group-hover:bg-orange-400 flex items-center justify-center flex-shrink-0 transition-colors">
-                        <svg class="w-5 h-5 text-orange-600 group-hover:text-white transition-colors" fill="none"
-                            viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round"
-                                d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                    </div>
-                    <span class="text-sm font-semibold text-orange-700 group-hover:text-white transition-colors">Data
-                        Stok</span>
-                </a>
-            @endif
+            <a href="{{ route('supplies.stockData') }}"
+                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-orange-50 hover:bg-orange-500 border border-orange-100 hover:border-orange-500 transition-all duration-200 hover:-translate-y-0.5">
+                <div
+                    class="w-9 h-9 rounded-xl bg-orange-100 group-hover:bg-orange-400 flex items-center justify-center flex-shrink-0 transition-colors">
+                    <svg class="w-5 h-5 text-orange-600 group-hover:text-white transition-colors" fill="none"
+                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                </div>
+                <span class="text-sm font-semibold text-orange-700 group-hover:text-white transition-colors">Data
+                    Stok</span>
+            </a>
 
             <a href="{{ route('supplies.stockOpname') }}"
-                class="{{ !isWarehousePharmacy() ? 'col-span-2' : '' }} group flex items-center gap-3 p-3.5 rounded-2xl bg-amber-50 hover:bg-amber-500 border border-amber-100 hover:border-amber-500 transition-all duration-200 hover:-translate-y-0.5">
+                class="{{ !isWarehousePharmacy() ? 'col-span-1' : 'col-span-2' }} group flex items-center gap-3 p-3.5 rounded-2xl bg-amber-50 hover:bg-amber-500 border border-amber-100 hover:border-amber-500 transition-all duration-200 hover:-translate-y-0.5">
                 <div
                     class="w-9 h-9 rounded-xl bg-amber-100 group-hover:bg-amber-400 flex items-center justify-center flex-shrink-0 transition-colors">
                     <svg class="w-5 h-5 text-amber-600 group-hover:text-white transition-colors" fill="none"
@@ -2185,11 +2187,12 @@
                 Periode Laporan
             </div>
             <div class="flex items-center gap-2 w-full sm:w-auto">
-                <input type="text" id="export_center_start_date"
-                    value="{{ now()->format('Y-m-d') }}" autocomplete="off"
+                <input type="text" id="export_center_start_date" value="{{ now()->format('Y-m-d') }}"
+                    autocomplete="off"
                     class="flatpickr-date rounded-xl border-slate-200 text-xs font-semibold py-2 px-3 focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 shadow-xs cursor-pointer">
                 <span class="text-xs text-slate-400 font-medium">s/d</span>
-                <input type="text" id="export_center_end_date" value="{{ now()->format('Y-m-d') }}" autocomplete="off"
+                <input type="text" id="export_center_end_date" value="{{ now()->format('Y-m-d') }}"
+                    autocomplete="off"
                     class="flatpickr-date rounded-xl border-slate-200 text-xs font-semibold py-2 px-3 focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 shadow-xs cursor-pointer">
             </div>
         </div>
@@ -2455,8 +2458,10 @@
     let exportPollInterval = null;
 
     async function triggerExportCenter(type) {
-        const startDate = window.getDatePickerValue ? window.getDatePickerValue('export_center_start_date') : (document.getElementById('export_center_start_date')?.value || '');
-        const endDate = window.getDatePickerValue ? window.getDatePickerValue('export_center_end_date') : (document.getElementById('export_center_end_date')?.value || '');
+        const startDate = window.getDatePickerValue ? window.getDatePickerValue('export_center_start_date') : (
+            document.getElementById('export_center_start_date')?.value || '');
+        const endDate = window.getDatePickerValue ? window.getDatePickerValue('export_center_end_date') : (document
+            .getElementById('export_center_end_date')?.value || '');
         const token = '{{ csrf_token() }}';
 
         let url = '';

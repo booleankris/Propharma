@@ -503,34 +503,63 @@
                 {{-- Opname Form (Matches Desktop) --}}
                 <div class="form-opname">
                     <input type="hidden" id="medicine_id">
-                    
-                    <div style="display: grid; grid-template-columns: {{ canAccessWarehouseStock() ? '1fr 1fr' : '1fr' }}; gap: 10px;">
-                        @if(canAccessWarehouseStock())
-                        <div class="form-group">
-                            <label>Fisik Gudang</label>
-                            <input type="number" id="stock_physic" class="form-control" placeholder="0" onkeyup="countDiscrepancy()">
-                        </div>
-                        @else
-                        <input type="hidden" id="stock_physic" value="0">
-                        @endif
-                        <div class="form-group">
-                            <label>Fisik Counter</label>
-                            <input type="number" id="counter_stock_physic" class="form-control" placeholder="0" onkeyup="countDiscrepancy()">
+
+                    @if(canAccessWarehouseStock())
+                    {{-- Target Mode Segmented Switch --}}
+                    <div class="form-group mb-3">
+                        <label>Lokasi / Mode Opname</label>
+                        <div style="display: flex; background: rgba(0,0,0,0.3); border-radius: 12px; padding: 4px; gap: 4px; border: 1px solid rgba(255,255,255,0.1);">
+                            <button type="button" id="btn_mode_pelayanan" class="mode-tab active" style="flex:1; padding: 8px 12px; border: none; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; transition: all 0.2s; background: #2563eb; color: #fff;">
+                                🏪 Pelayanan / Toko
+                            </button>
+                            <button type="button" id="btn_mode_gudang" class="mode-tab" style="flex:1; padding: 8px 12px; border: none; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; transition: all 0.2s; background: transparent; color: #94a3b8;">
+                                📦 Gudang PMI
+                            </button>
                         </div>
                     </div>
+                    @endif
+                    <input type="hidden" id="target_mode" value="pelayanan">
 
-                    <div class="form-group" style="text-align: center; margin: 15px 0;">
+                    {{-- Fisik Stok Input --}}
+                    <div class="form-group">
+                        <label id="label_stock_physic">Stok Fisik Pelayanan</label>
+                        <input type="number" id="current_stock_physic" class="form-control" placeholder="0" onkeyup="countDiscrepancy()">
+                    </div>
+
+                    {{-- Expired Date & Batch Name Form --}}
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div class="form-group">
+                            <label>Expired Date (ED)</label>
+                            <input type="date" id="expired_date" class="form-control" onchange="checkExpiredDateMatch()">
+                        </div>
+                        <div class="form-group">
+                            <label>No. / Nama Batch</label>
+                            <input type="text" id="batch_name" class="form-control" placeholder="Contoh: BTH01">
+                        </div>
+                    </div>
+                    <input type="hidden" id="selected_batch_id" value="">
+
+                    {{-- Etalase Selection & Quick Add (Hidden in Gudang mode) --}}
+                    <div class="form-group" id="group_etalase">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                            <label style="margin-bottom: 0;">Pilih Etalase</label>
+                            <button type="button" id="btn_open_add_etalase" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 6px; padding: 3px 8px; font-size: 11px; font-weight: 700; cursor: pointer;">
+                                + Tambah Etalase
+                            </button>
+                        </div>
+                        <select id="etalase_select" class="form-control">
+                            <option value="">Memuat etalase…</option>
+                        </select>
+                    </div>
+
+                    {{-- Batch selector hidden dropdown reference for stock calculation --}}
+                    <select id="batch_select" style="display: none;"></select>
+
+                    <div class="form-group" style="text-align: center; margin: 15px 0 5px;">
                         <label style="display: flex; justify-content: center; align-items: center; gap: 8px;">
                             Selisih Stok <span id="discrepancy_badge"></span>
                         </label>
                         <input type="text" readonly id="stock_discrepancy" class="form-control discrepancy" placeholder="—">
-                    </div>
-
-                    <div class="form-group">
-                        <label>Penyesuaian Batch (Opsional)</label>
-                        <select id="batch_select" class="form-control">
-                            <option value="">— Otomatis (FEFO) —</option>
-                        </select>
                     </div>
                 </div>
 
@@ -564,6 +593,43 @@
             </div>
         </div>
     </div>
+
+    {{-- Modal Quick Add Etalase --}}
+    <div id="modal_add_etalase" style="display:none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 200; backdrop-filter: blur(4px); align-items: center; justify-content: center; padding: 20px;">
+        <div style="background: #1e293b; border: 1px solid rgba(255,255,255,0.15); border-radius: 20px; width: 100%; max-width: 400px; padding: 20px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);">
+            <h3 style="color: #fff; font-size: 16px; font-weight: 700; margin: 0 0 12px 0;">+ Tambah Etalase Baru</h3>
+            <div class="form-group mb-3">
+                <label style="color: #94a3b8; font-size: 11px; font-weight: 700; text-transform: uppercase;">Nama Etalase</label>
+                <input type="text" id="new_etalase_name" class="form-control" placeholder="Contoh: Etalase 8, Kulkas Baru...">
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px;">
+                <button type="button" id="btn_close_etalase_modal" class="btn-action secondary" style="flex: 1; padding: 10px;">Batal</button>
+                <button type="button" id="btn_submit_add_etalase" class="btn-action" style="flex: 1; padding: 10px;">Simpan</button>
+            </div>
+        </div>
+    </div>
+
+    {{-- Modal Konfirmasi Batch Sama --}}
+    <div id="modal_batch_confirm" style="display:none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 200; backdrop-filter: blur(4px); align-items: center; justify-content: center; padding: 20px;">
+        <div style="background: #1e293b; border: 1px solid rgba(255,255,255,0.15); border-radius: 20px; width: 100%; max-width: 420px; padding: 22px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);">
+            <div style="text-align: center; margin-bottom: 12px;">
+                <div style="font-size: 32px; margin-bottom: 8px;">ℹ️</div>
+                <h3 style="color: #fff; font-size: 16px; font-weight: 700; margin: 0 0 6px 0;">Batch dengan ED Sama Ditemukan</h3>
+                <p style="color: #94a3b8; font-size: 13px; margin: 0; line-height: 1.4;">
+                    Tanggal ED <strong id="dup_ed_text" style="color: #60a5fa;"></strong> sudah ada di sistem dengan batch <strong id="dup_batch_text" style="color: #f59e0b;"></strong>.
+                    <br>Apakah ingin menggabungkan ke batch yang sudah ada?
+                </p>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 20px;">
+                <button type="button" id="btn_confirm_merge_batch" class="btn-action" style="padding: 12px;">
+                    Ya, Gabung
+                </button>
+                <button type="button" id="btn_confirm_new_batch" class="btn-action secondary" style="padding: 12px;">
+                    Tidak, Buat Baru Saja
+                </button>
+            </div>
+        </div>
+    </div>
 @endsection
 
 @section('scripts')
@@ -583,12 +649,124 @@
 
         let current_storage_stock = 0;
         let current_counter_stock = 0;
-        let total_stock = 0; // current system stock (storage + counter)
+        let total_stock = 0;
+        let cachedBatches = [];
+        let matchedBatchOnEd = null;
 
         /* ── Helpers ──────────────────────────────────────────────────── */
         function formatRupiah(val) {
             return 'Rp ' + parseInt(val || 0).toLocaleString('id-ID');
         }
+
+        /* ── Etalase List & Quick Add ─────────────────────────────────── */
+        function loadEtalases(selectedId = null) {
+            const select = document.getElementById('etalase_select');
+            select.innerHTML = '<option value="">Memuat etalase…</option>';
+
+            fetch(`{{ route('items.select') }}`)
+                .then(res => res.json())
+                .then(data => {
+                    select.innerHTML = '';
+                    if (data && data.length > 0) {
+                        data.forEach(item => {
+                            const opt = document.createElement('option');
+                            opt.value = item.id;
+                            opt.textContent = item.name;
+                            if (selectedId && selectedId == item.id) {
+                                opt.selected = true;
+                            }
+                            select.appendChild(opt);
+                        });
+                    } else {
+                        select.innerHTML = '<option value="">— Tidak ada etalase —</option>';
+                    }
+                })
+                .catch(() => {
+                    select.innerHTML = '<option value="">— Gagal memuat etalase —</option>';
+                });
+        }
+
+        document.getElementById('btn_open_add_etalase')?.addEventListener('click', () => {
+            document.getElementById('new_etalase_name').value = '';
+            document.getElementById('modal_add_etalase').style.display = 'flex';
+            document.getElementById('new_etalase_name').focus();
+        });
+
+        document.getElementById('btn_close_etalase_modal')?.addEventListener('click', () => {
+            document.getElementById('modal_add_etalase').style.display = 'none';
+        });
+
+        document.getElementById('btn_submit_add_etalase')?.addEventListener('click', () => {
+            const name = $('#new_etalase_name').val().trim();
+            if (!name) {
+                iziToast.warning({ title: 'Peringatan', message: 'Nama etalase tidak boleh kosong.', position: 'topRight' });
+                return;
+            }
+
+            const btn = document.getElementById('btn_submit_add_etalase');
+            btn.disabled = true;
+            btn.textContent = 'Menyimpan...';
+
+            $.ajax({
+                url: "{{ route('items.store') }}",
+                type: 'POST',
+                data: {
+                    _token: "{{ csrf_token() }}",
+                    name: name
+                },
+                success: function(res) {
+                    iziToast.success({ title: 'Berhasil', message: 'Etalase baru ditambahkan!', position: 'topRight' });
+                    document.getElementById('modal_add_etalase').style.display = 'none';
+                    loadEtalases(res.data?.id);
+                },
+                error: function(xhr) {
+                    const msg = xhr.responseJSON?.message || 'Gagal menambahkan etalase!';
+                    iziToast.error({ title: 'Gagal', message: msg, position: 'topRight' });
+                },
+                complete: function() {
+                    btn.disabled = false;
+                    btn.textContent = 'Simpan';
+                }
+            });
+        });
+
+        /* ── Target Mode Toggle ───────────────────────────────────────── */
+        function setTargetMode(mode) {
+            $('#target_mode').val(mode);
+            const btnPel = document.getElementById('btn_mode_pelayanan');
+            const btnGud = document.getElementById('btn_mode_gudang');
+            const grpEtalase = document.getElementById('group_etalase');
+            const lblPhysic = document.getElementById('label_stock_physic');
+
+            if (mode === 'gudang') {
+                if (btnGud) {
+                    btnGud.style.background = '#2563eb';
+                    btnGud.style.color = '#fff';
+                }
+                if (btnPel) {
+                    btnPel.style.background = 'transparent';
+                    btnPel.style.color = '#94a3b8';
+                }
+                if (grpEtalase) grpEtalase.style.display = 'none';
+                if (lblPhysic) lblPhysic.textContent = 'Stok Fisik Gudang PMI';
+            } else {
+                if (btnPel) {
+                    btnPel.style.background = '#2563eb';
+                    btnPel.style.color = '#fff';
+                }
+                if (btnGud) {
+                    btnGud.style.background = 'transparent';
+                    btnGud.style.color = '#94a3b8';
+                }
+                if (grpEtalase) grpEtalase.style.display = 'block';
+                if (lblPhysic) lblPhysic.textContent = 'Stok Fisik Pelayanan';
+            }
+
+            countDiscrepancy();
+        }
+
+        document.getElementById('btn_mode_pelayanan')?.addEventListener('click', () => setTargetMode('pelayanan'));
+        document.getElementById('btn_mode_gudang')?.addEventListener('click', () => setTargetMode('gudang'));
 
         /* ── Bottom sheet ─────────────────────────────────────────────── */
         function openSheet(state) {
@@ -607,22 +785,24 @@
         function resetScan() {
             statusEl.textContent = 'Siap scan…';
             scanning = true;
-            $('#stock_physic, #counter_stock_physic, #stock_discrepancy').val('');
+            $('#current_stock_physic, #stock_discrepancy, #expired_date, #batch_name, #selected_batch_id').val('');
             $('#batch_select').prop('selectedIndex', 0);
             document.getElementById('discrepancy_badge').style.display = 'none';
             document.getElementById('stock_discrepancy').classList.remove('error');
+            cachedBatches = [];
+            matchedBatchOnEd = null;
         }
 
-        /* ── Opname Logic (Matches Desktop) ────────────────────────────── */
+        /* ── Opname Logic ─────────────────────────────────────────────── */
         function loadBatches(medicine_id) {
             const select = document.getElementById('batch_select');
             select.innerHTML = '<option value="">Memuat batch…</option>';
-
             const canSeeWarehouse = {{ canAccessWarehouseStock() ? 'true' : 'false' }};
 
             fetch(`{{ route('supplies.batches') }}?medicine_id=${medicine_id}`)
                 .then(res => res.json())
                 .then(batches => {
+                    cachedBatches = batches || [];
                     select.innerHTML = '<option value="">— Otomatis (FEFO) —</option>';
 
                     let totalStorageStock = 0;
@@ -633,18 +813,20 @@
                         opt.value = b.id;
                         const gStock = parseInt(b.stock || 0);
                         const cStock = parseInt(b.counter_stock || 0);
-                        opt.textContent = canSeeWarehouse
-                            ? `${b.name} — Exp: ${b.expired_date} (Gdg: ${gStock}, Ctr: ${cStock})`
-                            : `${b.name} — Exp: ${b.expired_date} (Stok: ${cStock})`;
                         opt.dataset.stock = gStock;
                         opt.dataset.counterStock = cStock;
+                        opt.dataset.expiredDate = b.expired_date;
+                        opt.dataset.name = b.name;
                         select.appendChild(opt);
                         
                         totalStorageStock += gStock;
                         totalCounterStock += cStock;
                     });
 
-                    updateTotalStockFromSelect();
+                    current_storage_stock = totalStorageStock;
+                    current_counter_stock = totalCounterStock;
+                    total_stock = totalStorageStock + totalCounterStock;
+
                     // Set default display
                     if (document.getElementById('res_stock_gudang')) {
                         document.getElementById('res_stock_gudang').textContent = totalStorageStock;
@@ -652,57 +834,69 @@
                     if (document.getElementById('res_stock_counter')) {
                         document.getElementById('res_stock_counter').textContent = totalCounterStock;
                     }
+
+                    countDiscrepancy();
                 })
                 .catch(() => {
+                    cachedBatches = [];
                     select.innerHTML = '<option value="">— Gagal memuat batch —</option>';
                 });
         }
 
-        function updateTotalStockFromSelect() {
-            const select = document.getElementById('batch_select');
-            const selectedOpt = select.options[select.selectedIndex];
+        /* ── ED Match & Batch Modal Confirmation ──────────────────────── */
+        function checkExpiredDateMatch() {
+            const enteredEd = $('#expired_date').val();
+            if (!enteredEd || !cachedBatches || cachedBatches.length === 0) return;
 
-            if (selectedOpt && selectedOpt.value !== '') {
-                current_storage_stock = parseInt(selectedOpt.dataset.stock) || 0;
-                current_counter_stock = parseInt(selectedOpt.dataset.counterStock) || 0;
-            } else {
-                let sumStorage = 0;
-                let sumCounter = 0;
-                for (let i = 1; i < select.options.length; i++) {
-                    sumStorage += parseInt(select.options[i].dataset.stock) || 0;
-                    sumCounter += parseInt(select.options[i].dataset.counterStock) || 0;
-                }
-                current_storage_stock = sumStorage;
-                current_counter_stock = sumCounter;
-            }
+            // Normalize entered date to YYYY-MM-DD
+            const formattedEntered = enteredEd.replace(/\//g, '-');
 
-            total_stock = current_storage_stock + current_counter_stock;
+            const matched = cachedBatches.find(b => {
+                if (!b.expired_date) return false;
+                const bEd = b.expired_date.substring(0, 10);
+                return bEd === formattedEntered;
+            });
 
-            if ($('#stock_physic').val() !== '' || $('#counter_stock_physic').val() !== '') {
-                countDiscrepancy();
+            if (matched) {
+                matchedBatchOnEd = matched;
+                $('#dup_ed_text').text(matched.expired_date);
+                $('#dup_batch_text').text(matched.name);
+                document.getElementById('modal_batch_confirm').style.display = 'flex';
             }
         }
 
-        document.getElementById('batch_select')?.addEventListener('change', updateTotalStockFromSelect);
+        document.getElementById('btn_confirm_merge_batch')?.addEventListener('click', () => {
+            if (matchedBatchOnEd) {
+                $('#batch_name').val(matchedBatchOnEd.name);
+                $('#selected_batch_id').val(matchedBatchOnEd.id);
+            }
+            document.getElementById('modal_batch_confirm').style.display = 'none';
+            document.getElementById('batch_name').focus();
+        });
+
+        document.getElementById('btn_confirm_new_batch')?.addEventListener('click', () => {
+            $('#selected_batch_id').val('');
+            $('#batch_name').val('');
+            document.getElementById('modal_batch_confirm').style.display = 'none';
+            document.getElementById('batch_name').focus();
+        });
 
         function countDiscrepancy() {
-            const valGudang = $('#stock_physic').val();
-            const valCounter = $('#counter_stock_physic').val();
+            const valPhysic = $('#current_stock_physic').val();
             const input = document.getElementById('stock_discrepancy');
             const badge = document.getElementById('discrepancy_badge');
+            const mode = $('#target_mode').val();
 
-            if (valGudang === '' && valCounter === '') {
+            if (valPhysic === '') {
                 input.value = '';
                 input.classList.remove('error');
                 badge.style.display = 'none';
                 return;
             }
 
-            const gudangPhysic = valGudang !== '' ? (parseInt(valGudang) || 0) : current_storage_stock;
-            const counterPhysic = valCounter !== '' ? (parseInt(valCounter) || 0) : current_counter_stock;
-
-            const totalPhysic = gudangPhysic + counterPhysic;
-            const discrepancy = totalPhysic - total_stock;
+            const physicNum = parseInt(valPhysic) || 0;
+            const systemTargetStock = (mode === 'gudang') ? current_storage_stock : current_counter_stock;
+            const discrepancy = physicNum - systemTargetStock;
             input.value = (discrepancy > 0 ? '+' : '') + discrepancy;
 
             if (discrepancy !== 0) {
@@ -722,17 +916,20 @@
 
         function SaveOpname() {
             const medicineId = $('#medicine_id').val();
-            const stockPhysic = $('#stock_physic').val();
-            const counterStockPhysic = $('#counter_stock_physic').val();
-            const batchesId = $('#batch_select').val();
+            const valPhysic = $('#current_stock_physic').val();
+            const targetMode = $('#target_mode').val() || 'pelayanan';
+            const etalasesId = $('#etalase_select').val();
+            const customBatchName = $('#batch_name').val();
+            const customExpiredDate = $('#expired_date').val();
+            const batchesId = $('#selected_batch_id').val();
 
             if (!medicineId) {
                 iziToast.warning({ title: 'Peringatan', message: 'Obat tidak valid.', position: 'topRight' });
                 return;
             }
-            if (stockPhysic === '') {
-                iziToast.warning({ title: 'Peringatan', message: 'Isi stok fisik gudang terlebih dahulu!', position: 'topRight' });
-                document.getElementById('stock_physic').focus();
+            if (valPhysic === '') {
+                iziToast.warning({ title: 'Peringatan', message: 'Isi stok fisik terlebih dahulu!', position: 'topRight' });
+                document.getElementById('current_stock_physic').focus();
                 return;
             }
 
@@ -741,16 +938,26 @@
             btn.disabled = true;
             btn.innerHTML = 'Menyimpan...';
 
+            const payload = {
+                _token: "{{ csrf_token() }}",
+                medicine_id: medicineId,
+                target_mode: targetMode,
+                batches_id: batchesId || null,
+                custom_batch_name: customBatchName || null,
+                custom_expired_date: customExpiredDate || null,
+                etalases_id: (targetMode === 'pelayanan') ? (etalasesId || null) : null,
+            };
+
+            if (targetMode === 'gudang') {
+                payload.stock_physic = valPhysic;
+            } else {
+                payload.counter_stock_physic = valPhysic;
+            }
+
             $.ajax({
                 url: "{{ route('supplies.opname') }}",
                 type: 'POST',
-                data: {
-                    _token: "{{ csrf_token() }}",
-                    medicine_id: medicineId,
-                    stock_physic: stockPhysic,
-                    counter_stock_physic: counterStockPhysic,
-                    batches_id: batchesId,
-                },
+                data: payload,
                 success: function(response) {
                     iziToast.success({
                         title: 'Berhasil',
@@ -787,6 +994,7 @@
             
             // Start loading batches so we get real total stock from the server logic
             loadBatches(data.id);
+            loadEtalases();
 
             statusEl.textContent = 'Ditemukan';
             scanning = false;
