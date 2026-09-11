@@ -168,6 +168,7 @@ class ParetoController extends Controller
                 $pharmacy->id,
                 $request->start_date,
                 $request->end_date,
+                $request->search_medicine,
             ),
             'pareto-' . now()->format('Ymd') . '.xlsx'
         );

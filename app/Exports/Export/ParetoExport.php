@@ -22,19 +22,21 @@ class ParetoExport implements WithMultipleSheets
     protected $pharmacyId;
     protected $startDate;
     protected $endDate;
+    protected $searchMedicine;
 
-    public function __construct($pharmacyId, $startDate = null, $endDate = null)
+    public function __construct($pharmacyId, $startDate = null, $endDate = null, $searchMedicine = null)
     {
-        $this->pharmacyId = $pharmacyId;
-        $this->startDate  = $startDate;
-        $this->endDate    = $endDate;
+        $this->pharmacyId      = $pharmacyId;
+        $this->startDate       = $startDate;
+        $this->endDate         = $endDate;
+        $this->searchMedicine  = $searchMedicine;
     }
 
     public function sheets(): array
     {
         return [
-            new ParetoSalesSheet($this->pharmacyId, $this->startDate, $this->endDate),
-            new ParetoOrdersSheet($this->pharmacyId, $this->startDate, $this->endDate),
+            new ParetoSalesSheet($this->pharmacyId, $this->startDate, $this->endDate, $this->searchMedicine),
+            new ParetoOrdersSheet($this->pharmacyId, $this->startDate, $this->endDate, $this->searchMedicine),
         ];
     }
 }
@@ -47,18 +49,20 @@ abstract class ParetoBaseSheet implements FromArray, WithStyles, WithColumnWidth
     protected $pharmacyId;
     protected $startDate;
     protected $endDate;
+    protected $searchMedicine;
 
     // Accent color (hex RGB) — overridden per sheet
     protected string $accentColor   = '2563EB';   // blue  → sales
     protected string $totalBgColor  = 'DBEAFE';   // light blue
 
-    public function __construct($pharmacyId, $startDate = null, $endDate = null)
+    public function __construct($pharmacyId, $startDate = null, $endDate = null, $searchMedicine = null)
     {
-        $this->pharmacyId = $pharmacyId;
-        $this->startDate  = $startDate
+        $this->pharmacyId      = $pharmacyId;
+        $this->searchMedicine  = $searchMedicine;
+        $this->startDate       = $startDate
             ? Carbon::parse($startDate)->startOfDay()
             : Carbon::now()->startOfMonth();
-        $this->endDate    = $endDate
+        $this->endDate         = $endDate
             ? Carbon::parse($endDate)->endOfDay()
             : Carbon::now()->endOfDay();
     }
@@ -272,7 +276,7 @@ class ParetoSalesSheet extends ParetoBaseSheet
 
     protected function fetchItems(): \Illuminate\Support\Collection
     {
-        return DB::table('medicine_cart')
+        $query = DB::table('medicine_cart')
             ->join('medicine_transactions', 'medicine_transactions.id', '=', 'medicine_cart.transaction_id')
             ->join('medicines', 'medicines.id', '=', 'medicine_cart.medicine_id')
             ->where('medicine_transactions.pharmacy_id', $this->pharmacyId)
@@ -286,8 +290,17 @@ class ParetoSalesSheet extends ParetoBaseSheet
                 DB::raw('SUM(medicine_cart.quantity)    as total_qty'),
                 DB::raw('SUM(medicine_cart.final_price) as total_jumlah'),
                 DB::raw('COUNT(DISTINCT medicine_cart.transaction_id) as freq'),
-            ])
-            ->groupBy('medicine_cart.medicine_id', 'medicines.code', 'medicines.name', 'medicines.unit')
+            ]);
+
+        if (!empty($this->searchMedicine)) {
+            $kw = $this->searchMedicine;
+            $query->where(function ($q) use ($kw) {
+                $q->where('medicines.name', 'like', "%{$kw}%")
+                    ->orWhere('medicines.code', 'like', "%{$kw}%");
+            });
+        }
+
+        return $query->groupBy('medicine_cart.medicine_id', 'medicines.code', 'medicines.name', 'medicines.unit')
             ->orderBy('total_jumlah', 'desc')
             ->get();
     }
@@ -311,13 +324,13 @@ class ParetoOrdersSheet extends ParetoBaseSheet
         return 'Pareto Pembelian';
     }
 
-    private function getOrdersQuery()
+    protected function fetchItems(): \Illuminate\Support\Collection
     {
         $targetPharmacyIds = in_array((int) $this->pharmacyId, [1, 6, 9])
             ? [9, 1]
             : [(int) $this->pharmacyId];
 
-        return DB::table('receiving_items')
+        $query = DB::table('receiving_items')
             ->join('order_items', 'order_items.id', '=', 'receiving_items.order_items_id')
             ->join('medicines', 'medicines.id', '=', 'order_items.medicine_id')
             ->join('orders', 'orders.id', '=', 'order_items.order_id')
@@ -330,8 +343,17 @@ class ParetoOrdersSheet extends ParetoBaseSheet
                 DB::raw('SUM(receiving_items.qty)   as total_qty'),
                 DB::raw('SUM(receiving_items.total) as total_jumlah'),
                 DB::raw('COUNT(DISTINCT receiving_items.receiving_details_id) as freq'),
-            ])
-            ->groupBy('order_items.medicine_id', 'medicines.code', 'medicines.name', 'medicines.unit')
+            ]);
+
+        if (!empty($this->searchMedicine)) {
+            $kw = $this->searchMedicine;
+            $query->where(function ($q) use ($kw) {
+                $q->where('medicines.name', 'like', "%{$kw}%")
+                    ->orWhere('medicines.code', 'like', "%{$kw}%");
+            });
+        }
+
+        return $query->groupBy('order_items.medicine_id', 'medicines.code', 'medicines.name', 'medicines.unit')
             ->orderBy('total_jumlah', 'desc')
             ->get();
     }
