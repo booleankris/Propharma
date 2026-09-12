@@ -87,6 +87,14 @@ Route::get('/checkout/{id}', [LandingpageController::class, 'checkout'])->name('
 Route::post('/buyticket/{id}', [LandingpageController::class, 'buyTicket'])->name('buyticket');
 Route::get('/checkticket/{code}', [LandingpageController::class, 'checkTicket'])->name('check.ticket');
 
+// Swagger API Documentation (OpenAPI 3.0)
+Route::get('/api/docs', function () {
+    return view('docs.swagger');
+})->name('api.docs');
+Route::get('/docs', function () {
+    return view('docs.swagger');
+});
+
 
 
 // Redirect root to login
