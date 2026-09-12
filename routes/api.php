@@ -34,6 +34,13 @@ Route::post("/midtrans-ticket-feedback",[MidtransController::class,"midtransNoti
 use App\Http\Controllers\Api\MobileSyncController;
 
 Route::prefix('mobile')->group(function () {
+    // Sync & Lookup APIs for Mobile & Web App
+    Route::get('/pharmacies', [MobileSyncController::class, 'getPharmacies']);
+    Route::get('/medicines/lookup', [MobileSyncController::class, 'lookupMedicine']);
+    Route::get('/medicines/by-code/{code}', [MobileSyncController::class, 'getMedicineByCode']);
+    Route::get('/medicines', [MobileSyncController::class, 'getMedicines']);
+
+    // Existing Mobile App routes
     Route::get('/products', [MobileSyncController::class, 'getProducts']);
     Route::post('/members/check', [MobileSyncController::class, 'checkMember']);
     Route::post('/members/checkout', [MobileSyncController::class, 'checkoutPoints']);
