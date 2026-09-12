@@ -161,28 +161,46 @@ class StockOpnameImportService
                 // Skenario Client: Jika stok fisik = 0 (barang habis), wajar ED di Excel kosong (tidak perlu warning)
                 if ($stockPhysic === 0) {
                     $targetPharmId = ($targetMode === 'gudang') ? getWarehousePharmacyId() : (isWarehousePharmacy($pharmacyId) ? 1 : $pharmacyId);
-                    $existingBatch = Batches::where('medicine_id', $matchedMed?->id ?? 0)
+                    $candidateBatches = Batches::where('medicine_id', $matchedMed?->id ?? 0)
                         ->where('pharmacy_id', $targetPharmId)
-                        ->orderBy('expired_date', 'desc')
-                        ->first();
-                    $parsedEd = $existingBatch?->expired_date ? Carbon::parse($existingBatch->expired_date)->toDateString() : now()->addYear()->toDateString();
+                        ->whereNotNull('expired_date')
+                        ->orderBy('id', 'desc')
+                        ->limit(10)
+                        ->get();
+
+                    $parsedEd = null;
+                    foreach ($candidateBatches as $b) {
+                        try {
+                            $dt = Carbon::parse($b->expired_date);
+                            if ($dt->year >= 2020 && $dt->year <= 2050) {
+                                $parsedEd = $dt->toDateString();
+                                break;
+                            }
+                        } catch (\Throwable $e) {
+                            // Abaikan tanggal batch corrupt di database
+                        }
+                    }
+
+                    if (!$parsedEd) {
+                        $parsedEd = now()->addYear()->toDateString();
+                    }
                     $edValidCount++;
                 } else {
                     $parsedEd = now()->addYears(2)->toDateString();
                     $edDefaultedCount++;
-                    $rowWarnings[] = "Tanggal ED kosong, menggunakan default 2 tahun (" . Carbon::parse($parsedEd)->format('d/m/Y') . ").";
+                    $rowWarnings[] = "Tanggal ED kosong, menggunakan default 2 tahun (" . self::safeFormatDate($parsedEd, 'd/m/Y') . ").";
                 }
             } elseif ($parsedEd !== null) {
                 $edValidCount++;
                 // If input was a month-year format like Jun-26, add an informative note
                 $displayEd = $formattedEd ?: $rawEd;
                 if (preg_match('/^[a-zA-Z]{3,}[-\s\/]\d{2,4}$/u', $displayEd) || preg_match('/^\d{1,2}[-\/]\d{2,4}$/', $displayEd)) {
-                    $rowWarnings[] = "Format bulan-tahun '{$displayEd}' otomatis disesuaikan ke tanggal akhir bulan (" . Carbon::parse($parsedEd)->format('d/m/Y') . ").";
+                    $rowWarnings[] = "Format bulan-tahun '{$displayEd}' otomatis disesuaikan ke tanggal akhir bulan (" . self::safeFormatDate($parsedEd, 'd/m/Y') . ").";
                 }
             } else {
                 $parsedEd = now()->addYears(2)->toDateString();
                 $edDefaultedCount++;
-                $rowWarnings[] = "Format tanggal ED '{$rawEd}' tidak valid, menggunakan default (" . Carbon::parse($parsedEd)->format('d/m/Y') . ").";
+                $rowWarnings[] = "Format tanggal ED '{$rawEd}' tidak valid, menggunakan default (" . self::safeFormatDate($parsedEd, 'd/m/Y') . ").";
             }
 
             // 4. Etalase resolution
@@ -370,7 +388,11 @@ class StockOpnameImportService
                     ->first();
 
                 if (!$batch) {
-                    $edSlug = Carbon::parse($expiredDate)->format('Ymd');
+                    try {
+                        $edSlug = Carbon::parse($expiredDate)->format('Ymd');
+                    } catch (\Throwable $e) {
+                        $edSlug = date('Ymd');
+                    }
                     $batch = Batches::create([
                         'medicine_id'  => $medicineId,
                         'pharmacy_id'  => $batchTargetPharmacyId,
@@ -736,7 +758,9 @@ class StockOpnameImportService
                 if ($year < 100) $year += 2000;
                 if (isset($monthMap[$monthKey])) {
                     $month = $monthMap[$monthKey];
-                    return Carbon::create($year, $month, $day)->toDateString();
+                    try {
+                        return Carbon::create($year, $month, min($day, 28))->toDateString();
+                    } catch (\Throwable $e) {}
                 }
             }
 
@@ -747,5 +771,29 @@ class StockOpnameImportService
         }
 
         return null;
+    }
+
+    public static function safeFormatDate(?string $dateStr, string $format = 'd/m/Y'): string
+    {
+        if (empty($dateStr)) {
+            return '-';
+        }
+        try {
+            return Carbon::parse($dateStr)->format($format);
+        } catch (\Throwable $e) {
+            return (string) $dateStr;
+        }
+    }
+
+    public static function safeParseDate(?string $dateStr, ?string $fallback = null): string
+    {
+        if (empty($dateStr)) {
+            return $fallback ?? now()->addYear()->toDateString();
+        }
+        try {
+            return Carbon::parse($dateStr)->toDateString();
+        } catch (\Throwable $e) {
+            return $fallback ?? now()->addYear()->toDateString();
+        }
     }
 }
