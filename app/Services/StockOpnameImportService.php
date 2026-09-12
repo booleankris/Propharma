@@ -115,10 +115,16 @@ class StockOpnameImportService
             }
 
             // 2. Physical stock parse
+            // Mendukung sel kosong (blank), "-", "0", atau angka bulat >= 0
+            // Jika kosong atau "-", otomatis dianggap 0 (Habis / Nihil) sesuai kebutuhan klien
+            $isStockBlank = ($rawStock === '' || $rawStock === '-' || strtolower($rawStock) === 'null');
             $cleanStock = str_replace([' ', ','], ['', '.'], $rawStock);
-            if ($cleanStock === '' || !is_numeric($cleanStock) || (float) $cleanStock < 0) {
+
+            if ($isStockBlank) {
+                $stockPhysic = 0;
+            } elseif (!is_numeric($cleanStock) || (float) $cleanStock < 0) {
                 $isValid = false;
-                $rowErrors[] = "Stok fisik '{$rawStock}' tidak valid (harus angka >= 0).";
+                $rowErrors[] = "Stok fisik '{$rawStock}' tidak valid (harus angka >= 0 atau kosong untuk stok 0).";
                 $stockPhysic = 0;
             } else {
                 $stockPhysic = (int) round((float) $cleanStock);
@@ -129,11 +135,23 @@ class StockOpnameImportService
             $formattedEd = trim((string) $edCell->getFormattedValue());
 
             $parsedEd = self::parseSmartExpiredDate($rawEd, $formattedEd);
+            $isEmptyEd = ($rawEd === '' && $formattedEd === '');
 
-            if ($rawEd === '' && $formattedEd === '') {
-                $parsedEd = now()->addYears(2)->toDateString();
-                $edDefaultedCount++;
-                $rowWarnings[] = "Tanggal ED kosong, menggunakan default 2 tahun (" . Carbon::parse($parsedEd)->format('d/m/Y') . ").";
+            if ($isEmptyEd) {
+                // Skenario Client: Jika stok fisik = 0 (barang habis), wajar ED di Excel kosong (tidak perlu warning)
+                if ($stockPhysic === 0) {
+                    $targetPharmId = ($targetMode === 'gudang') ? getWarehousePharmacyId() : (isWarehousePharmacy($pharmacyId) ? 1 : $pharmacyId);
+                    $existingBatch = Batches::where('medicine_id', $matchedMed?->id ?? 0)
+                        ->where('pharmacy_id', $targetPharmId)
+                        ->orderBy('expired_date', 'desc')
+                        ->first();
+                    $parsedEd = $existingBatch?->expired_date ? Carbon::parse($existingBatch->expired_date)->toDateString() : now()->addYear()->toDateString();
+                    $edValidCount++;
+                } else {
+                    $parsedEd = now()->addYears(2)->toDateString();
+                    $edDefaultedCount++;
+                    $rowWarnings[] = "Tanggal ED kosong, menggunakan default 2 tahun (" . Carbon::parse($parsedEd)->format('d/m/Y') . ").";
+                }
             } elseif ($parsedEd !== null) {
                 $edValidCount++;
                 // If input was a month-year format like Jun-26, add an informative note
@@ -228,6 +246,8 @@ class StockOpnameImportService
                 'medicine_unit'        => $matchedMed ? $matchedMed->unit : '-',
                 'stock'                => $stockPhysic,
                 'raw_stock'            => $rawStock,
+                'is_empty_stock'       => $isStockBlank,
+                'is_empty_ed'          => $isEmptyEd,
                 'expired_date'         => $parsedEd,
                 'raw_ed'               => $rawEd,
                 'etalases_id'          => $resolvedEtalasesId,
@@ -339,6 +359,14 @@ class StockOpnameImportService
 
                 // 2. Process according to target_mode
                 if ($targetMode === 'gudang') {
+                    if ($stockPhysic === 0) {
+                        // Jika opname menyatakan stok = 0 (habis di gudang), nolkan seluruh batch gudang lainnya untuk obat ini
+                        Batches::where('medicine_id', $medicineId)
+                            ->where('pharmacy_id', $batchTargetPharmacyId)
+                            ->where('id', '!=', $batch->id)
+                            ->update(['stock' => 0]);
+                    }
+
                     $storageBefore = (int) $batch->stock;
                     $discrepancy   = $stockPhysic - $storageBefore;
                     $status        = $discrepancy >= 0 ? 5 : 6;
@@ -372,6 +400,17 @@ class StockOpnameImportService
                     ]);
                 } else {
                     // Pelayanan mode
+                    if ($stockPhysic === 0) {
+                        // Jika opname menyatakan stok = 0 (habis di etalase cabang), nolkan seluruh transfer items lama obat ini di cabang ini
+                        MedicineTransferItems::whereHas('batches', function ($b) use ($medicineId, $counterPharmacyId) {
+                                $b->where('medicine_id', $medicineId)
+                                  ->where('pharmacy_id', $counterPharmacyId);
+                            })
+                            ->where('status', 1)
+                            ->where('batches_id', '!=', $batch->id)
+                            ->update(['qty' => 0]);
+                    }
+
                     $transfers = MedicineTransferItems::where('batches_id', $batch->id)
                         ->where('status', 1)
                         ->where(function ($q) {

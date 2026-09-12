@@ -777,6 +777,7 @@
                                             </div>
                                         </div>
                                         <p class="text-[11px] text-slate-500 pt-1 leading-relaxed">
+                                            ✨ <strong>Stok Habis / Nihil (0) & ED Kosong:</strong> Jika barang habis di cabang, kolom stok boleh dikosongkan, diisi <code class="text-indigo-600 font-mono">0</code>, atau <code class="text-indigo-600 font-mono">-</code>, dan kolom ED boleh dikosongkan. Sistem otomatis menganggapnya valid dengan saldo akhir <strong>0</strong> (meniadakan sisa stok lama cabang).<br>
                                             ✨ <strong>Tanpa Batch:</strong> Sistem akan otomatis mencocokkan batch lama yang
                                             memiliki tanggal ED sama, atau membuatkan nomor batch baru jika belum ada.<br>
                                             ✨ <strong>Format ED Fleksibel:</strong> Mendukung penulisan Bulan-Tahun seperti
@@ -1936,17 +1937,38 @@
                                     `<span class="text-slate-400 text-[10px]">${row.etalase_name || '-'}</span>`;
                             }
 
-                            let statusBadge = row.is_valid ?
-                                `<span class="inline-flex items-center gap-1 text-emerald-600 font-bold"><svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg> Siap</span>` :
-                                `<span class="inline-flex items-center gap-1 text-rose-500 font-bold"><svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg> Error</span>`;
+                            let stockDisplay = '';
+                            if (row.stock === 0) {
+                                stockDisplay = `<span class="inline-flex items-center px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-bold text-xs" title="Stok Habis / Nihil (0)">0 (Nihil)</span>`;
+                            } else {
+                                stockDisplay = `<span class="font-black text-slate-800">${row.stock}</span> <span class="text-[10px] font-normal text-slate-400">${row.medicine_unit || ''}</span>`;
+                            }
+
+                            let edDisplay = '';
+                            if (row.is_empty_ed && row.stock === 0) {
+                                edDisplay = `<span class="text-slate-400 italic text-xs" title="ED kosong otomatis diselaraskan karena barang habis">— (Stok 0)</span>`;
+                            } else {
+                                edDisplay = `<span class="font-mono text-slate-600">${row.expired_date || '-'}</span>`;
+                            }
+
+                            let statusBadge = '';
+                            if (row.is_valid) {
+                                if (row.stock === 0) {
+                                    statusBadge = `<span class="inline-flex items-center gap-1 text-emerald-600 font-bold text-xs"><svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg> Siap (0)</span>`;
+                                } else {
+                                    statusBadge = `<span class="inline-flex items-center gap-1 text-emerald-600 font-bold text-xs"><svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg> Siap</span>`;
+                                }
+                            } else {
+                                statusBadge = `<span class="inline-flex items-center gap-1 text-rose-500 font-bold text-xs"><svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg> Error</span>`;
+                            }
 
                             tbody.append(`
                             <tr class="hover:bg-slate-50 transition-colors ${!row.is_valid ? 'bg-rose-50/40' : ''}">
                                 <td class="px-3 py-2 font-mono text-slate-400">${row.row_index}</td>
                                 <td class="px-3 py-2 font-mono font-bold text-slate-700">${row.medicine_code || '-'}</td>
                                 <td class="px-3 py-2 font-semibold text-slate-800">${row.medicine_name || '-'}</td>
-                                <td class="px-3 py-2 text-right font-black text-slate-800">${row.stock} <span class="text-[10px] font-normal text-slate-400">${row.medicine_unit || ''}</span></td>
-                                <td class="px-3 py-2 text-center font-mono text-slate-600">${row.expired_date || '-'}</td>
+                                <td class="px-3 py-2 text-right">${stockDisplay}</td>
+                                <td class="px-3 py-2 text-center">${edDisplay}</td>
                                 <td class="px-3 py-2">${etalaseBadge}</td>
                                 <td class="px-3 py-2 text-center">${statusBadge}</td>
                             </tr>
