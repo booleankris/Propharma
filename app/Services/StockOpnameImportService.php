@@ -31,7 +31,12 @@ class StockOpnameImportService
      */
     public function analyze(string $filePath, int $pharmacyId, string $targetMode = 'pelayanan'): array
     {
-        $spreadsheet = IOFactory::load($filePath);
+        @ini_set('memory_limit', '512M');
+        @set_time_limit(300);
+
+        $reader = IOFactory::createReaderForFile($filePath);
+        $reader->setReadEmptyCells(false);
+        $spreadsheet = $reader->load($filePath);
         $sheet = $spreadsheet->getActiveSheet();
         $highestRow = $sheet->getHighestRow();
         $highestCol = $sheet->getHighestColumn();
@@ -321,6 +326,9 @@ class StockOpnameImportService
      */
     public function execute(string $token, int $pharmacyId, string $targetMode, int $userId, ?int $jobId = null): array
     {
+        @ini_set('memory_limit', '512M');
+        @set_time_limit(300);
+
         $filePath = storage_path("app/opname_imports/{$token}.json");
         if (!File::exists($filePath)) {
             throw new \Exception("Sesi impor tidak ditemukan atau sudah kedaluwarsa. Silakan unggah ulang file.");

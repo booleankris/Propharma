@@ -738,7 +738,7 @@
                                                 atau seret file ke sini
                                             </p>
                                             <p class="text-xs text-slate-400">Mendukung format Excel (.xlsx, .xls, .csv)
-                                                hingga 20MB</p>
+                                                hingga 100MB</p>
                                             <div id="import_file_preview"
                                                 class="hidden mt-3 inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-100 text-emerald-800 text-xs font-bold rounded-lg">
                                                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24"
@@ -1814,6 +1814,14 @@
                 }
 
                 const file = files[0];
+                if (file.size > 100 * 1024 * 1024) {
+                    iziToast.error({
+                        title: 'Ukuran Terlalu Besar',
+                        message: `Ukuran file (${(file.size / (1024 * 1024)).toFixed(1)} MB) melebihi batas maksimal 100 MB.`,
+                        position: 'topRight'
+                    });
+                    return;
+                }
                 const targetMode = $('input[name="import_target_mode"]:checked').val() || 'pelayanan';
 
                 const btn = $(this);
@@ -1983,12 +1991,22 @@
                         switchImportStep(2);
                     })
                     .catch(err => {
-                        const msg = err.response?.data?.message || err.message ||
-                            'Gagal membaca atau memproses file Excel.';
+                        let msg = 'Gagal membaca atau memproses file Excel.';
+                        if (err.response?.status === 413) {
+                            msg = 'Ukuran file terlalu besar untuk server web (413 Request Entity Too Large). Tambahkan konfigurasi "client_max_body_size 100M;" pada Nginx server.';
+                        } else if (err.response?.data?.errors?.file) {
+                            const fErr = err.response.data.errors.file;
+                            msg = Array.isArray(fErr) ? fErr.join('<br>') : fErr;
+                        } else if (err.response?.data?.message) {
+                            msg = err.response.data.message;
+                        } else if (err.message) {
+                            msg = err.message;
+                        }
                         iziToast.error({
-                            title: 'Kesalahan File',
+                            title: 'Gagal Membaca File',
                             message: msg,
-                            position: 'topRight'
+                            position: 'topRight',
+                            timeout: 12000
                         });
                     })
                     .finally(() => {

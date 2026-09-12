@@ -1223,10 +1223,48 @@ class SuppliesController extends Controller
 
     public function analyzeStockOpnameImport(Request $request, StockOpnameImportService $importService)
     {
+        // 1. Deteksi jika payload di-strip oleh PHP karena melebihi post_max_size
+        if (empty($_FILES) && empty($_POST) && isset($_SERVER['CONTENT_LENGTH']) && (int) $_SERVER['CONTENT_LENGTH'] > 0) {
+            $postMax = ini_get('post_max_size');
+            return response()->json([
+                'success' => false,
+                'message' => "Ukuran file terlalu besar melampaui batas server (post_max_size: {$postMax}). Silakan perbesar upload_max_filesize & post_max_size pada php.ini atau Nginx (client_max_body_size).",
+                'errors'  => ['file' => ["Ukuran file melampaui batas upload server ({$postMax})."]],
+            ], 422);
+        }
+
+        // 2. Deteksi jika file gagal diupload karena batas upload_max_filesize PHP
+        if ($request->hasFile('file') && !$request->file('file')->isValid()) {
+            $errorCode = $request->file('file')->getError();
+            $uploadMax = ini_get('upload_max_filesize');
+            if ($errorCode === UPLOAD_ERR_INI_SIZE || $errorCode === UPLOAD_ERR_FORM_SIZE) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "File terlalu besar untuk diunggah! Batas PHP server saat ini adalah {$uploadMax}. Silakan tingkatkan upload_max_filesize & post_max_size di php.ini menjadi 100M.",
+                    'errors'  => ['file' => ["Ukuran file melebihi batas upload PHP ({$uploadMax})."]],
+                ], 422);
+            }
+        }
+
         $request->validate([
-            'file'        => 'required|file|mimes:xlsx,xls,csv|max:20480',
+            'file'        => 'required|file|max:102400',
             'target_mode' => 'nullable|in:pelayanan,gudang',
+        ], [
+            'file.required' => 'File Excel wajib diunggah.',
+            'file.file'     => 'File yang diunggah tidak valid.',
+            'file.max'      => 'Ukuran file terlalu besar (maksimal 100MB).',
+            'file.uploaded' => 'File gagal diunggah karena melebihi batas upload server (upload_max_filesize: ' . ini_get('upload_max_filesize') . '). Perbesar upload_max_filesize di php.ini.',
         ]);
+
+        $file = $request->file('file');
+        $ext = strtolower($file->getClientOriginalExtension());
+        if (!in_array($ext, ['xlsx', 'xls', 'csv'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Format file harus berupa Excel (.xlsx, .xls) atau .csv.',
+                'errors'  => ['file' => ['Format file harus berupa Excel (.xlsx, .xls) atau .csv.']],
+            ], 422);
+        }
 
         $pharmacyId = getActivePharmacyId();
         $canSeeWarehouse = canAccessWarehouseStock($pharmacyId);
@@ -1235,7 +1273,6 @@ class SuppliesController extends Controller
             $targetMode = 'pelayanan';
         }
 
-        $file = $request->file('file');
         $filePath = $file->getRealPath();
 
         try {
