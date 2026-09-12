@@ -92,6 +92,75 @@ paths:
                     items:
                       $ref: '#/components/schemas/PharmacyItem'
 
+  /api/mobile/transactions:
+    post:
+      tags:
+        - "Mobile Sync"
+      summary: Catat Transaksi Mobile ke Aplikasi Web (Kasir Online)
+      operationId: recordMobileTransaction
+      description: |
+        Mencatat transaksi penjualan dari aplikasi mobile ke database Web Apotek.
+        Secara otomatis:
+        - Menetapkan `transaction_type` = **"ONLINE"**
+        - Memotong stok obat dan batch pada cabang yang bersangkutan (FIFO / FEFO)
+        - Mencatat log mutasi kartu stok (`items_log`)
+        - Menghubungkan atau membuat master data pelanggan/pasien
+      requestBody:
+        required: true
+        description: Data transaksi mobile beserta daftar obat yang dibeli
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransactionCreateRequest'
+            example:
+              pharmacy_id: 5
+              payment_method: "QRIS"
+              customer_name: "Budi Santoso"
+              customer_phone: "081234567890"
+              discount: 0
+              total_transaction: 30000
+              notes: "Order Mobile App #1029"
+              items:
+                - code: "002700089"
+                  qty: 2
+                  price: 15000
+                  discount: 0
+      responses:
+        '201':
+          description: Transaksi berhasil dicatat dan stok berhasil dipotong
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionCreateResponse'
+              example:
+                success: true
+                message: "Transaksi ONLINE berhasil dicatat dan stok cabang telah terpotong"
+                transaction_code: "OL-20260912-0001"
+                data:
+                  transaction_id: 10662
+                  transaction_code: "OL-20260912-0001"
+                  transaction_type: "ONLINE"
+                  pharmacy_id: 5
+                  pharmacy_name: "SAHABAT ANTASARI"
+                  customer_name: "Budi Santoso"
+                  customer_phone: "081234567890"
+                  total: 30000
+                  payment_method: "QRIS"
+                  items_count: 1
+                  created_at: "2026-09-12 16:00:00"
+        '422':
+          description: Validasi parameter gagal (misal pharmacy_id kosong atau items kosong)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Kesalahan server atau stok/obat bermasalah
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
 components:
   schemas:
     MedicineDetail:
@@ -277,3 +346,121 @@ components:
         message:
           type: string
           example: "Obat dengan SKU/Barcode '002700089' tidak ditemukan pada sistem Web."
+
+    TransactionCreateRequest:
+      type: object
+      required:
+        - pharmacy_id
+        - items
+      properties:
+        pharmacy_id:
+          type: integer
+          description: ID Cabang Apotek tempat order diproses (ambil dari /api/mobile/pharmacies)
+          example: 5
+        payment_method:
+          type: string
+          description: Metode pembayaran (misal QRIS, CASH, TRANSFER, MIDTRANS, ONLINE)
+          example: "QRIS"
+        customer_name:
+          type: string
+          description: Nama pembeli / pasien
+          example: "Budi Santoso"
+        customer_phone:
+          type: string
+          description: Nomor WhatsApp / Telepon pembeli
+          example: "081234567890"
+        discount:
+          type: number
+          description: Total potongan diskon transaksi (opsional, default 0)
+          example: 0
+        total_transaction:
+          type: number
+          description: Total nilai transaksi (opsional, jika tidak diisi akan dihitung otomatis dari sum item)
+          example: 30000
+        notes:
+          type: string
+          nullable: true
+          description: Catatan tambahan / Nomor referensi pesanan mobile
+          example: "Order Mobile #1029"
+        items:
+          type: array
+          description: Daftar obat yang dibeli
+          items:
+            $ref: '#/components/schemas/TransactionItemInput'
+
+    TransactionItemInput:
+      type: object
+      required:
+        - code
+        - qty
+      properties:
+        code:
+          type: string
+          description: SKU / Kode Obat atau Barcode
+          example: "002700089"
+        qty:
+          type: number
+          description: Jumlah kuantitas yang dibeli
+          example: 2
+        price:
+          type: number
+          nullable: true
+          description: Harga satuan obat (opsional, jika kosong akan menggunakan HET/harga sistem)
+          example: 15000
+        discount:
+          type: number
+          nullable: true
+          description: Diskon untuk item ini (opsional, default 0)
+          example: 0
+
+    TransactionCreateResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "Transaksi ONLINE berhasil dicatat dan stok cabang telah terpotong"
+        transaction_code:
+          type: string
+          example: "OL-20260912-0001"
+        data:
+          type: object
+          properties:
+            transaction_id:
+              type: integer
+              example: 10662
+            transaction_code:
+              type: string
+              example: "OL-20260912-0001"
+            transaction_type:
+              type: string
+              description: Tipe transaksi pada sistem web apotek (selalu ONLINE)
+              example: "ONLINE"
+            pharmacy_id:
+              type: integer
+              example: 5
+            pharmacy_name:
+              type: string
+              example: "SAHABAT ANTASARI"
+            customer_name:
+              type: string
+              example: "Budi Santoso"
+            customer_phone:
+              type: string
+              example: "081234567890"
+            total:
+              type: number
+              example: 30000
+            payment_method:
+              type: string
+              example: "QRIS"
+            items_count:
+              type: integer
+              example: 1
+            created_at:
+              type: string
+              format: date-time
+              example: "2026-09-12 16:00:00"
+

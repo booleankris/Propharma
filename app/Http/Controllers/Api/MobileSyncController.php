@@ -12,8 +12,10 @@ use App\Models\MedicineTransferItems;
 use App\Models\ItemsLog;
 use App\Models\Batches;
 use App\Models\Pharmacies;
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 
 class MobileSyncController extends Controller
 {
@@ -409,26 +411,48 @@ class MobileSyncController extends Controller
         ]);
     }
 
-    // 5. [POST] /api/mobile/transactions/checkout
+    /**
+     * 5. [POST] /api/mobile/transactions atau /api/mobile/transactions/checkout
+     * Mencatat transaksi mobile ke dalam aplikasi web (Kasir Online).
+     * Secara otomatis:
+     * - transaction_type = "ONLINE"
+     * - cart_type = "ONLINE"
+     * - items_log.type = "ONLINE"
+     * - Memotong stok counter & batch (FIFO/FEFO) sesuai cabang yang dipilih.
+     */
     public function transactionCheckout(Request $request)
     {
-        $request->validate([
-            'pharmacy_id' => 'required|integer',
-            'payment_type' => 'required|string',
-            'transaction_type' => 'required|string',
-            'phone' => 'required|string',
-            'name' => 'required|string',
-            'discount' => 'nullable|numeric',
-            'total_transaction' => 'required|numeric',
-            'items' => 'required|array',
-            'items.*.code' => 'required|string',
-            'items.*.qty' => 'required|numeric',
-            'items.*.price' => 'required|numeric',
-            'items.*.discount' => 'nullable|numeric',
+        $validator = Validator::make($request->all(), [
+            'pharmacy_id'        => 'required|integer',
+            'items'              => 'required|array|min:1',
+            'items.*.code'       => 'required|string',
+            'items.*.qty'        => 'required|numeric|min:0.01',
+            'items.*.price'      => 'nullable|numeric',
+            'items.*.discount'   => 'nullable|numeric',
+            'payment_method'     => 'nullable|string',
+            'payment_type'       => 'nullable|string',
+            'transaction_type'   => 'nullable|string',
+            'name'               => 'nullable|string',
+            'customer_name'      => 'nullable|string',
+            'phone'              => 'nullable|string',
+            'customer_phone'     => 'nullable|string',
+            'discount'           => 'nullable|numeric',
+            'total_transaction'  => 'nullable|numeric',
+            'total'              => 'nullable|numeric',
+            'subtotal'           => 'nullable|numeric',
+            'notes'              => 'nullable|string',
         ]);
 
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Parameter transaksi tidak valid.',
+                'errors'  => $validator->errors()
+            ], 422);
+        }
+
         // Mapping Pharmacy ID
-        $mobilePharmacyId = $request->pharmacy_id;
+        $mobilePharmacyId = (int) $request->pharmacy_id;
         $map = [
             14 => 1, // Sahabat PMI
             17 => 2, // Sahabat Mulawarman
@@ -436,65 +460,140 @@ class MobileSyncController extends Controller
             15 => 5, // Sahabat Antasari
         ];
         $webPharmacyId = $map[$mobilePharmacyId] ?? $mobilePharmacyId;
+        $pharmacy = Pharmacies::find($webPharmacyId);
 
-        $patient = Patients::firstOrCreate(
-            ['phone' => $request->phone],
-            ['name' => $request->name, 'status' => 1]
-        );
+        // Identifikasi Customer / Pasien
+        $customerName  = $request->customer_name ?? $request->name ?? 'Pelanggan Online';
+        $customerPhone = $request->customer_phone ?? $request->phone ?? '-';
+
+        $patient = null;
+        if (!empty($customerPhone) && $customerPhone !== '-') {
+            $patient = Patients::firstOrCreate(
+                ['phone' => $customerPhone],
+                ['name' => $customerName, 'status' => 1]
+            );
+        } elseif (!empty($customerName)) {
+            $patient = Patients::firstOrCreate(
+                ['name' => $customerName, 'phone' => '-'],
+                ['status' => 1]
+            );
+        }
+
+        // User attribution (prioritaskan user ONLINE atau fallback ke ID 1)
+        $onlineUser = User::where('name', 'ONLINE')->orWhere('name', 'Online')->first();
+        $userId = $onlineUser?->id ?? 1;
+
+        $paymentMethod = $request->payment_method ?? $request->payment_type ?? 'ONLINE';
+        $discountTotal = (float) ($request->discount ?? 0);
 
         DB::beginTransaction();
         try {
-            // Generate Transaction Code (Mobile)
+            // Generate Transaction Code (Khusus Transaksi Online)
             $prefix = "OL-" . date('Ymd') . "-";
-            $lastTrans = MedicineTransactions::where('transaction_code', 'like', $prefix . '%')->orderBy('id', 'desc')->first();
+            $lastTrans = MedicineTransactions::where('transaction_code', 'like', $prefix . '%')
+                ->orderBy('id', 'desc')
+                ->lockForUpdate()
+                ->first();
             $num = $lastTrans ? intval(substr($lastTrans->transaction_code, -4)) + 1 : 1;
             $code = $prefix . str_pad($num, 4, '0', STR_PAD_LEFT);
 
-            $medTransaction = MedicineTransactions::create([
-                'pharmacy_id' => $webPharmacyId,
-                'patient_id' => $patient->id,
-                'user_id' => 1,
-                'transaction_code' => $code,
-                'transaction_type' => $request->transaction_type, // Misal: ONLINE
-                'subtotal' => $request->total_transaction,
-                'discount' => $request->discount ?? 0,
-                'paid' => $request->total_transaction,
-                'changes' => 0,
-                'payment_method' => $request->payment_type,
-                'status' => 1,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            // Counter Log Code
+            $prefixLog = "LOG-" . date('Ymd') . "-";
+            $lastLog = ItemsLog::where('code', 'like', $prefixLog . '%')
+                ->orderBy('id', 'desc')
+                ->first();
+            $currentLogNum = $lastLog ? intval(substr($lastLog->code, -4)) : 0;
 
-            foreach ($request->items as $item) {
-                $medicine = Medicines::where('code', $item['code'])->first();
+            // Hitung subtotal akumulatif jika total tidak diberikan secara eksplisit
+            $calculatedSubtotal = 0;
+            $preparedItems = [];
+
+            foreach ($request->items as $itemData) {
+                $codeItem = trim($itemData['code']);
+                $medicine = Medicines::where('code', $codeItem)
+                    ->orWhere('barcode', $codeItem)
+                    ->first();
+
                 if (!$medicine) {
-                    throw new \Exception("Obat dengan kode {$item['code']} tidak ditemukan.");
+                    throw new \Exception("Obat dengan SKU/Barcode '{$codeItem}' tidak ditemukan di sistem web.");
                 }
 
-                $totalPrice = ($item['qty'] * $item['price']) - ($item['discount'] ?? 0);
+                $qty = (float) $itemData['qty'];
+                $unitPrice = isset($itemData['price']) && $itemData['price'] !== null && $itemData['price'] !== ''
+                    ? (float) $itemData['price']
+                    : (float) ($medicine->het_price ?: ($medicine->net_price ?: $medicine->raw_price));
+
+                $itemDiscount = (float) ($itemData['discount'] ?? 0);
+                $totalItemPrice = max(0, ($qty * $unitPrice) - $itemDiscount);
+                $calculatedSubtotal += $totalItemPrice;
+
+                $preparedItems[] = [
+                    'medicine'    => $medicine,
+                    'qty'         => $qty,
+                    'price'       => $unitPrice,
+                    'discount'    => $itemDiscount,
+                    'total_price' => $totalItemPrice,
+                ];
+            }
+
+            $finalTotal = $request->total_transaction ?? $request->total ?? $request->subtotal;
+            $finalTotal = $finalTotal !== null ? (float) $finalTotal : max(0, $calculatedSubtotal - $discountTotal);
+
+            // 1. Simpan Transaksi Master dengan transaction_type = "ONLINE"
+            $medTransaction = MedicineTransactions::create([
+                'pharmacy_id'        => $webPharmacyId,
+                'patient_id'         => $patient?->id,
+                'user_id'            => $userId,
+                'transaction_code'   => $code,
+                'transaction_type'   => 'ONLINE', // Wajib ONLINE sesuai instruksi
+                'subtotal'           => $finalTotal,
+                'discount'           => $discountTotal,
+                'paid'               => $finalTotal,
+                'changes'            => 0,
+                'payment_method'     => strtoupper($paymentMethod),
+                'transfer_bank_name' => $request->notes ?? $request->reference_id ?? null,
+                'status'             => 1,
+                'created_at'         => now(),
+                'updated_at'         => now(),
+            ]);
+
+            // 2. Simpan Item Cart & Potong Stok Counter/Batch (FIFO / FEFO)
+            foreach ($preparedItems as $prep) {
+                $medicine = $prep['medicine'];
+                $qty = $prep['qty'];
+                $unitPrice = $prep['price'];
+                $itemDiscount = $prep['discount'];
+                $totalPrice = $prep['total_price'];
 
                 MedicineCart::create([
                     'transaction_id' => $medTransaction->id,
-                    'medicine_id' => $medicine->id,
-                    'user_id' => 1, // Default user
-                    'quantity' => $item['qty'],
-                    'item_price' => $item['price'],
-                    'discount' => $item['discount'] ?? 0,
-                    'total_price' => $totalPrice,
-                    'final_price' => $totalPrice,
-                    'cart_type' => $request->transaction_type, // Misal ONLINE
-                    'status' => 1,
+                    'medicine_id'    => $medicine->id,
+                    'user_id'        => $userId,
+                    'quantity'       => $qty,
+                    'item_price'     => $unitPrice,
+                    'discount'       => $itemDiscount,
+                    'raw_total'      => $qty * $unitPrice,
+                    'total_price'    => $totalPrice,
+                    'final_price'    => $totalPrice,
+                    'cart_type'      => 'ONLINE', // Cart type ONLINE
+                    'status'         => 1,
                 ]);
 
-                // Pemotongan Stok Serupa dengan Kasir Web POS
-                $qty_bought = $item['qty'];
+                // Pemotongan Stok Cabang (FIFO / FEFO)
+                $qty_bought = $qty;
                 $qty_before = $medicine->stock;
+                $lastBatchId = null;
 
                 while ($qty_bought > 0) {
+                    // Cari transfer item counter dengan stok > 0
                     $transfer = MedicineTransferItems::join('batches', 'medicine_transfer_items.batches_id', '=', 'batches.id')
                         ->where('batches.medicine_id', $medicine->id)
                         ->where('batches.pharmacy_id', $webPharmacyId)
+                        ->where('medicine_transfer_items.status', 1)
+                        ->where(function ($q) {
+                            $q->whereNull('medicine_transfer_items.source_type')
+                              ->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang');
+                        })
                         ->where('medicine_transfer_items.qty', '>', 0)
                         ->orderBy('batches.expired_date', 'asc')
                         ->lockForUpdate()
@@ -502,68 +601,93 @@ class MobileSyncController extends Controller
                         ->first();
 
                     if (!$transfer) {
+                        // Jika tidak ada stok > 0, izinkan deduction ke batch yang ada
                         $transfer = MedicineTransferItems::join('batches', 'medicine_transfer_items.batches_id', '=', 'batches.id')
                             ->where('batches.medicine_id', $medicine->id)
                             ->where('batches.pharmacy_id', $webPharmacyId)
+                            ->where('medicine_transfer_items.status', 1)
+                            ->where(function ($q) {
+                                $q->whereNull('medicine_transfer_items.source_type')
+                                  ->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang');
+                            })
                             ->orderBy('batches.expired_date', 'desc')
                             ->lockForUpdate()
                             ->select('medicine_transfer_items.*')
                             ->first();
 
                         if (!$transfer) {
-                            throw new \Exception("Stok counter tidak ditemukan untuk obat: {$medicine->name}.");
+                            \Log::warning("Stok counter tidak ditemukan untuk obat: {$medicine->name} (ID: {$medicine->id}) di cabang {$webPharmacyId}. Penjualan ONLINE tetap dicatat.");
+                            break;
                         }
-                    }
 
-                    if ($transfer->qty >= $qty_bought) {
                         $transfer->qty -= $qty_bought;
                         $transfer->save();
+                        $lastBatchId = $transfer->batches_id;
                         $qty_bought = 0;
                     } else {
-                        $qty_bought -= $transfer->qty;
-                        $transfer->qty = 0;
-                        $transfer->save();
+                        $lastBatchId = $transfer->batches_id;
+                        if ($transfer->qty >= $qty_bought) {
+                            $transfer->qty -= $qty_bought;
+                            $transfer->save();
+                            $qty_bought = 0;
+                        } else {
+                            $qty_bought -= $transfer->qty;
+                            $transfer->qty = 0;
+                            $transfer->save();
+                        }
                     }
                 }
 
-                $medicine->stock -= $item['qty'];
+                // Potong stok master obat
+                $medicine->stock -= $qty;
                 $medicine->save();
 
-                // Items Log untuk LIPH
-                $prefixLog = "LOG-" . date('Ymd') . "-";
-                $lastLog = ItemsLog::where('code', 'like', $prefixLog . '%')->orderBy('id', 'desc')->first();
-                $numLog = $lastLog ? intval(substr($lastLog->code, -4)) + 1 : 1;
-                $logCode = $prefixLog . str_pad($numLog, 4, '0', STR_PAD_LEFT);
+                // Items Log untuk audit trail & LIPH
+                $currentLogNum++;
+                $logCode = $prefixLog . str_pad($currentLogNum, 4, '0', STR_PAD_LEFT);
 
                 ItemsLog::create([
                     'transaction_code' => $code,
-                    'code' => $logCode,
-                    'type' => $request->transaction_type, // "ONLINE"
-                    'medicine_id' => $medicine->id,
-                    'qty' => $item['qty'],
-                    'qty_before' => $qty_before,
-                    'qty_after' => $medicine->stock,
-                    'total' => $totalPrice,
-                    'date' => now()->format('Y-m-d H:i:s'),
-                    'status' => 1,
-                    'batches_id' => $transfer->batches_id ?? null,
-                    'user_id' => 1,
+                    'code'             => $logCode,
+                    'type'             => 'ONLINE', // Tipe log ONLINE
+                    'medicine_id'      => $medicine->id,
+                    'qty'              => $qty,
+                    'qty_before'       => $qty_before,
+                    'qty_after'        => $medicine->stock,
+                    'total'            => $totalPrice,
+                    'date'             => now()->format('Y-m-d H:i:s'),
+                    'status'           => 1,
+                    'batches_id'       => $lastBatchId,
+                    'user_id'          => $userId,
                 ]);
             }
 
             DB::commit();
 
             return response()->json([
-                'success' => true,
-                'message' => 'Transaksi berhasil disimpan dan stok terpotong',
+                'success'          => true,
+                'message'          => 'Transaksi ONLINE berhasil dicatat dan stok cabang telah terpotong',
                 'transaction_code' => $code,
-            ]);
+                'data'             => [
+                    'transaction_id'   => $medTransaction->id,
+                    'transaction_code' => $code,
+                    'transaction_type' => 'ONLINE',
+                    'pharmacy_id'      => $webPharmacyId,
+                    'pharmacy_name'    => $pharmacy?->name,
+                    'customer_name'    => $customerName,
+                    'customer_phone'   => $customerPhone,
+                    'total'            => $finalTotal,
+                    'payment_method'   => strtoupper($paymentMethod),
+                    'items_count'      => count($preparedItems),
+                    'created_at'       => $medTransaction->created_at->format('Y-m-d H:i:s'),
+                ]
+            ], 201);
 
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => 'Gagal mencatat transaksi: ' . $e->getMessage()
             ], 500);
         }
     }
