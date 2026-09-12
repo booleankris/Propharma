@@ -302,6 +302,10 @@ Route::middleware(['auth', 'role:Kasir|Gudang PMI|HO|administrator|manager|Onlin
 
     // Stock Opname
     Route::get('/stockopname', [SuppliesController::class, 'stockOpname'])->name('supplies.stockOpname');
+    Route::get('/stockopname/template', [SuppliesController::class, 'downloadStockOpnameTemplate'])->name('supplies.stockOpname.template');
+    Route::post('/stockopname/analyze-import', [SuppliesController::class, 'analyzeStockOpnameImport'])->name('supplies.stockOpname.analyze');
+    Route::post('/stockopname/execute-import', [SuppliesController::class, 'executeStockOpnameImport'])->name('supplies.stockOpname.execute');
+    Route::get('/stockopname/import-status/{id}', [SuppliesController::class, 'stockOpnameImportStatus'])->name('supplies.stockOpname.status');
     Route::get('/getmedicines', [SuppliesController::class, 'getMedicines'])->name('supplies.medicines');
     Route::get('/medicineStockLog', [SuppliesController::class, 'medicineStockLog'])->name('supplies.medicineStockLog');
     Route::post('/saveopname', [SuppliesController::class, 'Opname'])->name('supplies.opname');

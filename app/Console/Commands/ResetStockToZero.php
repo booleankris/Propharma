@@ -2,15 +2,15 @@
 
 namespace App\Console\Commands;
 
-use Illuminate\Console\Command;
-use App\Models\Pharmacies;
 use App\Models\Batches;
+use App\Models\ItemsLog;
 use App\Models\Medicines;
 use App\Models\MedicineTransferItems;
-use App\Models\ItemsLog;
+use App\Models\Pharmacies;
 use App\Models\StockOpname;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Console\Command;
 use Illuminate\Support\Facades\App;
+use Illuminate\Support\Facades\DB;
 
 class ResetStockToZero extends Command
 {
@@ -46,15 +46,15 @@ class ResetStockToZero extends Command
 
         // Validasi parameter
         if (!$isAllPharmacies && empty($pharmacyOption)) {
-            $this->error("Tentukan cabang yang ingin di-reset menggunakan opsi --pharmacy=[ID] atau --all-pharmacies.");
+            $this->error('Tentukan cabang yang ingin di-reset menggunakan opsi --pharmacy=[ID] atau --all-pharmacies.');
             $this->newLine();
-            $this->line("Daftar Cabang yang Tersedia:");
+            $this->line('Daftar Cabang yang Tersedia:');
             $list = Pharmacies::all(['id', 'name']);
             foreach ($list as $p) {
                 $this->line("  [ID: {$p->id}] {$p->name}");
             }
             $this->newLine();
-            $this->info("Contoh: php artisan stock:reset-zero --pharmacy=1");
+            $this->info('Contoh: php artisan stock:reset-zero --pharmacy=1');
             return 1;
         }
 
@@ -70,24 +70,24 @@ class ResetStockToZero extends Command
             $targetPharmacies = collect([$pharmacy]);
         }
 
-        $this->info("===============================================================");
-        $this->info("           RESET STOK PERSIAPAN GO-LIVE (PROPHARMA)           ");
-        $this->info("===============================================================");
+        $this->info('===============================================================');
+        $this->info('          RESET STOK PERSIAPAN GO-LIVE (APOTEK SAHABAT)        ');
+        $this->info('===============================================================');
         if ($isDryRun) {
-            $this->warn("MODE DRY-RUN AKTIF: Simulasi saja, tidak ada data yang disimpan.");
+            $this->warn('MODE DRY-RUN AKTIF: Simulasi saja, tidak ada data yang disimpan.');
         }
-        $this->line("Target Cabang : " . $targetPharmacies->pluck('name')->implode(', '));
-        $this->line("Hapus Log SO  : " . ($clearLogs ? "YA (ItemsLog & StockOpname dibersihkan)" : "TIDAK (Hanya stok diset 0)"));
+        $this->line('Target Cabang : ' . $targetPharmacies->pluck('name')->implode(', '));
+        $this->line('Hapus Log SO  : ' . ($clearLogs ? 'YA (ItemsLog & StockOpname dibersihkan)' : 'TIDAK (Hanya stok diset 0)'));
         $this->newLine();
 
         // Konfirmasi jika bukan dry-run
         if (!$isDryRun && !$force) {
             $msg = $isAllPharmacies
-                ? "PERINGATAN: Anda akan me-reset stok SEMUA CABANG menjadi 0! Lanjutkan?"
+                ? 'PERINGATAN: Anda akan me-reset stok SEMUA CABANG menjadi 0! Lanjutkan?'
                 : "PERINGATAN: Anda akan me-reset stok untuk cabang '" . $targetPharmacies->first()->name . "' menjadi 0! Lanjutkan?";
 
             if (!$this->confirm($msg, false)) {
-                $this->info("Operasi dibatalkan.");
+                $this->info('Operasi dibatalkan.');
                 return 0;
             }
         }
@@ -106,7 +106,7 @@ class ResetStockToZero extends Command
             $transfersWithStock = MedicineTransferItems::whereHas('batches', function ($q) use ($pharmacyId) {
                 $q->where('pharmacy_id', $pharmacyId);
             })
-            ->where('qty', '!=', 0);
+                ->where('qty', '!=', 0);
             $countTransfers = $transfersWithStock->count();
 
             $countLogs = 0;
@@ -129,8 +129,8 @@ class ResetStockToZero extends Command
                     MedicineTransferItems::whereHas('batches', function ($q) use ($pharmacyId) {
                         $q->where('pharmacy_id', $pharmacyId);
                     })
-                    ->where('qty', '!=', 0)
-                    ->update(['qty' => 0]);
+                        ->where('qty', '!=', 0)
+                        ->update(['qty' => 0]);
 
                     if ($clearLogs) {
                         ItemsLog::whereHas('batches', fn($q) => $q->where('pharmacy_id', $pharmacyId))->delete();
@@ -150,17 +150,17 @@ class ResetStockToZero extends Command
                 'name' => $pharmacy->name,
                 'batches_reset' => $countBatches,
                 'transfers_reset' => $countTransfers,
-                'logs_cleared' => $clearLogs ? "{$countLogs} log, {$countOpnames} SO" : "Dilewati",
+                'logs_cleared' => $clearLogs ? "{$countLogs} log, {$countOpnames} SO" : 'Dilewati',
                 'status' => $isDryRun ? 'Simulasi Berhasil' : 'Reset Selesai (0)',
             ];
         }
 
         // Sinkronisasi total master obat jika tidak dalam mode dry-run
         if (!$isDryRun) {
-            $this->info("Menyinkronkan total real-time stock pada master obat (medicines)...");
+            $this->info('Menyinkronkan total real-time stock pada master obat (medicines)...');
             // Hitung ulang stok master obat
             $warehouseId = function_exists('getWarehousePharmacyId') ? getWarehousePharmacyId() : 9;
-            
+
             // Sinkronisasi master medicine stock:
             // Stock dihitung dari storage gudang + counter stock cabang 1
             $medicines = Medicines::all();
@@ -173,14 +173,15 @@ class ResetStockToZero extends Command
                     ->sum('stock');
 
                 $counterStock = (int) MedicineTransferItems::whereHas('batches', function ($b) use ($med) {
-                    $b->where('medicine_id', $med->id)
-                      ->where('pharmacy_id', 1);
+                    $b
+                        ->where('medicine_id', $med->id)
+                        ->where('pharmacy_id', 1);
                 })
-                ->where('status', 1)
-                ->where(function ($q) {
-                    $q->whereNull('source_type')->orWhere('source_type', '!=', 'retur_gudang');
-                })
-                ->sum('qty');
+                    ->where('status', 1)
+                    ->where(function ($q) {
+                        $q->whereNull('source_type')->orWhere('source_type', '!=', 'retur_gudang');
+                    })
+                    ->sum('qty');
 
                 $med->update(['stock' => $storageStock + $counterStock]);
                 $bar->advance();
@@ -197,10 +198,10 @@ class ResetStockToZero extends Command
 
         $this->newLine();
         if ($isDryRun) {
-            $this->info("Simulasi selesai. Jalankan tanpa opsi --dry-run untuk benar-benar menerapkan reset.");
+            $this->info('Simulasi selesai. Jalankan tanpa opsi --dry-run untuk benar-benar menerapkan reset.');
         } else {
-            $this->info("SUKSES: Stok cabang yang dipilih telah berhasil di-nol-kan!");
-            $this->line("Sekarang cabang siap untuk dilakukan Stock Opname Saldo Awal (cut-off) menggunakan nomor batch dan tanggal expired yang asli.");
+            $this->info('SUKSES: Stok cabang yang dipilih telah berhasil di-nol-kan!');
+            $this->line('Sekarang cabang siap untuk dilakukan Stock Opname Saldo Awal (cut-off) menggunakan nomor batch dan tanggal expired yang asli.');
         }
 
         return 0;

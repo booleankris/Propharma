@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Exports\Stocks\PrintStockOpnameExport;
 use App\Exports\Stocks\StockDataExport;
+use App\Exports\Stocks\StockOpnameTemplateExport;
 use App\Jobs\ProcessStockDataExport;
+use App\Jobs\ProcessStockOpnameImport;
 use App\Models\Batches;
 use App\Models\ExportJob;
 use App\Models\ItemsLog;
@@ -14,6 +16,7 @@ use App\Models\MedicineTransfers;
 use App\Models\MedicineTransferItems;
 use App\Models\ReceivingItems;
 use App\Models\StockOpname;
+use App\Services\StockOpnameImportService;
 use Carbon\Carbon;
 use DataTables;
 use Form;
@@ -880,232 +883,225 @@ class SuppliesController extends Controller
                 ->make(true);
         }
     }
+
     public function medicineStockLog(Request $request)
     {
         if ($request->ajax()) {
             $activePharmacyId = getActivePharmacyId();
-            $items = ItemsLog::with(['medicines', 'batches'])->whereHas('batches', function ($batch) use ($activePharmacyId) {
-                if (isWarehousePharmacy($activePharmacyId) || canAccessWarehouseStock($activePharmacyId) || in_array($activePharmacyId, [1, 6, 9])) {
-                    $batch->whereIn('pharmacy_id', [getWarehousePharmacyId(), 1]);
-                } else {
-                    $batch->where('pharmacy_id', $activePharmacyId);
-                }
-            });
-            if ($request->filled('searchMedicine')) {
-                $items->whereHas('medicines', function ($q) use ($request) {
-                    $q->where('name', 'like', "%{$request->searchMedicine}%")
-                        ->orWhere('code', 'like', "%{$request->searchMedicine}%");
+
+            $baseMedicineLogQuery = function () use ($activePharmacyId, $request) {
+                $warehouseId = getWarehousePharmacyId();
+                $canSeeWarehouse = canAccessWarehouseStock($activePharmacyId);
+
+                $q = ItemsLog::whereHas('batches', function ($batch) use ($activePharmacyId, $warehouseId, $canSeeWarehouse) {
+                    if (isWarehousePharmacy($activePharmacyId)) {
+                        $batch->whereIn('pharmacy_id', [$warehouseId, 1]);
+                    } else {
+                        $batch->where(function ($sub) use ($activePharmacyId, $warehouseId, $canSeeWarehouse) {
+                            $sub->where('pharmacy_id', $activePharmacyId);
+                            if ($canSeeWarehouse) {
+                                $sub->orWhere('pharmacy_id', $warehouseId)
+                                    ->orWhere('pharmacy_id', 1);
+                            }
+                        });
+                    }
                 });
+
+                if ($request->filled('searchMedicine')) {
+                    $q->whereHas('medicines', function ($sub) use ($request) {
+                        $sub->where('name', 'like', "%{$request->searchMedicine}%")
+                            ->orWhere('code', 'like', "%{$request->searchMedicine}%");
+                    });
+                }
+
+                return $q;
+            };
+
+            // Calculate Period Summaries (unfiltered by quick type chip)
+            $periodQuery = $baseMedicineLogQuery();
+            if ($request->filled('start_date')) {
+                $periodQuery->whereDate('date', '>=', $request->start_date);
             }
+            if ($request->filled('end_date')) {
+                $periodQuery->whereDate('date', '<=', $request->end_date);
+            }
+
+            $total_sales = (clone $periodQuery)->where('status', 1)->sum('qty');
+            $total_orders = (clone $periodQuery)->where('status', 2)->sum('qty');
+
+            // Calculate Saldo Awal for period
+            if ($request->filled('start_date')) {
+                $lastLogBefore = $baseMedicineLogQuery()
+                    ->whereDate('date', '<', $request->start_date)
+                    ->orderBy('date', 'desc')
+                    ->orderBy('id', 'desc')
+                    ->first();
+
+                if ($lastLogBefore) {
+                    $qty_awal = (int) $lastLogBefore->qty_after;
+                } else {
+                    $firstLogInPeriod = (clone $periodQuery)->orderBy('date', 'asc')->orderBy('id', 'asc')->first();
+                    $qty_awal = $firstLogInPeriod ? (int) $firstLogInPeriod->qty_before : 0;
+                }
+            } else {
+                $firstLog = $baseMedicineLogQuery()->orderBy('date', 'asc')->orderBy('id', 'asc')->first();
+                $qty_awal = $firstLog ? (int) $firstLog->qty_before : 0;
+            }
+
+            // Main items query for DataTable with eager loaded relationships
+            $items = $baseMedicineLogQuery()->with(['medicines', 'batches', 'users']);
 
             if ($request->filled('start_date')) {
                 $items->whereDate('date', '>=', $request->start_date);
             }
-
             if ($request->filled('end_date')) {
                 $items->whereDate('date', '<=', $request->end_date);
             }
-            $total_sales = (clone $items)->where('status', 1)->sum('qty');
-            $total_orders = (clone $items)->where('status', 2)->sum('qty');
-            $stock_start = (clone $items)->orderBy('date', 'asc')->first();
+
+            // Quick type filter chips
+            if ($request->filled('filter_type')) {
+                $ft = strtolower($request->filter_type);
+                if ($ft === 'so') {
+                    $items->where(function ($q) {
+                        $q->where('status', 5)->orWhere('type', 'SO');
+                    });
+                } elseif ($ft === 'sales') {
+                    $items->where('status', 1);
+                } elseif ($ft === 'purchase') {
+                    $items->where('status', 2);
+                } elseif ($ft === 'mutation') {
+                    $items->where('status', 7);
+                } elseif ($ft === 'retur') {
+                    $items->whereIn('status', [3, 4]);
+                }
+            }
+
+            $items->orderBy('date', 'desc')->orderBy('id', 'desc');
+
             return DataTables::eloquent($items)
                 ->addIndexColumn()
                 ->addColumn('date', function ($row) {
-                    return $row->date->format('d/m/Y');
+                    $d = $row->date ? \Carbon\Carbon::parse($row->date) : null;
+                    if (!$d) return '<span class="text-slate-400 text-xs">—</span>';
+                    $dateStr = $d->format('d/m/Y');
+                    $timeStr = $d->format('H:i');
+                    return '<div class="whitespace-nowrap leading-tight">
+                        <span class="font-semibold text-slate-700 text-xs">' . $dateStr . '</span>' .
+                        ($timeStr && $timeStr !== '00:00' ? '<span class="text-[10px] text-slate-400 block">' . $timeStr . '</span>' : '') .
+                    '</div>';
                 })
                 ->addColumn('transaction_code', function ($row) {
                     if (!$row->transaction_code)
-                        return '-';
+                        return '<span class="text-slate-400 text-xs">—</span>';
                     $code = e($row->transaction_code);
                     return '
-                    <div class="flex items-center gap-1.5">
-                        <span style="font-size:10px" class="font-nunito-bold text-slate-700 bg-slate-50 px-2 py-0.5 rounded border border-slate-200">' . $code . '</span>
-                        <button type="button" onclick="navigator.clipboard.writeText(\'' . $code . '\'); iziToast.success({title: \'Tersalin\', message: \'Kode berhasil disalin\', position: \'topRight\'})" class="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Salin kode">
+                    <div class="inline-flex items-center gap-1.5 whitespace-nowrap">
+                        <span class="text-[11px] font-mono font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">' . $code . '</span>
+                        <button type="button" onclick="navigator.clipboard.writeText(\'' . $code . '\'); iziToast.success({title: \'Tersalin\', message: \'Kode ' . $code . ' berhasil disalin\', position: \'topRight\'})" class="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors" title="Salin kode">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
                         </button>
                     </div>';
                 })
-                ->addColumn('code', function ($row) {
-                    return $row->code;
-                })
-                ->addColumn('type', function ($row) {
-                    return $row->type;
-                })
-                ->addColumn('name', function ($row) {
-                    return $row->medicines->name;
-                })
-                ->addColumn('stock', function ($row) {
-                    if ($row->status == 1) {
-                        return "
-                        <div style='color:#16a34a;font-weight:bold;'>
-                            <span>-</span>
-                            <b'>" . $row->qty . "</b>
-                        </div>";
-                    } else if ($row->status == 2) {
-                        return "
-                        <div style='color:#4173d3;font-weight:bold;'>
-                            <span>+</span>
-                            <b'>" . $row->qty . "</b>
-                        </div>";
-                    } else if ($row->status == 3) {
-                        return " 
-                    <div style='color:#d34163;font-weight:bold;'>
-                        <span>+</span>
-                        <b'>" . $row->qty . "</b>
-                    </div>";
-                    } else if ($row->status == 4) {
-                        return "   <div style='color:#d34163;font-weight:bold;'>
-                        <span>-</span>
-                        <b'>" . $row->qty . "</b>
-                    </div>";
-                    } else if ($row->status == 5) {
-                        if ($row->qty < 0) {
-                            return "<div style='color:#d34163;font-weight:bold;'>
-                                        <span></span>
-                                        <b'>" . $row->qty . "</b>
-                                    </div>";
-                        } else if ($row->qty > 0) {
-                            return "<div style='color:#d34163;font-weight:bold;'>
-                                        <span>+</span>
-                                        <b'>" . $row->qty . "</b>
-                                    </div>";
-                        } else {
-                            return "<div style='color:#d34163;font-weight:bold;'>
-                                        <span></span>
-                                        <b'>" . $row->qty . "</b>
-                                    </div>";
-                        }
-                    } else if ($row->status == 7) {
-                        return "   <div style='color:#d34163;font-weight:bold;'>
-                        <span>-</span>
-                        <b'>" . $row->qty . "</b>
-                    </div>";
+                ->addColumn('type_badge', function ($row) {
+                    switch ((int) $row->status) {
+                        case 1:
+                            return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap">Penjualan</span>';
+                        case 2:
+                            return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 whitespace-nowrap">Pembelian</span>';
+                        case 3:
+                            return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 whitespace-nowrap">Retur Jual</span>';
+                        case 4:
+                            return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-orange-50 text-orange-700 border border-orange-200 whitespace-nowrap">Retur Beli</span>';
+                        case 5:
+                            return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200 whitespace-nowrap">Stock Opname</span>';
+                        case 6:
+                            return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200 whitespace-nowrap">Penyesuaian</span>';
+                        case 7:
+                            return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-teal-50 text-teal-700 border border-teal-200 whitespace-nowrap">Mutasi Stok</span>';
+                        default:
+                            $lbl = e($row->type ?: 'Lainnya');
+                            return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200 whitespace-nowrap">' . $lbl . '</span>';
                     }
                 })
+                ->addColumn('batch_info', function ($row) {
+                    $batch = $row->batches;
+                    if (!$batch) return '<span class="text-slate-400 text-xs">—</span>';
+                    $batchName = e($batch->batch_1 ?: '-');
+                    $ed = $batch->expired_date ? \Carbon\Carbon::parse($batch->expired_date)->format('d/m/Y') : '-';
+                    return '<div class="flex flex-col whitespace-nowrap leading-tight">
+                        <span class="font-bold text-slate-700 text-xs">' . $batchName . '</span>
+                        <span class="text-[10px] text-slate-400">ED: ' . $ed . '</span>
+                    </div>';
+                })
                 ->addColumn('qty_before', function ($row) {
-                    return "
-                        <div style='color:#000000;font-weight:bold;'>
-                            <span></span>
-                            <b'>" . $row->qty_before . "</b>
-                        </div>";
+                    return '<span class="font-semibold text-slate-600 text-xs">' . number_format($row->qty_before) . '</span>';
+                })
+                ->addColumn('stock', function ($row) {
+                    $status = (int) $row->status;
+                    $delta = 0;
+                    if ($status === 1) {
+                        // Penjualan -> outflow
+                        $delta = - abs($row->qty);
+                    } elseif ($status === 2) {
+                        // Pembelian -> inflow
+                        $delta = abs($row->qty);
+                    } elseif ($status === 3) {
+                        // Retur Jual -> inflow
+                        $delta = abs($row->qty);
+                    } elseif ($status === 4) {
+                        // Retur Beli -> outflow
+                        $delta = - abs($row->qty);
+                    } elseif ($status === 5) {
+                        // Stock Opname -> difference between after and before
+                        $delta = $row->qty_after - $row->qty_before;
+                        if ($delta == 0 && $row->total != 0) {
+                            $delta = (int) $row->total;
+                        }
+                    } else {
+                        $delta = $row->qty_after - $row->qty_before;
+                    }
+
+                    if ($delta > 0) {
+                        return '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 whitespace-nowrap">+ ' . number_format($delta) . '</span>';
+                    } elseif ($delta < 0) {
+                        return '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 whitespace-nowrap">- ' . number_format(abs($delta)) . '</span>';
+                    } else {
+                        return '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-slate-500 bg-slate-50 border border-slate-200 whitespace-nowrap">0</span>';
+                    }
                 })
                 ->addColumn('qty_after', function ($row) {
-                    return "
-                    <div style='color:#000000;font-weight:bold;'>
-                        <span></span>
-                        <b'>" . $row->qty_after . "</b>
-                    </div>";
+                    return '<span class="font-bold text-slate-800 text-xs">' . number_format($row->qty_after) . '</span>';
                 })
-                ->addColumn('total_sales', function ($row) use ($total_sales) {
-                    return $total_sales;
+                ->addColumn('user_name', function ($row) {
+                    $name = $row->users?->name;
+                    if (!$name) return '<span class="text-slate-400 text-xs">—</span>';
+                    $safeName = e($name);
+                    return '<span class="text-xs font-medium text-slate-600 truncate max-w-[110px] block" title="' . $safeName . '">' . $safeName . '</span>';
                 })
-                ->addColumn('total_orders', function ($row) use ($total_orders) {
-                    return $total_orders;
-                })
-                ->addColumn('stock_start', function ($row) use ($stock_start) {
-                    return $stock_start;
-                })
-                ->addColumn('qty_after_number', function ($row) {
-                    return $row->qty_after;
-                })
+                // Legacy aliases for backward compatibility
+                ->addColumn('code', fn($row) => $row->code)
+                ->addColumn('type', fn($row) => $row->type)
+                ->addColumn('name', fn($row) => $row->medicines?->name ?? '-')
                 ->addColumn('supply', function ($row) {
                     static $stockCache = [];
                     $medId = $row->medicine_id;
                     if (!$medId) return '-';
-
                     if (!isset($stockCache[$medId])) {
                         $stockCache[$medId] = $this->calculateRealtimeStock($medId, getActivePharmacyId(), 'total');
                     }
-
                     return $stockCache[$medId];
                 })
-                ->addColumn('status', function ($row) {
-                    if ($row->status == 1) {
-                        return "<div style='
-                        text-align:center;
-                        font-weight:bold;
-                        text-transform:uppercase;
-                        background-color:rgba(34,197,94,0.2);
-                        color:#16a34a;
-                        padding: 10px 4px;
-                        font-size:9px;
-                        font-family: Poppins;
-                        border-radius:25px;'>
-                        Penjualan
-                        </div";
-                    } else if ($row->status == 2) {
-                        return "<div style='text-align: center;
-                        font-weight: bold;
-                        text-transform: uppercase;
-                        background-color: #d6e8ff94;
-                        color: #7f8eff;
-                        padding: 6px 4px;
-                        width:100px;
-                        font-size: 9px;
-                        font-family: Poppins;
-                        border-radius: 25px;'>
-                        Pembelian
-                        </div>";
-                    } else if ($row->status == 3) {
-                        return "<div style='
-                        text-align: center;
-                        font-weight: bold;
-                        text-transform: uppercase;
-                        background-color: rgb(255 0 0 / 17%);
-                        color: #a31616;
-                        padding: 6px 4px;
-                        width:100px;
-                        font-size: 9px;
-                        font-family: Poppins;
-                        border-radius: 25px;'>
-                        Retur Jual
-                        </div";
-                    } else if ($row->status == 4) {
-                        return "<div style='
-                        text-align: center;
-                        font-weight: bold;
-                        text-transform: uppercase;
-                        background-color: rgb(255 177 0 / 31%);
-                        color: #c17800;
-                        padding: 6px 4px;
-                        width:100px;
-                        font-size: 9px;
-                        font-family: Poppins;
-                        border-radius: 25px;'>
-                        Retur Beli
-                        </div";
-                    } else if ($row->status == 5) {
-                        return "<div style='
-                        text-align: center;
-                        font-weight: bold;
-                        text-transform: uppercase;
-                        background-color: #fff035;
-                        color: #7a7817;
-                        padding: 7px 6px;
-                        font-size: 9px;
-                        font-family: Poppins;
-                        border-radius: 25px;'>
-                        Stock Opname
-                        </div";
-                    } else if ($row->status == 7) {
-                        return "<div style='
-                        text-align: center;
-                        font-weight: bold;
-                        text-transform: uppercase;
-                        background-color: #aeffeaad;
-                        color: #238787;
-                        padding: 7px 6px;
-                        font-size: 9px;
-                        font-family: Poppins;
-                        border-radius: 25px;'>
-                        Mutasi Stok
-                        </div";
-                    }
-                })
-                ->rawColumns(['status', 'stock', 'qty_before', 'qty_after', 'transaction_code'])
+                ->addColumn('status', fn($row) => $row->status)
+                ->rawColumns(['date', 'transaction_code', 'type_badge', 'batch_info', 'qty_before', 'stock', 'qty_after', 'user_name'])
+                ->with([
+                    'qty_awal' => (int) $qty_awal,
+                    'qty_beli' => (int) $total_orders,
+                    'qty_jual' => (int) $total_sales,
+                ])
                 ->make(true);
         }
     }
+
     public function getBatchesByMedicine(Request $request)
     {
         $pharmacyId = getActivePharmacyId();
@@ -1215,6 +1211,104 @@ class SuppliesController extends Controller
     {
         return view('supply.stockOpname');
     }
+
+    public function downloadStockOpnameTemplate(Request $request)
+    {
+        $pharmacyId = getActivePharmacyId();
+        $mode = $request->input('mode', 'pelayanan');
+        $includeMedicines = $request->boolean('include_medicines', true);
+        $filename = 'Format_Stock_Opname_' . ($mode === 'gudang' ? 'Gudang' : 'Pelayanan') . '_' . date('Ymd_His') . '.xlsx';
+        return Excel::download(new StockOpnameTemplateExport($pharmacyId, $mode, $includeMedicines), $filename);
+    }
+
+    public function analyzeStockOpnameImport(Request $request, StockOpnameImportService $importService)
+    {
+        $request->validate([
+            'file'        => 'required|file|mimes:xlsx,xls,csv|max:20480',
+            'target_mode' => 'nullable|in:pelayanan,gudang',
+        ]);
+
+        $pharmacyId = getActivePharmacyId();
+        $canSeeWarehouse = canAccessWarehouseStock($pharmacyId);
+        $targetMode = $request->input('target_mode', 'pelayanan');
+        if (!$canSeeWarehouse && $targetMode === 'gudang') {
+            $targetMode = 'pelayanan';
+        }
+
+        $file = $request->file('file');
+        $filePath = $file->getRealPath();
+
+        try {
+            $result = $importService->analyze($filePath, $pharmacyId, $targetMode);
+            return response()->json($result);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal membaca file Excel: ' . $e->getMessage(),
+            ], 422);
+        }
+    }
+
+    public function executeStockOpnameImport(Request $request, StockOpnameImportService $importService)
+    {
+        $request->validate([
+            'token'       => 'required|string',
+            'target_mode' => 'nullable|in:pelayanan,gudang',
+            'is_async'    => 'nullable|boolean',
+        ]);
+
+        $pharmacyId = getActivePharmacyId();
+        $canSeeWarehouse = canAccessWarehouseStock($pharmacyId);
+        $targetMode = $request->input('target_mode', 'pelayanan');
+        if (!$canSeeWarehouse && $targetMode === 'gudang') {
+            $targetMode = 'pelayanan';
+        }
+
+        $token = $request->input('token');
+        $isAsync = $request->boolean('is_async', false);
+        $userId = auth()->id();
+
+        if ($isAsync) {
+            $job = ExportJob::create([
+                'type'      => 'import_stock_opname',
+                'status'    => ExportJob::STATUS_PENDING,
+                'progress'  => 0,
+                'file_path' => null,
+            ]);
+
+            ProcessStockOpnameImport::dispatch($job->id, $token, $pharmacyId, $targetMode, $userId);
+
+            return response()->json([
+                'success'   => true,
+                'is_async'  => true,
+                'job_id'    => $job->id,
+                'message'   => 'Impor sedang diproses di latar belakang.',
+            ]);
+        }
+
+        try {
+            $result = $importService->execute($token, $pharmacyId, $targetMode, $userId);
+            return response()->json($result);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal memproses impor: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function stockOpnameImportStatus($id)
+    {
+        $job = ExportJob::findOrFail($id);
+        return response()->json([
+            'id'        => $job->id,
+            'status'    => $job->status,
+            'progress'  => (int) $job->progress,
+            'finished'  => $job->isFinished(),
+            'failed'    => $job->status === ExportJob::STATUS_FAILED,
+        ]);
+    }
+
     public function printStockOpname(Request $request)
     {
         $now = Carbon::now()->format('dmY');
