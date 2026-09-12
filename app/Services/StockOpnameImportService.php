@@ -369,6 +369,30 @@ class StockOpnameImportService
         $processedCount = 0;
         $touchedMedicineIds = [];
 
+        // Preload sequence numbers once before loop to avoid 15,000+ sequential LIKE queries
+        $now = Carbon::now();
+        $year = $now->format('y');
+        $month = $now->format('m');
+
+        $opnamePrefix = "SO-{$year}{$month}";
+        $lastOpnameCode = ItemsLog::where('code', 'like', "{$opnamePrefix}%")
+            ->where('status', 5)
+            ->orderBy('code', 'desc')
+            ->value('code');
+        $opnameSeq = $lastOpnameCode ? ((int) substr($lastOpnameCode, -4)) : 0;
+
+        $itemsLogPrefix = "{$year}{$month}LOG-";
+        $lastLogCode = ItemsLog::where('code', 'like', "{$itemsLogPrefix}%")
+            ->orderBy('code', 'desc')
+            ->value('code');
+        $logSeq = $lastLogCode ? ((int) substr($lastLogCode, -4)) : 0;
+
+        $transfersPrefix = "{$year}{$month}MUT";
+        $lastMutCode = MedicineTransfers::where('code', 'like', "{$transfersPrefix}%")
+            ->orderBy('code', 'desc')
+            ->value('code');
+        $mutSeq = $lastMutCode ? ((int) substr($lastMutCode, -4)) : 0;
+
         DB::beginTransaction();
 
         try {
@@ -402,6 +426,12 @@ class StockOpnameImportService
                     ]);
                 }
 
+                $opnameSeq++;
+                $opnameCode = $opnamePrefix . str_pad($opnameSeq, 4, '0', STR_PAD_LEFT);
+
+                $logSeq++;
+                $logCode = $itemsLogPrefix . str_pad($logSeq, 4, '0', STR_PAD_LEFT);
+
                 // 2. Process according to target_mode
                 if ($targetMode === 'gudang') {
                     if ($stockPhysic === 0) {
@@ -431,8 +461,8 @@ class StockOpnameImportService
 
                     ItemsLog::create([
                         'batches_id'       => $batch->id,
-                        'transaction_code' => $this->generateOpnameCode(),
-                        'code'             => $this->generateItemsLogCode(),
+                        'transaction_code' => $opnameCode,
+                        'code'             => $logCode,
                         'type'             => "SO",
                         'medicine_id'      => $medicineId,
                         'qty'              => abs($discrepancy),
@@ -482,8 +512,11 @@ class StockOpnameImportService
                             }
                         }
                     } else {
+                        $mutSeq++;
+                        $mutCode = $transfersPrefix . str_pad($mutSeq, 4, '0', STR_PAD_LEFT);
+
                         $transferHeader = MedicineTransfers::create([
-                            'code'    => $this->generateTransfersCode(),
+                            'code'    => $mutCode,
                             'status'  => 1,
                             'user_id' => $userId,
                         ]);
@@ -511,8 +544,8 @@ class StockOpnameImportService
 
                     ItemsLog::create([
                         'batches_id'       => $batch->id,
-                        'transaction_code' => $this->generateOpnameCode(),
-                        'code'             => $this->generateItemsLogCode(),
+                        'transaction_code' => $opnameCode,
+                        'code'             => $logCode,
                         'type'             => "SO",
                         'medicine_id'      => $medicineId,
                         'qty'              => abs($discrepancy),
@@ -534,12 +567,45 @@ class StockOpnameImportService
                 }
             }
 
-            // Sync master medicines stock
-            foreach (array_keys($touchedMedicineIds) as $mId) {
-                $med = Medicines::find($mId);
-                if ($med) {
-                    $totalReal = $this->calculateRealtimeStock($mId, $pharmacyId, 'total');
-                    $med->update(['stock' => $totalReal]);
+            // Sync master medicines stock in fast bulk
+            $medIds = array_keys($touchedMedicineIds);
+            if (!empty($medIds)) {
+                if ($exportJob) {
+                    $exportJob->setProgress(92);
+                }
+
+                $canSeeWarehouse = canAccessWarehouseStock($pharmacyId);
+                $storageStocks = $canSeeWarehouse
+                    ? Batches::whereIn('medicine_id', $medIds)
+                        ->where('pharmacy_id', $warehouseId)
+                        ->groupBy('medicine_id')
+                        ->selectRaw('medicine_id, SUM(stock) as total')
+                        ->pluck('total', 'medicine_id')
+                        ->all()
+                    : [];
+
+                $counterStocks = MedicineTransferItems::where('medicine_transfer_items.status', 1)
+                    ->where(function ($q) {
+                        $q->whereNull('medicine_transfer_items.source_type')
+                          ->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang');
+                    })
+                    ->join('batches', 'medicine_transfer_items.batches_id', '=', 'batches.id')
+                    ->whereIn('batches.medicine_id', $medIds)
+                    ->where('batches.pharmacy_id', $counterPharmacyId)
+                    ->groupBy('batches.medicine_id')
+                    ->selectRaw('batches.medicine_id, SUM(medicine_transfer_items.qty) as total')
+                    ->pluck('total', 'batches.medicine_id')
+                    ->all();
+
+                if ($exportJob) {
+                    $exportJob->setProgress(96);
+                }
+
+                foreach (array_chunk($medIds, 200) as $chunk) {
+                    foreach ($chunk as $mId) {
+                        $totalReal = (int) ($storageStocks[$mId] ?? 0) + (int) ($counterStocks[$mId] ?? 0);
+                        Medicines::where('id', $mId)->update(['stock' => $totalReal]);
+                    }
                 }
             }
 
