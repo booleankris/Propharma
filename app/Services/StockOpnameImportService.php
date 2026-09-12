@@ -404,8 +404,7 @@ class StockOpnameImportService
 
                 // 1. Resolve target batch
                 // Look for existing batch with matching medicine_id, pharmacy_id, and expired_date
-                $batch = Batches::lockForUpdate()
-                    ->where('medicine_id', $medicineId)
+                $batch = Batches::where('medicine_id', $medicineId)
                     ->where('pharmacy_id', $batchTargetPharmacyId)
                     ->whereDate('expired_date', $expiredDate)
                     ->orderBy('id', 'asc')
