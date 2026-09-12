@@ -438,6 +438,7 @@ class StockOpnameImportService
                         Batches::where('medicine_id', $medicineId)
                             ->where('pharmacy_id', $batchTargetPharmacyId)
                             ->where('id', '!=', $batch->id)
+                            ->where('stock', '!=', 0)
                             ->update(['stock' => 0]);
                     }
 
@@ -476,13 +477,17 @@ class StockOpnameImportService
                     // Pelayanan mode
                     if ($stockPhysic === 0) {
                         // Jika opname menyatakan stok = 0 (habis di etalase cabang), nolkan seluruh transfer items lama obat ini di cabang ini
-                        MedicineTransferItems::whereHas('batches', function ($b) use ($medicineId, $counterPharmacyId) {
-                                $b->where('medicine_id', $medicineId)
-                                  ->where('pharmacy_id', $counterPharmacyId);
-                            })
-                            ->where('status', 1)
-                            ->where('batches_id', '!=', $batch->id)
-                            ->update(['qty' => 0]);
+                        $otherBatchIds = Batches::where('medicine_id', $medicineId)
+                            ->where('pharmacy_id', $counterPharmacyId)
+                            ->where('id', '!=', $batch->id)
+                            ->pluck('id');
+
+                        if ($otherBatchIds->isNotEmpty()) {
+                            MedicineTransferItems::whereIn('batches_id', $otherBatchIds)
+                                ->where('status', 1)
+                                ->where('qty', '!=', 0)
+                                ->update(['qty' => 0]);
+                        }
                     }
 
                     $transfers = MedicineTransferItems::where('batches_id', $batch->id)
