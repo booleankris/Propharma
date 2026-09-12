@@ -49,6 +49,6 @@ Route::prefix('mobile')->group(function () {
     Route::post('/members/check', [MobileSyncController::class, 'checkMember']);
     Route::post('/members/checkout', [MobileSyncController::class, 'checkoutPoints']);
     Route::get('/members/{phone}/history', [MobileSyncController::class, 'memberHistory']);
-    Route::post('/transactions', [MobileSyncController::class, 'transactionCheckout']);
-    Route::post('/transactions/checkout', [MobileSyncController::class, 'transactionCheckout']);
+    Route::match(['GET', 'POST'], '/transactions', [MobileSyncController::class, 'transactionCheckout']);
+    Route::match(['GET', 'POST'], '/transactions/checkout', [MobileSyncController::class, 'transactionCheckout']);
 });

@@ -212,6 +212,15 @@ class MobileSyncController extends Controller
                 ->orderBy('expired_date', 'asc')
                 ->first();
 
+            $nearestExpired = null;
+            if (!empty($nearestBatch?->expired_date) && $nearestBatch->expired_date !== '0000-00-00') {
+                try {
+                    $nearestExpired = Carbon::parse($nearestBatch->expired_date)->format('Y-m-d');
+                } catch (\Throwable $e) {
+                    $nearestExpired = null;
+                }
+            }
+
             $stockData = [
                 'pharmacy_id'          => $branchStock['pharmacy_id'],
                 'pharmacy_name'        => $pharmacy?->name ?? 'Cabang ' . $branchStock['pharmacy_id'],
@@ -221,7 +230,7 @@ class MobileSyncController extends Controller
                 'minimal_stock'        => (int) ($medicine->minimal_stock ?? 0),
                 'is_low_stock'         => $branchStock['total_stock'] <= ($medicine->minimal_stock ?? 0),
                 'is_out_of_stock'      => $branchStock['total_stock'] <= 0,
-                'nearest_expired_date' => $nearestBatch?->expired_date ? Carbon::parse($nearestBatch->expired_date)->format('Y-m-d') : null,
+                'nearest_expired_date' => $nearestExpired,
             ];
         } else {
             $pharmacies = Pharmacies::where('status', 1)->get();
@@ -422,6 +431,34 @@ class MobileSyncController extends Controller
      */
     public function transactionCheckout(Request $request)
     {
+        // Jika diakses menggunakan browser / HTTP GET, tampilkan informasi format transaksi
+        if ($request->isMethod('get')) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Endpoint API Transaksi Mobile aktif. Gunakan HTTP method POST untuk mengirim transaksi penjualan.',
+                'endpoint' => url('/api/mobile/transactions'),
+                'method' => 'POST',
+                'documentation' => url('/docs'),
+                'example_payload' => [
+                    'pharmacy_id' => 5,
+                    'payment_method' => 'QRIS',
+                    'customer_name' => 'Budi Santoso',
+                    'customer_phone' => '081234567890',
+                    'discount' => 0,
+                    'total_transaction' => 30000,
+                    'notes' => 'Order Mobile App #1029',
+                    'items' => [
+                        [
+                            'code' => '002700089',
+                            'qty' => 2,
+                            'price' => 15000,
+                            'discount' => 0
+                        ]
+                    ]
+                ]
+            ]);
+        }
+
         $validator = Validator::make($request->all(), [
             'pharmacy_id'        => 'required|integer',
             'items'              => 'required|array|min:1',
