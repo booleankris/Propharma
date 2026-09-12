@@ -11,6 +11,7 @@ use App\Models\Batches;
 use App\Models\MedicineTransfers;
 use App\Models\MedicineTransferItems;
 use App\Models\Pharmacies;
+use App\Services\MedicineImportService;
 use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
 
@@ -403,5 +404,30 @@ class MedicineController extends Controller
             ->get();
 
         return response()->json(['creditors' => $creditors]);
+    }
+
+    /**
+     * Import medicines master from Excel file.
+     */
+    public function import(Request $request, MedicineImportService $service)
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:xlsx,xls,csv|max:102400',
+        ], [
+            'file.required' => 'File Excel wajib dipilih.',
+            'file.mimes'    => 'Format file harus berupa .xlsx, .xls, atau .csv.',
+            'file.max'      => 'Ukuran file melebihi batas maksimal (100MB).',
+        ]);
+
+        $file = $request->file('file');
+        $filePath = $file->getRealPath();
+
+        $result = $service->import($filePath);
+
+        if (!$result['success']) {
+            return response()->json($result, 422);
+        }
+
+        return response()->json($result);
     }
 }

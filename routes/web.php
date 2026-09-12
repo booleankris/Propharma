@@ -241,6 +241,7 @@ Route::middleware(['auth', 'role:Kasir|Gudang PMI|HO|administrator|manager|Onlin
         Route::prefix('medicines')->name('medicines.')->group(function () {
             Route::get('/', [MedicineController::class, 'index'])->name('index');
             Route::post('/', [MedicineController::class, 'store'])->name('store');
+            Route::post('/import', [MedicineController::class, 'import'])->name('import');
             Route::put('/{id}', [MedicineController::class, 'update'])->name('update');
             Route::delete('/{id}', [MedicineController::class, 'destroy'])->name('destroy');
             Route::post('/{id}/restore', [MedicineController::class, 'restore'])->name('restore');

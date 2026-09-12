@@ -144,6 +144,14 @@
                             <h2 class="text-2xl font-bold text-gray-800">Data Obat</h2>
                         </div>
                         <div class="flex items-center gap-2">
+                            <button type="button" id="btnOpenImport"
+                                class="inline-flex items-center px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shadow-sm transition gap-1.5 cursor-pointer">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                                </svg>
+                                <span>Import Excel</span>
+                            </button>
                             <label for="statusFilter" class="text-xs font-semibold text-gray-600">Status:</label>
                             <select id="statusFilter"
                                 class="text-xs font-medium bg-gray-50 border border-gray-300 rounded-lg px-2.5 py-1.5 focus:ring-blue-500 focus:border-blue-500 text-gray-700 cursor-pointer shadow-sm">
@@ -485,6 +493,101 @@
             </div>
         </div>
     </section>
+
+    {{-- ─────────────────── MODAL IMPORT MASTER OBAT ─────────────────── --}}
+    <div id="modalImportMedicine" class="fixed inset-0 hidden overflow-y-auto" style="z-index: 99999 !important;" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 transition-opacity bg-gray-900 bg-opacity-60 backdrop-blur-sm" style="z-index: 99998 !important;" id="backdropImport"></div>
+
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+            <div class="relative inline-block px-6 pt-6 pb-6 overflow-hidden text-left align-bottom transition-all transform bg-white rounded-2xl shadow-2xl sm:my-8 sm:align-middle sm:max-w-lg sm:w-full border border-gray-100" style="z-index: 99999 !important;">
+                <div class="flex items-center justify-between pb-4 border-b border-gray-100">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="text-base font-bold text-gray-800" id="modal-title">Import Master Obat dari Excel</h3>
+                            <p class="text-xs text-gray-500">Mendukung format .xlsx, .xls, .csv (hingga 100MB)</p>
+                        </div>
+                    </div>
+                    <button type="button" id="btnCloseImport" class="text-gray-400 hover:text-gray-600 transition cursor-pointer">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <form id="formImportMedicine" enctype="multipart/form-data" class="mt-4 space-y-4">
+                    @csrf
+                    <input type="file" id="importFileInput" name="file" accept=".xlsx,.xls,.csv" class="hidden">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1.5">Pilih File Excel Master Obat</label>
+                        <div id="dropzoneImport" class="border-2 border-dashed border-gray-300 hover:border-emerald-500 rounded-xl p-6 text-center cursor-pointer transition bg-gray-50/50 hover:bg-emerald-50/30">
+                            <svg class="w-10 h-10 mx-auto text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                            </svg>
+                            <p id="fileNamePreview" class="text-xs font-medium text-gray-700">Klik untuk memilih file atau drag & drop ke sini</p>
+                            <p class="text-[11px] text-gray-400 mt-1">Format kolom B = Kode, C = Nama, O = HNA, P = HET, Q = Barcode, R = PBF, dll.</p>
+                        </div>
+                    </div>
+
+                    {{-- Panduan Kolom --}}
+                    <div class="bg-slate-50 border border-slate-200/80 rounded-xl p-3 text-[11px] text-slate-600">
+                        <div class="font-semibold text-slate-700 mb-1">Layout Kolom Excel (Mulai Baris 2):</div>
+                        <div class="grid grid-cols-2 gap-x-2 gap-y-0.5">
+                            <div>• <strong>B</strong>: Kode Obat</div>
+                            <div>• <strong>C</strong>: Nama Obat</div>
+                            <div>• <strong>O</strong>: HNA (Harga Beli)</div>
+                            <div>• <strong>P</strong>: HET</div>
+                            <div>• <strong>Q</strong>: Barcode</div>
+                            <div>• <strong>R</strong>: PBF (Distributor)</div>
+                            <div>• <strong>AC</strong>: Surat Pesanan</div>
+                            <div>• <strong>AE</strong>: Isi (Content)</div>
+                            <div>• <strong>AF</strong>: Strip</div>
+                            <div>• <strong>AG</strong>: Dosis</div>
+                            <div>• <strong>AH</strong>: Pabrik</div>
+                            <div>• <strong>AI</strong>: Kemasan</div>
+                            <div>• <strong>AJ</strong>: Satuan</div>
+                            <div>• <strong>AK</strong>: Sediaan</div>
+                            <div>• <strong>AL</strong>: Golongan</div>
+                            <div>• <strong>AN</strong>: Komposisi</div>
+                        </div>
+                    </div>
+
+                    {{-- Loading Indicator --}}
+                    <div id="importProgress" class="hidden space-y-2">
+                        <div class="flex items-center justify-between text-xs font-medium text-gray-600">
+                            <span class="flex items-center gap-1.5">
+                                <svg class="w-4 h-4 animate-spin text-emerald-600" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                                </svg>
+                                Sedang memproses import & relasi PBF...
+                            </span>
+                            <span class="text-emerald-600 font-bold">Harap tunggu</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                            <div class="bg-emerald-600 h-2 rounded-full animate-pulse" style="width: 100%"></div>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-end gap-2 pt-3 border-t border-gray-100">
+                        <button type="button" id="btnCancelImport" class="px-4 py-2 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition cursor-pointer">Batal</button>
+                        <button type="submit" id="btnSubmitImport" class="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow transition flex items-center gap-1.5 cursor-pointer">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                            </svg>
+                            <span>Proses Import</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 @endsection
 
 @section('scripts')
@@ -1319,6 +1422,102 @@
                 document.getElementById('medicineForm').scrollIntoView({
                     behavior: 'smooth',
                     block: 'start'
+                });
+            });
+
+            // ── IMPORT MASTER OBAT DARI EXCEL ──
+            const $modalImport = $('#modalImportMedicine');
+            const $fileInput = $('#importFileInput');
+            const $dropzone = $('#dropzoneImport');
+            const $namePreview = $('#fileNamePreview');
+            const $progress = $('#importProgress');
+            const $btnSubmit = $('#btnSubmitImport');
+
+            $('#btnOpenImport').on('click', function() {
+                try {
+                    $('.select2').select2('close');
+                } catch (e) {}
+                $fileInput.val('');
+                $namePreview.text('Klik untuk memilih file atau drag & drop ke sini');
+                $progress.addClass('hidden');
+                $btnSubmit.prop('disabled', false).removeClass('opacity-50');
+                $modalImport.removeClass('hidden');
+            });
+
+            $('#btnCloseImport, #btnCancelImport, #backdropImport').on('click', function() {
+                $modalImport.addClass('hidden');
+            });
+
+            $dropzone.on('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                $fileInput[0].click();
+            });
+
+            $fileInput.on('click', function(e) {
+                e.stopPropagation();
+            });
+
+            $fileInput.on('change', function() {
+                if (this.files && this.files[0]) {
+                    $namePreview.html('<span class="text-emerald-600 font-semibold">' + this.files[0].name + '</span> (' + (this.files[0].size / 1024 / 1024).toFixed(2) + ' MB)');
+                }
+            });
+
+            // Drag & Drop
+            $dropzone.on('dragover dragenter', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                $(this).addClass('border-emerald-500 bg-emerald-50/50');
+            });
+
+            $dropzone.on('dragleave dragend drop', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                $(this).removeClass('border-emerald-500 bg-emerald-50/50');
+            });
+
+            $dropzone.on('drop', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (e.originalEvent.dataTransfer && e.originalEvent.dataTransfer.files.length) {
+                    $fileInput[0].files = e.originalEvent.dataTransfer.files;
+                    $namePreview.html('<span class="text-emerald-600 font-semibold">' + $fileInput[0].files[0].name + '</span> (' + ($fileInput[0].files[0].size / 1024 / 1024).toFixed(2) + ' MB)');
+                }
+            });
+
+            $('#formImportMedicine').on('submit', function(e) {
+                e.preventDefault();
+                if (!$fileInput[0].files || !$fileInput[0].files[0]) {
+                    swal('Peringatan', 'Silakan pilih file Excel terlebih dahulu.', 'warning');
+                    return;
+                }
+
+                const formData = new FormData(this);
+                $progress.removeClass('hidden');
+                $btnSubmit.prop('disabled', true).addClass('opacity-50');
+
+                axios.post("{{ route('medicines.import') }}", formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                })
+                .then(function(res) {
+                    $modalImport.addClass('hidden');
+                    swal({
+                        title: 'Import Berhasil!',
+                        text: res.data.message || 'Data master obat berhasil diimpor.',
+                        icon: 'success',
+                        button: 'OK',
+                    }).then(() => {
+                        tableData.ajax.reload();
+                    });
+                })
+                .catch(function(err) {
+                    $progress.addClass('hidden');
+                    $btnSubmit.prop('disabled', false).removeClass('opacity-50');
+                    const msg = err.response && err.response.data && err.response.data.message 
+                        ? err.response.data.message 
+                        : (err.message || 'Gagal memproses file import.');
+                    swal('Gagal Import', msg, 'error');
                 });
             });
 
