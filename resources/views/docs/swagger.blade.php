@@ -64,7 +64,7 @@
     <script>
         window.onload = function() {
             window.ui = SwaggerUIBundle({
-                url: "{{ url('/swagger.yaml') }}",
+                url: "{{ url('/swagger.yaml') }}?v=" + new Date().getTime(),
                 dom_id: '#swagger-ui',
                 deepLinking: true,
                 presets: [
