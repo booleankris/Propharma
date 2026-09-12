@@ -760,19 +760,19 @@
                                         </div>
                                         <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
                                             <div class="bg-white p-2 rounded-lg border border-slate-200">
-                                                <span class="font-bold text-slate-700 block">Kolom B:</span>
+                                                <span class="font-bold text-slate-700 block">Kolom B (B2...):</span>
                                                 <span class="text-slate-500">Kode Barang</span>
                                             </div>
                                             <div class="bg-white p-2 rounded-lg border border-slate-200">
-                                                <span class="font-bold text-slate-700 block">Kolom C:</span>
+                                                <span class="font-bold text-slate-700 block">Kolom H (H2...):</span>
                                                 <span class="text-slate-500">Stok Fisik</span>
                                             </div>
                                             <div class="bg-white p-2 rounded-lg border border-slate-200">
-                                                <span class="font-bold text-slate-700 block">Kolom D:</span>
+                                                <span class="font-bold text-slate-700 block">Kolom I (I2...):</span>
                                                 <span class="text-slate-500">Expired Date</span>
                                             </div>
                                             <div class="bg-white p-2 rounded-lg border border-slate-200">
-                                                <span class="font-bold text-slate-700 block">Kolom E:</span>
+                                                <span class="font-bold text-slate-700 block">Kolom N (N2...):</span>
                                                 <span class="text-slate-500">Etalase</span>
                                             </div>
                                         </div>

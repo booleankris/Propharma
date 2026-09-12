@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 
@@ -50,25 +51,35 @@ class StockOpnameImportService
             }
         }
 
-        // Determine column indexes from row 1 header, or default
-        // Standard expected: A=No, B=Kode Barang, C=Stok Fisik, D=ED, E=Etalase
+        // Standard expected columns per user specification:
+        // Col B (idx 1): Code barang (starts from B2)
+        // Col H (idx 7): Stok Fisik (starts from H2)
+        // Col I (idx 8): Expired Date (starts from I2)
+        // Col N (idx 13): Etalase (starts from N2)
         $colMap = [
-            'code'    => 1, // Col B
-            'stock'   => 2, // Col C
-            'ed'      => 3, // Col D
-            'etalase' => 4, // Col E
+            'code'    => 1,  // Col B
+            'stock'   => 7,  // Col H
+            'ed'      => 8,  // Col I
+            'etalase' => 13, // Col N
         ];
 
-        $headerRow = $sheet->rangeToArray("A1:{$highestCol}1", null, true, false)[0] ?? [];
+        // Ensure reading range reaches at least column N (14th column, index 13)
+        $highestColIndex = Coordinate::columnIndexFromString($highestCol);
+        $readColIndex = max($highestColIndex, 14);
+        $readCol = Coordinate::stringFromColumnIndex($readColIndex);
+
+        $headerRow = $sheet->rangeToArray("A1:{$readCol}1", null, true, false)[0] ?? [];
         foreach ($headerRow as $idx => $headerVal) {
             $headerStr = mb_strtolower(trim((string) $headerVal));
-            if (str_contains($headerStr, 'kode') || str_contains($headerStr, 'code')) {
+            if ($headerStr === '') continue;
+
+            if (in_array($headerStr, ['kode', 'code', 'kd_obat', 'kode_barang', 'kode barang', 'kode obat'])) {
                 $colMap['code'] = $idx;
-            } elseif (str_contains($headerStr, 'stok') || str_contains($headerStr, 'fisik') || str_contains($headerStr, 'qty')) {
+            } elseif (in_array($headerStr, ['stok', 'stock', 'stok fisik', 'stok_fisik', 'qty fisik', 'real', 'so fisik', 'stok real'])) {
                 $colMap['stock'] = $idx;
-            } elseif (str_contains($headerStr, 'expired') || str_contains($headerStr, 'kadaluarsa') || $headerStr === 'ed') {
+            } elseif (in_array($headerStr, ['ed', 'exp', 'expired', 'kadaluarsa', 'tgl ed', 'expired date'])) {
                 $colMap['ed'] = $idx;
-            } elseif (str_contains($headerStr, 'etalase') || str_contains($headerStr, 'rak') || str_contains($headerStr, 'lokasi')) {
+            } elseif (in_array($headerStr, ['etalase', 'rak', 'lokasi', 'lokasi rak', 'nama etalase'])) {
                 $colMap['etalase'] = $idx;
             }
         }
@@ -85,9 +96,13 @@ class StockOpnameImportService
         $etalasesUnmatchedCount = 0;
 
         for ($rowIdx = 2; $rowIdx <= $highestRow; $rowIdx++) {
-            $rowData = $sheet->rangeToArray("A{$rowIdx}:{$highestCol}{$rowIdx}", null, true, false)[0] ?? [];
+            $rowData = $sheet->rangeToArray("A{$rowIdx}:{$readCol}{$rowIdx}", null, true, false)[0] ?? [];
 
-            $rawCode = trim((string) ($rowData[$colMap['code']] ?? ''));
+            // Read code (formatted string to preserve leading zeros if formatted as text)
+            $codeCell = $sheet->getCellByColumnAndRow($colMap['code'] + 1, $rowIdx);
+            $formattedCode = trim((string) $codeCell->getFormattedValue());
+            $rawCode = $formattedCode !== '' ? $formattedCode : trim((string) ($rowData[$colMap['code']] ?? ''));
+
             $rawStock = trim((string) ($rowData[$colMap['stock']] ?? ''));
             $rawEd = trim((string) ($rowData[$colMap['ed']] ?? ''));
             $rawEtalase = trim((string) ($rowData[$colMap['etalase']] ?? ''));
