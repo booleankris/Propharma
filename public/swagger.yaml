@@ -12,10 +12,6 @@ info:
 tags:
   - name: "Mobile Sync"
     description: "Endpoint sinkronisasi data master, harga, dan stok untuk aplikasi mobile"
-  - name: developers
-    description: Operations available to regular developers
-  - name: admins
-    description: Secured Admin-only calls
 
 paths:
   /api/mobile/medicines/lookup:
@@ -25,9 +21,7 @@ paths:
       summary: Lookup Data & Harga Obat berdasarkan SKU / Barcode
       operationId: lookupMedicine
       description: |
-        Dipanggil saat staf aplikasi mobile selesai mengetik SKU/Product Code atau scan barcode.
-        Sistem mengembalikan data lengkap: HNA (raw_price), HNA + PPN (net_price), HET (het_price),
-        satuan, kemasan, serta posisi stok cabang terpilih untuk auto-fill form master data.
+        Mengembalikan data lengkap: HNA (raw_price), HNA + PPN (net_price), HET (het_price), satuan, kemasan, serta data stok cabang terpilih untuk auto-fill form master data pada dashboard aplikasi mobile. Untuk stok wajib ambil per cabang.
       parameters:
         - in: query
           name: code
@@ -38,8 +32,8 @@ paths:
             example: "002700089"
         - in: query
           name: pharmacy_id
-          required: false
-          description: ID Cabang Apotek (opsional, untuk mendapatkan stok spesifik cabang)
+          required: true
+          description: ID Cabang Apotek (Wajib untuk mengambil data stok cabang)
           schema:
             type: integer
             example: 5
@@ -97,134 +91,6 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/PharmacyItem'
-
-  /api/mobile/medicines:
-    get:
-      tags:
-        - "Mobile Sync"
-      summary: Sinkronisasi Masal / Katalog Obat (Terpaginasi)
-      operationId: getMedicines
-      description: |
-        Mengambil daftar master obat terpaginasi. Mendukung pencarian, filter cabang,
-        dan incremental sync menggunakan parameter updated_since (hanya mengambil data yang berubah).
-      parameters:
-        - in: query
-          name: search
-          required: false
-          description: Keyword pencarian nama obat, SKU, atau barcode
-          schema:
-            type: string
-            example: "Paracetamol"
-        - in: query
-          name: pharmacy_id
-          required: false
-          description: ID Cabang untuk perhitungan stok spesifik
-          schema:
-            type: integer
-            example: 5
-        - in: query
-          name: updated_since
-          required: false
-          description: "Filter waktu pembaruan terakhir untuk incremental sync (format: YYYY-MM-DD HH:mm:ss)"
-          schema:
-            type: string
-            format: date-time
-            example: "2026-09-01 00:00:00"
-        - in: query
-          name: limit
-          required: false
-          description: Jumlah item per halaman (default 50, max 200)
-          schema:
-            type: integer
-            default: 50
-            minimum: 1
-            maximum: 200
-        - in: query
-          name: page
-          required: false
-          description: Nomor halaman
-          schema:
-            type: integer
-            default: 1
-      responses:
-        '200':
-          description: Katalog obat berhasil dimuat
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-                  data:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/MedicineDetail'
-                  pagination:
-                    $ref: '#/components/schemas/PaginationMeta'
-
-  /inventory:
-    get:
-      tags:
-        - developers
-      summary: searches inventory
-      operationId: searchInventory
-      description: |
-        By passing in the appropriate options, you can search for
-        available inventory in the system
-      parameters:
-        - in: query
-          name: searchString
-          description: pass an optional search string for looking up inventory
-          required: false
-          schema:
-            type: string
-        - in: query
-          name: skip
-          description: number of records to skip for pagination
-          schema:
-            type: integer
-            format: int32
-            minimum: 0
-        - in: query
-          name: limit
-          description: maximum number of records to return
-          schema:
-            type: integer
-            format: int32
-            minimum: 0
-            maximum: 50
-      responses:
-        '200':
-          description: search results matching criteria
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/InventoryItem'
-        '400':
-          description: bad input parameter
-    post:
-      tags:
-        - admins
-      summary: adds an inventory item
-      operationId: addInventory
-      description: Adds an item to the system
-      responses:
-        '201':
-          description: item created
-        '400':
-          description: 'invalid input, object invalid'
-        '409':
-          description: an existing item already exists
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/InventoryItem'
-        description: Inventory item to add
 
 components:
   schemas:
@@ -309,10 +175,8 @@ components:
           example: 12500
         stock:
           type: integer
-          description: Stok saat ini pada cabang yang dipilih (atau total stok)
+          description: Stok saat ini pada cabang yang dipilih
           example: 31
-        pricing:
-          $ref: '#/components/schemas/PricingDetail'
         stock_info:
           $ref: '#/components/schemas/StockInfoDetail'
         compliance:
@@ -322,52 +186,14 @@ components:
           format: date-time
           example: "2026-09-12 12:29:12"
 
-    PricingDetail:
-      type: object
-      properties:
-        raw_price:
-          type: number
-          example: 12500
-        net_price:
-          type: number
-          example: 13875
-        het_price:
-          type: number
-          example: 15500
-        pharmacy_net_price:
-          type: number
-          example: 12500
-        tax_percentage:
-          type: number
-          description: Persentase PPN (%)
-          example: 11
-        margin_percentage:
-          type: number
-          description: Estimasi margin keuntungan HET vs HNA+PPN (%)
-          example: 11.71
-        formatted:
-          type: object
-          properties:
-            raw_price:
-              type: string
-              example: "Rp 12.500"
-            net_price:
-              type: string
-              example: "Rp 13.875"
-            het_price:
-              type: string
-              example: "Rp 15.500"
-
     StockInfoDetail:
       type: object
       properties:
         pharmacy_id:
           type: integer
-          nullable: true
           example: 5
         pharmacy_name:
           type: string
-          nullable: true
           example: "SAHABAT ANTASARI"
         stock:
           type: integer
@@ -399,25 +225,6 @@ components:
           nullable: true
           description: Tanggal kadaluarsa terdekat pada cabang tersebut (FEFO)
           example: "2030-06-30"
-        total_stock:
-          type: integer
-          description: Total stok lintas seluruh cabang (muncul jika tanpa filter pharmacy_id)
-          example: 196
-        stock_by_pharmacy:
-          type: array
-          description: Rincian stok per cabang (muncul jika tanpa filter pharmacy_id)
-          items:
-            type: object
-            properties:
-              pharmacy_id:
-                type: integer
-                example: 5
-              pharmacy_name:
-                type: string
-                example: "SAHABAT ANTASARI"
-              stock:
-                type: integer
-                example: 31
 
     ComplianceDetail:
       type: object
@@ -461,29 +268,6 @@ components:
           type: integer
           example: 1
 
-    PaginationMeta:
-      type: object
-      properties:
-        current_page:
-          type: integer
-          example: 1
-        last_page:
-          type: integer
-          example: 158
-        per_page:
-          type: integer
-          example: 50
-        total:
-          type: integer
-          example: 7890
-        has_more:
-          type: boolean
-          example: true
-        next_page_url:
-          type: string
-          nullable: true
-          example: "https://apoteksahabatsmd.com/api/mobile/medicines?page=2"
-
     ErrorResponse:
       type: object
       properties:
@@ -493,41 +277,3 @@ components:
         message:
           type: string
           example: "Obat dengan SKU/Barcode '002700089' tidak ditemukan pada sistem Web."
-
-    InventoryItem:
-      type: object
-      required:
-        - id
-        - name
-        - manufacturer
-        - releaseDate
-      properties:
-        id:
-          type: string
-          format: uuid
-          example: d290f1ee-6c54-4b01-90e6-d701748f0851
-        name:
-          type: string
-          example: Widget Adapter
-        releaseDate:
-          type: string
-          format: date-time
-          example: '2016-08-29T09:12:33.001Z'
-        manufacturer:
-          $ref: '#/components/schemas/Manufacturer'
-
-    Manufacturer:
-      type: object
-      required:
-        - name
-      properties:
-        name:
-          type: string
-          example: ACME Corporation
-        homePage:
-          type: string
-          format: url
-          example: 'https://www.acme-corp.com'
-        phone:
-          type: string
-          example: 408-867-5309
