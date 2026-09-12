@@ -134,6 +134,8 @@ class MedicineImportService
                 $codeKey = strtoupper($code);
                 $isExisting = $existingMedicines->has($codeKey);
 
+                $netPrice = $hna > 0 ? (string) floor($hna * 1.11) : '0';
+
                 $payload = [
                     'code'                 => $code,
                     'name'                 => $name,
@@ -152,7 +154,7 @@ class MedicineImportService
                     'type'                 => $spType !== '' ? $spType : '0',
                     'raw_price'            => (string) $hna,
                     'pharmacy_net_price'   => (string) $hna,
-                    'net_price'            => (string) $hna,
+                    'net_price'            => $netPrice,
                     'het_price'            => (string) $het,
                     'minimal_stock'        => 0,
                     'status'               => 1,
