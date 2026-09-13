@@ -25,7 +25,7 @@ class SalesDataController extends Controller
 
             $query = MedicineCart::query()
                 ->join('medicine_transactions', 'medicine_transactions.id', '=', 'medicine_cart.transaction_id')
-                ->with(['transactions.patients', 'transactions.user.roles', 'transactions'])
+                ->with(['transactions.patients', 'transactions.user.roles', 'transactions', 'user.roles'])
                 ->where('medicine_transactions.status', 1)
                 ->whereHas('transactions', function ($transaction) {
                     $transaction->where('pharmacy_id', getActivePharmacyId());
@@ -45,27 +45,31 @@ class SalesDataController extends Controller
 
             // Filter Channel / Jenis Transaksi
             if ($channel) {
+                $applyChannel = function ($q, $roleName) {
+                    $q->where(function ($sub) use ($roleName) {
+                        $sub->whereHas('user.roles', function ($r) use ($roleName) {
+                            $r->where('name', $roleName);
+                        })->orWhereHas('transactions.user.roles', function ($r) use ($roleName) {
+                            $r->where('name', $roleName);
+                        });
+                    });
+                };
+
                 if ($channel === 'shopee') {
-                    $query->whereHas('transactions.user.roles', function ($r) {
-                        $r->where('name', 'Online Shopee');
-                    });
+                    $applyChannel($query, 'Online Shopee');
                 } elseif ($channel === 'grab') {
-                    $query->whereHas('transactions.user.roles', function ($r) {
-                        $r->where('name', 'Online Grab');
-                    });
+                    $applyChannel($query, 'Online Grab');
                 } elseif ($channel === 'online') {
-                    $query->whereHas('transactions.user.roles', function ($r) {
-                        $r->where('name', 'Online');
-                    });
+                    $applyChannel($query, 'Online');
                 } elseif ($channel === 'digital') {
-                    $query->whereHas('transactions.user.roles', function ($r) {
-                        $r->where('name', 'Digital');
-                    });
+                    $applyChannel($query, 'Digital');
                 } elseif ($channel === 'kasir') {
                     $query->where(function ($q) {
-                        $q->whereDoesntHave('transactions.user.roles', function ($r) {
+                        $q->whereDoesntHave('user.roles', function ($r) {
                             $r->whereIn('name', ['Online Shopee', 'Online Grab', 'Online', 'Digital']);
-                        })->orWhereNull('medicine_transactions.user_id');
+                        })->whereDoesntHave('transactions.user.roles', function ($r) {
+                            $r->whereIn('name', ['Online Shopee', 'Online Grab', 'Online', 'Digital']);
+                        });
                     });
                 }
             }
@@ -83,6 +87,10 @@ class SalesDataController extends Controller
                                 $p->where('name', 'like', "%{$search}%");
                             })
                             ->orWhereHas('transactions.user', function ($u) use ($search) {
+                                $u->where('name', 'like', "%{$search}%")
+                                    ->orWhere('username', 'like', "%{$search}%");
+                            })
+                            ->orWhereHas('user', function ($u) use ($search) {
                                 $u->where('name', 'like', "%{$search}%")
                                     ->orWhere('username', 'like', "%{$search}%");
                             });
@@ -123,13 +131,14 @@ class SalesDataController extends Controller
                     return $row->transactions?->transaction_code ?? '-';
                 })
                 ->addColumn('channel', function ($row) {
-                    return MedicineTransactions::renderChannelBadge($row->transactions?->user);
+                    return MedicineTransactions::renderChannelBadge($row->user, $row->transactions?->user);
                 })
                 ->addColumn('channel_name', function ($row) {
-                    return MedicineTransactions::resolveChannelInfo($row->transactions?->user)['label'];
+                    return MedicineTransactions::resolveChannelInfo($row->user, $row->transactions?->user)['label'];
                 })
                 ->addColumn('creator_name', function ($row) {
-                    $user = $row->transactions?->user;
+                    $info = MedicineTransactions::resolveChannelInfo($row->user, $row->transactions?->user);
+                    $user = $info['effective_user'] ?? $row->user ?? $row->transactions?->user;
                     return $user ? ($user->name ?? $user->username) : '-';
                 })
                 ->addColumn('type', function ($row) {
@@ -177,7 +186,7 @@ class SalesDataController extends Controller
 
             $query = MedicineCart::query()
                 ->join('medicine_transactions', 'medicine_transactions.id', '=', 'medicine_cart.transaction_id')
-                ->with(['transactions.patients', 'transactions.user.roles', 'transactions'])
+                ->with(['transactions.patients', 'transactions.user.roles', 'transactions', 'user.roles'])
                 ->whereHas('transactions', function ($transaction) {
                     $transaction->where('pharmacy_id', getActivePharmacyId())
                         ->where('status', 0);
@@ -197,27 +206,31 @@ class SalesDataController extends Controller
 
             // Filter Channel / Jenis Transaksi
             if ($channel) {
+                $applyChannel = function ($q, $roleName) {
+                    $q->where(function ($sub) use ($roleName) {
+                        $sub->whereHas('user.roles', function ($r) use ($roleName) {
+                            $r->where('name', $roleName);
+                        })->orWhereHas('transactions.user.roles', function ($r) use ($roleName) {
+                            $r->where('name', $roleName);
+                        });
+                    });
+                };
+
                 if ($channel === 'shopee') {
-                    $query->whereHas('transactions.user.roles', function ($r) {
-                        $r->where('name', 'Online Shopee');
-                    });
+                    $applyChannel($query, 'Online Shopee');
                 } elseif ($channel === 'grab') {
-                    $query->whereHas('transactions.user.roles', function ($r) {
-                        $r->where('name', 'Online Grab');
-                    });
+                    $applyChannel($query, 'Online Grab');
                 } elseif ($channel === 'online') {
-                    $query->whereHas('transactions.user.roles', function ($r) {
-                        $r->where('name', 'Online');
-                    });
+                    $applyChannel($query, 'Online');
                 } elseif ($channel === 'digital') {
-                    $query->whereHas('transactions.user.roles', function ($r) {
-                        $r->where('name', 'Digital');
-                    });
+                    $applyChannel($query, 'Digital');
                 } elseif ($channel === 'kasir') {
                     $query->where(function ($q) {
-                        $q->whereDoesntHave('transactions.user.roles', function ($r) {
+                        $q->whereDoesntHave('user.roles', function ($r) {
                             $r->whereIn('name', ['Online Shopee', 'Online Grab', 'Online', 'Digital']);
-                        })->orWhereNull('medicine_transactions.user_id');
+                        })->whereDoesntHave('transactions.user.roles', function ($r) {
+                            $r->whereIn('name', ['Online Shopee', 'Online Grab', 'Online', 'Digital']);
+                        });
                     });
                 }
             }
@@ -235,6 +248,10 @@ class SalesDataController extends Controller
                                 $p->where('name', 'like', "%{$search}%");
                             })
                             ->orWhereHas('transactions.user', function ($u) use ($search) {
+                                $u->where('name', 'like', "%{$search}%")
+                                    ->orWhere('username', 'like', "%{$search}%");
+                            })
+                            ->orWhereHas('user', function ($u) use ($search) {
                                 $u->where('name', 'like', "%{$search}%")
                                     ->orWhere('username', 'like', "%{$search}%");
                             });
@@ -275,13 +292,14 @@ class SalesDataController extends Controller
                     return $row->transactions?->transaction_code ?? '-';
                 })
                 ->addColumn('channel', function ($row) {
-                    return MedicineTransactions::renderChannelBadge($row->transactions?->user);
+                    return MedicineTransactions::renderChannelBadge($row->user, $row->transactions?->user);
                 })
                 ->addColumn('channel_name', function ($row) {
-                    return MedicineTransactions::resolveChannelInfo($row->transactions?->user)['label'];
+                    return MedicineTransactions::resolveChannelInfo($row->user, $row->transactions?->user)['label'];
                 })
                 ->addColumn('creator_name', function ($row) {
-                    $user = $row->transactions?->user;
+                    $info = MedicineTransactions::resolveChannelInfo($row->user, $row->transactions?->user);
+                    $user = $info['effective_user'] ?? $row->user ?? $row->transactions?->user;
                     return $user ? ($user->name ?? $user->username) : '-';
                 })
                 ->addColumn('type', function ($row) {

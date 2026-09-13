@@ -63,28 +63,29 @@ class MedicineTransactions extends Model
     public function getChannelInfoAttribute()
     {
         $user = $this->relationLoaded('user') ? $this->user : $this->user()->with('roles')->first();
-        return self::resolveChannelInfo($user);
+        return self::resolveChannelInfo(null, $user);
     }
 
-    public static function resolveChannelInfo($user)
+    public static function resolveChannelInfo($cartUser = null, $txUser = null)
     {
-        if (!$user) {
-            return [
-                'key' => 'kasir',
-                'role' => 'Kasir',
-                'label' => 'Kasir (Offline)',
-                'badge_text' => 'Kasir',
-                'sub' => 'Offline / Reguler',
-                'color' => 'slate',
-            ];
-        }
+        $getUserRoles = function ($user) {
+            if (!$user) return [];
+            if ($user->relationLoaded('roles')) {
+                return $user->roles->pluck('name')->map(fn($r) => strtolower(trim($r)))->toArray();
+            }
+            return $user->roles()->pluck('name')->map(fn($r) => strtolower(trim($r)))->toArray();
+        };
 
-        $roles = $user->relationLoaded('roles')
-            ? $user->roles->pluck('name')->map(fn($r) => strtolower(trim($r)))->toArray()
-            : $user->roles()->pluck('name')->map(fn($r) => strtolower(trim($r)))->toArray();
+        $cartRoles = $getUserRoles($cartUser);
+        $txRoles   = $getUserRoles($txUser);
+
+        $hasRole = function ($needle, $roles) {
+            return in_array(strtolower($needle), $roles);
+        };
 
         // 1. Digital (Aplikasi Mobile)
-        if (in_array('digital', $roles)) {
+        if ($hasRole('digital', $cartRoles) || $hasRole('digital', $txRoles)) {
+            $effective = $hasRole('digital', $cartRoles) ? $cartUser : $txUser;
             return [
                 'key' => 'digital',
                 'role' => 'Digital',
@@ -92,11 +93,16 @@ class MedicineTransactions extends Model
                 'badge_text' => 'Digital',
                 'sub' => 'Aplikasi Mobile',
                 'color' => 'purple',
+                'effective_user' => $effective,
+                'cart_user' => $cartUser,
+                'tx_user' => $txUser,
             ];
         }
 
         // 2. Online Shopee
-        if (in_array('online shopee', $roles) || in_array('shopee', $roles)) {
+        if ($hasRole('online shopee', $cartRoles) || $hasRole('shopee', $cartRoles) ||
+            $hasRole('online shopee', $txRoles)   || $hasRole('shopee', $txRoles)) {
+            $effective = ($hasRole('online shopee', $cartRoles) || $hasRole('shopee', $cartRoles)) ? $cartUser : $txUser;
             return [
                 'key' => 'shopee',
                 'role' => 'Online Shopee',
@@ -104,11 +110,16 @@ class MedicineTransactions extends Model
                 'badge_text' => 'Shopee',
                 'sub' => 'Penjualan Shopee',
                 'color' => 'orange',
+                'effective_user' => $effective,
+                'cart_user' => $cartUser,
+                'tx_user' => $txUser,
             ];
         }
 
         // 3. Online Grab
-        if (in_array('online grab', $roles) || in_array('grab', $roles)) {
+        if ($hasRole('online grab', $cartRoles) || $hasRole('grab', $cartRoles) ||
+            $hasRole('online grab', $txRoles)   || $hasRole('grab', $txRoles)) {
+            $effective = ($hasRole('online grab', $cartRoles) || $hasRole('grab', $cartRoles)) ? $cartUser : $txUser;
             return [
                 'key' => 'grab',
                 'role' => 'Online Grab',
@@ -116,11 +127,15 @@ class MedicineTransactions extends Model
                 'badge_text' => 'Grab',
                 'sub' => 'Penjualan Grab',
                 'color' => 'emerald',
+                'effective_user' => $effective,
+                'cart_user' => $cartUser,
+                'tx_user' => $txUser,
             ];
         }
 
         // 4. Online (Chat WA)
-        if (in_array('online', $roles)) {
+        if ($hasRole('online', $cartRoles) || $hasRole('online', $txRoles)) {
+            $effective = $hasRole('online', $cartRoles) ? $cartUser : $txUser;
             return [
                 'key' => 'online',
                 'role' => 'Online',
@@ -128,24 +143,43 @@ class MedicineTransactions extends Model
                 'badge_text' => 'Online WA',
                 'sub' => 'Chat WA',
                 'color' => 'green',
+                'effective_user' => $effective,
+                'cart_user' => $cartUser,
+                'tx_user' => $txUser,
             ];
         }
 
         // 5. Default / Offline Kasir
+        $effective = $txUser ?? $cartUser;
         return [
             'key' => 'kasir',
-            'role' => $user->roles->first()?->name ?? 'Kasir',
+            'role' => $effective?->roles?->first()?->name ?? 'Kasir',
             'label' => 'Kasir (Offline)',
             'badge_text' => 'Kasir',
             'sub' => 'Penjualan Kasir',
             'color' => 'slate',
+            'effective_user' => $effective,
+            'cart_user' => $cartUser,
+            'tx_user' => $txUser,
         ];
     }
 
-    public static function renderChannelBadge($user)
+    public static function renderChannelBadge($cartUser = null, $txUser = null)
     {
-        $info = self::resolveChannelInfo($user);
-        $creator = $user ? "Kasir: " . ($user->name ?? $user->username) . " ({$user->username})" : "Penjualan Kasir";
+        $info = self::resolveChannelInfo($cartUser, $txUser);
+
+        $onlineUser = $info['effective_user'];
+        $cashierUser = ($info['tx_user'] && $onlineUser && $info['tx_user']->id !== $onlineUser->id) ? $info['tx_user'] : null;
+
+        if ($info['key'] !== 'kasir' && $onlineUser) {
+            $creator = "Order: " . ($onlineUser->name ?? $onlineUser->username);
+            if ($cashierUser) {
+                $creator .= " | Kasir: " . ($cashierUser->name ?? $cashierUser->username);
+            }
+        } else {
+            $user = $info['effective_user'];
+            $creator = $user ? "Kasir: " . ($user->name ?? $user->username) : "Penjualan Kasir";
+        }
         $tooltip = e($creator . ' | ' . $info['sub']);
 
         switch ($info['key']) {
@@ -165,20 +199,20 @@ class MedicineTransactions extends Model
                     <span>Grab</span>
                 </span>';
 
-            case 'online':
-                return '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-green-50 text-green-700 border border-green-200 shadow-sm" title="' . $tooltip . '">
-                    <svg class="w-3.5 h-3.5 text-green-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                    </svg>
-                    <span>Online (WA)</span>
-                </span>';
-
             case 'digital':
                 return '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-200 shadow-sm" title="' . $tooltip . '">
                     <svg class="w-3.5 h-3.5 text-purple-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
                     </svg>
-                    <span>Digital (App)</span>
+                    <span>Digital</span>
+                </span>';
+
+            case 'online':
+                return '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-green-50 text-green-700 border border-green-200 shadow-sm" title="' . $tooltip . '">
+                    <svg class="w-3.5 h-3.5 text-green-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    </svg>
+                    <span>Online WA</span>
                 </span>';
 
             case 'kasir':
