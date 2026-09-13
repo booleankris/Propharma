@@ -45,5 +45,8 @@ return [
 
     ],
 
+    'mobile' => [
+        'api_key' => env('MOBILE_API_KEY', 'sahabat_mobile_sec_8f92a1c6e4b3d7501a9f'),
+    ],
 
 ];

@@ -6,8 +6,20 @@ servers:
     description: Local Development Server
 info:
   title: API Sinkronisasi Apotek Sahabat Samarinda (Web - Mobile)
-  description: API untuk sinkronisasi master data obat, harga (HNA, HNA+PPN, HET), dan stok per cabang antara Web POS dan Aplikasi Mobile.
+  description: |
+    API untuk sinkronisasi master data obat, harga, stok per cabang, transaksi online kasir, serta riwayat belanja member antara Web POS dan Aplikasi Mobile.
+
+    **Autentikasi:**
+    Semua endpoint di bawah `/api/mobile/*` dilindungi oleh API Key.
+    Kirimkan kunci melalui salah satu cara berikut:
+    - **Header:** `X-API-KEY: <api_key>`
+    - **Header Bearer:** `Authorization: Bearer <api_key>`
+    - **Query Parameter:** `?api_key=<api_key>`
   version: "1.0.0"
+
+security:
+  - ApiKeyAuth: []
+  - BearerAuth: []
 
 tags:
   - name: "Mobile Sync"
@@ -102,18 +114,16 @@ paths:
         Mencatat transaksi penjualan dari aplikasi mobile ke database Web Apotek.
         Secara otomatis:
         - Menetapkan `transaction_type` = **"ONLINE"**
+        - Menetapkan `user_id` berdasarkan cabang (penjualan digital):
+          | Cabang | pharmacy_id (web) | user_id |
+          |---|---|---|
+          | PMI | 1 | 114 |
+          | Antasari | 5 | 115 |
+          | Mulawarman | 2 | 116 |
+          | MIM | 3 | 117 |
         - Memotong stok obat dan batch pada cabang yang bersangkutan (FIFO / FEFO)
         - Mencatat log mutasi kartu stok (`items_log`)
         - Menghubungkan atau membuat master data pelanggan/pasien
-
-        **user_id per cabang (penjualan digital):**
-
-        | Cabang | user_id |
-        |---|---|
-        | PMI | 114 |
-        | Antasari | 115 |
-        | Mulawarman | 116 |
-        | MIM | 117 |
       requestBody:
         required: true
         description: Data transaksi mobile beserta daftar obat yang dibeli
@@ -123,7 +133,6 @@ paths:
               $ref: '#/components/schemas/TransactionCreateRequest'
             example:
               pharmacy_id: 5
-              user_id: 115
               payment_method: "QRIS"
               customer_name: "Budi Santoso"
               customer_phone: "081234567890"
@@ -171,7 +180,137 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /api/mobile/members/{phone}/history:
+    get:
+      tags:
+        - "Mobile Sync"
+      summary: Riwayat Belanja Pelanggan (Lintas Cabang & Channel)
+      operationId: memberHistory
+      description: |
+        Mengembalikan seluruh riwayat transaksi pelanggan berdasarkan nomor telepon, mencakup:
+        - Belanja **offline** di kasir (semua cabang)
+        - Belanja **online** dari aplikasi mobile
+
+        Diidentifikasi berdasarkan `phone` → tabel `patients` → `medicine_transactions`.
+        Mendukung **pagination** dan filter per cabang.
+      parameters:
+        - in: path
+          name: phone
+          required: true
+          description: Nomor telepon pelanggan
+          schema:
+            type: string
+            example: "081234567890"
+        - in: query
+          name: page
+          required: false
+          description: Halaman (default 1)
+          schema:
+            type: integer
+            example: 1
+        - in: query
+          name: per_page
+          required: false
+          description: Jumlah data per halaman (default 20, max 100)
+          schema:
+            type: integer
+            example: 20
+        - in: query
+          name: pharmacy_id
+          required: false
+          description: Filter cabang tertentu (mobile pharmacy_id, akan di-map ke web pharmacy_id secara otomatis)
+          schema:
+            type: integer
+            example: 15
+      responses:
+        '200':
+          description: Riwayat belanja berhasil dimuat
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TransactionHistoryItem'
+                  member:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                        example: "Budi Santoso"
+                      phone:
+                        type: string
+                        example: "081234567890"
+                  pagination:
+                    $ref: '#/components/schemas/PaginationMeta'
+              example:
+                success: true
+                data:
+                  - transaction_code: "OL-20260913-0001"
+                    date: "2026-09-13 10:30:00"
+                    channel: "online"
+                    transaction_type: "ONLINE"
+                    pharmacy_id: 5
+                    pharmacy_name: "SAHABAT ANTASARI"
+                    payment_method: "QRIS"
+                    subtotal: 30000
+                    discount: 0
+                    total: 30000
+                    items:
+                      - medicine_name: "AB VASK TAB 10MG"
+                        medicine_code: "002700089"
+                        qty: 2
+                        price: 15000
+                        discount: 0
+                        total: 30000
+                  - transaction_code: "HV-20260912-0042"
+                    date: "2026-09-12 14:00:00"
+                    channel: "offline"
+                    transaction_type: "HV/OTC"
+                    pharmacy_id: 1
+                    pharmacy_name: "SAHABAT PMI"
+                    payment_method: "CASH"
+                    subtotal: 50000
+                    discount: 5000
+                    total: 45000
+                    items:
+                      - medicine_name: "PARACETAMOL 500MG"
+                        medicine_code: "001000012"
+                        qty: 1
+                        price: 50000
+                        discount: 5000
+                        total: 45000
+                member:
+                  name: "Budi Santoso"
+                  phone: "081234567890"
+                pagination:
+                  current_page: 1
+                  last_page: 3
+                  per_page: 20
+                  total: 45
+        '404':
+          description: Member tidak ditemukan berdasarkan nomor telepon
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
 components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-KEY
+      description: "API Key untuk akses API Mobile Sync (Header X-API-KEY)"
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: "Atau gunakan format Authorization: Bearer <API_KEY>"
   schemas:
     MedicineDetail:
       type: object
@@ -361,19 +500,12 @@ components:
       type: object
       required:
         - pharmacy_id
-        - user_id
         - items
       properties:
         pharmacy_id:
           type: integer
           description: ID Cabang Apotek tempat order diproses (ambil dari /api/mobile/pharmacies)
           example: 5
-        user_id:
-          type: integer
-          description: |
-            ID user untuk menandakan penjualan digital per cabang.
-            PMI=114, Antasari=115, Mulawarman=116, MIM=117
-          example: 115
         payment_method:
           type: string
           description: Metode pembayaran (misal QRIS, CASH, TRANSFER, MIDTRANS, ONLINE)
@@ -487,3 +619,83 @@ components:
               format: date-time
               example: "2026-09-12 16:00:00"
 
+    TransactionHistoryItem:
+      type: object
+      properties:
+        transaction_code:
+          type: string
+          example: "OL-20260913-0001"
+        date:
+          type: string
+          format: date-time
+          example: "2026-09-13 10:30:00"
+        channel:
+          type: string
+          description: "'online' jika dari aplikasi mobile, 'offline' jika dari kasir"
+          enum: [online, offline]
+          example: "online"
+        transaction_type:
+          type: string
+          description: "Tipe transaksi asli (ONLINE, HV/OTC, RESEP TUNAI, KREDIT, UPDS)"
+          example: "ONLINE"
+        pharmacy_id:
+          type: integer
+          description: "ID cabang apotek (web)"
+          example: 5
+        pharmacy_name:
+          type: string
+          example: "SAHABAT ANTASARI"
+        payment_method:
+          type: string
+          nullable: true
+          example: "QRIS"
+        subtotal:
+          type: integer
+          example: 30000
+        discount:
+          type: integer
+          example: 0
+        total:
+          type: integer
+          description: "subtotal - discount"
+          example: 30000
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              medicine_name:
+                type: string
+                example: "AB VASK TAB 10MG"
+              medicine_code:
+                type: string
+                example: "002700089"
+              qty:
+                type: integer
+                example: 2
+              price:
+                type: integer
+                example: 15000
+              discount:
+                type: integer
+                example: 0
+              total:
+                type: integer
+                example: 30000
+
+    PaginationMeta:
+      type: object
+      properties:
+        current_page:
+          type: integer
+          example: 1
+        last_page:
+          type: integer
+          example: 3
+        per_page:
+          type: integer
+          example: 20
+        total:
+          type: integer
+          description: "Total seluruh transaksi pelanggan"
+          example: 45

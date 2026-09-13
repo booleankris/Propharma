@@ -68,5 +68,6 @@ class Kernel extends HttpKernel
         'permission' => \Spatie\Permission\Middleware\PermissionMiddleware::class,
         'role_or_permission' => \Spatie\Permission\Middlewares\RoleOrPermissionMiddleware::class,
         'non_warehouse' => \App\Http\Middleware\PreventWarehouseAccess::class,
+        'mobile.auth' => \App\Http\Middleware\VerifyMobileApiKey::class,
     ];
 }

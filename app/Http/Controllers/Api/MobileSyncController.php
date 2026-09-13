@@ -383,38 +383,100 @@ class MobileSyncController extends Controller
         ]);
     }
 
-    // 4. [GET] /api/mobile/members/{phone}/history
+    /**
+     * 4. [GET] /api/mobile/members/{phone}/history
+     *
+     * Riwayat belanja pelanggan lintas cabang & lintas channel (kasir offline + online mobile).
+     * Semua diidentifikasi berdasarkan nomor telepon.
+     *
+     * Query params:
+     *   - page     : halaman (default 1)
+     *   - per_page : jumlah per halaman (default 20, max 100)
+     *   - pharmacy_id : filter cabang tertentu (opsional, mobile pharmacy_id)
+     */
     public function memberHistory(Request $request, $phone)
     {
-        $patient = Patients::where('phone', $phone)->first();
-        if (!$patient) {
-            return response()->json(['success' => false, 'message' => 'Member tidak ditemukan']);
+        $rawPhone = trim($phone);
+        $cleanPhone = preg_replace('/[^0-9]/', '', $rawPhone);
+
+        $variants = array_unique(array_filter([
+            $rawPhone,
+            $cleanPhone,
+            str_starts_with($cleanPhone, '62') ? '0' . substr($cleanPhone, 2) : null,
+            str_starts_with($cleanPhone, '0') ? '62' . substr($cleanPhone, 1) : null,
+        ]));
+
+        $patients = Patients::whereIn('phone', $variants)->get();
+        if ($patients->isEmpty()) {
+            return response()->json(['success' => false, 'message' => 'Member tidak ditemukan'], 404);
         }
 
-        $history = MedicineTransactions::with('transactions.medicine')
-            ->where('patient_id', $patient->id)
-            ->where('status', 1)
-            ->orderBy('created_at', 'desc')
-            ->get()
-            ->map(function ($trans) {
-                return [
-                    'transaction_code' => $trans->transaction_code,
-                    'date' => $trans->created_at->format('Y-m-d H:i:s'),
-                    'total' => $trans->subtotal,
-                    'items' => $trans->transactions->map(function ($item) {
-                        return [
-                            'medicine_name' => $item->medicine ? $item->medicine->name : '-',
-                            'qty' => $item->quantity,
-                            'price' => $item->item_price,
-                            'total' => $item->final_price,
-                        ];
-                    })
-                ];
-            });
+        $patientIds = $patients->pluck('id')->toArray();
+        $primaryPatient = $patients->sortByDesc('id')->first();
+
+        $perPage = min((int) ($request->per_page ?? 20), 100);
+
+        // Mapping mobile pharmacy_id → web pharmacy_id
+        $pharmacyMap = [
+            14 => 1,  // Sahabat PMI
+            17 => 2,  // Sahabat Mulawarman
+            16 => 3,  // Sahabat MIM
+            15 => 5,  // Sahabat Antasari
+        ];
+
+        $query = MedicineTransactions::with(['transactions.medicine', 'pharmacy'])
+            ->whereIn('patient_id', $patientIds)
+            ->where('status', 1);
+
+        // Filter cabang (opsional)
+        if ($request->filled('pharmacy_id')) {
+            $mobileId = (int) $request->pharmacy_id;
+            $webId = $pharmacyMap[$mobileId] ?? $mobileId;
+            $query->where('pharmacy_id', $webId);
+        }
+
+        $paginated = $query->orderBy('created_at', 'desc')->paginate($perPage);
+
+        $history = collect($paginated->items())->map(function ($trans) {
+            $isOnline = $trans->transaction_type === 'ONLINE';
+
+            return [
+                'transaction_code' => $trans->transaction_code,
+                'date' => $trans->created_at->format('Y-m-d H:i:s'),
+                'channel' => $isOnline ? 'online' : 'offline',
+                'transaction_type' => $trans->transaction_type,
+                'pharmacy_id' => $trans->pharmacy_id,
+                'pharmacy_name' => $trans->pharmacy?->name ?? '-',
+                'payment_method' => $trans->payment_method,
+                'subtotal' => (int) $trans->subtotal,
+                'discount' => (int) ($trans->discount ?? 0),
+                'total' => (int) $trans->subtotal - (int) ($trans->discount ?? 0),
+                'items' => $trans->transactions->map(function ($item) {
+                    return [
+                        'medicine_name' => $item->medicine?->name ?? '-',
+                        'medicine_code' => $item->medicine?->code ?? '-',
+                        'qty' => (int) $item->quantity,
+                        'price' => (int) $item->item_price,
+                        'discount' => (int) ($item->discount ?? 0),
+                        'total' => (int) $item->final_price,
+                    ];
+                }),
+            ];
+        });
 
         return response()->json([
             'success' => true,
-            'data' => $history
+            'data' => $history,
+            'member' => [
+                'name' => $primaryPatient->name,
+                'phone' => $primaryPatient->phone,
+            ],
+            'pagination' => [
+                'current_page' => $paginated->currentPage(),
+                'last_page' => $paginated->lastPage(),
+                'per_page' => $paginated->perPage(),
+                'total' => $paginated->total(),
+            ],
         ]);
     }
 
