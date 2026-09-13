@@ -167,7 +167,6 @@
                             // 1. Sum the 'total_price' of all medicines inside this specific Racikan
                             $racikanPrice = $groupItems->sum('total_price');
 
-                       
                             $embalase = $groupItems->sum('embalase') ?? 0;
                         @endphp
 
@@ -207,7 +206,7 @@
 
     <div class="text-center">
         Terima Kasih<br>
-        Semoga Lekas Sembuh
+        Semoga Sehat Selalu
     </div>
 </div>
 
