@@ -20,6 +20,7 @@ class LiphPdfExport
         'RETUR JUAL'  => ['tunai',  'Retur Tunai'],
         'RESEP TUNAI' => ['tunai',  'Resep Tunai'],
         'UPDS'        => ['tunai',  'UPDS'],
+        'ONLINE'      => ['tunai',  'Obat Bebas'],
     ];
 
     const TUNAI_ORDER = ['Obat Bebas', 'Retur Tunai', 'Resep Tunai', 'UPDS'];

@@ -31,6 +31,7 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         'RETUR JUAL'  => ['tunai',  'Retur Tunai'],
         'RESEP TUNAI' => ['tunai',  'Resep Tunai'],
         'UPDS'        => ['tunai',  'UPDS'],
+        'ONLINE'      => ['tunai',  'Obat Bebas'],
     ];
 
     const TUNAI_ORDER = ['Obat Bebas', 'Retur Tunai', 'Resep Tunai', 'UPDS'];
@@ -38,10 +39,11 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
     // medicine_cart.cart_type stores abbreviations, not the full
     // transaction_type strings used as TYPE_MAP keys.
     const CART_TYPE_ABBR = [
-        'UK' => 'KREDIT',
-        'UM' => 'RESEP TUNAI',
-        'HV' => 'HV/OTC',
-        'UP' => 'UPDS',
+        'UK'     => 'KREDIT',
+        'UM'     => 'RESEP TUNAI',
+        'HV'     => 'HV/OTC',
+        'UP'     => 'UPDS',
+        'ONLINE' => 'ONLINE',
     ];
 
     private function nz($value)
