@@ -117,6 +117,11 @@
         }
 
         /* Preview table aesthetics */
+        #previewTable {
+            width: 100%;
+            min-width: 1100px;
+        }
+
         #previewTable th {
             background-color: #f8fafc;
             color: #475569;
@@ -134,6 +139,7 @@
             font-size: 13px;
             vertical-align: middle;
             border-bottom: 1px solid #f1f5f9;
+            white-space: nowrap;
         }
 
         #previewTable tbody tr:hover {
@@ -271,13 +277,13 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                             </svg>
-                            Apotek / Unit
+                            Apotek
                         </label>
                         <select id="pharmacySelect"
                             class="w-full rounded-xl border border-gray-300 px-3 py-2 text-xs text-gray-700 bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
                             <option value="all">Semua Apotek</option>
-                            @foreach ($pharmacies as $ph)
-                                <option value="{{ $ph->id }}" {{ $activePharmacyId == $ph->id ? 'selected' : '' }}>
+                            @foreach ($pharmacies as $key => $ph)
+                                <option value="{{ $ph->id }}" {{ $ph->id == 1 ? 'selected' : '' }}>
                                     {{ $ph->name }}
                                 </option>
                             @endforeach
@@ -326,27 +332,43 @@
                 class="hidden bg-white rounded-2xl border border-blue-200 shadow-md p-5 transition-all duration-300">
                 <div class="flex items-center justify-between mb-2">
                     <div class="flex items-center gap-3">
-                        <div
+                        <div id="progressIconBox"
                             class="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0">
-                            <svg class="w-5 h-5 text-blue-600 animate-spin" xmlns="http://www.w3.org/2000/svg"
-                                fill="none" viewBox="0 0 24 24">
+                            <svg id="progressSpinner" class="w-5 h-5 text-blue-600 animate-spin"
+                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
                                     stroke-width="4"></circle>
                                 <path class="opacity-75" fill="currentColor"
                                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
                                 </path>
                             </svg>
+                            <svg id="progressSuccessIcon" class="hidden w-5 h-5 text-emerald-600" fill="none"
+                                viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                                    d="M5 13l4 4L19 7" />
+                            </svg>
                         </div>
                         <div>
                             <span class="text-sm font-bold text-gray-800" id="progressStatus">Memulai antrean ekspor
                                 Excel...</span>
-                            <p class="text-xs text-gray-500 mt-0.5">Sistem memproses seluruh data transaksi per pasien di
+                            <p class="text-xs text-gray-500 mt-0.5" id="progressSubStatus">Sistem memproses seluruh data
+                                transaksi per pasien di
                                 latar belakang...</p>
                         </div>
                     </div>
-                    <span
-                        class="text-xs font-extrabold text-blue-700 bg-blue-100 border border-blue-200 px-3 py-1 rounded-full"
-                        id="progressText">0%</span>
+                    <div class="flex items-center gap-2">
+                        <span
+                            class="text-xs font-extrabold text-blue-700 bg-blue-100 border border-blue-200 px-3 py-1 rounded-full"
+                            id="progressText">0%</span>
+                        <button type="button" onclick="hideProgressBox()" id="btnCloseProgress"
+                            class="hidden p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition"
+                            title="Tutup panel">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
                 </div>
                 <div class="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden mt-3">
                     <div id="progressBar"
@@ -354,13 +376,14 @@
                         style="width: 0%"></div>
                 </div>
                 <div class="flex items-center justify-between mt-2.5 text-xs text-gray-500">
-                    <span class="flex items-center gap-1.5">
+                    <span class="flex items-center gap-1.5" id="progressFooterNotice">
                         <svg class="w-3.5 h-3.5 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24"
                             stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                 d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
-                        <span>File Excel akan otomatis terunduh begitu proses di server selesai.</span>
+                        <span id="progressFooterText">File Excel akan otomatis terunduh begitu proses di server
+                            selesai.</span>
                     </span>
                     <a id="manualDownloadLink" href="#"
                         class="hidden text-blue-600 font-bold hover:underline">Unduh Manual Disini</a>
@@ -777,6 +800,16 @@
         }
 
         // =================================== EXCEL QUEUE EXPORT ===================================
+        let autoCloseProgressTimeout = null;
+
+        function hideProgressBox() {
+            if (autoCloseProgressTimeout) clearTimeout(autoCloseProgressTimeout);
+            const progressContainer = document.getElementById('progressContainer');
+            if (progressContainer) {
+                progressContainer.classList.add('hidden');
+            }
+        }
+
         function startExportExcel() {
             const btnExport = document.getElementById('btnExport');
             const btnExportText = document.getElementById('btnExportText');
@@ -784,7 +817,14 @@
             const progressBar = document.getElementById('progressBar');
             const progressText = document.getElementById('progressText');
             const progressStatus = document.getElementById('progressStatus');
+            const progressSubStatus = document.getElementById('progressSubStatus');
+            const progressSpinner = document.getElementById('progressSpinner');
+            const progressSuccessIcon = document.getElementById('progressSuccessIcon');
+            const progressIconBox = document.getElementById('progressIconBox');
+            const btnCloseProgress = document.getElementById('btnCloseProgress');
             const manualDownloadLink = document.getElementById('manualDownloadLink');
+
+            if (autoCloseProgressTimeout) clearTimeout(autoCloseProgressTimeout);
 
             const payload = getFilterData(1);
 
@@ -793,11 +833,23 @@
             btnExport.classList.add('opacity-70', 'cursor-not-allowed');
             btnExportText.textContent = "Mengantrekan Ekspor...";
 
-            // Show progress box
+            // Reset box state
             progressContainer.classList.remove('hidden');
             progressBar.style.width = '5%';
+            progressBar.className =
+                'bg-gradient-to-r from-blue-500 to-indigo-600 h-2.5 rounded-full transition-all duration-300';
             progressText.textContent = '5%';
+            progressText.className =
+                'text-xs font-extrabold text-blue-700 bg-blue-100 border border-blue-200 px-3 py-1 rounded-full';
             progressStatus.textContent = 'Mendaftarkan antrean ekspor di server...';
+            if (progressSubStatus) {
+                progressSubStatus.textContent = 'Sistem memproses seluruh data transaksi per pasien di latar belakang...';
+            }
+            if (progressSpinner) progressSpinner.classList.remove('hidden');
+            if (progressSuccessIcon) progressSuccessIcon.classList.add('hidden');
+            if (progressIconBox) progressIconBox.className =
+                'w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0';
+            if (btnCloseProgress) btnCloseProgress.classList.add('hidden');
             manualDownloadLink.classList.add('hidden');
 
             axios.post("{{ route('master.patient-transactions.export') }}", payload)
@@ -827,7 +879,13 @@
             const progressBar = document.getElementById('progressBar');
             const progressText = document.getElementById('progressText');
             const progressStatus = document.getElementById('progressStatus');
+            const progressSubStatus = document.getElementById('progressSubStatus');
+            const progressSpinner = document.getElementById('progressSpinner');
+            const progressSuccessIcon = document.getElementById('progressSuccessIcon');
+            const progressIconBox = document.getElementById('progressIconBox');
+            const btnCloseProgress = document.getElementById('btnCloseProgress');
             const manualDownloadLink = document.getElementById('manualDownloadLink');
+            const progressContainer = document.getElementById('progressContainer');
 
             if (exportInterval) clearInterval(exportInterval);
 
@@ -847,8 +905,23 @@
                         } else if (status === 'completed' || status === 'finished') {
                             clearInterval(exportInterval);
                             progressBar.style.width = '100%';
+                            progressBar.className =
+                                'bg-emerald-500 h-2.5 rounded-full transition-all duration-300';
                             progressText.textContent = '100%';
-                            progressStatus.textContent = 'Ekspor Selesai! Mengunduh file Excel...';
+                            progressText.className =
+                                'text-xs font-extrabold text-emerald-700 bg-emerald-100 border border-emerald-200 px-3 py-1 rounded-full';
+
+                            progressStatus.textContent = 'Ekspor Selesai!';
+                            if (progressSubStatus) {
+                                progressSubStatus.textContent =
+                                    'File Excel berhasil dibuat dan sedang diunduh.';
+                            }
+
+                            if (progressSpinner) progressSpinner.classList.add('hidden');
+                            if (progressSuccessIcon) progressSuccessIcon.classList.remove('hidden');
+                            if (progressIconBox) progressIconBox.className =
+                                'w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center shrink-0';
+                            if (btnCloseProgress) btnCloseProgress.classList.remove('hidden');
 
                             iziToast.success({
                                 title: 'Berhasil',
@@ -864,11 +937,20 @@
                             }
 
                             resetExportButton();
+
+                            // Sembunyikan otomatis box progress setelah 4 detik
+                            if (autoCloseProgressTimeout) clearTimeout(autoCloseProgressTimeout);
+                            autoCloseProgressTimeout = setTimeout(function() {
+                                progressContainer.classList.add('hidden');
+                            }, 4000);
                         } else if (status === 'failed') {
                             clearInterval(exportInterval);
                             progressStatus.textContent = 'Proses ekspor gagal di server.';
-                            progressBar.classList.remove('from-blue-500', 'to-indigo-600');
-                            progressBar.classList.add('bg-red-500');
+                            if (progressSubStatus) {
+                                progressSubStatus.textContent = 'Terjadi kendala saat generate berkas.';
+                            }
+                            progressBar.className = 'bg-red-500 h-2.5 rounded-full transition-all duration-300';
+                            if (btnCloseProgress) btnCloseProgress.classList.remove('hidden');
 
                             iziToast.error({
                                 title: 'Ekspor Gagal',
