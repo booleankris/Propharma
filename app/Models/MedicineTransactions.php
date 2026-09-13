@@ -66,7 +66,7 @@ class MedicineTransactions extends Model
         return self::resolveChannelInfo(null, $user);
     }
 
-    public static function resolveChannelInfo($cartUser = null, $txUser = null)
+    public static function resolveChannelInfo($cartUser = null, $txUser = null, $extraUsers = [])
     {
         $getUserRoles = function ($user) {
             if (!$user) return [];
@@ -76,81 +76,90 @@ class MedicineTransactions extends Model
             return $user->roles()->pluck('name')->map(fn($r) => strtolower(trim($r)))->toArray();
         };
 
-        $cartRoles = $getUserRoles($cartUser);
-        $txRoles   = $getUserRoles($txUser);
+        $allCandidates = collect([$cartUser, $txUser]);
+        if (!empty($extraUsers)) {
+            $allCandidates = $allCandidates->concat($extraUsers);
+        }
+        $allCandidates = $allCandidates->filter()->unique('id');
 
         $hasRole = function ($needle, $roles) {
             return in_array(strtolower($needle), $roles);
         };
 
         // 1. Digital (Aplikasi Mobile)
-        if ($hasRole('digital', $cartRoles) || $hasRole('digital', $txRoles)) {
-            $effective = $hasRole('digital', $cartRoles) ? $cartUser : $txUser;
-            return [
-                'key' => 'digital',
-                'role' => 'Digital',
-                'label' => 'Digital (App)',
-                'badge_text' => 'Digital',
-                'sub' => 'Aplikasi Mobile',
-                'color' => 'purple',
-                'effective_user' => $effective,
-                'cart_user' => $cartUser,
-                'tx_user' => $txUser,
-            ];
+        foreach ($allCandidates as $candidate) {
+            $roles = $getUserRoles($candidate);
+            if ($hasRole('digital', $roles)) {
+                return [
+                    'key' => 'digital',
+                    'role' => 'Digital',
+                    'label' => 'Digital (App)',
+                    'badge_text' => 'Digital',
+                    'sub' => 'Aplikasi Mobile',
+                    'color' => 'purple',
+                    'effective_user' => $candidate,
+                    'cart_user' => $cartUser ?? $candidate,
+                    'tx_user' => $txUser,
+                ];
+            }
         }
 
         // 2. Online Shopee
-        if ($hasRole('online shopee', $cartRoles) || $hasRole('shopee', $cartRoles) ||
-            $hasRole('online shopee', $txRoles)   || $hasRole('shopee', $txRoles)) {
-            $effective = ($hasRole('online shopee', $cartRoles) || $hasRole('shopee', $cartRoles)) ? $cartUser : $txUser;
-            return [
-                'key' => 'shopee',
-                'role' => 'Online Shopee',
-                'label' => 'Shopee',
-                'badge_text' => 'Shopee',
-                'sub' => 'Penjualan Shopee',
-                'color' => 'orange',
-                'effective_user' => $effective,
-                'cart_user' => $cartUser,
-                'tx_user' => $txUser,
-            ];
+        foreach ($allCandidates as $candidate) {
+            $roles = $getUserRoles($candidate);
+            if ($hasRole('online shopee', $roles) || $hasRole('shopee', $roles)) {
+                return [
+                    'key' => 'shopee',
+                    'role' => 'Online Shopee',
+                    'label' => 'Shopee',
+                    'badge_text' => 'Shopee',
+                    'sub' => 'Penjualan Shopee',
+                    'color' => 'orange',
+                    'effective_user' => $candidate,
+                    'cart_user' => $cartUser ?? $candidate,
+                    'tx_user' => $txUser,
+                ];
+            }
         }
 
         // 3. Online Grab
-        if ($hasRole('online grab', $cartRoles) || $hasRole('grab', $cartRoles) ||
-            $hasRole('online grab', $txRoles)   || $hasRole('grab', $txRoles)) {
-            $effective = ($hasRole('online grab', $cartRoles) || $hasRole('grab', $cartRoles)) ? $cartUser : $txUser;
-            return [
-                'key' => 'grab',
-                'role' => 'Online Grab',
-                'label' => 'Grab',
-                'badge_text' => 'Grab',
-                'sub' => 'Penjualan Grab',
-                'color' => 'emerald',
-                'effective_user' => $effective,
-                'cart_user' => $cartUser,
-                'tx_user' => $txUser,
-            ];
+        foreach ($allCandidates as $candidate) {
+            $roles = $getUserRoles($candidate);
+            if ($hasRole('online grab', $roles) || $hasRole('grab', $roles)) {
+                return [
+                    'key' => 'grab',
+                    'role' => 'Online Grab',
+                    'label' => 'Grab',
+                    'badge_text' => 'Grab',
+                    'sub' => 'Penjualan Grab',
+                    'color' => 'emerald',
+                    'effective_user' => $candidate,
+                    'cart_user' => $cartUser ?? $candidate,
+                    'tx_user' => $txUser,
+                ];
+            }
         }
 
         // 4. Online (Chat WA)
-        if ($hasRole('online', $cartRoles) || $hasRole('online', $txRoles)) {
-            $effective = $hasRole('online', $cartRoles) ? $cartUser : $txUser;
-            return [
-                'key' => 'online',
-                'role' => 'Online',
-                'label' => 'Online (WA)',
-                'badge_text' => 'Online WA',
-                'sub' => 'Chat WA',
-                'color' => 'green',
-                'effective_user' => $effective,
-                'cart_user' => $cartUser,
-                'tx_user' => $txUser,
-            ];
+        foreach ($allCandidates as $candidate) {
+            $roles = $getUserRoles($candidate);
+            if ($hasRole('online', $roles)) {
+                return [
+                    'key' => 'online',
+                    'role' => 'Online',
+                    'label' => 'Online (WA)',
+                    'badge_text' => 'Online WA',
+                    'sub' => 'Chat WA',
+                    'color' => 'green',
+                    'effective_user' => $candidate,
+                    'cart_user' => $cartUser ?? $candidate,
+                    'tx_user' => $txUser,
+                ];
+            }
         }
 
         // 5. Default / Offline Kasir
-        $effective = $txUser ?? $cartUser;
+        $effective = $txUser ?? $cartUser ?? $allCandidates->first();
         return [
             'key' => 'kasir',
             'role' => $effective?->roles?->first()?->name ?? 'Kasir',
@@ -164,9 +173,9 @@ class MedicineTransactions extends Model
         ];
     }
 
-    public static function renderChannelBadge($cartUser = null, $txUser = null)
+    public static function renderChannelBadge($cartUser = null, $txUser = null, $extraUsers = [])
     {
-        $info = self::resolveChannelInfo($cartUser, $txUser);
+        $info = self::resolveChannelInfo($cartUser, $txUser, $extraUsers);
 
         $onlineUser = $info['effective_user'];
         $cashierUser = ($info['tx_user'] && $onlineUser && $info['tx_user']->id !== $onlineUser->id) ? $info['tx_user'] : null;

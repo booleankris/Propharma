@@ -25,13 +25,14 @@ class SalesDataController extends Controller
 
             $query = MedicineCart::query()
                 ->join('medicine_transactions', 'medicine_transactions.id', '=', 'medicine_cart.transaction_id')
-                ->with(['transactions.patients', 'transactions.user.roles', 'transactions', 'user.roles'])
+                ->with(['transactions.patients', 'transactions.user.roles', 'transactions.transactions.user.roles', 'transactions', 'user.roles'])
                 ->where('medicine_transactions.status', 1)
                 ->whereHas('transactions', function ($transaction) {
                     $transaction->where('pharmacy_id', getActivePharmacyId());
                 })
                 ->selectRaw('
                 transaction_id,
+                MAX(medicine_cart.user_id) as user_id,
                 MAX(medicine_transactions.transaction_code) as transaction_code,
                 MAX(medicine_transactions.updated_at) as updated_at,
                 SUM(medicine_cart.discount) as totaldiscount,
@@ -131,13 +132,16 @@ class SalesDataController extends Controller
                     return $row->transactions?->transaction_code ?? '-';
                 })
                 ->addColumn('channel', function ($row) {
-                    return MedicineTransactions::renderChannelBadge($row->user, $row->transactions?->user);
+                    $cartUsers = $row->transactions?->transactions?->pluck('user')->filter() ?? collect();
+                    return MedicineTransactions::renderChannelBadge($row->user, $row->transactions?->user, $cartUsers);
                 })
                 ->addColumn('channel_name', function ($row) {
-                    return MedicineTransactions::resolveChannelInfo($row->user, $row->transactions?->user)['label'];
+                    $cartUsers = $row->transactions?->transactions?->pluck('user')->filter() ?? collect();
+                    return MedicineTransactions::resolveChannelInfo($row->user, $row->transactions?->user, $cartUsers)['label'];
                 })
                 ->addColumn('creator_name', function ($row) {
-                    $info = MedicineTransactions::resolveChannelInfo($row->user, $row->transactions?->user);
+                    $cartUsers = $row->transactions?->transactions?->pluck('user')->filter() ?? collect();
+                    $info = MedicineTransactions::resolveChannelInfo($row->user, $row->transactions?->user, $cartUsers);
                     $user = $info['effective_user'] ?? $row->user ?? $row->transactions?->user;
                     return $user ? ($user->name ?? $user->username) : '-';
                 })
@@ -186,13 +190,14 @@ class SalesDataController extends Controller
 
             $query = MedicineCart::query()
                 ->join('medicine_transactions', 'medicine_transactions.id', '=', 'medicine_cart.transaction_id')
-                ->with(['transactions.patients', 'transactions.user.roles', 'transactions', 'user.roles'])
+                ->with(['transactions.patients', 'transactions.user.roles', 'transactions.transactions.user.roles', 'transactions', 'user.roles'])
                 ->whereHas('transactions', function ($transaction) {
                     $transaction->where('pharmacy_id', getActivePharmacyId())
                         ->where('status', 0);
                 })
                 ->selectRaw('
                 transaction_id,
+                MAX(medicine_cart.user_id) as user_id,
                 MAX(medicine_transactions.transaction_code) as transaction_code,
                 MAX(medicine_cart.updated_at) as updated_at,
                 SUM(medicine_cart.discount) as totaldiscount,
@@ -292,13 +297,16 @@ class SalesDataController extends Controller
                     return $row->transactions?->transaction_code ?? '-';
                 })
                 ->addColumn('channel', function ($row) {
-                    return MedicineTransactions::renderChannelBadge($row->user, $row->transactions?->user);
+                    $cartUsers = $row->transactions?->transactions?->pluck('user')->filter() ?? collect();
+                    return MedicineTransactions::renderChannelBadge($row->user, $row->transactions?->user, $cartUsers);
                 })
                 ->addColumn('channel_name', function ($row) {
-                    return MedicineTransactions::resolveChannelInfo($row->user, $row->transactions?->user)['label'];
+                    $cartUsers = $row->transactions?->transactions?->pluck('user')->filter() ?? collect();
+                    return MedicineTransactions::resolveChannelInfo($row->user, $row->transactions?->user, $cartUsers)['label'];
                 })
                 ->addColumn('creator_name', function ($row) {
-                    $info = MedicineTransactions::resolveChannelInfo($row->user, $row->transactions?->user);
+                    $cartUsers = $row->transactions?->transactions?->pluck('user')->filter() ?? collect();
+                    $info = MedicineTransactions::resolveChannelInfo($row->user, $row->transactions?->user, $cartUsers);
                     $user = $info['effective_user'] ?? $row->user ?? $row->transactions?->user;
                     return $user ? ($user->name ?? $user->username) : '-';
                 })
