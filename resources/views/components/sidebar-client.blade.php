@@ -1528,6 +1528,19 @@
                     <span class="text-sm font-semibold text-teal-700   group-hover:text-white transition-colors">Master
                         Pasien</span>
                 </a>
+                <a href="{{ route('master.patient-transactions.index') }}"
+                    class="group flex items-center gap-3 p-3.5 rounded-2xl bg-sky-50   hover:bg-sky-500   border border-sky-100   hover:border-sky-500   transition-all duration-200 hover:-translate-y-0.5">
+                    <div
+                        class="w-9 h-9 rounded-xl bg-sky-100   group-hover:bg-sky-400   flex items-center justify-center flex-shrink-0 transition-colors">
+                        <svg class="w-5 h-5 text-sky-500   group-hover:text-white transition-colors" fill="none"
+                            viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                    </div>
+                    <span class="text-sm font-semibold text-sky-700   group-hover:text-white transition-colors">Transaksi
+                        Pasien</span>
+                </a>
                 <a href="{{ route('factories.index') }}"
                     class="group flex items-center gap-3 p-3.5 rounded-2xl bg-orange-50  hover:bg-orange-500  border border-orange-100  hover:border-orange-500  transition-all duration-200 hover:-translate-y-0.5">
                     <div

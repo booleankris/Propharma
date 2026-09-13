@@ -263,6 +263,35 @@
             color: #dc2626;
             border-color: #fca5a5;
         }
+
+        .channel-filter-wrap {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 12px;
+        }
+
+        .channel-filter-wrap label {
+            font-size: 12px;
+            color: #6b7280;
+            white-space: nowrap;
+        }
+
+        .channel-filter-wrap select {
+            padding: 6px 10px;
+            font-size: 12px;
+            border-radius: 8px;
+            border: 0.5px solid #d1d5db;
+            outline: none;
+            background: #fff;
+            color: #374151;
+            cursor: pointer;
+        }
+
+        .channel-filter-wrap select:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, .12);
+        }
     </style>
 @endsection
 
@@ -308,11 +337,24 @@
                             Kembali
                         </a>
                     </div>
-                    <div class="date-filter-wrap">
-                        <label>Periode</label>
-                        <input type="text" id="date-range" placeholder="dd/mm/yyyy — dd/mm/yyyy" readonly
-                            style="width: 210px;">
-                        <button class="btn-clear-date" id="btn-clear-date">Reset</button>
+                    <div class="flex flex-wrap items-center gap-3 mb-2">
+                        <div class="date-filter-wrap !mb-0">
+                            <label>Periode</label>
+                            <input type="text" id="date-range" placeholder="dd/mm/yyyy — dd/mm/yyyy" readonly
+                                style="width: 210px;">
+                            <button class="btn-clear-date" id="btn-clear-date">Reset</button>
+                        </div>
+                        <div class="channel-filter-wrap !mb-0">
+                            <label>Jenis Transaksi</label>
+                            <select id="channel-filter">
+                                <option value="">Semua Jenis Transaksi</option>
+                                <option value="kasir">Kasir (Offline)</option>
+                                <option value="online">Online (Chat WA)</option>
+                                <option value="shopee">Online Shopee</option>
+                                <option value="grab">Online Grab</option>
+                                <option value="digital">Digital (Aplikasi Mobile)</option>
+                            </select>
+                        </div>
                     </div>
                     <div class="overflow-x-auto">
                         <table id="table-data" class="w-full">
@@ -322,6 +364,7 @@
                                     <th>Tanggal</th>
                                     <th>Jam</th>
                                     <th>Nomor</th>
+                                    <th>Jenis</th>
                                     <th>Tipe</th>
                                     <th>Pasien</th>
                                     <th class="col-right">Harga</th>
@@ -338,8 +381,11 @@
                 <div class="lg:col-span-2 bg-white border border-gray-100 rounded-xl p-5">
 
                     <div class="flex items-center justify-between mb-4">
-                        <h2 class="text-[14px] font-medium text-gray-800">Detail transaksi</h2>
-                        <span id="detail-code" class="text-[11px] font-mono text-gray-400">—</span>
+                        <div>
+                            <h2 class="text-[14px] font-medium text-gray-800">Detail transaksi</h2>
+                            <span id="detail-code" class="text-[11px] font-mono text-gray-400">—</span>
+                        </div>
+                        <div id="detail-channel-badge"></div>
                     </div>
 
                     <div id="detail-empty" class="empty-state">
@@ -351,6 +397,16 @@
                     </div>
 
                     <div id="detail-wrap" class="hidden">
+                        <div class="grid grid-cols-2 gap-2 p-2.5 mb-3 bg-gray-50 rounded-lg text-[12px] border border-gray-100">
+                            <div>
+                                <span class="text-gray-400 block text-[10px] uppercase font-medium">Pasien:</span>
+                                <span id="detail-patient" class="font-semibold text-gray-800 truncate block">—</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-400 block text-[10px] uppercase font-medium">Kasir / Pembuat:</span>
+                                <span id="detail-creator" class="font-semibold text-gray-800 truncate block">—</span>
+                            </div>
+                        </div>
                         <div class="overflow-x-auto">
                             <table id="items-table" class="w-full">
                                 <thead>
@@ -433,11 +489,12 @@
                         const parts = val.split(' to ');
                         d.date_from = parts[0] ?? '';
                         d.date_to = parts[1] ?? '';
+                        d.channel = $('#channel-filter').val();
                     }
                 },
                 language: {
                     search: '',
-                    searchPlaceholder: 'Cari nomor, nama pasien...'
+                    searchPlaceholder: 'Cari nomor, nama pasien, kasir...'
                 },
                 columns: [{
                         data: 'DT_RowIndex',
@@ -457,6 +514,11 @@
                         className: 'col-mono'
                     },
                     {
+                        data: 'channel',
+                        orderable: false,
+                        searchable: false,
+                    },
+                    {
                         data: 'type',
                         className: 'col-mono'
                     },
@@ -471,8 +533,24 @@
                         data: 'payment_method',
                         defaultContent: '-'
                     },
-
+                    {
+                        data: null,
+                        orderable: false,
+                        searchable: false,
+                        render: (d) =>
+                            `<button class="btn-print" onclick="event.stopPropagation(); window.open('/print/receipt/${d.transactions.id}','_blank')">
+                    <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
+                        <polyline points="4 6 4 1 12 1 12 6"/>
+                        <path d="M4 12H3a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1"/>
+                        <rect x="4" y="10" width="8" height="5"/>
+                    </svg>Cetak</button>`
+                    },
                 ],
+            });
+
+            // ── Channel filter change ─────────────────────────────────────────
+            $('#channel-filter').on('change', function() {
+                tableData.ajax.reload();
             });
 
             // ── Row click → load items ────────────────────────────────────────
@@ -482,6 +560,9 @@
                 $('#table-data tbody tr').removeClass('active');
                 $(this).addClass('active');
                 document.getElementById('detail-code').textContent = data.code;
+                document.getElementById('detail-channel-badge').innerHTML = data.channel || '';
+                document.getElementById('detail-patient').textContent = data.name || 'Umum / Tanpa Pasien';
+                document.getElementById('detail-creator').textContent = data.creator_name || '-';
                 loadItems(data.transaction_id, data.final_price, data.subtotal, data.totaldiscount);
             });
         });

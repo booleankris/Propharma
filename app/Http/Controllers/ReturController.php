@@ -46,12 +46,12 @@ class ReturController extends Controller
         $data = MedicineCart::query()
             ->with(['transactions.patients'])
             ->whereHas('transactions', function ($q) use ($search) {
-                $q->where('transaction_type', '!=', 'RETUR')
+                $q->where('medicine_transactions.transaction_type', '!=', 'RETUR')
                     // 1. Pastikan pharmacy_id selalu terfilter
-                    ->where('pharmacy_id', getActivePharmacyId())
+                    ->where('medicine_transactions.pharmacy_id', getActivePharmacyId())
                     // 2. Grup terpisah khusus untuk logic pencarian (OR)
                     ->where(function ($q2) use ($search) {
-                        $q2->where('transaction_code', 'LIKE', "%{$search}%")
+                        $q2->where('medicine_transactions.transaction_code', 'LIKE', "%{$search}%")
                             ->orWhereHas('patients', function ($q3) use ($search) {
                                 $q3->where('name', 'LIKE', "%{$search}%");
                             });
@@ -82,12 +82,31 @@ class ReturController extends Controller
             return response()->json([]);
         }
 
+        // Ambil transaksi berdasarkan transaction_code
+        $transaction = MedicineTransactions::where('transaction_code', $transactionCode)->first();
+        $transactionId = $transaction ? $transaction->id : null;
+
+        // Ambil ID obat-obat yang sudah pernah diretur pada transaksi ini SAJA
+        $returnedFromLog = ItemsLog::where('transaction_code', $transactionCode)
+            ->where(function ($q) {
+                $q->where('status', 3)->orWhere('type', 'RT');
+            })
+            ->pluck('medicine_id')
+            ->toArray();
+
+        $returnedFromRetur = $transactionId
+            ? Retur::where('transaction_id', $transactionId)->pluck('medicine_id')->toArray()
+            : [];
+
+        $returnedMedicineIds = array_unique(array_merge($returnedFromLog, $returnedFromRetur));
+
         $transactionCart = MedicineCart::with(['medicine', 'transactions'])
             ->whereHas('transactions', function ($q) use ($transactionCode) {
                 $q->where('transaction_code', $transactionCode);
             })
             ->get()
-            ->map(function ($item) {
+            ->map(function ($item) use ($returnedMedicineIds) {
+                $isLocked = in_array($item->medicine_id, $returnedMedicineIds);
                 return [
                     'id' => $item->id,
                     'medicine_id' => $item->medicine_id,
@@ -95,6 +114,8 @@ class ReturController extends Controller
                     'quantity' => $item->quantity,
                     'final_price' => $item->final_price,
                     'item_price' => $item->item_price ?? 0,
+                    'is_locked' => $isLocked,
+                    'is_returned' => $isLocked,
                     'medicine' => [
                         'id' => $item->medicine->id ?? null,
                         'code' => $item->medicine->code ?? '',
@@ -171,43 +192,51 @@ class ReturController extends Controller
     }
     public function returItem(Request $request)
     {
-
         $request->validate([
             'transaction_id' => 'required|integer',
             'medicine_id' => 'required|integer',
             'qty_retur' => 'required|numeric|min:1',
             'total_retur' => 'required',
             'old_qty' => 'required',
-
+            'transfer_id' => 'required|integer',
         ]);
+
+        $findcode = MedicineTransactions::findOrFail($request->transaction_id);
+
+        // Validasi lock: Cek apakah obat ini pada transaksi ini sudah pernah di-retur
+        $alreadyReturnedInLog = ItemsLog::where('transaction_code', $findcode->transaction_code)
+            ->where('medicine_id', $request->medicine_id)
+            ->where(function ($q) {
+                $q->where('status', 3)->orWhere('type', 'RT');
+            })
+            ->exists();
+
+        $alreadyReturnedInRetur = Retur::where('transaction_id', $request->transaction_id)
+            ->where('medicine_id', $request->medicine_id)
+            ->exists();
+
+        if ($alreadyReturnedInLog || $alreadyReturnedInRetur) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Obat ini pada transaksi ini sudah pernah di-retur dan telah dikunci. Tidak dapat diretur kembali.',
+            ], 422);
+        }
+
         DB::beginTransaction();
 
         try {
-            $findcode = MedicineTransactions::findOrFail($request->transaction_id);
             $now = Carbon::now()->format('Y-m-d');
-
 
             $medicine = Medicines::where('id', $request->medicine_id)
                 ->lockForUpdate()
                 ->firstOrFail();
             $qty_before = $medicine->stock;
 
-
-
-            // $batches = Batches::where('medicine_id', $request->medicine_id)
-            //     ->where('expired_at', $request->expired_date)
-            //     ->where('name', $request->batch)
-            //     ->first();
-            // if ($batches) {
-            //     $batches->increment('stock', $request->qty_rsetur);
-            // }
-
             $transfer = MedicineTransferItems::findOrFail($request->transfer_id);
             $transfer->qty += $request->qty_retur; // add back to counter stock
             $transfer->save();
 
-
-            // Create Retur (Retur Sales = 3)
+            // Create Retur Log (Retur Sales = 3)
             $itemsLog = ItemsLog::create([
                 'transaction_code' => $findcode->transaction_code,
                 'code' => $this->generateItemsLogCode(),
@@ -223,10 +252,21 @@ class ReturController extends Controller
                 'user_id' => auth()->user()->id,
             ]);
 
+            // Create record di tabel Retur
+            $returCode = $this->generateReturCode();
+            Retur::create([
+                'code' => $returCode,
+                'transaction_id' => $request->transaction_id,
+                'medicine_id' => $request->medicine_id,
+                'qty_retur' => $request->qty_retur,
+                'total_retur' => $request->total_retur,
+                'status' => 1,
+            ]);
+
             $activeshift = activeShift();
 
             // Create New Retur Transaction
-            $getTransactiondata = MedicineTransactions::findOrFail($request->transaction_id);
+            $getTransactiondata = $findcode;
             $transaction = MedicineTransactions::create([
                 'pharmacy_id' => $getTransactiondata->pharmacy_id,
                 "debtor_id" => $getTransactiondata->debtor_id,
@@ -238,42 +278,14 @@ class ReturController extends Controller
                 "changes" => "-",
                 "subtotal" => $request->total_retur,
                 "discount" => "-",
-                "shift_logs_id" => $activeshift->id,
+                "shift_logs_id" => $activeshift->id ?? null,
                 "status" => $getTransactiondata->status,
                 "created_at" => $getTransactiondata->created_at,
                 "updated_at" => $getTransactiondata->updated_at,
             ]);
 
-
             // Get & Increase stock
             $medicine->increment('stock', $request->qty_retur);
-
-
-            // if ($request->old_qty - $request->qty_retur == 0) {
-            //     $cart->delete();
-            //     $cart->update([
-            //         'final_price'   => $cart->final_price - $request->total_retur - $cart->discount,
-            //         'total_price'   => $cart->final_price - $request->total_retur,
-            //         'quantity'      => $request->old_qty - $request->qty_retur,
-            //     ]);
-            // } else if ($request->old_qty - $request->qty_retur > 0) {
-            //     $cart->update([
-            //         'final_price'   => $cart->final_price - $request->total_retur - $cart->discount,
-            //         'total_price'   => $cart->final_price - $request->total_retur,
-            //         'quantity'      => $request->old_qty - $request->qty_retur,
-            //     ]);
-            // } else {
-
-            // }
-
-
-            // Get & Update Transaction
-            // $transaction = MedicineTransactions::findOrFail($request->transaction_id);
-            // $transaction->update([
-            //     'status'        => 2,
-            //     'total_retur'   => $request->total_retur,
-            //     'updated_at'    => now(),
-            // ]);
 
             DB::commit();
 
@@ -283,7 +295,6 @@ class ReturController extends Controller
                 'retur_code' => $this->generateReturCode(), // next retur code
             ]);
         } catch (\Throwable $e) {
-
             DB::rollBack();
             
             \Log::error('Retur Error: ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine());
@@ -297,11 +308,15 @@ class ReturController extends Controller
     public function getBatchesByMedicine(Request $request)
     {
         $medicine_id = $request->medicine_id;
+        $pharmacyId = getActivePharmacyId();
 
         $transfers = MedicineTransferItems::join('batches', 'medicine_transfer_items.batches_id', '=', 'batches.id')
             ->join('etalases', 'medicine_transfer_items.etalases_id', '=', 'etalases.id')
             ->where('batches.medicine_id', $medicine_id)
-            ->where('pharmacy_id', getActivePharmacyId())
+            ->where(function ($q) use ($pharmacyId) {
+                $q->where('etalases.pharmacy_id', $pharmacyId)
+                  ->orWhere('batches.pharmacy_id', $pharmacyId);
+            })
             ->orderBy('batches.expired_date', 'asc') // FEFO
             ->select(
                 'medicine_transfer_items.id as transfer_id',
@@ -309,9 +324,25 @@ class ReturController extends Controller
                 'batches.id as batch_id',
                 'batches.name as batch_name',
                 'batches.expired_date',
-                'etalases.name as etalase_name',
+                'etalases.name as etalase_name'
             )
             ->get();
+
+        if ($transfers->isEmpty()) {
+            $transfers = MedicineTransferItems::join('batches', 'medicine_transfer_items.batches_id', '=', 'batches.id')
+                ->join('etalases', 'medicine_transfer_items.etalases_id', '=', 'etalases.id')
+                ->where('batches.medicine_id', $medicine_id)
+                ->orderBy('batches.expired_date', 'asc')
+                ->select(
+                    'medicine_transfer_items.id as transfer_id',
+                    'medicine_transfer_items.qty as counter_stock',
+                    'batches.id as batch_id',
+                    'batches.name as batch_name',
+                    'batches.expired_date',
+                    'etalases.name as etalase_name'
+                )
+                ->get();
+        }
 
         return response()->json($transfers);
     }

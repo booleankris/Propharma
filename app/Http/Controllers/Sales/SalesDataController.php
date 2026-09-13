@@ -18,13 +18,14 @@ class SalesDataController extends Controller
     {
         if ($request->ajax()) {
 
-            $search   = trim($request->input('search.value'));
+            $search   = trim((string) $request->input('search.value'));
             $dateFrom = $request->input('date_from');
             $dateTo   = $request->input('date_to');
+            $channel  = $request->input('channel');
 
             $query = MedicineCart::query()
                 ->join('medicine_transactions', 'medicine_transactions.id', '=', 'medicine_cart.transaction_id')
-                ->with(['transactions.patients', 'transactions'])
+                ->with(['transactions.patients', 'transactions.user.roles', 'transactions'])
                 ->where('medicine_transactions.status', 1)
                 ->whereHas('transactions', function ($transaction) {
                     $transaction->where('pharmacy_id', getActivePharmacyId());
@@ -42,6 +43,33 @@ class SalesDataController extends Controller
                 ->groupBy('transaction_id')
                 ->orderBy('transaction_code');
 
+            // Filter Channel / Jenis Transaksi
+            if ($channel) {
+                if ($channel === 'shopee') {
+                    $query->whereHas('transactions.user.roles', function ($r) {
+                        $r->where('name', 'Online Shopee');
+                    });
+                } elseif ($channel === 'grab') {
+                    $query->whereHas('transactions.user.roles', function ($r) {
+                        $r->where('name', 'Online Grab');
+                    });
+                } elseif ($channel === 'online') {
+                    $query->whereHas('transactions.user.roles', function ($r) {
+                        $r->where('name', 'Online');
+                    });
+                } elseif ($channel === 'digital') {
+                    $query->whereHas('transactions.user.roles', function ($r) {
+                        $r->where('name', 'Digital');
+                    });
+                } elseif ($channel === 'kasir') {
+                    $query->where(function ($q) {
+                        $q->whereDoesntHave('transactions.user.roles', function ($r) {
+                            $r->whereIn('name', ['Online Shopee', 'Online Grab', 'Online', 'Digital']);
+                        })->orWhereNull('medicine_transactions.user_id');
+                    });
+                }
+            }
+
             // text search only
             if ($search) {
                 $query->where(function ($q) use ($search) {
@@ -53,13 +81,14 @@ class SalesDataController extends Controller
                         })
                             ->orWhereHas('transactions.patients', function ($p) use ($search) {
                                 $p->where('name', 'like', "%{$search}%");
+                            })
+                            ->orWhereHas('transactions.user', function ($u) use ($search) {
+                                $u->where('name', 'like', "%{$search}%")
+                                    ->orWhere('username', 'like', "%{$search}%");
                             });
                     }
                 });
             }
-
-            $dateFrom = $request->input('date_from');
-            $dateTo   = $request->input('date_to');
 
             // If only one date was sent, treat it as a single-day filter
             if ($dateFrom && !$dateTo) {
@@ -93,6 +122,16 @@ class SalesDataController extends Controller
                 ->addColumn('code', function ($row) {
                     return $row->transactions?->transaction_code ?? '-';
                 })
+                ->addColumn('channel', function ($row) {
+                    return MedicineTransactions::renderChannelBadge($row->transactions?->user);
+                })
+                ->addColumn('channel_name', function ($row) {
+                    return MedicineTransactions::resolveChannelInfo($row->transactions?->user)['label'];
+                })
+                ->addColumn('creator_name', function ($row) {
+                    $user = $row->transactions?->user;
+                    return $user ? ($user->name ?? $user->username) : '-';
+                })
                 ->addColumn('type', function ($row) {
                     $type = $row->transactions?->transaction_type ?? '-';
 
@@ -121,8 +160,7 @@ class SalesDataController extends Controller
                         $row->transactions?->transfer_bank_name
                     );
                 })
-
-                ->rawColumns(['final_price'])
+                ->rawColumns(['final_price', 'channel'])
                 ->make(true);
         }
 
@@ -132,13 +170,14 @@ class SalesDataController extends Controller
     {
         if ($request->ajax()) {
 
-            $search   = trim($request->input('search.value'));
+            $search   = trim((string) $request->input('search.value'));
             $dateFrom = $request->input('date_from');
             $dateTo   = $request->input('date_to');
+            $channel  = $request->input('channel');
 
             $query = MedicineCart::query()
                 ->join('medicine_transactions', 'medicine_transactions.id', '=', 'medicine_cart.transaction_id')
-                ->with(['transactions.patients', 'transactions'])
+                ->with(['transactions.patients', 'transactions.user.roles', 'transactions'])
                 ->whereHas('transactions', function ($transaction) {
                     $transaction->where('pharmacy_id', getActivePharmacyId())
                         ->where('status', 0);
@@ -156,6 +195,33 @@ class SalesDataController extends Controller
                 ->groupBy('transaction_id')
                 ->orderBy('transaction_code');
 
+            // Filter Channel / Jenis Transaksi
+            if ($channel) {
+                if ($channel === 'shopee') {
+                    $query->whereHas('transactions.user.roles', function ($r) {
+                        $r->where('name', 'Online Shopee');
+                    });
+                } elseif ($channel === 'grab') {
+                    $query->whereHas('transactions.user.roles', function ($r) {
+                        $r->where('name', 'Online Grab');
+                    });
+                } elseif ($channel === 'online') {
+                    $query->whereHas('transactions.user.roles', function ($r) {
+                        $r->where('name', 'Online');
+                    });
+                } elseif ($channel === 'digital') {
+                    $query->whereHas('transactions.user.roles', function ($r) {
+                        $r->where('name', 'Digital');
+                    });
+                } elseif ($channel === 'kasir') {
+                    $query->where(function ($q) {
+                        $q->whereDoesntHave('transactions.user.roles', function ($r) {
+                            $r->whereIn('name', ['Online Shopee', 'Online Grab', 'Online', 'Digital']);
+                        })->orWhereNull('medicine_transactions.user_id');
+                    });
+                }
+            }
+
             // text search only
             if ($search) {
                 $query->where(function ($q) use ($search) {
@@ -167,13 +233,14 @@ class SalesDataController extends Controller
                         })
                             ->orWhereHas('transactions.patients', function ($p) use ($search) {
                                 $p->where('name', 'like', "%{$search}%");
+                            })
+                            ->orWhereHas('transactions.user', function ($u) use ($search) {
+                                $u->where('name', 'like', "%{$search}%")
+                                    ->orWhere('username', 'like', "%{$search}%");
                             });
                     }
                 });
             }
-
-            $dateFrom = $request->input('date_from');
-            $dateTo   = $request->input('date_to');
 
             // If only one date was sent, treat it as a single-day filter
             if ($dateFrom && !$dateTo) {
@@ -207,6 +274,16 @@ class SalesDataController extends Controller
                 ->addColumn('code', function ($row) {
                     return $row->transactions?->transaction_code ?? '-';
                 })
+                ->addColumn('channel', function ($row) {
+                    return MedicineTransactions::renderChannelBadge($row->transactions?->user);
+                })
+                ->addColumn('channel_name', function ($row) {
+                    return MedicineTransactions::resolveChannelInfo($row->transactions?->user)['label'];
+                })
+                ->addColumn('creator_name', function ($row) {
+                    $user = $row->transactions?->user;
+                    return $user ? ($user->name ?? $user->username) : '-';
+                })
                 ->addColumn('type', function ($row) {
                     $type = $row->transactions?->transaction_type ?? '-';
 
@@ -235,8 +312,7 @@ class SalesDataController extends Controller
                         $row->transactions?->transfer_bank_name
                     );
                 })
-
-                ->rawColumns(['final_price'])
+                ->rawColumns(['final_price', 'channel'])
                 ->make(true);
         }
 

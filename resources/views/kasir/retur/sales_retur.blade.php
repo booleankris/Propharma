@@ -152,6 +152,29 @@
             border-color: #3b82f6 !important;
             box-shadow: 0 0 0 3px rgba(59, 130, 246, .15) !important;
         }
+
+        #medicineTable tbody tr.row-locked {
+            cursor: not-allowed !important;
+            background-color: #f9fafb !important;
+        }
+
+        #medicineTable tbody tr.row-locked:hover {
+            background-color: #f3f4f6 !important;
+        }
+
+        .badge-locked {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 7px;
+            font-size: 10px;
+            font-weight: 600;
+            color: #e11d48;
+            background-color: #ffe4e6;
+            border: 1px solid #fecdd3;
+            border-radius: 9999px;
+            white-space: nowrap;
+        }
     </style>
 @endsection
 
@@ -162,6 +185,16 @@
 
                 {{-- LEFT: Form Panel --}}
                 <div class="bg-white border border-gray-100 rounded-xl p-6">
+
+                    {{-- Warning Banner --}}
+                    <div class="flex items-start gap-2.5 p-3 mb-4 rounded-xl bg-amber-50 border border-amber-200/80 text-amber-900 text-[12px] leading-relaxed">
+                        <svg class="w-4 h-4 text-amber-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        <div>
+                            <span class="font-semibold text-amber-950">Perhatian:</span> Obat yang telah di-retur akan <strong>dikunci otomatis</strong> pada transaksi ini dan <strong>tidak dapat diretur kembali</strong>.
+                        </div>
+                    </div>
 
                     {{-- Info Retur --}}
                     <p class="text-[11px] font-medium text-gray-400 uppercase tracking-widest mb-3">Informasi Retur</p>
@@ -504,6 +537,8 @@
             $('#total_retur').val('');
             $('#batch').val('');
             $('#expired_date').val('');
+            $('#transfer_id').val('');
+            $('#batch_select').html('<option value="">— Pilih batch / etalase —</option>');
 
             // Remove active row highlight from table
             $('#medicineTable tbody tr').removeClass('active');
@@ -518,6 +553,7 @@
             const total_retur = $('#total_retur').val();
             const transfer_id = $('#transfer_id').val();
             const medicine_code = $('#medicine_code').val();
+            const medicine_name = $('#medicine_name').val() || 'obat ini';
             const old_qty = $('#old_qty').val();
 
             // Basic validation
@@ -533,7 +569,7 @@
             if (!qty_retur || qty_retur <= 0) {
                 iziToast.warning({
                     title: 'Peringatan',
-                    message: 'Qty retur harus diisi.',
+                    message: 'Qty retur harus diisi dan lebih besar dari 0.',
                     position: 'topRight'
                 });
                 $('#qty').focus();
@@ -543,69 +579,95 @@
             if (!transfer_id) {
                 iziToast.warning({
                     title: 'Peringatan',
-                    message: 'Pilih batch terlebih dahulu.',
+                    message: 'Pilih batch & etalase terlebih dahulu.',
                     position: 'topRight'
                 });
                 $('#batch_select').focus();
                 return;
             }
 
-            const btn = document.getElementById('submitBtn');
-            btn.disabled = true;
-            btn.innerHTML = `
-                <svg class="w-3.5 h-3.5 animate-spin" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="8" cy="8" r="6" stroke-dasharray="28" stroke-dashoffset="10"/>
-                </svg>
-                Menyimpan...
-            `;
-
-            axios.post('{{ route('returdata.returItem') }}', {
-                    medicine_id,
-                    cart_id,
-                    transaction_id,
-                    qty_retur,
-                    total_retur,
-                    transfer_id,
-                    medicine_code,
-                    old_qty,
-                    _token: '{{ csrf_token() }}'
-                })
-                .then(response => {
-                    iziToast.success({
-                        title: 'Berhasil',
-                        message: `Retur obat berhasil disimpan.`,
-                        position: 'topRight'
-                    });
-
-                    // Update retur code display if returned from server
-                    if (response.data.retur_code) {
-                        $('#retur_code_display').val(response.data.retur_code);
+            // Peringatan konfirmasi retur dan penguncian
+            swal({
+                title: 'Konfirmasi Retur',
+                text: `PERHATIAN:\nObat "${medicine_name}" pada transaksi ini akan dikunci permanen dan TIDAK DAPAT di-retur lagi di transaksi ini.\n\nApakah Anda yakin ingin melanjutkan proses retur?`,
+                icon: 'warning',
+                buttons: {
+                    cancel: {
+                        text: 'Batal',
+                        value: null,
+                        visible: true,
+                        className: 'btn btn-secondary',
+                        closeModal: true,
+                    },
+                    confirm: {
+                        text: 'Ya, Retur & Kunci',
+                        value: true,
+                        visible: true,
+                        className: 'btn btn-danger',
+                        closeModal: true
                     }
+                },
+                dangerMode: true,
+            }).then(function(confirmed) {
+                if (!confirmed) return;
 
-                    // Reset form but keep transaction selected so user can retur next item
-                    resetReturForm();
-
-                    // Reload medicine table to reflect updated data
-                    medicineTable?.ajax.reload(null, false);
-                })
-                .catch(error => {
-                    const message = error.response?.data?.message || 'Terjadi kesalahan. Coba lagi.';
-                    iziToast.error({
-                        title: 'Gagal',
-                        message,
-                        position: 'topRight'
-                    });
-                })
-                .finally(() => {
-                    btn.disabled = false;
-                    btn.innerHTML = `
-                    <svg class="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor"
-                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="2 9 6 13 14 4" />
+                const btn = document.getElementById('submitBtn');
+                btn.disabled = true;
+                btn.innerHTML = `
+                    <svg class="w-3.5 h-3.5 animate-spin" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="8" cy="8" r="6" stroke-dasharray="28" stroke-dashoffset="10"/>
                     </svg>
-                    Simpan
+                    Menyimpan...
                 `;
-                });
+
+                axios.post('{{ route('returdata.returItem') }}', {
+                        medicine_id,
+                        cart_id,
+                        transaction_id,
+                        qty_retur,
+                        total_retur,
+                        transfer_id,
+                        medicine_code,
+                        old_qty,
+                        _token: '{{ csrf_token() }}'
+                    })
+                    .then(response => {
+                        iziToast.success({
+                            title: 'Berhasil',
+                            message: response.data?.message || 'Retur obat berhasil disimpan.',
+                            position: 'topRight'
+                        });
+
+                        // Update retur code display if returned from server
+                        if (response.data.retur_code) {
+                            $('#retur_code_display').val(response.data.retur_code);
+                        }
+
+                        // Reset form but keep transaction selected so user can retur next item
+                        resetReturForm();
+
+                        // Reload medicine table to reflect updated data
+                        medicineTable?.ajax.reload(null, false);
+                    })
+                    .catch(error => {
+                        const message = error.response?.data?.message || 'Terjadi kesalahan. Coba lagi.';
+                        iziToast.error({
+                            title: 'Gagal Retur',
+                            message,
+                            position: 'topRight'
+                        });
+                    })
+                    .finally(() => {
+                        btn.disabled = false;
+                        btn.innerHTML = `
+                            <svg class="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="2 9 6 13 14 4" />
+                            </svg>
+                            Simpan
+                        `;
+                    });
+            });
         }
 
         // ─── DOM-dependent code ───────────────────────────────────────────────────────
@@ -689,17 +751,41 @@
                         render: (d, t, r, m) => m.row + 1
                     },
                     {
-                        data: 'medicine.name'
+                        data: 'medicine.name',
+                        render: function(data, type, row) {
+                            if (row.is_locked) {
+                                return `
+                                    <div class="flex items-center justify-between gap-2">
+                                        <span class="text-gray-400 line-through select-none">${data || '—'}</span>
+                                        <span class="badge-locked" title="Obat ini sudah pernah di-retur pada transaksi ini dan terkunci">
+                                            <svg class="w-3 h-3 text-red-500 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                                                <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd" />
+                                            </svg>
+                                            Sudah Diretur
+                                        </span>
+                                    </div>
+                                `;
+                            }
+                            return `<span class="font-medium text-gray-800">${data || '—'}</span>`;
+                        }
                     },
                     {
                         data: 'quantity',
-                        className: 'text-end'
+                        className: 'text-end',
+                        render: (d, t, r) => r.is_locked ? `<span class="text-gray-400">${d}</span>` : d
                     },
                     {
                         data: 'final_price',
-                        className: 'text-end'
+                        className: 'text-end',
+                        render: (d, t, r) => r.is_locked ? `<span class="text-gray-400">${d}</span>` : d
                     },
                 ],
+
+                createdRow: function(row, data, dataIndex) {
+                    if (data.is_locked) {
+                        $(row).addClass('row-locked text-gray-400 select-none');
+                    }
+                },
 
                 drawCallback: function() {
                     const count = this.api().rows().count();
@@ -726,6 +812,16 @@
             $('#medicineTable tbody').on('click', 'tr', function() {
                 const data = medicineTable.row(this).data();
                 if (!data) return;
+
+                if (data.is_locked) {
+                    iziToast.warning({
+                        title: 'Terkunci',
+                        message: 'Obat "' + (data.medicine?.name || 'ini') + '" pada transaksi ini sudah pernah di-retur dan tidak dapat di-retur kembali.',
+                        position: 'topRight'
+                    });
+                    return;
+                }
+
                 $('#medicineTable tbody tr').removeClass('active');
                 $(this).addClass('active');
                 loadMedicineForRetur(data);

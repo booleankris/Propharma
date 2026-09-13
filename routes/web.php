@@ -1,37 +1,26 @@
 <?php
 
 use App\Exports\Orders\InvoiceExport;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Route;
-
-use App\Http\Controllers\Admin\UserController;
-use App\Http\Controllers\Admin\RolesController;
-use App\Http\Controllers\Admin\VideosController;
-use App\Http\Controllers\Admin\SlidersController;
 use App\Http\Controllers\Admin\ArticlesController;
+use App\Http\Controllers\Admin\MatchController;
+use App\Http\Controllers\Admin\MatchDayController;
 use App\Http\Controllers\Admin\PermissionsController;
+use App\Http\Controllers\Admin\PharmacyController;
+use App\Http\Controllers\Admin\RolesController;
+use App\Http\Controllers\Admin\ScanningController;
+use App\Http\Controllers\Admin\SlidersController;
 use App\Http\Controllers\Admin\SquadMembersController;
 use App\Http\Controllers\Admin\SquadOffcicialController;
 use App\Http\Controllers\Admin\TeamsController;
-use App\Http\Controllers\Admin\MatchDayController;
-use App\Http\Controllers\Admin\MatchController;
-use App\Http\Controllers\Admin\PharmacyController;
-use App\Http\Controllers\Admin\ScanningController;
 use App\Http\Controllers\Admin\TicketController;
-use App\Http\Controllers\Master\CreditorsController;
-
-use App\Http\Controllers\HomeController;
-use App\Http\Controllers\LandingpageController;
-use App\Http\Controllers\SquadController;
 use App\Http\Controllers\Admin\TicketingController;
 use App\Http\Controllers\Admin\TicketingTransactionController;
-use App\Http\Controllers\AdminItemController;
+use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\Admin\VideosController;
 use App\Http\Controllers\Auth\LoginController;
-use App\Http\Controllers\CreditorController;
-use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\InvoicesController;
 use App\Http\Controllers\Master\CategoriesController;
 use App\Http\Controllers\Master\CompositionsController;
+use App\Http\Controllers\Master\CreditorsController;
 use App\Http\Controllers\Master\DebtorsController;
 use App\Http\Controllers\Master\DoctorsController;
 use App\Http\Controllers\Master\FactoriesController;
@@ -40,10 +29,19 @@ use App\Http\Controllers\Master\LocationsController;
 use App\Http\Controllers\Master\MedicineController;
 use App\Http\Controllers\Master\ParametersController;
 use App\Http\Controllers\Master\PatientsController;
+use App\Http\Controllers\Master\PatientTransactionsController;
 use App\Http\Controllers\Master\ReportedMedicineController;
-use App\Http\Controllers\MedicineOrderHistoryController;
 use App\Http\Controllers\Orders\OrdersController;
 use App\Http\Controllers\Orders\ReceivingController;
+use App\Http\Controllers\Sales\ReturDataController;
+use App\Http\Controllers\Sales\SalesDataController;
+use App\Http\Controllers\AdminItemController;
+use App\Http\Controllers\CreditorController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\HomeController;
+use App\Http\Controllers\InvoicesController;
+use App\Http\Controllers\LandingpageController;
+use App\Http\Controllers\MedicineOrderHistoryController;
 use App\Http\Controllers\OrdersPayment;
 use App\Http\Controllers\OrdersTrackingController;
 use App\Http\Controllers\ParetoController;
@@ -53,17 +51,17 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RejectController;
 use App\Http\Controllers\ReportsController;
 use App\Http\Controllers\ReturController;
-use App\Http\Controllers\Sales\ReturDataController;
-use App\Http\Controllers\Sales\SalesDataController;
 use App\Http\Controllers\SalesController;
+use App\Http\Controllers\SquadController;
 use App\Http\Controllers\StaffStatsController;
 use App\Http\Controllers\SuppliesController;
 use App\Http\Controllers\TransactionReportController;
 use App\Http\Controllers\TransfersController;
 use App\Models\Item;
 use App\Models\TicketTransaction;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Route;
 use PhpOffice\PhpSpreadsheet\Calculation\Statistical\Averages\Mean;
-
 
 Route::get('/teamregistration', [LandingpageController::class, 'index'])->name('teamregistration');
 Route::post('/teamregister', [LandingpageController::class, 'teamRegister'])->name('teamregister');
@@ -95,8 +93,6 @@ Route::get('/docs', function () {
     return view('docs.swagger');
 });
 
-
-
 // Redirect root to login
 Route::get('/', function () {
     return redirect()->route('login');
@@ -116,10 +112,8 @@ Route::get('/logout', function () {
 })->name('logout.get');
 
 Route::middleware(['auth', 'role:administrator'])->group(function () {
-
     // Admin Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
-
 
     Route::resource('users', UserController::class);
     Route::patch('permissions/sort-module', [PermissionsController::class, 'sortModule'])->name('permissions.sort-module');
@@ -193,8 +187,7 @@ Route::middleware(['auth', 'role:Kasir|Gudang PMI|HO|administrator|manager|Onlin
 
     // ------ Modal Data On Transaction (For Modal) -----
 
-
-    // Medicine Data 
+    // Medicine Data
     Route::get('/transactions/getmedicinemaster', [SalesController::class, 'openMedicineMaster'])->name('openMedicineMaster');
 
     // Transaction Data
@@ -203,7 +196,6 @@ Route::middleware(['auth', 'role:Kasir|Gudang PMI|HO|administrator|manager|Onlin
 
     // Verify PIN
     Route::post('/verifypin', [SalesController::class, 'verifyPin'])->name('transactions.verifypin');
-
 
     // ------ Modal Data On Transaction (For Modal) -----
 
@@ -254,8 +246,17 @@ Route::middleware(['auth', 'role:Kasir|Gudang PMI|HO|administrator|manager|Onlin
 
         // Master Addition
         Route::get('/medicines/{id}/edit-data', [MedicineController::class, 'editCreditor']);
-    });
 
+        // Master Transaksi Pasien
+        Route::prefix('master/patient-transactions')->name('master.patient-transactions.')->group(function () {
+            Route::get('/', [PatientTransactionsController::class, 'index'])->name('index');
+            Route::get('/search-patients', [PatientTransactionsController::class, 'searchPatients'])->name('search-patients');
+            Route::get('/preview', [PatientTransactionsController::class, 'preview'])->name('preview');
+            Route::post('/export', [PatientTransactionsController::class, 'export'])->name('export');
+            Route::get('/export-status/{id}', [PatientTransactionsController::class, 'exportStatus'])->name('export-status');
+            Route::get('/export-download/{id}', [PatientTransactionsController::class, 'exportDownload'])->name('export-download');
+        });
+    });
 
     // Sales Data
     Route::get('/data/sales', [SalesDataController::class, 'index'])->name('salesdata.index');
@@ -271,7 +272,6 @@ Route::middleware(['auth', 'role:Kasir|Gudang PMI|HO|administrator|manager|Onlin
 
     Route::get('/medicineorderhistory/searchmedicine', [MedicineOrderHistoryController::class, 'searchMedicine'])
         ->name('medicine-order-history.searchmedicine');
-
 
     // Sales Reject
     Route::get('/reject', [RejectController::class, 'reject'])->name('sales.reject');
@@ -332,7 +332,6 @@ Route::middleware(['auth', 'role:Kasir|Gudang PMI|HO|administrator|manager|Onlin
     Route::get('/stock-storage', [SuppliesController::class, 'storageSupplies'])->name('supplies.storage');
     Route::get('/getstockstorage', [SuppliesController::class, 'getStorageSupplies'])->name('supplies.getStorageSupplies');
 
-
     // Transfers
     Route::get('/transfers/create', [TransfersController::class, 'transfersCreate'])->name('transfers.create');
     Route::post('/transfer', [TransfersController::class, 'transfer'])->name('transfer');
@@ -350,7 +349,7 @@ Route::middleware(['auth', 'role:Kasir|Gudang PMI|HO|administrator|manager|Onlin
     Route::get('/transfers/{id}/items', [TransfersController::class, 'getTransferItems'])->name('transfers.items');
     Route::post('/transfers/{item}/accept-item', [TransfersController::class, 'acceptItem'])->name('transfers.acceptItem');
     Route::post('/transfers/{item}/deny-item', [TransfersController::class, 'denyItem'])->name('transfers.denyItem');
-    // Reports  
+    // Reports
     Route::get('/reports/transactions', [ReportsController::class, 'transactions'])->name('reports.transactions');
     Route::get('/reports/medicines', [ReportsController::class, 'medicines'])->name('reports.medicines');
     Route::get('/reports/doctors', [ReportsController::class, 'doctors'])->name('reports.doctors');
@@ -365,7 +364,6 @@ Route::middleware(['auth', 'role:Kasir|Gudang PMI|HO|administrator|manager|Onlin
     Route::get('/exportpareto/status/{id}', [ParetoController::class, 'exportStatus'])->name('pareto.export.status');
     Route::get('/exportpareto/download/{id}', [ParetoController::class, 'download'])->name('pareto.export.download');
 
-
     // Patient Export
     Route::post('/reports/export/patients', [ReportsController::class, 'exportPatients'])
         ->name('reports.export.patients');
@@ -374,7 +372,6 @@ Route::middleware(['auth', 'role:Kasir|Gudang PMI|HO|administrator|manager|Onlin
     Route::get('/reports/export/status/{id}', [ReportsController::class, 'exportStatus'])
         ->name('reports.export.status');
     Route::get('/test-pdf', function () {
-
         return Pdf::loadHTML('
                 <!DOCTYPE html>
                 <html>
@@ -465,8 +462,6 @@ Route::middleware(['auth', 'role:Kasir|Gudang PMI|HO|administrator|manager|Onlin
     Route::post('/receiving/saveOrder', [ReceivingController::class, 'saveOrder'])
         ->name('receiving.saveOrder');
 
-
-
     Route::get('/receiving/orderlist', [ReceivingController::class, 'orderList'])->name('receiving.orderlist');
     Route::get('/searchreceivingdetails', [ReceivingController::class, 'searchReceivingDetails'])->name('receiving.searchreceivingdetails');
     Route::get('/searchselectcreditors', [ReceivingController::class, 'selectCreditors'])->name('receiving.selectCreditors');
@@ -531,7 +526,6 @@ Route::middleware(['auth', 'role:Kasir|Gudang PMI|HO|administrator|manager|Onlin
         ->name('admin.staff-stats.summary');
 });
 
-
 Route::get('/products/search', [SalesController::class, 'search'])
     ->middleware('auth')
     ->name('products.search');
@@ -549,8 +543,6 @@ Route::get('/doctors/search', [SalesController::class, 'searchDoctors'])
     ->name('doctors.search');
 
 Route::post('/qz/sign', function (\Illuminate\Http\Request $request) {
-
-
     \Log::info('QZ SIGN REQUEST', [
         'data' => $request->input('data')
     ]);
