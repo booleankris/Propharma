@@ -3,17 +3,17 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-use App\Models\Medicines;
-use App\Models\Patients;
-use App\Models\MedicineTransactions;
-use App\Models\MedicineCart;
-use App\Models\MedicineTransferItems;
-use App\Models\ItemsLog;
 use App\Models\Batches;
+use App\Models\ItemsLog;
+use App\Models\MedicineCart;
+use App\Models\Medicines;
+use App\Models\MedicineTransactions;
+use App\Models\MedicineTransferItems;
+use App\Models\Patients;
 use App\Models\Pharmacies;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
@@ -33,7 +33,7 @@ class MobileSyncController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Daftar cabang berhasil dimuat',
-            'data'    => $pharmacies,
+            'data' => $pharmacies,
         ]);
     }
 
@@ -55,8 +55,9 @@ class MobileSyncController extends Controller
 
         $medicine = Medicines::with(['category', 'factory'])
             ->where(function ($q) use ($searchCode) {
-                $q->where('code', $searchCode)
-                  ->orWhere('barcode', $searchCode);
+                $q
+                    ->where('code', $searchCode)
+                    ->orWhere('barcode', $searchCode);
             })
             ->first();
 
@@ -72,7 +73,7 @@ class MobileSyncController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Data obat berhasil ditemukan',
-            'data'    => $formatted,
+            'data' => $formatted,
         ]);
     }
 
@@ -99,10 +100,11 @@ class MobileSyncController extends Controller
 
         if ($search) {
             $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('code', 'like', "%{$search}%")
-                  ->orWhere('barcode', 'like', "%{$search}%")
-                  ->orWhere('generic', 'like', "%{$search}%");
+                $q
+                    ->where('name', 'like', "%{$search}%")
+                    ->orWhere('code', 'like', "%{$search}%")
+                    ->orWhere('barcode', 'like', "%{$search}%")
+                    ->orWhere('generic', 'like', "%{$search}%");
             });
         }
 
@@ -118,14 +120,14 @@ class MobileSyncController extends Controller
         });
 
         return response()->json([
-            'success'    => true,
-            'data'       => $items,
+            'success' => true,
+            'data' => $items,
             'pagination' => [
-                'current_page'  => $paginated->currentPage(),
-                'last_page'     => $paginated->lastPage(),
-                'per_page'      => $paginated->perPage(),
-                'total'         => $paginated->total(),
-                'has_more'      => $paginated->hasMorePages(),
+                'current_page' => $paginated->currentPage(),
+                'last_page' => $paginated->lastPage(),
+                'per_page' => $paginated->perPage(),
+                'total' => $paginated->total(),
+                'has_more' => $paginated->hasMorePages(),
                 'next_page_url' => $paginated->nextPageUrl(),
             ]
         ]);
@@ -137,10 +139,10 @@ class MobileSyncController extends Controller
     protected function calculateMedicineStockByPharmacy($medicineId, $pharmacyId)
     {
         $map = [
-            14 => 1, // Sahabat PMI
-            17 => 2, // Sahabat Mulawarman
-            16 => 3, // Sahabat MIM
-            15 => 5, // Sahabat Antasari
+            14 => 1,  // Sahabat PMI
+            17 => 2,  // Sahabat Mulawarman
+            16 => 3,  // Sahabat MIM
+            15 => 5,  // Sahabat Antasari
         ];
         $webPharmacyId = $map[$pharmacyId] ?? (int) $pharmacyId;
 
@@ -158,9 +160,10 @@ class MobileSyncController extends Controller
         // 2. Counter Stock (Pelayanan / Etalase)
         $counterPharmacyId = $isWarehouse ? 1 : $webPharmacyId;
         $counterStock = (int) MedicineTransferItems::whereHas('batches', function ($b) use ($medicineId, $counterPharmacyId) {
-                $b->where('medicine_id', $medicineId)
-                  ->where('pharmacy_id', $counterPharmacyId);
-            })
+            $b
+                ->where('medicine_id', $medicineId)
+                ->where('pharmacy_id', $counterPharmacyId);
+        })
             ->where('status', 1)
             ->where(function ($q) {
                 $q->whereNull('source_type')->orWhere('source_type', '!=', 'retur_gudang');
@@ -178,10 +181,10 @@ class MobileSyncController extends Controller
         $totalBranchStock = $counterStock + $directBatchStock + ($isWarehouse ? $storageStock : 0);
 
         return [
-            'pharmacy_id'        => $webPharmacyId,
-            'total_stock'        => $totalBranchStock,
-            'counter_stock'      => $counterStock,
-            'storage_stock'      => $storageStock,
+            'pharmacy_id' => $webPharmacyId,
+            'total_stock' => $totalBranchStock,
+            'counter_stock' => $counterStock,
+            'storage_stock' => $storageStock,
             'direct_batch_stock' => $directBatchStock,
         ];
     }
@@ -222,14 +225,14 @@ class MobileSyncController extends Controller
             }
 
             $stockData = [
-                'pharmacy_id'          => $branchStock['pharmacy_id'],
-                'pharmacy_name'        => $pharmacy?->name ?? 'Cabang ' . $branchStock['pharmacy_id'],
-                'stock'                => $branchStock['total_stock'],
-                'counter_stock'        => $branchStock['counter_stock'],
-                'storage_stock'        => $branchStock['storage_stock'],
-                'minimal_stock'        => (int) ($medicine->minimal_stock ?? 0),
-                'is_low_stock'         => $branchStock['total_stock'] <= ($medicine->minimal_stock ?? 0),
-                'is_out_of_stock'      => $branchStock['total_stock'] <= 0,
+                'pharmacy_id' => $branchStock['pharmacy_id'],
+                'pharmacy_name' => $pharmacy?->name ?? 'Cabang ' . $branchStock['pharmacy_id'],
+                'stock' => $branchStock['total_stock'],
+                'counter_stock' => $branchStock['counter_stock'],
+                'storage_stock' => $branchStock['storage_stock'],
+                'minimal_stock' => (int) ($medicine->minimal_stock ?? 0),
+                'is_low_stock' => $branchStock['total_stock'] <= ($medicine->minimal_stock ?? 0),
+                'is_out_of_stock' => $branchStock['total_stock'] <= 0,
                 'nearest_expired_date' => $nearestExpired,
             ];
         } else {
@@ -241,78 +244,73 @@ class MobileSyncController extends Controller
                 $bStock = $this->calculateMedicineStockByPharmacy($medicine->id, $p->id);
                 if ($bStock['total_stock'] > 0 || in_array($p->id, [1, 2, 3, 5, 9])) {
                     $stockByPharmacy[] = [
-                        'pharmacy_id'   => $p->id,
+                        'pharmacy_id' => $p->id,
                         'pharmacy_name' => $p->name,
-                        'stock'         => $bStock['total_stock'],
+                        'stock' => $bStock['total_stock'],
                     ];
                 }
                 $accumulatedStock += $bStock['total_stock'];
             }
 
             $stockData = [
-                'total_stock'       => $accumulatedStock,
-                'minimal_stock'     => (int) ($medicine->minimal_stock ?? 0),
-                'is_low_stock'      => $accumulatedStock <= ($medicine->minimal_stock ?? 0),
-                'is_out_of_stock'   => $accumulatedStock <= 0,
+                'total_stock' => $accumulatedStock,
+                'minimal_stock' => (int) ($medicine->minimal_stock ?? 0),
+                'is_low_stock' => $accumulatedStock <= ($medicine->minimal_stock ?? 0),
+                'is_out_of_stock' => $accumulatedStock <= 0,
                 'stock_by_pharmacy' => $stockByPharmacy,
             ];
         }
 
         return [
-            'id'                    => $medicine->id,
-            'code'                  => $medicine->code,
-            'barcode'               => $medicine->barcode,
-            'name'                  => $medicine->name,
-            'generic_name'          => $medicine->generic,
-            'unit'                  => $medicine->unit,
-            'packaging'             => $medicine->packaging,
-            'content'               => $medicine->content,
-            'strip'                 => $medicine->strip,
-            'dosage'                => $medicine->dosage,
-            'category'              => $medicine->category?->name ?? null,
-            'factory'               => $medicine->factory?->name ?? null,
-            'type'                  => $medicine->type,
-
+            'id' => $medicine->id,
+            'code' => $medicine->code,
+            'barcode' => $medicine->barcode,
+            'name' => $medicine->name,
+            'generic_name' => $medicine->generic,
+            'unit' => $medicine->unit,
+            'packaging' => $medicine->packaging,
+            'content' => $medicine->content,
+            'strip' => $medicine->strip,
+            'dosage' => $medicine->dosage,
+            'category' => $medicine->category?->name ?? null,
+            'factory' => $medicine->factory?->name ?? null,
+            'type' => $medicine->type,
             // Flat price attributes (langsung auto-fill di form mobile)
-            'raw_price'             => $rawPrice,
-            'net_price'             => $netPrice,
-            'het_price'             => $hetPrice,
-            'pharmacy_net_price'    => $pharmacyNetPrice,
-            'stock'                 => $pharmacyId ? ($stockData['stock'] ?? 0) : ($stockData['total_stock'] ?? 0),
-
+            'raw_price' => $rawPrice,
+            'net_price' => $netPrice,
+            'het_price' => $hetPrice,
+            'pharmacy_net_price' => $pharmacyNetPrice,
+            'stock' => $pharmacyId ? ($stockData['stock'] ?? 0) : ($stockData['total_stock'] ?? 0),
             // Structured Pricing Object
             'pricing' => [
-                'raw_price'          => $rawPrice,
-                'net_price'          => $netPrice,
-                'het_price'          => $hetPrice,
+                'raw_price' => $rawPrice,
+                'net_price' => $netPrice,
+                'het_price' => $hetPrice,
                 'pharmacy_net_price' => $pharmacyNetPrice,
-                'tax_percentage'     => 11,
-                'margin_percentage'  => $marginPercentage,
+                'tax_percentage' => 11,
+                'margin_percentage' => $marginPercentage,
                 'formatted' => [
                     'raw_price' => 'Rp ' . number_format($rawPrice, 0, ',', '.'),
                     'net_price' => 'Rp ' . number_format($netPrice, 0, ',', '.'),
                     'het_price' => 'Rp ' . number_format($hetPrice, 0, ',', '.'),
                 ],
             ],
-
             // Stock & Branch Object
             'stock_info' => $stockData,
-
             // Compliance & Regulations
             'compliance' => [
-                'is_psychotropic'       => (bool) $medicine->psychotropic,
-                'is_precursor'          => (bool) $medicine->precursor,
+                'is_psychotropic' => (bool) $medicine->psychotropic,
+                'is_precursor' => (bool) $medicine->precursor,
                 'requires_prescription' => (bool) $medicine->receipt,
-                'is_active'             => (bool) ($medicine->status == 1),
+                'is_active' => (bool) ($medicine->status == 1),
             ],
-
             'updated_at' => $medicine->updated_at ? $medicine->updated_at->format('Y-m-d H:i:s') : null,
         ];
     }
 
     public function getProducts(Request $request)
     {
-        $limit = $request->input('limit', 100); // Default 100 item per request
+        $limit = $request->input('limit', 100);  // Default 100 item per request
         $medicines = Medicines::select('code', 'name', DB::raw('het_price as price'), 'unit', 'stock')
             ->where('status', 1)
             ->paginate($limit);
@@ -398,12 +396,12 @@ class MobileSyncController extends Controller
             ->where('status', 1)
             ->orderBy('created_at', 'desc')
             ->get()
-            ->map(function($trans) {
+            ->map(function ($trans) {
                 return [
                     'transaction_code' => $trans->transaction_code,
                     'date' => $trans->created_at->format('Y-m-d H:i:s'),
                     'total' => $trans->subtotal,
-                    'items' => $trans->transactions->map(function($item) {
+                    'items' => $trans->transactions->map(function ($item) {
                         return [
                             'medicine_name' => $item->medicine ? $item->medicine->name : '-',
                             'qty' => $item->quantity,
@@ -455,52 +453,61 @@ class MobileSyncController extends Controller
                             'discount' => 0
                         ]
                     ]
+                ],
+                'user_id_mapping' => [
+                    'description' => 'user_id di-assign otomatis berdasarkan pharmacy_id cabang (penjualan digital)',
+                    'mapping' => [
+                        'PMI (pharmacy_id: 1)' => 'user_id: 114',
+                        'Antasari (pharmacy_id: 5)' => 'user_id: 115',
+                        'Mulawarman (pharmacy_id: 2)' => 'user_id: 116',
+                        'MIM (pharmacy_id: 3)' => 'user_id: 117',
+                    ]
                 ]
             ]);
         }
 
         $validator = Validator::make($request->all(), [
-            'pharmacy_id'        => 'required|integer',
-            'items'              => 'required|array|min:1',
-            'items.*.code'       => 'required|string',
-            'items.*.qty'        => 'required|numeric|min:0.01',
-            'items.*.price'      => 'nullable|numeric',
-            'items.*.discount'   => 'nullable|numeric',
-            'payment_method'     => 'nullable|string',
-            'payment_type'       => 'nullable|string',
-            'transaction_type'   => 'nullable|string',
-            'name'               => 'nullable|string',
-            'customer_name'      => 'nullable|string',
-            'phone'              => 'nullable|string',
-            'customer_phone'     => 'nullable|string',
-            'discount'           => 'nullable|numeric',
-            'total_transaction'  => 'nullable|numeric',
-            'total'              => 'nullable|numeric',
-            'subtotal'           => 'nullable|numeric',
-            'notes'              => 'nullable|string',
+            'pharmacy_id' => 'required|integer',
+            'items' => 'required|array|min:1',
+            'items.*.code' => 'required|string',
+            'items.*.qty' => 'required|numeric|min:0.01',
+            'items.*.price' => 'nullable|numeric',
+            'items.*.discount' => 'nullable|numeric',
+            'payment_method' => 'nullable|string',
+            'payment_type' => 'nullable|string',
+            'transaction_type' => 'nullable|string',
+            'name' => 'nullable|string',
+            'customer_name' => 'nullable|string',
+            'phone' => 'nullable|string',
+            'customer_phone' => 'nullable|string',
+            'discount' => 'nullable|numeric',
+            'total_transaction' => 'nullable|numeric',
+            'total' => 'nullable|numeric',
+            'subtotal' => 'nullable|numeric',
+            'notes' => 'nullable|string',
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
                 'message' => 'Parameter transaksi tidak valid.',
-                'errors'  => $validator->errors()
+                'errors' => $validator->errors()
             ], 422);
         }
 
         // Mapping Pharmacy ID
         $mobilePharmacyId = (int) $request->pharmacy_id;
         $map = [
-            14 => 1, // Sahabat PMI
-            17 => 2, // Sahabat Mulawarman
-            16 => 3, // Sahabat MIM
-            15 => 5, // Sahabat Antasari
+            14 => 1,  // Sahabat PMI
+            17 => 2,  // Sahabat Mulawarman
+            16 => 3,  // Sahabat MIM
+            15 => 5,  // Sahabat Antasari
         ];
         $webPharmacyId = $map[$mobilePharmacyId] ?? $mobilePharmacyId;
         $pharmacy = Pharmacies::find($webPharmacyId);
 
         // Identifikasi Customer / Pasien
-        $customerName  = $request->customer_name ?? $request->name ?? 'Pelanggan Online';
+        $customerName = $request->customer_name ?? $request->name ?? 'Pelanggan Online';
         $customerPhone = $request->customer_phone ?? $request->phone ?? '-';
 
         $patient = null;
@@ -516,9 +523,14 @@ class MobileSyncController extends Controller
             );
         }
 
-        // User attribution (prioritaskan user ONLINE atau fallback ke ID 1)
-        $onlineUser = User::where('name', 'ONLINE')->orWhere('name', 'Online')->first();
-        $userId = $onlineUser?->id ?? 1;
+        // User attribution per cabang (penjualan digital/aplikasi mobile)
+        $mobileUserMap = [
+            1 => 114,  // Sahabat PMI
+            5 => 115,  // Sahabat Antasari
+            2 => 116,  // Sahabat Mulawarman
+            3 => 117,  // Sahabat MIM
+        ];
+        $userId = $mobileUserMap[$webPharmacyId] ?? 1;
 
         $paymentMethod = $request->payment_method ?? $request->payment_type ?? 'ONLINE';
         $discountTotal = (float) ($request->discount ?? 0);
@@ -526,7 +538,7 @@ class MobileSyncController extends Controller
         DB::beginTransaction();
         try {
             // Generate Transaction Code (Khusus Transaksi Online)
-            $prefix = "OL-" . date('Ymd') . "-";
+            $prefix = 'OL-' . date('Ymd') . '-';
             $lastTrans = MedicineTransactions::where('transaction_code', 'like', $prefix . '%')
                 ->orderBy('id', 'desc')
                 ->lockForUpdate()
@@ -535,7 +547,7 @@ class MobileSyncController extends Controller
             $code = $prefix . str_pad($num, 4, '0', STR_PAD_LEFT);
 
             // Counter Log Code
-            $prefixLog = "LOG-" . date('Ymd') . "-";
+            $prefixLog = 'LOG-' . date('Ymd') . '-';
             $lastLog = ItemsLog::where('code', 'like', $prefixLog . '%')
                 ->orderBy('id', 'desc')
                 ->first();
@@ -565,10 +577,10 @@ class MobileSyncController extends Controller
                 $calculatedSubtotal += $totalItemPrice;
 
                 $preparedItems[] = [
-                    'medicine'    => $medicine,
-                    'qty'         => $qty,
-                    'price'       => $unitPrice,
-                    'discount'    => $itemDiscount,
+                    'medicine' => $medicine,
+                    'qty' => $qty,
+                    'price' => $unitPrice,
+                    'discount' => $itemDiscount,
                     'total_price' => $totalItemPrice,
                 ];
             }
@@ -578,20 +590,20 @@ class MobileSyncController extends Controller
 
             // 1. Simpan Transaksi Master dengan transaction_type = "ONLINE"
             $medTransaction = MedicineTransactions::create([
-                'pharmacy_id'        => $webPharmacyId,
-                'patient_id'         => $patient?->id,
-                'user_id'            => $userId,
-                'transaction_code'   => $code,
-                'transaction_type'   => 'ONLINE', // Wajib ONLINE sesuai instruksi
-                'subtotal'           => $finalTotal,
-                'discount'           => $discountTotal,
-                'paid'               => $finalTotal,
-                'changes'            => 0,
-                'payment_method'     => strtoupper($paymentMethod),
+                'pharmacy_id' => $webPharmacyId,
+                'patient_id' => $patient?->id,
+                'user_id' => $userId,
+                'transaction_code' => $code,
+                'transaction_type' => 'ONLINE',  // Wajib ONLINE sesuai instruksi
+                'subtotal' => $finalTotal,
+                'discount' => $discountTotal,
+                'paid' => $finalTotal,
+                'changes' => 0,
+                'payment_method' => strtoupper($paymentMethod),
                 'transfer_bank_name' => $request->notes ?? $request->reference_id ?? null,
-                'status'             => 1,
-                'created_at'         => now(),
-                'updated_at'         => now(),
+                'status' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
             ]);
 
             // 2. Simpan Item Cart & Potong Stok Counter/Batch (FIFO / FEFO)
@@ -604,16 +616,16 @@ class MobileSyncController extends Controller
 
                 MedicineCart::create([
                     'transaction_id' => $medTransaction->id,
-                    'medicine_id'    => $medicine->id,
-                    'user_id'        => $userId,
-                    'quantity'       => $qty,
-                    'item_price'     => $unitPrice,
-                    'discount'       => $itemDiscount,
-                    'raw_total'      => $qty * $unitPrice,
-                    'total_price'    => $totalPrice,
-                    'final_price'    => $totalPrice,
-                    'cart_type'      => 'ONLINE', // Cart type ONLINE
-                    'status'         => 1,
+                    'medicine_id' => $medicine->id,
+                    'user_id' => $userId,
+                    'quantity' => $qty,
+                    'item_price' => $unitPrice,
+                    'discount' => $itemDiscount,
+                    'raw_total' => $qty * $unitPrice,
+                    'total_price' => $totalPrice,
+                    'final_price' => $totalPrice,
+                    'cart_type' => 'ONLINE',  // Cart type ONLINE
+                    'status' => 1,
                 ]);
 
                 // Pemotongan Stok Cabang (FIFO / FEFO)
@@ -628,8 +640,9 @@ class MobileSyncController extends Controller
                         ->where('batches.pharmacy_id', $webPharmacyId)
                         ->where('medicine_transfer_items.status', 1)
                         ->where(function ($q) {
-                            $q->whereNull('medicine_transfer_items.source_type')
-                              ->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang');
+                            $q
+                                ->whereNull('medicine_transfer_items.source_type')
+                                ->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang');
                         })
                         ->where('medicine_transfer_items.qty', '>', 0)
                         ->orderBy('batches.expired_date', 'asc')
@@ -644,8 +657,9 @@ class MobileSyncController extends Controller
                             ->where('batches.pharmacy_id', $webPharmacyId)
                             ->where('medicine_transfer_items.status', 1)
                             ->where(function ($q) {
-                                $q->whereNull('medicine_transfer_items.source_type')
-                                  ->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang');
+                                $q
+                                    ->whereNull('medicine_transfer_items.source_type')
+                                    ->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang');
                             })
                             ->orderBy('batches.expired_date', 'desc')
                             ->lockForUpdate()
@@ -685,41 +699,41 @@ class MobileSyncController extends Controller
 
                 ItemsLog::create([
                     'transaction_code' => $code,
-                    'code'             => $logCode,
-                    'type'             => 'ONLINE', // Tipe log ONLINE
-                    'medicine_id'      => $medicine->id,
-                    'qty'              => $qty,
-                    'qty_before'       => $qty_before,
-                    'qty_after'        => $medicine->stock,
-                    'total'            => $totalPrice,
-                    'date'             => now()->format('Y-m-d H:i:s'),
-                    'status'           => 1,
-                    'batches_id'       => $lastBatchId,
-                    'user_id'          => $userId,
+                    'code' => $logCode,
+                    'type' => 'ONLINE',  // Tipe log ONLINE
+                    'medicine_id' => $medicine->id,
+                    'qty' => $qty,
+                    'qty_before' => $qty_before,
+                    'qty_after' => $medicine->stock,
+                    'total' => $totalPrice,
+                    'date' => now()->format('Y-m-d H:i:s'),
+                    'status' => 1,
+                    'batches_id' => $lastBatchId,
+                    'user_id' => $userId,
                 ]);
             }
 
             DB::commit();
 
             return response()->json([
-                'success'          => true,
-                'message'          => 'Transaksi ONLINE berhasil dicatat dan stok cabang telah terpotong',
+                'success' => true,
+                'message' => 'Transaksi ONLINE berhasil dicatat dan stok cabang telah terpotong',
                 'transaction_code' => $code,
-                'data'             => [
-                    'transaction_id'   => $medTransaction->id,
+                'data' => [
+                    'transaction_id' => $medTransaction->id,
                     'transaction_code' => $code,
                     'transaction_type' => 'ONLINE',
-                    'pharmacy_id'      => $webPharmacyId,
-                    'pharmacy_name'    => $pharmacy?->name,
-                    'customer_name'    => $customerName,
-                    'customer_phone'   => $customerPhone,
-                    'total'            => $finalTotal,
-                    'payment_method'   => strtoupper($paymentMethod),
-                    'items_count'      => count($preparedItems),
-                    'created_at'       => $medTransaction->created_at->format('Y-m-d H:i:s'),
+                    'pharmacy_id' => $webPharmacyId,
+                    'pharmacy_name' => $pharmacy?->name,
+                    'user_id' => $userId,
+                    'customer_name' => $customerName,
+                    'customer_phone' => $customerPhone,
+                    'total' => $finalTotal,
+                    'payment_method' => strtoupper($paymentMethod),
+                    'items_count' => count($preparedItems),
+                    'created_at' => $medTransaction->created_at->format('Y-m-d H:i:s'),
                 ]
             ], 201);
-
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json([

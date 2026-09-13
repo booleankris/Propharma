@@ -102,6 +102,13 @@ paths:
         Mencatat transaksi penjualan dari aplikasi mobile ke database Web Apotek.
         Secara otomatis:
         - Menetapkan `transaction_type` = **"ONLINE"**
+        - Menetapkan `user_id` berdasarkan cabang (penjualan digital):
+          | Cabang | pharmacy_id (web) | user_id |
+          |---|---|---|
+          | PMI | 1 | 114 |
+          | Antasari | 5 | 115 |
+          | Mulawarman | 2 | 116 |
+          | MIM | 3 | 117 |
         - Memotong stok obat dan batch pada cabang yang bersangkutan (FIFO / FEFO)
         - Mencatat log mutasi kartu stok (`items_log`)
         - Menghubungkan atau membuat master data pelanggan/pasien
@@ -444,6 +451,12 @@ components:
             pharmacy_name:
               type: string
               example: "SAHABAT ANTASARI"
+            user_id:
+              type: integer
+              description: |
+                ID user yang di-assign otomatis berdasarkan cabang.
+                PMI=114, Antasari=115, Mulawarman=116, MIM=117
+              example: 115
             customer_name:
               type: string
               example: "Budi Santoso"

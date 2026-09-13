@@ -105,6 +105,15 @@ paths:
         - Memotong stok obat dan batch pada cabang yang bersangkutan (FIFO / FEFO)
         - Mencatat log mutasi kartu stok (`items_log`)
         - Menghubungkan atau membuat master data pelanggan/pasien
+
+        **user_id per cabang (penjualan digital):**
+
+        | Cabang | user_id |
+        |---|---|
+        | PMI | 114 |
+        | Antasari | 115 |
+        | Mulawarman | 116 |
+        | MIM | 117 |
       requestBody:
         required: true
         description: Data transaksi mobile beserta daftar obat yang dibeli
@@ -114,6 +123,7 @@ paths:
               $ref: '#/components/schemas/TransactionCreateRequest'
             example:
               pharmacy_id: 5
+              user_id: 115
               payment_method: "QRIS"
               customer_name: "Budi Santoso"
               customer_phone: "081234567890"
@@ -351,12 +361,19 @@ components:
       type: object
       required:
         - pharmacy_id
+        - user_id
         - items
       properties:
         pharmacy_id:
           type: integer
           description: ID Cabang Apotek tempat order diproses (ambil dari /api/mobile/pharmacies)
           example: 5
+        user_id:
+          type: integer
+          description: |
+            ID user untuk menandakan penjualan digital per cabang.
+            PMI=114, Antasari=115, Mulawarman=116, MIM=117
+          example: 115
         payment_method:
           type: string
           description: Metode pembayaran (misal QRIS, CASH, TRANSFER, MIDTRANS, ONLINE)
@@ -444,6 +461,12 @@ components:
             pharmacy_name:
               type: string
               example: "SAHABAT ANTASARI"
+            user_id:
+              type: integer
+              description: |
+                ID user yang di-assign otomatis berdasarkan cabang.
+                PMI=114, Antasari=115, Mulawarman=116, MIM=117
+              example: 115
             customer_name:
               type: string
               example: "Budi Santoso"
