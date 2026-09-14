@@ -839,12 +839,12 @@ class OrdersController extends Controller
         $counterPharmacyId = isWarehousePharmacy($pharmacyId) ? 1 : $pharmacyId;
 
         $batchSub = \App\Models\Batches::selectRaw('COALESCE(SUM(stock), 0)')
-            ->whereColumn('batches.medicine_id', 'medicines.id')
+            ->whereColumn('batches.medicine_id', 'medicine_cart.medicine_id')
             ->where('batches.pharmacy_id', $pharmacyId);
 
         $transferSub = \App\Models\MedicineTransferItems::selectRaw('COALESCE(SUM(medicine_transfer_items.qty), 0)')
             ->join('batches', 'batches.id', '=', 'medicine_transfer_items.batches_id')
-            ->whereColumn('batches.medicine_id', 'medicines.id')
+            ->whereColumn('batches.medicine_id', 'medicine_cart.medicine_id')
             ->where('batches.pharmacy_id', $counterPharmacyId)
             ->where('medicine_transfer_items.status', 1)
             ->where(function ($q) {
@@ -854,6 +854,7 @@ class OrdersController extends Controller
 
         $query = MedicineCart::select(
             'medicine_cart.medicine_id',
+            'medicines.id as med_id',
             'medicines.code',
             'medicines.name',
             'medicines.packaging',
@@ -872,6 +873,7 @@ class OrdersController extends Controller
             ->when($search, fn($q) => $q->where('medicines.name', 'like', "%{$search}%"))
             ->groupBy(
                 'medicine_cart.medicine_id',
+                'medicines.id',
                 'medicines.code',
                 'medicines.name',
                 'medicines.packaging',
