@@ -112,10 +112,14 @@ Route::get('/logout', function () {
 })->name('logout.get');
 
 Route::middleware(['auth', 'role:administrator'])->group(function () {
+    Route::resource('users', UserController::class);
+    Route::resource('roles', RolesController::class);
+});
+
+Route::middleware(['auth', 'role:administrator'])->group(function () {
     // Admin Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
-    Route::resource('users', UserController::class);
     Route::patch('permissions/sort-module', [PermissionsController::class, 'sortModule'])->name('permissions.sort-module');
     Route::resource('permissions', PermissionsController::class, [
         'except' => [
@@ -131,7 +135,6 @@ Route::middleware(['auth', 'role:administrator'])->group(function () {
     Route::delete('teams/{id}', [TeamsController::class, 'delete'])->name('teams.delete');
     Route::get('teams/download/{id}', [TeamsController::class, 'download'])->name('teams.download');
     Route::get('downloadteam/', [TeamsController::class, 'downloadteam'])->name('allteam.download');
-    Route::resource('roles', RolesController::class);
     Route::resource('adminitems', AdminItemController::class);
     Route::resource('pharmacies', PharmacyController::class);
     Route::resource('teams', TeamsController::class);
@@ -159,8 +162,16 @@ Route::middleware(['auth', 'role:HO|administrator'])->group(function () {
         Route::get('/export', [ReportedMedicineController::class, 'export'])->name('export');
     });
 });
+Route::get('/home', [HomeController::class, 'index'])
+    ->middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrator|manager|Online|Online Grab|Online Shopee|Digital|UMKM|operator'])
+    ->name('home');
+
+Route::middleware(['auth', 'role:General Manager'])->prefix('general-manager')->name('general-manager.')->group(function () {
+    Route::get('/roles', [\App\Http\Controllers\GeneralManagerController::class, 'index'])->name('users.roles.index');
+    Route::patch('/users/{user}/roles', [\App\Http\Controllers\GeneralManagerController::class, 'updateRoles'])->name('users.roles');
+});
+
 Route::middleware(['auth', 'role:Kasir|Gudang PMI|HO|administrator|manager|Online|Online Grab|Online Shopee|Digital|UMKM|operator'])->group(function () {
-    Route::get('/home', [HomeController::class, 'index'])->name('home');
     Route::get('/near-expiry', [HomeController::class, 'nearExpiry'])->name('kasir.nearExpiry');
     Route::get('/stock-notifications', [HomeController::class, 'stockNotifications'])->name('kasir.stockNotifications');
 

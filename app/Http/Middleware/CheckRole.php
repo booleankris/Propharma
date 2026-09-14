@@ -24,6 +24,10 @@ class CheckRole
         }
 
         if (! $user->hasAnyRole($roles)) {
+            if ($user->hasRole('General Manager')) {
+                return redirect()->route('home');
+            }
+
             if ($user->hasRole('administrator') || $user->hasRole('Manager')) {
                 return redirect('/dashboard');
             }

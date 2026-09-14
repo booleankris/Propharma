@@ -823,10 +823,14 @@ class OrdersController extends Controller
 
     public function smartMedicines(Request $request)
     {
-        $dateFrom = $request->date_from ?? now()->subDays(30)->format('Y-m-d');
-        $dateTo = $request->date_to ?? now()->format('Y-m-d');
+        $yesterday = now()->subDay()->format('Y-m-d');
+        $dateFrom = $request->date_from ?? $yesterday;
+        $dateTo = $request->date_to ?? $yesterday;
         $search = $request->search;
         $orderId = $request->order_id;
+
+        $order = Order::find($orderId);
+        $pharmacyId = $order?->pharmacy_id ?? getPurchasingPharmacyId();
 
         // Exclude medicines already in this order
         $existingIds = OrderItems::where('order_id', $orderId)->pluck('medicine_id');
@@ -842,6 +846,8 @@ class OrdersController extends Controller
             ->selectRaw('SUM(medicine_cart.quantity) as total_sold')
             ->join('medicine_transactions', 'medicine_transactions.id', '=', 'medicine_cart.transaction_id')
             ->join('medicines', 'medicines.id', '=', 'medicine_cart.medicine_id')
+            ->where('medicine_transactions.pharmacy_id', $pharmacyId)
+            ->where('medicine_transactions.status', 1)
             ->whereBetween('medicine_transactions.created_at', ["{$dateFrom} 00:00:00", "{$dateTo} 23:59:59"])
             ->whereNotIn('medicine_cart.medicine_id', $existingIds)
             ->when($search, fn($q) => $q->where('medicines.name', 'like', "%{$search}%"))
@@ -856,12 +862,22 @@ class OrdersController extends Controller
             ->orderByDesc('total_sold')
             ->paginate(20);
 
-        $results->getCollection()->transform(function ($row) {
-            $batchStock = \App\Models\Batches::where('medicine_id', $row->medicine_id)->sum('stock');
+        $counterPharmacyId = isWarehousePharmacy($pharmacyId) ? 1 : $pharmacyId;
 
-            $transferStock = \App\Models\MedicineTransferItems::whereHas('batches', function ($q) use ($row) {
-                $q->where('medicine_id', $row->medicine_id);
-            })->sum('qty');
+        $results->getCollection()->transform(function ($row) use ($pharmacyId, $counterPharmacyId) {
+            $batchStock = \App\Models\Batches::where('medicine_id', $row->medicine_id)
+                ->where('pharmacy_id', $pharmacyId)
+                ->sum('stock');
+
+            $transferStock = \App\Models\MedicineTransferItems::whereHas('batches', function ($q) use ($row, $counterPharmacyId) {
+                $q->where('medicine_id', $row->medicine_id)
+                  ->where('pharmacy_id', $counterPharmacyId);
+            })
+            ->where('status', 1)
+            ->where(function ($q) {
+                $q->whereNull('source_type')->orWhere('source_type', '!=', 'retur_gudang');
+            })
+            ->sum('qty');
 
             $totalStocks = $batchStock + $transferStock;
 

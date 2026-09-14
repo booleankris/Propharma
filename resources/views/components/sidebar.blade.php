@@ -14,6 +14,7 @@
                     href="{{ url('/home') }}"><i class="fas fa-home"></i> <span>Dashboard</span></a>
             </li>
 
+            @role('administrator')
             <li class="menu-header">Data</li>
            
             <li class="{{ request()->routeIs('adminitems*') == true ? 'active' : null }}">
@@ -33,7 +34,9 @@
             
 
 
-            @if (Auth::user()->hasAnyRole(['administrator', 'Manager']))
+            @endrole
+
+            @if (Auth::user()->hasRole('administrator'))
             <li 
                 class="nav-item dropdown 
                 {{ request()->routeIs('users*') == true ? 'active' : null }}
@@ -47,10 +50,12 @@
                 </a>
                 <ul class="dropdown-menu">
 
+                    @role('administrator')
                     <li class="">
                         <a class="nav-link"
                             href="{{ route('pharmacies.index') }}">Manage Apotek</a>
                     </li>
+                    @endrole
 
 
                     <li class="">

@@ -9,6 +9,8 @@ class RoleSeeder extends Seeder
 {
     public function run(): void
     {
+        $this->call(GeneralManagerRoleSeeder::class);
+
         $roles = ['manager', 'UMKM'];
 
         foreach ($roles as $role) {
