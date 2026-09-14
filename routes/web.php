@@ -169,6 +169,7 @@ Route::get('/home', [HomeController::class, 'index'])
 Route::middleware(['auth', 'role:General Manager'])->prefix('general-manager')->name('general-manager.')->group(function () {
     Route::get('/roles', [\App\Http\Controllers\GeneralManagerController::class, 'index'])->name('users.roles.index');
     Route::patch('/users/{user}/roles', [\App\Http\Controllers\GeneralManagerController::class, 'updateRoles'])->name('users.roles');
+    Route::put('/users/{user}', [\App\Http\Controllers\GeneralManagerController::class, 'update'])->name('users.update');
 });
 
 Route::middleware(['auth', 'role:Kasir|Gudang PMI|HO|administrator|manager|Online|Online Grab|Online Shopee|Digital|UMKM|operator'])->group(function () {

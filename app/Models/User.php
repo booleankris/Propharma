@@ -24,7 +24,15 @@ class User extends Authenticatable
         'username',
         'password',
         'secret_pin',
-        'is_fixed'
+        'is_fixed',
+        'nik',
+        'fullname',
+        'department',
+        'division',
+        'position',
+        'grade',
+        'in',
+        'birthdate',
     ];
 
     /**
