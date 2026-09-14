@@ -133,13 +133,18 @@ class StockDataExport implements FromCollection, WithHeadings, WithStyles, Shoul
             $qtyCounter = (int) ($m->qty_counter ?? 0);
             $totalStok = $qtyStorage + $qtyCounter;
 
+            $qtyOrders = (int) ($m->qty_orders ?? 0);
+            $qtySales = (int) ($m->qty_sales ?? 0);
+
             if ($canSeeWarehouse) {
                 $qtyStart = (int) ($m->qty_start ?? 0);
             } else {
-                $netIn = (int) ($m->qty_orders ?? 0) - (int) ($m->qty_orders_rt ?? 0);
-                $netOut = (int) ($m->qty_sales ?? 0) - (int) ($m->qty_sales_rt ?? 0);
+                $netIn = $qtyOrders - (int) ($m->qty_orders_rt ?? 0);
+                $netOut = $qtySales - (int) ($m->qty_sales_rt ?? 0);
                 $qtyStart = $qtyCounter - $netIn + $netOut;
             }
+
+            $sisaStok = $qtyStart + $qtyOrders - $qtySales;
 
             $row = [
                 'No' => $index + 1,
@@ -147,8 +152,9 @@ class StockDataExport implements FromCollection, WithHeadings, WithStyles, Shoul
                 'Nama Obat' => $m->name,
                 'Satuan' => $m->unit ?? '-',
                 'QTY Awal' => $qtyStart,
-                'QTY Beli' => (int) ($m->qty_orders ?? 0),
-                'QTY Jual' => (int) ($m->qty_sales ?? 0),
+                'QTY Beli' => $qtyOrders,
+                'QTY Jual' => $qtySales,
+                'Sisa Stok' => $sisaStok,
             ];
 
             if ($canSeeWarehouse) {
@@ -175,6 +181,7 @@ class StockDataExport implements FromCollection, WithHeadings, WithStyles, Shoul
                 'QTY Awal',
                 'QTY Beli (Gudang PMI)',
                 'QTY Jual (Sahabat PMI)',
+                'Sisa Stok',
                 'Stok Gudang',
                 'Stok Pelayanan PMI',
                 'Total Stok',
@@ -189,6 +196,7 @@ class StockDataExport implements FromCollection, WithHeadings, WithStyles, Shoul
             'QTY Awal',
             'QTY Beli',
             'QTY Jual',
+            'Sisa Stok',
             'Stok Etalase',
             'Total Stok',
         ];
@@ -196,7 +204,7 @@ class StockDataExport implements FromCollection, WithHeadings, WithStyles, Shoul
 
     public function styles(Worksheet $sheet)
     {
-        $lastCol = $this->canSeeWarehouse ? 'J' : 'I';
+        $lastCol = $this->canSeeWarehouse ? 'K' : 'J';
         $sheet->getStyle("A1:{$lastCol}1")->getFont()->setBold(true);
         $sheet->getStyle('A')->getAlignment()->setHorizontal('center');
         $sheet->getStyle("E:{$lastCol}")->getAlignment()->setHorizontal('right');

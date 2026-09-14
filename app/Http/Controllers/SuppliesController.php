@@ -22,6 +22,7 @@ use DataTables;
 use Form;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Maatwebsite\Excel\Facades\Excel;
 
 class SuppliesController extends Controller
@@ -174,59 +175,7 @@ class SuppliesController extends Controller
               ->orderBy('updated_at', 'asc')
               ->orderBy('id', 'asc');
 
-            // Hitung running balance sekuensial jika ada filter spesifik obat
-            $runningMap = [];
-            $initialStartBalance = 0;
-            $allRows = (clone $itemsQuery)->get();
-            $firstRow = $allRows->first();
-
-            if ($firstRow) {
-                $prevRecord = (clone $baseQuery)
-                    ->where(function ($q) use ($firstRow) {
-                        $q->where('updated_at', '<', $firstRow->updated_at)
-                          ->orWhere(function ($sq) use ($firstRow) {
-                              $sq->where('updated_at', '=', $firstRow->updated_at)
-                                ->where('id', '<', $firstRow->id);
-                          });
-                    })
-                    ->orderBy('updated_at', 'desc')
-                    ->orderBy('id', 'desc')
-                    ->first();
-
-                $initialStartBalance = $prevRecord ? (int) $prevRecord->qty_after : (int) $firstRow->qty_before;
-
-                $currRunning = $initialStartBalance;
-                foreach ($allRows as $r) {
-                    $delta = 0;
-                    if ($r->status == 1) { // Penjualan (-)
-                        $delta = -$r->qty;
-                    } else if ($r->status == 2) { // Pembelian (+)
-                        $delta = $r->qty;
-                    } else if ($r->status == 3) { // Retur Jual (+)
-                        $delta = $r->qty;
-                    } else if ($r->status == 4) { // Retur Beli (-)
-                        $delta = -$r->qty;
-                    } else if ($r->status == 7) { // Mutasi
-                        $isOutgoing = (int) $r->qty_after < (int) $r->qty_before;
-                        $delta = $isOutgoing ? -$r->qty : $r->qty;
-                    }
-
-                    $rowStart = $currRunning;
-                    $rowEnd = $rowStart + $delta;
-                    $currRunning = $rowEnd;
-
-                    $runningMap[$r->id] = [
-                        'start' => $rowStart,
-                        'end'   => $rowEnd,
-                    ];
-                }
-            }
-
-            // Balance calculation: Real-time stock if medicine is selected, otherwise last record's qty_after
-            $balance = 0;
-            $storageStock = 0;
-            $counterStock = 0;
-
+            // Tentukan apakah ada filter 1 obat spesifik
             $med = null;
             if ($request->filled('searchMedicine')) {
                 $searchValue = $request->searchMedicine;
@@ -234,6 +183,62 @@ class SuppliesController extends Controller
                     ? Medicines::find($searchValue)
                     : Medicines::where('name', $searchValue)->orWhere('code', $searchValue)->first();
             }
+
+            // Hitung running balance sekuensial HANYA jika ada filter spesifik 1 obat
+            $runningMap = [];
+            $initialStartBalance = 0;
+
+            if ($med) {
+                $allRows = (clone $itemsQuery)->get();
+                $firstRow = $allRows->first();
+
+                if ($firstRow) {
+                    $prevRecord = (clone $baseQuery)
+                        ->where(function ($q) use ($firstRow) {
+                            $q->where('updated_at', '<', $firstRow->updated_at)
+                              ->orWhere(function ($sq) use ($firstRow) {
+                                  $sq->where('updated_at', '=', $firstRow->updated_at)
+                                    ->where('id', '<', $firstRow->id);
+                              });
+                        })
+                        ->orderBy('updated_at', 'desc')
+                        ->orderBy('id', 'desc')
+                        ->first();
+
+                    $initialStartBalance = $prevRecord ? (int) $prevRecord->qty_after : (int) $firstRow->qty_before;
+
+                    $currRunning = $initialStartBalance;
+                    foreach ($allRows as $r) {
+                        $delta = 0;
+                        if ($r->status == 1) { // Penjualan (-)
+                            $delta = -$r->qty;
+                        } else if ($r->status == 2) { // Pembelian (+)
+                            $delta = $r->qty;
+                        } else if ($r->status == 3) { // Retur Jual (+)
+                            $delta = $r->qty;
+                        } else if ($r->status == 4) { // Retur Beli (-)
+                            $delta = -$r->qty;
+                        } else if ($r->status == 7) { // Mutasi
+                            $isOutgoing = (int) $r->qty_after < (int) $r->qty_before;
+                            $delta = $isOutgoing ? -$r->qty : $r->qty;
+                        }
+
+                        $rowStart = $currRunning;
+                        $rowEnd = $rowStart + $delta;
+                        $currRunning = $rowEnd;
+
+                        $runningMap[$r->id] = [
+                            'start' => $rowStart,
+                            'end'   => $rowEnd,
+                        ];
+                    }
+                }
+            }
+
+            // Balance calculation: Real-time stock if medicine is selected, otherwise last record's qty_after
+            $balance = 0;
+            $storageStock = 0;
+            $counterStock = 0;
 
             if ($med) {
                 $storageStock = $canSeeWarehouse ? $this->calculateRealtimeStock($med->id, $pharmacyId, 'storage') : 0;
@@ -390,7 +395,9 @@ class SuppliesController extends Controller
                 ->rawColumns(['status', 'stock', 'qty_before', 'qty_after', 'transaction_code'])
                 ->with([
                     'stats' => [
-                        'stat_before' => !empty($runningMap) ? $initialStartBalance : ($firstRecord ? $firstRecord->qty_before : 0),
+                        'stat_before' => $med
+                            ? (!empty($runningMap) ? $initialStartBalance : ($firstRecord ? (int) $firstRecord->qty_before : 0))
+                            : ($balance - (int)($stats->qty_bought ?? 0) + (int)($stats->qty_bought_rt ?? 0) + (int)($stats->qty_sold ?? 0) - (int)($stats->qty_sold_rt ?? 0)),
                         'stat_bought' => $stats->qty_bought ?? 0,
                         'stat_bought_rt' => $stats->qty_bought_rt ?? 0,
                         'stat_sold' => $stats->qty_sold ?? 0,
@@ -642,6 +649,17 @@ class SuppliesController extends Controller
                 })
                 ->editColumn('qty_orders', fn($m) => (int) ($m->qty_orders ?? 0))
                 ->editColumn('qty_sales', fn($m) => (int) ($m->qty_sales ?? 0))
+                ->addColumn('qty_remaining', function ($m) use ($canSeeWarehouse) {
+                    if ($canSeeWarehouse) {
+                        $qtyStart = (int) ($m->qty_start ?? 0);
+                    } else {
+                        $counter = (int) ($m->qty_counter ?? 0);
+                        $netIn = (int) ($m->qty_orders ?? 0) - (int) ($m->qty_orders_rt ?? 0);
+                        $netOut = (int) ($m->qty_sales ?? 0) - (int) ($m->qty_sales_rt ?? 0);
+                        $qtyStart = $counter - $netIn + $netOut;
+                    }
+                    return $qtyStart + (int) ($m->qty_orders ?? 0) - (int) ($m->qty_sales ?? 0);
+                })
                 ->editColumn('qty_storage', fn($m) => (int) ($m->qty_storage ?? 0))
                 ->editColumn('qty_counter', fn($m) => (int) ($m->qty_counter ?? 0))
                 ->addColumn('qty_now', function ($m) use ($canSeeWarehouse) {
@@ -696,11 +714,27 @@ class SuppliesController extends Controller
     {
         $job = ExportJob::findOrFail($id);
 
+        $downloadUrl = null;
+        if (($job->status === 'completed' || $job->status === 'finished') && $job->file_path) {
+            $downloadUrl = route('supplies.exportStockDataDownload', $job->id);
+        }
+
         return response()->json([
             'status' => $job->status,
             'progress' => (int) $job->progress,
-            'file' => $job->file_path ? asset('storage/' . $job->file_path) : null,
+            'file' => $downloadUrl,
         ]);
+    }
+
+    public function exportStockDataDownload($id)
+    {
+        $job = ExportJob::findOrFail($id);
+
+        if (!$job->file_path || !Storage::disk('public')->exists($job->file_path)) {
+            abort(404, 'File export tidak ditemukan atau masih diproses.');
+        }
+
+        return Storage::disk('public')->download($job->file_path);
     }
 
     // Stock Opname

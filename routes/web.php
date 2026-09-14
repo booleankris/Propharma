@@ -319,6 +319,7 @@ Route::middleware(['auth', 'role:Kasir|Gudang PMI|HO|administrator|manager|Onlin
     Route::get('/stock-data/medicine-select', [SuppliesController::class, 'medicineSelect'])->name('supplies.medicineSelect');
     Route::get('/stock-data/export', [SuppliesController::class, 'exportStockData'])->name('supplies.exportStockData');
     Route::get('/stock-data/export/status/{id}', [SuppliesController::class, 'exportStockDataStatus'])->name('supplies.exportStockDataStatus');
+    Route::get('/stock-data/export/download/{id}', [SuppliesController::class, 'exportStockDataDownload'])->name('supplies.exportStockDataDownload');
 
     // Stock Opname
     Route::get('/stockopname', [SuppliesController::class, 'stockOpname'])->name('supplies.stockOpname');

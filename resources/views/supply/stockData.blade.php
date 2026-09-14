@@ -195,6 +195,7 @@
                                 <th class="px-4 py-3 text-center">
                                     {{ $canSeeWarehouse ? 'QTY Jual (PMI)' : 'QTY Jual' }}
                                 </th>
+                                <th class="px-4 py-3 text-center">Sisa Stok</th>
                                 @if($canSeeWarehouse)
                                     <th class="px-4 py-3 text-center">Stok Gudang</th>
                                     <th class="px-4 py-3 text-center">Stok Pelayanan PMI</th>
@@ -443,6 +444,10 @@
                     {
                         data: 'qty_sales',
                         className: 'text-center font-semibold text-blue-600'
+                    },
+                    {
+                        data: 'qty_remaining',
+                        className: 'text-center font-bold text-teal-600'
                     },
                     @if($canSeeWarehouse)
                     {

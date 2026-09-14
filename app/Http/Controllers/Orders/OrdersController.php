@@ -828,6 +828,7 @@ class OrdersController extends Controller
         $dateTo = $request->date_to ?? $yesterday;
         $search = $request->search;
         $orderId = $request->order_id;
+        $sort = $request->sort ?? 'sold_desc_stock_asc';
 
         $order = Order::find($orderId);
         $pharmacyId = $order?->pharmacy_id ?? getPurchasingPharmacyId();
@@ -835,7 +836,23 @@ class OrdersController extends Controller
         // Exclude medicines already in this order
         $existingIds = OrderItems::where('order_id', $orderId)->pluck('medicine_id');
 
-        $results = MedicineCart::select(
+        $counterPharmacyId = isWarehousePharmacy($pharmacyId) ? 1 : $pharmacyId;
+
+        $batchSub = \App\Models\Batches::selectRaw('COALESCE(SUM(stock), 0)')
+            ->whereColumn('batches.medicine_id', 'medicines.id')
+            ->where('batches.pharmacy_id', $pharmacyId);
+
+        $transferSub = \App\Models\MedicineTransferItems::selectRaw('COALESCE(SUM(medicine_transfer_items.qty), 0)')
+            ->join('batches', 'batches.id', '=', 'medicine_transfer_items.batches_id')
+            ->whereColumn('batches.medicine_id', 'medicines.id')
+            ->where('batches.pharmacy_id', $counterPharmacyId)
+            ->where('medicine_transfer_items.status', 1)
+            ->where(function ($q) {
+                $q->whereNull('medicine_transfer_items.source_type')
+                  ->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang');
+            });
+
+        $query = MedicineCart::select(
             'medicine_cart.medicine_id',
             'medicines.code',
             'medicines.name',
@@ -844,6 +861,8 @@ class OrdersController extends Controller
             'medicines.minimal_stock'
         )
             ->selectRaw('SUM(medicine_cart.quantity) as total_sold')
+            ->selectSub($batchSub, 'batch_stock')
+            ->selectSub($transferSub, 'transfer_stock')
             ->join('medicine_transactions', 'medicine_transactions.id', '=', 'medicine_cart.transaction_id')
             ->join('medicines', 'medicines.id', '=', 'medicine_cart.medicine_id')
             ->where('medicine_transactions.pharmacy_id', $pharmacyId)
@@ -858,28 +877,26 @@ class OrdersController extends Controller
                 'medicines.packaging',
                 'medicines.raw_price',
                 'medicines.minimal_stock'
-            )
-            ->orderByDesc('total_sold')
-            ->paginate(20);
+            );
 
-        $counterPharmacyId = isWarehousePharmacy($pharmacyId) ? 1 : $pharmacyId;
+        if ($sort === 'sold_desc') {
+            // Filter 2 : qty terbanyak
+            $query->orderByDesc('total_sold')
+                  ->orderBy('medicines.name', 'asc');
+        } elseif ($sort === 'stock_asc') {
+            // Filter 3 : stok paling sedikit
+            $query->orderByRaw('(batch_stock + transfer_stock) ASC')
+                  ->orderByDesc('total_sold');
+        } else {
+            // Filter 1 (default) : qty terbanyak DAN stok paling sedikit
+            $query->orderByDesc('total_sold')
+                  ->orderByRaw('(batch_stock + transfer_stock) ASC');
+        }
 
-        $results->getCollection()->transform(function ($row) use ($pharmacyId, $counterPharmacyId) {
-            $batchStock = \App\Models\Batches::where('medicine_id', $row->medicine_id)
-                ->where('pharmacy_id', $pharmacyId)
-                ->sum('stock');
+        $results = $query->paginate(20);
 
-            $transferStock = \App\Models\MedicineTransferItems::whereHas('batches', function ($q) use ($row, $counterPharmacyId) {
-                $q->where('medicine_id', $row->medicine_id)
-                  ->where('pharmacy_id', $counterPharmacyId);
-            })
-            ->where('status', 1)
-            ->where(function ($q) {
-                $q->whereNull('source_type')->orWhere('source_type', '!=', 'retur_gudang');
-            })
-            ->sum('qty');
-
-            $totalStocks = $batchStock + $transferStock;
+        $results->getCollection()->transform(function ($row) {
+            $totalStocks = (int) ($row->batch_stock ?? 0) + (int) ($row->transfer_stock ?? 0);
 
             return [
                 'medicine_id' => $row->medicine_id,

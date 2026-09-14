@@ -592,11 +592,17 @@
                     class="text-gray-400 hover:text-gray-700 text-xl leading-none">&times;</button>
             </div>
 
-            <div class="px-6 py-3 flex gap-2 border-b border-gray-100">
+            <div class="px-6 py-3 flex flex-wrap gap-2 border-b border-gray-100">
                 <input type="text" id="smartSearch" placeholder="Cari obat..."
-                    class="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-purple-200">
+                    class="flex-1 min-w-[180px] rounded-lg border border-gray-300 px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-purple-200">
                 <input type="text" id="smartDateRange" placeholder="Rentang tanggal"
                     class="w-[200px] rounded-lg border border-gray-300 px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-purple-200">
+                <select id="smartSortFilter"
+                    class="rounded-lg border border-gray-300 px-3 py-2 text-[13px] font-medium text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-purple-200 cursor-pointer">
+                    <option value="sold_desc_stock_asc" selected>Filter 1 : Qty Terbanyak DAN Stok Paling Sedikit</option>
+                    <option value="sold_desc">Filter 2 : Qty Terbanyak</option>
+                    <option value="stock_asc">Filter 3 : Stok Paling Sedikit</option>
+                </select>
             </div>
 
             <div id="smartList" class="flex-1 overflow-y-auto px-6 py-2 divide-y divide-gray-50"></div>
@@ -1646,6 +1652,10 @@
             fetchSmartMedicines(true);
         }, 300));
 
+        document.getElementById('smartSortFilter').addEventListener('change', () => {
+            fetchSmartMedicines(true);
+        });
+
         document.getElementById('smartList').addEventListener('scroll', function() {
             if (this.scrollTop + this.clientHeight >= this.scrollHeight - 40) {
                 fetchSmartMedicines(false);
@@ -1671,10 +1681,12 @@
             }
 
             const dates = smartRange.selectedDates;
+            const sortFilter = document.getElementById('smartSortFilter')?.value || 'sold_desc_stock_asc';
             const params = new URLSearchParams({
                 page: smartPage,
                 order_id: orderid,
                 search: document.getElementById('smartSearch').value,
+                sort: sortFilter,
                 date_from: dates[0] ? flatpickr.formatDate(dates[0], 'Y-m-d') : '',
                 date_to: dates[1] ? flatpickr.formatDate(dates[1], 'Y-m-d') : (dates[0] ? flatpickr.formatDate(
                     dates[0], 'Y-m-d') : ''),
