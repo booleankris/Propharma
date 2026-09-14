@@ -1160,10 +1160,13 @@
                         <label class="payment-option flex-1 cursor-pointer">
                             <input type="radio" name="payment_type" onclick="getPaymentType()" value="BELUM BAYAR"
                                 class="sr-only">
-                            <div class="payment-card unpaid-card flex flex-col items-center gap-2 py-3 px-2 rounded-xl border text-center">
+                            <div
+                                class="payment-card unpaid-card flex flex-col items-center gap-2 py-3 px-2 rounded-xl border text-center">
                                 <div class="payment-icon w-9 h-9 rounded-lg flex items-center justify-center">
-                                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                                        <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" />
+                                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="1.8">
+                                        <circle cx="12" cy="12" r="9" />
+                                        <path d="M12 7v5l3 2" />
                                     </svg>
                                 </div>
                                 <span class="payment-label text-[12px] font-medium">Belum Bayar</span>
@@ -2779,7 +2782,9 @@
                 setTimeout(() => {
                     const payEl = document.getElementById('pay');
                     if (payEl) {
-                        payEl.focus({ preventScroll: true });
+                        payEl.focus({
+                            preventScroll: true
+                        });
                         if (typeof payEl.select === 'function') payEl.select();
                     }
                 }, 50);
@@ -2909,7 +2914,9 @@
                             if (val === 'BELUM BAYAR') {
                                 setTimeout(() => {
                                     if (nextInput) {
-                                        nextInput.focus({ preventScroll: true });
+                                        nextInput.focus({
+                                            preventScroll: true
+                                        });
                                         if (typeof nextInput.select === 'function') nextInput.select();
                                     }
                                 }, 50);
@@ -3887,7 +3894,7 @@
             transaction_type === 'HV/OTC'
         ) {
 
-            doctor_id = null;
+            doctor_id = document.getElementById('doctor_id').value || null;
             debtor_id = null;
 
         } else {
@@ -5405,9 +5412,10 @@
                             position: 'topRight'
                         });
                         // Prevent sending more messages
-                        channel.onmessage = null; 
+                        channel.onmessage = null;
                         setTimeout(() => {
-                            window.location.href = "{{ route('transaction', ['type' => $type ?? 'resep']) }}";
+                            window.location.href =
+                                "{{ route('transaction', ['type' => $type ?? 'resep']) }}";
                         }, 1200);
                     }
                 }
@@ -5420,7 +5428,7 @@
             tx_id: myTxId,
             sender: myTabId
         });
-        
+
         // Ping again after a short delay in case the other tab was busy
         setTimeout(() => {
             channel.postMessage({
