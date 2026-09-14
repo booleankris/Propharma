@@ -599,7 +599,7 @@
                     class="w-[200px] rounded-lg border border-gray-300 px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-purple-200">
                 <select id="smartSortFilter"
                     class="rounded-lg border border-gray-300 px-3 py-2 text-[13px] font-medium text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-purple-200 cursor-pointer">
-                    <option value="sold_desc_stock_asc" selected>Filter 1 : Qty Terbanyak DAN Stok Paling Sedikit</option>
+                    <option value="name_asc" selected>Filter 1 : Per Abjad (A - Z)</option>
                     <option value="sold_desc">Filter 2 : Qty Terbanyak</option>
                     <option value="stock_asc">Filter 3 : Stok Paling Sedikit</option>
                 </select>
@@ -694,9 +694,7 @@
             orderItemsTable = $('#orderItemsTable').DataTable({
                 processing: true,
                 serverSide: true,
-                order: [
-                    [2, 'asc']
-                ],
+                order: [],
                 ajax: {
                     url: "{{ route('orders.orderitems') }}",
                     data: function(d) {
@@ -1681,7 +1679,7 @@
             }
 
             const dates = smartRange.selectedDates;
-            const sortFilter = document.getElementById('smartSortFilter')?.value || 'sold_desc_stock_asc';
+            const sortFilter = document.getElementById('smartSortFilter')?.value || 'name_asc';
             const params = new URLSearchParams({
                 page: smartPage,
                 order_id: orderid,

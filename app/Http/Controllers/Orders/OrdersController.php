@@ -76,9 +76,16 @@ class OrdersController extends Controller
                         ->orWhere('code', 'like', '%' . $searchTerm . '%');
                 });
             })
-            ->orderBy('active_creditors.name', 'asc');
+            ->orderByRaw("CASE WHEN active_creditors.name IS NOT NULL AND active_creditors.name != '' THEN 0 ELSE 1 END ASC")
+            ->orderBy('active_creditors.name', 'asc')
+            ->orderBy('order_items.id', 'asc');
 
         return DataTables::of($query)
+            ->orderColumn('creditors', function ($q, $order) {
+                $q->orderByRaw("CASE WHEN active_creditors.name IS NOT NULL AND active_creditors.name != '' THEN 0 ELSE 1 END ASC")
+                  ->orderBy('active_creditors.name', $order)
+                  ->orderBy('order_items.id', 'asc');
+            })
             ->addColumn(
                 'item_total',
                 fn($data) =>
@@ -114,7 +121,7 @@ class OrdersController extends Controller
                 if ($hoName) {
                     $html .= '<span class="font-bold text-emerald-950 truncate" title="Disetujui HO: ' . htmlspecialchars($hoName) . ' oleh ' . $updaterName . ' (' . $timeFormatted . ')">' . htmlspecialchars($hoName) . '</span>';
                 } else {
-                    $html .= '<span class="text-amber-600 italic text-[11px] flex items-center gap-1"><i class="fas fa-clock text-[9px]"></i> ' . htmlspecialchars($branchName) . '</span>';
+                    $html .= '<span class="text-amber-600 italic text-[11px] flex items-center gap-1"><i class="fas fa-clock text-[9px]"></i> ' . htmlspecialchars($branchName ?? '') . '</span>';
                 }
                 $html .= '</div>';
 
@@ -828,7 +835,7 @@ class OrdersController extends Controller
         $dateTo = $request->date_to ?? $yesterday;
         $search = $request->search;
         $orderId = $request->order_id;
-        $sort = $request->sort ?? 'sold_desc_stock_asc';
+        $sort = $request->sort ?? 'name_asc';
 
         $order = Order::find($orderId);
         $pharmacyId = $order?->pharmacy_id ?? getPurchasingPharmacyId();
@@ -888,11 +895,13 @@ class OrdersController extends Controller
         } elseif ($sort === 'stock_asc') {
             // Filter 3 : stok paling sedikit
             $query->orderByRaw('(batch_stock + transfer_stock) ASC')
-                  ->orderByDesc('total_sold');
-        } else {
-            // Filter 1 (default) : qty terbanyak DAN stok paling sedikit
+                  ->orderBy('medicines.name', 'asc');
+        } elseif ($sort === 'sold_desc_stock_asc') {
             $query->orderByDesc('total_sold')
                   ->orderByRaw('(batch_stock + transfer_stock) ASC');
+        } else {
+            // Filter 1 (default) : per abjad (A - Z)
+            $query->orderBy('medicines.name', 'asc');
         }
 
         $results = $query->paginate(20);
