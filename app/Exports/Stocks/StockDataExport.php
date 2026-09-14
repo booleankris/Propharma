@@ -116,6 +116,23 @@ class StockDataExport implements FromCollection, WithHeadings, WithStyles, Shoul
                         $q->whereNull('medicine_transfer_items.source_type')
                           ->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang');
                     }),
+
+                // Keterangan: Metode pembayaran barang diterima (invoice_payment) terakhir s/d batas rentang tanggal
+                'payment_method' => DB::table('receiving_items')
+                    ->join('receiving_details', 'receiving_details.id', '=', 'receiving_items.receiving_details_id')
+                    ->join('receiving', 'receiving.id', '=', 'receiving_details.receiving_id')
+                    ->leftJoin('batches', 'batches.id', '=', 'receiving_items.batches_id')
+                    ->leftJoin('order_items', 'order_items.id', '=', 'receiving_items.order_items_id')
+                    ->where(function ($q) {
+                        $q->whereColumn('batches.medicine_id', 'medicines.id')
+                          ->orWhereColumn('order_items.medicine_id', 'medicines.id');
+                    })
+                    ->where('receiving.pharmacy_id', $ordersPharmacyId)
+                    ->when($endDate, fn($q) => $q->whereDate('receiving_details.invoice_date', '<=', $endDate))
+                    ->orderByDesc('receiving_details.invoice_date')
+                    ->orderByDesc('receiving_details.id')
+                    ->select('receiving_details.invoice_payment')
+                    ->limit(1),
             ])
             ->when($req && $req->filled('searchMedicine'), function ($q) use ($req) {
                 $q->where(function ($sub) use ($req) {
@@ -146,6 +163,9 @@ class StockDataExport implements FromCollection, WithHeadings, WithStyles, Shoul
 
             $sisaStok = $qtyStart + $qtyOrders - $qtySales;
 
+            $p = $m->payment_method ? strtoupper(trim($m->payment_method)) : null;
+            $keterangan = ($p === 'TUNAI' || $p === 'CASH') ? 'Cash' : (($p === 'KREDIT') ? 'Kredit' : (($p === 'KONSINYASI') ? 'Konsinyasi' : ($p ? ucfirst(strtolower($p)) : '-')));
+
             $row = [
                 'No' => $index + 1,
                 'Kode Obat' => $m->code,
@@ -165,6 +185,7 @@ class StockDataExport implements FromCollection, WithHeadings, WithStyles, Shoul
             }
 
             $row['Total Stok'] = $totalStok;
+            $row['Keterangan'] = $keterangan;
 
             return $row;
         });
@@ -185,6 +206,7 @@ class StockDataExport implements FromCollection, WithHeadings, WithStyles, Shoul
                 'Stok Gudang',
                 'Stok Pelayanan PMI',
                 'Total Stok',
+                'Keterangan',
             ];
         }
 
@@ -199,15 +221,17 @@ class StockDataExport implements FromCollection, WithHeadings, WithStyles, Shoul
             'Sisa Stok',
             'Stok Etalase',
             'Total Stok',
+            'Keterangan',
         ];
     }
 
     public function styles(Worksheet $sheet)
     {
-        $lastCol = $this->canSeeWarehouse ? 'K' : 'J';
+        $lastCol = $this->canSeeWarehouse ? 'L' : 'K';
         $sheet->getStyle("A1:{$lastCol}1")->getFont()->setBold(true);
         $sheet->getStyle('A')->getAlignment()->setHorizontal('center');
         $sheet->getStyle("E:{$lastCol}")->getAlignment()->setHorizontal('right');
+        $sheet->getStyle($lastCol)->getAlignment()->setHorizontal('center');
 
         return [];
     }

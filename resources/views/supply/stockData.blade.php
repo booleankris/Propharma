@@ -203,6 +203,7 @@
                                     <th class="px-4 py-3 text-center">Stok Etalase</th>
                                 @endif
                                 <th class="px-4 py-3 text-center">Total Stok</th>
+                                <th class="px-4 py-3 text-center">Keterangan</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100"></tbody>
@@ -467,6 +468,10 @@
                     {
                         data: 'qty_now',
                         className: 'text-center font-bold text-slate-800'
+                    },
+                    {
+                        data: 'keterangan',
+                        className: 'text-center font-medium text-slate-700'
                     }
                 ],
                 paging: true,

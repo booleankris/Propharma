@@ -630,6 +630,23 @@ class SuppliesController extends Controller
                             $q->whereNull('medicine_transfer_items.source_type')
                               ->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang');
                         }),
+
+                    // Keterangan: Metode pembayaran barang diterima (invoice_payment) terakhir s/d batas rentang tanggal
+                    'payment_method' => DB::table('receiving_items')
+                        ->join('receiving_details', 'receiving_details.id', '=', 'receiving_items.receiving_details_id')
+                        ->join('receiving', 'receiving.id', '=', 'receiving_details.receiving_id')
+                        ->leftJoin('batches', 'batches.id', '=', 'receiving_items.batches_id')
+                        ->leftJoin('order_items', 'order_items.id', '=', 'receiving_items.order_items_id')
+                        ->where(function ($q) {
+                            $q->whereColumn('batches.medicine_id', 'medicines.id')
+                              ->orWhereColumn('order_items.medicine_id', 'medicines.id');
+                        })
+                        ->where('receiving.pharmacy_id', $ordersPharmacyId)
+                        ->when($endDate, fn($q) => $q->whereDate('receiving_details.invoice_date', '<=', $endDate))
+                        ->orderByDesc('receiving_details.invoice_date')
+                        ->orderByDesc('receiving_details.id')
+                        ->select('receiving_details.invoice_payment')
+                        ->limit(1),
                 ]);
 
             if ($request->filled('medicine_id')) {
@@ -667,6 +684,20 @@ class SuppliesController extends Controller
                     $counter = (int) ($m->qty_counter ?? 0);
                     return $storage + $counter;
                 })
+                ->addColumn('keterangan', function ($m) {
+                    $p = $m->payment_method ? strtoupper(trim($m->payment_method)) : null;
+                    if ($p === 'TUNAI' || $p === 'CASH') {
+                        return '<span class="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">Cash</span>';
+                    } elseif ($p === 'KREDIT') {
+                        return '<span class="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">Kredit</span>';
+                    } elseif ($p === 'KONSINYASI') {
+                        return '<span class="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">Konsinyasi</span>';
+                    } elseif ($p) {
+                        return '<span class="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">' . htmlspecialchars(ucfirst(strtolower($p))) . '</span>';
+                    }
+                    return '<span class="text-slate-400">-</span>';
+                })
+                ->rawColumns(['keterangan'])
                 ->make(true);
         }
     }
