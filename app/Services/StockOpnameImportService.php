@@ -701,30 +701,48 @@ class StockOpnameImportService
     private function generateItemsLogCode(): string
     {
         $now = Carbon::now();
-        $year = $now->format('y');
-        $month = $now->format('m');
-        $prefix = "{$year}{$month}LOG-";
+        $prefix = $now->format('ym') . 'LOG-';
 
         $lastCode = ItemsLog::where('code', 'like', "{$prefix}%")
-            ->orderBy('code', 'desc')
+            ->orderBy('id', 'desc')
             ->value('code');
 
-        $nextNumber = $lastCode ? ((int) substr($lastCode, -4)) + 1 : 1;
+        if (!$lastCode) {
+            $lastCode = ItemsLog::where('code', 'like', "{$prefix}%")
+                ->orderByRaw('LENGTH(code) DESC, code DESC')
+                ->value('code');
+        }
+
+        $nextNumber = 1;
+        if ($lastCode) {
+            $parts = explode('LOG-', $lastCode);
+            $nextNumber = ((int) ($parts[1] ?? substr($lastCode, -4))) + 1;
+        }
+
         return $prefix . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
     }
 
     private function generateTransfersCode(): string
     {
         $now = Carbon::now();
-        $year = $now->format('y');
-        $month = $now->format('m');
-        $prefix = "{$year}{$month}MUT";
+        $prefix = $now->format('ym') . 'MUT';
 
         $lastCode = MedicineTransfers::where('code', 'like', "{$prefix}%")
-            ->orderBy('code', 'desc')
+            ->orderBy('id', 'desc')
             ->value('code');
 
-        $nextNumber = $lastCode ? ((int) substr($lastCode, -4)) + 1 : 1;
+        if (!$lastCode) {
+            $lastCode = MedicineTransfers::where('code', 'like', "{$prefix}%")
+                ->orderByRaw('LENGTH(code) DESC, code DESC')
+                ->value('code');
+        }
+
+        $nextNumber = 1;
+        if ($lastCode) {
+            $parts = explode('MUT', $lastCode);
+            $nextNumber = ((int) ($parts[1] ?? substr($lastCode, -4))) + 1;
+        }
+
         return $prefix . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
     }
 

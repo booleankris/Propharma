@@ -843,7 +843,16 @@ class OrdersController extends Controller
         // Exclude medicines already in this order
         $existingIds = OrderItems::where('order_id', $orderId)->pluck('medicine_id');
 
-        $counterPharmacyId = isWarehousePharmacy($pharmacyId) ? 1 : $pharmacyId;
+        $user = auth()->user();
+        $isWarehouse = isWarehousePharmacy($pharmacyId) || (int) $pharmacyId === 9 || (int) $pharmacyId === 1;
+        if ($user && ($user->hasRole('Gudang PMI') || $user->hasRole('HO') || $user->hasRole('administrator') || $user->hasRole('Manager'))) {
+            if (!session()->has('ho_pharmacy_id') || in_array((int) session('ho_pharmacy_id'), [1, 9])) {
+                $isWarehouse = true;
+            }
+        }
+
+        $counterPharmacyId = $isWarehouse ? 1 : $pharmacyId;
+        $salesPharmacyId = $isWarehouse ? 1 : $pharmacyId;
 
         $batchSub = \App\Models\Batches::selectRaw('COALESCE(SUM(stock), 0)')
             ->whereColumn('batches.medicine_id', 'medicine_cart.medicine_id')
@@ -873,7 +882,7 @@ class OrdersController extends Controller
             ->selectSub($transferSub, 'transfer_stock')
             ->join('medicine_transactions', 'medicine_transactions.id', '=', 'medicine_cart.transaction_id')
             ->join('medicines', 'medicines.id', '=', 'medicine_cart.medicine_id')
-            ->where('medicine_transactions.pharmacy_id', $pharmacyId)
+            ->where('medicine_transactions.pharmacy_id', $salesPharmacyId)
             ->where('medicine_transactions.status', 1)
             ->whereBetween('medicine_transactions.created_at', ["{$dateFrom} 00:00:00", "{$dateTo} 23:59:59"])
             ->whereNotIn('medicine_cart.medicine_id', $existingIds)

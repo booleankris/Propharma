@@ -213,7 +213,7 @@ class ReportsController extends Controller
                     $request->shiftType,
                     $request->selectedType,
                 ),
-                'DATA_OBAT_' . $pharmacy->name . '_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx',
+                (in_array($request->selectedType, ['rekap_bulanan', 'bulanan']) ? 'REKAP_BULANAN_OBAT_' : 'DATA_OBAT_') . $pharmacy->name . '_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx',
             ],
             'Golongan' => [
                 new CategoryExport(

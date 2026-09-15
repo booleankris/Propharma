@@ -466,6 +466,8 @@ Route::middleware(['auth', 'role:Kasir|Gudang PMI|HO|administrator|manager|Onlin
     Route::post('/orders/{orderId}/revision/move-item', [ReceivingController::class, 'moveRevisionItem'])->name('receiving.revision.moveItem');
     Route::delete('/orders/{orderId}/revision/details/{detailsId}', [ReceivingController::class, 'deleteEmptyRevisionDetails'])->name('receiving.revision.deleteDetails');
     Route::get('/orders/{orderId}/comparison', [ReceivingController::class, 'orderComparison'])->name('orders.comparison');
+    Route::get('/receiving/rincian', [ReceivingController::class, 'rincianIndex'])->name('receiving.rincian');
+    Route::get('/orders/{orderId}/rincian', [ReceivingController::class, 'orderRincian'])->name('orders.rincian');
 
     // Save Order
     Route::post('/receiving/completeorder', [ReceivingController::class, 'completeOrder'])

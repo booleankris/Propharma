@@ -86,15 +86,24 @@ class ReceivingController extends Controller
     public function generateItemsLogCode()
     {
         $now = Carbon::now();
-        $year = $now->format('y');
-        $month = $now->format('m');
-        $prefix = "{$year}{$month}LOG-";
+        $prefix = $now->format('ym') . 'LOG-';
 
         $lastCode = ItemsLog::where('code', 'like', "{$prefix}%")
-            ->orderBy('code', 'desc')
+            ->orderBy('id', 'desc')
             ->value('code');
 
-        $nextNumber = $lastCode ? ((int) substr($lastCode, -4) + 1) : 1;
+        if (!$lastCode) {
+            $lastCode = ItemsLog::where('code', 'like', "{$prefix}%")
+                ->orderByRaw('LENGTH(code) DESC, code DESC')
+                ->value('code');
+        }
+
+        $nextNumber = 1;
+        if ($lastCode) {
+            $parts = explode('LOG-', $lastCode);
+            $nextNumber = ((int) ($parts[1] ?? substr($lastCode, -4))) + 1;
+        }
+
         $serial = str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
         $code = $prefix . $serial;
 
@@ -979,9 +988,22 @@ class ReceivingController extends Controller
                         . '</div>';
                 }
 
+                $hasDraftItems = false;
+                if ($row->relationLoaded('order_items')) {
+                    $hasDraftItems = $row->order_items->contains(function ($oi) {
+                        return $oi->receivingItems->isNotEmpty();
+                    });
+                }
+
+                $rincianItem = $menuItem(
+                    '/orders/' . $row->id . '/rincian',
+                    'Rincian',
+                    '<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"/>'
+                );
+
                 // STATUS 1 & 2: DIPESAN (Emerald Solid Split Button - Sesuai Mockup Pengguna)
                 if ($row->status == 1 || $row->status == 2) {
-                    $dropdownItems = $compareItem . ($isEmpty ? '<div class="my-1 border-t border-slate-100"></div>' . $deleteMenuItem : '');
+                    $dropdownItems = ($hasDraftItems ? $rincianItem : '') . $compareItem . ($isEmpty ? '<div class="my-1 border-t border-slate-100"></div>' . $deleteMenuItem : '');
 
                     return '<div class="btn-split-group btn-split-emerald inline-flex items-stretch rounded-lg shadow-xs overflow-hidden">'
                         . '<a href="/receive/' . $row->id . '" class="btn-split-main inline-flex items-center gap-2 px-3.5 py-1.5 text-xs font-bold text-white transition-colors">'
@@ -1014,7 +1036,7 @@ class ReceivingController extends Controller
                     '<path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"/>'
                 );
 
-                $dropdownItems = $invoiceItem . $revisionItem . $compareItem . ($isEmpty ? '<div class="my-1 border-t border-slate-100"></div>' . $deleteMenuItem : '');
+                $dropdownItems = $rincianItem . $invoiceItem . $revisionItem . $compareItem . ($isEmpty ? '<div class="my-1 border-t border-slate-100"></div>' . $deleteMenuItem : '');
 
                 return '<div class="btn-split-group btn-split-white inline-flex items-stretch rounded-lg shadow-xs overflow-hidden">'
                     . '<a href="/receiving/' . $row->id . '/printspbfinal" target="_blank" class="btn-split-main inline-flex items-center gap-2 px-3.5 py-1.5 text-xs font-bold text-slate-800 transition-colors">'
@@ -1910,6 +1932,221 @@ class ReceivingController extends Controller
         ));
     }
 
+    public function rincianIndex(Request $request)
+    {
+        $pharmacyId = getPurchasingPharmacyId();
+        $latestOrder = Order::query()
+            ->when($pharmacyId > 0, fn($q) => $q->where('pharmacy_id', $pharmacyId))
+            ->where(function ($q) {
+                $q->where('status', 3)
+                    ->orWhereHas('order_items.receivingItems');
+            })
+            ->orderByDesc('id')
+            ->first();
+
+        if ($latestOrder) {
+            return redirect()->route('orders.rincian', $latestOrder->id);
+        }
+
+        return view('orders.rincian', [
+            'order' => null,
+            'availableOrders' => collect(),
+            'creditorOption' => collect(),
+            'allFakturs' => collect(),
+            'faktursData' => [],
+            'itemsData' => collect(),
+        ]);
+    }
+
+    public function orderRincian($orderId)
+    {
+        $pharmacyId = getPurchasingPharmacyId();
+        $order = Order::with([
+            'order_items.medicines.factory',
+            'order_items.medicines.creditors',
+            'order_items.creditors',
+            'order_items.receivingItems.receiving_details.creditor',
+            'order_items.receivingItems.batches',
+            'order_items.receivingItems.locations',
+            'order_items.receivingItems.etalases',
+        ])->findOrFail($orderId);
+
+        // List of all orders that have saved draft receiving items or are completed
+        $availableOrders = Order::query()
+            ->when($pharmacyId > 0, fn($q) => $q->where('pharmacy_id', $pharmacyId))
+            ->where(function ($q) {
+                $q->where('status', 3)
+                    ->orWhereHas('order_items.receivingItems');
+            })
+            ->orderByDesc('id')
+            ->select('id', 'code', 'status', 'created_at')
+            ->get();
+
+        $rdIdsFromItems = $order->order_items->flatMap->receivingItems
+            ->pluck('receiving_details_id')
+            ->unique()
+            ->filter();
+
+        $orderSpCodes = $order->order_items->pluck('order_items_code')->filter();
+
+        $allFakturs = ReceivingDetails::where(function ($q) use ($rdIdsFromItems, $order, $orderSpCodes) {
+            $q->whereIn('id', $rdIdsFromItems);
+            if ($order->receiving_id) {
+                $q->orWhere('receiving_id', $order->receiving_id);
+            }
+            if ($orderSpCodes->isNotEmpty()) {
+                $q->orWhereIn('sp_code', $orderSpCodes);
+            }
+        })
+            ->with(['creditor', 'receiving'])
+            ->orderBy('id', 'asc')
+            ->get();
+
+        // Creditor options: from order_items + allFakturs
+        $creditorOption = $order->order_items->map(fn($oi) => $oi->creditors)->filter()
+            ->concat($allFakturs->map(fn($f) => $f->creditor)->filter())
+            ->unique('code')
+            ->values();
+
+        $faktursData = $allFakturs->map(function ($f) {
+            return [
+                'id' => $f->id,
+                'receiving_details_code' => $f->receiving_details_code ?? '-',
+                'sp_code' => $f->sp_code ?? '-',
+                'invoice_number' => $f->invoice_number ?? '-',
+                'invoice_date' => $f->invoice_date ? (is_string($f->invoice_date) ? $f->invoice_date : Carbon::parse($f->invoice_date)->format('Y-m-d')) : '-',
+                'invoice_payment' => $f->invoice_payment ?? '-',
+                'invoice_times' => $f->invoice_times ?? 0,
+                'invoice_due' => $f->invoice_due ?? '-',
+                'invoice_ppn' => $f->invoice_ppn ?? 'TANPA',
+                'creditor_code' => $f->creditor_code ?? '',
+                'creditor_name' => $f->creditor->name ?? '-',
+                'receiving_date' => $f->receiving->date ?? ($f->created_at ? $f->created_at->format('d/m/Y') : '-'),
+            ];
+        })->values();
+
+        $itemsData = collect();
+
+        foreach ($order->order_items as $orderItem) {
+            $creditorCode = $orderItem->creditor_code;
+            $creditorPpn = $orderItem->creditors?->ppn_type ?? 'TANPA';
+            $medCred = $orderItem->medicines?->creditors?->firstWhere('code', $creditorCode) ?? $orderItem->medicines?->creditors?->first();
+            $pbfDiscRaw = floatval($medCred?->pivot?->discount ?? 0);
+            $pbfDiscStr = ($pbfDiscRaw > 0) ? (($pbfDiscRaw == (int) $pbfDiscRaw ? (int) $pbfDiscRaw : $pbfDiscRaw) . '%') : '0%';
+
+            if ($orderItem->receivingItems->isEmpty()) {
+                $ppnType = strtoupper(trim($creditorPpn));
+                $rawPrice = floatval($orderItem->price ?? 0);
+                $gross = floatval($orderItem->quantity ?? 0) * $rawPrice;
+                $disc = floatval($orderItem->discount ?? 0);
+                $extraDisc = floatval($orderItem->extra_discount ?? 0);
+                $nomDisc = ($disc <= 100 && $disc > 0) ? ($gross * $disc / 100) : $disc;
+                $nomExtraDisc = ($extraDisc <= 100 && $extraDisc > 0) ? ($gross * $extraDisc / 100) : $extraDisc;
+                $net = max(0, $gross - $nomDisc - $nomExtraDisc);
+
+                if ($ppnType === 'EXCLUDE') {
+                    $priceHna = $rawPrice;
+                    $pricePpn = floor($rawPrice * 1.11);
+                    $itemTotal = floor($net * 1.11);
+                } elseif ($ppnType === 'INCLUDE') {
+                    $priceHna = floor($rawPrice / 1.11);
+                    $pricePpn = $rawPrice;
+                    $itemTotal = $net;
+                } else {
+                    $priceHna = $rawPrice;
+                    $pricePpn = $rawPrice;
+                    $itemTotal = $net;
+                }
+
+                $itemsData->push([
+                    'order_item_id' => $orderItem->id,
+                    'medicine_id' => $orderItem->medicine_id,
+                    'medicine_name' => $orderItem->medicines->name ?? '-',
+                    'medicine_code' => $orderItem->medicines->code ?? '-',
+                    'quantity_ordered' => (float) $orderItem->quantity,
+                    'quantity_received' => 0,
+                    'batch' => '-',
+                    'expired_date' => '-',
+                    'hna' => $priceHna,
+                    'harga_ppn' => $pricePpn,
+                    'discount' => $disc,
+                    'extra_discount' => $extraDisc,
+                    'pbf_discount' => $pbfDiscStr,
+                    'total' => $itemTotal,
+                    'status' => 'Belum Diterima',
+                    'status_class' => 'bg-amber-50 text-amber-700 border-amber-200',
+                    'creditor_code' => $creditorCode,
+                    'receiving_details_id' => null,
+                ]);
+            } else {
+                foreach ($orderItem->receivingItems as $ri) {
+                    $details = $ri->receiving_details;
+                    $ppnType = strtoupper(trim($details?->invoice_ppn ?? $creditorPpn));
+                    $activePrice = floatval($ri->raw_price ?? $orderItem->price ?? 0);
+                    $qtyReceived = floatval($ri->qty_received ?? 0);
+                    $gross = $qtyReceived * $activePrice;
+                    $disc = floatval($ri->discount ?? 0);
+                    $extraDisc = floatval($ri->extra_discount ?? 0);
+                    $nomDisc = ($disc <= 100 && $disc > 0) ? ($gross * $disc / 100) : $disc;
+                    $nomExtraDisc = ($extraDisc <= 100 && $extraDisc > 0) ? ($gross * $extraDisc / 100) : $extraDisc;
+                    $net = max(0, $gross - $nomDisc - $nomExtraDisc);
+
+                    if ($ppnType === 'EXCLUDE') {
+                        $priceHna = $activePrice;
+                        $pricePpn = floor($activePrice * 1.11);
+                        $itemTotal = floor($net * 1.11);
+                    } elseif ($ppnType === 'INCLUDE') {
+                        $priceHna = floor($activePrice / 1.11);
+                        $pricePpn = $activePrice;
+                        $itemTotal = $net;
+                    } else {
+                        $priceHna = $activePrice;
+                        $pricePpn = $activePrice;
+                        $itemTotal = $net;
+                    }
+
+                    $batchNo = $ri->batches->batch_number ?? $ri->batch ?? '-';
+                    $expDate = $ri->batches->expired_date ?? $ri->expired_date ?? '-';
+                    if ($expDate !== '-' && strlen($expDate) >= 10) {
+                        try {
+                            $expDate = Carbon::parse($expDate)->format('d/m/Y');
+                        } catch (\Exception $e) {}
+                    }
+
+                    $itemsData->push([
+                        'order_item_id' => $orderItem->id,
+                        'medicine_id' => $orderItem->medicine_id,
+                        'medicine_name' => $orderItem->medicines->name ?? '-',
+                        'medicine_code' => $orderItem->medicines->code ?? '-',
+                        'quantity_ordered' => (float) $orderItem->quantity,
+                        'quantity_received' => $qtyReceived,
+                        'batch' => $batchNo,
+                        'expired_date' => $expDate,
+                        'hna' => $priceHna,
+                        'harga_ppn' => $pricePpn,
+                        'discount' => $disc,
+                        'extra_discount' => $extraDisc,
+                        'pbf_discount' => $pbfDiscStr,
+                        'total' => $ri->total ? floatval($ri->total) : $itemTotal,
+                        'status' => 'Diterima',
+                        'status_class' => 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                        'creditor_code' => $details?->creditor_code ?? $creditorCode,
+                        'receiving_details_id' => $ri->receiving_details_id,
+                    ]);
+                }
+            }
+        }
+
+        return view('orders.rincian', compact(
+            'order',
+            'availableOrders',
+            'creditorOption',
+            'allFakturs',
+            'faktursData',
+            'itemsData'
+        ));
+    }
+
     public function index()
     {
         $now = Carbon::now()->format('d/m/Y');
@@ -2362,15 +2599,24 @@ class ReceivingController extends Controller
     public function generateTransfersCode()
     {
         $now = Carbon::now();
-        $year = $now->format('y');
-        $month = $now->format('m');
-        $prefix = "{$year}{$month}MUT";
+        $prefix = $now->format('ym') . 'MUT';
 
         $lastCode = MedicineTransfers::where('code', 'like', "{$prefix}%")
-            ->orderBy('code', 'desc')
+            ->orderBy('id', 'desc')
             ->value('code');
 
-        $nextNumber = $lastCode ? ((int) substr($lastCode, -4) + 1) : 1;
+        if (!$lastCode) {
+            $lastCode = MedicineTransfers::where('code', 'like', "{$prefix}%")
+                ->orderByRaw('LENGTH(code) DESC, code DESC')
+                ->value('code');
+        }
+
+        $nextNumber = 1;
+        if ($lastCode) {
+            $parts = explode('MUT', $lastCode);
+            $nextNumber = ((int) ($parts[1] ?? substr($lastCode, -4))) + 1;
+        }
+
         $serial = str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
         $code = $prefix . $serial;
 
@@ -2408,6 +2654,7 @@ class ReceivingController extends Controller
 
             // Generate Nomor Terima (NT) and SP Code for any ReceivingDetails on this order that doesn't have one yet
             $allDetails = ReceivingDetails::whereHas('receiving_items.order_items', fn($q) => $q->where('order_id', $order->id))
+                ->with(['receiving_items.order_items'])
                 ->get();
 
             foreach ($allDetails as $details) {
@@ -2444,26 +2691,21 @@ class ReceivingController extends Controller
             $now = Carbon::now()->format('Y-m-d');
             $pharmacyId = $order->pharmacy_id ?? getPurchasingPharmacyId();
 
-            $medicineIds = $receivingItems->pluck('order_items.medicine_id')->unique()->values();
+            $medicineIds = $receivingItems->pluck('order_items.medicine_id')->filter()->unique()->values();
+            $batchNames = $receivingItems->pluck('batch')->filter()->unique()->values();
             $medicines = Medicines::whereIn('id', $medicineIds)->get()->keyBy('id');
 
             $existingBatches = Batches::where('pharmacy_id', $pharmacyId)
-                ->where(function ($q) use ($receivingItems) {
-                    foreach ($receivingItems as $item) {
-                        $q->orWhere(
-                            fn($q2) => $q2
-                                ->where('medicine_id', $item->order_items->medicine_id)
-                                ->where('name', $item->batch)
-                                ->where('expired_date', $item->expired_date)
-                        );
-                    }
-                })
+                ->whereIn('medicine_id', $medicineIds)
+                ->whereIn('name', $batchNames)
                 ->get()
                 ->keyBy(fn($b) => "{$b->medicine_id}|{$b->name}|{$b->expired_date}");
 
             $itemsLogInserts = [];
             $medicineIncrements = [];
+            $batchIncrements = [];
             $receivingItemUpdates = [];
+            $transferItemsInserts = [];
 
             $transferHeader = null;
             if (!isWarehousePharmacy($pharmacyId)) {
@@ -2474,8 +2716,9 @@ class ReceivingController extends Controller
             }
 
             $baseLogCode = $this->generateItemsLogCode();
-            $logPrefix = substr($baseLogCode, 0, -4);
-            $currentLogNum = (int) substr($baseLogCode, -4);
+            $parts = explode('LOG-', $baseLogCode);
+            $logPrefix = $parts[0] . 'LOG-';
+            $currentLogNum = (int) ($parts[1] ?? substr($baseLogCode, -4));
 
             $recCode = $receiving ? $receiving->code : ($order->code ?? 'REC');
 
@@ -2514,16 +2757,18 @@ class ReceivingController extends Controller
                 $receivingItemUpdates[$item->id] = $batch->id;
 
                 if (!isWarehousePharmacy($pharmacyId)) {
-                    MedicineTransferItems::create([
+                    $transferItemsInserts[] = [
                         'medicine_transfer_id' => $transferHeader->id,
                         'batches_id' => $batch->id,
                         'receiving_items_id' => $item->id,
                         'etalases_id' => 99,
                         'qty' => $actualStockQty,
                         'status' => 1,
-                    ]);
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ];
                 } else {
-                    Batches::where('id', $batch->id)->increment('stock', $actualStockQty);
+                    $batchIncrements[$batch->id] = ($batchIncrements[$batch->id] ?? 0) + $actualStockQty;
                 }
 
                 $itemsLogInserts[] = [
@@ -2547,13 +2792,24 @@ class ReceivingController extends Controller
                 Medicines::where('id', $medicineId)->increment('stock', $qty);
             }
 
-            collect($receivingItemUpdates)
-                ->chunk(500)
-                ->each(function ($chunk) {
-                    foreach ($chunk as $itemId => $batchId) {
-                        ReceivingItems::where('id', $itemId)->update(['batches_id' => $batchId]);
-                    }
-                });
+            foreach ($batchIncrements as $batchId => $qty) {
+                Batches::where('id', $batchId)->increment('stock', $qty);
+            }
+
+            if (!empty($transferItemsInserts)) {
+                collect($transferItemsInserts)
+                    ->chunk(500)
+                    ->each(fn($chunk) => MedicineTransferItems::insert($chunk->toArray()));
+            }
+
+            // Bulk update receiving_items batches_id grouped by batchId
+            $itemsByBatch = [];
+            foreach ($receivingItemUpdates as $itemId => $batchId) {
+                $itemsByBatch[$batchId][] = $itemId;
+            }
+            foreach ($itemsByBatch as $batchId => $itemIds) {
+                ReceivingItems::whereIn('id', $itemIds)->update(['batches_id' => $batchId]);
+            }
 
             collect($itemsLogInserts)
                 ->chunk(500)

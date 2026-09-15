@@ -450,6 +450,11 @@
                 typeFilterEl.style.display = config.type_filter ? 'block' : 'none';
             }
 
+            const optRekapBulanan = document.getElementById('opt-rekap-bulanan');
+            if (optRekapBulanan) {
+                optRekapBulanan.style.display = (reportLabel === 'Obat') ? 'flex' : 'none';
+            }
+
             // Always reset type to 'rekap' when switching report
             resetReportTypeOptions();
 
@@ -463,6 +468,58 @@
                 setTimeout(() => initDoctorSelect(), 100);
             }
         }
+
+        window.setQuickDateRange = function(range) {
+            const startEl = document.getElementById('sales_start_date');
+            const endEl = document.getElementById('sales_end_date');
+            if (!startEl || !endEl) return;
+
+            const now = new Date();
+            let startDate, endDate;
+
+            if (range === '1_month') {
+                startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+                endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+            } else if (range === '3_months') {
+                startDate = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+                endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+            } else if (range === '6_months') {
+                startDate = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+                endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+            } else if (range === 'this_year') {
+                startDate = new Date(now.getFullYear(), 0, 1);
+                endDate = new Date(now.getFullYear(), 11, 31);
+            }
+
+            const fmt = (d) => {
+                const year = d.getFullYear();
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            };
+
+            const sStr = fmt(startDate);
+            const eStr = fmt(endDate);
+
+            if (startEl._flatpickr) {
+                startEl._flatpickr.setDate(sStr, true);
+            } else {
+                startEl.value = sStr;
+            }
+
+            if (endEl._flatpickr) {
+                endEl._flatpickr.setDate(eStr, true);
+            } else {
+                endEl.value = eStr;
+            }
+
+            if (selectedReport === 'Obat' && (range === '3_months' || range === '6_months')) {
+                const optBulanan = document.getElementById('opt-rekap-bulanan');
+                if (optBulanan) {
+                    selectOption(optBulanan);
+                }
+            }
+        };
 
         function selectReport(el) {
             document.querySelectorAll('.report-btn').forEach(btn => {
@@ -541,8 +598,10 @@
                 if (mode === 'download') {
                     const url = window.URL.createObjectURL(new Blob([result.data]));
                     const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `Laporan_Jual_${selectedReport}_${start_date}_${end_date}.xlsx`;
+                    const isBulanan = selectedReport === 'Obat' && (selectedType === 'rekap_bulanan' || selectedType === 'bulanan');
+                    a.download = isBulanan
+                        ? `Laporan_Jual_Obat_Bulanan_${start_date}_${end_date}.xlsx`
+                        : `Laporan_Jual_${selectedReport}_${start_date}_${end_date}.xlsx`;
                     a.click();
                     window.URL.revokeObjectURL(url);
                 } else {

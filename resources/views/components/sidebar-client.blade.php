@@ -574,7 +574,7 @@
         @endif
 
         @if (canAccessPurchasing())
-            <a href="{{ route('receiving.index') }}" class="nav-item {{ request()->is('receiving*') ? 'active' : '' }}">
+            <a href="{{ route('receiving.index') }}" class="nav-item {{ (request()->is('receiving*') || request()->is('receive/*')) && !request()->is('receiving/rincian*') && !request()->is('orders/*/rincian*') ? 'active' : '' }}">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="9" cy="21" r="1" />
@@ -582,6 +582,17 @@
                     <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
                 </svg>
                 Pembelian
+            </a>
+            <a href="{{ route('receiving.rincian') }}" class="nav-item {{ request()->is('*rincian*') ? 'active' : '' }}">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                    <line x1="16" y1="13" x2="8" y2="13" />
+                    <line x1="16" y1="17" x2="8" y2="17" />
+                    <polyline points="10 9 9 9 8 9" />
+                </svg>
+                Rincian
             </a>
         @endif
 
@@ -1263,7 +1274,19 @@
             <div class="h-px bg-slate-100"></div>
 
             <div>
-                <p class="text-xs font-semibold tracking-widest uppercase text-slate-400 mb-3">Rentang Tanggal</p>
+                <div class="flex items-center justify-between mb-3">
+                    <p class="text-xs font-semibold tracking-widest uppercase text-slate-400 m-0">Rentang Tanggal</p>
+                    <div id="quick_date_presets" class="flex items-center gap-1">
+                        <button type="button" onclick="setQuickDateRange('1_month')"
+                            class="text-[11px] px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium transition">1 Bulan</button>
+                        <button type="button" onclick="setQuickDateRange('3_months')"
+                            class="text-[11px] px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium transition">3 Bulan</button>
+                        <button type="button" onclick="setQuickDateRange('6_months')"
+                            class="text-[11px] px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium transition">6 Bulan</button>
+                        <button type="button" onclick="setQuickDateRange('this_year')"
+                            class="text-[11px] px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium transition">Tahun Ini</button>
+                    </div>
+                </div>
                 <div class="flex items-center gap-2">
                     <input type="text" value="{{ \Carbon\Carbon::now()->format('Y-m-d') }}" id="sales_start_date"
                         name="start_date" autocomplete="off"
@@ -1337,6 +1360,28 @@
                                     </p>
                                     <p class="opt-desc text-[9px] text-blue-500 m-0 mt-0.5">Hasil Perhitungan
                                         Keseluruhan
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div data-value="rekap_bulanan" id="opt-rekap-bulanan" onclick="selectOption(this)"
+                                class="opt flex items-center gap-4 p-2.5 px-3 flex-1 rounded-2xl border-2 border-gray-200 bg-white cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:border-gray-300 hover:bg-gray-50">
+                                <div
+                                    class="icon-box w-7 h-7 rounded-xl flex items-center justify-center shrink-0 bg-gray-100 transition-all duration-200">
+                                    <svg class="icon-svg text-gray-400" width="14" height="14"
+                                        viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                        stroke-linecap="round" stroke-linejoin="round">
+                                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                                        <line x1="16" y1="2" x2="16" y2="6" />
+                                        <line x1="8" y1="2" x2="8" y2="6" />
+                                        <line x1="3" y1="10" x2="21" y2="10" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <p class="opt-title text-[12px] font-semibold tracking-tight text-gray-800 m-0">
+                                        Per Bulan
+                                    </p>
+                                    <p class="opt-desc text-[9px] text-gray-400 m-0 mt-0.5">Rekap Bulanan + Sisa Stok
                                     </p>
                                 </div>
                             </div>
@@ -1826,6 +1871,19 @@
                 </div>
                 <span class="text-sm font-semibold text-amber-700 group-hover:text-white transition-colors">Retur
                     Pembelian</span>
+            </a>
+
+            <a href="{{ route('receiving.rincian') }}"
+                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-sky-50 hover:bg-sky-500 border border-sky-100 hover:border-sky-500 transition-all duration-200 hover:-translate-y-0.5">
+                <div
+                    class="w-9 h-9 rounded-xl bg-sky-100 group-hover:bg-sky-400 flex items-center justify-center flex-shrink-0 transition-colors">
+                    <svg class="w-5 h-5 text-sky-600 group-hover:text-white transition-colors" fill="none"
+                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                </div>
+                <span class="text-sm font-semibold text-sky-700 group-hover:text-white transition-colors leading-tight">Rincian Penerimaan</span>
             </a>
 
         </div>

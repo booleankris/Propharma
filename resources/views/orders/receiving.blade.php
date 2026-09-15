@@ -641,13 +641,13 @@
             <div class="flex flex-wrap py-3 px-2 items-center justify-between gap-3 border-b border-gray-100 pb-4">
 
                 <div class="flex flex-wrap items-center gap-2">
-                    <button onclick="saveOrder()" type="button"
-                        class="inline-flex items-center gap-1.5 rounded-xl bg-blue-50 border border-blue-200 px-4 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100 transition-all">
+                    <button onclick="saveOrder(this)" type="button" id="btnSaveDraft"
+                        class="inline-flex items-center gap-1.5 rounded-xl bg-blue-50 border border-blue-200 px-4 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round"
                                 d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
                         </svg>
-                        Simpan Draft
+                        <span>Simpan Draft</span>
                     </button>
                     <a href="{{ route('receiving.revision', $order_id) }}"
                         class="inline-flex items-center gap-1.5 rounded-xl bg-amber-50 border border-amber-200 px-4 py-2 text-xs font-semibold text-amber-800 hover:bg-amber-100 transition-all">
@@ -1764,7 +1764,7 @@
                 });
         }
         // NEW: "Simpan" button — posts items to batches, status → 2
-        function saveOrder() {
+        function saveOrder(btnElement) {
             if (!receiving_id) {
                 iziToast.warning({
                     title: 'Peringatan',
@@ -1773,6 +1773,10 @@
                 });
                 return;
             }
+
+            const btn = btnElement ? $(btnElement) : $('#btnSaveDraft');
+            const originalHtml = btn.html();
+            btn.prop('disabled', true).html('<svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-blue-700 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> <span>Menyimpan...</span>');
 
             axios.post("{{ route('receiving.saveOrder') }}", {
                 receivingid: receiving_id,
@@ -1807,6 +1811,9 @@
                         message: message,
                         position: 'topRight'
                     });
+                })
+                .finally(() => {
+                    btn.prop('disabled', false).html(originalHtml);
                 });
         }
 

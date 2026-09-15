@@ -2,8 +2,11 @@
 
 namespace App\Exports\Report;
 
+use App\Models\Batches;
+use App\Models\MedicineTransferItems;
 use App\Models\MedicineTransactions;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\WithStyles;
 use Maatwebsite\Excel\Concerns\WithColumnWidths;
@@ -49,18 +52,26 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
 
         $pharmacy = \App\Models\Pharmacies::find($this->pharmacyId);
 
+        $typeTitle = match ($this->selectedType) {
+            'rekap_bulanan', 'bulanan' => 'Rekap Bulanan Obat',
+            'detail'                   => 'Detail Penjualan Obat',
+            default                    => 'Rekap Penjualan Obat',
+        };
+
         $header = [
             [$pharmacy->name ?? 'APOTEK'],
             [$pharmacy->address ?? ''],
             [''],
-            ['Laporan Penjualan (' . ucfirst($this->selectedType) . ' Obat)'],
-            ['Tanggal : ' . $this->startDate->format('d/m/Y') . ' s/d ' . $this->endDate->format('d/m/Y')],
+            ['Laporan Penjualan (' . $typeTitle . ')'],
+            ['Periode : ' . $this->startDate->format('d/m/Y') . ' s/d ' . $this->endDate->format('d/m/Y')],
             [''],
         ];
 
-        $body = $this->selectedType === 'rekap'
-            ? $this->buildRecap($transactions)
-            : $this->buildDetail($transactions);
+        $body = match ($this->selectedType) {
+            'rekap_bulanan', 'bulanan' => $this->buildMonthlyRecap($transactions),
+            'detail'                   => $this->buildDetail($transactions),
+            default                    => $this->buildRecap($transactions),
+        };
 
         return array_merge($header, $body);
     }
@@ -193,6 +204,167 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
         return $rows;
     }
 
+    public function getMonthsList(): array
+    {
+        $currentMonth = $this->startDate->copy()->startOfMonth();
+        $endMonth     = $this->endDate->copy()->startOfMonth();
+        $months       = [];
+
+        while ($currentMonth->lte($endMonth)) {
+            $key = $currentMonth->format('Y-m');
+            $label = $currentMonth->locale('id')->isoFormat('MMMM Y');
+            $months[$key] = $label;
+            $currentMonth->addMonth();
+        }
+
+        if (empty($months)) {
+            $key = $this->startDate->format('Y-m');
+            $months[$key] = $this->startDate->locale('id')->isoFormat('MMMM Y');
+        }
+
+        return $months;
+    }
+
+    private function buildMonthlyRecap($transactions): array
+    {
+        $months = $this->getMonthsList();
+        $grouped = [];
+        $medicineIds = [];
+
+        foreach ($transactions as $trx) {
+            $trxDate = Carbon::parse($trx->updated_at ?? $trx->created_at);
+            $monthKey = $trxDate->format('Y-m');
+
+            foreach ($trx->transactions ?? [] as $item) {
+                $medicine = $item->medicine;
+                if (!$medicine) {
+                    $key     = 'item_' . $item->id;
+                    $code    = '-';
+                    $name    = $item->medicine_name ?? 'Obat (Tanpa Master)';
+                    $unit    = '-';
+                    $factory = '-';
+                    $medId   = null;
+                } else {
+                    $key     = $medicine->id;
+                    $code    = $medicine->code ?? '-';
+                    $name    = $medicine->name ?? '-';
+                    $unit    = $medicine->unit ?? '-';
+                    $factory = $medicine->factory?->name ?? '-';
+                    $medId   = $medicine->id;
+                    $medicineIds[$medId] = $medId;
+                }
+
+                if (!isset($grouped[$key])) {
+                    $grouped[$key] = [
+                        'id'        => $medId,
+                        'code'      => $code,
+                        'name'      => $name,
+                        'unit'      => $unit,
+                        'factory'   => $factory,
+                        'monthly'   => array_fill_keys(array_keys($months), 0),
+                        'total_qty' => 0,
+                    ];
+                }
+
+                $qty = (float) ($item->quantity ?? 0);
+                if (isset($grouped[$key]['monthly'][$monthKey])) {
+                    $grouped[$key]['monthly'][$monthKey] += $qty;
+                } else {
+                    $grouped[$key]['monthly'][$monthKey] = $qty;
+                }
+                $grouped[$key]['total_qty'] += $qty;
+            }
+        }
+
+        // Realtime stock calculation for involved medicines
+        $storageStockMap = [];
+        $counterStockMap = [];
+
+        if (!empty($medicineIds)) {
+            $canSeeWarehouse   = canAccessWarehouseStock($this->pharmacyId);
+            $warehouseId       = getWarehousePharmacyId();
+            $counterPharmacyId = isWarehousePharmacy($this->pharmacyId) ? 1 : $this->pharmacyId;
+
+            if ($canSeeWarehouse) {
+                $storageStockMap = Batches::where('pharmacy_id', $warehouseId)
+                    ->whereIn('medicine_id', $medicineIds)
+                    ->groupBy('medicine_id')
+                    ->select('medicine_id', DB::raw('COALESCE(SUM(stock), 0) as total'))
+                    ->pluck('total', 'medicine_id')
+                    ->toArray();
+            }
+
+            $counterStockMap = MedicineTransferItems::join('batches', 'medicine_transfer_items.batches_id', '=', 'batches.id')
+                ->where('batches.pharmacy_id', $counterPharmacyId)
+                ->where('medicine_transfer_items.status', 1)
+                ->where(function ($q) {
+                    $q->whereNull('medicine_transfer_items.source_type')
+                      ->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang');
+                })
+                ->whereIn('batches.medicine_id', $medicineIds)
+                ->groupBy('batches.medicine_id')
+                ->select('batches.medicine_id', DB::raw('COALESCE(SUM(medicine_transfer_items.qty), 0) as total'))
+                ->pluck('total', 'medicine_id')
+                ->toArray();
+        }
+
+        // Sort alphabetically by medicine name
+        uasort($grouped, fn($a, $b) => strcasecmp($a['name'], $b['name']));
+
+        $headerCols = ['No', 'Kode Obat', 'Nama Obat', 'Satuan', 'Pabrik'];
+        foreach ($months as $label) {
+            $headerCols[] = $label;
+        }
+        $headerCols[] = 'Total Terjual';
+        $headerCols[] = 'Sisa Stok';
+
+        $rows = [$headerCols];
+
+        $no = 1;
+        $monthlyTotals = array_fill_keys(array_keys($months), 0);
+        $grandTotalQty = 0;
+        $grandTotalStock = 0;
+
+        foreach ($grouped as $data) {
+            $medId = $data['id'];
+            $stock = $medId ? ((int) ($storageStockMap[$medId] ?? 0) + (int) ($counterStockMap[$medId] ?? 0)) : 0;
+
+            $row = [
+                $no++,
+                $data['code'],
+                $data['name'],
+                $data['unit'],
+                $data['factory'],
+            ];
+
+            foreach (array_keys($months) as $mK) {
+                $mQty = (float) ($data['monthly'][$mK] ?? 0);
+                $row[] = $mQty;
+                $monthlyTotals[$mK] += $mQty;
+            }
+
+            $row[] = $data['total_qty'];
+            $row[] = $stock;
+
+            $grandTotalQty += $data['total_qty'];
+            $grandTotalStock += $stock;
+
+            $rows[] = $row;
+        }
+
+        // Summary row
+        $summaryRow = ['', '', 'TOTAL', '', ''];
+        foreach (array_keys($months) as $mK) {
+            $summaryRow[] = $monthlyTotals[$mK];
+        }
+        $summaryRow[] = $grandTotalQty;
+        $summaryRow[] = $grandTotalStock;
+
+        $rows[] = $summaryRow;
+
+        return $rows;
+    }
+
     public function styles(Worksheet $sheet)
     {
         $lastCol      = $sheet->getHighestColumn();
@@ -238,7 +410,26 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
             ->getAlignment()
             ->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-        if ($this->selectedType === 'rekap') {
+        if ($this->selectedType === 'rekap_bulanan' || $this->selectedType === 'bulanan') {
+            // Center Kode Obat (Col B) and Satuan (Col D)
+            $sheet->getStyle("B{$dataStartRow}:B{$lastRow}")
+                ->getAlignment()
+                ->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+            $sheet->getStyle("D{$dataStartRow}:D{$lastRow}")
+                ->getAlignment()
+                ->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+            // Numeric columns (Months, Total Terjual, Sisa Stok) start from Col F (col 6) to $lastCol
+            $sheet->getStyle("F{$dataStartRow}:{$lastCol}{$lastRow}")
+                ->getAlignment()
+                ->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+
+            // Format numbers as #,##0
+            $sheet->getStyle("F" . ($dataStartRow + 1) . ":{$lastCol}{$lastRow}")
+                ->getNumberFormat()
+                ->setFormatCode('#,##0');
+        } elseif ($this->selectedType === 'rekap') {
             // Align Qty & Nilai right
             $sheet->getStyle("D{$dataStartRow}:E{$lastRow}")
                 ->getAlignment()
@@ -263,6 +454,32 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
 
     public function columnWidths(): array
     {
+        if ($this->selectedType === 'rekap_bulanan' || $this->selectedType === 'bulanan') {
+            $widths = [
+                'A' => 6,   // No
+                'B' => 14,  // Kode Obat
+                'C' => 40,  // Nama Obat
+                'D' => 10,  // Satuan
+                'E' => 25,  // Pabrik
+            ];
+
+            $colIdx = 6;
+            foreach ($this->getMonthsList() as $m) {
+                $colLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($colIdx++);
+                $widths[$colLetter] = 16;
+            }
+
+            // Total Terjual
+            $totalCol = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($colIdx++);
+            $widths[$totalCol] = 16;
+
+            // Sisa Stok
+            $stockCol = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($colIdx++);
+            $widths[$stockCol] = 15;
+
+            return $widths;
+        }
+
         return $this->selectedType === 'rekap'
             ? [
                 'A' => 6,
@@ -284,6 +501,10 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
 
     public function title(): string
     {
-        return 'MedicineExport';
+        return match ($this->selectedType) {
+            'rekap_bulanan', 'bulanan' => 'Rekap Obat Per Bulan',
+            'detail'                   => 'Detail Penjualan Obat',
+            default                    => 'Rekap Penjualan Obat',
+        };
     }
 }
