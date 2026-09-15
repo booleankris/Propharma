@@ -104,13 +104,13 @@
                             Bandingkan
                         </a>
 
-                        <a href="{{ url('/receiving/' . $order->id . '/printspbfinal') }}" target="_blank"
+                        <a href="{{ url('/receiving/print/' . $order->id) }}" target="_blank"
                             class="inline-flex items-center gap-1.5 rounded-xl bg-purple-50 border border-purple-200 px-3.5 py-2 text-xs font-semibold text-purple-700 hover:bg-purple-100 transition-all">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round"
                                     d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                             </svg>
-                            Cetak SPB
+                            Cetak Penerimaan
                         </a>
 
                         @if ($order->status == 3)
@@ -282,18 +282,15 @@
                             </select>
                         </div>
 
-                        <!-- Cetak SP Faktur Ini -->
+                        <!-- Cetak Penerimaan Faktur Ini -->
                         <div class="flex items-end">
-                            <button type="button" onclick="printSPBSelectedFaktur()" id="btnPrintSp"
+                            <button type="button" onclick="printReceivingSelectedFaktur()" id="btnPrintReceiving"
                                 class="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 text-[12px] font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-xs transition-all">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24"
-                                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                    stroke-linejoin="round">
-                                    <path d="M6 9V2h12v7" />
-                                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
-                                    <rect x="6" y="14" width="12" height="8" />
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                                 </svg>
-                                Cetak SP Faktur Ini
+                                Cetak Penerimaan Faktur Ini
                             </button>
                         </div>
 
@@ -613,7 +610,7 @@
             document.getElementById('summaryTotalAkhir').innerText = formatRupiah(sumTotal);
         }
 
-        function printSPBSelectedFaktur() {
+        function printReceivingSelectedFaktur() {
             if (!currentOrderId) {
                 iziToast.warning({
                     title: 'Peringatan',
@@ -624,16 +621,11 @@
             }
 
             const selectedFaktur = $('#print_faktur').val();
-            if (!selectedFaktur) {
-                iziToast.warning({
-                    title: 'Pilih Faktur',
-                    message: 'Silakan pilih faktur pada dropdown "Pilih Faktur" terlebih dahulu.',
-                    position: 'topRight'
-                });
-                return;
+            if (selectedFaktur) {
+                window.open(`/receiving/print/${currentOrderId}?faktur=${selectedFaktur}`, "_blank");
+            } else {
+                window.open(`/receiving/print/${currentOrderId}`, "_blank");
             }
-
-            window.open(`/receiving/${currentOrderId}/printspbfinal/faktur/${selectedFaktur}`, "_blank");
         }
     </script>
 @endsection

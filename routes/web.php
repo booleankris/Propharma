@@ -455,6 +455,7 @@ Route::middleware(['auth', 'role:Kasir|Gudang PMI|HO|administrator|manager|Onlin
     Route::get('/receiving/getorderitems/items', [ReceivingController::class, 'getOrderItems'])->name('receiving.getorderitems');
     Route::post('/receiving/addreceivingitem', [ReceivingController::class, 'addReceivingItem'])->name('receiving.addreceivingitem');
     Route::get('/receiving/print/{id}', [ReceivingController::class, 'printReceiving']);
+    Route::get('/receiving/print/{id}/faktur/{faktur_id}', [ReceivingController::class, 'printReceiving']);
     Route::get('/invoice/print/{id}', [ReceivingController::class, 'printInvoice']);
     Route::put('/receiving-items/{id}', [ReceivingController::class, 'updateReceivingItem'])->name('receiving.updateItem');
     Route::delete('/receiving-items/{id}', [ReceivingController::class, 'deleteReceivingItem'])->name('receiving.deleteItem');

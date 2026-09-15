@@ -2472,7 +2472,7 @@ class ReceivingController extends Controller
         }
     }
 
-    public function printReceiving($id)
+    public function printReceiving($id, $fakturId = null)
     {
         $order = Order::with('pharmacy')->find($id);
         $receiving = null;
@@ -2516,7 +2516,9 @@ class ReceivingController extends Controller
                     'receiving_items' => function ($q) use ($orderId) {
                         $q->whereHas('order_items', function ($sub) use ($orderId) {
                             $sub->where('order_id', $orderId);
-                        })->whereNotNull('batches_id');
+                        })->where(function ($q2) {
+                            $q2->whereNotNull('batches_id')->orWhere('qty_received', '>', 0);
+                        });
                     },
                     'receiving_items.order_items.medicines',
                     'creditor'
@@ -2525,8 +2527,6 @@ class ReceivingController extends Controller
                 ->filter(fn($d) => $d->receiving_items->isNotEmpty())
                 ->unique('id')
                 ->values();
-
-            $receiving->setRelation('receiving_details', $allDetails);
         } else {
             $allDetails = $receiving
                 ->receiving_details()
@@ -2535,8 +2535,16 @@ class ReceivingController extends Controller
                     'creditor'
                 ])
                 ->get();
-            $receiving->setRelation('receiving_details', $allDetails);
         }
+
+        $fakturFilter = $fakturId ?? request('faktur') ?? request()->route('faktur_id');
+        if ($fakturFilter) {
+            $filteredDetails = $allDetails->where('id', $fakturFilter)->values();
+            if ($filteredDetails->isNotEmpty()) {
+                $allDetails = $filteredDetails;
+            }
+        }
+        $receiving->setRelation('receiving_details', $allDetails);
 
         if ($receiving->receiving_details->isEmpty() || $receiving->receiving_details->flatMap->receiving_items->isEmpty()) {
             return redirect()->back()->with('warning', 'Belum ada faktur atau barang yang tersimpan dalam draft penerimaan ini.');

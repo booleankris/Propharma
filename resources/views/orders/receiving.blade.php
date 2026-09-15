@@ -356,10 +356,9 @@
                         </select>
                     </div>
 
-                    <!-- Pilih Faktur untuk dicetak SP -->
+                    <!-- Pilih Faktur untuk dicetak Penerimaan -->
                     <div>
-                        <label for="print_faktur" class="block text-xs font-semibold text-gray-700 mb-1">Pilih Faktur (Cetak
-                            SP)</label>
+                        <label for="print_faktur" class="block text-xs font-semibold text-gray-700 mb-1">Pilih Faktur</label>
                         <select id="print_faktur" name="print_faktur"
                             class="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all">
                             <option value="">-- Pilih Faktur --</option>
@@ -377,17 +376,15 @@
                         </select>
                     </div>
 
-                    <!-- Cetak SP Faktur Ini -->
+                    <!-- Cetak Penerimaan Faktur Ini -->
                     <div class="flex items-end">
-                        <button type="button" onclick="printSPBSelectedFaktur()"
+                        <button type="button" onclick="printReceivingSelectedFaktur()"
                             class="inline-flex items-center gap-1.5 px-4 py-2.5 text-[12px] font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm transition-all duration-150">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none"
-                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M6 9V2h12v7" />
-                                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
-                                <rect x="6" y="14" width="12" height="8" />
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                             </svg>
-                            Cetak SP Faktur Ini
+                            Cetak Penerimaan Faktur Ini
                         </button>
                     </div>
 
@@ -663,15 +660,7 @@
                             <path stroke-linecap="round" stroke-linejoin="round"
                                 d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                         </svg>
-                        Cetak
-                    </button>
-                    <button onclick="printSPB()" type="button"
-                        class="inline-flex items-center gap-1.5 rounded-xl bg-purple-50 border border-purple-200 px-4 py-2 text-xs font-semibold text-purple-700 hover:bg-purple-100 transition-all">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round"
-                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                        SPB
+                        Cetak Penerimaan
                     </button>
                     @if(!empty($hasSavedBatches))
                     <a href="{{ route('orders.comparison', $ordersid ?? $id ?? request()->route('id')) }}" 
@@ -938,17 +927,18 @@
             window.open(`/orders/${ordersid}/printspb`, "_blank");
         }
 
-        function printSPBSelectedFaktur() {
+        function printReceivingSelectedFaktur() {
             const selectedFaktur = $('#print_faktur').val();
             if (!selectedFaktur) {
                 iziToast.warning({ title: 'Peringatan', message: 'Pilih faktur terlebih dahulu!', position: 'topRight' });
                 return;
             }
-            if (!ordersid) {
+            const printTarget = (typeof ordersid !== 'undefined' && ordersid) ? ordersid : receiving_id;
+            if (!printTarget) {
                 iziToast.warning({ title: 'Peringatan', message: 'Pilih order terlebih dahulu!', position: 'topRight' });
                 return;
             }
-            window.open(`/receiving/${ordersid}/printspbfinal/faktur/${selectedFaktur}`, "_blank");
+            window.open(`/receiving/print/${printTarget}?faktur=${selectedFaktur}`, "_blank");
         }
 
         $('#creditor').on('change', function () {
@@ -978,20 +968,13 @@
             }
         });
 
-        function printSPBItem(orderItemId) {
-            if (!ordersid) {
+        function printReceivingFaktur(receivingDetailsId, creditorCode) {
+            const printTarget = (typeof ordersid !== 'undefined' && ordersid) ? ordersid : receiving_id;
+            if (!printTarget) {
                 iziToast.warning({ title: 'Peringatan', message: 'Data order belum tersedia!', position: 'topRight' });
                 return;
             }
-            window.open(`/receiving/${ordersid}/printspbfinal/item/${orderItemId}`, "_blank");
-        }
-
-        function printSPBFaktur(receivingDetailsId, creditorCode) {
-            if (!ordersid) {
-                iziToast.warning({ title: 'Peringatan', message: 'Data order belum tersedia!', position: 'topRight' });
-                return;
-            }
-            window.open(`/receiving/${ordersid}/printspbfinal/faktur/${receivingDetailsId}`, "_blank");
+            window.open(`/receiving/print/${printTarget}?faktur=${receivingDetailsId}`, "_blank");
         }
 
         function setSelect2AjaxValue(selector, id, text) {
@@ -1137,7 +1120,7 @@
                         const saved = row.receiving_items.batches_id != null;
                         let html = '';
                         if (row.receiving_items.receiving_details_id) {
-                            html += `<button type="button" onclick="printSPBFaktur(${row.receiving_items.receiving_details_id}, '${row.creditor_code}')" class="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 text-[10px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-all w-[100px]" title="Cetak SP Faktur Ini"><svg xmlns='http://www.w3.org/2000/svg' class='w-3.5 h-3.5 shrink-0' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9V2h12v7'/><path d='M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2'/><rect x='6' y='14' width='12' height='8'/></svg>SP Faktur</button>`;
+                            html += `<button type="button" onclick="printReceivingFaktur(${row.receiving_items.receiving_details_id}, '${row.creditor_code}')" class="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 text-[10px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-all w-[100px]" title="Cetak Penerimaan Faktur Ini"><svg xmlns='http://www.w3.org/2000/svg' class='w-3.5 h-3.5 shrink-0' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z'/></svg>Penerimaan</button>`;
                         }
                         if (saved) {
                             html += `<a href="/orders/${ordersid}/revision" class="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 text-[10px] font-semibold text-sky-700 bg-sky-50 border border-sky-200 rounded-lg hover:bg-sky-100 transition-all w-[70px]" title="Revisi Faktur"><svg xmlns='http://www.w3.org/2000/svg' class='w-3.5 h-3.5 shrink-0' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><path d='M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z'/></svg>Revisi</a>`;
