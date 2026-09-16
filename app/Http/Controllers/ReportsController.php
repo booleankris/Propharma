@@ -59,7 +59,7 @@ class ReportsController extends Controller
         [$export, $filename] = $this->resolveReportExport($report, $request, $pharmacy);
 
         if (!$export) {
-            return response()->json(['status' => 'success']);
+            return response()->json(['message' => 'Laporan tidak ditemukan atau jenis laporan belum didukung.'], 422);
         }
 
         // mode=preview -> render HTML table, mode anything else (or absent) -> download
@@ -163,8 +163,14 @@ class ReportsController extends Controller
     private function resolveReportExport(string $report, Request $request, Pharmacies $pharmacy): array
     {
         $request->validate([
-            'start_date' => 'required_if:selectedReport,LIPH,Obat,Golongan,Pabrik,Dokter,Daftar Resep,Retur Jual,Bank,Penjualan Bank|date',
-            'end_date' => 'required_if:selectedReport,LIPH,Obat,Golongan,Pabrik,Dokter,Daftar Resep,Retur Jual,Bank,Penjualan Bank|date|after_or_equal:start_date',
+            'start_date' => 'required|date',
+            'end_date'   => 'required|date|after_or_equal:start_date',
+        ], [
+            'start_date.required' => 'Tanggal mulai wajib dipilih.',
+            'start_date.date' => 'Format tanggal mulai tidak valid.',
+            'end_date.required' => 'Tanggal akhir wajib dipilih.',
+            'end_date.date' => 'Format tanggal akhir tidak valid.',
+            'end_date.after_or_equal' => 'Tanggal akhir tidak boleh lebih awal dari tanggal mulai.',
         ]);
 
         return match ($report) {

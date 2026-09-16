@@ -574,7 +574,8 @@
         @endif
 
         @if (canAccessPurchasing())
-            <a href="{{ route('receiving.index') }}" class="nav-item {{ (request()->is('receiving*') || request()->is('receive/*')) && !request()->is('receiving/rincian*') && !request()->is('orders/*/rincian*') ? 'active' : '' }}">
+            <a href="{{ route('receiving.index') }}"
+                class="nav-item {{ (request()->is('receiving*') || request()->is('receive/*')) && !request()->is('receiving/rincian*') && !request()->is('orders/*/rincian*') ? 'active' : '' }}">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="9" cy="21" r="1" />
@@ -583,7 +584,8 @@
                 </svg>
                 Pembelian
             </a>
-            <a href="{{ route('receiving.rincian') }}" class="nav-item {{ request()->is('*rincian*') ? 'active' : '' }}">
+            <a href="{{ route('receiving.rincian') }}"
+                class="nav-item {{ request()->is('*rincian*') ? 'active' : '' }}">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -609,9 +611,9 @@
             </a>
             <a width="16" height="16" onclick="openModal('transfersModal')"
                 class="nav-item {{ request()->is('inventory*') ? 'active' : '' }}">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                    class="icon icon-tabler icons-tabler-outline icon-tabler-transfer">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                    stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-transfer">
                     <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                     <path d="M20 10h-16l5.5 -6" />
                     <path d="M4 14h16l-5.5 6" />
@@ -1278,13 +1280,17 @@
                     <p class="text-xs font-semibold tracking-widest uppercase text-slate-400 m-0">Rentang Tanggal</p>
                     <div id="quick_date_presets" class="flex items-center gap-1">
                         <button type="button" onclick="setQuickDateRange('1_month')"
-                            class="text-[11px] px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium transition">1 Bulan</button>
+                            class="text-[11px] px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium transition">1
+                            Bulan</button>
                         <button type="button" onclick="setQuickDateRange('3_months')"
-                            class="text-[11px] px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium transition">3 Bulan</button>
+                            class="text-[11px] px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium transition">3
+                            Bulan</button>
                         <button type="button" onclick="setQuickDateRange('6_months')"
-                            class="text-[11px] px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium transition">6 Bulan</button>
+                            class="text-[11px] px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium transition">6
+                            Bulan</button>
                         <button type="button" onclick="setQuickDateRange('this_year')"
-                            class="text-[11px] px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium transition">Tahun Ini</button>
+                            class="text-[11px] px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium transition">Tahun
+                            Ini</button>
                     </div>
                 </div>
                 <div class="flex items-center gap-2">
@@ -1371,7 +1377,8 @@
                                     <svg class="icon-svg text-gray-400" width="14" height="14"
                                         viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                                         stroke-linecap="round" stroke-linejoin="round">
-                                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                                        <rect x="3" y="4" width="18" height="18" rx="2"
+                                            ry="2" />
                                         <line x1="16" y1="2" x2="16" y2="6" />
                                         <line x1="8" y1="2" x2="8" y2="6" />
                                         <line x1="3" y1="10" x2="21" y2="10" />
@@ -1841,10 +1848,24 @@
                             d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
                     </svg>
                 </div>
-                <span class="text-sm font-semibold text-green-700 group-hover:text-white transition-colors">History
+                <span class="text-sm font-semibold text-green-700 group-hover:text-white transition-colors">Riwayat
                     Harga Beli</span>
             </a>
+            <a href="{{ route('receiving.history') }}"
+                class="group flex items-center gap-3 p-3.5 rounded-2xl bg-[#d0f5dc] hover:bg-green-500 border border-green-100 hover:border-green-500 transition-all duration-200 hover:-translate-y-0.5">
+                <div
+                    class="w-9 h-9 rounded-xl bg-green-100 group-hover:bg-green-400 flex items-center justify-center flex-shrink-0 transition-colors">
+                    <svg class="w-5 h-5 text-green-600 group-hover:text-white transition-colors"
+                        xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#607d8b"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M7 10h14l-4 -4" />
+                        <path d="M17 14h-14l4 4" />
+                    </svg>
 
+                </div>
+                <span class="text-sm font-semibold text-green-700 group-hover:text-white transition-colors">Riwayat
+                    Perubahan Harga</span>
+            </a>
             <a href="{{ route('medicine-order-history.index') }}"
                 class="group flex items-center gap-3 p-3.5 rounded-2xl bg-purple-50 hover:bg-purple-500 border border-purple-100 hover:border-purple-500 transition-all duration-200 hover:-translate-y-0.5">
                 <div
@@ -1883,7 +1904,9 @@
                             d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
                 </div>
-                <span class="text-sm font-semibold text-sky-700 group-hover:text-white transition-colors leading-tight">Rincian Penerimaan</span>
+                <span
+                    class="text-sm font-semibold text-sky-700 group-hover:text-white transition-colors leading-tight">Rincian
+                    Penerimaan</span>
             </a>
 
         </div>

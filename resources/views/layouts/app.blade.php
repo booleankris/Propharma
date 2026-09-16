@@ -594,15 +594,54 @@
                 mode: mode
             }, {
                 responseType: mode === 'download' ? 'blob' : 'text'
-            }).then((result) => {
+            }).then(async (result) => {
                 if (mode === 'download') {
-                    const url = window.URL.createObjectURL(new Blob([result.data]));
+                    if (result.data && result.data.type === 'application/json') {
+                        try {
+                            const errorText = await result.data.text();
+                            const errorJson = JSON.parse(errorText);
+                            iziToast.error({
+                                title: 'Gagal',
+                                message: errorJson.message || 'Gagal mengunduh laporan.',
+                                position: 'topRight'
+                            });
+                        } catch (e) {
+                            iziToast.error({
+                                title: 'Gagal',
+                                message: 'Gagal mengunduh laporan.',
+                                position: 'topRight'
+                            });
+                        }
+                        return;
+                    }
+
+                    const blob = new Blob([result.data], {
+                        type: result.headers['content-type'] || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                    });
+                    const url = window.URL.createObjectURL(blob);
                     const a = document.createElement('a');
-                    const isBulanan = selectedReport === 'Obat' && (selectedType === 'rekap_bulanan' || selectedType === 'bulanan');
-                    a.download = isBulanan
-                        ? `Laporan_Jual_Obat_Bulanan_${start_date}_${end_date}.xlsx`
-                        : `Laporan_Jual_${selectedReport}_${start_date}_${end_date}.xlsx`;
+                    a.href = url;
+
+                    let filename = '';
+                    const contentDisposition = result.headers['content-disposition'];
+                    if (contentDisposition) {
+                        const match = contentDisposition.match(/filename\*?=(?:UTF-8'')?["']?([^"';]+)["']?/i);
+                        if (match && match[1]) {
+                            filename = decodeURIComponent(match[1]);
+                        }
+                    }
+
+                    if (!filename) {
+                        const isBulanan = selectedReport === 'Obat' && (selectedType === 'rekap_bulanan' || selectedType === 'bulanan');
+                        filename = isBulanan
+                            ? `Laporan_Jual_Obat_Bulanan_${start_date}_${end_date}.xlsx`
+                            : `Laporan_Jual_${selectedReport}_${start_date}_${end_date}.xlsx`;
+                    }
+
+                    a.download = filename;
+                    document.body.appendChild(a);
                     a.click();
+                    a.remove();
                     window.URL.revokeObjectURL(url);
                 } else {
                     // Preview mode
@@ -619,16 +658,36 @@
                         modalDownloadBtn.setAttribute('onclick', "getReport('download')");
                     }
                 }
-            }).catch((err) => {
-                if (err.response && err.response.data && err.response.data.message) {
-                    iziToast.error({
-                        title: 'Error',
-                        message: err.response.data.message,
-                        position: 'topRight'
-                    });
-                } else {
-                    console.log(err);
+            }).catch(async (err) => {
+                let message = 'Terjadi kesalahan saat memproses laporan.';
+                if (err.response && err.response.data) {
+                    if (err.response.data instanceof Blob) {
+                        try {
+                            const errorText = await err.response.data.text();
+                            const errorJson = JSON.parse(errorText);
+                            message = errorJson.message || message;
+                            if (errorJson.errors) {
+                                const firstKey = Object.keys(errorJson.errors)[0];
+                                if (firstKey && errorJson.errors[firstKey][0]) {
+                                    message = errorJson.errors[firstKey][0];
+                                }
+                            }
+                        } catch (e) {
+                            message = 'Gagal memproses data laporan.';
+                        }
+                    } else if (err.response.data.message) {
+                        message = err.response.data.message;
+                    }
+                } else if (err.message) {
+                    message = err.message;
                 }
+
+                iziToast.error({
+                    title: 'Error',
+                    message: message,
+                    position: 'topRight'
+                });
+                console.error(err);
             }).finally(() => {
                 // Hide loading
                 overlay.style.display = 'none';
@@ -914,13 +973,51 @@
                 mode: mode
             }, {
                 responseType: mode === 'download' ? 'blob' : 'text'
-            }).then((result) => {
+            }).then(async (result) => {
                 if (mode === 'download') {
-                    const url = window.URL.createObjectURL(new Blob([result.data]));
+                    if (result.data && result.data.type === 'application/json') {
+                        try {
+                            const errorText = await result.data.text();
+                            const errorJson = JSON.parse(errorText);
+                            iziToast.error({
+                                title: 'Gagal',
+                                message: errorJson.message || 'Gagal mengunduh laporan.',
+                                position: 'topRight'
+                            });
+                        } catch (e) {
+                            iziToast.error({
+                                title: 'Gagal',
+                                message: 'Gagal mengunduh laporan.',
+                                position: 'topRight'
+                            });
+                        }
+                        return;
+                    }
+
+                    const blob = new Blob([result.data], {
+                        type: result.headers['content-type'] || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                    });
+                    const url = window.URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = `Laporan_Beli_${selectedOrderReport}_${start_date}_${end_date}.xlsx`;
+
+                    let filename = '';
+                    const contentDisposition = result.headers['content-disposition'];
+                    if (contentDisposition) {
+                        const match = contentDisposition.match(/filename\*?=(?:UTF-8'')?["']?([^"';]+)["']?/i);
+                        if (match && match[1]) {
+                            filename = decodeURIComponent(match[1]);
+                        }
+                    }
+
+                    if (!filename) {
+                        filename = `Laporan_Beli_${selectedOrderReport}_${start_date}_${end_date}.xlsx`;
+                    }
+
+                    a.download = filename;
+                    document.body.appendChild(a);
                     a.click();
+                    a.remove();
                     window.URL.revokeObjectURL(url);
                 } else {
                     // Preview mode
@@ -935,16 +1032,36 @@
                         modalDownloadBtn.setAttribute('onclick', "getOrderReport('download')");
                     }
                 }
-            }).catch((err) => {
-                if (err.response && err.response.data && err.response.data.message) {
-                    iziToast.error({
-                        title: 'Error',
-                        message: err.response.data.message,
-                        position: 'topRight'
-                    });
-                } else {
-                    console.error(err);
+            }).catch(async (err) => {
+                let message = 'Terjadi kesalahan saat memproses laporan.';
+                if (err.response && err.response.data) {
+                    if (err.response.data instanceof Blob) {
+                        try {
+                            const errorText = await err.response.data.text();
+                            const errorJson = JSON.parse(errorText);
+                            message = errorJson.message || message;
+                            if (errorJson.errors) {
+                                const firstKey = Object.keys(errorJson.errors)[0];
+                                if (firstKey && errorJson.errors[firstKey][0]) {
+                                    message = errorJson.errors[firstKey][0];
+                                }
+                            }
+                        } catch (e) {
+                            message = 'Gagal memproses data laporan.';
+                        }
+                    } else if (err.response.data.message) {
+                        message = err.response.data.message;
+                    }
+                } else if (err.message) {
+                    message = err.message;
                 }
+
+                iziToast.error({
+                    title: 'Error',
+                    message: message,
+                    position: 'topRight'
+                });
+                console.error(err);
             }).finally(() => {
                 overlay.style.display = 'none';
             });
