@@ -117,6 +117,12 @@
             }
 
             if (window.axios) {
+                const csrfMetaToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+                if (csrfMetaToken) {
+                    window.axios.defaults.headers.common['X-CSRF-TOKEN'] = csrfMetaToken;
+                }
+                window.axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
+
                 window.axios.interceptors.response.use(
                     response => response,
                     error => {
@@ -574,15 +580,30 @@
         function getReport(mode = 'download') {
             const start_date = getDatePickerValue('sales_start_date');
             const end_date = getDatePickerValue('sales_end_date');
-            const shift = document.getElementById('shift').value;
-            const factory = document.getElementById('factory').value;
-            const doctor = document.getElementById('doctor').value;
+            const shift = document.getElementById('shift')?.value ?? '';
+            const factory = document.getElementById('factory')?.value ?? '';
+            const doctor = document.getElementById('doctor')?.value ?? '';
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
+
+            if (!start_date || !end_date) {
+                if (window.iziToast) {
+                    iziToast.warning({
+                        title: 'Peringatan',
+                        message: 'Silakan tentukan tanggal mulai dan tanggal akhir terlebih dahulu.',
+                        position: 'topRight'
+                    });
+                } else {
+                    alert('Silakan tentukan tanggal mulai dan tanggal akhir terlebih dahulu.');
+                }
+                return;
+            }
 
             // Start Loading
             const overlay = document.getElementById('loading-overlay');
-            overlay.style.display = 'flex';
+            if (overlay) overlay.style.display = 'flex';
 
             axios.post('/reports', {
+                _token: csrfToken,
                 start_date: start_date,
                 end_date: end_date,
                 selectedReport: selectedReport,
@@ -593,6 +614,9 @@
                 doctor: doctor,
                 mode: mode
             }, {
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken
+                },
                 responseType: mode === 'download' ? 'blob' : 'text'
             }).then(async (result) => {
                 if (mode === 'download') {
@@ -641,8 +665,10 @@
                     a.download = filename;
                     document.body.appendChild(a);
                     a.click();
-                    a.remove();
-                    window.URL.revokeObjectURL(url);
+                    setTimeout(() => {
+                        a.remove();
+                        window.URL.revokeObjectURL(url);
+                    }, 2000);
                 } else {
                     // Preview mode
                     const previewContent = document.getElementById('previewModalContent');
@@ -959,12 +985,27 @@
         function getOrderReport(mode = 'download') {
             const start_date = getDatePickerValue('order_start_date');
             const end_date = getDatePickerValue('order_end_date');
-            const supplier = document.getElementById('order_supplier').value;
+            const supplier = document.getElementById('order_supplier')?.value ?? '';
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
+
+            if (!start_date || !end_date) {
+                if (window.iziToast) {
+                    iziToast.warning({
+                        title: 'Peringatan',
+                        message: 'Silakan tentukan tanggal mulai dan tanggal akhir terlebih dahulu.',
+                        position: 'topRight'
+                    });
+                } else {
+                    alert('Silakan tentukan tanggal mulai dan tanggal akhir terlebih dahulu.');
+                }
+                return;
+            }
 
             const overlay = document.getElementById('loading-overlay');
-            overlay.style.display = 'flex';
+            if (overlay) overlay.style.display = 'flex';
 
             axios.post('/reports', {
+                _token: csrfToken,
                 start_date: start_date,
                 end_date: end_date,
                 selectedReport: selectedOrderReport,
@@ -972,6 +1013,9 @@
                 supplier: supplier,
                 mode: mode
             }, {
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken
+                },
                 responseType: mode === 'download' ? 'blob' : 'text'
             }).then(async (result) => {
                 if (mode === 'download') {
@@ -1017,8 +1061,10 @@
                     a.download = filename;
                     document.body.appendChild(a);
                     a.click();
-                    a.remove();
-                    window.URL.revokeObjectURL(url);
+                    setTimeout(() => {
+                        a.remove();
+                        window.URL.revokeObjectURL(url);
+                    }, 2000);
                 } else {
                     // Preview mode
                     const previewContent = document.getElementById('previewModalContent');

@@ -418,6 +418,22 @@
             });
 
             // Auto-select initial state
+            const urlParams = new URLSearchParams(window.location.search);
+            const targetRdId = urlParams.get('rd_id');
+            if (targetRdId) {
+                const targetFaktur = allFaktursData.find(f => String(f.id) === String(targetRdId));
+                if (targetFaktur) {
+                    if (targetFaktur.creditor_code) {
+                        $('#creditor').val(targetFaktur.creditor_code).trigger('change.select2');
+                    }
+                    updateFakturDropdown();
+                    $('#print_faktur').val(targetFaktur.id).trigger('change.select2');
+                    updateInvoiceFields();
+                    renderTable();
+                    return;
+                }
+            }
+
             if ($('#creditor option').length === 2) {
                 // Hanya ada 1 kreditur selain option "Semua", auto select
                 $('#creditor').val($('#creditor option').eq(1).val()).trigger('change');

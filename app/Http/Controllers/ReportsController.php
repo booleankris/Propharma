@@ -162,6 +162,20 @@ class ReportsController extends Controller
 
     private function resolveReportExport(string $report, Request $request, Pharmacies $pharmacy): array
     {
+        // Normalisasi format tanggal bila dikirim dalam format d/m/Y atau d-m-Y dari browser klien
+        if ($request->filled('start_date')) {
+            $rawStart = trim((string) $request->start_date);
+            if (preg_match('/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/', $rawStart, $m)) {
+                $request->merge(['start_date' => sprintf('%04d-%02d-%02d', (int) $m[3], (int) $m[2], (int) $m[1])]);
+            }
+        }
+        if ($request->filled('end_date')) {
+            $rawEnd = trim((string) $request->end_date);
+            if (preg_match('/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/', $rawEnd, $m)) {
+                $request->merge(['end_date' => sprintf('%04d-%02d-%02d', (int) $m[3], (int) $m[2], (int) $m[1])]);
+            }
+        }
+
         $request->validate([
             'start_date' => 'required|date',
             'end_date'   => 'required|date|after_or_equal:start_date',

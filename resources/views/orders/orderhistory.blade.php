@@ -1,235 +1,403 @@
 @extends('layouts.app')
 
-@section('title', 'Sales Data')
+@section('title', 'Data Pembelian')
 
 @section('style')
-    <!-- CSS Libraries -->
     <link rel="stylesheet" href="{{ asset('templates/library/izitoast/dist/css/iziToast.min.css') }}">
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
-    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 
     <style>
-        .select2-container .select2-selection--single {
-            height: 46px !important;
-            /* match your Tailwind input height */
-            padding: 7px 10px !important;
-            display: flex !important;
-            align-items: center !important;
-        }
-
-        .select2-container--default .select2-selection--single .select2-selection__rendered {
-            line-height: 42px !important;
-        }
-
-        .select2-container--default .select2-selection--single .select2-selection__arrow {
-            height: 42px !important;
-        }
-
-        .select2-selection__choice {
-            background: #e5e7eb !important;
-            border-radius: 6px !important;
-            padding: 4px 8px !important;
-            font-size: 13px;
-        }
-
-        .dropdown-table {
-            width: 100%;
-            position: absolute;
-            z-index: 999999;
-            margin-top: 0;
-            background: #ffffff;
-            border-radius: 10px;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, .12);
-            border: 1px solid #e5e7eb;
-            max-height: 320px;
-            overflow-y: auto;
-            display: none;
-            z-index: 9999;
-        }
-
-        .dropdown-table tbody tr.active {
-            background-color: #dbeafe;
-        }
-
-        .dropdown-table table {
-            width: 100%;
-            border-collapse: separate;
-            border-spacing: 0;
-            font-size: 14px;
-        }
-
-        .dropdown-table thead th {
-            position: sticky;
-            top: 0;
-            background: #f9fafb;
-            color: #374151;
-            font-weight: 600;
-            padding: 10px 12px;
-            border-bottom: 1px solid #e5e7eb;
-            text-transform: uppercase;
-            font-size: 12px;
-            letter-spacing: .04em;
-        }
-
-        .dropdown-table tbody tr {
-            transition: background-color .15s ease, transform .05s ease;
-            cursor: pointer;
-        }
-
-        .dropdown-table tbody tr:hover {
-            background-color: #f3f4f6;
-        }
-
-        .dropdown-table tbody tr:active {
-            transform: scale(0.995);
-        }
-
-        .dropdown-table td {
-            padding: 10px 12px;
-            border-bottom: 1px solid #f1f5f9;
-            color: #111827;
-            vertical-align: middle;
-        }
-
-        .dropdown-table tbody tr:last-child td {
-            border-bottom: none;
-        }
-
-        .dropdown-table td:first-child {
-            width: 40px;
-            color: #6b7280;
-            font-size: 13px;
-        }
-
-        .dropdown-table td:nth-child(4) {
-            font-weight: 600;
-            color: #16a34a;
-        }
-
-        .dropdown-table td:last-child {
-            color: #6b7280;
-            font-size: 13px;
-        }
-
-        .dropdown-table .empty-row {
-            text-align: center;
-            padding: 16px;
-            color: #9ca3af;
-            font-style: italic;
-        }
-
-
+        /* ── DataTable styling ── */
         .dataTables_wrapper .top {
-            font-family: "Poppins";
             display: flex !important;
             justify-content: space-between !important;
             align-items: center !important;
-            margin-bottom: 12px !important;
+            margin-bottom: 14px !important;
         }
 
         .dataTables_filter {
-            display: block !important;
-        }
-
-        .dataTables_filter label {
-            font-weight: 600 !important;
-        }
-
-        .dataTables_filter input {
-            width: 260px !important;
-            padding: 6px 10px !important;
-            border-radius: 6px !important;
-            border: 1px solid #d1d5db !important;
-            outline: none !important;
-        }
-
-        .dataTables_length {
-            display: block !important;
+            display: none !important;
+            /* using custom Cari Faktur input */
         }
 
         .dataTables_length select {
-            padding: 4px 23px !important;
-            border-radius: 6px !important;
+            padding: 5px 26px 5px 10px !important;
+            border-radius: 8px !important;
             border: 1px solid #d1d5db !important;
-        }
-
-
-        #medicineTable thead th {
-            background-color: #f8fafc !important;
-            font-weight: 600 !important;
             font-size: 13px !important;
+        }
+
+        #orderHistoryTable thead th {
+            background-color: #f8fafc !important;
+            color: #334155 !important;
+            font-weight: 700 !important;
+            font-size: 12px !important;
             text-transform: uppercase !important;
-            border-bottom: 2px solid #e5e7eb !important;
+            letter-spacing: 0.04em !important;
+            border-bottom: 2px solid #e2e8f0 !important;
+            padding: 12px 14px !important;
+            white-space: nowrap;
         }
 
-
-        #medicineTable tbody td {
-            padding: 12px 10px !important;
-            font-size: 14px !important;
+        #orderHistoryTable tbody td {
+            padding: 12px 14px !important;
+            font-size: 13px !important;
             vertical-align: middle !important;
+            border-bottom: 1px solid #f1f5f9 !important;
         }
 
-        #medicineTable tbody tr:hover {
-            background-color: #f1f5f9 !important;
+        #orderHistoryTable tbody tr {
+            cursor: pointer;
+            transition: background-color 0.15s ease;
         }
 
-        #orderItemsTable tr.selected {
+        #orderHistoryTable tbody tr:hover {
+            background-color: #f8fafc !important;
+        }
+
+        #orderHistoryTable tbody tr.selected {
             background-color: #e0f2fe !important;
+            border-left: 3px solid #0284c7;
         }
 
-        .dataTables_paginate .paginate_button {
-            padding: 6px 12px !important;
-            border-radius: 6px !important;
+        /* ── Stat cards ── */
+        .stat-card {
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 18px 22px;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.06);
+            border: 1px solid #f1f5f9;
+            display: flex;
+            align-items: center;
+            gap: 16px;
         }
 
-        .text-end {
-            text-align: right !important;
+        .stat-card .icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+
+        .stat-card .label {
+            font-size: 12px;
+            color: #64748b;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .stat-card .val {
+            font-size: 20px;
+            font-weight: 800;
+            color: #0f172a;
+            margin-top: 2px;
+        }
+
+        /* ── Search Groupbox (like old desktop app) ── */
+        .search-groupbox {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 18px;
+            padding: 18px 22px;
+            position: relative;
+        }
+
+        .search-legend {
+            font-size: 13px;
+            font-weight: 700;
+            color: #1e3a8a;
+            letter-spacing: 0.02em;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 12px;
+        }
+
+        .quick-pill {
+            padding: 4px 12px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 600;
+            background: #f1f5f9;
+            color: #475569;
+            border: 1px solid #e2e8f0;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .quick-pill:hover,
+        .quick-pill.active {
+            background: #1e40af;
+            color: #ffffff;
+            border-color: #1e40af;
+        }
+
+        .badge-faktur {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-weight: 700;
+            color: #1d4ed8;
+            background: #eff6ff;
+            padding: 3px 8px;
+            border-radius: 6px;
+            border: 1px solid #dbeafe;
+        }
+
+        .badge-terima {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-weight: 600;
+            color: #0f766e;
+            background: #f0fdfa;
+            padding: 3px 8px;
+            border-radius: 6px;
+            border: 1px solid #ccfbf1;
         }
     </style>
 @endsection
 
 @section('content')
-    <section class="section px-4">
-        <div class="section-body">
+    <section class="section px-4 pb-12">
+        <div class="section-body space-y-4">
 
-            <div class="relative w-full p-[24px] bg-[#ffffff] rounded-[22px]">
-                <div id="searchWrapper" class="flex gap-5" style="position: relative; width: 100%;">
-                    <div class="w-11/12">
-                        <div class="flex items-end justify-between md:block">
-                            <h1 class="text-2xl font-semibold tracking-tight font-poppins text-[#1c1c1c]">Data Pembelian
-                            </h1>
-                        </div>
-                        <div class="flex py-2 gap-1">
+            {{-- ─── Header ─── --}}
+            <div
+                class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div class="flex items-center gap-3.5">
+                    <div
+                        class="w-12 h-12 rounded-2xl bg-blue-500 text-white flex items-center justify-center shadow-md shadow-blue-500/20 flex-shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"
+                            fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                            stroke-linejoin="round">
+                            <rect x="1" y="3" width="15" height="13" rx="2" />
+                            <path d="M16 8h4l4 5v4h-8V8z" />
+                            <circle cx="5.5" cy="18.5" r="2.5" />
+                            <circle cx="18.5" cy="18.5" r="2.5" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold text-slate-800 tracking-tight">Data Pembelian</h1>
+                        <p class="text-xs text-slate-500 mt-0.5">Menampilkan riwayat faktur penerimaan pembelian per faktur
+                        </p>
+                    </div>
+                </div>
 
-                            <div>
-                                <div class="py-1 text-[13px] font-bold">Cari Obat...</div>
+                <div class="flex items-center gap-2">
+                    <a href="{{ route('receiving.index') }}"
+                        class="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl border border-slate-200 text-slate-700 bg-white hover:bg-slate-50 text-xs font-semibold shadow-sm transition">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"
+                            fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                            stroke-linejoin="round">
+                            <path
+                                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                        </svg>
+                        <span>Input Penerimaan</span>
+                    </a>
+                    <button type="button" onclick="printSelectedRow()" id="btnTopPrint"
+                        class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold shadow-md shadow-amber-500/20 transition">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"
+                            fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                            stroke-linejoin="round">
+                            <path d="M6 9V3H18V9" />
+                            <rect x="6" y="14" width="12" height="7" rx="1" />
+                            <path d="M6 18H5A2 2 0 0 1 3 16V11A2 2 0 0 1 5 9H19A2 2 0 0 1 21 11V16A2 2 0 0 1 19 18H18" />
+                        </svg>
+                        <span>Cetak Faktur</span>
+                    </button>
+                </div>
+            </div>
 
-                                <input type="text" onkeyup="searchInvoice(this.value)" id="search"
-                                    placeholder="Ketik Nomor Faktur, Tanggal, Kreditur"
-                                    class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
-                                    autocomplete="off">
-                            </div>
+            {{-- ─── Summary Cards ─── --}}
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                <div class="stat-card">
+                    <div class="icon bg-blue-50 text-blue-600">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"
+                            fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                            stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                            <polyline points="14 2 14 8 20 8" />
+                            <line x1="16" y1="13" x2="8" y2="13" />
+                            <line x1="16" y1="17" x2="8" y2="17" />
+                            <polyline points="10 9 9 9 8 9" />
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="label">Total Faktur</div>
+                        <div class="val" id="statTotalInvoices">0</div>
+                    </div>
+                </div>
 
-                        </div>
+                <div class="stat-card">
+                    <div class="icon bg-emerald-50 text-emerald-600">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"
+                            fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                            stroke-linejoin="round">
+                            <line x1="12" y1="1" x2="12" y2="23" />
+                            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="label">Total Pembelian (Tampil)</div>
+                        <div class="val text-emerald-700" id="statTotalAmount">Rp 0</div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="icon bg-purple-50 text-purple-600">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"
+                            fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                            stroke-linejoin="round">
+                            <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                            <circle cx="8.5" cy="7" r="4" />
+                            <line x1="20" y1="8" x2="20" y2="14" />
+                            <line x1="23" y1="11" x2="17" y2="11" />
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="label">PBF / Kreditur (Tampil)</div>
+                        <div class="val text-purple-700" id="statTotalCreditors">0</div>
                     </div>
                 </div>
             </div>
-            <div class="mt-3 relative w-full p-[24px] bg-[#ffffff] rounded-[22px]">
-                <table id="orderItemsTable" class="w-full">
-                    <thead>
-                        <tr>
-                            <th>Tanggal</th>
-                            <th>Jenis Pembayaran</th>
-                            <th>Tanggal Faktur</th>
-                            <th>No. Faktur</th>
-                            <th>Kreditur</th>
-                            <th>Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody class="text-[12px]"></tbody>
-                </table>
+
+            {{-- ─── Cari Faktur (Groupbox ala Aplikasi Lama) ─── --}}
+            <div class="search-groupbox shadow-sm">
+                <div class="search-legend">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8" />
+                        <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                    </svg>
+                    <span>Cari Faktur</span>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-3 items-end">
+                    {{-- Dropdown Kolom Pencarian --}}
+                    <div class="lg:col-span-3">
+                        <label for="searchField" class="block text-xs font-semibold text-slate-600 mb-1.5">Kategori
+                            Pencarian</label>
+                        <select id="searchField"
+                            class="w-full h-11 px-3.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-200">
+                            <option selected value="all">Semua Kolom</option>
+                            <option value="invoice_date">Tgl Faktur</option>
+                            <option value="invoice_number">No Faktur</option>
+                            <option value="creditor">Kreditur</option>
+                            <option value="receiving_code">No Terima</option>
+                            <option value="receive_date">Tgl Terima</option>
+                        </select>
+                    </div>
+
+                    {{-- Text Pencarian --}}
+                    <div class="lg:col-span-5">
+                        <label for="searchInput" class="block text-xs font-semibold text-slate-600 mb-1.5">Kata
+                            Kunci</label>
+                        <div class="relative">
+                            <input type="text" id="searchInput" autocomplete="off"
+                                placeholder="Ketik tanggal (contoh: 14 9), no faktur, atau kreditur..."
+                                class="w-full h-11 pl-4 pr-10 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-200">
+                            <button type="button" id="btnClearSearch"
+                                class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 hidden">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14"
+                                    viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                                    stroke-linecap="round" stroke-linejoin="round">
+                                    <line x1="18" y1="6" x2="6" y2="18" />
+                                    <line x1="6" y1="6" x2="18" y2="18" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    {{-- Rentang Tanggal Faktur --}}
+                    <div class="lg:col-span-4">
+                        <label for="dateRange" class="block text-xs font-semibold text-slate-600 mb-1.5">Rentang Tanggal
+                            Faktur</label>
+                        <div class="flex items-center gap-2">
+                            <input type="text" id="dateRange" placeholder="Pilih rentang tanggal..." readonly
+                                class="flex-1 h-11 px-3.5 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-200 cursor-pointer">
+                            <button type="button" onclick="resetFilter()"
+                                class="h-11 px-3.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-600 text-xs font-semibold transition"
+                                title="Reset Filter">
+                                Reset
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Quick date range pills --}}
+                <div class="flex flex-wrap items-center gap-1.5 mt-3 pt-3 border-t border-slate-100">
+                    <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mr-1">Filter
+                        Cepat:</span>
+                    <button type="button" class="quick-pill" onclick="setQuickDate('today', this)">Hari Ini</button>
+                    <button type="button" class="quick-pill" onclick="setQuickDate('7_days', this)">7 Hari
+                        Terakhir</button>
+                    <button type="button" class="quick-pill" onclick="setQuickDate('this_month', this)">Bulan
+                        Ini</button>
+                    <button type="button" class="quick-pill active" onclick="setQuickDate('all', this)">Semua
+                        Data</button>
+                </div>
             </div>
+
+            {{-- ─── DataTable Data Pembelian ─── --}}
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
+                <div class="overflow-x-auto">
+                    <table id="orderHistoryTable" class="w-full">
+                        <thead>
+                            <tr>
+                                <th style="width: 36px;">#</th>
+                                <th style="width: 105px;">Tgl Terima</th>
+                                <th>No Terima</th>
+                                <th style="width: 105px;">Tgl Faktur</th>
+                                <th>No Faktur</th>
+                                <th>Kreditur</th>
+                                <th style="text-align: right;">Jumlah</th>
+                                <th style="width: 175px; text-align: center;">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-[13px]"></tbody>
+                    </table>
+                </div>
+
+                {{-- Bottom Action Row ala Desktop App --}}
+                <div
+                    class="flex flex-col sm:flex-row items-center justify-between gap-3 mt-4 pt-4 border-t border-slate-100">
+                    <div class="text-xs text-slate-500 font-medium">
+                        * Klik salah satu baris untuk memilih faktur, atau klik ganda untuk langsung mencetak.
+                    </div>
+                    <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+                        <button type="button" onclick="viewSelectedRincian()"
+                            class="h-10 px-5 rounded-xl border border-blue-200 bg-blue-50 hover:bg-blue-600 hover:text-white text-blue-700 text-xs font-bold shadow-xs active:scale-[0.98] transition flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"
+                                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                                <line x1="16" y1="13" x2="8" y2="13"></line>
+                                <line x1="16" y1="17" x2="8" y2="17"></line>
+                                <polyline points="10 9 9 9 8 9"></polyline>
+                            </svg>
+                            <span>Rincian</span>
+                        </button>
+                        <button type="button" onclick="printSelectedRow()"
+                            class="h-10 px-6 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white text-xs font-bold shadow-md shadow-amber-500/20 active:scale-[0.98] transition flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <path d="M6 9V3H18V9" />
+                                <rect x="6" y="14" width="12" height="7" rx="1" />
+                                <path
+                                    d="M6 18H5A2 2 0 0 1 3 16V11A2 2 0 0 1 5 9H19A2 2 0 0 1 21 11V16A2 2 0 0 1 19 18H18" />
+                            </svg>
+                            <span>Cetak</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </section>
 @endsection
@@ -237,525 +405,274 @@
 @section('scripts')
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
-    <script src="{{ asset('templates/js/page/modules-datatables.js') }}"></script>
-    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="{{ asset('templates/library/izitoast/dist/js/iziToast.min.js') }}"></script>
-    <script src="https://unpkg.com/sweetalert/dist/sweetalert.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://npmcdn.com/flatpickr/dist/l10n/id.js"></script>
 
     <script>
-        let page = 1;
-        let keyword = '';
-        let loading = false;
-        let hasMore = true;
-        let activeIndex = -1;
-        let selectedTransactionCode = null;
-        let medicineTable = null;
-        let medicineSelectedId = '';
+        let orderHistoryTable = null;
+        let selectedRowData = null;
         let startDate = '';
         let endDate = '';
-        var search_invoice = '';
-
-        var pack = document.getElementById('pack');
-        let orderItemsTable;
-        let selectedRowData = null;
-        let selectedRowIndex = null;
+        let searchTimer = null;
+        let datePickerInstance = null;
 
         document.addEventListener('DOMContentLoaded', function() {
+            // ── Initialize Flatpickr ──
+            datePickerInstance = flatpickr('#dateRange', {
+                mode: 'range',
+                dateFormat: 'Y-m-d',
+                altInput: true,
+                altFormat: 'd/m/Y',
+                locale: 'id',
+                allowInput: false,
+                onClose: function(selectedDates) {
+                    if (selectedDates.length === 2) {
+                        startDate = flatpickr.formatDate(selectedDates[0], 'Y-m-d');
+                        endDate = flatpickr.formatDate(selectedDates[1], 'Y-m-d');
+                    } else if (selectedDates.length === 0) {
+                        startDate = '';
+                        endDate = '';
+                    }
+                    // Reset quick pills active
+                    document.querySelectorAll('.quick-pill').forEach(p => p.classList.remove('active'));
+                    orderHistoryTable.ajax.reload();
+                }
+            });
 
-
-            // DATATABLE INIT
-            orderItemsTable = $('#orderItemsTable').DataTable({
+            // ── Initialize DataTable ──
+            orderHistoryTable = $('#orderHistoryTable').DataTable({
                 processing: true,
                 serverSide: true,
                 ajax: {
                     url: "{{ route('receiving.getorderhistory') }}",
                     data: function(d) {
-                        d.search = search_invoice;
-
+                        d.search_field = document.getElementById('searchField').value;
+                        d.search = document.getElementById('searchInput').value.trim();
+                        d.start_date = startDate;
+                        d.end_date = endDate;
                     }
                 },
                 columns: [{
-                        data: 'date'
+                        data: 'DT_RowIndex',
+                        orderable: false,
+                        searchable: false,
+                        className: 'text-center font-medium text-slate-400'
                     },
                     {
-                        data: 'invoice_payment'
+                        data: 'receive_date',
+                        className: 'text-center font-medium text-slate-600'
                     },
                     {
-                        data: 'invoice_date'
+                        data: 'receive_code',
+                        render: function(data) {
+                            return `<span class="badge-terima">${data || '-'}</span>`;
+                        }
                     },
                     {
-                        data: 'invoice_number'
+                        data: 'invoice_date',
+                        className: 'text-center font-medium text-slate-600'
                     },
                     {
-                        data: 'creditor'
+                        data: 'invoice_number',
+                        render: function(data) {
+                            return `<span class="badge-faktur">${data || '-'}</span>`;
+                        }
                     },
                     {
-                        data: 'action'
+                        data: 'creditor',
+                        className: 'font-semibold text-slate-800'
                     },
+                    {
+                        data: 'total_formatted',
+                        className: 'text-end font-bold text-slate-900',
+                        render: function(data) {
+                            return `<span class="text-[13px] font-bold tracking-tight">${data || '0'}</span>`;
+                        }
+                    },
+                    {
+                        data: 'action',
+                        orderable: false,
+                        searchable: false,
+                        className: 'text-center'
+                    }
                 ],
-                paging: false,
-                searching: false,
-                info: false,
-
+                order: [
+                    [3, 'desc']
+                ], // sort by invoice_date by default
+                pageLength: 25,
+                language: {
+                    lengthMenu: 'Tampilkan _MENU_ data',
+                    info: 'Menampilkan _START_–_END_ dari _TOTAL_ faktur',
+                    infoEmpty: 'Tidak ada data faktur',
+                    emptyTable: 'Tidak ada data pembelian ditemukan',
+                    zeroRecords: 'Tidak ada faktur yang cocok dengan pencarian',
+                    paginate: {
+                        first: '«',
+                        last: '»',
+                        next: '›',
+                        previous: '‹'
+                    }
+                },
+                drawCallback: function() {
+                    updateSummaryStats();
+                    selectedRowData = null; // reset row selection on page/draw
+                }
             });
 
-        });
+            // ── Row selection & double click ──
+            $('#orderHistoryTable tbody').on('click', 'tr', function(e) {
+                // If clicked directly on the button / link, let default action proceed
+                if ($(e.target).closest('a, button').length) return;
 
-        function formatRupiah(value) {
-            const number = Number(value) || 0;
-            return new Intl.NumberFormat('id-ID', {
-                style: 'currency',
-                currency: 'IDR',
-                minimumFractionDigits: 0
-            }).format(number);
-        }
+                const row = orderHistoryTable.row(this);
+                if (!row.data()) return;
 
-        function searchInvoice(search) {
-            if (!search || search.trim() === '') {
-                $('#search').val('');
-                search = '';
-                orderItemsTable.ajax.reload();
-                return;
-            }
-
-            search_invoice = search;
-
-            orderItemsTable.ajax.reload();
-
-        }
-
-
-        // Fetch   
-        function fetchData() {
-            if (loading || !hasMore) return;
-
-            loading = true;
-
-            fetch(`{{ route('receiving.searchbpba') }}?search=${keyword}&page=${page}`)
-                .then(res => res.json())
-                .then(res => {
-                    const tbody = document.getElementById('searchResults');
-
-                    if (page === 1 && res.data.length === 0) {
-                        tbody.innerHTML = `
-                            <tr>
-                                <td colspan="4" class="text-center">No data found</td>
-                            </tr>`;
-                        hasMore = false;
-                        return;
-                    }
-
-                    res.data.forEach((item, index) => {
-                        tbody.insertAdjacentHTML('beforeend', `
-                            <tr 
-                                data-item='${JSON.stringify(item)}'
-                                tabindex="0"
-                            >
-                                <td>${((page - 1) * res.per_page) + index + 1}</td>
-                                <td>${item.code}</td>
-                            </tr>
-                        `);
-                    });
-
-                    hasMore = res.current_page < res.last_page;
-                    page++;
-
-                    document.getElementById('searchDropdown').style.display = 'block';
-                })
-                .finally(() => loading = false);
-        }
-
-        function calculateReturTotal() {
-            const oldQty = parseFloat(document.getElementById('old_qty').value) || 0;
-            const returQty = parseFloat(document.getElementById('qty').value) || 0;
-
-            // item_price may contain formatting, strip non-numeric
-            const priceRaw = document.getElementById('item_price').value || '0';
-            const itemPrice = parseFloat(priceRaw.replace(/[^\d.-]/g, '')) || 0;
-
-
-
-            const total = (oldQty - returQty) * itemPrice;
-
-            document.getElementById('total_retur').value = total.toFixed(0);
-        }
-        // Hover
-        document.getElementById('searchResults').addEventListener('mouseover', function(e) {
-            const row = e.target.closest('tr');
-            if (!row) return;
-
-            const rows = [...this.children];
-            rows.forEach(r => r.classList.remove('active'));
-
-            row.classList.add('active');
-            activeIndex = rows.indexOf(row);
-        });
-
-        // Click
-        document.getElementById('searchResults').addEventListener('click', function(e) {
-            const row = e.target.closest('tr');
-            if (row) {
-                selectRow(row);
-                e.stopPropagation();
-            }
-        });
-
-        // Select
-
-
-        function selectRow(row) {
-            const item = JSON.parse(row.dataset.item);
-            document.getElementById('invoice_number').focus();
-            console.log(item.items);
-            ordersid = item.code;
-            loadItems(ordersid);
-        }
-
-        console.log(ordersid);
-        // Update
-        function updateActiveRow(rows) {
-            rows.forEach(r => r.classList.remove('active'));
-            if (activeIndex >= 0) {
-                rows[activeIndex].classList.add('active');
-                rows[activeIndex].scrollIntoView({
-                    block: 'nearest'
-                });
-            }
-        }
-        document.addEventListener('click', function(e) {
-            const wrapper = document.getElementById('searchWrapper');
-            if (!wrapper.contains(e.target)) {
-                document.getElementById('searchDropdown').style.display = 'none';
-            }
-        }, true);
-
-        pack.addEventListener('change', function() {
-            if (this.checked) {
-                itempack = 1;
-            } else {
-                itempack = 0;
-            }
-
-            counttotal();
-        });
-
-        pack.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') {
-                document.getElementById('qty').focus();
-            }
-        })
-
-        function counttotal() {
-            let qty = parseInt(document.getElementById('qty_received').value) || 0;
-            itemqty = qty;
-
-            if (pack.checked) {
-                itemtotal = qty * itemcontent * itemprice;
-                total_transaction = itemtotal;
-                document.getElementById('total_price').value = formatRupiah(itemtotal);
-
-            } else {
-                itemtotal = qty * itemprice;
-                total_transaction = itemtotal;
-                document.getElementById('total_price').value = formatRupiah(itemtotal);
-
-
-            }
-        }
-
-        function counttotalreceived() {
-            let qty = parseInt(document.getElementById('qty_received').value) || 0;
-            itemqty = qty;
-
-            if (pack.checked) {
-                itemtotal = qty * itemcontent * itemprice;
-                total_transaction = itemtotal;
-                document.getElementById('total_price').value = formatRupiah(itemtotal);
-
-            } else {
-                itemtotal = qty * itemprice;
-                total_transaction = itemtotal;
-                document.getElementById('total_price').value = formatRupiah(itemtotal);
-            }
-        }
-
-        function resetInputs() {
-            document.getElementById('medicine_code').value = '';
-            document.getElementById('medicine_name').value = '';
-            document.getElementById('unit').value = '';
-            document.getElementById('qty').value = '';
-            document.getElementById('content').value = '';
-            document.getElementById('item_price').value = '';
-            document.getElementById('total_price').value = '';
-            const isActive = document.getElementById('is_active');
-            pack.checked = false;
-
-            if (isActive && isActive.checked) {
-                isActive.checked = false;
-            }
-
-            // reset JS
-            itemcode = '';
-            itemprice = '';
-            itemqty = '';
-            itemtotal = '';
-            itemcreditor = null;
-            selectedRowData = null;
-            document.getElementById('searchInput').focus();
-        }
-
-        function addItem() {
-
-            // alert(itemlocation.value);
-            // alert(discount.value);
-            // alert(batch.value);
-            // alert(itemlocation.value);
-            // alert(qty_received.value);
-
-            const payload = {
-                creditor_code: creditor.value,
-                receiving_items_id: receiving_items_id.value,
-                receiving_id: receiving_id,
-                order_items_id: order_items_id,
-                order_id: order_id,
-                qty_received: qty_received.value,
-                discount: discount.value,
-                expired_date: expired_date.value,
-                batch: batch.value,
-                location: itemlocation.value,
-                etalase: etalase.value,
-                status: itemstatus.value,
-                total: total_transaction,
-                invoice_payment: invoice_payment.value,
-                invoice_number: invoice_number.value,
-                invoice_date: invoice_date.value,
-                invoice_times: invoice_times.value,
-                invoice_due: invoice_due.value,
-                invoice_ppn: invoice_ppn.value,
-            };
-
-            axios.post("{{ route('receiving.addreceivingitem') }}", payload, {
-                    headers: {
-                        'X-CSRF-TOKEN': document
-                            .querySelector('meta[name="csrf-token"]')
-                            .content
-                    }
-                })
-                .then(res => {
-                    if (res.data.success) {
-                        iziToast.success({
-                            title: 'Berhasil',
-                            message: res.message ??
-                                'Item Berhasil di-Update!',
-                            position: 'topRight'
-                        });
-                        orderItemsTable.ajax.reload(null, false);
-                        document.getElementById("searchInput").readOnly = true;
-                        resetInputs();
-
-                    }
-                })
-                .catch(err => {
-                    let message = 'Data gagal disimpan';
-                    if (err.response) {
-                        if (err.response.data.errors) {
-                            message = Object.values(err.response.data.errors)
-                                .map(e => e[0])
-                                .join('<br>');
-                        }
-                        if (err.response.data.message) {
-                            message = err.response.data.message;
-                        }
-                    }
-                    iziToast.error({
-                        title: 'Gagal',
-                        message: message,
-                        position: 'topRight'
-                    });
-                });
-        }
-
-        function completeOrder() {
-
-            axios.post("{{ route('receiving.completeOrder') }}", {
-                receivingid: receiving_id,
-                orderid: ordersid,
-            }, {
-                headers: {
-                    'X-CSRF-TOKEN': document
-                        .querySelector('meta[name="csrf-token"]')
-                        .content
-                }
-            }).then(res => {
-                if (res.data.success) {
-                    orderItemsTable.ajax.reload(null, false);
-                    resetInputs();
+                if ($(this).hasClass('selected')) {
+                    $(this).removeClass('selected');
                     selectedRowData = null;
-                    selectedRowIndex = null;
-                    location.reload();
-
+                } else {
+                    $('#orderHistoryTable tbody tr.selected').removeClass('selected');
+                    $(this).addClass('selected');
+                    selectedRowData = row.data();
                 }
-            }).catch(err => {
-                console.error(err);
-                alert('Update failed');
             });
+
+            $('#orderHistoryTable tbody').on('dblclick', 'tr', function(e) {
+                if ($(e.target).closest('a, button').length) return;
+                const row = orderHistoryTable.row(this);
+                if (row.data() && row.data().id) {
+                    window.open(`{{ url('invoice/print') }}/${row.data().id}`, '_blank');
+                }
+            });
+
+            // ── Debounced search input ──
+            const searchInput = document.getElementById('searchInput');
+            const btnClearSearch = document.getElementById('btnClearSearch');
+
+            searchInput.addEventListener('input', function() {
+                const val = this.value.trim();
+                btnClearSearch.classList.toggle('hidden', val.length === 0);
+
+                clearTimeout(searchTimer);
+                searchTimer = setTimeout(() => {
+                    orderHistoryTable.ajax.reload();
+                }, 300);
+            });
+
+            searchInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    clearTimeout(searchTimer);
+                    orderHistoryTable.ajax.reload();
+                }
+            });
+
+            btnClearSearch.addEventListener('click', function() {
+                searchInput.value = '';
+                this.classList.add('hidden');
+                orderHistoryTable.ajax.reload();
+                searchInput.focus();
+            });
+
+            // ── Search category dropdown change ──
+            document.getElementById('searchField').addEventListener('change', function() {
+                orderHistoryTable.ajax.reload();
+            });
+        });
+
+        // ── Quick date filters ──
+        function setQuickDate(type, btn) {
+            document.querySelectorAll('.quick-pill').forEach(p => p.classList.remove('active'));
+            if (btn) btn.classList.add('active');
+
+            const now = new Date();
+            const fmt = d =>
+                `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+            if (type === 'today') {
+                startDate = fmt(now);
+                endDate = fmt(now);
+                if (datePickerInstance) datePickerInstance.setDate([now, now]);
+            } else if (type === '7_days') {
+                const past = new Date(now);
+                past.setDate(now.getDate() - 6);
+                startDate = fmt(past);
+                endDate = fmt(now);
+                if (datePickerInstance) datePickerInstance.setDate([past, now]);
+            } else if (type === 'this_month') {
+                const startMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+                const endMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                startDate = fmt(startMonth);
+                endDate = fmt(endMonth);
+                if (datePickerInstance) datePickerInstance.setDate([startMonth, endMonth]);
+            } else {
+                // all
+                startDate = '';
+                endDate = '';
+                if (datePickerInstance) datePickerInstance.clear();
+            }
+
+            orderHistoryTable.ajax.reload();
         }
 
-        let itemsTable;
-
-        function loadItems(transactionId) {
-
-            if (!orderItemsTable) {
-                console.warn('DataTable belum siap');
-                return;
-            }
-
-            ordersid = transactionId;
-
-            document.getElementById('searchDropdown').style.display = 'none';
-            document.getElementById('searchInput').value = orderscode;
-
-            orderItemsTable.ajax.reload(null, false);
+        // ── Reset filter ──
+        function resetFilter() {
+            document.getElementById('searchField').value = 'all';
+            document.getElementById('searchInput').value = '';
+            document.getElementById('btnClearSearch').classList.add('hidden');
+            startDate = '';
+            endDate = '';
+            if (datePickerInstance) datePickerInstance.clear();
+            document.querySelectorAll('.quick-pill').forEach(p => p.classList.remove('active'));
+            document.querySelector('.quick-pill[onclick*="all"]')?.classList.add('active');
+            orderHistoryTable.ajax.reload();
         }
 
-
-        // Count Due
-        function count_due() {
-
-            const days = parseInt(invoice_times.value);
-            const baseDateValue = invoice_date.value;
-
-            if (!days || days <= 0 || !baseDateValue) {
-                invoice_due.value = '';
-                return;
-            }
-
-            const dueDate = new Date(baseDateValue);
-            dueDate.setDate(dueDate.getDate() + days);
-
-            const yyyy = dueDate.getFullYear();
-            const mm = String(dueDate.getMonth() + 1).padStart(2, '0');
-            const dd = String(dueDate.getDate()).padStart(2, '0');
-
-            invoice_due.value = `${yyyy}-${mm}-${dd}`;
-        }
-        // Count Items Left
-        function count_itemsleft() {
-            const qtyOrder = parseFloat(document.getElementById('qty').value) || 0;
-            const input = document.getElementById('qty_received');
-            let value = parseFloat(input.value) || 0;
-
-            if (value > qtyOrder) {
-                input.value = qtyOrder;
-            }
-
-            if (value < 0) {
-                input.value = 0;
-            }
-        }
-
-        // ENTER REDIRECTION AND SUBMIT
-        document.getElementById('qty_received').addEventListener('keydown', function(e) {
-            if (e.key == 'Enter') {
-                batch.focus();
-            }
-            const qtyOrder = parseFloat(document.getElementById('qty').value) || 0;
-            const input = document.getElementById('qty_received');
-            let value = parseFloat(input.value) || 0;
-
-            if (value > qtyOrder) {
-                input.value = qtyOrder;
-                counttotal();
-            }
-
-            if (value < 0) {
-                input.value = 0;
-            }
-        });
-
-        $("#invoice_payment").on("select2:select", () => {
-            setTimeout(() => $("#invoice_number").focus(), 100);
-        });
-
-        discount.addEventListener('keydown', function(e) {
-            if (e.key == 'Enter') {
-                etalase.focus();
-            }
-        });
-        etalase.addEventListener('keydown', function(e) {
-            if (e.key == 'Enter') {
-                itemlocation.focus();
-            }
-        });
-        itemlocation.addEventListener('keydown', function(e) {
-            if (e.key == 'Enter') {
-                itemstatus.focus();
-            }
-        });
-        itemstatus.addEventListener('keydown', function(e) {
-            if (e.key == 'Enter') {
-                addItem();
-            }
-        });
-        invoice_number.addEventListener('keydown', function(e) {
-            if (e.key == 'Enter') {
-                invoice_date.focus();
-            }
-        });
-        invoice_date.addEventListener('keydown', function(e) {
-            if (e.key == 'Enter') {
-                invoice_times.focus();
-            }
-        });
-        invoice_times.addEventListener('keydown', function(e) {
-            if (e.key == 'Enter') {
-                invoice_ppn.focus();
-            }
-        });
-        batch.addEventListener('keydown', function(e) {
-            if (e.key == 'Enter') {
-                discount.focus();
-            }
-        });
-        discount.addEventListener('keydown', function(e) {
-            if (e.key == 'Enter') {
-                expired_date.focus();
-            }
-        });
-        expired_date.addEventListener('keydown', function(e) {
-            if (e.key == 'Enter') {
-                etalase.focus();
-            }
-        });
-        etalase.addEventListener('keydown', function(e) {
-            if (e.key == 'Enter') {
-                location.focus();
-            }
-        });
-
-        function printReceiving() {
-
-            if (!receiving_id) {
-                iziToast.error({
-                    title: 'Error',
-                    message: 'Data penerimaan belum ada',
+        // ── View Rincian selected row ──
+        function viewSelectedRincian() {
+            if (selectedRowData && selectedRowData.rincian_url) {
+                window.location.href = selectedRowData.rincian_url;
+            } else {
+                iziToast.info({
+                    title: 'Pilih Faktur',
+                    message: 'Silakan klik salah satu baris faktur di tabel terlebih dahulu untuk melihat rincian.',
                     position: 'topRight'
                 });
-                return;
             }
+        }
 
-            const url = `/receiving/print/${receiving_id}`;
+        // ── Print selected row ──
+        function printSelectedRow() {
+            if (selectedRowData && selectedRowData.id) {
+                window.open(`{{ url('invoice/print') }}/${selectedRowData.id}`, '_blank');
+            } else {
+                iziToast.info({
+                    title: 'Pilih Faktur',
+                    message: 'Silakan klik salah satu baris faktur di tabel terlebih dahulu untuk mencetak.',
+                    position: 'topRight'
+                });
+            }
+        }
 
-            window.open(url, '_blank');
-            setTimeout(() => {
-                window.location.reload();
+        // ── Update Summary Stats ──
+        function updateSummaryStats() {
+            if (!orderHistoryTable) return;
 
-            }, 300);
+            const info = orderHistoryTable.page.info();
+            document.getElementById('statTotalInvoices').textContent = (info.recordsDisplay || 0).toLocaleString('id-ID');
 
+            let pageSum = 0;
+            const creditorsSet = new Set();
+
+            orderHistoryTable.rows({
+                page: 'current'
+            }).data().each(function(row) {
+                if (row.total_raw) pageSum += parseFloat(row.total_raw);
+                if (row.creditor) creditorsSet.add(row.creditor);
+            });
+
+            document.getElementById('statTotalAmount').textContent = 'Rp ' + Math.round(pageSum).toLocaleString('id-ID');
+            document.getElementById('statTotalCreditors').textContent = creditorsSet.size.toLocaleString('id-ID');
         }
     </script>
-
-
 @endsection

@@ -14,6 +14,7 @@ class MedicinePriceHistory extends Model
     protected $fillable = [
         'user_id',
         'medicine_id',
+        'old_price',
         'new_price',
     ];
 

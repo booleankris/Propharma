@@ -747,21 +747,41 @@ class ReceivingController extends Controller
             ->addColumn('medicine_code', fn($row) => $row->medicines?->code ?? '-')
             ->addColumn('medicine_name', fn($row) => $row->medicines?->name ?? '-')
             ->addColumn('medicine_unit', fn($row) => $row->medicines?->unit ?? '-')
+            ->addColumn('old_price_fmt', function ($row) {
+                if ($row->old_price === null || $row->old_price === '' || (float) $row->old_price <= 0) {
+                    return '-';
+                }
+                return 'Rp ' . number_format((float) $row->old_price, 0, ',', '.');
+            })
             ->addColumn('new_price_fmt', function ($row) {
-                return 'Rp ' . number_format($row->new_price, 0, ',', '.');
+                if ($row->new_price === null || $row->new_price === '') {
+                    return '-';
+                }
+                return 'Rp ' . number_format((float) $row->new_price, 0, ',', '.');
             })
             ->addColumn('changed_by', fn($row) => $row->user?->name ?? '-')
             ->addColumn('changed_at', fn($row) => $row->created_at?->format('d/m/Y H:i') ?? '-')
             ->addColumn('direction', function ($row) {
-                $current = $row->medicines?->net_price ?? 0;
-                $new = $row->new_price;
-
-                if ($new > $current) {
-                    return '<span class="badge-up">▲ Naik</span>';
-                } elseif ($new < $current) {
-                    return '<span class="badge-down">▼ Turun</span>';
+                if ($row->old_price === null || $row->old_price === '' || (float) $row->old_price <= 0) {
+                    return '<span class="badge-same">—</span>';
                 }
-                return '<span class="badge-same">— Sama</span>';
+                $old = (float) $row->old_price;
+                $new = (float) $row->new_price;
+                $diff = $new - $old;
+
+                if ($old <= 0) {
+                    return '<span class="badge-same">—</span>';
+                }
+
+                $pct = round(abs($diff) / $old * 100, 1);
+                $pctFormatted = ($pct == (int) $pct) ? (int) $pct . '%' : number_format($pct, 1, ',', '.') . '%';
+
+                if ($new > $old) {
+                    return '<span class="badge-up">▲ Naik ' . $pctFormatted . '</span>';
+                } elseif ($new < $old) {
+                    return '<span class="badge-down">▼ Turun ' . $pctFormatted . '</span>';
+                }
+                return '<span class="badge-same">— Tetap</span>';
             })
             ->rawColumns(['direction'])
             ->make(true);
@@ -769,69 +789,162 @@ class ReceivingController extends Controller
 
     public function getorderhistory(Request $request)
     {
-        $items = ReceivingDetails::with([
-            'receiving',
-            'creditor',
-            'receiving_items.order_items',
-        ]);
+        $pharmacyId = getPurchasingPharmacyId() ?: getActivePharmacyId();
+        $targetPharmacyIds = in_array((int) $pharmacyId, [1, 6, 9]) ? [9, 1] : [(int) $pharmacyId];
 
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $items->where(function ($query) use ($search) {
-                $query
-                    ->where('invoice_date', $search)
-                    ->orWhere('invoice_number', $search)
-                    ->orWhereHas('creditor', function ($q) use ($search) {
-                        $q->where('name', 'like', "%$search%");
+        $items = ReceivingDetails::query()
+            ->with([
+                'receiving',
+                'creditor',
+            ])
+            ->withSum('receiving_items as total_amount', 'total')
+            ->whereHas('receiving', function ($q) use ($targetPharmacyIds) {
+                $q->whereIn('pharmacy_id', $targetPharmacyIds);
+            });
+
+        // Search Field and Value filter
+        $searchField = $request->get('search_field', 'all');
+        $search = trim($request->get('search', ''));
+
+        if ($search !== '') {
+            // Flexible match for date like "14 9", "14/09", "14-09", "14 09"
+            $dateQuery = null;
+            if (preg_match('/^(\d{1,2})[\s\/\-](\d{1,2})(?:[\s\/\-](\d{2,4}))?$/', $search, $m)) {
+                $day = str_pad($m[1], 2, '0', STR_PAD_LEFT);
+                $month = str_pad($m[2], 2, '0', STR_PAD_LEFT);
+                $year = !empty($m[3]) ? (strlen($m[3]) == 2 ? '20' . $m[3] : $m[3]) : null;
+                $dateQuery = $year ? "{$year}-{$month}-{$day}" : "-{$month}-{$day}";
+            }
+
+            $items->where(function ($query) use ($searchField, $search, $dateQuery) {
+                if ($searchField === 'invoice_date') {
+                    if ($dateQuery) {
+                        $query->where('invoice_date', 'like', "%{$dateQuery}%");
+                    } else {
+                        $query->where('invoice_date', 'like', "%{$search}%")
+                            ->orWhereRaw("DATE_FORMAT(invoice_date, '%d/%m/%Y') like ?", ["%{$search}%"])
+                            ->orWhereRaw("DATE_FORMAT(invoice_date, '%d %c') like ?", ["%{$search}%"]);
+                    }
+                } elseif ($searchField === 'invoice_number') {
+                    $query->where('invoice_number', 'like', "%{$search}%");
+                } elseif ($searchField === 'creditor') {
+                    $query->whereHas('creditor', function ($q) use ($search) {
+                        $q->where('name', 'like', "%{$search}%")
+                            ->orWhere('code', 'like', "%{$search}%");
                     });
+                } elseif ($searchField === 'receiving_code') {
+                    $query->where('receiving_details_code', 'like', "%{$search}%")
+                        ->orWhereHas('receiving', function ($q) use ($search) {
+                            $q->where('code', 'like', "%{$search}%");
+                        });
+                } elseif ($searchField === 'receive_date') {
+                    if ($dateQuery) {
+                        $query->whereHas('receiving', function ($q) use ($dateQuery) {
+                            $q->where('date', 'like', "%{$dateQuery}%")
+                                ->orWhereDate('created_at', 'like', "%{$dateQuery}%");
+                        });
+                    } else {
+                        $query->whereHas('receiving', function ($q) use ($search) {
+                            $q->where('date', 'like', "%{$search}%")
+                                ->orWhereRaw("DATE_FORMAT(created_at, '%d/%m/%Y') like ?", ["%{$search}%"]);
+                        });
+                    }
+                } else {
+                    // Search all columns
+                    $query->where('invoice_number', 'like', "%{$search}%")
+                        ->orWhere('receiving_details_code', 'like', "%{$search}%")
+                        ->orWhereHas('creditor', function ($q) use ($search) {
+                            $q->where('name', 'like', "%{$search}%")
+                                ->orWhere('code', 'like', "%{$search}%");
+                        })
+                        ->orWhereHas('receiving', function ($q) use ($search) {
+                            $q->where('code', 'like', "%{$search}%")
+                                ->orWhere('date', 'like', "%{$search}%");
+                        });
+
+                    if ($dateQuery) {
+                        $query->orWhere('invoice_date', 'like', "%{$dateQuery}%");
+                    } else {
+                        $query->orWhere('invoice_date', 'like', "%{$search}%")
+                            ->orWhereRaw("DATE_FORMAT(invoice_date, '%d/%m/%Y') like ?", ["%{$search}%"])
+                            ->orWhereRaw("DATE_FORMAT(invoice_date, '%d %c') like ?", ["%{$search}%"]);
+                    }
+                }
             });
         }
 
+        // Optional date range
+        if ($request->filled('start_date')) {
+            $items->whereDate('invoice_date', '>=', $request->start_date);
+        }
+        if ($request->filled('end_date')) {
+            $items->whereDate('invoice_date', '<=', $request->end_date);
+        }
+
+        $items->orderByDesc('invoice_date')->orderByDesc('id');
+
         return DataTables::of($items)
             ->addIndexColumn()
-            ->addColumn('date', function ($row) {
-                return Carbon::parse($row->created_at)->format('d/m/Y');
+            ->addColumn('receive_date', function ($row) {
+                if (!empty($row->receiving?->date)) {
+                    return $row->receiving->date;
+                }
+                return $row->created_at ? Carbon::parse($row->created_at)->format('d/m/Y') : '-';
             })
-            ->addColumn('invoice_payment', function ($row) {
-                return $row->invoice_payment;
+            ->addColumn('receive_code', function ($row) {
+                return $row->receiving_details_code ?: ($row->receiving?->code ?? '-');
             })
             ->addColumn('invoice_date', function ($row) {
-                return Carbon::parse($row->invoice_date)->format('d/m/Y');
+                if (empty($row->invoice_date)) return '-';
+                try {
+                    return Carbon::parse($row->invoice_date)->format('d/m/Y');
+                } catch (\Throwable $e) {
+                    return $row->invoice_date;
+                }
             })
             ->addColumn('invoice_number', function ($row) {
                 return $row->invoice_number ?? '-';
             })
             ->addColumn('creditor', function ($row) {
-                return $row->creditor->name;
+                return $row->creditor?->name ?? '-';
+            })
+            ->addColumn('total_raw', function ($row) {
+                return (float) ($row->total_amount ?? 0);
+            })
+            ->addColumn('total_formatted', function ($row) {
+                return number_format((float) ($row->total_amount ?? 0), 0, ',', '.');
+            })
+            ->addColumn('rincian_url', function ($row) {
+                return url('/receiving/rincian?rd_id=' . $row->id);
             })
             ->addColumn('action', function ($row) {
-                return ' <a target="_blank" href="../invoice/print/' . $row->id . '">
-                            <div class="flex gap-1">
-                                <div class="w-full">
-                                    <button style="background-color:#eab308;color:white;" class="rounded-full px-2 py-2 font-semibold">
-                                        <div class="flex gap-2 justify-center items-center">
-                                            <span>
-                                            <svg 
-                                            xmlns="http://www.w3.org/2000/svg" 
-                                            viewBox="0 0 24 24" 
-                                            fill="none"
-                                            stroke="currentColor"
-                                            stroke-width="2"
-                                            stroke-linecap="round"
-                                            stroke-linejoin="round"
-                                            class="w-6 h-6 text-[#fff] hover:text-blue-600 transition cursor-pointer"
-                                        >
-                                            <path d="M6 9V3H18V9" />
-                                            <rect x="6" y="14" width="12" height="7" rx="1" />
-                                            <path d="M6 18H5A2 2 0 0 1 3 16V11A2 2 0 0 1 5 9H19A2 2 0 0 1 21 11V16A2 2 0 0 1 19 18H18" />
-                                        </svg>
-                                            </span>
-                                            <span class="text-xs pr-2">Cetak</span>
-                                        </div>
-                                    </button>
-                                </div>
-                            </div>
-                        </a>';
+                $rincianUrl = url('/receiving/rincian?rd_id=' . $row->id);
+                $printUrl = url('invoice/print/' . $row->id);
+
+                return '<div class="inline-flex items-center gap-1.5">
+                            <a href="' . $rincianUrl . '" 
+                               class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-600 text-blue-700 hover:text-white border border-blue-200 text-xs font-semibold shadow-xs transition-all"
+                               title="Lihat Rincian Item Faktur">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                    <polyline points="14 2 14 8 20 8"></polyline>
+                                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                                    <polyline points="10 9 9 9 8 9"></polyline>
+                                </svg>
+                                <span>Rincian</span>
+                            </a>
+                            <a target="_blank" href="' . $printUrl . '" 
+                               class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold shadow-xs transition-all"
+                               title="Cetak Faktur">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M6 9V3H18V9" />
+                                    <rect x="6" y="14" width="12" height="7" rx="1" />
+                                    <path d="M6 18H5A2 2 0 0 1 3 16V11A2 2 0 0 1 5 9H19A2 2 0 0 1 21 11V16A2 2 0 0 1 19 18H18" />
+                                </svg>
+                                <span>Cetak</span>
+                            </a>
+                        </div>';
             })
             ->rawColumns(['action'])
             ->make(true);
@@ -1935,6 +2048,20 @@ class ReceivingController extends Controller
     public function rincianIndex(Request $request)
     {
         $pharmacyId = getPurchasingPharmacyId();
+
+        if ($request->filled('rd_id')) {
+            $rd = ReceivingDetails::with('receiving_items.order_items')->find($request->rd_id);
+            if ($rd) {
+                $actualOrderId = $rd->receiving_items->first()?->order_items?->order_id;
+                if (!$actualOrderId && $rd->sp_code) {
+                    $actualOrderId = \App\Models\OrderItems::where('order_items_code', $rd->sp_code)->value('order_id');
+                }
+                if ($actualOrderId) {
+                    return redirect()->route('orders.rincian', ['orderId' => $actualOrderId, 'rd_id' => $request->rd_id]);
+                }
+            }
+        }
+
         $latestOrder = Order::query()
             ->when($pharmacyId > 0, fn($q) => $q->where('pharmacy_id', $pharmacyId))
             ->where(function ($q) {
@@ -1945,7 +2072,7 @@ class ReceivingController extends Controller
             ->first();
 
         if ($latestOrder) {
-            return redirect()->route('orders.rincian', $latestOrder->id);
+            return redirect()->route('orders.rincian', array_filter(['orderId' => $latestOrder->id, 'rd_id' => $request->get('rd_id')]));
         }
 
         return view('orders.rincian', [
@@ -1961,7 +2088,39 @@ class ReceivingController extends Controller
     public function orderRincian($orderId)
     {
         $pharmacyId = getPurchasingPharmacyId();
-        $order = Order::with([
+
+        $order = Order::find($orderId);
+
+        // Jika $orderId bukan id dari tabel orders (misal yang dikirim adalah receiving_id dari tabel receiving)
+        if (!$order) {
+            $rec = Receiving::find($orderId);
+            if ($rec) {
+                $actualOrderId = $rec->receiving_items()->first()?->order_items?->order_id;
+                if ($actualOrderId) {
+                    $order = Order::find($actualOrderId);
+                }
+            }
+        }
+
+        // Jika masih belum ketemu dan ada rd_id di URL
+        if (!$order && request()->filled('rd_id')) {
+            $rd = ReceivingDetails::with('receiving_items.order_items')->find(request()->get('rd_id'));
+            if ($rd) {
+                $actualOrderId = $rd->receiving_items->first()?->order_items?->order_id;
+                if (!$actualOrderId && $rd->sp_code) {
+                    $actualOrderId = \App\Models\OrderItems::where('order_items_code', $rd->sp_code)->value('order_id');
+                }
+                if ($actualOrderId) {
+                    $order = Order::find($actualOrderId);
+                }
+            }
+        }
+
+        if (!$order) {
+            abort(404, 'Data pesanan/penerimaan tidak ditemukan.');
+        }
+
+        $order->load([
             'order_items.medicines.factory',
             'order_items.medicines.creditors',
             'order_items.creditors',
@@ -1969,7 +2128,7 @@ class ReceivingController extends Controller
             'order_items.receivingItems.batches',
             'order_items.receivingItems.locations',
             'order_items.receivingItems.etalases',
-        ])->findOrFail($orderId);
+        ]);
 
         // List of all orders that have saved draft receiving items or are completed
         $availableOrders = Order::query()
@@ -2390,9 +2549,20 @@ class ReceivingController extends Controller
                 $item = ReceivingItems::findOrFail($request->receiving_items_id);
                 $item->update($itemData);
             } else {
-                // New batch entry — same medicine can appear multiple times
-                // under one order item with different expiry/qty/price
-                $item = ReceivingItems::create($itemData);
+                // Prevent duplicate draft items: if uncommitted draft item with same batch already exists for this order item & faktur, update it
+                $batchName = trim((string) $request->batch);
+                $existingDraft = ReceivingItems::where('receiving_details_id', $details->id)
+                    ->where('order_items_id', $request->order_items_id)
+                    ->whereNull('batches_id')
+                    ->where('batch', $batchName)
+                    ->first();
+
+                if ($existingDraft) {
+                    $existingDraft->update($itemData);
+                    $item = $existingDraft;
+                } else {
+                    $item = ReceivingItems::create($itemData);
+                }
             }
 
             DB::commit();
@@ -2647,7 +2817,7 @@ class ReceivingController extends Controller
         try {
             DB::beginTransaction();
 
-            $order = Order::findOrFail($request->orderid);
+            $order = Order::whereKey($request->orderid)->lockForUpdate()->firstOrFail();
 
             if ($order->status == 3) {
                 DB::rollBack();
@@ -2682,9 +2852,10 @@ class ReceivingController extends Controller
                 }
             }
 
-            // Find all uncommitted receiving items for this order
+            // Find all uncommitted receiving items for this order with lockForUpdate to prevent race conditions
             $receivingItems = ReceivingItems::whereNull('batches_id')
                 ->whereHas('order_items', fn($q) => $q->where('order_id', $order->id))
+                ->lockForUpdate()
                 ->with(['order_items.medicines', 'receiving_details'])
                 ->get();
 

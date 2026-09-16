@@ -11,7 +11,7 @@ class MedicineOrderHistoryController extends Controller
 {
     public function index()
     {
-        return view('orders.medicineorderhistory');
+        return redirect()->route('receiving.orderhistory');
     }
 
     // Autocomplete dropdown source — only medicines that have actually

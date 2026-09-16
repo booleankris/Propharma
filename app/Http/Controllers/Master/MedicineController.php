@@ -279,6 +279,7 @@ class MedicineController extends Controller
 
         // Check if checkbox is checked, if so, set content to 1, otherwise use the input value
         $contentValue = $request->has('is_active') ? ($request->input('content') ?: null) : 1;
+        $oldPrice = $medicine->pharmacy_net_price;
 
         // Update the medicine record
         $medicine->update([
@@ -318,6 +319,7 @@ class MedicineController extends Controller
         $history = MedicinePriceHistory::create([
             'user_id'      => auth()->user()->id,
             'medicine_id'  => $id,
+            'old_price'    => $oldPrice,
             'new_price'    => $request->pharmacy_net_price
         ]);
 

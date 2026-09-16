@@ -64,6 +64,7 @@
             border-radius: 999px;
             font-size: 12px;
             font-weight: 600;
+            white-space: nowrap;
         }
 
         .badge-down {
@@ -76,6 +77,7 @@
             border-radius: 999px;
             font-size: 12px;
             font-weight: 600;
+            white-space: nowrap;
         }
 
         .badge-same {
@@ -88,6 +90,7 @@
             border-radius: 999px;
             font-size: 12px;
             font-weight: 600;
+            white-space: nowrap;
         }
 
         /* ── Summary cards ── */
@@ -150,6 +153,11 @@
         }
 
         /* ── Price value styling ── */
+        .price-old {
+            font-weight: 600;
+            color: #64748b;
+        }
+
         .price-new {
             font-weight: 700;
             color: #1d4ed8;
@@ -167,11 +175,23 @@
         <div class="section-body space-y-4">
 
             {{-- ─── Page header ─── --}}
-            <div class="flex items-center justify-between">
-                <div>
-                    <h1 class="text-2xl font-bold text-gray-800 tracking-tight">History Perubahan Harga</h1>
-                    <p class="text-sm text-gray-500 mt-1">Riwayat perubahan harga obat oleh Superadmin & Manager</p>
+            <div
+                class="flex flex-col gap-4 p-5 bg-white border border-slate-200/80 rounded-xl shadow-sm md:flex-row md:items-center md:justify-between">
+
+                <div class="flex items-center gap-3">
+                    <div
+                        class="flex items-center justify-center w-11 h-11 rounded-xl bg-blue-50 border border-blue-100 shrink-0">
+                        <svg class="w-5 h-5 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M5 12h14M12 5l7 7-7 7"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h2 class="text-base font-bold text-slate-800 leading-tight">History Perubahan Harga</h2>
+                        <p class="text-xs text-slate-400">Riwayat perubahan harga obat oleh Superadmin & Manager</p>
+                    </div>
                 </div>
+
             </div>
 
             {{-- ─── Summary cards ─── --}}
@@ -245,7 +265,8 @@
                             <th>Kode Obat</th>
                             <th>Nama Obat</th>
                             <th>Satuan</th>
-                            <th>Harga Beli</th>
+                            <th>Harga Lama</th>
+                            <th>Harga Baru</th>
                             <th>Diubah Oleh</th>
                         </tr>
                     </thead>
@@ -359,12 +380,21 @@
                         width: '80px'
                     },
                     {
-                        // Harga baru — styled bold blue
-                        data: 'new_price_fmt',
-                        render: (data) => `<span class="price-new">${data}</span>`,
+                        // Harga lama (sebelum diubah)
+                        data: 'old_price_fmt',
+                        render: (data) => `<span class="price-old">${data}</span>`,
                         orderable: false
                     },
-                
+                    {
+                        // Harga baru (setelah diubah)
+                        data: 'new_price_fmt',
+                        render: (data, type, row) => {
+                            const badge = row.direction && !row.direction.includes('badge-same') ? ` ${row.direction}` : '';
+                            return `<div class="flex items-center gap-1.5"><span class="price-new">${data}</span>${badge}</div>`;
+                        },
+                        orderable: false
+                    },
+
                     {
                         data: 'changed_by',
                         orderable: false
