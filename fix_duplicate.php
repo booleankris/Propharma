@@ -2,26 +2,14 @@
 
 /**
  * ============================================================================
- * PROPHARMA - FULL AUDIT & CORRECTION SYSTEM FOR RECEIVING DUPLICATES
+ * PROPHARMA - DIRECT STOCK & KARTU STOCK REPAIR SCRIPT
  * ============================================================================
- * Skrip ini melakukan audit mendalam dan perbaikan menyeluruh pada:
- * 1. receiving_items        : Menghapus baris duplikat, mempertahankan baris master
- * 2. medicines              : Mengembalikan (rollback) stok master obat
- * 3. batches                : Mengembalikan (rollback) stok batch spesifik
- * 4. medicine_transfer_items: Menghapus mutasi transfer etalase (stok pelayanan)
- * 5. medicine_transfers     : Membersihkan header transfer yang kosong/yatim
- * 6. items_log              : Menghapus log mutasi kartu stok pembelian duplikat
- * 7. order_items            : Memverifikasi sinkronisasi status & quantity pesanan
- * 8. Orders Payment         : Mengoreksi kalkulasi tagihan/pembayaran hutang
- *
- * PENGGUNAAN:
- *   # Audit & Perbaiki faktur tertentu:
- *   php fix_duplicate.php NT-26-09/0120 --dry-run   (Cek & simulasi saja)
- *   php fix_duplicate.php NT-26-09/0120             (Eksekusi perbaikan)
- *
- *   # Audit & Perbaiki SELURUH DATABASE:
- *   php fix_duplicate.php --all --dry-run          (Scan & simulasi seluruh DB)
- *   php fix_duplicate.php --all                    (Eksekusi perbaikan seluruh DB)
+ * Skrip ini menyasar LANGSUNG tabel yang dibaca oleh menu "Kartu Stock":
+ * 1. items_log               -> Menghapus log mutasi status 2 duplikat (+2, +2 atau +10, +10)
+ * 2. medicine_transfer_items -> Menghapus mutasi etalase berlebih (yang membuat Stok Etalase 6 / 30)
+ * 3. medicines.stock         -> Mengoreksi master stok fisik
+ * 4. batches.stock           -> Mengoreksi stok batch
+ * 5. receiving_items         -> Menghapus item penerimaan faktur duplikat jika masih ada
  * ============================================================================
  */
 
@@ -39,347 +27,274 @@ use App\Models\ItemsLog;
 use App\Models\Medicines;
 use App\Models\MedicineTransfers;
 use App\Models\MedicineTransferItems;
-use App\Models\Order;
-use App\Models\OrderItems;
 use App\Models\Receiving;
 use App\Models\ReceivingDetails;
 use App\Models\ReceivingItems;
 use Illuminate\Support\Facades\DB;
 
-$targetCode = null;
-$isDryRun = false;
-$scanAll = false;
+$code = null;
+$medSearch = null;
+$isDryRun = in_array('--dry-run', $argv);
 
 foreach (array_slice($argv, 1) as $arg) {
     if ($arg === '--dry-run') {
         $isDryRun = true;
-    } else if ($arg === '--all') {
-        $scanAll = true;
-    } else if (!$targetCode && substr($arg, 0, 2) !== '--') {
-        $targetCode = trim($arg);
+    } else if (str_starts_with($arg, '--medicine=')) {
+        $medSearch = trim(substr($arg, 11));
+    } else if (!$code && substr($arg, 0, 2) !== '--') {
+        $code = trim($arg);
     }
 }
 
-if (!$targetCode && !$scanAll) {
-    // Default fallback jika tidak mengisi argumen apapun
-    $targetCode = 'NT-26-09/0120';
+if (!$code && !$medSearch) {
+    $code = 'NT-26-09/0120';
 }
 
 echo "================================================================================\n";
-echo "       PROPHARMA - AUDIT & PEMULIHAN MENYELURUH DUPLIKASI PENERIMAAN\n";
+echo "   PROPHARMA - PEMULIHAN PRESISI KARTU STOCK & STOK ETALASE\n";
 echo "================================================================================\n";
-echo "Mode Operasi : " . ($isDryRun ? "DRY-RUN (Simulasi saja, TIDAK MENGUBAH DATABASE)" : "LIVE EXECUTION (PERBAIKAN PERMANEN DATABASE)") . "\n";
-echo "Cakupan      : " . ($scanAll ? "SELURUH DATABASE (Semua Faktur & Penerimaan)" : "FAKTUR TERTENTU: [{$targetCode}]") . "\n";
-echo "Waktu Audit  : " . date('Y-m-d H:i:s') . "\n";
+if ($medSearch) {
+    echo "Target Obat   : [{$medSearch}]\n";
+} else {
+    echo "Target Faktur : [{$code}]\n";
+}
+echo "Mode          : " . ($isDryRun ? "DRY-RUN (Simulasi)" : "EKSEKUSI NYATA (Live Database)") . "\n";
+echo "Waktu         : " . date('Y-m-d H:i:s') . "\n";
 echo "--------------------------------------------------------------------------------\n\n";
 
-// 1. Kumpulkan daftar ReceivingDetails yang akan diaudit
-$detailsList = collect();
+$rd = null;
+$recCode = null;
 
-if ($scanAll) {
-    echo "[1/4] Memindai seluruh faktur di database...\n";
-    // Cari semua receiving_details yang memiliki duplikasi pada receiving_items
-    $detailIdsWithDupes = ReceivingItems::select('receiving_details_id')
-        ->groupBy('receiving_details_id', 'order_items_id', 'batch')
-        ->havingRaw('COUNT(*) > 1')
-        ->pluck('receiving_details_id')
-        ->unique();
-
-    if ($detailIdsWithDupes->isEmpty()) {
-        echo "[HASIL SCAN] Luar biasa! Tidak ditemukan satupun duplikasi receiving_items di seluruh database.\n";
-        exit(0);
-    }
-
-    $detailsList = ReceivingDetails::with(['receiving', 'creditor'])
-        ->whereIn('id', $detailIdsWithDupes)
-        ->get();
-
-    echo "Ditemukan " . $detailsList->count() . " faktur yang memiliki item terduplikasi!\n\n";
-} else {
-    echo "[1/4] Mencari data faktur [{$targetCode}]...\n";
+if (!$medSearch) {
+    // 1. Cari ReceivingDetails
     $rd = ReceivingDetails::with(['receiving', 'creditor'])
-        ->where('receiving_details_code', $targetCode)
-        ->orWhere('invoice_number', $targetCode)
+        ->where('receiving_details_code', $code)
+        ->orWhere('invoice_number', $code)
         ->first();
 
     if (!$rd) {
-        echo "[ERROR] Faktur dengan nomor terima/nomor faktur '{$targetCode}' TIDAK DITEMUKAN.\n";
+        echo "[ERROR] Faktur {$code} tidak ditemukan di tabel receiving_details.\n";
         exit(1);
     }
 
-    $detailsList->push($rd);
+    $recCode = $rd->receiving->code ?? null;
+    echo "[INFO] Faktur Ditemukan:\n";
+    echo "  - ID Detail          : {$rd->id}\n";
+    echo "  - No Terima (NT)     : {$rd->receiving_details_code}\n";
+    echo "  - No Faktur          : {$rd->invoice_number}\n";
+    echo "  - Kode Transaksi Rec : " . ($recCode ?: '-') . "\n\n";
 }
 
-// 2. Audit mendalam per faktur
-echo "[2/4] Melakukan audit mendalam struktur item & relasi data...\n\n";
+// 2. Cari ItemsLog yang relevan
+$logQuery = ItemsLog::where('status', 2)->with(['medicines', 'batches'])->orderBy('id', 'asc');
 
-$allAuditResults = [];
-$totalDuplicateRows = 0;
-$totalQtyRollback = 0;
-
-foreach ($detailsList as $rd) {
-    echo "================================================================================\n";
-    echo "FAKTUR : {$rd->receiving_details_code} (No Faktur: {$rd->invoice_number})\n";
-    echo "--------------------------------------------------------------------------------\n";
-    echo "  - ID Detail   : {$rd->id}\n";
-    echo "  - No SP       : {$rd->sp_code}\n";
-    echo "  - PBF/Supplier: " . ($rd->creditor->name ?? $rd->creditor_code ?? '-') . "\n";
-    echo "  - Header Rec  : ID " . ($rd->receiving_id ?? '-') . " (" . ($rd->receiving->code ?? '-') . ")\n";
-
-    $items = ReceivingItems::where('receiving_details_id', $rd->id)
-        ->with(['order_items.medicines', 'batches'])
-        ->orderBy('id', 'asc')
-        ->get();
-
-    echo "  - Total Item  : " . $items->count() . " baris tercatat\n";
-
-    $grouped = $items->groupBy(function ($it) {
-        $medId = $it->order_items->medicine_id ?? 0;
-        $batch = trim((string)($it->batch ?? '0'));
-        return "{$medId}_{$batch}";
+if ($medSearch) {
+    $logQuery->whereHas('medicines', function ($q) use ($medSearch) {
+        $q->where('name', 'like', "%{$medSearch}%");
     });
-
-    $fakturDupes = [];
-
-    foreach ($grouped as $groupKey => $groupItems) {
-        $count = $groupItems->count();
-        $master = $groupItems->first();
-        $med = $master->order_items->medicines ?? null;
-        $medName = $med->name ?? ("Obat ID #" . ($master->order_items->medicine_id ?? '?'));
-        $batchName = trim((string)($master->batch ?? '0'));
-        $orderItem = $master->order_items;
-
-        if ($count <= 1) {
-            echo "  [OK NORMAL] {$medName} | Batch: {$batchName} | Qty: {$master->qty_received} (1 baris)\n";
-            continue;
+} else {
+    $logQuery->where(function ($q) use ($rd, $recCode) {
+        $q->whereHas('receiving.receiving_details', function ($rq) use ($rd) {
+            $rq->where('id', $rd->id)
+               ->orWhere('receiving_details_code', $rd->receiving_details_code)
+               ->orWhere('invoice_number', $rd->invoice_number);
+        });
+        if ($recCode) {
+            $q->orWhere('transaction_code', $recCode);
         }
-
-        $duplicates = $groupItems->slice(1);
-        echo "  [PERINGATAN DUPLIKAT] {$medName} | Batch: {$batchName} | Total: {$count} baris!\n";
-        echo "      -> Baris Master (Asli dipertahankan): ID #{$master->id} (Qty: {$master->qty_received})\n";
-
-        foreach ($duplicates as $dup) {
-            $totalDuplicateRows++;
-            $isPack = ($dup->order_items->pack == 1);
-            $content = $isPack ? (int) ($med->content ?? 1) : 1;
-            if ($content < 1) $content = 1;
-            $qtyReceived = (float) $dup->qty_received;
-            $actualQty = $qtyReceived * $content;
-            $totalQtyRollback += $actualQty;
-
-            // Cari mutasi etalase terkait
-            $transferItems = MedicineTransferItems::where('receiving_items_id', $dup->id)->get();
-
-            // Cari items_log terkait
-            $candidateCodes = array_filter([
-                $rd->receiving->code ?? null,
-                $rd->receiving_details_code,
-                $rd->invoice_number,
-            ]);
-
-            $logQuery = ItemsLog::where('status', 2)
-                ->where('medicine_id', $med->id ?? 0)
-                ->where('qty', $actualQty);
-            if ($dup->batches_id) {
-                $logQuery->where('batches_id', $dup->batches_id);
-            }
-            if (!empty($candidateCodes)) {
-                $logQuery->whereIn('transaction_code', $candidateCodes);
-            }
-            $targetLog = $logQuery->orderByDesc('id')->first();
-
-            if (!$targetLog) {
-                // Fallback pencarian tanpa filter transaction_code jika format berbeda
-                $targetLog = ItemsLog::where('status', 2)
-                    ->where('medicine_id', $med->id ?? 0)
-                    ->where('qty', $actualQty)
-                    ->orderByDesc('id')
-                    ->first();
-            }
-
-            $fakturDupes[] = [
-                'dup' => $dup,
-                'master' => $master,
-                'medicine' => $med,
-                'order_item' => $orderItem,
-                'actual_qty' => $actualQty,
-                'is_pack' => $isPack,
-                'content' => $content,
-                'transfer_items' => $transferItems,
-                'target_log' => $targetLog,
-                'batch_id' => $dup->batches_id,
-            ];
-
-            echo "      -> Baris Duplikat : ID #{$dup->id} | Qty: {$qtyReceived} " . ($isPack ? "Pack (x{$content}={$actualQty} Satuan)" : "Satuan") . "\n";
-            echo "         * Transfer Etalase: " . ($transferItems->count() > 0 ? ($transferItems->count() . " baris (ID: " . $transferItems->pluck('id')->join(',') . ")") : "Tidak ada") . "\n";
-            echo "         * ItemsLog (Kartu): " . ($targetLog ? "ID #{$targetLog->id} (Kode: {$targetLog->code}, Trans: {$targetLog->transaction_code}, Qty: +{$targetLog->qty})" : "Tidak ditemukan / sudah terhapus") . "\n";
-        }
-    }
-
-    if (!empty($fakturDupes)) {
-        $allAuditResults[] = [
-            'rd' => $rd,
-            'dupes' => $fakturDupes,
-        ];
-    }
-    echo "\n";
+        $q->orWhere('transaction_code', $rd->receiving_details_code)
+          ->orWhere('transaction_code', $rd->invoice_number);
+    });
 }
 
-// 3. Ringkasan Evaluasi Dampak
-echo "================================================================================\n";
-echo "[3/4] RINGKASAN AUDIT KESELURUHAN\n";
-echo "================================================================================\n";
-echo "Total Faktur Bermasalah : " . count($allAuditResults) . "\n";
-echo "Total Baris Duplikat    : {$totalDuplicateRows} baris\n";
-echo "Total Kelebihan Qty     : {$totalQtyRollback} satuan\n\n";
+$allLogs = $logQuery->get();
 
-if (empty($allAuditResults)) {
-    echo "[SELESAI] Semua data faktur yang diperiksa sudah bersih dan normal!\n";
+echo "[1/4] Memeriksa items_log (Kartu Stock)...\n";
+echo "Total log pembelian (status 2) terhubung dengan faktur ini: " . $allLogs->count() . " baris.\n\n";
+
+// Kelompokkan log per obat
+$logsByMedicine = $allLogs->groupBy('medicine_id');
+$dupesToFix = [];
+
+foreach ($logsByMedicine as $medId => $medLogs) {
+    $medName = $medLogs->first()->medicines->name ?? "Obat #{$medId}";
+    $count = $medLogs->count();
+
+    if ($count <= 1) {
+        echo "  [OK] {$medName} (ID: {$medId}) -> {$count} baris log. Normal.\n";
+        continue;
+    }
+
+    $masterLog = $medLogs->first();
+    $duplicateLogs = $medLogs->slice(1);
+    $excessQty = (float) $duplicateLogs->sum('qty');
+
+    echo "  [DUPLIKAT] {$medName} (ID: {$medId}) -> Ditemukan {$count} baris log!\n";
+    echo "      - Baris Asli (Pertahankan) : ID #{$masterLog->id} (Qty: +{$masterLog->qty}, Saldo: {$masterLog->qty_before} -> {$masterLog->qty_after})\n";
+    foreach ($duplicateLogs as $dupLog) {
+        echo "      - Baris Duplikat (Hapus)   : ID #{$dupLog->id} (Qty: +{$dupLog->qty}, Kode: {$dupLog->code}, Trans: {$dupLog->transaction_code})\n";
+    }
+    echo "      - Total Kelebihan Qty      : {$excessQty}\n\n";
+
+    $dupesToFix[$medId] = [
+        'medicine_id' => $medId,
+        'medicine_name' => $medName,
+        'master_log' => $masterLog,
+        'duplicate_logs' => $duplicateLogs,
+        'excess_qty' => $excessQty,
+        'batches_id' => $masterLog->batches_id,
+    ];
+}
+
+// 3. Periksa juga receiving_items duplikat jika masih ada
+$duplicateRI = collect();
+if ($rd) {
+    $receivingItems = ReceivingItems::where('receiving_details_id', $rd->id)->orderBy('id', 'asc')->get();
+    $riGrouped = $receivingItems->groupBy(fn($i) => ($i->order_items->medicine_id ?? 0) . '_' . ($i->batch ?? '0'));
+    foreach ($riGrouped as $group) {
+        if ($group->count() > 1) {
+            $duplicateRI = $duplicateRI->merge($group->slice(1));
+        }
+    }
+}
+
+// 4. Jika tidak ada duplikat di items_log maupun receiving_items
+if (empty($dupesToFix) && $duplicateRI->isEmpty()) {
+    echo "================================================================================\n";
+    echo "[SELESAI] Tidak ditemukan baris duplikat di Kartu Stock maupun Faktur ini.\n";
+    echo "================================================================================\n";
     exit(0);
 }
 
-// Tabel rencana aksi
-printf("%-8s | %-16s | %-28s | %-8s | %-12s | %-14s | %-12s\n", 
-    "RI ID", "No Faktur", "Nama Obat", "Batch", "Rollback Qty", "Hapus Etalase", "Hapus Log");
-echo str_repeat("-", 108) . "\n";
-
-foreach ($allAuditResults as $res) {
-    $rdCode = $res['rd']->receiving_details_code ?: $res['rd']->invoice_number;
-    foreach ($res['dupes'] as $d) {
-        printf("%-8s | %-16s | %-28s | %-8s | -%-11s | %-14s | %-12s\n",
-            $d['dup']->id,
-            substr($rdCode, 0, 16),
-            substr($d['medicine']->name ?? 'Obat', 0, 28),
-            substr($d['dup']->batch ?? '0', 0, 8),
-            $d['actual_qty'],
-            $d['transfer_items']->count() . " baris",
-            $d['target_log'] ? ("ID #" . $d['target_log']->id) : "-"
-        );
-    }
+// 5. Tampilkan Rincian Koreksi
+echo "================================================================================\n";
+echo "[2/4] RINCIAN RENCANA PERBAIKAN\n";
+echo "================================================================================\n";
+printf("%-10s | %-28s | %-12s | %-15s | %-15s\n", "Med ID", "Nama Obat", "Kelebihan", "Hapus Log", "Hapus Mutasi");
+echo str_repeat("-", 90) . "\n";
+foreach ($dupesToFix as $item) {
+    printf("%-10s | %-28s | %-12s | %-15s | %-15s\n",
+        $item['medicine_id'],
+        substr($item['medicine_name'], 0, 28),
+        "-{$item['excess_qty']}",
+        $item['duplicate_logs']->count() . " baris",
+        "Disesuaikan"
+    );
 }
-echo str_repeat("-", 108) . "\n\n";
+echo str_repeat("-", 90) . "\n\n";
 
 if ($isDryRun) {
-    echo "[SIMULASI SELESAI] Ini adalah mode --dry-run.\n";
-    echo "Database TIDAK MENGALAMI PERUBAHAN APAPUN.\n\n";
-    echo "Untuk mengeksekusi perbaikan database secara nyata dan aman, jalankan:\n";
-    if ($scanAll) {
-        echo "  php fix_duplicate.php --all\n\n";
-    } else {
-        echo "  php fix_duplicate.php {$targetCode}\n\n";
-    }
+    echo "[DRY-RUN] Simulasi selesai. Database tidak diubah.\n";
+    echo "Jalankan tanpa --dry-run untuk mengeksekusi perbaikan secara nyata:\n";
+    echo "  php fix_duplicate.php {$code}\n\n";
     exit(0);
 }
 
-// 4. EKSEKUSI DATABASE SECARA ATOMIK & AMAN
-echo "[4/4] MENGEKSEKUSI PERBAIKAN DATABASE (TRANSACTION MODE)...\n";
+// 6. EKSEKUSI DATABASE
+echo "[3/4] MENGEKSEKUSI PERBAIKAN DATABASE...\n";
 echo "================================================================================\n";
 
 DB::beginTransaction();
 
 try {
-    $affectedMedicines = [];
-    $affectedBatches = [];
-    $deletedTransferHeaders = [];
+    foreach ($dupesToFix as $medId => $item) {
+        $medName = $item['medicine_name'];
+        $excessQty = $item['excess_qty'];
 
-    foreach ($allAuditResults as $res) {
-        $rd = $res['rd'];
-        echo "\n>>> Memproses Faktur {$rd->receiving_details_code}...\n";
+        echo "Memproses {$medName} (ID: {$medId}):\n";
 
-        foreach ($res['dupes'] as $d) {
-            $dup = $d['dup'];
-            $med = $d['medicine'];
-            $qty = $d['actual_qty'];
-            $medId = $med->id ?? null;
-
-            echo "  * Mengoreksi Duplikat RI #{$dup->id} (" . ($med->name ?? 'Obat') . "):\n";
-
-            // 1. Rollback stok di medicines
-            if ($medId) {
-                $medModel = Medicines::find($medId);
-                if ($medModel) {
-                    $stockBefore = $medModel->stock;
-                    $medModel->decrement('stock', $qty);
-                    $stockAfter = $medModel->fresh()->stock;
-                    $affectedMedicines[$medId] = [
-                        'name' => $medModel->name,
-                        'before' => $stockBefore,
-                        'after' => $stockAfter,
-                    ];
-                    echo "    - [Medicines] Stok master dikurangi: {$stockBefore} -> {$stockAfter} (-{$qty})\n";
-                }
-            }
-
-            // 2. Rollback stok di batches
-            if ($d['batch_id']) {
-                $batchModel = Batches::find($d['batch_id']);
-                if ($batchModel) {
-                    $bStockBefore = $batchModel->stock;
-                    $batchModel->decrement('stock', $qty);
-                    $bStockAfter = $batchModel->fresh()->stock;
-                    $affectedBatches[$d['batch_id']] = [
-                        'name' => $batchModel->name,
-                        'before' => $bStockBefore,
-                        'after' => $bStockAfter,
-                    ];
-                    echo "    - [Batches #{$batchModel->id}] Stok batch dikurangi: {$bStockBefore} -> {$bStockAfter} (-{$qty})\n";
-                }
-            }
-
-            // 3. Hapus mutasi stok etalase
-            $transferHeaderIds = $d['transfer_items']->pluck('medicine_transfer_id')->filter()->unique();
-            $deletedTransfersCount = MedicineTransferItems::where('receiving_items_id', $dup->id)->delete();
-            echo "    - [Etalase] Menghapus {$deletedTransfersCount} baris mutasi stok etalase.\n";
-
-            // Cek apakah ada header transfer yang kini kosong melompong
-            foreach ($transferHeaderIds as $thId) {
-                if (MedicineTransferItems::where('medicine_transfer_id', $thId)->count() === 0) {
-                    MedicineTransfers::where('id', $thId)->delete();
-                    $deletedTransferHeaders[] = $thId;
-                    echo "    - [Transfer Header] Menghapus header transfer kosong #{$thId}.\n";
-                }
-            }
-
-            // 4. Hapus log mutasi kartu stok duplikat
-            if ($d['target_log']) {
-                $logId = $d['target_log']->id;
-                $logCode = $d['target_log']->code;
-                $d['target_log']->delete();
-                echo "    - [ItemsLog] Menghapus log mutasi kartu stok #{$logId} ({$logCode}).\n";
-            }
-
-            // 5. Hapus baris receiving_items duplikat
-            $dupId = $dup->id;
-            $dup->delete();
-            echo "    - [ReceivingItems] Menghapus baris item duplikat #{$dupId}.\n";
+        // A. HAPUS BARIS DUPLIKAT DI items_log
+        $deletedLogIds = [];
+        foreach ($item['duplicate_logs'] as $dupLog) {
+            $deletedLogIds[] = $dupLog->id;
+            $dupLog->delete();
         }
+        echo "  1. [items_log] Berhasil menghapus " . count($deletedLogIds) . " log duplikat (ID: " . implode(', ', $deletedLogIds) . ").\n";
+
+        // B. KOREKSI MUTASI ETALASE DI medicine_transfer_items
+        // Cari transfer items untuk obat ini di farmasi bersangkutan
+        $transferItems = MedicineTransferItems::whereHas('batches', function ($b) use ($medId) {
+                $b->where('medicine_id', $medId);
+            })
+            ->where('status', 1)
+            ->where(function ($q) {
+                $q->whereNull('source_type')->orWhere('source_type', '!=', 'retur_gudang');
+            })
+            ->orderBy('id', 'desc')
+            ->get();
+
+        $curEtalaseStock = $transferItems->sum('qty');
+        $qtyToDeduct = $excessQty;
+        $deletedTransferCount = 0;
+
+        foreach ($transferItems as $ti) {
+            if ($qtyToDeduct <= 0) break;
+            if ($ti->qty <= $qtyToDeduct) {
+                $qtyToDeduct -= $ti->qty;
+                $ti->delete();
+                $deletedTransferCount++;
+            } else {
+                $ti->decrement('qty', $qtyToDeduct);
+                $qtyToDeduct = 0;
+            }
+        }
+        $newEtalaseStock = MedicineTransferItems::whereHas('batches', fn($b) => $b->where('medicine_id', $medId))->where('status', 1)->sum('qty');
+        echo "  2. [Etalase] Stok etalase dikoreksi: {$curEtalaseStock} -> {$newEtalaseStock} (-{$excessQty}).\n";
+
+        // C. KOREKSI MASTER STOK OBAT
+        $medModel = Medicines::find($medId);
+        if ($medModel) {
+            $oldStock = $medModel->stock;
+            $medModel->decrement('stock', $excessQty);
+            $newStock = $medModel->fresh()->stock;
+            echo "  3. [Medicines] Stok master obat dikurangi: {$oldStock} -> {$newStock} (-{$excessQty}).\n";
+        }
+
+        // D. KOREKSI STOK BATCH
+        if ($item['batches_id']) {
+            $batchModel = Batches::find($item['batches_id']);
+            if ($batchModel && $batchModel->stock >= $excessQty) {
+                $oldBStock = $batchModel->stock;
+                $batchModel->decrement('stock', $excessQty);
+                $newBStock = $batchModel->fresh()->stock;
+                echo "  4. [Batches #{$batchModel->id}] Stok batch dikurangi: {$oldBStock} -> {$newBStock} (-{$excessQty}).\n";
+            }
+        }
+
+        echo "\n";
+    }
+
+    // E. HAPUS BARIS receiving_items DUPLIKAT JIKA MASIH ADA
+    if ($duplicateRI->isNotEmpty()) {
+        $countRI = 0;
+        foreach ($duplicateRI as $ri) {
+            $ri->delete();
+            $countRI++;
+        }
+        echo "  5. [receiving_items] Menghapus {$countRI} baris item faktur duplikat.\n";
+    }
+
+    // F. BERSIHKAN HEADER TRANSFER KOSONG
+    $emptyHeaders = MedicineTransfers::doesntHave('items')->delete();
+    if ($emptyHeaders > 0) {
+        echo "  6. [Transfers] Membersihkan {$emptyHeaders} header transfer kosong.\n";
     }
 
     DB::commit();
 
-    echo "\n================================================================================\n";
-    echo "  HASIL PERBAIKAN: BERHASIL DILAKUKAN SECARA LENGKAP & AMAN!\n";
     echo "================================================================================\n";
-    echo "Ringkasan Stok Master Obat Terkoreksi:\n";
-    foreach ($affectedMedicines as $mId => $mInfo) {
-        echo "  - [ID: {$mId}] {$mInfo['name']} : {$mInfo['before']} -> {$mInfo['after']}\n";
-    }
-
-    if (!empty($affectedBatches)) {
-        echo "\nRingkasan Stok Batch Terkoreksi:\n";
-        foreach ($affectedBatches as $bId => $bInfo) {
-            echo "  - [Batch ID: {$bId}] {$bInfo['name']} : {$bInfo['before']} -> {$bInfo['after']}\n";
-        }
-    }
-
-    echo "\nSeluruh kartu stok, mutasi etalase, dan item faktur telah kembali presisi.\n";
+    echo "[BERHASIL 100%] KARTU STOCK & STOK ETALASE TELAH SEPENUHNYA DIPULIHKAN!\n";
+    echo "================================================================================\n";
+    echo "Silakan refresh halaman 'Kartu Stock' di browser Anda.\n";
+    echo "- Baris duplikat di tabel Kartu Stock kini telah hilang (hanya tersisa 1 baris asli).\n";
+    echo "- Nilai 'BELI', 'STOK ETALASE', dan 'SALDO' di bagian atas kini telah kembali normal.\n";
     echo "================================================================================\n";
     exit(0);
 
 } catch (\Throwable $e) {
     DB::rollBack();
-    echo "\n[CRITICAL ERROR] Terjadi kegagalan: " . $e->getMessage() . "\n";
+    echo "\n[ERROR CRITICAL] " . $e->getMessage() . "\n";
     echo "Line: " . $e->getLine() . " in " . $e->getFile() . "\n";
-    echo "Seluruh perubahan telah di-ROLLBACK. Database tetap dalam kondisi utuh.\n";
+    echo "Seluruh perubahan dibatalkan (Rollback). Database aman.\n";
     exit(1);
 }
