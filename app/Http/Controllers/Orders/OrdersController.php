@@ -915,8 +915,34 @@ class OrdersController extends Controller
 
         $results = $query->paginate(20);
 
-        $results->getCollection()->transform(function ($row) {
+        // Fetch 1-month (30 days) and 3-month (90 days) total sales for the paginated items
+        $pageMedicineIds = $results->getCollection()->pluck('medicine_id')->filter()->unique()->values()->all();
+        $salesAggMap = [];
+
+        if (!empty($pageMedicineIds)) {
+            $oneMonthAgo = now()->subDays(30)->toDateTimeString();
+            $threeMonthsAgo = now()->subDays(90)->toDateTimeString();
+
+            $salesAgg = MedicineCart::select('medicine_cart.medicine_id')
+                ->selectRaw('COALESCE(SUM(CASE WHEN medicine_transactions.created_at >= ? THEN medicine_cart.quantity ELSE 0 END), 0) as sold_1_month', [$oneMonthAgo])
+                ->selectRaw('COALESCE(SUM(medicine_cart.quantity), 0) as sold_3_months')
+                ->join('medicine_transactions', 'medicine_transactions.id', '=', 'medicine_cart.transaction_id')
+                ->where('medicine_transactions.pharmacy_id', $salesPharmacyId)
+                ->where('medicine_transactions.status', 1)
+                ->where('medicine_transactions.created_at', '>=', $threeMonthsAgo)
+                ->whereIn('medicine_cart.medicine_id', $pageMedicineIds)
+                ->groupBy('medicine_cart.medicine_id')
+                ->get()
+                ->keyBy('medicine_id');
+
+            $salesAggMap = $salesAgg;
+        }
+
+        $results->getCollection()->transform(function ($row) use ($salesAggMap) {
             $totalStocks = (int) ($row->batch_stock ?? 0) + (int) ($row->transfer_stock ?? 0);
+            $medId = $row->medicine_id;
+            $sold1Month = isset($salesAggMap[$medId]) ? (int) $salesAggMap[$medId]->sold_1_month : 0;
+            $sold3Months = isset($salesAggMap[$medId]) ? (int) $salesAggMap[$medId]->sold_3_months : 0;
 
             return [
                 'medicine_id' => $row->medicine_id,
@@ -927,6 +953,8 @@ class OrdersController extends Controller
                 'total_sold' => (int) $row->total_sold,
                 'min_stock' => $row->minimal_stock,
                 'stocks' => $totalStocks,
+                'sold_1_month' => $sold1Month,
+                'sold_3_months' => $sold3Months,
             ];
         });
 

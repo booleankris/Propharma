@@ -277,7 +277,7 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         $rows[] = [];
 
         // TABLE HEADER
-        $rows[] = ['No.', 'Pelanggan', 'Lembar', 'R/', 'Jasa', 'Embalase', 'Netto', 'Potongan', 'Potongan Transaksi', 'Netto Akhir'];
+        $rows[] = ['No.', 'Pelanggan', 'Lembar', 'R/', 'Jasa', 'Embalase', 'Potongan', 'Netto', 'Potongan Transaksi', 'Netto Akhir'];
 
         // KREDIT
         $rows[] = ['Penjualan Kredit', '', '', '', '', '', '', '', '', ''];
@@ -293,8 +293,8 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                 $this->nz($d['r']),
                 $this->nz($d['jasa']),
                 $this->nz($d['embalase']),
-                $this->nz($d['netto']),
                 $this->nz($d['potongan']),
+                $this->nz($d['netto']),
                 $this->nz($d['potongan_transaksi']),
                 $this->nz($d['netto'] - $d['potongan_transaksi'])
             ];
@@ -309,8 +309,8 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
             $this->nz($sub['r']),
             $this->nz($sub['jasa']),
             $this->nz($sub['embalase']),
-            $this->nz($sub['netto']),
             $this->nz($sub['potongan']),
+            $this->nz($sub['netto']),
             $this->nz($sub['potongan_transaksi']),
             $this->nz($sub['netto'] - $sub['potongan_transaksi'])
         ];
@@ -338,8 +338,8 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                 $this->nz($label === 'Retur Tunai' ?  -$d['r'] : $d['r']),
                 $this->nz($d['jasa']),
                 $this->nz($d['embalase']),
-                $this->nz($d['netto']),
                 $this->nz($d['potongan']),
+                $this->nz($d['netto']),
                 $this->nz($d['potongan_transaksi']),
                 $this->nz($d['netto'] - $d['potongan_transaksi'])
             ];
@@ -360,8 +360,8 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
             $this->nz($sub['r']),
             $this->nz($sub['jasa']),
             $this->nz($sub['embalase']),
-            $this->nz($sub['netto']),
             $this->nz($sub['potongan']),
+            $this->nz($sub['netto']),
             $this->nz($sub['potongan_transaksi']),
             $this->nz($sub['netto'] - $sub['potongan_transaksi'])
         ];
@@ -376,8 +376,8 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
             $this->nz($grand['r']),
             $this->nz($grand['jasa']),
             $this->nz($grand['embalase']),
-            $this->nz($grand['netto']),
             $this->nz($grand['potongan']),
+            $this->nz($grand['netto']),
             $this->nz($grand['potongan_transaksi']),
             $this->nz($grand['netto'] - $grand['potongan_transaksi'])
         ];
@@ -551,8 +551,8 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
             'D' => 7,   // R/
             'E' => 14,  // Jasa
             'F' => 14,  // Embalase
-            'G' => 14,  // Netto
-            'H' => 14,  // Potongan
+            'G' => 14,  // Potongan
+            'H' => 18,  // Netto
             'I' => 18,  // Potongan Transaksi
             'J' => 18,  // Netto Akhir
         ];

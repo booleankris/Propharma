@@ -579,50 +579,118 @@
             </div>
     </section>
     <div id="smartOrderModal" class="fixed inset-0 z-[9999] hidden">
-        <div class="absolute inset-0 bg-black/40" onclick="closeSmartOrder()"></div>
+        <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="closeSmartOrder()"></div>
 
         <div
-            class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] bg-white rounded-2xl shadow-2xl flex flex-col max-h-[85vh]">
-            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-                <div>
-                    <h3 class="text-lg font-semibold text-[#1c1c1c]">Smart Order</h3>
-                    <p class="text-[12px] text-gray-500">Obat terlaris berdasarkan riwayat transaksi</p>
+            class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[95%] max-w-6xl bg-white rounded-2xl shadow-2xl flex flex-col max-h-[90vh] border border-gray-100 overflow-hidden">
+            
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-slate-50/70">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center shadow-sm">
+                        <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-bold text-gray-900 tracking-tight">Smart Order</h3>
+                        <p class="text-xs text-gray-500">Rekomendasi pesanan obat otomatis berdasarkan histori penjualan & pergerakan stok</p>
+                    </div>
                 </div>
                 <button onclick="closeSmartOrder()"
-                    class="text-gray-400 hover:text-gray-700 text-xl leading-none">&times;</button>
+                    class="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
             </div>
 
-            <div class="px-6 py-3 flex flex-wrap gap-2 border-b border-gray-100">
-                <input type="text" id="smartSearch" placeholder="Cari obat..."
-                    class="flex-1 min-w-[180px] rounded-lg border border-gray-300 px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-purple-200">
-                <input type="text" id="smartDateRange" placeholder="Rentang tanggal"
-                    class="w-[200px] rounded-lg border border-gray-300 px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-purple-200">
-                <select id="smartSortFilter"
-                    class="rounded-lg border border-gray-300 px-3 py-2 text-[13px] font-medium text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-purple-200 cursor-pointer">
-                    <option value="name_asc" selected>Filter 1 : Per Abjad (A - Z)</option>
-                    <option value="sold_desc">Filter 2 : Qty Terbanyak</option>
-                    <option value="stock_asc">Filter 3 : Stok Paling Sedikit</option>
-                </select>
+            <!-- Filters Bar -->
+            <div class="px-6 py-3.5 bg-white border-b border-gray-100 flex flex-wrap items-center gap-3">
+                <div class="relative flex-1 min-w-[220px]">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                    </div>
+                    <input type="text" id="smartSearch" placeholder="Cari nama obat atau kode..."
+                        class="w-full pl-9 pr-3 py-2 rounded-xl border border-gray-200 text-xs font-medium text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all bg-gray-50/50 focus:bg-white">
+                </div>
+
+                <div class="relative min-w-[210px]">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                        </svg>
+                    </div>
+                    <input type="text" id="smartDateRange" placeholder="Rentang filter transaksi"
+                        class="w-full pl-9 pr-3 py-2 rounded-xl border border-gray-200 text-xs font-medium text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all bg-gray-50/50 focus:bg-white cursor-pointer">
+                </div>
+
+                <div class="min-w-[190px]">
+                    <select id="smartSortFilter"
+                        class="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs font-semibold text-gray-700 bg-gray-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 cursor-pointer transition-all">
+                        <option value="name_asc" selected>Urutan: Abjad (A - Z)</option>
+                        <option value="sold_desc">Urutan: Qty Terjual Terbanyak</option>
+                        <option value="stock_asc">Urutan: Sisa Stok Paling Sedikit</option>
+                    </select>
+                </div>
             </div>
 
-            <div id="smartList" class="flex-1 overflow-y-auto px-6 py-2 divide-y divide-gray-50"></div>
+            <!-- Table Container (Responsive & Infinite Scroll) -->
+            <div id="smartList" class="flex-1 overflow-y-auto overflow-x-auto min-h-[300px] bg-slate-50/30">
+                <table class="w-full border-collapse text-left text-xs min-w-[850px]">
+                    <thead class="sticky top-0 z-10 bg-slate-100/95 backdrop-blur-sm border-b border-gray-200 text-gray-600 uppercase font-semibold tracking-wider text-[11px]">
+                        <tr>
+                            <th scope="col" class="w-12 px-4 py-3 text-center">
+                                <input type="checkbox" id="smartSelectAll" title="Pilih Semua di Tampilan Ini"
+                                    class="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500 cursor-pointer">
+                            </th>
+                            <th scope="col" class="w-12 px-2 py-3 text-center">No.</th>
+                            <th scope="col" class="px-4 py-3">Produk / Obat</th>
+                            <th scope="col" class="px-3 py-3 text-center bg-slate-200/60 text-slate-800 font-bold border-x border-slate-200">Sisa Stok</th>
+                            <th scope="col" class="px-3 py-3 text-center">Min. Stok</th>
+                            <th scope="col" class="px-3 py-3 text-center bg-purple-50/60 text-purple-900 border-x border-purple-100">Jual (Rentang)</th>
+                            <th scope="col" class="px-3 py-3 text-center bg-amber-50/60 text-amber-900">1 Bln (30 Hari)</th>
+                            <th scope="col" class="px-3 py-3 text-center bg-emerald-50/60 text-emerald-900 border-r border-emerald-100">3 Bln (90 Hari)</th>
+                            <th scope="col" class="w-28 px-4 py-3 text-center">Qty Pesan</th>
+                        </tr>
+                    </thead>
+                    <tbody id="smartTableBody" class="divide-y divide-gray-100 bg-white">
+                        <!-- Rows injected dynamically via JS -->
+                    </tbody>
+                </table>
+                <div id="smartLoadingSpinner" class="hidden py-4 text-center text-gray-400 text-xs flex items-center justify-center gap-2">
+                    <svg class="animate-spin h-4 w-4 text-purple-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                    </svg>
+                    <span>Memuat data obat...</span>
+                </div>
+            </div>
 
-            <div class="flex items-center justify-between border-t border-gray-100 px-6 py-4">
-                <!-- Status Jumlah Item -->
-                <span id="smartSelectedCount" class="text-sm font-medium text-gray-600">
-                    0 obat dipilih
-                </span>
+            <!-- Modal Footer -->
+            <div class="flex items-center justify-between border-t border-gray-200 px-6 py-3.5 bg-slate-50/80">
+                <div class="flex items-center gap-3">
+                    <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-purple-50 border border-purple-100 text-purple-700 font-semibold text-xs shadow-sm">
+                        <span class="w-2 h-2 rounded-full bg-purple-600 animate-pulse"></span>
+                        <span id="smartSelectedCount">0 obat dipilih</span>
+                    </div>
+                    <span class="text-[11px] text-gray-500 hidden sm:inline">Scroll ke bawah untuk memuat obat berikutnya</span>
+                </div>
 
-                <!-- Pembungkus Tombol Aksi -->
                 <div class="flex items-center gap-3">
                     <button type="button" onclick="closeSmartOrder()"
-                        class="rounded-lg px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-300">
+                        class="rounded-xl px-4 py-2 text-xs font-semibold text-gray-600 transition hover:bg-gray-200 focus:outline-none">
                         Batal
                     </button>
 
-                    <button type="button" onclick="confirmSmartOrder()"
-                        class="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2">
-                        Tambahkan Item
+                    <button type="button" onclick="confirmSmartOrder()" id="smartBtnSubmit"
+                        class="inline-flex items-center gap-2 rounded-xl bg-purple-600 px-5 py-2 text-xs font-bold text-white shadow-md shadow-purple-500/20 transition hover:bg-purple-700 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                        </svg>
+                        Tambahkan ke Pesanan
                     </button>
                 </div>
             </div>
@@ -1618,12 +1686,18 @@
         }
 
         // Smart Order
+        let smartCurrentRowNumber = 0;
+
         function openSmartOrder() {
             smartSelected = {};
             smartPage = 1;
             smartHasMore = true;
-            document.getElementById('smartList').innerHTML = '';
+            smartCurrentRowNumber = 0;
+            const tbody = document.getElementById('smartTableBody');
+            if (tbody) tbody.innerHTML = '';
             document.getElementById('smartSearch').value = '';
+            const selectAll = document.getElementById('smartSelectAll');
+            if (selectAll) selectAll.checked = false;
             updateSmartSelectedCount();
 
             if (!smartRange) {
@@ -1655,10 +1729,46 @@
         });
 
         document.getElementById('smartList').addEventListener('scroll', function() {
-            if (this.scrollTop + this.clientHeight >= this.scrollHeight - 40) {
+            if (this.scrollTop + this.clientHeight >= this.scrollHeight - 60) {
                 fetchSmartMedicines(false);
             }
         });
+
+        // Select All Handler
+        const smartSelectAllEl = document.getElementById('smartSelectAll');
+        if (smartSelectAllEl) {
+            smartSelectAllEl.addEventListener('change', function() {
+                const isChecked = this.checked;
+                const rows = document.querySelectorAll('#smartTableBody tr[data-med-id]');
+                rows.forEach(tr => {
+                    const medId = tr.getAttribute('data-med-id');
+                    const checkbox = tr.querySelector('.smart-checkbox');
+                    const qtyInput = tr.querySelector('.smart-qty');
+                    const medData = tr._medData;
+
+                    if (checkbox && qtyInput && medData) {
+                        checkbox.checked = isChecked;
+                        if (isChecked) {
+                            qtyInput.classList.remove('opacity-40', 'bg-gray-100');
+                            qtyInput.classList.add('bg-white', 'border-purple-300', 'ring-2', 'ring-purple-200');
+                            qtyInput.removeAttribute('disabled');
+                            smartSelected[medId] = {
+                                medicine: medData,
+                                quantity: parseInt(qtyInput.value) || 1
+                            };
+                            tr.classList.add('bg-purple-50/40');
+                        } else {
+                            qtyInput.classList.add('opacity-40', 'bg-gray-100');
+                            qtyInput.classList.remove('bg-white', 'border-purple-300', 'ring-2', 'ring-purple-200');
+                            qtyInput.setAttribute('disabled', 'disabled');
+                            delete smartSelected[medId];
+                            tr.classList.remove('bg-purple-50/40');
+                        }
+                    }
+                });
+                updateSmartSelectedCount();
+            });
+        }
 
         function debounce(fn, delay) {
             let t;
@@ -1672,13 +1782,20 @@
             if (smartLoading || (!reset && !smartHasMore)) return;
             smartLoading = true;
 
+            const spinner = document.getElementById('smartLoadingSpinner');
+            if (spinner) spinner.classList.remove('hidden');
+
             if (reset) {
                 smartPage = 1;
                 smartHasMore = true;
-                document.getElementById('smartList').innerHTML = '';
+                smartCurrentRowNumber = 0;
+                const tbody = document.getElementById('smartTableBody');
+                if (tbody) tbody.innerHTML = '';
+                const selectAll = document.getElementById('smartSelectAll');
+                if (selectAll) selectAll.checked = false;
             }
 
-            const dates = smartRange.selectedDates;
+            const dates = smartRange ? smartRange.selectedDates : [];
             const sortFilter = document.getElementById('smartSortFilter')?.value || 'name_asc';
             const params = new URLSearchParams({
                 page: smartPage,
@@ -1686,77 +1803,144 @@
                 search: document.getElementById('smartSearch').value,
                 sort: sortFilter,
                 date_from: dates[0] ? flatpickr.formatDate(dates[0], 'Y-m-d') : '',
-                date_to: dates[1] ? flatpickr.formatDate(dates[1], 'Y-m-d') : (dates[0] ? flatpickr.formatDate(
-                    dates[0], 'Y-m-d') : ''),
+                date_to: dates[1] ? flatpickr.formatDate(dates[1], 'Y-m-d') : (dates[0] ? flatpickr.formatDate(dates[0], 'Y-m-d') : ''),
             });
 
             axios.get(`{{ route('orders.smartMedicines') }}?${params}`)
                 .then(res => {
                     const data = res.data;
-                    const list = document.getElementById('smartList');
+                    const tbody = document.getElementById('smartTableBody');
 
-                    if (smartPage === 1 && data.data.length === 0) {
-                        list.innerHTML =
-                            `<div class="text-center text-gray-400 text-[13px] py-10">Tidak ada data terjual pada rentang ini</div>`;
+                    if (smartPage === 1 && (!data.data || data.data.length === 0)) {
+                        tbody.innerHTML = `
+                            <tr>
+                                <td colspan="9" class="text-center py-12 text-gray-400">
+                                    <div class="flex flex-col items-center justify-center gap-2">
+                                        <svg class="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/>
+                                        </svg>
+                                        <span class="text-xs font-medium">Tidak ada data obat terjual pada rentang tanggal atau filter ini</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        `;
                     }
 
-                    data.data.forEach(med => {
-                        const row = document.createElement('div');
-                        row.className = 'flex items-center gap-3 py-3';
-                        row.innerHTML = `
-                                    <input type="checkbox" data-id="${med.medicine_id}"
-                                        class="smart-checkbox h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500">
-                                    <div class="flex-1 min-w-0">
-                                        <div class="text-[13px] font-medium text-gray-900 truncate">${med.name}</div>
-                                        <div class="text-[12px] text-gray-500">${med.code} · ${med.packaging ?? '-'}</div>
-                                    </div>
-                                    <span class="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-full whitespace-nowrap">
-                                        Terjual ${med.total_sold}
-                                    </span>
-                                        <span class="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-full whitespace-nowrap">
-                                        Minimal Stok : ${med.min_stock}
-                                    </span>
-                                        <span class="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-full whitespace-nowrap">
-                                        Stok : ${med.stocks}
-                                    </span>
-                                    <input type="number" min="1" value="1" data-id="${med.medicine_id}"
-                                        class="smart-qty w-16 rounded-lg border border-gray-300 px-2 py-1.5 text-[13px] text-center hidden">
-                                `;
+                    if (data.data && data.data.length > 0) {
+                        data.data.forEach(med => {
+                            smartCurrentRowNumber++;
+                            const isSelected = !!smartSelected[med.medicine_id];
+                            const defaultQty = isSelected ? smartSelected[med.medicine_id].quantity : 1;
+                            const isLowStock = med.stocks <= (med.min_stock || 0);
 
-                        const checkbox = row.querySelector('.smart-checkbox');
-                        const qtyInput = row.querySelector('.smart-qty');
+                            const tr = document.createElement('tr');
+                            tr.setAttribute('data-med-id', med.medicine_id);
+                            tr._medData = med;
+                            tr.className = `border-b border-gray-100 hover:bg-purple-50/30 transition-colors ${isSelected ? 'bg-purple-50/40' : ''}`;
 
-                        checkbox.addEventListener('change', function() {
-                            qtyInput.classList.toggle('hidden', !this.checked);
-                            if (this.checked) {
-                                smartSelected[med.medicine_id] = {
-                                    medicine: med,
-                                    quantity: parseInt(qtyInput.value) || 1
-                                };
-                            } else {
-                                delete smartSelected[med.medicine_id];
-                            }
-                            updateSmartSelectedCount();
+                            tr.innerHTML = `
+                                <td class="px-4 py-3 text-center align-middle">
+                                     <input type="checkbox" data-id="${med.medicine_id}" ${isSelected ? 'checked' : ''}
+                                         class="smart-checkbox h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500 cursor-pointer">
+                                </td>
+                                <td class="px-2 py-3 text-center font-mono text-gray-400 text-[11px] align-middle">
+                                     ${smartCurrentRowNumber}
+                                </td>
+                                <td class="px-4 py-3 align-middle">
+                                     <div class="font-bold text-gray-900 leading-snug">${med.name}</div>
+                                     <div class="flex items-center gap-2 mt-0.5 text-[11px] text-gray-500 font-mono">
+                                         <span class="bg-gray-100 px-1.5 py-0.5 rounded text-gray-600">${med.code || '-'}</span>
+                                         <span>Kemasan: <strong class="text-gray-700 font-sans">${med.packaging ?? '-'}</strong></span>
+                                     </div>
+                                </td>
+                                <td class="px-3 py-3 text-center align-middle bg-slate-50/70 border-x border-slate-100">
+                                     <span class="inline-flex items-center gap-1 font-bold px-2 py-1 rounded-md text-xs ${isLowStock ? 'bg-rose-50 text-rose-700 border border-rose-200 shadow-sm' : 'bg-slate-100 text-gray-800'}">
+                                         ${med.stocks}
+                                         ${isLowStock ? '<span class="text-[10px] text-rose-500">⚠️</span>' : ''}
+                                     </span>
+                                </td>
+                                <td class="px-3 py-3 text-center align-middle font-medium text-gray-500">
+                                     ${med.min_stock ?? 0}
+                                </td>
+                                <td class="px-3 py-3 text-center align-middle bg-purple-50/40 border-x border-purple-100/70">
+                                     <span class="font-bold text-purple-700 text-xs">
+                                         ${med.total_sold}
+                                     </span>
+                                </td>
+                                <td class="px-3 py-3 text-center align-middle bg-amber-50/40">
+                                     <span class="font-bold text-amber-800 text-xs">
+                                         ${med.sold_1_month ?? 0}
+                                     </span>
+                                </td>
+                                <td class="px-3 py-3 text-center align-middle bg-emerald-50/40 border-r border-emerald-100/70">
+                                     <span class="font-bold text-emerald-800 text-xs">
+                                         ${med.sold_3_months ?? 0}
+                                     </span>
+                                </td>
+                                <td class="px-4 py-3 text-center align-middle">
+                                     <input type="number" min="1" value="${defaultQty}" data-id="${med.medicine_id}"
+                                         ${!isSelected ? 'disabled' : ''}
+                                         class="smart-qty w-16 rounded-lg border text-center font-bold text-xs py-1.5 transition-all ${isSelected ? 'bg-white border-purple-300 ring-2 ring-purple-200 text-purple-900' : 'opacity-40 bg-gray-100 border-gray-200 text-gray-400'}">
+                                </td>
+                            `;
+
+                            const checkbox = tr.querySelector('.smart-checkbox');
+                            const qtyInput = tr.querySelector('.smart-qty');
+
+                            checkbox.addEventListener('change', function() {
+                                if (this.checked) {
+                                    qtyInput.classList.remove('opacity-40', 'bg-gray-100');
+                                    qtyInput.classList.add('bg-white', 'border-purple-300', 'ring-2', 'ring-purple-200', 'text-purple-900');
+                                    qtyInput.removeAttribute('disabled');
+                                    smartSelected[med.medicine_id] = {
+                                        medicine: med,
+                                        quantity: parseInt(qtyInput.value) || 1
+                                    };
+                                    tr.classList.add('bg-purple-50/40');
+                                } else {
+                                    qtyInput.classList.add('opacity-40', 'bg-gray-100');
+                                    qtyInput.classList.remove('bg-white', 'border-purple-300', 'ring-2', 'ring-purple-200', 'text-purple-900');
+                                    qtyInput.setAttribute('disabled', 'disabled');
+                                    delete smartSelected[med.medicine_id];
+                                    tr.classList.remove('bg-purple-50/40');
+                                }
+                                updateSmartSelectedCount();
+                            });
+
+                            qtyInput.addEventListener('input', function() {
+                                if (smartSelected[med.medicine_id]) {
+                                    smartSelected[med.medicine_id].quantity = Math.max(1, parseInt(this.value) || 1);
+                                }
+                            });
+
+                            tbody.appendChild(tr);
                         });
-
-                        qtyInput.addEventListener('input', function() {
-                            if (smartSelected[med.medicine_id]) {
-                                smartSelected[med.medicine_id].quantity = parseInt(this.value) || 1;
-                            }
-                        });
-
-                        list.appendChild(row);
-                    });
+                    }
 
                     smartHasMore = data.current_page < data.last_page;
                     smartPage++;
                 })
-                .finally(() => smartLoading = false);
+                .catch(err => {
+                    console.error(err);
+                })
+                .finally(() => {
+                    smartLoading = false;
+                    if (spinner) spinner.classList.add('hidden');
+                });
         }
 
         function updateSmartSelectedCount() {
             const count = Object.keys(smartSelected).length;
             document.getElementById('smartSelectedCount').textContent = `${count} obat dipilih`;
+            const submitBtn = document.getElementById('smartBtnSubmit');
+            if (submitBtn) {
+                submitBtn.disabled = (count === 0);
+                if (count === 0) {
+                    submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                } else {
+                    submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                }
+            }
         }
 
         function confirmSmartOrder() {
@@ -1765,7 +1949,28 @@
                 quantity: s.quantity
             }));
 
-            if (!items.length) return;
+            if (!items.length) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Perhatian',
+                    text: 'Silakan pilih minimal 1 obat untuk ditambahkan ke pesanan.',
+                    timer: 2000,
+                    showConfirmButton: false
+                });
+                return;
+            }
+
+            const submitBtn = document.getElementById('smartBtnSubmit');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = `
+                    <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                    </svg>
+                    Menambahkan...
+                `;
+            }
 
             axios.post("{{ route('orders.addItemsBulk') }}", {
                 order_id: orderid,
@@ -1784,11 +1989,28 @@
                     $('#d_price').val(formatRupiah(d_price));
                     $('#d_ppn').val(formatRupiah(d_ppn));
                     $('#d_total').val(formatRupiah(d_total));
+
+                    iziToast.success({
+                        title: 'Berhasil',
+                        message: `${items.length} obat berhasil ditambahkan ke daftar pesanan`,
+                        position: 'topRight'
+                    });
+
                     closeSmartOrder();
                 }
             }).catch(err => {
                 console.error(err);
                 alert('Gagal menambahkan item!');
+            }).finally(() => {
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = `
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                        </svg>
+                        Tambahkan ke Pesanan
+                    `;
+                }
             });
         }
 

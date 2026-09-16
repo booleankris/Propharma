@@ -484,6 +484,12 @@ Route::middleware(['auth', 'role:Kasir|Gudang PMI|HO|administrator|manager|Onlin
 
     Route::get('/receiving/history', [ReceivingController::class, 'history'])->name('receiving.history');
     Route::get('/receiving/gethistory', [ReceivingController::class, 'gethistory'])->name('receiving.gethistory');
+    Route::get('/receiving/buy-price-history', [ReceivingController::class, 'buyPriceHistory'])->name('receiving.buyPriceHistory');
+    Route::get('/receiving/get-buy-price-history', [ReceivingController::class, 'getBuyPriceHistory'])->name('receiving.getBuyPriceHistory');
+    Route::get('/receiving/export-buy-price-history', [ReceivingController::class, 'exportBuyPriceHistory'])->name('receiving.exportBuyPriceHistory');
+    Route::get('/receiving/export-buy-price-history/status/{id}', [ReceivingController::class, 'exportBuyPriceHistoryStatus'])->name('receiving.exportBuyPriceHistory.status');
+    Route::get('/receiving/export-buy-price-history/download/{id}', [ReceivingController::class, 'exportBuyPriceHistoryDownload'])->name('receiving.exportBuyPriceHistory.download');
+    Route::post('/receiving/update-master-price', [ReceivingController::class, 'updateMasterPrice'])->name('receiving.updateMasterPrice');
     Route::get('/receiving/orderhistory', [ReceivingController::class, 'orderhistory'])->name('receiving.orderhistory');
     Route::get('/receiving/getorderhistory', [ReceivingController::class, 'getorderhistory'])->name('receiving.getorderhistory');
 

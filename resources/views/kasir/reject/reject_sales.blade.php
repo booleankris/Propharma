@@ -292,6 +292,11 @@
                             <h1 class="text-2xl font-semibold tracking-tight font-poppins text-[#1c1c1c]">Penolakan Barang
                             </h1>
 
+                            @php
+                                $canExportReject = auth()->check() && (!auth()->user()->hasRole('Kasir') || auth()->user()->hasAnyRole(['administrator', 'General Manager', 'Manager', 'HO', 'operator']));
+                            @endphp
+
+                            @if ($canExportReject)
                             <!-- Export Controls -->
                             <div class="flex flex-wrap items-end gap-3 max-w-full">
                                 <div>
@@ -322,8 +327,10 @@
                                     </button>
                                 </div>
                             </div>
+                            @endif
                         </div>
 
+                        @if ($canExportReject)
                         {{-- Progress Bar --}}
                         <div id="progressContainer"
                             class="hidden mb-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm w-full">
@@ -334,6 +341,7 @@
                             </div>
                             <p id="progressText" class="text-xs mt-2 text-slate-500 font-medium">0%</p>
                         </div>
+                        @endif
                         <div class="flex py-2 gap-1">
                             <div>
                                 <div class="py-1 text-[13px] font-bold">Tanggal Penolakan</div>
@@ -1208,69 +1216,74 @@
             window.location.href = "{{ route('home') }}";
         });
 
+        @if ($canExportReject)
         // --- EXPORT QUEUE LOGIC ---
-        document.getElementById('export-reject-btn').addEventListener('click', async function(e) {
-            e.preventDefault();
+        const exportRejectBtn = document.getElementById('export-reject-btn');
+        if (exportRejectBtn) {
+            exportRejectBtn.addEventListener('click', async function(e) {
+                e.preventDefault();
 
-            const startDate = window.getDatePickerValue('export_start_date');
-            const endDate = window.getDatePickerValue('export_end_date');
+                const startDate = window.getDatePickerValue('export_start_date');
+                const endDate = window.getDatePickerValue('export_end_date');
 
-            if (startDate && endDate && endDate < startDate) {
-                iziToast.error({
-                    title: 'Rentang tanggal tidak valid',
-                    message: 'Tanggal akhir harus sama atau setelah tanggal awal.',
-                    position: 'topRight'
-                });
-                return;
-            }
-
-            const exportBtn = this;
-            const originalContent = exportBtn.innerHTML;
-
-            exportBtn.innerHTML = `
-                <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                <span>Menyiapkan...</span>
-            `;
-            exportBtn.classList.add('opacity-75', 'cursor-not-allowed', 'pointer-events-none');
-
-            let queryParams = new URLSearchParams();
-            if (startDate) queryParams.append('start_date', startDate);
-            if (endDate) queryParams.append('end_date', endDate);
-
-            try {
-                const response = await fetch(`{{ route('sales.reject.export') }}?${queryParams.toString()}`, {
-                    headers: {
-                        'Accept': 'application/json'
-                    }
-                });
-
-                if (!response.ok) throw new Error('Gagal memulai export');
-                const data = await response.json();
-
-                if (data.job_id) {
-                    iziToast.info({
-                        title: 'Memproses',
-                        message: 'Export sedang disiapkan...',
+                if (startDate && endDate && endDate < startDate) {
+                    iziToast.error({
+                        title: 'Rentang tanggal tidak valid',
+                        message: 'Tanggal akhir harus sama atau setelah tanggal awal.',
                         position: 'topRight'
                     });
-                    document.getElementById('progressContainer').classList.remove('hidden');
-                    pollRejectExportStatus(data.job_id);
+                    return;
                 }
-            } catch (error) {
-                iziToast.error({
-                    title: 'Gagal',
-                    message: 'Terjadi kesalahan saat memulai export.',
-                    position: 'topRight'
-                });
-                resetRejectExportButton();
-            }
-        });
+
+                const exportBtn = this;
+                const originalContent = exportBtn.innerHTML;
+
+                exportBtn.innerHTML = `
+                    <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>Menyiapkan...</span>
+                `;
+                exportBtn.classList.add('opacity-75', 'cursor-not-allowed', 'pointer-events-none');
+
+                let queryParams = new URLSearchParams();
+                if (startDate) queryParams.append('start_date', startDate);
+                if (endDate) queryParams.append('end_date', endDate);
+
+                try {
+                    const response = await fetch(`{{ route('sales.reject.export') }}?${queryParams.toString()}`, {
+                        headers: {
+                            'Accept': 'application/json'
+                        }
+                    });
+
+                    if (!response.ok) throw new Error('Gagal memulai export');
+                    const data = await response.json();
+
+                    if (data.job_id) {
+                        iziToast.info({
+                            title: 'Memproses',
+                            message: 'Export sedang disiapkan...',
+                            position: 'topRight'
+                        });
+                        document.getElementById('progressContainer').classList.remove('hidden');
+                        pollRejectExportStatus(data.job_id);
+                    }
+                } catch (error) {
+                    iziToast.error({
+                        title: 'Gagal',
+                        message: 'Terjadi kesalahan saat memulai export.',
+                        position: 'topRight'
+                    });
+                    resetRejectExportButton();
+                }
+            });
+        }
 
         function resetRejectExportButton() {
             const exportBtn = document.getElementById('export-reject-btn');
+            if (!exportBtn) return;
             exportBtn.innerHTML = `
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                     <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
@@ -1293,8 +1306,10 @@
                 fetch(`/reject/export/status/${jobId}`)
                     .then(res => res.json())
                     .then(data => {
-                        progressBar.style.width = data.progress + "%";
-                        progressText.innerText = data.progress + "%";
+                        if (progressBar && progressText) {
+                            progressBar.style.width = data.progress + "%";
+                            progressText.innerText = data.progress + "%";
+                        }
 
                         if (data.status === "completed") {
                             clearInterval(interval);
@@ -1303,9 +1318,11 @@
                                 message: 'File Excel siap diunduh!',
                                 position: 'topRight'
                             });
-                            document.getElementById('progressContainer').classList.add('hidden');
-                            progressBar.style.width = "0%";
-                            progressText.innerText = "0%";
+                            document.getElementById('progressContainer')?.classList.add('hidden');
+                            if (progressBar && progressText) {
+                                progressBar.style.width = "0%";
+                                progressText.innerText = "0%";
+                            }
                             resetRejectExportButton();
 
                             // Trigger download
@@ -1317,13 +1334,13 @@
                                 message: 'Gagal men-generate file Excel.',
                                 position: 'topRight'
                             });
-                            document.getElementById('progressContainer').classList.add('hidden');
+                            document.getElementById('progressContainer')?.classList.add('hidden');
                             resetRejectExportButton();
                         }
                     })
                     .catch(err => {
                         clearInterval(interval);
-                        document.getElementById('progressContainer').classList.add('hidden');
+                        document.getElementById('progressContainer')?.classList.add('hidden');
                         resetRejectExportButton();
                     });
             }, 2000);
@@ -1334,6 +1351,7 @@
             if (e.key !== 'Enter') return;
             const start = document.getElementById('export_start_date');
             const end = document.getElementById('export_end_date');
+            if (!start || !end) return;
             const startDisplay = start._flatpickr?.altInput || start;
             const endDisplay = end._flatpickr?.altInput || end;
             if (e.target !== startDisplay && e.target !== endDisplay) return;
@@ -1343,9 +1361,10 @@
             if (e.target === startDisplay) {
                 endDisplay.focus();
             } else {
-                document.getElementById('export-reject-btn').click();
+                document.getElementById('export-reject-btn')?.click();
             }
         });
+        @endif
     </script>
 
 

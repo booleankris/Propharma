@@ -22,6 +22,11 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use DataTables;
 use Form;
+use App\Exports\Orders\BuyPriceHistoryExport;
+use App\Jobs\ProcessBuyPriceHistoryExport;
+use App\Models\ExportJob;
+use Illuminate\Support\Facades\Storage;
+use Maatwebsite\Excel\Facades\Excel;
 
 class ReceivingController extends Controller
 {
@@ -326,6 +331,15 @@ class ReceivingController extends Controller
     public function history(Request $request)
     {
         return view('orders.history');
+    }
+
+    public function buyPriceHistory(Request $request)
+    {
+        $canUpdateMaster = auth()->user() && auth()->user()->hasAnyRole(['General Manager', 'operator', 'Operator', 'administrator', 'HO']);
+
+        $pharmacies = \App\Models\Pharmacies::all(['id', 'name']);
+
+        return view('orders.buy_price_history', compact('canUpdateMaster', 'pharmacies'));
     }
 
     public function orderhistory(Request $request)
@@ -785,6 +799,472 @@ class ReceivingController extends Controller
             })
             ->rawColumns(['direction'])
             ->make(true);
+    }
+
+    private function buildBuyPriceHistoryQuery(Request $request)
+    {
+        $query = ReceivingItems::query()
+            ->with([
+                'receiving_details.receiving.pharmacy',
+                'receiving_details.creditor',
+                'order_items.medicines',
+                'order_items.creditors',
+                'batches',
+            ])
+            ->whereNotNull('batches_id')
+            ->whereHas('order_items.medicines');
+
+        // Filter by medicine
+        if ($request->filled('search_medicine')) {
+            $kw = trim($request->search_medicine);
+            $query->whereHas('order_items.medicines', function ($q) use ($kw) {
+                $q->where('name', 'like', "%{$kw}%")
+                  ->orWhere('code', 'like', "%{$kw}%");
+            });
+        }
+
+        // Filter by invoice or receiving code
+        if ($request->filled('search_invoice')) {
+            $inv = trim($request->search_invoice);
+            $query->where(function ($q) use ($inv) {
+                $q->whereHas('receiving_details', function ($q2) use ($inv) {
+                    $q2->where('invoice_number', 'like', "%{$inv}%")
+                      ->orWhere('receiving_details_code', 'like', "%{$inv}%");
+                })->orWhereHas('receiving_details.receiving', function ($q2) use ($inv) {
+                    $q2->where('code', 'like', "%{$inv}%");
+                });
+            });
+        }
+
+        // Filter by creditor / PBF
+        if ($request->filled('creditor')) {
+            $cred = trim($request->creditor);
+            $query->where(function ($q) use ($cred) {
+                $q->whereHas('receiving_details.creditor', function ($q2) use ($cred) {
+                    $q2->where('name', 'like', "%{$cred}%")
+                       ->orWhere('code', 'like', "%{$cred}%");
+                })->orWhereHas('order_items.creditors', function ($q2) use ($cred) {
+                    $q2->where('name', 'like', "%{$cred}%")
+                       ->orWhere('code', 'like', "%{$cred}%");
+                });
+            });
+        }
+
+        // Filter by date
+        if ($request->filled('start_date')) {
+            $query->where(function ($q) use ($request) {
+                $q->whereHas('receiving_details', function ($rd) use ($request) {
+                    $rd->whereDate('invoice_date', '>=', $request->start_date);
+                })->orWhereDate('created_at', '>=', $request->start_date);
+            });
+        }
+        if ($request->filled('end_date')) {
+            $query->where(function ($q) use ($request) {
+                $q->whereHas('receiving_details', function ($rd) use ($request) {
+                    $rd->whereDate('invoice_date', '<=', $request->end_date);
+                })->orWhereDate('created_at', '<=', $request->end_date);
+            });
+        }
+
+        // Filter by pharmacy
+        if ($request->filled('pharmacy_id') && $request->pharmacy_id !== 'all') {
+            $pId = (int) $request->pharmacy_id;
+            $query->whereHas('receiving_details.receiving', function ($q) use ($pId) {
+                $q->where('pharmacy_id', $pId);
+            });
+        } elseif (auth()->check() && !auth()->user()->hasAnyRole(['General Manager', 'administrator', 'HO'])) {
+            $pId = getPurchasingPharmacyId() ?: getActivePharmacyId();
+            if ($pId) {
+                $targetPharmacyIds = in_array((int) $pId, [1, 6, 9]) ? [9, 1] : [(int) $pId];
+                $query->whereHas('receiving_details.receiving', function ($q) use ($targetPharmacyIds) {
+                    $q->whereIn('pharmacy_id', $targetPharmacyIds);
+                });
+            }
+        }
+
+        // Filter by price difference: 'naik', 'turun', 'beda', 'sama'
+        if ($request->filled('price_diff')) {
+            $diff = $request->price_diff;
+            $unitPriceSql = "CASE WHEN order_items.pack = 1 AND CAST(medicines.content AS UNSIGNED) > 1 THEN (CAST(receiving_items.raw_price AS DECIMAL(15,4)) / CAST(medicines.content AS DECIMAL(15,4))) ELSE CAST(receiving_items.raw_price AS DECIMAL(15,4)) END";
+
+            $query->join('order_items', 'receiving_items.order_items_id', '=', 'order_items.id')
+                  ->join('medicines', 'order_items.medicine_id', '=', 'medicines.id')
+                  ->select('receiving_items.*');
+
+            if ($diff === 'naik') {
+                $query->whereRaw("{$unitPriceSql} > (CAST(medicines.raw_price AS DECIMAL(15,4)) + 0.5)");
+            } elseif ($diff === 'turun') {
+                $query->whereRaw("{$unitPriceSql} < (CAST(medicines.raw_price AS DECIMAL(15,4)) - 0.5)");
+            } elseif ($diff === 'beda') {
+                $query->whereRaw("ABS({$unitPriceSql} - CAST(medicines.raw_price AS DECIMAL(15,4))) > 0.5");
+            } elseif ($diff === 'sama') {
+                $query->whereRaw("ABS({$unitPriceSql} - CAST(medicines.raw_price AS DECIMAL(15,4))) <= 0.5");
+            }
+        }
+
+        return $query;
+    }
+
+    public function exportBuyPriceHistory(Request $request)
+    {
+        $targetPharmacyIds = null;
+        if (auth()->check() && !auth()->user()->hasAnyRole(['General Manager', 'administrator', 'HO'])) {
+            $pId = getPurchasingPharmacyId() ?: getActivePharmacyId();
+            if ($pId) {
+                $targetPharmacyIds = in_array((int) $pId, [1, 6, 9]) ? [9, 1] : [(int) $pId];
+            }
+        }
+
+        $filters = [
+            'search_medicine'     => $request->search_medicine,
+            'search_invoice'      => $request->search_invoice,
+            'creditor'            => $request->creditor,
+            'price_diff'          => $request->price_diff,
+            'start_date'          => $request->start_date,
+            'end_date'            => $request->end_date,
+            'pharmacy_id'         => $request->pharmacy_id,
+            'target_pharmacy_ids' => $targetPharmacyIds,
+        ];
+
+        // If AJAX request or async flag, run as tracked background export job with progress polling
+        if ($request->ajax() || $request->wantsJson() || $request->filled('async')) {
+            $job = ExportJob::create([
+                'type'     => 'buy_price_history',
+                'status'   => 'pending',
+                'progress' => 0,
+            ]);
+
+            dispatch(new ProcessBuyPriceHistoryExport(
+                $job->id,
+                $filters,
+                auth()->id()
+            ));
+
+            return response()->json([
+                'success' => true,
+                'job_id'  => $job->id,
+                'message' => 'Proses export data riwayat harga beli dimulai...',
+            ]);
+        }
+
+        // Direct synchronous download fallback
+        $query = $this->buildBuyPriceHistoryQuery($request);
+        $items = $query->orderByDesc('receiving_items.id')->get();
+        $filename = 'riwayat_harga_beli_' . now()->format('Ymd_His') . '.xlsx';
+
+        return Excel::download(
+            new BuyPriceHistoryExport($items, $filters),
+            $filename
+        );
+    }
+
+    public function exportBuyPriceHistoryStatus($id)
+    {
+        $job = ExportJob::findOrFail($id);
+
+        $downloadUrl = null;
+        if (($job->status === 'completed' || $job->status === 'finished') && $job->file_path) {
+            $downloadUrl = route('receiving.exportBuyPriceHistory.download', $job->id);
+        }
+
+        return response()->json([
+            'status'   => $job->status,
+            'progress' => (int) $job->progress,
+            'file'     => $downloadUrl,
+        ]);
+    }
+
+    public function exportBuyPriceHistoryDownload($id)
+    {
+        $job = ExportJob::findOrFail($id);
+
+        if (!$job->file_path || !Storage::disk('public')->exists($job->file_path)) {
+            abort(404, 'File export tidak ditemukan atau masih diproses.');
+        }
+
+        $filename = 'riwayat_harga_beli_' . now()->format('Ymd_His') . '.xlsx';
+        return Storage::disk('public')->download($job->file_path, $filename);
+    }
+
+    public function getBuyPriceHistory(Request $request)
+    {
+        $canUpdateMaster = auth()->user() && auth()->user()->hasAnyRole(['General Manager', 'operator', 'Operator', 'administrator', 'HO']);
+
+        $query = $this->buildBuyPriceHistoryQuery($request);
+
+        $formatPrice = function ($val) {
+            if ($val === null || $val === '') return 'Rp 0';
+            $val = (float) $val;
+            if (abs($val - round($val)) > 0.001) {
+                return 'Rp ' . number_format($val, 2, ',', '.');
+            }
+            return 'Rp ' . number_format($val, 0, ',', '.');
+        };
+
+        $getRawReceived = function ($row, $isPack, $content) {
+            $raw = (float) ($row->raw_price ?? 0);
+            if ($raw <= 0) {
+                if (!empty($row->total) && !empty($row->qty_received) && (float) $row->qty_received > 0) {
+                    $raw = (float) $row->total / (float) $row->qty_received;
+                } elseif (!empty($row->order_items?->price) && (float) $row->order_items->price > 0) {
+                    $oiPrice = (float) $row->order_items->price;
+                    $raw = ($isPack && $content > 1) ? ($oiPrice * $content) : $oiPrice;
+                }
+            }
+            return $raw;
+        };
+
+        return DataTables::of($query)
+            ->order(function ($q) use ($request) {
+                if ($request->has('order')) {
+                    $orderColIdx = (int) $request->input('order.0.column');
+                    $orderDir = $request->input('order.0.dir', 'desc');
+                    if ($orderColIdx === 1) {
+                        $q->orderBy('receiving_items.id', $orderDir);
+                        return;
+                    }
+                }
+                $q->orderByDesc('receiving_items.id');
+            })
+            ->addIndexColumn()
+            ->addColumn('date', function ($row) {
+                $invDate = $row->receiving_details?->invoice_date;
+                if ($invDate) {
+                    return Carbon::parse($invDate)->format('d/m/Y');
+                }
+                return $row->created_at ? $row->created_at->format('d/m/Y') : '-';
+            })
+            ->addColumn('no_terima', function ($row) {
+                return $row->receiving_details?->receiving_details_code 
+                    ?? $row->receiving_details?->receiving?->code 
+                    ?? '-';
+            })
+            ->addColumn('invoice_number', function ($row) {
+                return $row->receiving_details?->invoice_number ?? '-';
+            })
+            ->addColumn('medicine_name', function ($row) {
+                return $row->order_items?->medicines?->name ?? '-';
+            })
+            ->addColumn('medicine_code', function ($row) {
+                return $row->order_items?->medicines?->code ?? '-';
+            })
+            ->addColumn('is_pack', function ($row) {
+                return (bool) ($row->order_items?->pack == 1);
+            })
+            ->addColumn('content', function ($row) {
+                $c = (float) ($row->order_items?->medicines?->content ?? 1);
+                return $c > 0 ? $c : 1;
+            })
+            ->addColumn('packaging', function ($row) {
+                return trim((string) ($row->order_items?->medicines?->packaging ?: 'BOX'));
+            })
+            ->addColumn('unit', function ($row) {
+                $isPack = ($row->order_items?->pack == 1);
+                $med = $row->order_items?->medicines;
+                $content = (float) ($med?->content ?? 1);
+                $pkg = trim((string) ($med?->packaging ?: 'BOX'));
+                $unit = trim((string) ($med?->unit ?: 'TAB'));
+                if (strcasecmp($pkg, $unit) === 0 && $content > 1) {
+                    $pkg = 'BOX';
+                }
+
+                if ($isPack && $content > 1) {
+                    return '<span class="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200" title="Diterima kemasan utuh (1 ' . $pkg . ' = ' . $content . ' ' . $unit . ')">
+                        1 ' . $pkg . ' @' . $content . ' ' . $unit . '
+                    </span>';
+                }
+                return '<span class="inline-flex items-center text-[11px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200">' . $unit . '</span>';
+            })
+            ->addColumn('creditor_name', function ($row) {
+                return $row->receiving_details?->creditor?->name 
+                    ?? $row->order_items?->creditors?->name 
+                    ?? '-';
+            })
+            ->addColumn('raw_price_num', function ($row) use ($getRawReceived) {
+                $isPack = ($row->order_items?->pack == 1);
+                $content = (float) ($row->order_items?->medicines?->content ?? 1);
+                if ($content <= 0) $content = 1;
+                return $getRawReceived($row, $isPack, $content);
+            })
+            ->addColumn('unit_price_num', function ($row) use ($getRawReceived) {
+                $isPack = ($row->order_items?->pack == 1);
+                $content = (float) ($row->order_items?->medicines?->content ?? 1);
+                if ($content <= 0) $content = 1;
+                $raw = $getRawReceived($row, $isPack, $content);
+                return ($isPack && $content > 1) ? round($raw / $content, 2) : $raw;
+            })
+            ->addColumn('raw_price_fmt', function ($row) use ($formatPrice, $getRawReceived) {
+                $isPack = ($row->order_items?->pack == 1);
+                $med = $row->order_items?->medicines;
+                $content = (float) ($med?->content ?? 1);
+                if ($content <= 0) $content = 1;
+
+                $pkg = trim((string) ($med?->packaging ?: 'BOX'));
+                $unit = trim((string) ($med?->unit ?: 'TAB'));
+                if (strcasecmp($pkg, $unit) === 0 && $content > 1) {
+                    $pkg = 'BOX';
+                }
+                $rawReceived = $getRawReceived($row, $isPack, $content);
+
+                if ($isPack && $content > 1) {
+                    $unitPrice = round($rawReceived / $content, 2);
+                    return '<div>
+                        <div class="price-invoice">' . $formatPrice($rawReceived) . ' <span class="text-xs font-semibold text-slate-500">/ ' . $pkg . '</span></div>
+                        <div class="text-[11px] font-bold text-blue-700 mt-0.5">' . $formatPrice($unitPrice) . ' <span class="text-slate-500 font-normal">/ ' . $unit . '</span></div>
+                    </div>';
+                }
+
+                return '<div>
+                    <div class="price-invoice">' . $formatPrice($rawReceived) . ' <span class="text-xs font-semibold text-slate-500">/ ' . $unit . '</span></div>
+                </div>';
+            })
+            ->addColumn('master_price_num', function ($row) {
+                return (float) ($row->order_items?->medicines?->raw_price ?? 0);
+            })
+            ->addColumn('master_price_fmt', function ($row) use ($formatPrice) {
+                $med = $row->order_items?->medicines;
+                $content = (float) ($med?->content ?? 1);
+                if ($content <= 0) $content = 1;
+
+                $pkg = trim((string) ($med?->packaging ?: 'BOX'));
+                $unit = trim((string) ($med?->unit ?: 'TAB'));
+                if (strcasecmp($pkg, $unit) === 0 && $content > 1) {
+                    $pkg = 'BOX';
+                }
+                $masterUnitHna = (float) ($med?->raw_price ?? 0);
+                $masterBoxHna = round($masterUnitHna * $content, 2);
+
+                if ($content > 1) {
+                    return '<div>
+                        <div class="price-master">' . $formatPrice($masterUnitHna) . ' <span class="text-xs font-normal text-slate-500">/ ' . $unit . '</span></div>
+                        <div class="text-[11px] text-slate-500 font-medium">' . $formatPrice($masterBoxHna) . ' <span class="text-slate-400 font-normal">/ ' . $pkg . '</span></div>
+                    </div>';
+                }
+
+                return '<div>
+                    <div class="price-master">' . $formatPrice($masterUnitHna) . ' <span class="text-xs font-normal text-slate-500">/ ' . $unit . '</span></div>
+                </div>';
+            })
+            ->addColumn('price_diff', function ($row) use ($getRawReceived) {
+                $isPack = ($row->order_items?->pack == 1);
+                $med = $row->order_items?->medicines;
+                $content = (float) ($med?->content ?? 1);
+                if ($content <= 0) $content = 1;
+
+                $rawReceived = $getRawReceived($row, $isPack, $content);
+                $unitHnaReceived = ($isPack && $content > 1) ? round($rawReceived / $content, 2) : $rawReceived;
+                $masterUnitHna = (float) ($med?->raw_price ?? 0);
+
+                if ($masterUnitHna <= 0 && $unitHnaReceived <= 0) {
+                    return '<span class="inline-flex items-center px-2 py-0.5 text-xs font-semibold rounded-full bg-gray-100 text-gray-500">—</span>';
+                }
+                if ($masterUnitHna <= 0) {
+                    return '<span class="inline-flex items-center px-2.5 py-0.5 text-xs font-bold rounded-full bg-blue-100 text-blue-700 border border-blue-200">Baru</span>';
+                }
+
+                $diff = $unitHnaReceived - $masterUnitHna;
+                if (abs($diff) < 0.01) {
+                    return '<span class="inline-flex items-center px-2.5 py-0.5 text-xs font-semibold rounded-full bg-slate-100 text-slate-600 border border-slate-200">Sama</span>';
+                }
+
+                $pct = round(abs($diff) / $masterUnitHna * 100, 1);
+                $pctFmt = ($pct == (int) $pct) ? (int) $pct . '%' : number_format($pct, 1, ',', '.') . '%';
+
+                if ($diff > 0) {
+                    return '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-bold rounded-full bg-red-100 text-red-700 border border-red-200">
+                        <svg class="w-3 h-3 text-red-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7"/></svg>
+                        Naik ' . $pctFmt . '
+                    </span>';
+                } else {
+                    return '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-bold rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">
+                        <svg class="w-3 h-3 text-emerald-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                        Turun ' . $pctFmt . '
+                    </span>';
+                }
+            })
+            ->addColumn('actions', function ($row) use ($canUpdateMaster, $getRawReceived) {
+                $orderId = $row->order_items?->order_id;
+                $rdId = $row->receiving_details_id;
+                $rincianUrl = $orderId 
+                    ? route('orders.rincian', ['orderId' => $orderId, 'rd_id' => $rdId])
+                    : route('receiving.rincian', ['rd_id' => $rdId]);
+
+                $medId = $row->order_items?->medicines?->id ?? 0;
+                $medName = htmlspecialchars($row->order_items?->medicines?->name ?? 'Obat', ENT_QUOTES);
+
+                $isPack = ($row->order_items?->pack == 1);
+                $med = $row->order_items?->medicines;
+                $content = (float) ($med?->content ?? 1);
+                if ($content <= 0) $content = 1;
+
+                $pkg = trim((string) ($med?->packaging ?: 'BOX'));
+                $unit = trim((string) ($med?->unit ?: 'TAB'));
+                $rawReceived = $getRawReceived($row, $isPack, $content);
+                $unitHnaReceived = ($isPack && $content > 1) ? round($rawReceived / $content, 2) : $rawReceived;
+                $masterUnitHna = (float) ($med?->raw_price ?? 0);
+
+                $btnRincian = '<a href="' . $rincianUrl . '" target="_blank" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white border border-blue-200 font-bold text-xs transition duration-150 shadow-sm" title="Buka rincian penerimaan obat ini">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                    BUKA RINCIAN
+                </a>';
+
+                $btnUpdate = '';
+                if ($canUpdateMaster) {
+                    $isSame = (abs($unitHnaReceived - $masterUnitHna) <= 0.5);
+                    $btnClass = $isSame 
+                        ? 'bg-slate-50 text-slate-600 hover:bg-emerald-600 hover:text-white border-slate-300' 
+                        : 'bg-emerald-600 text-white hover:bg-emerald-700 border-emerald-600 shadow-sm shadow-emerald-200';
+
+                    $btnUpdate = '<button type="button" onclick="confirmUpdateMaster(' . $medId . ', ' . $row->id . ', ' . $unitHnaReceived . ', ' . $masterUnitHna . ', \'' . $medName . '\', ' . ($isPack ? 1 : 0) . ', ' . $content . ', ' . $rawReceived . ', \'' . $pkg . '\', \'' . $unit . '\')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg ' . $btnClass . ' border font-bold text-xs transition duration-150" title="Sinkronkan master harga ke harga faktur ini">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                        UPDATE MASTER HARGA
+                    </button>';
+                }
+
+                return '<div class="flex items-center gap-2 justify-end whitespace-nowrap">' . $btnRincian . $btnUpdate . '</div>';
+            })
+            ->rawColumns(['unit', 'raw_price_fmt', 'master_price_fmt', 'price_diff', 'actions'])
+            ->make(true);
+    }
+
+    public function updateMasterPrice(Request $request)
+    {
+        $user = auth()->user();
+        if (!$user || !$user->hasAnyRole(['General Manager', 'operator', 'Operator', 'administrator', 'HO'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Akses ditolak: Hanya role General Manager atau Operator yang dapat memperbarui master harga.',
+            ], 403);
+        }
+
+        $request->validate([
+            'medicine_id' => 'required|exists:medicines,id',
+            'new_raw_price' => 'required|numeric|min:0',
+        ]);
+
+        $medicine = Medicines::findOrFail($request->medicine_id);
+        $oldPrice = (float) ($medicine->raw_price ?? $medicine->pharmacy_net_price ?? 0);
+        $newRawPrice = (float) $request->new_raw_price;
+
+        $medicine->update([
+            'raw_price' => $newRawPrice,
+            'pharmacy_net_price' => $newRawPrice,
+            'net_price' => round($newRawPrice * 1.11),
+        ]);
+
+        MedicinePriceHistory::create([
+            'user_id' => $user->id,
+            'medicine_id' => $medicine->id,
+            'old_price' => $oldPrice,
+            'new_price' => $newRawPrice,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => "Harga master obat '{$medicine->name}' berhasil diperbarui menjadi Rp " . number_format($newRawPrice, 0, ',', '.'),
+            'old_price' => $oldPrice,
+            'new_price' => $newRawPrice,
+        ]);
     }
 
     public function getorderhistory(Request $request)

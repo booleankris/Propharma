@@ -1838,7 +1838,7 @@
                     & Penerimaan</span>
             </a>
 
-            <a href="{{ route('receiving.history') }}"
+            <a href="{{ route('receiving.buyPriceHistory') }}"
                 class="group flex items-center gap-3 p-3.5 rounded-2xl bg-green-50 hover:bg-green-500 border border-green-100 hover:border-green-500 transition-all duration-200 hover:-translate-y-0.5">
                 <div
                     class="w-9 h-9 rounded-xl bg-green-100 group-hover:bg-green-400 flex items-center justify-center flex-shrink-0 transition-colors">
