@@ -189,17 +189,26 @@ class SpecialCategoryAllInOneSheet implements FromArray, WithStyles, WithColumnW
             ->select('items_log.medicine_id', \Illuminate\Support\Facades\DB::raw('SUM(items_log.qty) as total_qty'))
             ->pluck('total_qty', 'medicine_id');
 
-        // Batches stock in this pharmacy (exclude non-positive / negative records)
-        $batchesStockGroup = \Illuminate\Support\Facades\DB::table('batches')
-            ->where('pharmacy_id', $this->pharmacyId)
-            ->where('stock', '>', 0)
-            ->groupBy('medicine_id')
-            ->select('medicine_id', \Illuminate\Support\Facades\DB::raw('SUM(stock) as total_stock'))
-            ->pluck('total_stock', 'medicine_id');
-
-        // Counter / Etalase stock in this pharmacy (for retail branches, only positive records)
+        // Stock queries: Gudang (9) uses batches, Cabang uses etalase/pelayanan (medicine_transfer_items)
+        $batchesStockGroup = collect();
         $counterStockGroup = collect();
-        if ((int)$this->pharmacyId !== 9) {
+        if ((int)$this->pharmacyId === 9) {
+            $batchesStockGroup = \Illuminate\Support\Facades\DB::table('batches')
+                ->where('pharmacy_id', 9)
+                ->where('stock', '>', 0)
+                ->groupBy('medicine_id')
+                ->select('medicine_id', \Illuminate\Support\Facades\DB::raw('SUM(stock) as total_stock'))
+                ->pluck('total_stock', 'medicine_id');
+
+            $nearestBatches = \Illuminate\Support\Facades\DB::table('batches')
+                ->where('pharmacy_id', 9)
+                ->whereNotNull('expired_date')
+                ->where('stock', '>', 0)
+                ->orderBy('expired_date', 'asc')
+                ->get()
+                ->groupBy('medicine_id')
+                ->map(fn($items) => $items->first()->expired_date ?? null);
+        } else {
             $counterStockGroup = \Illuminate\Support\Facades\DB::table('medicine_transfer_items')
                 ->join('batches', 'medicine_transfer_items.batches_id', '=', 'batches.id')
                 ->where('batches.pharmacy_id', $this->pharmacyId)
@@ -212,27 +221,22 @@ class SpecialCategoryAllInOneSheet implements FromArray, WithStyles, WithColumnW
                 ->groupBy('batches.medicine_id')
                 ->select('batches.medicine_id', \Illuminate\Support\Facades\DB::raw('SUM(medicine_transfer_items.qty) as total_qty'))
                 ->pluck('total_qty', 'batches.medicine_id');
-        }
 
-        $nearestBatches = \Illuminate\Support\Facades\DB::table('batches')
-            ->where('pharmacy_id', $this->pharmacyId)
-            ->whereNotNull('expired_date')
-            ->where(function($q) {
-                $q->where('stock', '>', 0)
-                  ->orWhereExists(function($sub) {
-                      $sub->select(\Illuminate\Support\Facades\DB::raw(1))
-                          ->from('medicine_transfer_items')
-                          ->whereColumn('medicine_transfer_items.batches_id', 'batches.id')
-                          ->where('medicine_transfer_items.status', 1)
-                          ->where('medicine_transfer_items.qty', '>', 0);
-                  });
-            })
-            ->orderBy('expired_date', 'asc')
-            ->get()
-            ->groupBy('medicine_id')
-            ->map(function ($items) {
-                return $items->first()->expired_date ?? null;
-            });
+            $nearestBatches = \Illuminate\Support\Facades\DB::table('batches')
+                ->where('pharmacy_id', $this->pharmacyId)
+                ->whereNotNull('expired_date')
+                ->whereExists(function($sub) {
+                    $sub->select(\Illuminate\Support\Facades\DB::raw(1))
+                        ->from('medicine_transfer_items')
+                        ->whereColumn('medicine_transfer_items.batches_id', 'batches.id')
+                        ->where('medicine_transfer_items.status', 1)
+                        ->where('medicine_transfer_items.qty', '>', 0);
+                })
+                ->orderBy('expired_date', 'asc')
+                ->get()
+                ->groupBy('medicine_id')
+                ->map(fn($items) => $items->first()->expired_date ?? null);
+        }
 
         foreach (SpecialMedicinesExport::CATEGORIES as $key => $config) {
             // Section Banner (e.g. NARKOTIKA)
@@ -253,13 +257,9 @@ class SpecialCategoryAllInOneSheet implements FromArray, WithStyles, WithColumnW
                 $outBefore = (int) ($outBeforeGroup[$med->id] ?? 0);
                 $stokAwal  = max(0, $inBefore - $outBefore);
 
-                if ((int)$this->pharmacyId === 9) {
-                    $fisik = (int) ($batchesStockGroup[$med->id] ?? 0);
-                } else {
-                    $counterStock = (int) ($counterStockGroup[$med->id] ?? 0);
-                    $storageStock = (int) ($batchesStockGroup[$med->id] ?? 0);
-                    $fisik = $counterStock + $storageStock;
-                }
+                $fisik = (int)$this->pharmacyId === 9
+                    ? (int) ($batchesStockGroup[$med->id] ?? 0)
+                    : (int) ($counterStockGroup[$med->id] ?? 0);
 
                 if ($stokAwal === 0 && $inBefore === 0 && $outBefore === 0) {
                     $masukCheck = (int) ($inRangeGroup[$med->id] ?? 0);
@@ -497,17 +497,26 @@ class SpecialCategorySingleSheet implements FromArray, WithStyles, WithColumnWid
             ->select('items_log.medicine_id', \Illuminate\Support\Facades\DB::raw('SUM(items_log.qty) as total_qty'))
             ->pluck('total_qty', 'medicine_id');
 
-        // Batches stock in this pharmacy (exclude non-positive / negative records)
-        $batchesStockGroup = \Illuminate\Support\Facades\DB::table('batches')
-            ->where('pharmacy_id', $this->pharmacyId)
-            ->where('stock', '>', 0)
-            ->groupBy('medicine_id')
-            ->select('medicine_id', \Illuminate\Support\Facades\DB::raw('SUM(stock) as total_stock'))
-            ->pluck('total_stock', 'medicine_id');
-
-        // Counter / Etalase stock in this pharmacy (for retail branches, only positive records)
+        // Stock queries: Gudang (9) uses batches, Cabang uses etalase/pelayanan (medicine_transfer_items)
+        $batchesStockGroup = collect();
         $counterStockGroup = collect();
-        if ((int)$this->pharmacyId !== 9) {
+        if ((int)$this->pharmacyId === 9) {
+            $batchesStockGroup = \Illuminate\Support\Facades\DB::table('batches')
+                ->where('pharmacy_id', 9)
+                ->where('stock', '>', 0)
+                ->groupBy('medicine_id')
+                ->select('medicine_id', \Illuminate\Support\Facades\DB::raw('SUM(stock) as total_stock'))
+                ->pluck('total_stock', 'medicine_id');
+
+            $nearestBatches = \Illuminate\Support\Facades\DB::table('batches')
+                ->where('pharmacy_id', 9)
+                ->whereNotNull('expired_date')
+                ->where('stock', '>', 0)
+                ->orderBy('expired_date', 'asc')
+                ->get()
+                ->groupBy('medicine_id')
+                ->map(fn($items) => $items->first()->expired_date ?? null);
+        } else {
             $counterStockGroup = \Illuminate\Support\Facades\DB::table('medicine_transfer_items')
                 ->join('batches', 'medicine_transfer_items.batches_id', '=', 'batches.id')
                 ->where('batches.pharmacy_id', $this->pharmacyId)
@@ -520,27 +529,22 @@ class SpecialCategorySingleSheet implements FromArray, WithStyles, WithColumnWid
                 ->groupBy('batches.medicine_id')
                 ->select('batches.medicine_id', \Illuminate\Support\Facades\DB::raw('SUM(medicine_transfer_items.qty) as total_qty'))
                 ->pluck('total_qty', 'batches.medicine_id');
-        }
 
-        $nearestBatches = \Illuminate\Support\Facades\DB::table('batches')
-            ->where('pharmacy_id', $this->pharmacyId)
-            ->whereNotNull('expired_date')
-            ->where(function($q) {
-                $q->where('stock', '>', 0)
-                  ->orWhereExists(function($sub) {
-                      $sub->select(\Illuminate\Support\Facades\DB::raw(1))
-                          ->from('medicine_transfer_items')
-                          ->whereColumn('medicine_transfer_items.batches_id', 'batches.id')
-                          ->where('medicine_transfer_items.status', 1)
-                          ->where('medicine_transfer_items.qty', '>', 0);
-                  });
-            })
-            ->orderBy('expired_date', 'asc')
-            ->get()
-            ->groupBy('medicine_id')
-            ->map(function ($items) {
-                return $items->first()->expired_date ?? null;
-            });
+            $nearestBatches = \Illuminate\Support\Facades\DB::table('batches')
+                ->where('pharmacy_id', $this->pharmacyId)
+                ->whereNotNull('expired_date')
+                ->whereExists(function($sub) {
+                    $sub->select(\Illuminate\Support\Facades\DB::raw(1))
+                        ->from('medicine_transfer_items')
+                        ->whereColumn('medicine_transfer_items.batches_id', 'batches.id')
+                        ->where('medicine_transfer_items.status', 1)
+                        ->where('medicine_transfer_items.qty', '>', 0);
+                })
+                ->orderBy('expired_date', 'asc')
+                ->get()
+                ->groupBy('medicine_id')
+                ->map(fn($items) => $items->first()->expired_date ?? null);
+        }
 
         $medicines = SpecialMedicinesExport::getMedicinesQuery($this->config)->get();
 
@@ -550,13 +554,9 @@ class SpecialCategorySingleSheet implements FromArray, WithStyles, WithColumnWid
             $outBefore = (int) ($outBeforeGroup[$med->id] ?? 0);
             $stokAwal  = max(0, $inBefore - $outBefore);
 
-            if ((int)$this->pharmacyId === 9) {
-                $fisik = (int) ($batchesStockGroup[$med->id] ?? 0);
-            } else {
-                $counterStock = (int) ($counterStockGroup[$med->id] ?? 0);
-                $storageStock = (int) ($batchesStockGroup[$med->id] ?? 0);
-                $fisik = $counterStock + $storageStock;
-            }
+            $fisik = (int)$this->pharmacyId === 9
+                ? (int) ($batchesStockGroup[$med->id] ?? 0)
+                : (int) ($counterStockGroup[$med->id] ?? 0);
 
             if ($stokAwal === 0 && $inBefore === 0 && $outBefore === 0) {
                 $masukCheck = (int) ($inRangeGroup[$med->id] ?? 0);

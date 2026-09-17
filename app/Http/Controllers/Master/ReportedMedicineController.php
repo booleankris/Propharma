@@ -37,16 +37,17 @@ class ReportedMedicineController extends Controller
                 ->where('pharmacy_id', $pharmacyId)
                 ->select('reported_medicines.*');
 
-            // Pre-calculate branch stock (batches.stock + medicine_transfer_items.qty)
-            $batchesStocks = DB::table('batches')
-                ->where('pharmacy_id', $pharmacyId)
-                ->where('stock', '>', 0)
-                ->groupBy('medicine_id')
-                ->select('medicine_id', DB::raw('SUM(stock) as total_stock'))
-                ->pluck('total_stock', 'medicine_id');
-
+            // Stock calculation: Gudang (9) uses batches, Cabang uses etalase/pelayanan (medicine_transfer_items)
+            $batchesStocks = collect();
             $counterStocks = collect();
-            if ($pharmacyId !== 9) {
+            if ($pharmacyId === 9) {
+                $batchesStocks = DB::table('batches')
+                    ->where('pharmacy_id', 9)
+                    ->where('stock', '>', 0)
+                    ->groupBy('medicine_id')
+                    ->select('medicine_id', DB::raw('SUM(stock) as total_stock'))
+                    ->pluck('total_stock', 'medicine_id');
+            } else {
                 $counterStocks = DB::table('medicine_transfer_items')
                     ->join('batches', 'medicine_transfer_items.batches_id', '=', 'batches.id')
                     ->where('batches.pharmacy_id', $pharmacyId)
@@ -80,11 +81,9 @@ class ReportedMedicineController extends Controller
                 })
                 ->addColumn('stock', function ($row) use ($batchesStocks, $counterStocks, $pharmacyId) {
                     $medId = $row->medicine_id;
-                    if ($pharmacyId === 9) {
-                        $stock = (int)($batchesStocks[$medId] ?? 0);
-                    } else {
-                        $stock = (int)($counterStocks[$medId] ?? 0) + (int)($batchesStocks[$medId] ?? 0);
-                    }
+                    $stock = $pharmacyId === 9
+                        ? (int)($batchesStocks[$medId] ?? 0)
+                        : (int)($counterStocks[$medId] ?? 0);
                     return '<span style="display:inline-flex; align-items:center; padding:2px 8px; border-radius:9999px; font-weight:700; font-size:11px; background-color:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe;">' . number_format($stock) . '</span>';
                 })
                 ->addColumn('added_by', function ($row) {
@@ -150,16 +149,17 @@ class ReportedMedicineController extends Controller
 
         // Calculate branch stock for search result items
         $itemIds = $items->pluck('id');
-        $batchesStocks = DB::table('batches')
-            ->where('pharmacy_id', $pharmacyId)
-            ->where('stock', '>', 0)
-            ->whereIn('medicine_id', $itemIds)
-            ->groupBy('medicine_id')
-            ->select('medicine_id', DB::raw('SUM(stock) as total_stock'))
-            ->pluck('total_stock', 'medicine_id');
-
+        $batchesStocks = collect();
         $counterStocks = collect();
-        if ($pharmacyId !== 9) {
+        if ($pharmacyId === 9) {
+            $batchesStocks = DB::table('batches')
+                ->where('pharmacy_id', 9)
+                ->where('stock', '>', 0)
+                ->whereIn('medicine_id', $itemIds)
+                ->groupBy('medicine_id')
+                ->select('medicine_id', DB::raw('SUM(stock) as total_stock'))
+                ->pluck('total_stock', 'medicine_id');
+        } else {
             $counterStocks = DB::table('medicine_transfer_items')
                 ->join('batches', 'medicine_transfer_items.batches_id', '=', 'batches.id')
                 ->where('batches.pharmacy_id', $pharmacyId)
@@ -177,11 +177,9 @@ class ReportedMedicineController extends Controller
 
         $results = [];
         foreach ($items as $item) {
-            if ($pharmacyId === 9) {
-                $branchStock = (int)($batchesStocks[$item->id] ?? 0);
-            } else {
-                $branchStock = (int)($counterStocks[$item->id] ?? 0) + (int)($batchesStocks[$item->id] ?? 0);
-            }
+            $branchStock = $pharmacyId === 9
+                ? (int)($batchesStocks[$item->id] ?? 0)
+                : (int)($counterStocks[$item->id] ?? 0);
             $results[] = [
                 'id'    => $item->id,
                 'text'  => $item->name . ' (' . ($item->code ?: 'No Code') . ')' . ($item->unit ? ' - ' . $item->unit : '') . ' [Stok Cabang: ' . number_format($branchStock) . ']',
