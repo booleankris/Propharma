@@ -189,20 +189,22 @@ class SpecialCategoryAllInOneSheet implements FromArray, WithStyles, WithColumnW
             ->select('items_log.medicine_id', \Illuminate\Support\Facades\DB::raw('SUM(items_log.qty) as total_qty'))
             ->pluck('total_qty', 'medicine_id');
 
-        // Batches stock in this pharmacy
+        // Batches stock in this pharmacy (exclude non-positive / negative records)
         $batchesStockGroup = \Illuminate\Support\Facades\DB::table('batches')
             ->where('pharmacy_id', $this->pharmacyId)
+            ->where('stock', '>', 0)
             ->groupBy('medicine_id')
             ->select('medicine_id', \Illuminate\Support\Facades\DB::raw('SUM(stock) as total_stock'))
             ->pluck('total_stock', 'medicine_id');
 
-        // Counter / Etalase stock in this pharmacy (for retail branches)
+        // Counter / Etalase stock in this pharmacy (for retail branches, only positive records)
         $counterStockGroup = collect();
         if ((int)$this->pharmacyId !== 9) {
             $counterStockGroup = \Illuminate\Support\Facades\DB::table('medicine_transfer_items')
                 ->join('batches', 'medicine_transfer_items.batches_id', '=', 'batches.id')
                 ->where('batches.pharmacy_id', $this->pharmacyId)
                 ->where('medicine_transfer_items.status', 1)
+                ->where('medicine_transfer_items.qty', '>', 0)
                 ->where(function ($q) {
                     $q->whereNull('medicine_transfer_items.source_type')
                       ->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang');
@@ -251,7 +253,13 @@ class SpecialCategoryAllInOneSheet implements FromArray, WithStyles, WithColumnW
                 $outBefore = (int) ($outBeforeGroup[$med->id] ?? 0);
                 $stokAwal  = max(0, $inBefore - $outBefore);
 
-                $fisik = (int) ($batchesStockGroup[$med->id] ?? 0) + (int) ($counterStockGroup[$med->id] ?? 0);
+                if ((int)$this->pharmacyId === 9) {
+                    $fisik = (int) ($batchesStockGroup[$med->id] ?? 0);
+                } else {
+                    $counterStock = (int) ($counterStockGroup[$med->id] ?? 0);
+                    $storageStock = (int) ($batchesStockGroup[$med->id] ?? 0);
+                    $fisik = $counterStock + $storageStock;
+                }
 
                 if ($stokAwal === 0 && $inBefore === 0 && $outBefore === 0) {
                     $masukCheck = (int) ($inRangeGroup[$med->id] ?? 0);
@@ -489,20 +497,22 @@ class SpecialCategorySingleSheet implements FromArray, WithStyles, WithColumnWid
             ->select('items_log.medicine_id', \Illuminate\Support\Facades\DB::raw('SUM(items_log.qty) as total_qty'))
             ->pluck('total_qty', 'medicine_id');
 
-        // Batches stock in this pharmacy
+        // Batches stock in this pharmacy (exclude non-positive / negative records)
         $batchesStockGroup = \Illuminate\Support\Facades\DB::table('batches')
             ->where('pharmacy_id', $this->pharmacyId)
+            ->where('stock', '>', 0)
             ->groupBy('medicine_id')
             ->select('medicine_id', \Illuminate\Support\Facades\DB::raw('SUM(stock) as total_stock'))
             ->pluck('total_stock', 'medicine_id');
 
-        // Counter / Etalase stock in this pharmacy (for retail branches)
+        // Counter / Etalase stock in this pharmacy (for retail branches, only positive records)
         $counterStockGroup = collect();
         if ((int)$this->pharmacyId !== 9) {
             $counterStockGroup = \Illuminate\Support\Facades\DB::table('medicine_transfer_items')
                 ->join('batches', 'medicine_transfer_items.batches_id', '=', 'batches.id')
                 ->where('batches.pharmacy_id', $this->pharmacyId)
                 ->where('medicine_transfer_items.status', 1)
+                ->where('medicine_transfer_items.qty', '>', 0)
                 ->where(function ($q) {
                     $q->whereNull('medicine_transfer_items.source_type')
                       ->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang');
@@ -540,7 +550,13 @@ class SpecialCategorySingleSheet implements FromArray, WithStyles, WithColumnWid
             $outBefore = (int) ($outBeforeGroup[$med->id] ?? 0);
             $stokAwal  = max(0, $inBefore - $outBefore);
 
-            $fisik = (int) ($batchesStockGroup[$med->id] ?? 0) + (int) ($counterStockGroup[$med->id] ?? 0);
+            if ((int)$this->pharmacyId === 9) {
+                $fisik = (int) ($batchesStockGroup[$med->id] ?? 0);
+            } else {
+                $counterStock = (int) ($counterStockGroup[$med->id] ?? 0);
+                $storageStock = (int) ($batchesStockGroup[$med->id] ?? 0);
+                $fisik = $counterStock + $storageStock;
+            }
 
             if ($stokAwal === 0 && $inBefore === 0 && $outBefore === 0) {
                 $masukCheck = (int) ($inRangeGroup[$med->id] ?? 0);
