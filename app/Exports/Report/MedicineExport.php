@@ -287,6 +287,7 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
 
             if ($canSeeWarehouse) {
                 $storageStockMap = Batches::where('pharmacy_id', $warehouseId)
+                    ->where('stock', '>', 0)
                     ->whereIn('medicine_id', $medicineIds)
                     ->groupBy('medicine_id')
                     ->select('medicine_id', DB::raw('COALESCE(SUM(stock), 0) as total'))
@@ -297,6 +298,7 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
             $counterStockMap = MedicineTransferItems::join('batches', 'medicine_transfer_items.batches_id', '=', 'batches.id')
                 ->where('batches.pharmacy_id', $counterPharmacyId)
                 ->where('medicine_transfer_items.status', 1)
+                ->where('medicine_transfer_items.qty', '>', 0)
                 ->where(function ($q) {
                     $q->whereNull('medicine_transfer_items.source_type')
                       ->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang');

@@ -104,6 +104,7 @@ class StockDataExport implements FromCollection, WithHeadings, WithStyles, Shoul
                     ? Batches::select(DB::raw('COALESCE(SUM(stock), 0)'))
                         ->whereColumn('medicine_id', 'medicines.id')
                         ->where('pharmacy_id', $warehouseId)
+                        ->where('stock', '>', 0)
                     : DB::raw('0'),
 
                 // Stok Pelayanan / Etalase (Cabang atau Sahabat PMI)
@@ -112,6 +113,7 @@ class StockDataExport implements FromCollection, WithHeadings, WithStyles, Shoul
                     ->whereColumn('batches.medicine_id', 'medicines.id')
                     ->where('batches.pharmacy_id', $counterPharmacyId)
                     ->where('medicine_transfer_items.status', 1)
+                    ->where('medicine_transfer_items.qty', '>', 0)
                     ->where(function ($q) {
                         $q->whereNull('medicine_transfer_items.source_type')
                           ->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang');

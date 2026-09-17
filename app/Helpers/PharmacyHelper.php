@@ -111,16 +111,23 @@ if (!function_exists('isPmiPharmacy')) {
 if (!function_exists('canAccessWarehouseStock')) {
     /**
      * Check if current user / pharmacy can view/manage warehouse stock.
-     * Allowed only for: SAHABAT PMI (ID 1), GUDANG PMI (ID 9), and HO / Administrator / Manager.
+     * Allowed only for: SAHABAT PMI (ID 1), GUDANG PMI (ID 9), and HO / Administrator / Manager (when not on a branch).
+     * Apotek cabang TIDAK memiliki gudang.
      */
     function canAccessWarehouseStock($pharmacyId = null): bool
     {
+        $id = $pharmacyId !== null ? (int) $pharmacyId : getActivePharmacyId();
+
+        // Apotek cabang tidak memiliki gudang fisik
+        if (isBranchPharmacy($id)) {
+            return false;
+        }
+
         $user = auth()->user();
         if ($user && ($user->hasRole('HO') || $user->hasRole('administrator') || $user->hasRole('Manager') || $user->hasRole('Gudang PMI'))) {
             return true;
         }
 
-        $id = $pharmacyId !== null ? (int) $pharmacyId : getActivePharmacyId();
         return $id === 1 || $id === getWarehousePharmacyId();
     }
 }

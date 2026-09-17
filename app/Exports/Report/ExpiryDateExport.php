@@ -57,36 +57,71 @@ class ExpiryDateExport implements FromArray, WithStyles, WithColumnWidths, WithT
         ];
 
         $warehouseId = getWarehousePharmacyId();
+        $isWarehouse = ((int)$this->pharmacyId === $warehouseId);
 
-        // Pre-aggregate counter stocks efficiently
-        $counterStocks = \Illuminate\Support\Facades\DB::table('medicine_transfer_items')
-            ->where('status', 1)
-            ->where(function ($sub) {
-                $sub->whereNull('source_type')->orWhere('source_type', '!=', 'retur_gudang');
-            })
-            ->groupBy('batches_id')
-            ->select('batches_id', \Illuminate\Support\Facades\DB::raw('SUM(qty) as total_counter'))
-            ->pluck('total_counter', 'batches_id');
-
-        $batches = \Illuminate\Support\Facades\DB::table('batches')
-            ->leftJoin('medicines', 'medicines.id', '=', 'batches.medicine_id')
-            ->leftJoin('medicine_categories', 'medicine_categories.id', '=', 'medicines.medicine_category_id')
-            ->whereNotNull('batches.expired_date')
-            ->where('batches.stock', '>=', 0)
-            ->select([
-                'batches.id',
-                'batches.name as batch_name',
-                'batches.expired_date',
-                'batches.stock as batch_stock',
-                'batches.pharmacy_id',
-                'medicines.code as medicine_code',
-                'medicines.name as medicine_name',
-                'medicines.type as medicine_type',
-                'medicines.unit as medicine_unit',
-                'medicine_categories.name as category_name',
-            ])
-            ->orderBy('batches.expired_date', 'asc')
-            ->cursor();
+        if ($isWarehouse) {
+            $batches = \Illuminate\Support\Facades\DB::table('batches')
+                ->leftJoin('medicines', 'medicines.id', '=', 'batches.medicine_id')
+                ->leftJoin('medicine_categories', 'medicine_categories.id', '=', 'medicines.medicine_category_id')
+                ->where('batches.pharmacy_id', $warehouseId)
+                ->whereNotNull('batches.expired_date')
+                ->where('batches.stock', '>', 0)
+                ->select([
+                    'batches.id',
+                    'batches.name as batch_name',
+                    'batches.expired_date',
+                    'batches.stock as batch_stock',
+                    'batches.pharmacy_id',
+                    'medicines.code as medicine_code',
+                    'medicines.name as medicine_name',
+                    'medicines.type as medicine_type',
+                    'medicines.unit as medicine_unit',
+                    'medicine_categories.name as category_name',
+                    \Illuminate\Support\Facades\DB::raw('0 as counter_qty'),
+                ])
+                ->orderBy('batches.expired_date', 'asc')
+                ->cursor();
+        } else {
+            // Cabang apotek: murni dari stok etalase/pelayanan (cabang tidak ada gudang)
+            $batches = \Illuminate\Support\Facades\DB::table('medicine_transfer_items')
+                ->join('batches', 'batches.id', '=', 'medicine_transfer_items.batches_id')
+                ->leftJoin('medicines', 'medicines.id', '=', 'batches.medicine_id')
+                ->leftJoin('medicine_categories', 'medicine_categories.id', '=', 'medicines.medicine_category_id')
+                ->where('batches.pharmacy_id', $this->pharmacyId)
+                ->where('medicine_transfer_items.status', 1)
+                ->where('medicine_transfer_items.qty', '>', 0)
+                ->where(function ($sub) {
+                    $sub->whereNull('medicine_transfer_items.source_type')
+                        ->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang');
+                })
+                ->whereNotNull('batches.expired_date')
+                ->groupBy(
+                    'batches.id',
+                    'batches.name',
+                    'batches.expired_date',
+                    'batches.pharmacy_id',
+                    'medicines.code',
+                    'medicines.name',
+                    'medicines.type',
+                    'medicines.unit',
+                    'medicine_categories.name'
+                )
+                ->select([
+                    'batches.id',
+                    'batches.name as batch_name',
+                    'batches.expired_date',
+                    \Illuminate\Support\Facades\DB::raw('0 as batch_stock'),
+                    'batches.pharmacy_id',
+                    'medicines.code as medicine_code',
+                    'medicines.name as medicine_name',
+                    'medicines.type as medicine_type',
+                    'medicines.unit as medicine_unit',
+                    'medicine_categories.name as category_name',
+                    \Illuminate\Support\Facades\DB::raw('SUM(medicine_transfer_items.qty) as counter_qty'),
+                ])
+                ->orderBy('batches.expired_date', 'asc')
+                ->cursor();
+        }
 
         $no = 1;
         $now = now();
@@ -124,10 +159,12 @@ class ExpiryDateExport implements FromArray, WithStyles, WithColumnWidths, WithT
                 }
             }
 
-            $storageStock = ($batch->pharmacy_id == $warehouseId) ? (int) $batch->batch_stock : 0;
-            $counterStock = (int) ($counterStocks[$batch->id] ?? 0);
-            if ($batch->pharmacy_id != $warehouseId && $counterStock === 0) {
-                $counterStock = (int) $batch->batch_stock;
+            if ($isWarehouse) {
+                $storageStock = (int) $batch->batch_stock;
+                $counterStock = 0;
+            } else {
+                $storageStock = 0;
+                $counterStock = (int) ($batch->counter_qty ?? 0);
             }
             $totalStock = $storageStock + $counterStock;
 
