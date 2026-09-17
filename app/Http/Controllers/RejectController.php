@@ -214,7 +214,7 @@ class RejectController extends Controller
     public function exportReject(Request $request)
     {
         $user = auth()->user();
-        if ($user && $user->hasRole('Kasir') && !$user->hasAnyRole(['administrator', 'General Manager', 'Manager', 'HO', 'operator'])) {
+        if ($user && $user->hasRole('Kasir') && !$user->hasAnyRole(['administrator', 'General Manager', 'Manager', 'manager', 'Koordinator', 'HO', 'operator'])) {
             return response()->json([
                 'message' => 'Role Kasir tidak diizinkan untuk melakukan export Excel data penolakan barang.',
             ], 403);
@@ -246,7 +246,7 @@ class RejectController extends Controller
     public function exportStatus($id)
     {
         $user = auth()->user();
-        if ($user && $user->hasRole('Kasir') && !$user->hasAnyRole(['administrator', 'General Manager', 'Manager', 'HO', 'operator'])) {
+        if ($user && $user->hasRole('Kasir') && !$user->hasAnyRole(['administrator', 'General Manager', 'Manager', 'manager', 'Koordinator', 'HO', 'operator'])) {
             return response()->json([
                 'message' => 'Role Kasir tidak diizinkan untuk mengakses status export.',
             ], 403);

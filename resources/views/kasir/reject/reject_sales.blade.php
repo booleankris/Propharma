@@ -293,7 +293,7 @@
                             </h1>
 
                             @php
-                                $canExportReject = auth()->check() && (!auth()->user()->hasRole('Kasir') || auth()->user()->hasAnyRole(['administrator', 'General Manager', 'Manager', 'HO', 'operator']));
+                                $canExportReject = auth()->check() && (!auth()->user()->hasRole('Kasir') || auth()->user()->hasAnyRole(['administrator', 'General Manager', 'Manager', 'manager', 'Koordinator', 'HO', 'operator']));
                             @endphp
 
                             @if ($canExportReject)

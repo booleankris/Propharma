@@ -60,7 +60,7 @@ class GeneralManagerHomeTest extends TestCase
     {
         $manager = $this->makeUser('Manager Satu', 'General Manager');
         $target = $this->makeUser('Target', 'Kasir');
-        $this->actingAs($manager)->patch(route('general-manager.users.roles', $target), [
+        $this->from(route('home'))->actingAs($manager)->patch(route('general-manager.users.roles', $target), [
             'roles' => ['Kasir', 'HO'], 'name' => 'Changed',
         ])->assertRedirect(route('home'))->assertSessionHas('success');
         $this->assertEqualsCanonicalizing(['Kasir', 'HO'], $target->fresh()->getRoleNames()->all());

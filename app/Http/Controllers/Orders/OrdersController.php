@@ -351,7 +351,7 @@ class OrdersController extends Controller
 
         $user = auth()->user();
         $hasCreditor = !empty($validated['creditor_code']);
-        $role = $user && ($user->hasRole('HO') || $user->hasRole('administrator') || $user->hasRole('Manager')) ? 'HO' : 'Cabang';
+        $role = $user && ($user->hasRole('HO') || $user->hasRole('administrator') || $user->hasRole('Manager') || $user->hasRole('manager') || $user->hasRole('Koordinator')) ? 'HO' : 'Cabang';
 
         $item = OrderItems::create([
             'order_items_code' => $itemCode,
@@ -403,7 +403,7 @@ class OrdersController extends Controller
 
         $user = auth()->user();
         $hasCreditor = !empty($request->creditor_code);
-        $role = $user && ($user->hasRole('HO') || $user->hasRole('administrator') || $user->hasRole('Manager')) ? 'HO' : 'Cabang';
+        $role = $user && ($user->hasRole('HO') || $user->hasRole('administrator') || $user->hasRole('Manager') || $user->hasRole('manager') || $user->hasRole('Koordinator')) ? 'HO' : 'Cabang';
 
         $data = [
             'medicine_id' => $request->medicine_id,
@@ -845,7 +845,7 @@ class OrdersController extends Controller
 
         $user = auth()->user();
         $isWarehouse = isWarehousePharmacy($pharmacyId) || (int) $pharmacyId === 9 || (int) $pharmacyId === 1;
-        if ($user && ($user->hasRole('Gudang PMI') || $user->hasRole('HO') || $user->hasRole('administrator') || $user->hasRole('Manager'))) {
+        if ($user && ($user->hasRole('Gudang PMI') || $user->hasRole('HO') || $user->hasRole('administrator') || $user->hasRole('Manager') || $user->hasRole('manager') || $user->hasRole('Koordinator'))) {
             if (!session()->has('ho_pharmacy_id') || in_array((int) session('ho_pharmacy_id'), [1, 9])) {
                 $isWarehouse = true;
             }

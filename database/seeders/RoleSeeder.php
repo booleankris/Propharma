@@ -11,7 +11,7 @@ class RoleSeeder extends Seeder
     {
         $this->call(GeneralManagerRoleSeeder::class);
 
-        $roles = ['manager', 'UMKM'];
+        $roles = ['Koordinator', 'UMKM'];
 
         foreach ($roles as $role) {
             Role::firstOrCreate(

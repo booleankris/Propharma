@@ -72,8 +72,8 @@ if (!function_exists('getPurchasingPharmacyId')) {
 
         $userPharmacyId = (int) ($user->pharmacy_id ?? 1);
 
-        // Jika akun berada di PMI (1 atau 9) dan memiliki role Gudang PMI, HO, administrator, manager
-        if (($userPharmacyId === 1 || $userPharmacyId === 9) && ($user->hasRole('Gudang PMI') || $user->hasRole('HO') || $user->hasRole('administrator') || $user->hasRole('Manager'))) {
+        // Jika akun berada di PMI (1 atau 9) dan memiliki role Gudang PMI, HO, administrator, manager, Koordinator
+        if (($userPharmacyId === 1 || $userPharmacyId === 9) && ($user->hasRole('Gudang PMI') || $user->hasRole('HO') || $user->hasRole('administrator') || $user->hasRole('Manager') || $user->hasRole('manager') || $user->hasRole('Koordinator'))) {
             return 9; // Selalu ke Gudang PMI
         }
 
@@ -124,7 +124,7 @@ if (!function_exists('canAccessWarehouseStock')) {
         }
 
         $user = auth()->user();
-        if ($user && ($user->hasRole('HO') || $user->hasRole('administrator') || $user->hasRole('Manager') || $user->hasRole('Gudang PMI'))) {
+        if ($user && ($user->hasRole('HO') || $user->hasRole('administrator') || $user->hasRole('Manager') || $user->hasRole('manager') || $user->hasRole('Koordinator') || $user->hasRole('Gudang PMI'))) {
             return true;
         }
 
@@ -156,7 +156,7 @@ if (!function_exists('canAccessPurchasing')) {
             return false;
         }
 
-        if ($user && ($user->hasRole('HO') || $user->hasRole('administrator') || $user->hasRole('Manager') || $user->hasRole('Gudang PMI'))) {
+        if ($user && ($user->hasRole('HO') || $user->hasRole('administrator') || $user->hasRole('Manager') || $user->hasRole('manager') || $user->hasRole('Koordinator') || $user->hasRole('Gudang PMI'))) {
             return true;
         }
 

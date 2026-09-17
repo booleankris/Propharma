@@ -740,7 +740,7 @@
             </a>
         @endrole
 
-        @hasanyrole('HO|operator|Operator|administrator|manager|Manager')
+        @hasanyrole('HO|operator|Operator|administrator')
             <div class="nav-section-title">Master Data</div>
 
             <a onclick="openModal('masterModal')" class="nav-item" style="cursor:pointer;">
@@ -765,7 +765,7 @@
             Profil
         </a>
 
-        @if (!isWarehousePharmacy() && !isOnlineRole())
+        @if (!isWarehousePharmacy() && !isOnlineRole() && !auth()->user()->hasAnyRole(['Koordinator', 'manager', 'Manager']))
             <a href="{{ url('staff-stats') }}" class="nav-item {{ request()->is('staff-stats*') ? 'active' : '' }}">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1479,7 +1479,7 @@
     </div>
 </div>
 
-@hasanyrole('HO|operator|Operator|administrator|manager|Manager')
+@hasanyrole('HO|operator|Operator|administrator')
     {{-- Master Modal --}}
     <div id="masterModal"
         class="modal-hide modal-transition fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2

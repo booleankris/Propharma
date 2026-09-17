@@ -163,7 +163,7 @@ Route::middleware(['auth', 'role:General Manager'])->prefix('reported-medicines'
     Route::get('/export', [ReportedMedicineController::class, 'export'])->name('export');
 });
 Route::get('/home', [HomeController::class, 'index'])
-    ->middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrator|manager|Online|Online Grab|Online Shopee|Digital|UMKM|operator'])
+    ->middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrator|manager|Koordinator|Online|Online Grab|Online Shopee|Digital|UMKM|operator'])
     ->name('home');
 
 Route::middleware(['auth', 'role:General Manager'])->prefix('general-manager')->name('general-manager.')->group(function () {
@@ -172,7 +172,7 @@ Route::middleware(['auth', 'role:General Manager'])->prefix('general-manager')->
     Route::put('/users/{user}', [\App\Http\Controllers\GeneralManagerController::class, 'update'])->name('users.update');
 });
 
-Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrator|manager|Online|Online Grab|Online Shopee|Digital|UMKM|operator'])->group(function () {
+Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrator|manager|Koordinator|Online|Online Grab|Online Shopee|Digital|UMKM|operator'])->group(function () {
     Route::get('/near-expiry', [HomeController::class, 'nearExpiry'])->name('kasir.nearExpiry');
     Route::get('/stock-notifications', [HomeController::class, 'stockNotifications'])->name('kasir.stockNotifications');
 
@@ -235,7 +235,7 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
     // ================================================================== Add Data =========================================================================
 
     // Master Data (Role HO & Operator)
-    Route::middleware(['role:HO|operator|Operator|administrator|manager|Manager'])->group(function () {
+    Route::middleware(['role:HO|operator|Operator|administrator'])->group(function () {
         Route::resource('creditors', CreditorsController::class)->except(['show']);
         Route::resource('debtors', DebtorsController::class)->except(['show']);
         Route::resource('patients', PatientsController::class)->except(['show']);

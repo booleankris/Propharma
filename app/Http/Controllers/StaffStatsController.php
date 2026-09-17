@@ -14,6 +14,17 @@ use Yajra\DataTables\Facades\DataTables;
 
 class StaffStatsController extends Controller
 {
+    public function __construct()
+    {
+        $this->middleware(function ($request, $next) {
+            $user = auth()->user();
+            if ($user && $user->hasAnyRole(['Koordinator', 'manager', 'Manager'])) {
+                abort(403, 'Akses ditolak: Koordinator tidak memiliki akses ke Statistik Kasir.');
+            }
+            return $next($request);
+        });
+    }
+
     /**
      * Display the main Staff Analytics Dashboard
      */
