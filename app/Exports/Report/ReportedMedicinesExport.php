@@ -31,7 +31,11 @@ class ReportedMedicinesExport implements WithMultipleSheets
     public function sheets(): array
     {
         $sheets = [];
-        $reported = ReportedMedicine::with('medicine')->get();
+        $query = ReportedMedicine::with('medicine');
+        if ($this->pharmacyId) {
+            $query->where('pharmacy_id', $this->pharmacyId);
+        }
+        $reported = $query->get();
 
         $usedTitles = [];
 

@@ -171,6 +171,29 @@
             background: #dbeafe;
         }
 
+        .btn-kwitansi {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 6px;
+            border: 0.5px solid #a7f3d0;
+            background: #ecfdf5;
+            color: #059669;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all .12s;
+            line-height: 1.4;
+        }
+
+        .btn-kwitansi:hover {
+            background: #d1fae5;
+            color: #047857;
+            border-color: #6ee7b7;
+        }
+
         /* ── Qty badge ── */
         .qty-badge {
             display: inline-block;
@@ -464,6 +487,27 @@
                             <span>Total</span>
                             <span id="detail-total">—</span>
                         </div>
+                        <div class="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-gray-100">
+                            <button type="button" id="btn-detail-struk"
+                                class="flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold transition-all">
+                                <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
+                                    <polyline points="4 6 4 1 12 1 12 6"/>
+                                    <path d="M4 12H3a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1"/>
+                                    <rect x="4" y="10" width="8" height="5"/>
+                                </svg>
+                                <span>Cetak Struk</span>
+                            </button>
+                            <button type="button" id="btn-detail-kwitansi"
+                                class="flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-semibold transition-all">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                    <polyline points="14 2 14 8 20 8"></polyline>
+                                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                                </svg>
+                                <span>Cetak Kwitansi</span>
+                            </button>
+                        </div>
                     </div>
 
                 </div>
@@ -597,13 +641,26 @@
                         data: null,
                         orderable: false,
                         searchable: false,
-                        render: (d) =>
-                            `<button class="btn-print" onclick="event.stopPropagation(); window.open('/print/receipt/${d.transactions.id}','_blank')">
-                    <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
-                        <polyline points="4 6 4 1 12 1 12 6"/>
-                        <path d="M4 12H3a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1"/>
-                        <rect x="4" y="10" width="8" height="5"/>
-                    </svg>Cetak</button>`
+                        render: (d) => {
+                            const trxId = d.transactions?.id || d.transaction_id;
+                            return `<div class="flex items-center gap-1 justify-center">
+                                <button class="btn-print" onclick="event.stopPropagation(); window.open('/print/receipt/${trxId}','_blank')" title="Cetak Struk POS Thermal">
+                                    <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
+                                        <polyline points="4 6 4 1 12 1 12 6"/>
+                                        <path d="M4 12H3a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1"/>
+                                        <rect x="4" y="10" width="8" height="5"/>
+                                    </svg>Struk
+                                </button>
+                                <button class="btn-kwitansi" onclick="event.stopPropagation(); window.open('/print/kwitansi/${trxId}','_blank')" title="Cetak Kwitansi Format Apotek">
+                                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                        <polyline points="14 2 14 8 20 8"/>
+                                        <line x1="16" y1="13" x2="8" y2="13"/>
+                                        <line x1="16" y1="17" x2="8" y2="17"/>
+                                    </svg>Kwitansi
+                                </button>
+                            </div>`;
+                        }
                     },
                 ],
             });
@@ -614,16 +671,31 @@
             });
 
             // ── Row click → load items ────────────────────────────────────────
+            let currentSelectedTrxId = null;
+
             $('#table-data tbody').on('click', 'tr', function() {
                 const data = tableData.row(this).data();
                 if (!data) return;
                 $('#table-data tbody tr').removeClass('active');
                 $(this).addClass('active');
+                currentSelectedTrxId = data.transactions?.id || data.transaction_id;
                 document.getElementById('detail-code').textContent = data.code;
                 document.getElementById('detail-channel-badge').innerHTML = data.channel || '';
                 document.getElementById('detail-patient').textContent = data.name || 'Umum / Tanpa Pasien';
                 document.getElementById('detail-creator').textContent = data.creator_name || '-';
                 loadItems(data.transaction_id, data.final_price, data.subtotal, data.totaldiscount);
+            });
+
+            $('#btn-detail-struk').on('click', function() {
+                if (currentSelectedTrxId) {
+                    window.open(`/print/receipt/${currentSelectedTrxId}`, '_blank');
+                }
+            });
+
+            $('#btn-detail-kwitansi').on('click', function() {
+                if (currentSelectedTrxId) {
+                    window.open(`/print/kwitansi/${currentSelectedTrxId}`, '_blank');
+                }
             });
         });
 

@@ -1660,7 +1660,7 @@
                     <span class="text-sm font-semibold text-lime-700 group-hover:text-white transition-colors">Master
                         Etalase</span>
                 </a>
-                @hasanyrole('HO|administrator')
+                @hasrole('General Manager')
                     <a href="{{ route('reported-medicines.index') }}"
                         class="group flex items-center gap-3 p-3.5 rounded-2xl bg-rose-50 hover:bg-rose-500 border border-rose-100 hover:border-rose-500 transition-all duration-200 hover:-translate-y-0.5">
                         <div
@@ -2280,7 +2280,7 @@
 
         <!-- Date Filter Toolbar -->
         <div
-            class="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
+            class="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 flex flex-col md:flex-row items-center justify-between gap-3 shadow-xs">
             <div class="flex items-center gap-2 text-slate-700 font-bold text-xs uppercase tracking-wider">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
                     fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
@@ -2292,105 +2292,128 @@
                     <path d="M8 3v4" />
                     <path d="M4 11h16" />
                 </svg>
-                Periode Laporan
+                Filter Export
             </div>
-            <div class="flex items-center gap-2 w-full sm:w-auto">
-                <input type="text" id="export_center_start_date" value="{{ now()->format('Y-m-d') }}"
-                    autocomplete="off"
-                    class="flatpickr-date rounded-xl border-slate-200 text-xs font-semibold py-2 px-3 focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 shadow-xs cursor-pointer">
-                <span class="text-xs text-slate-400 font-medium">s/d</span>
-                <input type="text" id="export_center_end_date" value="{{ now()->format('Y-m-d') }}"
-                    autocomplete="off"
-                    class="flatpickr-date rounded-xl border-slate-200 text-xs font-semibold py-2 px-3 focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 shadow-xs cursor-pointer">
+            <div class="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                @if (auth()->user()->hasRole('General Manager'))
+                    @php
+                        $exportPharmacies = \App\Models\Pharmacies::whereNotIn('id', [6, 8])->orderBy('id', 'asc')->get();
+                        $activePhId = getActivePharmacyId();
+                    @endphp
+                    <div class="flex items-center gap-1.5">
+                        <span class="text-[11px] text-slate-500 font-semibold">Cabang:</span>
+                        <select id="export_center_pharmacy_id"
+                            class="rounded-xl border-slate-200 text-xs font-semibold py-2 px-2.5 focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 shadow-xs bg-white cursor-pointer">
+                            @foreach ($exportPharmacies as $ep)
+                                <option value="{{ $ep->id }}" {{ $ep->id == $activePhId ? 'selected' : '' }}>
+                                    {{ $ep->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                @endif
+                <div class="flex items-center gap-2">
+                    <input type="text" id="export_center_start_date" value="{{ now()->format('Y-m-d') }}"
+                        autocomplete="off"
+                        class="flatpickr-date rounded-xl border-slate-200 text-xs font-semibold py-2 px-3 focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 shadow-xs cursor-pointer">
+                    <span class="text-xs text-slate-400 font-medium">s/d</span>
+                    <input type="text" id="export_center_end_date" value="{{ now()->format('Y-m-d') }}"
+                        autocomplete="off"
+                        class="flatpickr-date rounded-xl border-slate-200 text-xs font-semibold py-2 px-3 focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 shadow-xs cursor-pointer">
+                </div>
             </div>
         </div>
 
-        <!-- Section 1: Pengawasan & Regulasi (HO & Gudang) -->
-        @if (auth()->user()->hasRole('HO') || isWarehousePharmacy())
+        <!-- Section 1: Pengawasan & Regulasi -->
+        @if (auth()->user()->hasRole('General Manager') || auth()->user()->hasRole('HO') || isWarehousePharmacy())
             <div>
                 <div class="flex items-center gap-2 mb-3">
                     <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Laporan Regulasi &
-                        Monitoring (Gudang & HO)</span>
+                        Monitoring</span>
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <!-- Card SIPNAP -->
-                    <div
-                        class="bg-gradient-to-br from-amber-50/60 to-orange-50/60 border border-amber-200/80 rounded-2xl p-4 flex flex-col justify-between hover:shadow-md transition-all">
-                        <div>
-                            <div class="flex items-start justify-between gap-2 mb-2">
-                                <div
-                                    class="w-8 h-8 rounded-xl bg-amber-100 border border-amber-200 flex items-center justify-center text-amber-700">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"
-                                        viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                                        class="icon icon-tabler icons-tabler-outline icon-tabler-pill">
-                                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                                        <path d="M4.5 12.5l8 -8a4.95 4.95 0 1 1 7 7l-8 8a4.95 4.95 0 0 1 -7 -7z" />
-                                        <path d="M8.5 8.5l7 7" />
-                                    </svg>
+                    <!-- Card SIPNAP (Khusus General Manager) -->
+                    @if (auth()->user()->hasRole('General Manager'))
+                        <div
+                            class="bg-gradient-to-br from-amber-50/60 to-orange-50/60 border border-amber-200/80 rounded-2xl p-4 flex flex-col justify-between hover:shadow-md transition-all">
+                            <div>
+                                <div class="flex items-start justify-between gap-2 mb-2">
+                                    <div
+                                        class="w-8 h-8 rounded-xl bg-amber-100 border border-amber-200 flex items-center justify-center text-amber-700">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"
+                                            viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                            class="icon icon-tabler icons-tabler-outline icon-tabler-pill">
+                                            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                            <path d="M4.5 12.5l8 -8a4.95 4.95 0 1 1 7 7l-8 8a4.95 4.95 0 0 1 -7 -7z" />
+                                            <path d="M8.5 8.5l7 7" />
+                                        </svg>
+                                    </div>
+                                    <span
+                                        class="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">SIPNAP</span>
                                 </div>
-                                <span
-                                    class="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">SIPNAP</span>
+                                <h4 class="text-sm font-bold text-slate-800 leading-snug mb-1">Narkotika & Psikotropika
+                                </h4>
+                                <p class="text-[11px] text-slate-500 leading-relaxed mb-4">Mutasi obat Narkotika,
+                                    Psikotropika, OOT, dan Prekursor (Awal, Masuk, Keluar, Saldo, Fisik, Selisih, ED).</p>
                             </div>
-                            <h4 class="text-sm font-bold text-slate-800 leading-snug mb-1">Narkotika & Psikotropika
-                            </h4>
-                            <p class="text-[11px] text-slate-500 leading-relaxed mb-4">Mutasi obat Narkotika,
-                                Psikotropika, OOT, dan Prekursor (Awal, Masuk, Keluar, Saldo, Fisik, Selisih, ED).</p>
+                            <button onclick="triggerExportCenter('special_medicines')"
+                                class="w-full inline-flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-xs transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+                                    viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                    stroke-linecap="round" stroke-linejoin="round"
+                                    class="icon icon-tabler icons-tabler-outline icon-tabler-download">
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                    <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2" />
+                                    <path d="M7 11l5 5l5 -5" />
+                                    <path d="M12 4l0 12" />
+                                </svg>
+                                Export Excel SIPNAP
+                            </button>
                         </div>
-                        <button onclick="triggerExportCenter('special_medicines')"
-                            class="w-full inline-flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-xs transition-colors">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
-                                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                                stroke-linecap="round" stroke-linejoin="round"
-                                class="icon icon-tabler icons-tabler-outline icon-tabler-download">
-                                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                                <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2" />
-                                <path d="M7 11l5 5l5 -5" />
-                                <path d="M12 4l0 12" />
-                            </svg>
-                            Export Excel SIPNAP
-                        </button>
-                    </div>
+                    @endif
 
                     <!-- Card Monitoring ED -->
-                    <div
-                        class="bg-gradient-to-br from-teal-50/60 to-emerald-50/60 border border-teal-200/80 rounded-2xl p-4 flex flex-col justify-between hover:shadow-md transition-all">
-                        <div>
-                            <div class="flex items-start justify-between gap-2 mb-2">
-                                <div
-                                    class="w-8 h-8 rounded-xl bg-teal-100 border border-teal-200 flex items-center justify-center text-teal-700">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"
-                                        viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                                        class="icon icon-tabler icons-tabler-outline icon-tabler-hourglass-high">
-                                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                                        <path d="M6.5 7h11" />
-                                        <path d="M6 20v-2a6 6 0 1 1 12 0v2a1 1 0 0 1 -1 1h-10a1 1 0 0 1 -1 -1z" />
-                                        <path d="M6 4v2a6 6 0 1 0 12 0v-2a1 1 0 0 0 -1 -1h-10a1 1 0 0 0 -1 1z" />
-                                    </svg>
+                    @if (auth()->user()->hasRole('General Manager') || auth()->user()->hasRole('HO') || isWarehousePharmacy())
+                        <div
+                            class="bg-gradient-to-br from-teal-50/60 to-emerald-50/60 border border-teal-200/80 rounded-2xl p-4 flex flex-col justify-between hover:shadow-md transition-all">
+                            <div>
+                                <div class="flex items-start justify-between gap-2 mb-2">
+                                    <div
+                                        class="w-8 h-8 rounded-xl bg-teal-100 border border-teal-200 flex items-center justify-center text-teal-700">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"
+                                            viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                                            class="icon icon-tabler icons-tabler-outline icon-tabler-hourglass-high">
+                                            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                            <path d="M6.5 7h11" />
+                                            <path d="M6 20v-2a6 6 0 1 1 12 0v2a1 1 0 0 1 -1 1h-10a1 1 0 0 1 -1 -1z" />
+                                            <path d="M6 4v2a6 6 0 1 0 12 0v-2a1 1 0 0 0 -1 -1h-10a1 1 0 0 0 -1 1z" />
+                                        </svg>
+                                    </div>
+                                    <span
+                                        class="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-teal-100 text-teal-800 border border-teal-200">Semua
+                                        Batch</span>
                                 </div>
-                                <span
-                                    class="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-teal-100 text-teal-800 border border-teal-200">Semua
-                                    Batch</span>
+                                <h4 class="text-sm font-bold text-slate-800 leading-snug mb-1">Data Kadaluarsa (ED)</h4>
+                                <p class="text-[11px] text-slate-500 leading-relaxed mb-4">Daftar seluruh batch obat
+                                    dengan tanggal ED, sisa waktu, status kadaluarsa, stok gudang & pelayanan.</p>
                             </div>
-                            <h4 class="text-sm font-bold text-slate-800 leading-snug mb-1">Data Kadaluarsa (ED)</h4>
-                            <p class="text-[11px] text-slate-500 leading-relaxed mb-4">Daftar seluruh batch obat
-                                dengan tanggal ED, sisa waktu, status kadaluarsa, stok gudang & pelayanan.</p>
+                            <button onclick="triggerExportCenter('expiry_dates')"
+                                class="w-full inline-flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold shadow-xs transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+                                    viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                    stroke-linecap="round" stroke-linejoin="round"
+                                    class="icon icon-tabler icons-tabler-outline icon-tabler-download">
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                    <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2" />
+                                    <path d="M7 11l5 5l5 -5" />
+                                    <path d="M12 4l0 12" />
+                                </svg>
+                                Export Monitoring ED
+                            </button>
                         </div>
-                        <button onclick="triggerExportCenter('expiry_dates')"
-                            class="w-full inline-flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold shadow-xs transition-colors">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
-                                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                                stroke-linecap="round" stroke-linejoin="round"
-                                class="icon icon-tabler icons-tabler-outline icon-tabler-download">
-                                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                                <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2" />
-                                <path d="M7 11l5 5l5 -5" />
-                                <path d="M12 4l0 12" />
-                            </svg>
-                            Export Monitoring ED
-                        </button>
-                    </div>
+                    @endif
                 </div>
             </div>
         @endif
@@ -2613,6 +2636,10 @@
             formData.append('_token', token);
             formData.append('start_date', startDate);
             formData.append('end_date', endDate);
+            const exportPharmacyId = document.getElementById('export_center_pharmacy_id')?.value;
+            if (exportPharmacyId) {
+                formData.append('pharmacy_id', exportPharmacyId);
+            }
 
             const res = await fetch(url, {
                 method: 'POST',

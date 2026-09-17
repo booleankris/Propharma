@@ -1414,6 +1414,9 @@
                         className: 'py-3 px-3 text-xs'
                     },
                 ],
+                order: [
+                    [1, 'asc']
+                ],
                 paging: true,
                 pageLength: 10,
                 lengthChange: false,

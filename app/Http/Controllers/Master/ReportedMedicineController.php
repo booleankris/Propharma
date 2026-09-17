@@ -9,6 +9,7 @@ use App\Models\Pharmacies;
 use App\Models\ReportedMedicine;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Facades\Excel;
 use Yajra\DataTables\Facades\DataTables;
 
@@ -16,17 +17,47 @@ class ReportedMedicineController extends Controller
 {
     public function __construct()
     {
-        $this->middleware(['auth', 'role:HO|administrator']);
+        $this->middleware(['auth', 'role:General Manager']);
     }
 
     /**
-     * Tampilkan halaman utama & respon DataTables
+     * Tampilkan halaman utama & respon DataTables per cabang
      */
     public function index(Request $request)
     {
+        $selectedPharmacyId = $request->filled('pharmacy_id') ? (int)$request->pharmacy_id : getActivePharmacyId();
+        if (!$selectedPharmacyId || $selectedPharmacyId === 6) {
+            $selectedPharmacyId = 1; // Default ke Sahabat PMI jika HO atau 0
+        }
+
         if ($request->ajax()) {
-            $query = ReportedMedicine::with(['medicine.category', 'medicine.factory', 'user'])
+            $pharmacyId = $request->filled('pharmacy_id') ? (int)$request->pharmacy_id : $selectedPharmacyId;
+
+            $query = ReportedMedicine::with(['medicine.category', 'medicine.factory', 'user', 'pharmacy'])
+                ->where('pharmacy_id', $pharmacyId)
                 ->select('reported_medicines.*');
+
+            // Pre-calculate branch stock (batches.stock + medicine_transfer_items.qty)
+            $batchesStocks = DB::table('batches')
+                ->where('pharmacy_id', $pharmacyId)
+                ->groupBy('medicine_id')
+                ->select('medicine_id', DB::raw('SUM(stock) as total_stock'))
+                ->pluck('total_stock', 'medicine_id');
+
+            $counterStocks = collect();
+            if ($pharmacyId !== 9) {
+                $counterStocks = DB::table('medicine_transfer_items')
+                    ->join('batches', 'medicine_transfer_items.batches_id', '=', 'batches.id')
+                    ->where('batches.pharmacy_id', $pharmacyId)
+                    ->where('medicine_transfer_items.status', 1)
+                    ->where(function ($q) {
+                        $q->whereNull('medicine_transfer_items.source_type')
+                          ->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang');
+                    })
+                    ->groupBy('batches.medicine_id')
+                    ->select('batches.medicine_id', DB::raw('SUM(medicine_transfer_items.qty) as total_qty'))
+                    ->pluck('total_qty', 'batches.medicine_id');
+            }
 
             return DataTables::of($query)
                 ->addIndexColumn()
@@ -45,8 +76,9 @@ class ReportedMedicineController extends Controller
                 ->addColumn('unit', function ($row) {
                     return $row->medicine ? ($row->medicine->unit ?: '-') : '-';
                 })
-                ->addColumn('stock', function ($row) {
-                    $stock = $row->medicine ? (int)$row->medicine->stock : 0;
+                ->addColumn('stock', function ($row) use ($batchesStocks, $counterStocks) {
+                    $medId = $row->medicine_id;
+                    $stock = (int)($batchesStocks[$medId] ?? 0) + (int)($counterStocks[$medId] ?? 0);
                     return '<span style="display:inline-flex; align-items:center; padding:2px 8px; border-radius:9999px; font-weight:700; font-size:11px; background-color:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe;">' . number_format($stock) . '</span>';
                 })
                 ->addColumn('added_by', function ($row) {
@@ -70,24 +102,31 @@ class ReportedMedicineController extends Controller
                             </div>';
                 })
                 ->rawColumns(['name', 'stock', 'notes', 'action'])
+                ->with([
+                    'total_reported' => ReportedMedicine::where('pharmacy_id', $pharmacyId)->count(),
+                ])
                 ->toJson();
         }
 
-        $pharmacies = Pharmacies::whereNotIn('id', [6, 8])->orderBy('name', 'asc')->get();
-        $totalReported = ReportedMedicine::count();
+        $pharmacies = Pharmacies::whereNotIn('id', [6, 8])->orderBy('id', 'asc')->get();
+        $totalReported = ReportedMedicine::where('pharmacy_id', $selectedPharmacyId)->count();
 
-        return view('master.reported-medicines.index', compact('pharmacies', 'totalReported'));
+        return view('master.reported-medicines.index', compact('pharmacies', 'totalReported', 'selectedPharmacyId'));
     }
 
     /**
-     * Endpoint Select2 pencarian master obat
+     * Endpoint Select2 pencarian master obat per cabang
      */
     public function searchMedicines(Request $request)
     {
         $q = trim((string)$request->q);
+        $pharmacyId = $request->filled('pharmacy_id') ? (int)$request->pharmacy_id : getActivePharmacyId();
+        if (!$pharmacyId || $pharmacyId === 6) {
+            $pharmacyId = 1;
+        }
 
-        // Ambil ID obat yang sudah masuk daftar pelaporan agar tidak dipilih ganda
-        $alreadyReportedIds = ReportedMedicine::pluck('medicine_id')->toArray();
+        // Ambil ID obat yang sudah masuk daftar pelaporan pada cabang ini
+        $alreadyReportedIds = ReportedMedicine::where('pharmacy_id', $pharmacyId)->pluck('medicine_id')->toArray();
 
         $query = Medicines::query()
             ->where('status', 1)
@@ -103,12 +142,38 @@ class ReportedMedicineController extends Controller
 
         $items = $query->orderBy('name', 'asc')->take(40)->get(['id', 'code', 'name', 'unit', 'stock']);
 
+        // Calculate branch stock for search result items
+        $itemIds = $items->pluck('id');
+        $batchesStocks = DB::table('batches')
+            ->where('pharmacy_id', $pharmacyId)
+            ->whereIn('medicine_id', $itemIds)
+            ->groupBy('medicine_id')
+            ->select('medicine_id', DB::raw('SUM(stock) as total_stock'))
+            ->pluck('total_stock', 'medicine_id');
+
+        $counterStocks = collect();
+        if ($pharmacyId !== 9) {
+            $counterStocks = DB::table('medicine_transfer_items')
+                ->join('batches', 'medicine_transfer_items.batches_id', '=', 'batches.id')
+                ->where('batches.pharmacy_id', $pharmacyId)
+                ->whereIn('batches.medicine_id', $itemIds)
+                ->where('medicine_transfer_items.status', 1)
+                ->where(function ($q) {
+                    $q->whereNull('medicine_transfer_items.source_type')
+                      ->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang');
+                })
+                ->groupBy('batches.medicine_id')
+                ->select('batches.medicine_id', DB::raw('SUM(medicine_transfer_items.qty) as total_qty'))
+                ->pluck('total_qty', 'batches.medicine_id');
+        }
+
         $results = [];
         foreach ($items as $item) {
+            $branchStock = (int)($batchesStocks[$item->id] ?? 0) + (int)($counterStocks[$item->id] ?? 0);
             $results[] = [
                 'id'    => $item->id,
-                'text'  => $item->name . ' (' . ($item->code ?: 'No Code') . ')' . ($item->unit ? ' - ' . $item->unit : '') . ' [Stok: ' . $item->stock . ']',
-                'stock' => $item->stock,
+                'text'  => $item->name . ' (' . ($item->code ?: 'No Code') . ')' . ($item->unit ? ' - ' . $item->unit : '') . ' [Stok Cabang: ' . number_format($branchStock) . ']',
+                'stock' => $branchStock,
                 'code'  => $item->code,
             ];
         }
@@ -117,27 +182,34 @@ class ReportedMedicineController extends Controller
     }
 
     /**
-     * Tambahkan obat ke daftar wajib lapor
+     * Tambahkan obat ke daftar wajib lapor cabang
      */
     public function store(Request $request)
     {
         $request->validate([
             'medicine_id' => 'required|exists:medicines,id',
+            'pharmacy_id' => 'required|exists:pharmacies,id',
             'notes'       => 'nullable|string|max:255',
         ], [
             'medicine_id.required' => 'Silakan pilih obat yang ingin ditambahkan.',
             'medicine_id.exists'   => 'Obat yang dipilih tidak valid.',
+            'pharmacy_id.required' => 'Silakan tentukan cabang apotek.',
+            'pharmacy_id.exists'   => 'Cabang apotek tidak valid.',
         ]);
 
-        $exists = ReportedMedicine::where('medicine_id', $request->medicine_id)->exists();
+        $exists = ReportedMedicine::where('medicine_id', $request->medicine_id)
+            ->where('pharmacy_id', $request->pharmacy_id)
+            ->exists();
+
         if ($exists) {
             return response()->json([
                 'status'  => 'error',
-                'message' => 'Obat ini sudah terdaftar dalam daftar pelaporan obat.',
+                'message' => 'Obat ini sudah terdaftar dalam daftar pelaporan apotek cabang ini.',
             ], 422);
         }
 
         ReportedMedicine::create([
+            'pharmacy_id' => $request->pharmacy_id,
             'medicine_id' => $request->medicine_id,
             'user_id'     => auth()->id(),
             'notes'       => $request->notes,
@@ -145,7 +217,7 @@ class ReportedMedicineController extends Controller
 
         return response()->json([
             'status'  => 'success',
-            'message' => 'Obat berhasil ditambahkan ke daftar wajib lapor.',
+            'message' => 'Obat berhasil ditambahkan ke daftar wajib lapor cabang.',
         ]);
     }
 
@@ -179,7 +251,7 @@ class ReportedMedicineController extends Controller
 
         return response()->json([
             'status'  => 'success',
-            'message' => 'Obat berhasil dihapus dari daftar wajib lapor.',
+            'message' => 'Obat berhasil dihapus dari daftar wajib lapor cabang.',
         ]);
     }
 

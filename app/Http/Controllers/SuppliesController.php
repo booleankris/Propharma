@@ -1041,9 +1041,20 @@ class SuppliesController extends Controller
                 }
             }
 
-            $items->orderBy('date', 'desc')->orderBy('id', 'desc');
+            $items->orderBy('date', 'asc')->orderBy('id', 'asc');
 
             return DataTables::eloquent($items)
+                ->order(function ($q) use ($request) {
+                    if ($request->has('order')) {
+                        $orderColIdx = (int) $request->input('order.0.column');
+                        $orderDir = strtolower($request->input('order.0.dir', 'asc')) === 'desc' ? 'desc' : 'asc';
+                        if ($orderColIdx === 1) {
+                            $q->orderBy('date', $orderDir)->orderBy('id', $orderDir);
+                            return;
+                        }
+                    }
+                    $q->orderBy('date', 'asc')->orderBy('id', 'asc');
+                })
                 ->addIndexColumn()
                 ->addColumn('date', function ($row) {
                     $d = $row->date ? \Carbon\Carbon::parse($row->date) : null;

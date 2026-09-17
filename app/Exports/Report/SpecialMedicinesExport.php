@@ -152,47 +152,79 @@ class SpecialCategoryAllInOneSheet implements FromArray, WithStyles, WithColumnW
         $rows[] = ['LAPORAN MUTASI OBAT GOLONGAN KHUSUS (SIPNAP)'];
         $rows[] = ['Periode: ' . $this->startDate->format('d/m/Y') . ' s/d ' . $this->endDate->format('d/m/Y')];
         $rows[] = [''];
-        // Pre-aggregate queries in bulk for high performance and low memory
+        // Pre-aggregate queries in bulk for high performance and low memory - FILTERED BY PHARMACY
         $inBeforeGroup = \Illuminate\Support\Facades\DB::table('items_log')
-            ->where('created_at', '<', $this->startDate)
-            ->whereIn('status', [2, 3, 5, 7])
-            ->groupBy('medicine_id')
-            ->select('medicine_id', \Illuminate\Support\Facades\DB::raw('SUM(qty) as total_qty'))
+            ->join('batches', 'items_log.batches_id', '=', 'batches.id')
+            ->where('batches.pharmacy_id', $this->pharmacyId)
+            ->where('items_log.created_at', '<', $this->startDate)
+            ->whereIn('items_log.status', [2, 3, 5, 7])
+            ->groupBy('items_log.medicine_id')
+            ->select('items_log.medicine_id', \Illuminate\Support\Facades\DB::raw('SUM(items_log.qty) as total_qty'))
             ->pluck('total_qty', 'medicine_id');
 
         $outBeforeGroup = \Illuminate\Support\Facades\DB::table('items_log')
-            ->where('created_at', '<', $this->startDate)
-            ->whereIn('status', [1, 4, 6])
-            ->groupBy('medicine_id')
-            ->select('medicine_id', \Illuminate\Support\Facades\DB::raw('SUM(qty) as total_qty'))
+            ->join('batches', 'items_log.batches_id', '=', 'batches.id')
+            ->where('batches.pharmacy_id', $this->pharmacyId)
+            ->where('items_log.created_at', '<', $this->startDate)
+            ->whereIn('items_log.status', [1, 4, 6])
+            ->groupBy('items_log.medicine_id')
+            ->select('items_log.medicine_id', \Illuminate\Support\Facades\DB::raw('SUM(items_log.qty) as total_qty'))
             ->pluck('total_qty', 'medicine_id');
 
         $inRangeGroup = \Illuminate\Support\Facades\DB::table('items_log')
-            ->whereBetween('created_at', [$this->startDate, $this->endDate])
-            ->whereIn('status', [2, 3, 5, 7])
-            ->groupBy('medicine_id')
-            ->select('medicine_id', \Illuminate\Support\Facades\DB::raw('SUM(qty) as total_qty'))
+            ->join('batches', 'items_log.batches_id', '=', 'batches.id')
+            ->where('batches.pharmacy_id', $this->pharmacyId)
+            ->whereBetween('items_log.created_at', [$this->startDate, $this->endDate])
+            ->whereIn('items_log.status', [2, 3, 5, 7])
+            ->groupBy('items_log.medicine_id')
+            ->select('items_log.medicine_id', \Illuminate\Support\Facades\DB::raw('SUM(items_log.qty) as total_qty'))
             ->pluck('total_qty', 'medicine_id');
 
         $outRangeGroup = \Illuminate\Support\Facades\DB::table('items_log')
-            ->whereBetween('created_at', [$this->startDate, $this->endDate])
-            ->whereIn('status', [1, 4, 6])
-            ->groupBy('medicine_id')
-            ->select('medicine_id', \Illuminate\Support\Facades\DB::raw('SUM(qty) as total_qty'))
+            ->join('batches', 'items_log.batches_id', '=', 'batches.id')
+            ->where('batches.pharmacy_id', $this->pharmacyId)
+            ->whereBetween('items_log.created_at', [$this->startDate, $this->endDate])
+            ->whereIn('items_log.status', [1, 4, 6])
+            ->groupBy('items_log.medicine_id')
+            ->select('items_log.medicine_id', \Illuminate\Support\Facades\DB::raw('SUM(items_log.qty) as total_qty'))
             ->pluck('total_qty', 'medicine_id');
 
+        // Batches stock in this pharmacy
         $batchesStockGroup = \Illuminate\Support\Facades\DB::table('batches')
-            ->where(function ($q) {
-                $q->where('pharmacy_id', $this->pharmacyId)
-                  ->orWhere('pharmacy_id', 9);
-            })
+            ->where('pharmacy_id', $this->pharmacyId)
             ->groupBy('medicine_id')
             ->select('medicine_id', \Illuminate\Support\Facades\DB::raw('SUM(stock) as total_stock'))
             ->pluck('total_stock', 'medicine_id');
 
+        // Counter / Etalase stock in this pharmacy (for retail branches)
+        $counterStockGroup = collect();
+        if ((int)$this->pharmacyId !== 9) {
+            $counterStockGroup = \Illuminate\Support\Facades\DB::table('medicine_transfer_items')
+                ->join('batches', 'medicine_transfer_items.batches_id', '=', 'batches.id')
+                ->where('batches.pharmacy_id', $this->pharmacyId)
+                ->where('medicine_transfer_items.status', 1)
+                ->where(function ($q) {
+                    $q->whereNull('medicine_transfer_items.source_type')
+                      ->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang');
+                })
+                ->groupBy('batches.medicine_id')
+                ->select('batches.medicine_id', \Illuminate\Support\Facades\DB::raw('SUM(medicine_transfer_items.qty) as total_qty'))
+                ->pluck('total_qty', 'batches.medicine_id');
+        }
+
         $nearestBatches = \Illuminate\Support\Facades\DB::table('batches')
+            ->where('pharmacy_id', $this->pharmacyId)
             ->whereNotNull('expired_date')
-            ->where('stock', '>', 0)
+            ->where(function($q) {
+                $q->where('stock', '>', 0)
+                  ->orWhereExists(function($sub) {
+                      $sub->select(\Illuminate\Support\Facades\DB::raw(1))
+                          ->from('medicine_transfer_items')
+                          ->whereColumn('medicine_transfer_items.batches_id', 'batches.id')
+                          ->where('medicine_transfer_items.status', 1)
+                          ->where('medicine_transfer_items.qty', '>', 0);
+                  });
+            })
             ->orderBy('expired_date', 'asc')
             ->get()
             ->groupBy('medicine_id')
@@ -219,18 +251,19 @@ class SpecialCategoryAllInOneSheet implements FromArray, WithStyles, WithColumnW
                 $outBefore = (int) ($outBeforeGroup[$med->id] ?? 0);
                 $stokAwal  = max(0, $inBefore - $outBefore);
 
+                $fisik = (int) ($batchesStockGroup[$med->id] ?? 0) + (int) ($counterStockGroup[$med->id] ?? 0);
+
                 if ($stokAwal === 0 && $inBefore === 0 && $outBefore === 0) {
-                    $stokAwal = (int) ($med->stock ?? 0);
+                    $masukCheck = (int) ($inRangeGroup[$med->id] ?? 0);
+                    $keluarCheck = (int) ($outRangeGroup[$med->id] ?? 0);
+                    if ($masukCheck === 0 && $keluarCheck === 0 && $fisik > 0) {
+                        $stokAwal = $fisik;
+                    }
                 }
 
                 $masuk  = (int) ($inRangeGroup[$med->id] ?? 0);
                 $keluar = (int) ($outRangeGroup[$med->id] ?? 0);
                 $jumlah = $stokAwal + $masuk - $keluar;
-
-                $fisik = (int) ($batchesStockGroup[$med->id] ?? 0);
-                if ($fisik === 0 && $jumlah > 0) {
-                    $fisik = $jumlah;
-                }
 
                 $selisih = $jumlah - $fisik;
 
@@ -419,47 +452,79 @@ class SpecialCategorySingleSheet implements FromArray, WithStyles, WithColumnWid
         // Columns
         $rows[] = ['NO', 'NAMA OBAT', 'AWAL', 'MASUK', 'KELUAR', 'JUMLAH', 'FISIK', 'SELISIH', 'KETERANGAN'];
 
-        // Pre-aggregate queries in bulk for single sheet
+        // Pre-aggregate queries in bulk for single sheet - FILTERED BY PHARMACY
         $inBeforeGroup = \Illuminate\Support\Facades\DB::table('items_log')
-            ->where('created_at', '<', $this->startDate)
-            ->whereIn('status', [2, 3, 5, 7])
-            ->groupBy('medicine_id')
-            ->select('medicine_id', \Illuminate\Support\Facades\DB::raw('SUM(qty) as total_qty'))
+            ->join('batches', 'items_log.batches_id', '=', 'batches.id')
+            ->where('batches.pharmacy_id', $this->pharmacyId)
+            ->where('items_log.created_at', '<', $this->startDate)
+            ->whereIn('items_log.status', [2, 3, 5, 7])
+            ->groupBy('items_log.medicine_id')
+            ->select('items_log.medicine_id', \Illuminate\Support\Facades\DB::raw('SUM(items_log.qty) as total_qty'))
             ->pluck('total_qty', 'medicine_id');
 
         $outBeforeGroup = \Illuminate\Support\Facades\DB::table('items_log')
-            ->where('created_at', '<', $this->startDate)
-            ->whereIn('status', [1, 4, 6])
-            ->groupBy('medicine_id')
-            ->select('medicine_id', \Illuminate\Support\Facades\DB::raw('SUM(qty) as total_qty'))
+            ->join('batches', 'items_log.batches_id', '=', 'batches.id')
+            ->where('batches.pharmacy_id', $this->pharmacyId)
+            ->where('items_log.created_at', '<', $this->startDate)
+            ->whereIn('items_log.status', [1, 4, 6])
+            ->groupBy('items_log.medicine_id')
+            ->select('items_log.medicine_id', \Illuminate\Support\Facades\DB::raw('SUM(items_log.qty) as total_qty'))
             ->pluck('total_qty', 'medicine_id');
 
         $inRangeGroup = \Illuminate\Support\Facades\DB::table('items_log')
-            ->whereBetween('created_at', [$this->startDate, $this->endDate])
-            ->whereIn('status', [2, 3, 5, 7])
-            ->groupBy('medicine_id')
-            ->select('medicine_id', \Illuminate\Support\Facades\DB::raw('SUM(qty) as total_qty'))
+            ->join('batches', 'items_log.batches_id', '=', 'batches.id')
+            ->where('batches.pharmacy_id', $this->pharmacyId)
+            ->whereBetween('items_log.created_at', [$this->startDate, $this->endDate])
+            ->whereIn('items_log.status', [2, 3, 5, 7])
+            ->groupBy('items_log.medicine_id')
+            ->select('items_log.medicine_id', \Illuminate\Support\Facades\DB::raw('SUM(items_log.qty) as total_qty'))
             ->pluck('total_qty', 'medicine_id');
 
         $outRangeGroup = \Illuminate\Support\Facades\DB::table('items_log')
-            ->whereBetween('created_at', [$this->startDate, $this->endDate])
-            ->whereIn('status', [1, 4, 6])
-            ->groupBy('medicine_id')
-            ->select('medicine_id', \Illuminate\Support\Facades\DB::raw('SUM(qty) as total_qty'))
+            ->join('batches', 'items_log.batches_id', '=', 'batches.id')
+            ->where('batches.pharmacy_id', $this->pharmacyId)
+            ->whereBetween('items_log.created_at', [$this->startDate, $this->endDate])
+            ->whereIn('items_log.status', [1, 4, 6])
+            ->groupBy('items_log.medicine_id')
+            ->select('items_log.medicine_id', \Illuminate\Support\Facades\DB::raw('SUM(items_log.qty) as total_qty'))
             ->pluck('total_qty', 'medicine_id');
 
+        // Batches stock in this pharmacy
         $batchesStockGroup = \Illuminate\Support\Facades\DB::table('batches')
-            ->where(function ($q) {
-                $q->where('pharmacy_id', $this->pharmacyId)
-                  ->orWhere('pharmacy_id', 9);
-            })
+            ->where('pharmacy_id', $this->pharmacyId)
             ->groupBy('medicine_id')
             ->select('medicine_id', \Illuminate\Support\Facades\DB::raw('SUM(stock) as total_stock'))
             ->pluck('total_stock', 'medicine_id');
 
+        // Counter / Etalase stock in this pharmacy (for retail branches)
+        $counterStockGroup = collect();
+        if ((int)$this->pharmacyId !== 9) {
+            $counterStockGroup = \Illuminate\Support\Facades\DB::table('medicine_transfer_items')
+                ->join('batches', 'medicine_transfer_items.batches_id', '=', 'batches.id')
+                ->where('batches.pharmacy_id', $this->pharmacyId)
+                ->where('medicine_transfer_items.status', 1)
+                ->where(function ($q) {
+                    $q->whereNull('medicine_transfer_items.source_type')
+                      ->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang');
+                })
+                ->groupBy('batches.medicine_id')
+                ->select('batches.medicine_id', \Illuminate\Support\Facades\DB::raw('SUM(medicine_transfer_items.qty) as total_qty'))
+                ->pluck('total_qty', 'batches.medicine_id');
+        }
+
         $nearestBatches = \Illuminate\Support\Facades\DB::table('batches')
+            ->where('pharmacy_id', $this->pharmacyId)
             ->whereNotNull('expired_date')
-            ->where('stock', '>', 0)
+            ->where(function($q) {
+                $q->where('stock', '>', 0)
+                  ->orWhereExists(function($sub) {
+                      $sub->select(\Illuminate\Support\Facades\DB::raw(1))
+                          ->from('medicine_transfer_items')
+                          ->whereColumn('medicine_transfer_items.batches_id', 'batches.id')
+                          ->where('medicine_transfer_items.status', 1)
+                          ->where('medicine_transfer_items.qty', '>', 0);
+                  });
+            })
             ->orderBy('expired_date', 'asc')
             ->get()
             ->groupBy('medicine_id')
@@ -475,18 +540,19 @@ class SpecialCategorySingleSheet implements FromArray, WithStyles, WithColumnWid
             $outBefore = (int) ($outBeforeGroup[$med->id] ?? 0);
             $stokAwal  = max(0, $inBefore - $outBefore);
 
+            $fisik = (int) ($batchesStockGroup[$med->id] ?? 0) + (int) ($counterStockGroup[$med->id] ?? 0);
+
             if ($stokAwal === 0 && $inBefore === 0 && $outBefore === 0) {
-                $stokAwal = (int) ($med->stock ?? 0);
+                $masukCheck = (int) ($inRangeGroup[$med->id] ?? 0);
+                $keluarCheck = (int) ($outRangeGroup[$med->id] ?? 0);
+                if ($masukCheck === 0 && $keluarCheck === 0 && $fisik > 0) {
+                    $stokAwal = $fisik;
+                }
             }
 
             $masuk  = (int) ($inRangeGroup[$med->id] ?? 0);
             $keluar = (int) ($outRangeGroup[$med->id] ?? 0);
             $jumlah = $stokAwal + $masuk - $keluar;
-
-            $fisik = (int) ($batchesStockGroup[$med->id] ?? 0);
-            if ($fisik === 0 && $jumlah > 0) {
-                $fisik = $jumlah;
-            }
 
             $selisih = $jumlah - $fisik;
 

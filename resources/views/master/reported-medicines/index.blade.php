@@ -112,10 +112,9 @@
                     <div>
                         <div class="flex items-center gap-2">
                             <h2 class="text-xl font-bold text-gray-800">Master Pelaporan Obat</h2>
-
                         </div>
-                        <p class="text-xs text-gray-500 mt-0.5">Kelola daftar obat yang wajib dilaporkan dan unduh
-                            rekapitulasi transaksi selesai dalam format Excel multi-sheet.</p>
+                        <p class="text-xs text-gray-500 mt-0.5">Kelola daftar obat yang wajib dilaporkan per cabang dan unduh
+                            rekapitulasi transaksi dalam format Excel multi-sheet.</p>
                     </div>
                 </div>
                 <div class="flex items-center gap-2">
@@ -123,6 +122,35 @@
                     <span id="totalBadge" class="px-3 py-1 bg-rose-500 text-white rounded-xl text-xs font-bold shadow-sm">
                         {{ number_format($totalReported) }} Obat
                     </span>
+                </div>
+            </div>
+
+            {{-- Branch Selector Bar --}}
+            <div class="mb-6 bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-sm">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-bold uppercase tracking-wider text-gray-400">Pilih Cabang / Apotek</span>
+                            <span id="selectedBranchBadge" class="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-lg text-[11px] font-bold border border-blue-100">
+                                {{ $pharmacies->firstWhere('id', $selectedPharmacyId)->name ?? 'Cabang Terpilih' }}
+                            </span>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-0.5">Daftar obat wajib lapor dan stok pelaporan dihitung per masing-masing cabang.</p>
+                    </div>
+                </div>
+                <div class="w-full sm:w-72">
+                    <select id="branchSelector" class="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-blue-200 bg-blue-50/50 text-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-400">
+                        @foreach ($pharmacies as $p)
+                            <option value="{{ $p->id }}" {{ (int)$p->id === (int)$selectedPharmacyId ? 'selected' : '' }}>
+                                {{ $p->name }}
+                            </option>
+                        @endforeach
+                    </select>
                 </div>
             </div>
 
@@ -142,6 +170,7 @@
                         </div>
 
                         <form id="formAddReported">
+                            <input type="hidden" name="pharmacy_id" id="addPharmacyId" value="{{ $selectedPharmacyId }}">
                             <div class="mb-3">
                                 <label class="block text-xs font-semibold text-gray-700 mb-1">
                                     Cari & Pilih Obat <span class="text-red-500">*</span>
@@ -150,7 +179,7 @@
                                     <option value="">-- Ketik nama / barcode / kode obat --</option>
                                 </select>
                                 <p class="text-[11px] text-gray-400 mt-1">Hanya menampilkan obat aktif yang belum masuk
-                                    daftar pelaporan.</p>
+                                    daftar pelaporan pada cabang terpilih.</p>
                             </div>
 
                             <div class="mb-3">
@@ -237,9 +266,10 @@
                                     <label class="block text-xs font-semibold text-gray-700 mb-1">Apotek / Cabang</label>
                                     <select name="pharmacy_id" id="exportPharmacy"
                                         class="w-full px-3 py-2 text-xs rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-200">
-                                        <option value="">Semua Cabang</option>
                                         @foreach ($pharmacies as $p)
-                                            <option value="{{ $p->id }}">{{ $p->name }}</option>
+                                            <option value="{{ $p->id }}" {{ (int)$p->id === (int)$selectedPharmacyId ? 'selected' : '' }}>
+                                                {{ $p->name }}
+                                            </option>
                                         @endforeach
                                     </select>
                                 </div>
@@ -273,7 +303,7 @@
                     <div>
                         <h3 class="font-bold text-base text-gray-800">Daftar Obat yang Wajib Dilaporkan</h3>
                         <p class="text-xs text-gray-500">Seluruh obat di tabel ini akan otomatis dibuatkan lembar kerja
-                            (tab sheet) pada laporan Excel.</p>
+                            (tab sheet) pada laporan Excel untuk cabang terpilih.</p>
                     </div>
                     <div>
                         <button type="button" onclick="reloadTable()"
@@ -298,7 +328,7 @@
                                 <th class="px-4 py-3">Nama Obat</th>
                                 <th class="px-4 py-3">Kategori</th>
                                 <th class="px-4 py-3">Satuan</th>
-                                <th class="px-4 py-3 text-center">Stok Master</th>
+                                <th class="px-4 py-3 text-center">Stok Cabang</th>
                                 <th class="px-4 py-3">Catatan</th>
                                 <th class="px-4 py-3">Ditambahkan Oleh</th>
                                 <th class="px-4 py-3 text-center" style="width: 130px;">Aksi</th>
@@ -374,6 +404,10 @@
     <script>
         let table;
 
+        function getSelectedBranchId() {
+            return $('#branchSelector').val() || '{{ $selectedPharmacyId }}';
+        }
+
         $(document).ready(function() {
             // Setup AJAX CSRF
             $.ajaxSetup({
@@ -382,7 +416,7 @@
                 }
             });
 
-            // Initialize Select2 AJAX for Medicine Search
+            // Initialize Select2 AJAX for Medicine Search (Scoped to Selected Branch)
             $('#selectMedicine').select2({
                 placeholder: '-- Ketik nama / barcode / kode obat --',
                 allowClear: true,
@@ -392,7 +426,8 @@
                     delay: 250,
                     data: function(params) {
                         return {
-                            q: params.term || ''
+                            q: params.term || '',
+                            pharmacy_id: getSelectedBranchId()
                         };
                     },
                     processResults: function(data) {
@@ -405,11 +440,16 @@
                 minimumInputLength: 1
             });
 
-            // Initialize DataTables
+            // Initialize DataTables (Scoped to Selected Branch)
             table = $('#table-reported').DataTable({
                 processing: true,
                 serverSide: true,
-                ajax: "{{ route('reported-medicines.index') }}",
+                ajax: {
+                    url: "{{ route('reported-medicines.index') }}",
+                    data: function(d) {
+                        d.pharmacy_id = getSelectedBranchId();
+                    }
+                },
                 columns: [{
                         data: 'DT_RowIndex',
                         name: 'DT_RowIndex',
@@ -440,8 +480,9 @@
                     },
                     {
                         data: 'stock',
-                        name: 'medicine.stock',
-                        className: 'text-center'
+                        name: 'stock',
+                        orderable: false,
+                        className: 'text-center font-bold text-gray-700'
                     },
                     {
                         data: 'notes',
@@ -477,7 +518,38 @@
                 }
             });
 
-            // Submit Add Medicine Form
+            // Update Total Badge dynamically on DataTable reload
+            table.on('xhr.dt', function(e, settings, json, xhr) {
+                if (json && json.total_reported !== undefined) {
+                    $('#totalBadge').text(json.total_reported + ' Obat');
+                }
+            });
+
+            // Branch Selector Change Event
+            $('#branchSelector').on('change', function() {
+                const branchId = $(this).val();
+                const branchText = $(this).find('option:selected').text().trim();
+
+                $('#selectedBranchBadge').text(branchText);
+                $('#addPharmacyId').val(branchId);
+                $('#exportPharmacy').val(branchId);
+
+                // Reset medicine dropdown selection
+                $('#selectMedicine').val(null).trigger('change');
+
+                // Reload DataTable
+                table.ajax.reload();
+            });
+
+            // Sync Export dropdown if user changes it
+            $('#exportPharmacy').on('change', function() {
+                const branchId = $(this).val();
+                if (branchId && branchId !== $('#branchSelector').val()) {
+                    $('#branchSelector').val(branchId).trigger('change');
+                }
+            });
+
+            // Submit Add Medicine Form (Per Branch)
             $('#formAddReported').on('submit', function(e) {
                 e.preventDefault();
                 const medId = $('#selectMedicine').val();
@@ -498,6 +570,7 @@
                     type: "POST",
                     data: {
                         medicine_id: medId,
+                        pharmacy_id: getSelectedBranchId(),
                         notes: $('#inputNotes').val()
                     },
                     success: function(res) {

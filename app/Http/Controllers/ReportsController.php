@@ -446,7 +446,11 @@ class ReportsController extends Controller
 
     public function exportSpecialMedicines(Request $request)
     {
-        $pharmacyId = getActivePharmacyId();
+        if (!auth()->user()->hasRole('General Manager')) {
+            return response()->json(['message' => 'Hanya General Manager yang memiliki akses export SIPNAP.'], 403);
+        }
+
+        $pharmacyId = $request->filled('pharmacy_id') ? (int) $request->pharmacy_id : getActivePharmacyId();
         $startDate = $request->start_date ?? now()->startOfMonth()->toDateString();
         $endDate = $request->end_date ?? now()->toDateString();
 

@@ -151,16 +151,16 @@ Route::middleware(['auth', 'role:HO|administrator'])->group(function () {
     Route::post('/pharmacy/switch', [\App\Http\Controllers\PharmacySelectorController::class, 'switch'])->name('pharmacy.switch');
     Route::get('/ho/analytics', [\App\Http\Controllers\HO\HODashboardController::class, 'index'])->name('ho.analytics');
     Route::get('/ho/analytics/data', [\App\Http\Controllers\HO\HODashboardController::class, 'getData'])->name('ho.analytics.data');
+});
 
-    // Master Pelaporan Obat (Role HO Only)
-    Route::prefix('reported-medicines')->name('reported-medicines.')->group(function () {
-        Route::get('/', [ReportedMedicineController::class, 'index'])->name('index');
-        Route::get('/search', [ReportedMedicineController::class, 'searchMedicines'])->name('search');
-        Route::post('/', [ReportedMedicineController::class, 'store'])->name('store');
-        Route::put('/{id}', [ReportedMedicineController::class, 'update'])->name('update');
-        Route::delete('/{id}', [ReportedMedicineController::class, 'destroy'])->name('destroy');
-        Route::get('/export', [ReportedMedicineController::class, 'export'])->name('export');
-    });
+// Master Pelaporan Obat (Khusus General Manager)
+Route::middleware(['auth', 'role:General Manager'])->prefix('reported-medicines')->name('reported-medicines.')->group(function () {
+    Route::get('/', [ReportedMedicineController::class, 'index'])->name('index');
+    Route::get('/search', [ReportedMedicineController::class, 'searchMedicines'])->name('search');
+    Route::post('/', [ReportedMedicineController::class, 'store'])->name('store');
+    Route::put('/{id}', [ReportedMedicineController::class, 'update'])->name('update');
+    Route::delete('/{id}', [ReportedMedicineController::class, 'destroy'])->name('destroy');
+    Route::get('/export', [ReportedMedicineController::class, 'export'])->name('export');
 });
 Route::get('/home', [HomeController::class, 'index'])
     ->middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrator|manager|Online|Online Grab|Online Shopee|Digital|UMKM|operator'])
@@ -172,7 +172,7 @@ Route::middleware(['auth', 'role:General Manager'])->prefix('general-manager')->
     Route::put('/users/{user}', [\App\Http\Controllers\GeneralManagerController::class, 'update'])->name('users.update');
 });
 
-Route::middleware(['auth', 'role:Kasir|Gudang PMI|HO|administrator|manager|Online|Online Grab|Online Shopee|Digital|UMKM|operator'])->group(function () {
+Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrator|manager|Online|Online Grab|Online Shopee|Digital|UMKM|operator'])->group(function () {
     Route::get('/near-expiry', [HomeController::class, 'nearExpiry'])->name('kasir.nearExpiry');
     Route::get('/stock-notifications', [HomeController::class, 'stockNotifications'])->name('kasir.stockNotifications');
 
@@ -223,6 +223,7 @@ Route::middleware(['auth', 'role:Kasir|Gudang PMI|HO|administrator|manager|Onlin
     Route::post('deleteTransaction', [SalesController::class, 'deleteTransaction'])->name('sales.deletetransaction');
     Route::get('/print/receipt/{id}', [PrintController::class, 'receipt'])->name('sales.print');
     Route::get('/print/fullreceipt/{id}', [PrintController::class, 'fullReceipt'])->name('salesrecipe.print');
+    Route::get('/print/kwitansi/{id}', [PrintController::class, 'kwitansi'])->name('sales.kwitansi');
     Route::get('/kasir/print-smart-receipt/{id}', [PrintController::class, 'printSmartReceipt'])->name('transaction.printSmartReceipt');
 
     // ================================================================== Add Data =========================================================================
@@ -410,7 +411,9 @@ Route::middleware(['auth', 'role:Kasir|Gudang PMI|HO|administrator|manager|Onlin
     Route::get('/reports/export/medicines/download/{id}', [ReportsController::class, 'exportMedicinesDownload']);
 
     // Pusat Export Baru (SIPNAP, Retur Jual/Beli, Monitoring ED, Penolakan)
-    Route::post('/reports/export/special-medicines', [ReportsController::class, 'exportSpecialMedicines'])->name('reports.export.specialMedicines');
+    Route::post('/reports/export/special-medicines', [ReportsController::class, 'exportSpecialMedicines'])
+        ->middleware('role:General Manager')
+        ->name('reports.export.specialMedicines');
     Route::post('/reports/export/sales-retur', [ReportsController::class, 'exportSalesRetur'])->name('reports.export.salesRetur');
     Route::post('/reports/export/purchase-retur', [ReportsController::class, 'exportPurchaseRetur'])->name('reports.export.purchaseRetur');
     Route::post('/reports/export/expiry-dates', [ReportsController::class, 'exportExpiryDates'])->name('reports.export.expiryDates');
