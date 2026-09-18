@@ -21,17 +21,52 @@ class ReportedMedicineController extends Controller
     }
 
     /**
+     * Cek apakah user memiliki hak akses untuk berpindah / memilih cabang lain.
+     * Hanya General Manager, HO, administrator, atau akun pusat PMI/Gudang yang dapat berpindah cabang.
+     * Akun cabang (ID != 1 dan ID != 9) dikunci hanya pada cabangnya sendiri.
+     */
+    private function canSwitchBranch(): bool
+    {
+        $user = auth()->user();
+        if (!$user) {
+            return false;
+        }
+
+        if ($user->hasAnyRole(['General Manager', 'HO', 'administrator'])) {
+            return true;
+        }
+
+        $userPharmacyId = (int) ($user->pharmacy_id ?? 1);
+        if (in_array($userPharmacyId, [1, 9]) && $user->hasRole('Koordinator')) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
      * Tampilkan halaman utama & respon DataTables per cabang
      */
     public function index(Request $request)
     {
-        $selectedPharmacyId = $request->filled('pharmacy_id') ? (int)$request->pharmacy_id : getActivePharmacyId();
-        if (!$selectedPharmacyId || $selectedPharmacyId === 6) {
-            $selectedPharmacyId = 1; // Default ke Sahabat PMI jika HO atau 0
+        $canSwitch = $this->canSwitchBranch();
+        $userPharmacyId = (int) (auth()->user()?->pharmacy_id ?: getActivePharmacyId());
+
+        if (!$canSwitch) {
+            $selectedPharmacyId = $userPharmacyId ?: 1;
+            $pharmacies = Pharmacies::where('id', $selectedPharmacyId)->get();
+        } else {
+            $selectedPharmacyId = $request->filled('pharmacy_id') ? (int)$request->pharmacy_id : getActivePharmacyId();
+            if (!$selectedPharmacyId || $selectedPharmacyId === 6) {
+                $selectedPharmacyId = 1; // Default ke Sahabat PMI jika HO atau 0
+            }
+            $pharmacies = Pharmacies::whereNotIn('id', [6, 8])->orderBy('id', 'asc')->get();
         }
 
         if ($request->ajax()) {
-            $pharmacyId = $request->filled('pharmacy_id') ? (int)$request->pharmacy_id : $selectedPharmacyId;
+            $pharmacyId = $canSwitch && $request->filled('pharmacy_id')
+                ? (int)$request->pharmacy_id 
+                : $selectedPharmacyId;
 
             $query = ReportedMedicine::with(['medicine.category', 'medicine.factory', 'user', 'pharmacy'])
                 ->where('reported_medicines.pharmacy_id', $pharmacyId)
@@ -113,10 +148,9 @@ class ReportedMedicineController extends Controller
                 ->toJson();
         }
 
-        $pharmacies = Pharmacies::whereNotIn('id', [6, 8])->orderBy('id', 'asc')->get();
-        $totalReported = ReportedMedicine::where('pharmacy_id', $selectedPharmacyId)->count();
+        $totalReported = ReportedMedicine::where('reported_medicines.pharmacy_id', $selectedPharmacyId)->count();
 
-        return view('master.reported-medicines.index', compact('pharmacies', 'totalReported', 'selectedPharmacyId'));
+        return view('master.reported-medicines.index', compact('pharmacies', 'totalReported', 'selectedPharmacyId', 'canSwitch'));
     }
 
     /**
@@ -125,13 +159,15 @@ class ReportedMedicineController extends Controller
     public function searchMedicines(Request $request)
     {
         $q = trim((string)$request->q);
-        $pharmacyId = $request->filled('pharmacy_id') ? (int)$request->pharmacy_id : getActivePharmacyId();
+        $pharmacyId = $this->canSwitchBranch() && $request->filled('pharmacy_id')
+            ? (int)$request->pharmacy_id
+            : (int)(auth()->user()?->pharmacy_id ?: getActivePharmacyId());
         if (!$pharmacyId || $pharmacyId === 6) {
             $pharmacyId = 1;
         }
 
         // Ambil ID obat yang sudah masuk daftar pelaporan pada cabang ini
-        $alreadyReportedIds = ReportedMedicine::where('pharmacy_id', $pharmacyId)->pluck('medicine_id')->toArray();
+        $alreadyReportedIds = ReportedMedicine::where('reported_medicines.pharmacy_id', $pharmacyId)->pluck('medicine_id')->toArray();
 
         $query = Medicines::query()
             ->where('status', 1)
@@ -196,6 +232,14 @@ class ReportedMedicineController extends Controller
      */
     public function store(Request $request)
     {
+        $targetPharmacyId = $this->canSwitchBranch() && $request->filled('pharmacy_id')
+            ? (int) $request->pharmacy_id 
+            : (int) (auth()->user()?->pharmacy_id ?: getActivePharmacyId());
+        if (!$targetPharmacyId || $targetPharmacyId === 6) {
+            $targetPharmacyId = 1;
+        }
+        $request->merge(['pharmacy_id' => $targetPharmacyId]);
+
         $request->validate([
             'medicine_id' => 'required|exists:medicines,id',
             'pharmacy_id' => 'required|exists:pharmacies,id',
@@ -270,9 +314,9 @@ class ReportedMedicineController extends Controller
      */
     public function export(Request $request)
     {
-        $month = (int)$request->input('month', date('n'));
-        $year  = (int)$request->input('year', date('Y'));
-        $pharmacyId = $request->filled('pharmacy_id') ? (int)$request->pharmacy_id : null;
+        $pharmacyId = $this->canSwitchBranch() && $request->filled('pharmacy_id') 
+            ? (int)$request->pharmacy_id 
+            : (int) (auth()->user()?->pharmacy_id ?: getActivePharmacyId());
 
         $startDate = Carbon::createFromDate($year, $month, 1)->startOfMonth();
         $endDate   = Carbon::createFromDate($year, $month, 1)->endOfMonth();
