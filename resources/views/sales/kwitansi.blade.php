@@ -9,12 +9,12 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Dynalight&family=Ephesis&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Charm:wght@400;700&display=swap" rel="stylesheet">
 
     <style>
         :root {
             --form-font: 'Courier Prime', Courier, monospace;
-            --detail-font: 'Dynalight', 'Ephesis', cursive;
+            --detail-font: 'Charm', cursive;
         }
 
         /* ── Reset & Base ────────────────────────────────────────────── */
@@ -284,9 +284,9 @@
 
         .form-fill-value {
             font-family: var(--detail-font);
-            font-size: 23px;
-            font-weight: 400;
-            color: #0b132b;
+            font-size: 21px;
+            font-weight: 700;
+            color: #000000;
             padding: 0 4px;
             letter-spacing: 0.3px;
             line-height: 1;
@@ -294,9 +294,9 @@
 
         .handwritten-look {
             font-family: var(--detail-font);
-            font-size: 23px;
-            font-weight: 400;
-            color: #0b132b;
+            font-size: 21px;
+            font-weight: 700;
+            color: #000000;
             line-height: 1;
         }
 
@@ -314,9 +314,9 @@
 
         .terbilang-text {
             font-family: var(--detail-font);
-            font-size: 20px;
-            font-weight: 400;
-            color: #09090b;
+            font-size: 18px;
+            font-weight: 700;
+            color: #000000;
             line-height: 1.25;
             letter-spacing: 0.3px;
         }
@@ -420,9 +420,9 @@
 
         .sig-date {
             font-family: var(--detail-font);
-            font-size: 18px;
-            font-weight: 400;
-            color: #0b132b;
+            font-size: 17px;
+            font-weight: 700;
+            color: #000;
             border-bottom: 1px dotted #444;
             padding-bottom: 2px;
             margin-bottom: 6px;
@@ -449,8 +449,9 @@
         .sig-name {
             font-family: var(--detail-font);
             font-size: 18px;
-            font-weight: 400;
-            color: #0f172a;
+            font-weight: 700;
+            color: #000;
+            letter-spacing: 0.3px;
         }
 
         /* ── PRINT RULES ─────────────────────────────────────────────── */
@@ -514,8 +515,8 @@
             <div style="display:inline-flex; align-items:center; gap:6px; background:#f8fafc; border:1px solid #cbd5e1; padding:5px 10px; border-radius:8px; font-size:12px; font-weight:600;">
                 <span style="color:#64748b;">Font Isi:</span>
                 <select id="detailFontSelector" onchange="switchDetailFont(this.value)" style="border:none; background:transparent; font-size:12px; font-weight:700; color:#1e293b; cursor:pointer; outline:none;">
-                    <option value="'Dynalight', 'Ephesis', cursive">Dynalight</option>
-                    <option value="'Ephesis', 'Dynalight', cursive">Ephesis</option>
+                    <option value="'Charm', cursive">Charm (Tulisan Jelas)</option>
+                    <option value="'Courier Prime', Courier, monospace">Courier Prime (Tegak Cetak)</option>
                 </select>
             </div>
             <button type="button" onclick="location.reload()" class="btn btn-secondary" title="Kembalikan ke data awal">
@@ -607,7 +608,7 @@
                         <span class="form-colon">:</span>
                         <div class="form-fill-dotted">
                             <span class="form-fill-value handwritten-look editable-field" contenteditable="true" spellcheck="false" title="Klik untuk edit nama pembeli/pasien">
-                                {{ $patient?->name ?? 'Pelanggan Umum' }}
+                                {{ ucwords(strtolower($patient?->name ?? 'Pelanggan Umum')) }}
                             </span>
                         </div>
                     </div>
@@ -677,7 +678,7 @@
                             </div>
 
                             <div class="sig-name editable-field" contenteditable="true" spellcheck="false" title="Klik untuk edit nama petugas">
-                                ( {{ $operator ?? 'Petugas Farmasi' }} )
+                                ( {{ ucwords(strtolower($operator ?? 'Petugas Farmasi')) }} )
                             </div>
                         </div>
 
