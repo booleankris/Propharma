@@ -108,4 +108,34 @@ class KoordinatorAccessTest extends TestCase
 
         $this->assertSame('ok', $response->getContent());
     }
+
+    public function test_koordinator_can_access_reported_medicines_and_special_medicines_export(): void
+    {
+        $koordinator = $this->userWithRoles(['Koordinator']);
+
+        // Check reported-medicines route middleware allows Koordinator
+        $route = app('router')->getRoutes()->getByName('reported-medicines.index');
+        $this->assertNotNull($route);
+        $roleMiddlewares = array_values(array_filter(
+            $route->gatherMiddleware(),
+            fn ($m) => str_starts_with($m, 'role:')
+        ));
+        $this->assertNotEmpty($roleMiddlewares);
+        $allowedRoles = explode('|', substr(end($roleMiddlewares), 5));
+        $this->assertContains('Koordinator', $allowedRoles);
+        $this->assertContains('General Manager', $allowedRoles);
+
+        // Check special medicines export route middleware allows Koordinator
+        $exportRoute = app('router')->getRoutes()->getByName('reports.export.specialMedicines');
+        $this->assertNotNull($exportRoute);
+        $exportRoleMiddlewares = array_values(array_filter(
+            $exportRoute->gatherMiddleware(),
+            fn ($m) => str_starts_with($m, 'role:')
+        ));
+        $this->assertNotEmpty($exportRoleMiddlewares);
+        $exportAllowedRoles = explode('|', substr(end($exportRoleMiddlewares), 5));
+        $this->assertContains('Koordinator', $exportAllowedRoles);
+        $this->assertContains('General Manager', $exportAllowedRoles);
+    }
 }
+

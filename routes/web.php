@@ -153,8 +153,8 @@ Route::middleware(['auth', 'role:HO|administrator'])->group(function () {
     Route::get('/ho/analytics/data', [\App\Http\Controllers\HO\HODashboardController::class, 'getData'])->name('ho.analytics.data');
 });
 
-// Master Pelaporan Obat (Khusus General Manager)
-Route::middleware(['auth', 'role:General Manager'])->prefix('reported-medicines')->name('reported-medicines.')->group(function () {
+// Master Pelaporan Obat (General Manager & Koordinator)
+Route::middleware(['auth', 'role:General Manager|Koordinator|manager|Manager'])->prefix('reported-medicines')->name('reported-medicines.')->group(function () {
     Route::get('/', [ReportedMedicineController::class, 'index'])->name('index');
     Route::get('/search', [ReportedMedicineController::class, 'searchMedicines'])->name('search');
     Route::post('/', [ReportedMedicineController::class, 'store'])->name('store');
@@ -412,7 +412,7 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
 
     // Pusat Export Baru (SIPNAP, Retur Jual/Beli, Monitoring ED, Penolakan)
     Route::post('/reports/export/special-medicines', [ReportsController::class, 'exportSpecialMedicines'])
-        ->middleware('role:General Manager')
+        ->middleware('role:General Manager|Koordinator|manager|Manager')
         ->name('reports.export.specialMedicines');
     Route::post('/reports/export/sales-retur', [ReportsController::class, 'exportSalesRetur'])->name('reports.export.salesRetur');
     Route::post('/reports/export/purchase-retur', [ReportsController::class, 'exportPurchaseRetur'])->name('reports.export.purchaseRetur');

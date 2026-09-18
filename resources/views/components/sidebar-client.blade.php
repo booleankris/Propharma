@@ -716,6 +716,17 @@
             </a>
         @endif
 
+        @hasanyrole('General Manager|Koordinator|manager|Manager')
+            <a href="{{ route('reported-medicines.index') }}"
+                class="nav-item {{ request()->is('reported-medicines*') ? 'active' : '' }}">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Pelaporan Obat
+            </a>
+        @endhasanyrole
+
         @role('HO')
             <div class="nav-section-title">Head Office (HO)</div>
 
@@ -1660,7 +1671,7 @@
                     <span class="text-sm font-semibold text-lime-700 group-hover:text-white transition-colors">Master
                         Etalase</span>
                 </a>
-                @hasrole('General Manager')
+                @hasanyrole('General Manager|Koordinator|manager|Manager')
                     <a href="{{ route('reported-medicines.index') }}"
                         class="group flex items-center gap-3 p-3.5 rounded-2xl bg-rose-50 hover:bg-rose-500 border border-rose-100 hover:border-rose-500 transition-all duration-200 hover:-translate-y-0.5">
                         <div
@@ -2325,15 +2336,15 @@
         </div>
 
         <!-- Section 1: Pengawasan & Regulasi -->
-        @if (auth()->user()->hasRole('General Manager') || auth()->user()->hasRole('HO') || isWarehousePharmacy())
+        @if (auth()->user()->hasRole('General Manager') || auth()->user()->hasRole('HO') || isWarehousePharmacy() || auth()->user()->hasAnyRole(['Koordinator', 'manager', 'Manager']))
             <div>
                 <div class="flex items-center gap-2 mb-3">
                     <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Laporan Regulasi &
                         Monitoring</span>
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <!-- Card SIPNAP (Khusus General Manager) -->
-                    @if (auth()->user()->hasRole('General Manager'))
+                    <!-- Card SIPNAP (General Manager & Koordinator) -->
+                    @if (auth()->user()->hasRole('General Manager') || auth()->user()->hasAnyRole(['Koordinator', 'manager', 'Manager']))
                         <div
                             class="bg-gradient-to-br from-amber-50/60 to-orange-50/60 border border-amber-200/80 rounded-2xl p-4 flex flex-col justify-between hover:shadow-md transition-all">
                             <div>

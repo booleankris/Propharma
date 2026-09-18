@@ -17,7 +17,7 @@ class ReportedMedicineController extends Controller
 {
     public function __construct()
     {
-        $this->middleware(['auth', 'role:General Manager']);
+        $this->middleware(['auth', 'role:General Manager|Koordinator|manager|Manager']);
     }
 
     /**
