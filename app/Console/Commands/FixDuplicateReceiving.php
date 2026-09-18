@@ -40,38 +40,84 @@ class FixDuplicateReceiving extends Command
         $code = trim((string) $this->argument('code'));
         $isDryRun = (bool) $this->option('dry-run');
         $medSearch = $this->option('medicine');
-
-        if (!$code && !$medSearch) {
-            $code = 'NT-26-09/0120';
-        }
+        $isAll = (bool) $this->option('all');
 
         $this->info("================================================================================");
         $this->info("   PROPHARMA - PEMULIHAN PRESISI KARTU STOCK & STOK ETALASE");
         $this->info("================================================================================");
-        if ($medSearch) {
+        if ($isAll) {
+            $this->line("Target Mode   : [SCAN SEMUA TRANSAKSI DI DATABASE]");
+        } elseif ($medSearch) {
             $this->line("Target Obat   : [{$medSearch}]");
         } else {
-            $this->line("Target Faktur : [{$code}]");
+            if (!$code) {
+                $code = '2609RE0635';
+            }
+            $this->line("Target Input  : [{$code}]");
         }
         $this->line("Mode          : " . ($isDryRun ? "DRY-RUN (Simulasi)" : "EKSEKUSI NYATA (Live Database)"));
         $this->newLine();
+
+        if ($isAll) {
+            // Find all transactions with duplicate purchase logs
+            $dupeTransactions = ItemsLog::select('transaction_code')
+                ->where('status', 2)
+                ->whereNotNull('transaction_code')
+                ->groupBy('transaction_code', 'medicine_id')
+                ->havingRaw('count(*) > 1')
+                ->distinct()
+                ->pluck('transaction_code')
+                ->toArray();
+
+            $this->info("Ditemukan " . count($dupeTransactions) . " transaksi penerimaan dengan log duplikat di database.");
+            
+            $totalFixed = 0;
+            foreach ($dupeTransactions as $tCode) {
+                $this->line("\n----------------------------------------------------------------");
+                $this->line("Memproses Transaksi: {$tCode}");
+                $this->line("----------------------------------------------------------------");
+                $this->call('receiving:fix-duplicate', [
+                    'code' => $tCode,
+                    '--dry-run' => $isDryRun,
+                ]);
+                $totalFixed++;
+            }
+            $this->newLine();
+            $this->info("=== SCAN & PERBAIKAN MENYELURUH SELESAI ({$totalFixed} Transaksi) ===");
+            return 0;
+        }
 
         $rd = null;
         $recCode = null;
 
         if (!$medSearch) {
-            $rd = ReceivingDetails::with(['receiving', 'creditor'])
-                ->where('receiving_details_code', $code)
-                ->orWhere('invoice_number', $code)
-                ->first();
+            // 1. Check if code is receiving transaction code (e.g. 2609RE0635)
+            $recObj = \App\Models\Receiving::where('code', $code)->first();
+            if ($recObj) {
+                $recCode = $recObj->code;
+                $this->line("Transaksi Penerimaan Ditemukan: ID {$recObj->id} | Kode: {$recObj->code} | Cabang: {$recObj->pharmacy_id}");
+            } else {
+                // 2. Check if code is receiving_details_code (NT-...) or invoice_number
+                $rd = ReceivingDetails::with(['receiving', 'creditor'])
+                    ->where('receiving_details_code', $code)
+                    ->orWhere('invoice_number', $code)
+                    ->first();
 
-            if (!$rd) {
-                $this->error("Faktur {$code} tidak ditemukan di tabel receiving_details.");
-                return 1;
+                if ($rd) {
+                    $recCode = $rd->receiving->code ?? null;
+                    $this->line("Faktur Ditemukan: ID {$rd->id} | No Terima: {$rd->receiving_details_code} | Faktur: {$rd->invoice_number} | Trans Rec: " . ($recCode ?: '-'));
+                } else {
+                    // Try checking items_log directly for transaction_code
+                    $hasLog = ItemsLog::where('transaction_code', $code)->exists();
+                    if ($hasLog) {
+                        $recCode = $code;
+                        $this->line("Kode Transaksi Log Ditemukan: {$recCode}");
+                    } else {
+                        $this->error("Penerimaan/Faktur {$code} tidak ditemukan.");
+                        return 1;
+                    }
+                }
             }
-
-            $recCode = $rd->receiving->code ?? null;
-            $this->line("Faktur Ditemukan: ID {$rd->id} | No Terima: {$rd->receiving_details_code} | Faktur: {$rd->invoice_number} | Trans Rec: " . ($recCode ?: '-'));
         }
 
         $logQuery = ItemsLog::where('status', 2)->with(['medicines', 'batches'])->orderBy('id', 'asc');
@@ -80,26 +126,33 @@ class FixDuplicateReceiving extends Command
             $logQuery->whereHas('medicines', function ($q) use ($medSearch) {
                 $q->where('name', 'like', "%{$medSearch}%");
             });
+            if ($code) {
+                $logQuery->where('transaction_code', $code);
+            }
         } else {
             $logQuery->where(function ($q) use ($rd, $recCode) {
-                $q->whereHas('receiving.receiving_details', function ($rq) use ($rd) {
-                    $rq->where('id', $rd->id)
-                       ->orWhere('receiving_details_code', $rd->receiving_details_code)
-                       ->orWhere('invoice_number', $rd->invoice_number);
-                });
                 if ($recCode) {
-                    $q->orWhere('transaction_code', $recCode);
+                    $q->where('transaction_code', $recCode);
                 }
-                $q->orWhere('transaction_code', $rd->receiving_details_code)
-                  ->orWhere('transaction_code', $rd->invoice_number);
+                if ($rd) {
+                    $q->orWhere('transaction_code', $rd->receiving_details_code)
+                      ->orWhere('transaction_code', $rd->invoice_number);
+                }
             });
         }
 
         $allLogs = $logQuery->get();
         $this->info("Total log pembelian (status 2) ditemukan: " . $allLogs->count() . " baris.");
 
+        if ($allLogs->isEmpty()) {
+            $this->info("Tidak ada log pembelian yang ditemukan untuk target ini.");
+            return 0;
+        }
+
         $logsByMedicine = $allLogs->groupBy('medicine_id');
         $dupesToFix = [];
+        $allDupBatchIds = [];
+        $dupTransferItemIds = [];
 
         foreach ($logsByMedicine as $medId => $medLogs) {
             $medName = $medLogs->first()->medicines->name ?? "Obat #{$medId}";
@@ -113,51 +166,88 @@ class FixDuplicateReceiving extends Command
             $masterLog = $medLogs->first();
             $duplicateLogs = $medLogs->slice(1);
             $excessQty = (float) $duplicateLogs->sum('qty');
+            $masterBatchId = $masterLog->batches_id;
 
-            $this->warn("  [DUPLIKAT] {$medName} (ID: {$medId}) -> Ditemukan {$count} baris log!");
-            $this->line("      - Master : ID #{$masterLog->id} (Qty: +{$masterLog->qty})");
+            $dupBatchesForMed = $duplicateLogs->pluck('batches_id')
+                ->filter(fn($bId) => $bId && $bId != $masterBatchId)
+                ->unique()
+                ->values()
+                ->toArray();
+
+            $allDupBatchIds = array_merge($allDupBatchIds, $dupBatchesForMed);
+
+            $this->warn("  [DUPLIKAT] {$medName} (ID: {$medId}) -> Ditemukan {$count} baris log (Kelebihan: +{$excessQty})");
+            $this->line("      - Master Log : ID #{$masterLog->id} (Qty: +{$masterLog->qty}, Batch: #{$masterBatchId})");
             foreach ($duplicateLogs as $dupLog) {
-                $this->line("      - Hapus  : ID #{$dupLog->id} (Qty: +{$dupLog->qty}, Kode: {$dupLog->code})");
+                $this->line("      - Hapus Log  : ID #{$dupLog->id} (Qty: +{$dupLog->qty}, Batch: #{$dupLog->batches_id})");
             }
 
             $dupesToFix[$medId] = [
                 'medicine_id' => $medId,
                 'medicine_name' => $medName,
                 'master_log' => $masterLog,
+                'master_batch_id' => $masterBatchId,
                 'duplicate_logs' => $duplicateLogs,
+                'duplicate_batch_ids' => $dupBatchesForMed,
                 'excess_qty' => $excessQty,
-                'batches_id' => $masterLog->batches_id,
             ];
         }
 
-        $duplicateRI = collect();
-        if ($rd) {
-            $receivingItems = ReceivingItems::where('receiving_details_id', $rd->id)->orderBy('id', 'asc')->get();
-            $riGrouped = $receivingItems->groupBy(fn($i) => ($i->order_items->medicine_id ?? 0) . '_' . ($i->batch ?? '0'));
-            foreach ($riGrouped as $group) {
-                if ($group->count() > 1) {
-                    $duplicateRI = $duplicateRI->merge($group->slice(1));
+        $allDupBatchIds = array_unique($allDupBatchIds);
+
+        // Find transfer items to remove
+        // If transfer headers exist from duplicate runs, or transfer items tied to duplicate batches
+        if (!empty($dupesToFix)) {
+            $allDupLogIds = collect($dupesToFix)->flatMap(fn($i) => $i['duplicate_logs']->pluck('id'))->toArray();
+            
+            // Look for transfer items created around the same timestamps or tied to duplicate batches
+            $transferItemsQuery = MedicineTransferItems::where(function ($q) use ($allDupBatchIds, $dupesToFix) {
+                if (!empty($allDupBatchIds)) {
+                    $q->whereIn('batches_id', $allDupBatchIds);
                 }
+                foreach ($dupesToFix as $item) {
+                    $medId = $item['medicine_id'];
+                    $q->orWhereHas('batches', function ($bq) use ($medId) {
+                        $bq->where('medicine_id', $medId);
+                    });
+                }
+            })->where('status', 1);
+
+            // If we have specific duplicate transfer headers
+            $dupTransferHeaders = MedicineTransfers::whereHas('items', function ($q) use ($allDupBatchIds) {
+                $q->whereIn('batches_id', $allDupBatchIds);
+            })->pluck('id')->toArray();
+
+            if (!empty($dupTransferHeaders)) {
+                $dupTransferItems = MedicineTransferItems::whereIn('medicine_transfer_id', $dupTransferHeaders)->get();
+                $dupTransferItemIds = $dupTransferItems->pluck('id')->toArray();
+                $this->info("Ditemukan " . count($dupTransferHeaders) . " header transfer duplikat dengan " . count($dupTransferItemIds) . " item transfer.");
             }
         }
 
-        if (empty($dupesToFix) && $duplicateRI->isEmpty()) {
-            $this->info("Tidak ditemukan duplikasi di Kartu Stock maupun Faktur.");
+        if (empty($dupesToFix)) {
+            $this->info("Tidak ditemukan duplikasi di Kartu Stock.");
             return 0;
         }
 
         if ($isDryRun) {
-            $this->warn("MODE DRY-RUN: Database tidak diubah.");
+            $this->warn("\nMODE DRY-RUN: Database TIDAK diubah. Rangkuman:");
+            $this->line("- Total Obat yang akan dikoreksi : " . count($dupesToFix));
+            $this->line("- Total Log Duplikat dihapus     : " . collect($dupesToFix)->sum(fn($i) => $i['duplicate_logs']->count()));
+            $this->line("- Total Batch Duplikat dihapus   : " . count($allDupBatchIds));
+            $this->line("- Total Item Transfer dihapus    : " . count($dupTransferItemIds));
             return 0;
         }
 
-        $this->info("Mengeksekusi perbaikan database...");
+        $this->info("\nMengeksekusi perbaikan database secara transaksional...");
         DB::beginTransaction();
 
         try {
             foreach ($dupesToFix as $medId => $item) {
                 $medName = $item['medicine_name'];
                 $excessQty = $item['excess_qty'];
+                $masterBatchId = $item['master_batch_id'];
+                $dupBatchIds = $item['duplicate_batch_ids'];
 
                 // 1. Hapus duplicate items_log
                 foreach ($item['duplicate_logs'] as $dupLog) {
@@ -165,64 +255,59 @@ class FixDuplicateReceiving extends Command
                 }
                 $this->line("  - [items_log] Menghapus {$item['duplicate_logs']->count()} baris log duplikat {$medName}.");
 
-                // 2. Koreksi stok etalase
-                $transferItems = MedicineTransferItems::whereHas('batches', function ($b) use ($medId) {
-                        $b->where('medicine_id', $medId);
-                    })
-                    ->where('status', 1)
-                    ->where(function ($q) {
-                        $q->whereNull('source_type')->orWhere('source_type', '!=', 'retur_gudang');
-                    })
-                    ->orderBy('id', 'desc')
-                    ->get();
-
-                $qtyToDeduct = $excessQty;
-                foreach ($transferItems as $ti) {
-                    if ($qtyToDeduct <= 0) break;
-                    if ($ti->qty <= $qtyToDeduct) {
-                        $qtyToDeduct -= $ti->qty;
-                        $ti->delete();
-                    } else {
-                        $ti->decrement('qty', $qtyToDeduct);
-                        $qtyToDeduct = 0;
+                // 2. Koreksi receiving_items jika batches_id mengarah ke duplicate batch
+                if (!empty($dupBatchIds) && $masterBatchId) {
+                    $updatedRI = ReceivingItems::whereIn('batches_id', $dupBatchIds)
+                        ->whereHas('order_items', fn($q) => $q->where('medicine_id', $medId))
+                        ->update(['batches_id' => $masterBatchId]);
+                    if ($updatedRI > 0) {
+                        $this->line("  - [receiving_items] Memperbaiki {$updatedRI} item faktur agar kembali mengarah ke master batch #{$masterBatchId}.");
                     }
                 }
-                $this->line("  - [Etalase] Mengurangi {$excessQty} dari stok etalase {$medName}.");
 
-                // 3. Koreksi master obat
+                // 3. Koreksi master obat (medicines.stock)
                 $medModel = Medicines::find($medId);
                 if ($medModel) {
                     $medModel->decrement('stock', $excessQty);
-                    $this->line("  - [Medicines] Stok master {$medName} berkurang -{$excessQty}.");
-                }
-
-                // 4. Koreksi batch jika ada
-                if ($item['batches_id']) {
-                    $batchModel = Batches::find($item['batches_id']);
-                    if ($batchModel && $batchModel->stock >= $excessQty) {
-                        $batchModel->decrement('stock', $excessQty);
-                        $this->line("  - [Batches] Stok batch berkurang -{$excessQty}.");
-                    }
+                    $this->line("  - [Medicines] Stok master {$medName} berkurang -{$excessQty} (Sisa: {$medModel->fresh()->stock}).");
                 }
             }
 
-            // 5. Hapus receiving_items duplikat jika masih ada
-            if ($duplicateRI->isNotEmpty()) {
-                foreach ($duplicateRI as $ri) {
-                    $ri->delete();
+            // 4. Hapus transfer items duplikat
+            if (!empty($dupTransferItemIds)) {
+                MedicineTransferItems::whereIn('id', $dupTransferItemIds)->delete();
+                $this->line("  - [Etalase] Menghapus " . count($dupTransferItemIds) . " baris transfer item etalase duplikat.");
+            }
+
+            // 5. Hapus duplicate batches jika tidak ada referensi lain
+            if (!empty($allDupBatchIds)) {
+                $batchesToDelete = Batches::whereIn('id', $allDupBatchIds)->get();
+                $deletedBatchCount = 0;
+                foreach ($batchesToDelete as $b) {
+                    $hasLogs = ItemsLog::where('batches_id', $b->id)->exists();
+                    $hasTransfers = MedicineTransferItems::where('batches_id', $b->id)->exists();
+                    $hasRI = ReceivingItems::where('batches_id', $b->id)->exists();
+                    if (!$hasLogs && !$hasTransfers && !$hasRI) {
+                        $b->delete();
+                        $deletedBatchCount++;
+                    }
                 }
-                $this->line("  - [receiving_items] Menghapus {$duplicateRI->count()} baris item faktur duplikat.");
+                $this->line("  - [Batches] Menghapus {$deletedBatchCount} batch duplikat.");
             }
 
             // 6. Header transfer kosong
-            MedicineTransfers::doesntHave('items')->delete();
+            $deletedTransfers = MedicineTransfers::doesntHave('items')->delete();
+            if ($deletedTransfers > 0) {
+                $this->line("  - [MedicineTransfers] Menghapus {$deletedTransfers} header transfer kosong.");
+            }
 
             DB::commit();
-            $this->info("=== PERBAIKAN SELESAI SECARA PRESISI ===");
+            $this->info("\n=== PERBAIKAN SELESAI SECARA PRESISI ===");
             return 0;
         } catch (\Throwable $e) {
             DB::rollBack();
             $this->error("TERJADI KESALAHAN: " . $e->getMessage());
+            $this->error($e->getTraceAsString());
             return 1;
         }
     }

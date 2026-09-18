@@ -1895,7 +1895,7 @@
             // Disable buttons
             const addBtn = document.querySelector('[onclick="addItem()"]');
             if (addBtn) addBtn.disabled = true;
-            const saveBtn = document.querySelector('[onclick="saveOrder()"]');
+            const saveBtn = document.getElementById('btnSaveDraft') || document.querySelector('[onclick*="saveOrder"]');
             if (saveBtn) saveBtn.disabled = true;
         }
 
