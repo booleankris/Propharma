@@ -7,11 +7,16 @@
     <title>Kwitansi {{ $transaction->transaction_code }} - {{ $pharmacy->name ?? 'Apotek' }}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
-        rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Dynalight&family=Ephesis&display=swap" rel="stylesheet">
 
     <style>
+        :root {
+            --form-font: 'Courier Prime', Courier, monospace;
+            --detail-font: 'Dynalight', 'Ephesis', cursive;
+        }
+
         /* ── Reset & Base ────────────────────────────────────────────── */
         * {
             box-sizing: border-box;
@@ -206,6 +211,7 @@
         }
 
         .kwitansi-canvas {
+            font-family: var(--form-font);
             padding: 8px 10px 4px 6px;
             font-size: 11px;
             color: #000;
@@ -218,10 +224,12 @@
             align-items: center;
             gap: 8px;
             margin-bottom: 12px;
+            font-family: var(--form-font);
         }
 
         .kwitansi-no-label {
-            font-weight: 800;
+            font-family: var(--form-font);
+            font-weight: 700;
             font-size: 11.5px;
             letter-spacing: 0.5px;
         }
@@ -231,7 +239,7 @@
             padding: 2px 14px;
             font-weight: 700;
             font-size: 11.5px;
-            font-family: monospace, sans-serif;
+            font-family: var(--form-font);
             letter-spacing: 0.5px;
             min-width: 110px;
             text-align: center;
@@ -243,21 +251,25 @@
             align-items: baseline;
             margin-bottom: 8px;
             position: relative;
+            font-family: var(--form-font);
         }
 
         .form-label {
+            font-family: var(--form-font);
             font-size: 11px;
-            font-weight: 600;
+            font-weight: 700;
             white-space: nowrap;
-            width: 135px;
+            width: 140px;
             flex-shrink: 0;
+            letter-spacing: -0.1px;
         }
 
         .form-colon {
+            font-family: var(--form-font);
             width: 14px;
             text-align: center;
             flex-shrink: 0;
-            font-weight: bold;
+            font-weight: 700;
         }
 
         .form-fill-dotted {
@@ -271,18 +283,20 @@
         }
 
         .form-fill-value {
-            font-size: 12px;
-            font-weight: 700;
-            color: #0f172a;
+            font-family: var(--detail-font);
+            font-size: 23px;
+            font-weight: 400;
+            color: #0b132b;
             padding: 0 4px;
             letter-spacing: 0.3px;
+            line-height: 1;
         }
 
         .handwritten-look {
-            font-family: 'Caveat', 'Comic Sans MS', cursive, sans-serif;
-            font-size: 17px;
-            font-weight: 700;
-            color: #0f172a;
+            font-family: var(--detail-font);
+            font-size: 23px;
+            font-weight: 400;
+            color: #0b132b;
             line-height: 1;
         }
 
@@ -295,14 +309,13 @@
             margin-left: 2px;
             position: relative;
             background: #fafafa;
-            /* Slanted container effect with double parallel lines */
             box-shadow: inset 0 0 0 1.2px #000;
         }
 
         .terbilang-text {
-            font-family: 'Caveat', 'Comic Sans MS', cursive, sans-serif;
-            font-size: 15px;
-            font-weight: 700;
+            font-family: var(--detail-font);
+            font-size: 20px;
+            font-weight: 400;
             color: #09090b;
             line-height: 1.25;
             letter-spacing: 0.3px;
@@ -313,9 +326,12 @@
             width: 100%;
             height: 17px;
             border-bottom: 1px dotted #444;
-            margin-left: 149px;
-            width: calc(100% - 149px);
+            margin-left: 154px;
+            width: calc(100% - 154px);
             margin-top: 4px;
+            font-family: var(--detail-font);
+            font-size: 21px;
+            line-height: 1;
         }
 
         /* ── Bottom Section: Kotak Nominal Rp & Tanda Tangan / Cap ───── */
@@ -332,20 +348,23 @@
             display: flex;
             align-items: center;
             gap: 6px;
+            font-family: var(--form-font);
         }
 
         .rp-prefix {
+            font-family: var(--form-font);
             font-size: 15px;
-            font-weight: 800;
-            font-style: italic;
+            font-weight: 700;
+            font-style: normal;
         }
 
         .nominal-box {
             border: 1.5px solid #000;
             box-shadow: inset 0 0 0 1px #000;
             padding: 4px 16px;
-            font-size: 14px;
-            font-weight: 800;
+            font-family: var(--form-font);
+            font-size: 13.5px;
+            font-weight: 700;
             letter-spacing: 0.8px;
             min-width: 140px;
             text-align: center;
@@ -396,11 +415,14 @@
             text-align: center;
             width: 200px;
             position: relative;
+            font-family: var(--form-font);
         }
 
         .sig-date {
-            font-size: 11px;
-            font-weight: 600;
+            font-family: var(--detail-font);
+            font-size: 18px;
+            font-weight: 400;
+            color: #0b132b;
             border-bottom: 1px dotted #444;
             padding-bottom: 2px;
             margin-bottom: 6px;
@@ -425,8 +447,9 @@
         }
 
         .sig-name {
-            font-size: 10.5px;
-            font-weight: 700;
+            font-family: var(--detail-font);
+            font-size: 18px;
+            font-weight: 400;
             color: #0f172a;
         }
 
@@ -488,6 +511,13 @@
             </span>
         </div>
         <div class="toolbar-actions">
+            <div style="display:inline-flex; align-items:center; gap:6px; background:#f8fafc; border:1px solid #cbd5e1; padding:5px 10px; border-radius:8px; font-size:12px; font-weight:600;">
+                <span style="color:#64748b;">Font Isi:</span>
+                <select id="detailFontSelector" onchange="switchDetailFont(this.value)" style="border:none; background:transparent; font-size:12px; font-weight:700; color:#1e293b; cursor:pointer; outline:none;">
+                    <option value="'Dynalight', 'Ephesis', cursive">Dynalight</option>
+                    <option value="'Ephesis', 'Dynalight', cursive">Ephesis</option>
+                </select>
+            </div>
             <button type="button" onclick="location.reload()" class="btn btn-secondary" title="Kembalikan ke data awal">
                 Reset
             </button>
@@ -674,6 +704,21 @@
                 btnText.textContent = 'Mode: Menyamping (Sesuai Foto)';
             }
         }
+
+        // Switch detail font between Dynalight and Ephesis
+        function switchDetailFont(font) {
+            document.documentElement.style.setProperty('--detail-font', font);
+            localStorage.setItem('kwitansi_detail_font', font);
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const saved = localStorage.getItem('kwitansi_detail_font');
+            if (saved) {
+                document.documentElement.style.setProperty('--detail-font', saved);
+                const select = document.getElementById('detailFontSelector');
+                if (select) select.value = saved;
+            }
+        });
     </script>
 </body>
 
