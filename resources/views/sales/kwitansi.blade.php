@@ -7,8 +7,10 @@
     <title>Kwitansi {{ $transaction->transaction_code }} - {{ $pharmacy->name ?? 'Apotek' }}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400;1,700&display=swap"
+        rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Charm:wght@400;700&display=swap" rel="stylesheet">
 
     <style>
@@ -256,7 +258,7 @@
 
         .form-label {
             font-family: var(--form-font);
-            font-size: 11px;
+            font-size: 14px;
             font-weight: 700;
             white-space: nowrap;
             width: 140px;
@@ -503,8 +505,10 @@
                 <polyline points="10 9 9 9 8 9"></polyline>
             </svg>
             <span>Kwitansi Pembayaran: <strong>{{ $transaction->transaction_code }}</strong></span>
-            <span style="font-size:11px; color:#059669; background:#ecfdf5; border:1px solid #a7f3d0; padding:3px 8px; border-radius:6px; font-weight:600; display:inline-flex; align-items:center; gap:4px; margin-left:8px;">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <span
+                style="font-size:11px; color:#059669; background:#ecfdf5; border:1px solid #a7f3d0; padding:3px 8px; border-radius:6px; font-weight:600; display:inline-flex; align-items:center; gap:4px; margin-left:8px;">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2">
                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                 </svg>
@@ -512,14 +516,17 @@
             </span>
         </div>
         <div class="toolbar-actions">
-            <div style="display:inline-flex; align-items:center; gap:6px; background:#f8fafc; border:1px solid #cbd5e1; padding:5px 10px; border-radius:8px; font-size:12px; font-weight:600;">
+            <div
+                style="display:inline-flex; align-items:center; gap:6px; background:#f8fafc; border:1px solid #cbd5e1; padding:5px 10px; border-radius:8px; font-size:12px; font-weight:600;">
                 <span style="color:#64748b;">Font Isi:</span>
-                <select id="detailFontSelector" onchange="switchDetailFont(this.value)" style="border:none; background:transparent; font-size:12px; font-weight:700; color:#1e293b; cursor:pointer; outline:none;">
+                <select id="detailFontSelector" onchange="switchDetailFont(this.value)"
+                    style="border:none; background:transparent; font-size:12px; font-weight:700; color:#1e293b; cursor:pointer; outline:none;">
                     <option value="'Charm', cursive">Charm (Tulisan Jelas)</option>
                     <option value="'Courier Prime', Courier, monospace">Courier Prime (Tegak Cetak)</option>
                 </select>
             </div>
-            <button type="button" onclick="location.reload()" class="btn btn-secondary" title="Kembalikan ke data awal">
+            <button type="button" onclick="location.reload()" class="btn btn-secondary"
+                title="Kembalikan ke data awal">
                 Reset
             </button>
             <button type="button" onclick="toggleOrientation()" class="btn btn-secondary" id="btnToggleMode"
@@ -573,16 +580,27 @@
                         @endif
                     </td>
                     <td class="kop-text-td">
-                        <div class="kop-name editable-field" contenteditable="true" spellcheck="false" title="Klik untuk edit nama apotek">{{ strtoupper($pharmacy->name ?? 'APOTEK SAHABAT') }}</div>
+                        <div class="kop-name editable-field" contenteditable="true" spellcheck="false"
+                            title="Klik untuk edit nama apotek">{{ strtoupper($pharmacy->name ?? 'APOTEK SAHABAT') }}
+                        </div>
                         <div class="kop-detail">
-                            <div class="editable-field" contenteditable="true" spellcheck="false" title="Klik untuk edit alamat">{{ $pharmacy->address ?? 'Jl. Palang Merah No.16 B, Sidodadi' }}</div>
-                            <div class="editable-field" contenteditable="true" spellcheck="false" title="Klik untuk edit telepon">Telp. {{ $pharmacy->phone ?? '0812 5758 6688' }}</div>
-                            <div class="editable-field" contenteditable="true" spellcheck="false" title="Klik untuk edit apoteker">Apoteker : {{ $pharmacy->pharmacist ?? 'apt. Nurlina Muliani, S.Farm., M. Farm' }}</div>
-                            <div class="editable-field" contenteditable="true" spellcheck="false" title="Klik untuk edit SIPA">No. SIPA : {{ $pharmacy->pharmacist_permit ?? '12440004111020004' }}</div>
+                            <div class="editable-field" contenteditable="true" spellcheck="false"
+                                title="Klik untuk edit alamat">
+                                {{ $pharmacy->address ?? 'Jl. Palang Merah No.16 B, Sidodadi' }}</div>
+                            <div class="editable-field" contenteditable="true" spellcheck="false"
+                                title="Klik untuk edit telepon">Telp. {{ $pharmacy->phone ?? '0812 5758 6688' }}</div>
+                            <div class="editable-field" contenteditable="true" spellcheck="false"
+                                title="Klik untuk edit apoteker">Apoteker :
+                                {{ $pharmacy->pharmacist ?? 'apt. Nurlina Muliani, S.Farm., M. Farm' }}</div>
+                            <div class="editable-field" contenteditable="true" spellcheck="false"
+                                title="Klik untuk edit SIPA">No. SIPA :
+                                {{ $pharmacy->pharmacist_permit ?? '12440004111020004' }}</div>
                             @if (!empty($pharmacy->permit))
-                                <div class="editable-field" contenteditable="true" spellcheck="false" title="Klik untuk edit SIA">No. SIA : {{ $pharmacy->permit }}</div>
+                                <div class="editable-field" contenteditable="true" spellcheck="false"
+                                    title="Klik untuk edit SIA">No. SIA : {{ $pharmacy->permit }}</div>
                             @elseif(!empty($pharmacy->pharmacy_registration))
-                                <div class="editable-field" contenteditable="true" spellcheck="false" title="Klik untuk edit SIA">No. SIA : {{ $pharmacy->pharmacy_registration }}</div>
+                                <div class="editable-field" contenteditable="true" spellcheck="false"
+                                    title="Klik untuk edit SIA">No. SIA : {{ $pharmacy->pharmacy_registration }}</div>
                             @endif
                         </div>
                     </td>
@@ -599,7 +617,8 @@
                     {{-- Baris 1: KWITANSI NO. : [ ... ] --}}
                     <div class="row-kwitansi-no">
                         <span class="kwitansi-no-label">KWITANSI NO. :</span>
-                        <div class="kwitansi-no-box editable-field" contenteditable="true" spellcheck="false" title="Klik untuk edit nomor kwitansi">{{ $transaction->transaction_code }}</div>
+                        <div class="kwitansi-no-box editable-field" contenteditable="true" spellcheck="false"
+                            title="Klik untuk edit nomor kwitansi">{{ $transaction->transaction_code }}</div>
                     </div>
 
                     {{-- Baris 2: Sudah terima : <Nama Pasien / Pembeli> --}}
@@ -607,7 +626,8 @@
                         <span class="form-label">Sudah terima</span>
                         <span class="form-colon">:</span>
                         <div class="form-fill-dotted">
-                            <span class="form-fill-value handwritten-look editable-field" contenteditable="true" spellcheck="false" title="Klik untuk edit nama pembeli/pasien">
+                            <span class="form-fill-value handwritten-look editable-field" contenteditable="true"
+                                spellcheck="false" title="Klik untuk edit nama pembeli/pasien">
                                 {{ ucwords(strtolower($patient?->name ?? 'Pelanggan Umum')) }}
                             </span>
                         </div>
@@ -618,7 +638,8 @@
                         <span class="form-label">Banyaknya Uang</span>
                         <span class="form-colon">:</span>
                         <div class="terbilang-double-slash-box">
-                            <span class="terbilang-text editable-field" contenteditable="true" spellcheck="false" title="Klik untuk edit terbilang">
+                            <span class="terbilang-text editable-field" contenteditable="true" spellcheck="false"
+                                title="Klik untuk edit terbilang">
                                 {{ $terbilang }} .
                             </span>
                         </div>
@@ -629,15 +650,18 @@
                         <span class="form-label">Untuk Pembayaran</span>
                         <span class="form-colon">:</span>
                         <div class="form-fill-dotted">
-                            <span class="form-fill-value handwritten-look editable-field" contenteditable="true" spellcheck="false" title="Klik untuk edit keterangan pembayaran">
+                            <span class="form-fill-value handwritten-look editable-field" contenteditable="true"
+                                spellcheck="false" title="Klik untuk edit keterangan pembayaran">
                                 {{ $paymentFor }}
                             </span>
                         </div>
                     </div>
 
                     {{-- Garis Titik-titik Tambahan Panduan Tulisan --}}
-                    <div class="dotted-line-blank editable-field" contenteditable="true" spellcheck="false" title="Klik untuk tambah keterangan baris 2"></div>
-                    <div class="dotted-line-blank editable-field" contenteditable="true" spellcheck="false" title="Klik untuk tambah keterangan baris 3"></div>
+                    <div class="dotted-line-blank editable-field" contenteditable="true" spellcheck="false"
+                        title="Klik untuk tambah keterangan baris 2"></div>
+                    <div class="dotted-line-blank editable-field" contenteditable="true" spellcheck="false"
+                        title="Klik untuk tambah keterangan baris 3"></div>
 
                     {{-- Bagian Bawah: Nominal Rp (Kiri) & Tempat/Tanggal/TTD (Kanan - Tanpa Stempel) --}}
                     <div class="bottom-section">
@@ -645,14 +669,16 @@
                         {{-- Kotak Nominal Rp --}}
                         <div class="nominal-container">
                             <span class="rp-prefix">Rp.</span>
-                            <div class="nominal-box editable-field" contenteditable="true" spellcheck="false" title="Klik untuk edit nominal">
+                            <div class="nominal-box editable-field" contenteditable="true" spellcheck="false"
+                                title="Klik untuk edit nominal">
                                 {{ number_format($totalPrice, 0, ',', '.') }},00,-
                             </div>
                         </div>
 
                         {{-- Tempat, Tanggal, dan Tanda Tangan (Tanpa Stempel) --}}
                         <div class="signature-container">
-                            <div class="sig-date editable-field" contenteditable="true" spellcheck="false" title="Klik untuk edit kota & tanggal">
+                            <div class="sig-date editable-field" contenteditable="true" spellcheck="false"
+                                title="Klik untuk edit kota & tanggal">
                                 {{ $pharmacy->city ?? 'Samarinda' }},
                                 {{ \Carbon\Carbon::parse($transaction->updated_at)->format('d/m/y') }}
                             </div>
@@ -677,7 +703,8 @@
                                 @endif
                             </div>
 
-                            <div class="sig-name editable-field" contenteditable="true" spellcheck="false" title="Klik untuk edit nama petugas">
+                            <div class="sig-name editable-field" contenteditable="true" spellcheck="false"
+                                title="Klik untuk edit nama petugas">
                                 ( {{ ucwords(strtolower($operator ?? 'Petugas Farmasi')) }} )
                             </div>
                         </div>
