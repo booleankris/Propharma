@@ -34,7 +34,7 @@ class ReportedMedicineController extends Controller
             $pharmacyId = $request->filled('pharmacy_id') ? (int)$request->pharmacy_id : $selectedPharmacyId;
 
             $query = ReportedMedicine::with(['medicine.category', 'medicine.factory', 'user', 'pharmacy'])
-                ->where('pharmacy_id', $pharmacyId)
+                ->where('reported_medicines.pharmacy_id', $pharmacyId)
                 ->select('reported_medicines.*');
 
             // Stock calculation: Gudang (9) uses batches, Cabang uses etalase/pelayanan (medicine_transfer_items)
