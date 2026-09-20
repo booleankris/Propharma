@@ -75,7 +75,7 @@ class KoordinatorAccessTest extends TestCase
         $controllerMiddleware = $controller->getMiddleware();
         $this->assertNotEmpty($controllerMiddleware, 'StaffStatsController should have protection middleware.');
 
-        foreach (['Koordinator', 'manager', 'Manager'] as $role) {
+        foreach (['Koordinator', 'manager', 'Manager', 'administrator', 'Kasir'] as $role) {
             $user = $this->userWithRoles([$role]);
             $this->actingAs($user);
 
@@ -94,13 +94,13 @@ class KoordinatorAccessTest extends TestCase
         }
     }
 
-    public function test_staff_stats_controller_allows_non_koordinator_user(): void
+    public function test_staff_stats_controller_allows_general_manager_only(): void
     {
         $controller = new StaffStatsController();
         $controllerMiddleware = $controller->getMiddleware();
 
-        $admin = $this->userWithRoles(['administrator']);
-        $this->actingAs($admin);
+        $gm = $this->userWithRoles(['General Manager']);
+        $this->actingAs($gm);
 
         $request = Request::create('/staff-stats');
         $closure = $controllerMiddleware[0]['middleware'];

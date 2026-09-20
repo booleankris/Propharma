@@ -542,13 +542,15 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
 
     // ================================ Profile & Staff Stats ================================
     Route::get('/profile', [ProfileController::class, 'index'])->name('profile.index');
-    Route::get('/staff-stats', [StaffStatsController::class, 'index'])
-        ->name('admin.staff-stats-page');
 
-    Route::get('/staff-stats/data', [StaffStatsController::class, 'data'])
-        ->name('admin.staff-stats');
-    Route::get('/staff-stats/summary', [StaffStatsController::class, 'summary'])
-        ->name('admin.staff-stats.summary');
+    Route::middleware('role:General Manager')->group(function () {
+        Route::get('/staff-stats', [StaffStatsController::class, 'index'])
+            ->name('admin.staff-stats-page');
+        Route::get('/staff-stats/data', [StaffStatsController::class, 'data'])
+            ->name('admin.staff-stats');
+        Route::get('/staff-stats/summary', [StaffStatsController::class, 'summary'])
+            ->name('admin.staff-stats.summary');
+    });
 });
 
 Route::get('/products/search', [SalesController::class, 'search'])

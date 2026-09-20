@@ -35,8 +35,16 @@ class MedicineTransferItems extends Model
     {
         return $this->belongsTo(Batches::class, 'batches_id');
     }
+    public function batch()
+    {
+        return $this->batches();
+    }
     public function etalases()
     {
         return $this->belongsTo(Etalases::class, 'etalases_id');
+    }
+    public function etalase()
+    {
+        return $this->etalases();
     }
 }

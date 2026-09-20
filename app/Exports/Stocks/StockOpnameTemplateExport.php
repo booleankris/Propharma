@@ -6,6 +6,7 @@ use App\Models\Medicines;
 use App\Models\MedicineTransferItems;
 use App\Models\Batches;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithStyles;
@@ -68,43 +69,71 @@ class StockOpnameTemplateExport implements FromCollection, WithHeadings, WithSty
         $rows = [];
         $no = 1;
 
-        foreach ($medicines as $med) {
-            // Find default or recent etalase if pelayanan
-            $etalaseName = '';
-            $latestEd = '';
+        if ($this->mode === 'gudang') {
+            // Bulk prefetch for gudang (pharmacy 9)
+            $gudangBatchMap = DB::table('batches')
+                ->select('medicine_id', DB::raw('MIN(expired_date) as latest_ed'))
+                ->where('pharmacy_id', 9)
+                ->whereNotNull('expired_date')
+                ->where('expired_date', '!=', '')
+                ->groupBy('medicine_id')
+                ->pluck('latest_ed', 'medicine_id');
 
-            if ($this->mode === 'gudang') {
-                $batch = Batches::where('medicine_id', $med->id)
-                    ->where('pharmacy_id', 9)
-                    ->orderBy('expired_date', 'asc')
-                    ->first();
-                if ($batch && $batch->expired_date) {
-                    $latestEd = $batch->expired_date;
-                }
-            } else {
-                $transferItem = MedicineTransferItems::whereHas('batch', function ($q) use ($med) {
-                    $q->where('medicine_id', $med->id);
-                })
-                ->whereNotNull('etalases_id')
-                ->with('etalase', 'batch')
-                ->latest()
-                ->first();
-
-                if ($transferItem) {
-                    $etalaseName = $transferItem->etalase->name ?? '';
-                    $latestEd = $transferItem->batch->expired_date ?? '';
-                }
+            foreach ($medicines as $med) {
+                $ed = $gudangBatchMap[$med->id] ?? '';
+                $rows[] = [
+                    'No'           => $no++,
+                    'Kode Barang'  => $med->code,
+                    'Stok Fisik'   => '', // Left empty for user to fill
+                    'Expired Date' => $ed ? substr($ed, 0, 10) : '',
+                    'Etalase'      => '',
+                    'Nama Obat'    => $med->name,
+                    'Satuan'       => $med->unit,
+                ];
             }
+        } else {
+            // Bulk prefetch for pelayanan (active branch pharmacy)
+            $targetPharmacyId = $this->pharmacyId ?: getActivePharmacyId();
 
-            $rows[] = [
-                'No'           => $no++,
-                'Kode Barang'  => $med->code,
-                'Stok Fisik'   => '', // Left empty for user to fill
-                'Expired Date' => $latestEd,
-                'Etalase'      => $etalaseName,
-                'Nama Obat'    => $med->name,
-                'Satuan'       => $med->unit,
-            ];
+            $pelayananMap = DB::table('medicine_transfer_items as mti')
+                ->join('batches as b', 'b.id', '=', 'mti.batches_id')
+                ->leftJoin('etalases as e', 'e.id', '=', 'mti.etalases_id')
+                ->where('b.pharmacy_id', $targetPharmacyId)
+                ->whereNotNull('mti.etalases_id')
+                ->select(
+                    'b.medicine_id',
+                    'e.name as etalase_name',
+                    'b.expired_date',
+                    'mti.id as mti_id'
+                )
+                ->orderBy('mti.id', 'desc')
+                ->get()
+                ->unique('medicine_id')
+                ->keyBy('medicine_id');
+
+            $batchFallback = DB::table('batches')
+                ->select('medicine_id', DB::raw('MIN(expired_date) as latest_ed'))
+                ->where('pharmacy_id', $targetPharmacyId)
+                ->whereNotNull('expired_date')
+                ->where('expired_date', '!=', '')
+                ->groupBy('medicine_id')
+                ->pluck('latest_ed', 'medicine_id');
+
+            foreach ($medicines as $med) {
+                $info = $pelayananMap->get($med->id);
+                $etalaseName = $info->etalase_name ?? '';
+                $latestEd = $info->expired_date ?? ($batchFallback[$med->id] ?? '');
+
+                $rows[] = [
+                    'No'           => $no++,
+                    'Kode Barang'  => $med->code,
+                    'Stok Fisik'   => '', // Left empty for user to fill
+                    'Expired Date' => $latestEd ? substr($latestEd, 0, 10) : '',
+                    'Etalase'      => $etalaseName,
+                    'Nama Obat'    => $med->name,
+                    'Satuan'       => $med->unit,
+                ];
+            }
         }
 
         return collect($rows);
@@ -140,7 +169,7 @@ class StockOpnameTemplateExport implements FromCollection, WithHeadings, WithSty
         $sheet->getStyle("D2:D{$highestRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
         // Borders
-        $sheet->getStyle("A1:G{$highestRow}")->getBorder()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+        $sheet->getStyle("A1:G{$highestRow}")->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
 
         return [];
     }

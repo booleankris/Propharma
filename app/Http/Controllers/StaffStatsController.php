@@ -18,8 +18,8 @@ class StaffStatsController extends Controller
     {
         $this->middleware(function ($request, $next) {
             $user = auth()->user();
-            if ($user && $user->hasAnyRole(['Koordinator', 'manager', 'Manager'])) {
-                abort(403, 'Akses ditolak: Koordinator tidak memiliki akses ke Statistik Kasir.');
+            if (!$user || !$user->hasRole('General Manager')) {
+                abort(403, 'Akses ditolak: Hanya General Manager yang memiliki akses ke Statistik Kasir.');
             }
             return $next($request);
         });

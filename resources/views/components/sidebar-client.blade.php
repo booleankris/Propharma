@@ -776,7 +776,7 @@
             Profil
         </a>
 
-        @if (!isWarehousePharmacy() && !isOnlineRole() && !auth()->user()->hasAnyRole(['Koordinator', 'manager', 'Manager']))
+        @hasrole('General Manager')
             <a href="{{ url('staff-stats') }}" class="nav-item {{ request()->is('staff-stats*') ? 'active' : '' }}">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -785,7 +785,7 @@
                 </svg>
                 Statistik Kasir
             </a>
-        @endif
+        @endhasrole
 
         @hasrole('General Manager')
             <a href="{{ route('general-manager.users.roles.index') }}"
