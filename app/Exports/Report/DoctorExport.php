@@ -65,7 +65,10 @@ class DoctorExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
     // REKAP — 5 Kolom: No, Nama Dokter, Nilai Resep, Lembar, Jumlah R/
     private function buildRecap(): array
     {
-        $query = MedicineTransactions::with(['transactions', 'doctors'])
+        $query = MedicineTransactions::with([
+            'transactions' => fn($q) => $q->where('status', 1),
+            'doctors',
+        ])
             ->where('pharmacy_id', $this->pharmacyId)
             ->whereIn('transaction_type', ['RESEP TUNAI', 'KREDIT'])
             ->where('status', 1)
@@ -88,11 +91,11 @@ class DoctorExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         $grouped = [];
 
         foreach ($transactions as $trx) {
-            $docId   = $trx->doctor_id ?? 0;
-            $docName = $trx->doctors?->name ?? 'TANPA DOKTER';
+            $docName  = trim($trx->doctors?->name ?? 'TANPA DOKTER');
+            $groupKey = strtoupper($docName);
 
-            if (!isset($grouped[$docId])) {
-                $grouped[$docId] = [
+            if (!isset($grouped[$groupKey])) {
+                $grouped[$groupKey] = [
                     'doctor_name' => $docName,
                     'nilai_resep' => 0,
                     'lembar'      => 0,
@@ -100,12 +103,22 @@ class DoctorExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                 ];
             }
 
-            $grouped[$docId]['nilai_resep'] += (float) ($trx->subtotal ?? 0);
-            $grouped[$docId]['lembar']      += 1;
+            $grouped[$groupKey]['nilai_resep'] += (float) ($trx->subtotal ?? 0);
+            $grouped[$groupKey]['lembar']      += 1;
 
-            foreach ($trx->transactions ?? [] as $item) {
-                $grouped[$docId]['jumlah_r'] += (float) ($item->quantity ?? 0);
-            }
+            // Hitung Jumlah R/ secara presisi:
+            // 1 racikan (recipe_number yang sama) dihitung 1 R/
+            // Setiap obat non-racikan (recipe_number null/kosong) dihitung 1 R/
+            $activeItems = $trx->transactions ?? collect();
+            $racikanCount = $activeItems->whereNotNull('recipe_number')
+                ->filter(fn($item) => trim((string)$item->recipe_number) !== '')
+                ->pluck('recipe_number')
+                ->unique()
+                ->count();
+
+            $nonRacikanCount = $activeItems->filter(fn($item) => empty($item->recipe_number))->count();
+
+            $grouped[$groupKey]['jumlah_r'] += ($racikanCount + $nonRacikanCount);
         }
 
         // Sort alphabetically by Doctor Name (A-Z)
@@ -141,7 +154,10 @@ class DoctorExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
     // DETAIL — 5 Kolom: No, Nama Dokter, Nama Obat, Qty, Jumlah
     private function buildDetail(): array
     {
-        $query = MedicineTransactions::with(['transactions.medicine', 'doctors'])
+        $query = MedicineTransactions::with([
+            'transactions' => fn($q) => $q->where('status', 1)->with('medicine'),
+            'doctors',
+        ])
             ->where('pharmacy_id', $this->pharmacyId)
             ->whereIn('transaction_type', ['RESEP TUNAI', 'KREDIT'])
             ->where('status', 1)
@@ -164,14 +180,14 @@ class DoctorExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         $grouped = [];
 
         foreach ($transactions as $trx) {
-            $docId   = $trx->doctor_id ?? 0;
-            $docName = $trx->doctors?->name ?? 'TANPA DOKTER';
+            $docName  = trim($trx->doctors?->name ?? 'TANPA DOKTER');
+            $groupDoc = strtoupper($docName);
 
             foreach ($trx->transactions ?? [] as $item) {
                 $med     = $item->medicine;
                 $medId   = $med?->id ?? ('item_' . $item->id);
                 $medName = $med?->name ?? ($item->medicine_name ?? '-');
-                $key     = "{$docId}_{$medId}";
+                $key     = "{$groupDoc}_{$medId}";
 
                 if (!isset($grouped[$key])) {
                     $grouped[$key] = [
@@ -233,9 +249,12 @@ class DoctorExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(13);
         $sheet->getStyle('A4')->getFont()->setBold(true);
 
-        // Column header row bold
+        // Column header row bold & centered
         $sheet->getStyle("A{$dataStartRow}:{$lastCol}{$dataStartRow}")
             ->getFont()->setBold(true);
+        $sheet->getStyle("A{$dataStartRow}:{$lastCol}{$dataStartRow}")
+            ->getAlignment()
+            ->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
         // Borders on data area
         $sheet->getStyle("A{$dataStartRow}:{$lastCol}{$lastRow}")
@@ -252,24 +271,37 @@ class DoctorExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
             ->getAlignment()
             ->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-        if ($this->selectedType === 'rekap') {
-            // Rekap: C (Nilai Resep), D (Lembar), E (Jumlah R/) -> Right-aligned & Number format
-            $sheet->getStyle("C{$dataStartRow}:E{$lastRow}")
-                ->getAlignment()
-                ->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+        $dataRowsStart = $dataStartRow + 1;
 
-            $sheet->getStyle("C{$dataStartRow}:E{$lastRow}")
-                ->getNumberFormat()
-                ->setFormatCode('#,##0');
-        } else {
-            // Detail: D (Qty), E (Jumlah) -> Right-aligned & Number format
-            $sheet->getStyle("D{$dataStartRow}:E{$lastRow}")
-                ->getAlignment()
-                ->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+        if ($dataRowsStart <= $lastRow) {
+            if ($this->selectedType === 'rekap') {
+                // Rekap: C (Nilai Resep), D (Lembar), E (Jumlah R/) -> Right-aligned & Number format
+                $sheet->getStyle("C{$dataRowsStart}:E{$lastRow}")
+                    ->getAlignment()
+                    ->setHorizontal(Alignment::HORIZONTAL_RIGHT);
 
-            $sheet->getStyle("D{$dataStartRow}:E{$lastRow}")
-                ->getNumberFormat()
-                ->setFormatCode('#,##0');
+                $sheet->getStyle("C{$dataRowsStart}:E{$lastRow}")
+                    ->getNumberFormat()
+                    ->setFormatCode('#,##0');
+            } else {
+                // Detail: D (Qty), E (Jumlah) -> Right-aligned & Number format
+                $sheet->getStyle("D{$dataRowsStart}:E{$lastRow}")
+                    ->getAlignment()
+                    ->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+
+                $sheet->getStyle("D{$dataRowsStart}:E{$lastRow}")
+                    ->getNumberFormat()
+                    ->setFormatCode('#,##0');
+            }
+        }
+
+        // Total row bold & border formatting
+        if ($lastRow >= $dataRowsStart) {
+            $sheet->getStyle("A{$lastRow}:{$lastCol}{$lastRow}")
+                ->getFont()->setBold(true);
+            $sheet->getStyle("A{$lastRow}:{$lastCol}{$lastRow}")
+                ->getBorders()->getBottom()
+                ->setBorderStyle(Border::BORDER_DOUBLE);
         }
     }
 
