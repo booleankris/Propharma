@@ -823,7 +823,8 @@
                                 Pembelian</span>
                         </a>
 
-                        {{-- Pareto --}}
+                        {{-- Pareto (Khusus Finance & General Manager) --}}
+                        @hasanyrole('Finance|General Manager|administrator')
                         <a href="{{ route('pareto.index') }}"
                             class="menu-tile group flex flex-col items-center gap-2 rounded-2xl border border-slate-200/70 bg-slate-50/60 p-4 text-center hover:bg-white hover:border-pink-200 hover:shadow-md hover:shadow-pink-500/5 cursor-pointer">
                             <div
@@ -838,6 +839,7 @@
                             </div>
                             <span class="text-xs font-bold text-slate-700 group-hover:text-pink-600">Analisis Pareto</span>
                         </a>
+                        @endhasanyrole
                     @endif
                 </div>
             </div>
@@ -863,7 +865,7 @@
                     </h2>
 
                     <div
-                        class="grid grid-cols-2 sm:grid-cols-3 {{ auth()->user()->hasRole('HO') ? 'lg:grid-cols-5' : 'lg:grid-cols-4' }} gap-3">
+                        class="grid grid-cols-2 sm:grid-cols-3 {{ auth()->user()->hasRole('HO') ? 'lg:grid-cols-3' : 'lg:grid-cols-4' }} gap-3">
                         {{-- Master Data (Khusus HO) --}}
                         @role('HO')
                             <a onclick="openModal('masterModal')"
@@ -919,7 +921,8 @@
                             <span class="text-xs font-bold text-slate-700 group-hover:text-cyan-600">Mutasi Stok</span>
                         </a>
 
-                        {{-- Klaim Tagihan --}}
+                        {{-- Klaim Tagihan (Dihilangkan sementara) --}}
+                        {{--
                         <a href="{{ url('invoices/') }}"
                             class="menu-tile group flex flex-col items-center gap-2 rounded-2xl border border-slate-200/70 bg-slate-50/60 p-4 text-center hover:bg-white hover:border-blue-200 hover:shadow-md hover:shadow-blue-500/5 cursor-pointer">
                             <div
@@ -937,8 +940,10 @@
                             </div>
                             <span class="text-xs font-bold text-slate-700 group-hover:text-blue-600">Klaim Tagihan</span>
                         </a>
+                        --}}
 
-                        {{-- Hutang Dagang --}}
+                        {{-- Hutang Dagang (Dihilangkan sementara) --}}
+                        {{--
                         <a href="{{ url('orders-payment/') }}"
                             class="menu-tile group flex flex-col items-center gap-2 rounded-2xl border border-slate-200/70 bg-slate-50/60 p-4 text-center hover:bg-white hover:border-orange-200 hover:shadow-md hover:shadow-orange-500/5 cursor-pointer">
                             <div
@@ -955,6 +960,7 @@
                             </div>
                             <span class="text-xs font-bold text-slate-700 group-hover:text-orange-600">Hutang Dagang</span>
                         </a>
+                        --}}
                     </div>
                 </div>
             @endif

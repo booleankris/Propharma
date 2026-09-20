@@ -256,8 +256,63 @@ class HomeController extends Controller
         return redirect()->route('account.profile')->with('success', 'Profil Akun Berhasil Diupdat');
     }
 
-    public function stockNotifications()
+    public function stockNotifications(Request $request)
     {
+        $user = auth()->user();
+        $isGlobalViewer = $user && ($user->hasRole('General Manager') || $user->hasRole('administrator') || $user->hasRole('HO'));
+
+        $availableBranches = \App\Models\Pharmacies::whereIn('id', [1, 9, 2, 3, 4, 5])
+            ->orderByRaw('CASE id WHEN 1 THEN 1 WHEN 9 THEN 2 WHEN 2 THEN 3 WHEN 3 THEN 4 WHEN 4 THEN 5 WHEN 5 THEN 6 ELSE 7 END')
+            ->select('id', 'name')
+            ->get()
+            ->map(function ($p) {
+                return [
+                    'id' => $p->id,
+                    'name' => $p->name,
+                    'short_name' => trim(str_replace(['SAHABAT ', 'SAHABAT'], '', $p->name)),
+                ];
+            });
+
+        $activePharmacyId = function_exists('getActivePharmacyId') ? getActivePharmacyId() : 1;
+        $activePharmacy = \App\Models\Pharmacies::find($activePharmacyId);
+        $activePharmacyName = $activePharmacy ? $activePharmacy->name : 'Cabang';
+
+        $filterPharmacy = $request->query('pharmacy_id');
+
+        $query = \App\Models\ItemsLog::query()
+            ->join('batches', 'batches.id', '=', 'items_log.batches_id')
+            ->leftJoin('pharmacies', 'pharmacies.id', '=', 'batches.pharmacy_id')
+            ->select([
+                'items_log.id',
+                'items_log.transaction_code',
+                'items_log.medicine_id',
+                'items_log.status',
+                'items_log.qty',
+                'items_log.qty_before',
+                'items_log.qty_after',
+                'items_log.created_at',
+                'batches.pharmacy_id',
+                'pharmacies.name as pharmacy_name',
+            ])
+            ->with('medicines:id,name,code')
+            ->orderBy('items_log.id', 'desc');
+
+        $selectedFilter = 'all';
+
+        if (!$isGlobalViewer) {
+            $query->where('batches.pharmacy_id', $activePharmacyId);
+            $selectedFilter = $activePharmacyId;
+        } else {
+            if ($filterPharmacy && $filterPharmacy !== 'all') {
+                $query->where('batches.pharmacy_id', (int) $filterPharmacy);
+                $selectedFilter = (int) $filterPharmacy;
+            } else {
+                $selectedFilter = 'all';
+            }
+        }
+
+        $logs = $query->take(35)->get();
+
         $typeMap = [
             1 => ['label' => 'Penjualan', 'icon' => '↓', 'sign' => '-', 'class' => 'qty-out', 'color' => 1],
             2 => ['label' => 'Pembelian', 'icon' => '↑', 'sign' => '+', 'class' => 'qty-in', 'color' => 2],
@@ -265,13 +320,10 @@ class HomeController extends Controller
             4 => ['label' => 'Retur Pembelian', 'icon' => '↪', 'sign' => '-', 'class' => 'qty-out', 'color' => 4],
             5 => ['label' => 'Stock Opname (+)', 'icon' => '↑', 'sign' => '+', 'class' => 'qty-neutral', 'color' => 5],
             6 => ['label' => 'Stock Opname (-)', 'icon' => '↓', 'sign' => '-', 'class' => 'qty-neutral', 'color' => 6],
+            7 => ['label' => 'Mutasi Stok', 'icon' => '⇄', 'sign' => '', 'class' => 'qty-neutral', 'color' => 5],
+            8 => ['label' => 'Revisi Penerimaan', 'icon' => '✎', 'sign' => '', 'class' => 'qty-neutral', 'color' => 4],
+            9 => ['label' => 'Hapus Penerimaan', 'icon' => '✕', 'sign' => '-', 'class' => 'qty-out', 'color' => 1],
         ];
-
-        $logs = \App\Models\ItemsLog::with('medicines:id,name')
-            ->where('status', '!=', 7)
-            ->orderBy('id', 'desc')
-            ->take(30)
-            ->get();
 
         $formatted = $logs->map(function ($log) use ($typeMap) {
             $info = $typeMap[$log->status] ?? [
@@ -281,19 +333,67 @@ class HomeController extends Controller
                 'class' => 'qty-neutral',
                 'color' => 0,
             ];
+
+            // Penyesuaian khusus untuk Mutasi Stok (status 7)
+            if ($log->status == 7) {
+                if ($log->qty_after > $log->qty_before) {
+                    $info['label'] = 'Mutasi Masuk';
+                    $info['icon'] = '↑';
+                    $info['sign'] = '+';
+                    $info['class'] = 'qty-in';
+                    $info['color'] = 2;
+                } elseif ($log->qty_after < $log->qty_before) {
+                    $info['label'] = 'Mutasi Keluar';
+                    $info['icon'] = '↓';
+                    $info['sign'] = '-';
+                    $info['class'] = 'qty-out';
+                    $info['color'] = 4;
+                }
+            }
+
+            $pharmacyName = $log->pharmacy_name ?? '-';
+            $pharmacyShort = trim(str_replace(['SAHABAT ', 'SAHABAT'], '', $pharmacyName));
+
+            $qtyFormatted = abs($log->qty);
+            if (floor($qtyFormatted) == $qtyFormatted) {
+                $qtyFormatted = (int) $qtyFormatted;
+            }
+
+            $qtyAfterFormatted = null;
+            if ($log->qty_after !== null) {
+                $qtyAfterFormatted = floor($log->qty_after) == $log->qty_after ? (int) $log->qty_after : $log->qty_after;
+            }
+
             return [
                 'id' => $log->id,
                 'name' => $log->medicines->name ?? '-',
+                'code' => $log->medicines->code ?? null,
+                'transaction_code' => $log->transaction_code,
                 'label' => $info['label'],
                 'icon' => $info['icon'],
                 'sign' => $info['sign'],
                 'class' => $info['class'],
                 'color' => $info['color'],
-                'qty' => $log->qty,
+                'qty' => $qtyFormatted,
+                'qty_after' => $qtyAfterFormatted,
+                'pharmacy_id' => $log->pharmacy_id,
+                'pharmacy_name' => $pharmacyName,
+                'pharmacy_short' => $pharmacyShort,
                 'time' => safeDateFormat($log->created_at, 'd M Y H:i'),
+                'time_relative' => $log->created_at ? $log->created_at->diffForHumans() : '',
             ];
         });
 
-        return response()->json($formatted);
+        return response()->json([
+            'notifications' => $formatted,
+            'meta' => [
+                'can_filter_branch' => $isGlobalViewer,
+                'active_pharmacy_id' => $activePharmacyId,
+                'active_pharmacy_name' => $activePharmacyName,
+                'selected_filter' => $selectedFilter,
+                'branches' => $availableBranches,
+                'count' => $formatted->count(),
+            ],
+        ]);
     }
 }

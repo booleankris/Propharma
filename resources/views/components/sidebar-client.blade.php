@@ -55,12 +55,154 @@
         transition: transform 0.3s ease;
     }
 
-    .finance {
+    /* ── Sahabat Finance Executive Card ── */
+    .finance-wrap {
+        padding: 10px 12px 6px;
+    }
+
+    .finance-btn {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 12px;
+        border-radius: 14px;
+        background: linear-gradient(135deg, #fcd34d 0%, #f59e0b 55%, #d97706 100%);
+        box-shadow: 0 4px 16px -2px rgba(245, 158, 11, 0.45), inset 0 1px 1px rgba(255, 255, 255, 0.7);
+        border: 1px solid rgba(254, 240, 138, 0.75);
+        text-decoration: none;
+        overflow: hidden;
         cursor: pointer;
-        padding: 17px !important;
-        background: #ffdb3b;
-        margin: 2px 12px 2px;
-        color: #000000 !important;
+        transition: all 0.24s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .finance-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px -2px rgba(245, 158, 11, 0.6), inset 0 1px 1px rgba(255, 255, 255, 0.85);
+        filter: brightness(1.03);
+    }
+
+    .finance-btn:active {
+        transform: translateY(0);
+        box-shadow: 0 2px 10px rgba(245, 158, 11, 0.4);
+    }
+
+    .finance-btn.active {
+        outline: 2px solid #fef08a;
+        outline-offset: 2px;
+        box-shadow: 0 6px 20px rgba(245, 158, 11, 0.65);
+    }
+
+    /* Ambient Shimmer Light Effect */
+    .finance-btn::after {
+        content: '';
+        position: absolute;
+        top: -50%;
+        left: -60%;
+        width: 40%;
+        height: 200%;
+        background: linear-gradient(to right,
+                rgba(255, 255, 255, 0) 0%,
+                rgba(255, 255, 255, 0.4) 50%,
+                rgba(255, 255, 255, 0) 100%);
+        transform: rotate(25deg);
+        pointer-events: none;
+        animation: financeShimmer 4.5s infinite ease-in-out;
+    }
+
+    @keyframes financeShimmer {
+
+        0%,
+        70% {
+            left: -60%;
+        }
+
+        100% {
+            left: 140%;
+        }
+    }
+
+    .finance-icon-box {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        background: #ffffff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        box-shadow: 0 2px 8px rgba(180, 83, 9, 0.22);
+        color: #d97706;
+        transition: transform 0.2s ease;
+    }
+
+    .finance-btn:hover .finance-icon-box {
+        transform: scale(1.08) rotate(-4deg);
+    }
+
+    .finance-content {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .finance-title-row {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .finance-title {
+        font-size: 12.5px;
+        font-weight: 800;
+        color: #78350f;
+        letter-spacing: -0.01em;
+        white-space: nowrap;
+        line-height: 1.2;
+    }
+
+    .finance-badge {
+        font-size: 8.5px;
+        font-weight: 800;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        padding: 1px 4.5px;
+        border-radius: 5px;
+        background: rgba(120, 53, 15, 0.12);
+        color: #78350f;
+        border: 1px solid rgba(120, 53, 15, 0.18);
+        line-height: 1.1;
+    }
+
+    .finance-sub {
+        font-size: 10px;
+        font-weight: 600;
+        color: #92400e;
+        opacity: 0.92;
+        margin-top: 1px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .finance-arrow {
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.35);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        color: #78350f;
+        transition: all 0.2s ease;
+    }
+
+    .finance-btn:hover .finance-arrow {
+        transform: translateX(3px);
+        background: rgba(255, 255, 255, 0.55);
+        color: #451a03;
     }
 
     .sidebar-brand {
@@ -252,21 +394,23 @@
         position: absolute;
         top: 68px;
         right: 16px;
-        width: 360px;
+        width: 410px;
+        max-width: calc(100vw - 32px);
         z-index: 999;
         background: white;
-        border-radius: 16px;
+        border-radius: 18px;
         border: 1px solid #e2e8f0;
-        box-shadow: 0 8px 24px rgba(0, 0, 0, .10);
+        box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.15);
         overflow: hidden;
     }
 
     .notif-header {
-        padding: 16px 18px 12px;
+        padding: 14px 16px 12px;
         border-bottom: 1px solid #f1f5f9;
         display: flex;
         align-items: center;
         justify-content: space-between;
+        gap: 8px;
     }
 
     .notif-title {
@@ -275,12 +419,147 @@
         color: #0f2744;
     }
 
+    .notif-active-badge {
+        font-size: 10.5px;
+        font-weight: 600;
+        padding: 2px 8px;
+        border-radius: 9999px;
+        background: #eff6ff;
+        color: #1d4ed8;
+        border: 1px solid #bfdbfe;
+        white-space: nowrap;
+    }
+
+    .notif-active-badge.badge-all {
+        background: #ecfdf5;
+        color: #047857;
+        border-color: #a7f3d0;
+    }
+
+    .notif-icon-btn {
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: #64748b;
+        padding: 5px;
+        border-radius: 8px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.15s ease;
+    }
+
+    .notif-icon-btn:hover {
+        background: #f1f5f9;
+        color: #0f172a;
+    }
+
     .notif-close {
         background: none;
         border: none;
         cursor: pointer;
         color: #94a3b8;
-        font-size: 18px;
+        font-size: 20px;
+        line-height: 1;
+        padding: 2px 6px;
+        border-radius: 6px;
+        transition: all 0.15s ease;
+    }
+
+    .notif-close:hover {
+        background: #f1f5f9;
+        color: #0f172a;
+    }
+
+    .notif-tabs-bar {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 14px;
+        background: #f8fafc;
+        border-bottom: 1px solid #f1f5f9;
+        overflow-x: auto;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .notif-tabs-bar::-webkit-scrollbar {
+        display: none;
+    }
+
+    .notif-tab {
+        white-space: nowrap;
+        font-size: 11px;
+        font-weight: 600;
+        padding: 4px 10px;
+        border-radius: 9999px;
+        border: 1px solid #e2e8f0;
+        background: #ffffff;
+        color: #64748b;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        user-select: none;
+    }
+
+    .notif-tab:hover {
+        background: #f1f5f9;
+        color: #1e293b;
+        border-color: #cbd5e1;
+    }
+
+    .notif-tab.active {
+        background: #4f46e5;
+        color: #ffffff;
+        border-color: #4f46e5;
+        box-shadow: 0 2px 6px rgba(79, 70, 229, 0.25);
+    }
+
+    .notif-branch-pill {
+        display: inline-flex;
+        align-items: center;
+        font-size: 9.5px;
+        font-weight: 700;
+        padding: 1.5px 6px;
+        border-radius: 6px;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        line-height: 1.2;
+    }
+
+    .notif-footer-meta {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 11px;
+        color: #94a3b8;
+        margin-top: 4px;
+        gap: 6px;
+    }
+
+    .notif-time {
+        font-size: 11px;
+        color: #94a3b8;
+        white-space: nowrap;
+    }
+
+    .notif-trx-code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 10px;
+        color: #64748b;
+        background: #f1f5f9;
+        padding: 1px 5px;
+        border-radius: 4px;
+        border: 1px solid #e2e8f0;
+    }
+
+    .notif-sisa {
+        font-size: 10.5px;
+        color: #334155;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        padding: 1px 6px;
+        border-radius: 4px;
+        white-space: nowrap;
     }
 
     .notif-list {
@@ -533,19 +812,30 @@
             </div>
         </div>
     </div>
-    {{-- FEATURE COMING SOON --}}
-    {{-- <a href="{{ route('pareto.index') }}" class="nav-item finance" style="cursor:pointer;">
+    {{-- Sahabat Finance Button (Khusus Finance & General Manager) --}}
+    @hasanyrole('Finance|General Manager|administrator')
+        <div class="finance-wrap">
+            <a href="{{ route('finance.index') }}" class="finance-btn {{ request()->is('finance*') || request()->is('pareto*') ? 'active' : '' }}"
+                title="Sahabat Finance - Analisis Pareto & Profit">
+                <div class="finance-icon-box">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                        <path d="M3 3v18h18" />
+                        <path d="M3 6h18" />
+                        <path d="M3 8c10 0 8 9 18 9" />
+                    </svg>
+                </div>
+                <div class="finance-content">
+                    <div class="finance-title-row">
+                        <span class="finance-title">Sahabat Finance</span>
+                    </div>
+                    <span class="finance-sub">Akun, Pengeluaran, &amp; Profit</span>
+                </div>
 
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-            class="icon icon-tabler icons-tabler-outline icon-tabler-chart-sankey">
-            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-            <path d="M3 3v18h18" />
-            <path d="M3 6h18" />
-            <path d="M3 8c10 0 8 9 18 9" />
-        </svg>
-        Sahabat Finance
-    </a> --}}
+            </a>
+        </div>
+    @endhasanyrole
     <div class="sidebar-nav">
         <div class="nav-section-title">Menu Utama</div>
 
@@ -701,27 +991,30 @@
             </a>
         @endif
 
-        @if (!isWarehousePharmacy() && !isOnlineRole())
-            <a href="{{ route('pareto.index') }}" class="nav-item" style="cursor:pointer;">
+        @hasanyrole('Finance|General Manager|administrator')
+            @if (!isWarehousePharmacy() && !isOnlineRole())
+                <a href="{{ route('pareto.index') }}" class="nav-item" style="cursor:pointer;">
 
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                    stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-chart-sankey">
-                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                    <path d="M3 3v18h18" />
-                    <path d="M3 6h18" />
-                    <path d="M3 8c10 0 8 9 18 9" />
-                </svg>
-                Pareto
-            </a>
-        @endif
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-chart-sankey">
+                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                        <path d="M3 3v18h18" />
+                        <path d="M3 6h18" />
+                        <path d="M3 8c10 0 8 9 18 9" />
+                    </svg>
+                    Pareto
+                </a>
+            @endif
+        @endhasanyrole
 
         @hasanyrole('General Manager|Koordinator|manager|Manager')
             <a href="{{ route('reported-medicines.index') }}"
                 class="nav-item {{ request()->is('reported-medicines*') ? 'active' : '' }}">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    <path
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
                 Pelaporan Obat
             </a>
@@ -2160,50 +2453,224 @@
 {{-- Notif Modal --}}
 <div id="notif-modal" class="notif-overlay hidden">
     <div class="notif-header">
-        <span class="notif-title">Notifikasi Stok</span>
-        <button class="notif-close"
-            onclick="document.getElementById('notif-modal').classList.add('hidden')">×</button>
+        <div class="flex items-center gap-2 overflow-hidden">
+            <span class="notif-title">Notifikasi Stok</span>
+            <span id="notif-active-branch-badge" class="notif-active-badge">Memuat...</span>
+        </div>
+        <div class="flex items-center gap-1">
+            <button id="notif-refresh-btn" type="button" class="notif-icon-btn"
+                onclick="loadStockNotifications(true)" title="Segarkan Notifikasi" aria-label="Segarkan">
+                <svg id="notif-refresh-icon" width="15" height="15" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
+                </svg>
+            </button>
+            <button class="notif-close" type="button"
+                onclick="document.getElementById('notif-modal').classList.add('hidden')" title="Tutup"
+                aria-label="Tutup">×</button>
+        </div>
     </div>
+
+    <!-- Branch Filter Container (Dynamically rendered for GM/Admin/HO) -->
+    <div id="notif-branch-tabs" class="notif-tabs-bar hidden"></div>
+
     <div class="notif-list" id="notif-list-container">
-        <div class="notif-empty" id="notif-loading">Memuat aktivitas stok...</div>
+        <div class="notif-empty" id="notif-loading">
+            <div
+                class="animate-spin inline-block w-5 h-5 border-[2px] border-current border-t-transparent text-indigo-600 rounded-full mb-2">
+            </div>
+            <div>Memuat aktivitas stok...</div>
+        </div>
     </div>
 </div>
 
 <script>
     let stockNotifsLoaded = false;
+    let currentStockBranchFilter = 'all';
+    let isFetchingStockNotifs = false;
 
-    function loadStockNotifications() {
-        if (stockNotifsLoaded) return;
+    function getBranchBadgeStyle(pharmacyId) {
+        const id = parseInt(pharmacyId);
+        switch (id) {
+            case 1:
+                return {
+                    bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe'
+                }; // PMI - Blue
+            case 2:
+                return {
+                    bg: '#fffbeb', color: '#b45309', border: '#fde68a'
+                }; // Mulawarman - Amber
+            case 3:
+                return {
+                    bg: '#ecfdf5', color: '#047857', border: '#a7f3d0'
+                }; // MIM - Emerald
+            case 4:
+                return {
+                    bg: '#eef2ff', color: '#4338ca', border: '#c7d2fe'
+                }; // Sutomo - Indigo
+            case 5:
+                return {
+                    bg: '#fff1f2', color: '#be123c', border: '#fecdd3'
+                }; // Antasari - Rose
+            case 9:
+                return {
+                    bg: '#f5f3ff', color: '#6d28d9', border: '#ddd6fe'
+                }; // Gudang PMI - Purple
+            default:
+                return {
+                    bg: '#f8fafc', color: '#475569', border: '#e2e8f0'
+                };
+        }
+    }
+
+    function loadStockNotifications(forceRefresh = false, branchId = null) {
+        if (isFetchingStockNotifs) return;
+        if (stockNotifsLoaded && !forceRefresh && branchId === null) return;
+
+        if (branchId !== null) {
+            currentStockBranchFilter = branchId;
+        }
+
         const container = document.getElementById('notif-list-container');
+        const refreshIcon = document.getElementById('notif-refresh-icon');
+        const activeBadgeEl = document.getElementById('notif-active-branch-badge');
+        const tabsContainer = document.getElementById('notif-branch-tabs');
+
         if (!container) return;
 
-        fetch('{{ route('kasir.stockNotifications') }}')
-            .then(res => res.json())
-            .then(data => {
+        isFetchingStockNotifs = true;
+        if (refreshIcon) refreshIcon.classList.add('animate-spin');
+
+        container.innerHTML = `
+            <div class="notif-empty">
+                <div class="animate-spin inline-block w-5 h-5 border-[2px] border-current border-t-transparent text-indigo-600 rounded-full mb-2"></div>
+                <div>Memuat aktivitas stok...</div>
+            </div>`;
+
+        let url = '{{ route('kasir.stockNotifications') }}';
+        const params = new URLSearchParams();
+        if (currentStockBranchFilter && currentStockBranchFilter !== 'all') {
+            params.append('pharmacy_id', currentStockBranchFilter);
+        } else if (currentStockBranchFilter === 'all') {
+            params.append('pharmacy_id', 'all');
+        }
+        if (params.toString()) {
+            url += '?' + params.toString();
+        }
+
+        fetch(url, {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                }
+            })
+            .then(res => {
+                if (!res.ok) throw new Error('Network response was not ok');
+                return res.json();
+            })
+            .then(response => {
                 stockNotifsLoaded = true;
-                if (!data || data.length === 0) {
-                    container.innerHTML = '<div class="notif-empty">Belum ada aktivitas stok</div>';
+                isFetchingStockNotifs = false;
+                if (refreshIcon) refreshIcon.classList.remove('animate-spin');
+
+                const items = Array.isArray(response) ? response : (response.notifications || []);
+                const meta = response.meta || {};
+
+                // Update active branch badge in header
+                if (activeBadgeEl) {
+                    if (meta.can_filter_branch) {
+                        if (currentStockBranchFilter === 'all') {
+                            activeBadgeEl.textContent = 'Semua Cabang';
+                            activeBadgeEl.className = 'notif-active-badge badge-all';
+                        } else {
+                            const matched = meta.branches ? meta.branches.find(b => String(b.id) === String(
+                                currentStockBranchFilter)) : null;
+                            const label = matched ? (matched.short_name || matched.name) : 'Cabang ' +
+                                currentStockBranchFilter;
+                            activeBadgeEl.textContent = label;
+                            activeBadgeEl.className = 'notif-active-badge';
+                        }
+                    } else {
+                        activeBadgeEl.textContent = meta.active_pharmacy_name ? (meta.active_pharmacy_name.replace(
+                            /SAHABAT /i, '')) : 'Cabang';
+                        activeBadgeEl.className = 'notif-active-badge';
+                    }
+                }
+
+                // Render branch filter tabs if allowed
+                if (tabsContainer) {
+                    if (meta.can_filter_branch && meta.branches && meta.branches.length > 0) {
+                        tabsContainer.classList.remove('hidden');
+                        let tabsHtml = `
+                        <button type="button" class="notif-tab ${currentStockBranchFilter === 'all' ? 'active' : ''}" 
+                            onclick="loadStockNotifications(true, 'all')">Semua</button>`;
+                        meta.branches.forEach(b => {
+                            const isActive = String(currentStockBranchFilter) === String(b.id);
+                            tabsHtml += `
+                            <button type="button" class="notif-tab ${isActive ? 'active' : ''}" 
+                                onclick="loadStockNotifications(true, ${b.id})">${b.short_name || b.name}</button>`;
+                        });
+                        tabsContainer.innerHTML = tabsHtml;
+                    } else {
+                        tabsContainer.classList.add('hidden');
+                    }
+                }
+
+                if (!items || items.length === 0) {
+                    container.innerHTML = `
+                    <div class="notif-empty">
+                        <svg class="w-8 h-8 text-gray-300 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/>
+                        </svg>
+                        <div>Belum ada aktivitas stok untuk cabang ini</div>
+                    </div>`;
                     return;
                 }
+
                 let html = '';
-                data.forEach(item => {
+                items.forEach(item => {
+                    const badgeStyle = getBranchBadgeStyle(item.pharmacy_id);
+                    const sisaHtml = (item.qty_after !== null && item.qty_after !== undefined) ?
+                        `<span class="notif-sisa">Sisa: <b>${item.qty_after}</b></span>` :
+                        '';
+                    const codeHtml = item.transaction_code ?
+                        `<span class="notif-trx-code">${item.transaction_code}</span>` :
+                        '';
+
                     html += `
-                    <div class="notif-item">
-                        <div class="notif-dot dot-${item.color}">${item.icon}</div>
-                        <div style="flex:1; min-width:0;">
-                            <div class="notif-name">${item.name}</div>
-                            <div style="display:flex; align-items:center; gap:6px; margin-bottom:2px;">
-                                <span class="notif-badge badge-${item.color}">${item.label}</span>
-                            </div>
-                            <div class="notif-meta">${item.time}</div>
+                <div class="notif-item">
+                    <div class="notif-dot dot-${item.color}">${item.icon}</div>
+                    <div style="flex:1; min-width:0;">
+                        <div class="flex items-start justify-between gap-1">
+                            <div class="notif-name" title="${item.name}">${item.name}</div>
+                            <div class="notif-qty ${item.class}">${item.sign} ${item.qty}</div>
                         </div>
-                        <div class="notif-qty ${item.class}">${item.sign} ${item.qty}</div>
-                    </div>`;
+                        <div class="flex items-center flex-wrap gap-1.5 my-1">
+                            <span class="notif-badge badge-${item.color}">${item.label}</span>
+                            <span class="notif-branch-pill" style="background:${badgeStyle.bg}; color:${badgeStyle.color}; border:1px solid ${badgeStyle.border};">
+                                ${item.pharmacy_short || item.pharmacy_name || 'Cabang'}
+                            </span>
+                        </div>
+                        <div class="notif-footer-meta">
+                            <span class="notif-time">${item.time}</span>
+                            <div class="flex items-center gap-1.5 ml-auto text-right">
+                                ${codeHtml}
+                                ${sisaHtml}
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
                 });
                 container.innerHTML = html;
             })
             .catch(err => {
-                container.innerHTML = '<div class="notif-empty text-red-500">Gagal memuat notifikasi</div>';
+                isFetchingStockNotifs = false;
+                if (refreshIcon) refreshIcon.classList.remove('animate-spin');
+                container.innerHTML = `
+                <div class="notif-empty text-red-500">
+                    <p class="font-semibold mb-1">Gagal memuat notifikasi stok</p>
+                    <button type="button" onclick="loadStockNotifications(true)" class="text-xs text-indigo-600 hover:underline">Coba lagi</button>
+                </div>`;
             });
     }
 </script>
@@ -2308,7 +2775,9 @@
             <div class="flex flex-wrap items-center gap-2 w-full md:w-auto">
                 @if (auth()->user()->hasRole('General Manager'))
                     @php
-                        $exportPharmacies = \App\Models\Pharmacies::whereNotIn('id', [6, 8])->orderBy('id', 'asc')->get();
+                        $exportPharmacies = \App\Models\Pharmacies::whereNotIn('id', [6, 8])
+                            ->orderBy('id', 'asc')
+                            ->get();
                         $activePhId = getActivePharmacyId();
                     @endphp
                     <div class="flex items-center gap-1.5">
@@ -2336,7 +2805,10 @@
         </div>
 
         <!-- Section 1: Pengawasan & Regulasi -->
-        @if (auth()->user()->hasRole('General Manager') || auth()->user()->hasRole('HO') || isWarehousePharmacy() || auth()->user()->hasAnyRole(['Koordinator', 'manager', 'Manager']))
+        @if (auth()->user()->hasRole('General Manager') ||
+                auth()->user()->hasRole('HO') ||
+                isWarehousePharmacy() ||
+                auth()->user()->hasAnyRole(['Koordinator', 'manager', 'Manager']))
             <div>
                 <div class="flex items-center gap-2 mb-3">
                     <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Laporan Regulasi &
@@ -2344,7 +2816,8 @@
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <!-- Card SIPNAP (General Manager & Koordinator) -->
-                    @if (auth()->user()->hasRole('General Manager') || auth()->user()->hasAnyRole(['Koordinator', 'manager', 'Manager']))
+                    @if (auth()->user()->hasRole('General Manager') ||
+                            auth()->user()->hasAnyRole(['Koordinator', 'manager', 'Manager']))
                         <div
                             class="bg-gradient-to-br from-amber-50/60 to-orange-50/60 border border-amber-200/80 rounded-2xl p-4 flex flex-col justify-between hover:shadow-md transition-all">
                             <div>
@@ -2363,10 +2836,12 @@
                                     <span
                                         class="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">SIPNAP</span>
                                 </div>
-                                <h4 class="text-sm font-bold text-slate-800 leading-snug mb-1">Narkotika & Psikotropika
+                                <h4 class="text-sm font-bold text-slate-800 leading-snug mb-1">Narkotika &
+                                    Psikotropika
                                 </h4>
                                 <p class="text-[11px] text-slate-500 leading-relaxed mb-4">Mutasi obat Narkotika,
-                                    Psikotropika, OOT, dan Prekursor (Awal, Masuk, Keluar, Saldo, Fisik, Selisih, ED).</p>
+                                    Psikotropika, OOT, dan Prekursor (Awal, Masuk, Keluar, Saldo, Fisik, Selisih, ED).
+                                </p>
                             </div>
                             <button onclick="triggerExportCenter('special_medicines')"
                                 class="w-full inline-flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-xs transition-colors">
@@ -2406,7 +2881,8 @@
                                         class="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-teal-100 text-teal-800 border border-teal-200">Semua
                                         Batch</span>
                                 </div>
-                                <h4 class="text-sm font-bold text-slate-800 leading-snug mb-1">Data Kadaluarsa (ED)</h4>
+                                <h4 class="text-sm font-bold text-slate-800 leading-snug mb-1">Data Kadaluarsa (ED)
+                                </h4>
                                 <p class="text-[11px] text-slate-500 leading-relaxed mb-4">Daftar seluruh batch obat
                                     dengan tanggal ED, sisa waktu, status kadaluarsa, stok gudang & pelayanan.</p>
                             </div>

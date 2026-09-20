@@ -163,7 +163,7 @@ Route::middleware(['auth', 'role:General Manager|Koordinator|manager|Manager'])-
     Route::get('/export', [ReportedMedicineController::class, 'export'])->name('export');
 });
 Route::get('/home', [HomeController::class, 'index'])
-    ->middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrator|manager|Koordinator|Online|Online Grab|Online Shopee|Digital|UMKM|operator'])
+    ->middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrator|manager|Koordinator|Online|Online Grab|Online Shopee|Digital|UMKM|operator|Finance'])
     ->name('home');
 
 Route::middleware(['auth', 'role:General Manager'])->prefix('general-manager')->name('general-manager.')->group(function () {
@@ -172,7 +172,7 @@ Route::middleware(['auth', 'role:General Manager'])->prefix('general-manager')->
     Route::put('/users/{user}', [\App\Http\Controllers\GeneralManagerController::class, 'update'])->name('users.update');
 });
 
-Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrator|manager|Koordinator|Online|Online Grab|Online Shopee|Digital|UMKM|operator'])->group(function () {
+Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrator|manager|Koordinator|Online|Online Grab|Online Shopee|Digital|UMKM|operator|Finance'])->group(function () {
     Route::get('/near-expiry', [HomeController::class, 'nearExpiry'])->name('kasir.nearExpiry');
     Route::get('/stock-notifications', [HomeController::class, 'stockNotifications'])->name('kasir.stockNotifications');
 
@@ -530,6 +530,11 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
         Route::get('/', [OrdersPayment::class, 'index'])->name('index');
         Route::get('/get', [OrdersPayment::class, 'getOrdersPayment'])->name('get');
         Route::post('/selesai/{id}', [OrdersPayment::class, 'selesai'])->name('selesai');
+    });
+
+    // SAHABAT Finances (Dedicated ERP Module)
+    Route::prefix('finance')->name('finance.')->middleware(['role:Finance|General Manager|administrator'])->group(function () {
+        Route::get('/', [\App\Http\Controllers\FinanceController::class, 'index'])->name('index');
     });
 
     Route::get('/compositions/select', [CompositionsController::class, 'select'])->name('composition.select');
