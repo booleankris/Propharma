@@ -247,6 +247,7 @@ class SalesController extends Controller
         $canSeeWarehouse = canAccessWarehouseStock($pharmacyId);
 
         $query = Medicines::query()
+            ->where('medicines.status', 1)
             ->select([
                 'medicines.id',
                 'medicines.code',
@@ -1283,7 +1284,8 @@ class SalesController extends Controller
     {
         $perPage = 30;
 
-        $query = Medicines::with(['composition', 'factory']);
+        $query = Medicines::with(['composition', 'factory'])
+            ->where('status', 1);
 
         if ($request->search) {
             $search = $request->search;
