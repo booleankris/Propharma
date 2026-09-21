@@ -59,7 +59,7 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         $this->pharmacyName    = $pharmacyName;
         $this->pharmacyAddress = $pharmacyAddress;
         $this->shift           = $shift;
-        $this->shiftType       = $shiftType;
+        $this->shiftType       = !empty($shiftType) ? $shiftType : 'semua';
         $this->onlineRole      = $onlineRole;
         $this->customTitle     = $customTitle;
     }
@@ -89,21 +89,30 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
 
     private function buildReportData(): array
     {
+        $grouped = [];
+
         if ($this->shiftType == "shift") {
-            $transactions = MedicineTransactions::with(['transactions', 'shift_logs'])
+            $transactions = MedicineTransactions::with([
+                'transactions' => fn($q) => $q->where('status', 1),
+                'shift_logs'
+            ])
                 ->where('pharmacy_id', $this->pharmacyId)
                 ->where('status', 1)
                 ->whereDate('updated_at', '>=', $this->startDate->toDateString())
                 ->whereDate('updated_at', '<=', $this->endDate->toDateString())
                 ->whereIn('transaction_type', array_keys(self::TYPE_MAP))
-                ->whereHas('shift_logs', function ($shift) {
-                    $shift->where('shift_id', $this->shift);
+                ->when(!empty($this->shift), function ($q) {
+                    $q->whereHas('shift_logs', function ($shiftQuery) {
+                        $shiftQuery->where('shift_id', $this->shift);
+                    });
                 })
                 ->get();
 
             $grouped = $this->groupTransactions($transactions);
         } else if ($this->shiftType == 'semua') {
-            $transactions = MedicineTransactions::with('transactions')
+            $transactions = MedicineTransactions::with([
+                'transactions' => fn($q) => $q->where('status', 1)
+            ])
                 ->where('pharmacy_id', $this->pharmacyId)
                 ->where('status', 1)
                 ->whereDate('updated_at', '>=', $this->startDate->toDateString())
@@ -114,7 +123,12 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
             $grouped = $this->groupTransactions($transactions);
         } else if ($this->shiftType == 'online') {
             $roleName = $this->onlineRole ?? ['Online', 'Online Grab', 'Online Shopee', 'Digital'];
-            $transactions = MedicineTransactions::with(['transactions.user', 'user', 'shift_logs'])
+            $transactions = MedicineTransactions::with([
+                'transactions' => fn($q) => $q->where('status', 1),
+                'transactions.user',
+                'user',
+                'shift_logs'
+            ])
                 ->where('pharmacy_id', $this->pharmacyId)
                 ->where('status', 1)
                 ->whereDate('updated_at', '>=', $this->startDate->toDateString())
@@ -146,6 +160,19 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                 ->get();
 
             $grouped = $this->groupTransactions($transactions);
+        } else {
+            // Fallback for any other shiftType
+            $transactions = MedicineTransactions::with([
+                'transactions' => fn($q) => $q->where('status', 1)
+            ])
+                ->where('pharmacy_id', $this->pharmacyId)
+                ->where('status', 1)
+                ->whereDate('updated_at', '>=', $this->startDate->toDateString())
+                ->whereDate('updated_at', '<=', $this->endDate->toDateString())
+                ->whereIn('transaction_type', array_keys(self::TYPE_MAP))
+                ->get();
+
+            $grouped = $this->groupTransactions($transactions);
         }
 
         return $grouped;
@@ -173,7 +200,8 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
 
             [, $originalLabel] = $originalMap;
 
-            $items = $trx->transactions;
+            // Strictly filter cart items by status = 1 (exclude drafts/cancelled)
+            $items = $trx->transactions->where('status', 1);
             $totalItems = $items->count();
 
             if ($totalItems === 0) {
@@ -218,9 +246,9 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                 $potonganTransaksiTarget = array_key_first($byLabel);
             } else {
                 // Edge case: fully switched AND split across more than
-                // one non-original type. No single natural home — fall
-                // back to the original type so the amount isn't lost.
-                $potonganTransaksiTarget = $originalLabel;
+                // one non-original type. Fall back to the first available bucket
+                // so Lembar and Potongan Transaksi are never lost.
+                $potonganTransaksiTarget = array_key_first($byLabel);
             }
 
             foreach ($byLabel as $label => $bucket) {

@@ -208,7 +208,7 @@ class ReportsController extends Controller
                         $pharmacy->name,
                         $pharmacy->address,
                         $request->shift,
-                        $request->shiftType,
+                        $request->shiftType ?? 'semua',
                     ),
                     'LIPH_' . $pharmacy->name . '_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx',
                 ],

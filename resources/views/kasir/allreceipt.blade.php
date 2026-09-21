@@ -97,9 +97,9 @@
 <div class="struk">
 
     <div class="text-center">
-        <strong>APOTEK SAHABAT</strong><br>
-        Jl. Palang Merah Ind No.16 A-B-C<br>
-        Telp: 081257586688<br>
+        <strong>APOTEK {{ $pharmacy_name }}</strong><br>
+        {{ $pharmacy_address }}<br>
+        Telp: {{ $pharmacy_phone }}<br>
         SAMARINDA
     </div>
 
@@ -186,7 +186,7 @@
 
     <div class="text-center">
         Terima Kasih<br>
-        Semoga Lekas Sembuh
+        Semoga Sehat Selalu
     </div>
 
 </div>
