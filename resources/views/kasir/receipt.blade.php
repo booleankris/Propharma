@@ -100,7 +100,7 @@
     <div class="text-center">
         <strong>APOTEK {{ $pharmacy_name }}</strong><br>
         {{ $pharmacy_address }}<br>
-        Telp: 081257586688<br>
+        Telp: {{ $pharmacy_phone }}<br>
         SAMARINDA
     </div>
 

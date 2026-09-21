@@ -18,18 +18,19 @@ class PrintController extends Controller
         // Yang pecah jadi satu-satu itulahh
         $transactionCart = $items->groupBy(fn($recipe) => $recipe->recipe_number ?? 'single');
 
-        $transaction     = MedicineTransactions::with(['patients', 'doctors'])->findOrFail($id);
+        $transaction = MedicineTransactions::with(['patients', 'doctors'])->findOrFail($id);
 
-        $totalEmbalase   = $items->sum('embalase');
+        $totalEmbalase = $items->sum('embalase');
         $totalFinalPrice = $items->sum('final_price') - ($transaction->discount ?? 0);
-        $totalPrice      = $items->sum('total_price');
-        $discount        = $items->sum('discount');
-        $operator        = $transaction->user->name;
+        $totalPrice = $items->sum('total_price');
+        $discount = $items->sum('discount');
+        $operator = $transaction->user->name;
         $pharmacy_name = $transaction->pharmacy->name;
+        $pharmacy_phone = $transaction->pharmacy->phone;
         $pharmacy_address = $transaction->pharmacy->address;
         $subtotaldiscount = $transaction->discount ?? 0;
-        $totaldiscount   = ceil(($discount + $subtotaldiscount) / 1000) * 1000;
-        $payment         = $totalFinalPrice - $totaldiscount;
+        $totaldiscount = ceil(($discount + $subtotaldiscount) / 1000) * 1000;
+        $payment = $totalFinalPrice - $totaldiscount;
 
         return view('kasir.receipt', compact(
             'payment',
@@ -44,6 +45,7 @@ class PrintController extends Controller
             'pharmacy_address'
         ));
     }
+
     public function fullReceipt($id)
     {
         $items = MedicineCart::with(['medicine', 'transactions'])
@@ -53,18 +55,18 @@ class PrintController extends Controller
         // Yang pecah jadi satu-satu itulahh
         $transactionCart = $items->groupBy(fn($recipe) => $recipe->recipe_number ?? 'single');
 
-        $transaction     = MedicineTransactions::with(['patients', 'doctors'])->findOrFail($id);
+        $transaction = MedicineTransactions::with(['patients', 'doctors'])->findOrFail($id);
 
-        $totalEmbalase   = $items->sum('embalase');
+        $totalEmbalase = $items->sum('embalase');
         $totalFinalPrice = $items->sum('final_price') - ($transaction->discount ?? 0);
-        $totalPrice      = $items->sum('total_price');
-        $discount        = $items->sum('discount');
-        $operator        = $transaction->user->name;
+        $totalPrice = $items->sum('total_price');
+        $discount = $items->sum('discount');
+        $operator = $transaction->user->name;
         $pharmacy_name = $transaction->pharmacy->name;
         $pharmacy_address = $transaction->pharmacy->address;
         $subtotaldiscount = $transaction->discount ?? 0;
-        $totaldiscount   = ceil(($discount + $subtotaldiscount) / 1000) * 1000;
-        $payment         = $totalFinalPrice - $totaldiscount;
+        $totaldiscount = ceil(($discount + $subtotaldiscount) / 1000) * 1000;
+        $payment = $totalFinalPrice - $totaldiscount;
 
         return view('kasir.allreceipt', compact(
             'payment',
