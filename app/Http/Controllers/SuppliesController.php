@@ -557,6 +557,7 @@ class SuppliesController extends Controller
             $counterPharmacyId = $canSeeWarehouse ? $pmiPharmacyId : $pharmacyId;
 
             $medicines = Medicines::query()
+                ->where('medicines.status', 1)
                 ->select([
                     'medicines.id',
                     'medicines.code',
@@ -599,19 +600,6 @@ class SuppliesController extends Controller
                         ->where('batches.pharmacy_id', $salesPharmacyId)
                         ->when($request->filled('start_date'), fn($q) => $q->whereDate('items_log.date', '>=', $request->start_date))
                         ->when($request->filled('end_date'), fn($q) => $q->whereDate('items_log.date', '<=', $request->end_date)),
-
-                    // Qty Awal untuk Gudang PMI (Opname/Log awal)
-                    'qty_start' => $canSeeWarehouse
-                        ? ItemsLog::select(DB::raw("CASE WHEN items_log.type = 'SO' THEN items_log.qty_after ELSE items_log.qty_before END"))
-                            ->join('batches', 'batches.id', '=', 'items_log.batches_id')
-                            ->whereColumn('items_log.medicine_id', 'medicines.id')
-                            ->whereIn('batches.pharmacy_id', $startPharmacyIds)
-                            ->when($request->filled('start_date'), fn($q) => $q->whereDate('items_log.date', '>=', $request->start_date))
-                            ->when($request->filled('end_date'), fn($q) => $q->whereDate('items_log.date', '<=', $request->end_date))
-                            ->orderBy('items_log.date', 'asc')
-                            ->orderBy('items_log.id', 'asc')
-                            ->limit(1)
-                        : DB::raw('0'),
 
                     // Stok Gudang (hanya jika cabang memiliki/mengakses Gudang PMI)
                     'qty_storage' => $canSeeWarehouse
@@ -656,26 +644,27 @@ class SuppliesController extends Controller
             return DataTables::of($medicines)
                 ->addIndexColumn()
                 ->editColumn('qty_start', function ($m) use ($canSeeWarehouse) {
-                    if ($canSeeWarehouse) {
-                        return (int) ($m->qty_start ?? 0);
-                    }
+                    $storage = $canSeeWarehouse ? (int) ($m->qty_storage ?? 0) : 0;
                     $counter = (int) ($m->qty_counter ?? 0);
+                    $totalNow = $storage + $counter;
+
                     $netIn = (int) ($m->qty_orders ?? 0) - (int) ($m->qty_orders_rt ?? 0);
                     $netOut = (int) ($m->qty_sales ?? 0) - (int) ($m->qty_sales_rt ?? 0);
-                    return $counter - $netIn + $netOut;
+
+                    return $totalNow - $netIn + $netOut;
                 })
                 ->editColumn('qty_orders', fn($m) => (int) ($m->qty_orders ?? 0))
                 ->editColumn('qty_sales', fn($m) => (int) ($m->qty_sales ?? 0))
                 ->addColumn('qty_remaining', function ($m) use ($canSeeWarehouse) {
-                    if ($canSeeWarehouse) {
-                        $qtyStart = (int) ($m->qty_start ?? 0);
-                    } else {
-                        $counter = (int) ($m->qty_counter ?? 0);
-                        $netIn = (int) ($m->qty_orders ?? 0) - (int) ($m->qty_orders_rt ?? 0);
-                        $netOut = (int) ($m->qty_sales ?? 0) - (int) ($m->qty_sales_rt ?? 0);
-                        $qtyStart = $counter - $netIn + $netOut;
-                    }
-                    return $qtyStart + (int) ($m->qty_orders ?? 0) - (int) ($m->qty_sales ?? 0);
+                    $storage = $canSeeWarehouse ? (int) ($m->qty_storage ?? 0) : 0;
+                    $counter = (int) ($m->qty_counter ?? 0);
+                    $totalNow = $storage + $counter;
+
+                    $netIn = (int) ($m->qty_orders ?? 0) - (int) ($m->qty_orders_rt ?? 0);
+                    $netOut = (int) ($m->qty_sales ?? 0) - (int) ($m->qty_sales_rt ?? 0);
+                    $qtyStart = $totalNow - $netIn + $netOut;
+
+                    return $qtyStart + $netIn - $netOut;
                 })
                 ->editColumn('qty_storage', fn($m) => (int) ($m->qty_storage ?? 0))
                 ->editColumn('qty_counter', fn($m) => (int) ($m->qty_counter ?? 0))

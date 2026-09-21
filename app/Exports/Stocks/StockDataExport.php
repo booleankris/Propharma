@@ -43,6 +43,7 @@ class StockDataExport implements FromCollection, WithHeadings, WithStyles, Shoul
         $counterPharmacyId = $canSeeWarehouse ? $pmiPharmacyId : $pharmacyId;
 
         $medicines = Medicines::query()
+            ->where('medicines.status', 1)
             ->select([
                 'medicines.id',
                 'medicines.code',
@@ -86,25 +87,11 @@ class StockDataExport implements FromCollection, WithHeadings, WithStyles, Shoul
                     ->when($req && $req->filled('start_date'), fn($q) => $q->whereDate('items_log.date', '>=', $req->start_date))
                     ->when($req && $req->filled('end_date'), fn($q) => $q->whereDate('items_log.date', '<=', $req->end_date)),
 
-                // Qty Awal: Opname/Log awal sesuai unit untuk Gudang PMI
-                'qty_start' => $canSeeWarehouse
-                    ? ItemsLog::select(DB::raw("CASE WHEN items_log.type = 'SO' THEN items_log.qty_after ELSE items_log.qty_before END"))
-                        ->join('batches', 'batches.id', '=', 'items_log.batches_id')
-                        ->whereColumn('items_log.medicine_id', 'medicines.id')
-                        ->whereIn('batches.pharmacy_id', $startPharmacyIds)
-                        ->when($req && $req->filled('start_date'), fn($q) => $q->whereDate('items_log.date', '>=', $req->start_date))
-                        ->when($req && $req->filled('end_date'), fn($q) => $q->whereDate('items_log.date', '<=', $req->end_date))
-                        ->orderBy('items_log.date', 'asc')
-                        ->orderBy('items_log.id', 'asc')
-                        ->limit(1)
-                    : DB::raw('0'),
-
                 // Stok Gudang (hanya jika ada akses gudang)
                 'qty_storage' => $canSeeWarehouse
                     ? Batches::select(DB::raw('COALESCE(SUM(stock), 0)'))
                         ->whereColumn('medicine_id', 'medicines.id')
                         ->where('pharmacy_id', $warehouseId)
-                        ->where('stock', '>', 0)
                     : DB::raw('0'),
 
                 // Stok Pelayanan / Etalase (Cabang atau Sahabat PMI)
@@ -113,7 +100,6 @@ class StockDataExport implements FromCollection, WithHeadings, WithStyles, Shoul
                     ->whereColumn('batches.medicine_id', 'medicines.id')
                     ->where('batches.pharmacy_id', $counterPharmacyId)
                     ->where('medicine_transfer_items.status', 1)
-                    ->where('medicine_transfer_items.qty', '>', 0)
                     ->where(function ($q) {
                         $q->whereNull('medicine_transfer_items.source_type')
                           ->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang');
@@ -153,17 +139,15 @@ class StockDataExport implements FromCollection, WithHeadings, WithStyles, Shoul
             $totalStok = $qtyStorage + $qtyCounter;
 
             $qtyOrders = (int) ($m->qty_orders ?? 0);
+            $qtyOrdersRt = (int) ($m->qty_orders_rt ?? 0);
             $qtySales = (int) ($m->qty_sales ?? 0);
+            $qtySalesRt = (int) ($m->qty_sales_rt ?? 0);
 
-            if ($canSeeWarehouse) {
-                $qtyStart = (int) ($m->qty_start ?? 0);
-            } else {
-                $netIn = $qtyOrders - (int) ($m->qty_orders_rt ?? 0);
-                $netOut = $qtySales - (int) ($m->qty_sales_rt ?? 0);
-                $qtyStart = $qtyCounter - $netIn + $netOut;
-            }
+            $netIn = $qtyOrders - $qtyOrdersRt;
+            $netOut = $qtySales - $qtySalesRt;
 
-            $sisaStok = $qtyStart + $qtyOrders - $qtySales;
+            $qtyStart = $totalStok - $netIn + $netOut;
+            $sisaStok = $qtyStart + $netIn - $netOut;
 
             $p = $m->payment_method ? strtoupper(trim($m->payment_method)) : null;
             $keterangan = ($p === 'TUNAI' || $p === 'CASH') ? 'Cash' : (($p === 'KREDIT') ? 'Kredit' : (($p === 'KONSINYASI') ? 'Konsinyasi' : ($p ? ucfirst(strtolower($p)) : '-')));
