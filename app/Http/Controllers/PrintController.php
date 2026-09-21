@@ -41,6 +41,7 @@ class PrintController extends Controller
             'totalPrice',
             'totaldiscount',
             'operator',
+            'pharmacy_phone',
             'pharmacy_name',
             'pharmacy_address'
         ));
