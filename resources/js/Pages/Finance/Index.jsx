@@ -1450,15 +1450,7 @@ export default function Index({
                         >
                             <ArrowLeft className="w-4 h-4" />
                         </a>
-                        <Link
-                            href="/logout"
-                            method="post"
-                            as="button"
-                            className="text-slate-400 hover:text-red-600 hover:bg-red-50 transition p-1.5 rounded-lg"
-                            title="Keluar / Logout Akun"
-                        >
-                            <LogOut className="w-4 h-4" />
-                        </Link>
+
                     </div>
                 </div>
             </aside>
