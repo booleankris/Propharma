@@ -7,10 +7,6 @@ use App\Models\Creditor;
 use App\Models\MedicineCreditor;
 use App\Models\MedicinePriceHistory;
 use App\Models\Medicines;
-use App\Models\Batches;
-use App\Models\MedicineTransfers;
-use App\Models\MedicineTransferItems;
-use App\Models\Pharmacies;
 use App\Services\MedicineImportService;
 use Illuminate\Http\Request;
 use Yajra\DataTables\Facades\DataTables;
@@ -162,80 +158,6 @@ class MedicineController extends Controller
                 'discount'      => $row['discount'] ?? 0,
             ]);
         }
-
-        // =========================================================================
-        // [START KODE SEMENTARA] Auto-generate batch gudang & etalase 200 (AKAN DIHAPUS NANTI)
-        // =========================================================================
-        try {
-            $defaultQty = 200;
-
-            // 1. Buat Stok di Gudang PMI (ID 9)
-            Batches::firstOrCreate(
-                [
-                    'medicine_id' => $insert->id,
-                    'pharmacy_id' => 9,
-                    'name'        => 'BATCH-INITIAL',
-                ],
-                [
-                    'expired_date' => now()->addYears(2)->toDateString(),
-                    'stock'        => $defaultQty,
-                    'status'       => 1,
-                ]
-            );
-
-            // 2. Buat Batch & Stok Etalase di Cabang ID 1 s/d 5
-            $targetPharmacies = Pharmacies::whereIn('id', [1, 2, 3, 4, 5])->get();
-
-            foreach ($targetPharmacies as $p) {
-                // Batch di Cabang ini (Stok Gudang = 200)
-                $branchBatch = Batches::firstOrCreate(
-                    [
-                        'medicine_id' => $insert->id,
-                        'pharmacy_id' => $p->id,
-                        'name'        => 'BATCH-INITIAL',
-                    ],
-                    [
-                        'expired_date' => now()->addYears(2)->toDateString(),
-                        'stock'        => $defaultQty,
-                        'status'       => 1,
-                    ]
-                );
-
-                // Transfer Header Cabang jika belum ada
-                $transferHeader = MedicineTransfers::firstOrCreate(
-                    [
-                        'code'    => 'TRF-INIT-' . $p->id,
-                        'user_id' => 1,
-                    ],
-                    [
-                        'status'  => 1,
-                    ]
-                );
-
-                // Stok Etalase Pelayanan Kasir di Cabang ini (Stok Etalase = 200)
-                MedicineTransferItems::firstOrCreate(
-                    [
-                        'batches_id' => $branchBatch->id,
-                        'status'     => 1,
-                    ],
-                    [
-                        'medicine_transfer_id' => $transferHeader->id,
-                        'source_batches_id'    => $branchBatch->id,
-                        'qty'                  => $defaultQty,
-                        'source_type'          => 'pelayanan',
-                        'etalases_id'          => 99,
-                    ]
-                );
-            }
-
-            // 3. Update stok master obat
-            $insert->update(['stock' => $defaultQty]);
-        } catch (\Throwable $e) {
-            \Log::error("Gagal inisialisasi batch otomatis untuk obat ID {$insert->id}: " . $e->getMessage());
-        }
-        // =========================================================================
-        // [END KODE SEMENTARA]
-        // =========================================================================
 
         return response()->json(['message' => 'Obat Berhasil Ditambahkan']);
     }
