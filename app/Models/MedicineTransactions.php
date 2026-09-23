@@ -59,6 +59,10 @@ class MedicineTransactions extends Model
     {
         return $this->belongsTo(Pharmacies::class, 'pharmacy_id');
     }
+    public function payments()
+    {
+        return $this->hasMany(FinancePayment::class, 'medicine_transaction_id');
+    }
 
     public function getChannelInfoAttribute()
     {

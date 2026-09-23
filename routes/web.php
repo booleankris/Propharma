@@ -535,6 +535,15 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
     // SAHABAT Finances (Dedicated ERP Module)
     Route::prefix('finance')->name('finance.')->middleware(['role:Finance|General Manager|administrator'])->group(function () {
         Route::get('/', [\App\Http\Controllers\FinanceController::class, 'index'])->name('index');
+        Route::post('/payments', [\App\Http\Controllers\FinanceController::class, 'storePayment'])->name('payments.store');
+        Route::post('/bulk-payments', [\App\Http\Controllers\FinanceController::class, 'storeBulkPayments'])->name('payments.bulkStore');
+        Route::post('/accounts', [\App\Http\Controllers\FinanceController::class, 'storeAccount'])->name('accounts.store');
+        Route::put('/accounts/{id}', [\App\Http\Controllers\FinanceController::class, 'updateAccount'])->name('accounts.update');
+        Route::delete('/accounts/{id}', [\App\Http\Controllers\FinanceController::class, 'destroyAccount'])->name('accounts.destroy');
+        Route::post('/cash-payment', [\App\Http\Controllers\FinanceController::class, 'assignCashAccount'])->name('cash.assign');
+        Route::post('/bulk-cash-payment', [\App\Http\Controllers\FinanceController::class, 'assignBulkCashAccount'])->name('cash.bulkAssign');
+        Route::post('/piutang-payments', [\App\Http\Controllers\FinanceController::class, 'storePiutangPayment'])->name('piutang.store');
+        Route::post('/bulk-piutang-payments', [\App\Http\Controllers\FinanceController::class, 'bulkPiutangPayment'])->name('piutang.bulkStore');
     });
 
     Route::get('/compositions/select', [CompositionsController::class, 'select'])->name('composition.select');

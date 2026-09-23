@@ -1,7 +1,7 @@
 module.exports = {
   content: [
     './resources/**/*.blade.php',
-    './resources/**/*.js',
+    './resources/**/*.{js,jsx,ts,tsx}',
     './resources/**/*.vue',
     './app/**/*.php',
     './node_modules/flowbite/**/*.js', 
