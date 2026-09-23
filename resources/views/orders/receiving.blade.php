@@ -474,9 +474,9 @@
                                     class="w-full rounded-lg bg-gray-100 border border-gray-200 px-3 py-2 text-xs text-gray-700 font-medium">
                             </div>
                             <div>
-                                <label class="block text-[11px] text-gray-500 mb-1">Satuan</label>
+                                <label class="block text-[11px] text-gray-500 mb-1">Satuan Diterima</label>
                                 <input id="unit" type="text" readonly placeholder="-"
-                                    class="w-full rounded-lg bg-gray-100 border border-gray-200 px-3 py-2 text-xs text-gray-600">
+                                    class="w-full rounded-lg bg-gray-100 border border-gray-200 px-3 py-2 text-xs font-semibold text-blue-800">
                             </div>
                             <div>
                                 <label class="block text-[11px] text-gray-500 mb-1">Isi Obat</label>
@@ -496,18 +496,18 @@
 
                         <!-- Kemasan -->
                         <div class="flex flex-col justify-end">
-                            <label class="block text-xs font-semibold text-gray-700 mb-2">Kemasan Utuh</label>
+                            <label class="block text-xs font-semibold text-gray-700 mb-2">Kemasan Diterima</label>
                             <label
                                 class="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border border-gray-300 cursor-pointer hover:bg-gray-50 transition-colors">
                                 <input type="checkbox" id="pack" name="is_active"
                                     class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer">
-                                <span class="text-xs font-medium text-gray-700 select-none">Utuh</span>
+                                <span id="pack_label" class="text-xs font-medium text-gray-700 select-none">Utuh</span>
                             </label>
                         </div>
 
                         <!-- QTY Diterima -->
                         <div>
-                            <label for="qty_received" class="block text-xs font-semibold text-blue-900 mb-1">QTY Diterima
+                            <label for="qty_received" id="qty_received_label" class="block text-xs font-semibold text-blue-900 mb-1">QTY Diterima
                                 <span class="text-red-500">*</span></label>
                             <input id="qty_received" type="number" name="qty_received" placeholder="0"
                                 oninput="counttotalreceived()"
@@ -751,6 +751,8 @@
         let itemtotal = '';
         let total_transaction = 0;
         let itempack = '0';
+        let currentPackaging = 'BOX';
+        let currentUnit = 'TAB';
         var itemcreditor = '';
         var order_items_id = 0;
         var receiving_id = @json($receiving_id);
@@ -765,10 +767,57 @@
             if (!boxInfo) return;
             if (pack.checked && itemcontent > 1 && itemrawprice > 0) {
                 const boxPrice = itemrawprice * itemcontent;
-                boxInfo.textContent = `(Box: Rp ${formatRupiah(boxPrice)})`;
+                boxInfo.textContent = `(per ${currentPackaging || 'BOX'} @${itemcontent} ${currentUnit || 'TAB'})`;
+            } else if (!pack.checked && itemcontent > 1 && itemrawprice > 0) {
+                boxInfo.textContent = `(per ${currentUnit || 'TAB'})`;
             } else {
                 boxInfo.textContent = '';
             }
+        }
+
+        function updatePackAndUnitUI() {
+            const isPack = pack.checked;
+            itempack = isPack ? 1 : 0;
+
+            // 1. Update Unit input value (Satuan Terbesar vs Satuan Terkecil)
+            const unitInput = document.getElementById('unit');
+            if (unitInput) {
+                unitInput.value = isPack ? (currentPackaging || 'BOX') : (currentUnit || 'TAB');
+            }
+
+            // 2. Update Label Checkbox Utuh / Eceran
+            const packLabel = document.getElementById('pack_label');
+            if (packLabel) {
+                if (isPack) {
+                    packLabel.textContent = `Utuh (${currentPackaging || 'BOX'})`;
+                    packLabel.className = "text-xs font-semibold text-blue-700 select-none";
+                } else {
+                    packLabel.textContent = `Eceran (${currentUnit || 'TAB'})`;
+                    packLabel.className = "text-xs font-medium text-amber-700 select-none";
+                }
+            }
+
+            // 3. Update Label QTY Diterima
+            const qtyReceivedLabel = document.getElementById('qty_received_label');
+            if (qtyReceivedLabel) {
+                const activeUnit = isPack ? (currentPackaging || 'BOX') : (currentUnit || 'TAB');
+                qtyReceivedLabel.innerHTML = `QTY Diterima <span class="text-[10px] font-bold text-blue-600">(${activeUnit})</span> <span class="text-red-500">*</span>`;
+            }
+
+            // 4. Update Price
+            if (isPack) {
+                itemprice = itemcontent > 1 ? (itemrawprice * itemcontent) : itemrawprice;
+            } else {
+                itemprice = itemrawprice;
+            }
+
+            const priceInput = document.getElementById('item_price');
+            if (priceInput) {
+                priceInput.value = formatRupiah(itemprice);
+            }
+
+            updateBoxPriceInfo();
+            counttotalreceived();
         }
         // Setting Initial Transaction Value
         $('#d_price').val(formatRupiah(d_price));
@@ -1203,22 +1252,19 @@
             itemcontent = parseFloat(data.medicines?.content) || 1;
             itemqty = data.quantity;
 
+            currentPackaging = (data.medicines?.packaging && data.medicines.packaging.trim() !== '') ? data.medicines.packaging.trim() : 'BOX';
+            currentUnit = (data.medicines?.unit && data.medicines.unit.trim() !== '') ? data.medicines.unit.trim() : 'TAB';
+            if (currentPackaging.toLowerCase() === currentUnit.toLowerCase() && itemcontent > 1) {
+                currentPackaging = 'BOX';
+            }
+
             // Safely map medicine data
             document.getElementById('medicine_name').value = data.medicines?.name ?? '';
-            document.getElementById('unit').value = data.medicines?.unit ?? '';
             document.getElementById('content').value = data.medicines?.content ?? '';
             document.getElementById('medicine_code').value = data.medicines?.code ?? '';
 
             document.getElementById('qty').value = data.quantity ?? 0;
             document.getElementById('qty_received').value = data.receiving_items?.qty_received ?? '';
-
-            if (data.pack == "1") {
-                itemprice = itemrawprice * itemcontent;
-                document.getElementById('item_price').value = formatRupiah(itemprice);
-            } else {
-                itemprice = itemrawprice;
-                document.getElementById('item_price').value = formatRupiah(itemprice);
-            }
 
             document.getElementById('total_price').value = data.total ?? '';
 
@@ -1232,12 +1278,38 @@
                 ?.name);
             setSelect2AjaxValue("#items", data.receiving_items?.etalases?.id, data.receiving_items?.etalases?.name);
 
-            if (data.pack == "1") {
-                pack.checked = true;
-                itempack = 1;
+            // Default mengikuti hasil pemesanan di order.blade.php (orders.order_items.pack)
+            const orderPack = (data.pack == "1" || data.pack === 1 || data.pack === true);
+            pack.checked = orderPack;
+            itempack = orderPack ? 1 : 0;
+
+            if (data.receiving_items && data.receiving_items.raw_price) {
+                itemprice = parseFloat(data.receiving_items.raw_price) || 0;
+                document.getElementById('item_price').value = formatRupiah(itemprice);
+
+                const unitInput = document.getElementById('unit');
+                if (unitInput) {
+                    unitInput.value = orderPack ? (currentPackaging || 'BOX') : (currentUnit || 'TAB');
+                }
+                const packLabel = document.getElementById('pack_label');
+                if (packLabel) {
+                    if (orderPack) {
+                        packLabel.textContent = `Utuh (${currentPackaging || 'BOX'})`;
+                        packLabel.className = "text-xs font-semibold text-blue-700 select-none";
+                    } else {
+                        packLabel.textContent = `Eceran (${currentUnit || 'TAB'})`;
+                        packLabel.className = "text-xs font-medium text-amber-700 select-none";
+                    }
+                }
+                const qtyReceivedLabel = document.getElementById('qty_received_label');
+                if (qtyReceivedLabel) {
+                    const activeUnit = orderPack ? (currentPackaging || 'BOX') : (currentUnit || 'TAB');
+                    qtyReceivedLabel.innerHTML = `QTY Diterima <span class="text-[10px] font-bold text-blue-600">(${activeUnit})</span> <span class="text-red-500">*</span>`;
+                }
+                updateBoxPriceInfo();
+                counttotalreceived();
             } else {
-                pack.checked = false;
-                itempack = 0;
+                updatePackAndUnitUI();
             }
 
             // Only fire the Axios request if a detail_id actually exists
@@ -1586,17 +1658,7 @@
         }, true);
 
         pack.addEventListener('change', function () {
-            if (this.checked) {
-                itempack = 1;
-                itemprice = itemcontent > 1 ? (itemrawprice * itemcontent) : itemrawprice;
-            } else {
-                itempack = 0;
-                itemprice = itemrawprice;
-            }
-
-            document.getElementById('item_price').value = formatRupiah(itemprice);
-            updateBoxPriceInfo();
-            counttotal();
+            updatePackAndUnitUI();
         });
 
         pack.addEventListener('keydown', function (e) {
