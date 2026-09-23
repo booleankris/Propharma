@@ -39,4 +39,10 @@ class Receiving extends Model
             'id'                   // PK on receiving_details
         );
     }
+
+    public function payments()
+    {
+        return $this->hasMany(FinancePayment::class, 'receiving_id');
+    }
 }
+

@@ -16,6 +16,18 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class ParetoController extends Controller
 {
+    public function __construct()
+    {
+        $this->middleware('auth');
+        $this->middleware(function ($request, $next) {
+            $user = auth()->user();
+            if (!$user || (!$user->hasRole('Finance') && !$user->hasRole('General Manager') && !$user->hasRole('administrator'))) {
+                abort(403, 'Akses ditolak: Menu ini hanya dapat diakses oleh role Finance dan General Manager.');
+            }
+            return $next($request);
+        });
+    }
+
     public function index()
     {
         return view('pareto.index');

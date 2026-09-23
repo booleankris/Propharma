@@ -1,0 +1,992 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Creditor;
+use App\Models\Debtors;
+use App\Models\FinanceAccount;
+use App\Models\FinancePayment;
+use App\Models\MedicineCart;
+use App\Models\MedicineTransactions;
+use App\Models\Receiving;
+use App\Models\ReceivingDetails;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Inertia\Inertia;
+
+class FinanceController extends Controller
+{
+    public function __construct()
+    {
+        $this->middleware('auth');
+        $this->middleware(function ($request, $next) {
+            $user = auth()->user();
+            if (!$user || (!$user->hasRole('Finance') && !$user->hasRole('General Manager') && !$user->hasRole('administrator'))) {
+                abort(403, 'Akses ditolak: Modul SAHABAT Finances hanya dapat diakses oleh role Finance dan General Manager.');
+            }
+            return $next($request);
+        });
+    }
+
+    /**
+     * Tampilkan halaman utama modul SAHABAT Finances (React Realtime SPA).
+     */
+    public function index()
+    {
+        $creditors = Creditor::orderBy('name')->get(['code', 'name']);
+        $debtors = Debtors::orderBy('name')->get(['id', 'code', 'name', 'phone', 'city']);
+
+        // Ambil master akun (Chart of Accounts ala Kledo)
+        $accounts = FinanceAccount::orderBy('code')->get();
+
+        // 1. Ambil data faktur pembelian KREDIT (Hutang Dagang)
+        $receivingsKredit = Receiving::with([
+            'receiving_details' => function ($query) {
+                $query->where('invoice_payment', 'KREDIT');
+            },
+            'receiving_details.creditor',
+            'receiving_details.payments.account',
+            'receiving_details.payments.creator',
+            'receiving_details.receiving_items.order_items.medicines',
+            'pharmacy'
+        ])
+            ->whereIn('status', [1, 2, 3])
+            ->whereHas('receiving_details', function ($query) {
+                $query->where('invoice_payment', 'KREDIT');
+            })
+            ->latest('updated_at')
+            ->take(150)
+            ->get();
+
+        $hutangDagang = [];
+        foreach ($receivingsKredit as $rec) {
+            foreach ($rec->receiving_details as $detail) {
+                if ($detail->invoice_payment !== 'KREDIT') continue;
+
+                $vendorName = $detail->creditor->name ?? ($detail->creditor_code ?: 'PBF / Vendor');
+                $itemsList = [];
+                $subtotal = 0;
+
+                foreach ($detail->receiving_items as $item) {
+                    $medName = $item->order_items->medicines->name ?? 'Obat';
+                    $sku = $item->order_items->medicines->code ?? ('SKU-' . $item->id);
+                    $qty = (float) ($item->qty_received ?? 0);
+                    $harga = (float) ($item->raw_price ?? ($item->order_items->price ?? 0));
+                    $diskon = (float) ($item->discount ?? 0);
+                    $totalItem = (float) ($item->total ?? ($qty * $harga));
+
+                    $subtotal += $totalItem;
+
+                    $itemsList[] = [
+                        'sku' => $sku,
+                        'nama' => $medName,
+                        'qty' => $qty,
+                        'satuan' => $item->order_items->medicines->unit ?? 'Pcs',
+                        'diskon' => $diskon . '%',
+                        'harga' => $harga,
+                        'pajak' => strtoupper($detail->invoice_ppn ?? 'PPN11'),
+                        'jumlah' => $totalItem,
+                    ];
+                }
+
+                $ppnNominal = ($detail->invoice_ppn === 'INCLUDE') ? 0 : round($subtotal * 0.11);
+                $total = $subtotal + $ppnNominal;
+
+                // Hitung riwayat pembayaran dan total terbayar
+                $paymentHistory = [];
+                $totalTerbayar = 0;
+
+                foreach ($detail->payments as $payment) {
+                    $totalTerbayar += (float) $payment->amount;
+                    $paymentHistory[] = [
+                        'id' => $payment->id,
+                        'tanggal' => \Carbon\Carbon::parse($payment->payment_date)->format('d/m/Y'),
+                        'nominal' => (float) $payment->amount,
+                        'noReferensi' => $payment->reference_number ?: '-',
+                        'catatan' => $payment->notes ?: '-',
+                        'akunId' => $payment->account_id,
+                        'akunNama' => $payment->account->name ?? 'Kas & Bank',
+                        'akunKode' => $payment->account->code ?? '',
+                        'akunKategori' => $payment->account->category ?? 'Kas & Bank',
+                        'diprosesOleh' => $payment->creator->name ?? ($payment->creator->username ?? 'Staf Finance'),
+                        'waktuAudit' => \Carbon\Carbon::parse($payment->created_at)->format('d M Y, H:i'),
+                    ];
+                }
+
+                $isLunas = ((int) $rec->status === 3) || ($totalTerbayar >= $total && $total > 0);
+                $sisa = $isLunas ? 0 : max(0, $total - $totalTerbayar);
+
+                $statusLabel = 'Belum Dibayar';
+                if ($isLunas) {
+                    $statusLabel = 'Lunas';
+                } elseif ($totalTerbayar > 0) {
+                    $statusLabel = 'Dibayar Sebagian';
+                }
+
+                $hutangDagang[] = [
+                    'id' => $detail->id,
+                    'receiving_id' => $rec->id,
+                    'nomor' => $detail->invoice_number ?: $rec->code,
+                    'vendor' => $vendorName,
+                    'referensi' => $detail->receiving_details_code ?: $rec->code,
+                    'tanggal' => $detail->invoice_date ? \Carbon\Carbon::parse($detail->invoice_date)->format('d/m/Y') : ($rec->date ?: '-'),
+                    'jatuhTempo' => $detail->invoice_due ? \Carbon\Carbon::parse($detail->invoice_due)->format('d/m/Y') : '-',
+                    'tanggalBayar' => $isLunas ? \Carbon\Carbon::parse($rec->updated_at)->format('d/m/Y') : '',
+                    'status' => $statusLabel,
+                    'subtotal' => $subtotal,
+                    'ppn' => $ppnNominal,
+                    'total' => $total,
+                    'terbayar' => $totalTerbayar,
+                    'sisa' => $sisa,
+                    'gudang' => $rec->pharmacy->name ?? 'Gudang Utama',
+                    'tglKirim' => $rec->date ?: '-',
+                    'items' => $itemsList,
+                    'payments' => $paymentHistory,
+                    'lastModified' => \Carbon\Carbon::parse($rec->updated_at)->format('d M Y H:i'),
+                ];
+            }
+        }
+
+        // 2. Ambil data faktur pembelian CASH (Tunai)
+        $receivingsCash = Receiving::with([
+            'receiving_details' => function ($query) {
+                $query->where('invoice_payment', 'TUNAI');
+            },
+            'receiving_details.creditor',
+            'receiving_details.payments.account',
+            'receiving_details.payments.creator',
+            'receiving_details.receiving_items.order_items.medicines',
+            'pharmacy'
+        ])
+            ->whereIn('status', [1, 2, 3])
+            ->whereHas('receiving_details', function ($query) {
+                $query->where('invoice_payment', 'TUNAI');
+            })
+            ->latest('updated_at')
+            ->take(100)
+            ->get();
+
+        $pembelianCash = [];
+        foreach ($receivingsCash as $rec) {
+            foreach ($rec->receiving_details as $detail) {
+                if ($detail->invoice_payment !== 'TUNAI') continue;
+
+                $vendorName = $detail->creditor->name ?? ($detail->creditor_code ?: 'PBF / Vendor');
+                $itemsList = [];
+                $subtotal = 0;
+
+                foreach ($detail->receiving_items as $item) {
+                    $medName = $item->order_items->medicines->name ?? 'Obat';
+                    $sku = $item->order_items->medicines->code ?? ('SKU-' . $item->id);
+                    $qty = (float) ($item->qty_received ?? 0);
+                    $harga = (float) ($item->raw_price ?? ($item->order_items->price ?? 0));
+                    $diskon = (float) ($item->discount ?? 0);
+                    $totalItem = (float) ($item->total ?? ($qty * $harga));
+
+                    $subtotal += $totalItem;
+
+                    $itemsList[] = [
+                        'sku' => $sku,
+                        'nama' => $medName,
+                        'qty' => $qty,
+                        'satuan' => $item->order_items->medicines->unit ?? 'Pcs',
+                        'diskon' => $diskon . '%',
+                        'harga' => $harga,
+                        'pajak' => strtoupper($detail->invoice_ppn ?? 'PPN11'),
+                        'jumlah' => $totalItem,
+                    ];
+                }
+
+                $ppnNominal = ($detail->invoice_ppn === 'INCLUDE') ? 0 : round($subtotal * 0.11);
+                $total = $subtotal + $ppnNominal;
+
+                // Cari akun pembayaran yang dipakai jika sudah dicatat
+                $latestPayment = $detail->payments->last();
+                $akunPembayaran = null;
+                if ($latestPayment && $latestPayment->account) {
+                    $akunPembayaran = [
+                        'id' => $latestPayment->account->id,
+                        'nama' => $latestPayment->account->name,
+                        'kode' => $latestPayment->account->code,
+                        'kategori' => $latestPayment->account->category,
+                        'noRekening' => $latestPayment->account->account_number,
+                        'noReferensi' => $latestPayment->reference_number,
+                        'tanggal' => \Carbon\Carbon::parse($latestPayment->payment_date)->format('d/m/Y'),
+                        'diprosesOleh' => $latestPayment->creator->name ?? 'Staf',
+                    ];
+                }
+
+                $pembelianCash[] = [
+                    'id' => $detail->id,
+                    'receiving_id' => $rec->id,
+                    'nomor' => $detail->invoice_number ?: $rec->code,
+                    'vendor' => $vendorName,
+                    'referensi' => $detail->receiving_details_code ?: $rec->code,
+                    'tanggal' => $detail->invoice_date ? \Carbon\Carbon::parse($detail->invoice_date)->format('d/m/Y') : ($rec->date ?: '-'),
+                    'status' => 'Lunas (Cash)',
+                    'subtotal' => $subtotal,
+                    'ppn' => $ppnNominal,
+                    'total' => $total,
+                    'gudang' => $rec->pharmacy->name ?? 'Gudang Utama',
+                    'akunPembayaran' => $akunPembayaran,
+                    'items' => $itemsList,
+                    'lastModified' => \Carbon\Carbon::parse($rec->updated_at)->format('d M Y H:i'),
+                ];
+            }
+        }
+
+        // 3. Ambil data penjualan KREDIT (Piutang Penjualan / Piutang Usaha)
+        $creditTransactions = MedicineTransactions::with([
+            'debtors',
+            'doctors',
+            'patients',
+            'pharmacy',
+            'payments.account',
+            'payments.creator',
+            'transactions.medicine',
+        ])
+            ->where('transaction_type', 'KREDIT')
+            ->where('status', 1)
+            ->latest('id')
+            ->take(300)
+            ->get();
+
+        $piutangPenjualan = [];
+        foreach ($creditTransactions as $tx) {
+            $debtorName = $tx->debtors->name ?? ($tx->patient_id ? ('Pasien: ' . ($tx->patients->name ?? 'Umum')) : 'Pelanggan Umum');
+            $itemsList = [];
+            $calcSubtotal = 0;
+
+            foreach ($tx->transactions as $cart) {
+                $medName = $cart->medicine->name ?? 'Obat';
+                $sku = $cart->medicine->code ?? ('SKU-' . $cart->medicine_id);
+                $qty = (float) ($cart->quantity ?? 0);
+                $harga = (float) ($cart->item_price ?? 0);
+                $diskon = (float) ($cart->discount ?? 0);
+                $finalPrice = (float) ($cart->final_price ?: ($cart->total_price ?: ($qty * $harga)));
+
+                $calcSubtotal += $finalPrice;
+
+                $itemsList[] = [
+                    'id' => $cart->id,
+                    'sku' => $sku,
+                    'nama' => $medName,
+                    'qty' => $qty,
+                    'satuan' => $cart->medicine->unit ?? ($cart->package ?? 'Pcs'),
+                    'diskon' => $diskon . '%',
+                    'harga' => $harga,
+                    'pajak' => 'NON',
+                    'jumlah' => $finalPrice,
+                ];
+            }
+
+            $total = (float) ($tx->subtotal > 0 ? $tx->subtotal : $calcSubtotal);
+
+            // Riwayat pembayaran piutang dari finance_payments
+            $paymentHistory = [];
+            $totalTerbayarViaFinance = 0;
+            foreach ($tx->payments as $payment) {
+                $totalTerbayarViaFinance += (float) $payment->amount;
+                $paymentHistory[] = [
+                    'id' => $payment->id,
+                    'tanggal' => \Carbon\Carbon::parse($payment->payment_date)->format('d/m/Y'),
+                    'nominal' => (float) $payment->amount,
+                    'noReferensi' => $payment->reference_number ?: '-',
+                    'catatan' => $payment->notes ?: '-',
+                    'akunNama' => $payment->account->name ?? 'Kas & Bank',
+                    'akunKode' => $payment->account->code ?? '-',
+                    'akunKategori' => $payment->account->category ?? 'Kas & Bank',
+                    'noRekening' => $payment->account->account_number ?? '-',
+                    'diprosesOleh' => $payment->creator->name ?? 'Staf Finance',
+                    'waktuAudit' => \Carbon\Carbon::parse($payment->created_at)->format('d M Y H:i'),
+                ];
+            }
+
+            $legacyPaid = (float) ($tx->paid ?? 0);
+            $totalTerbayar = max($totalTerbayarViaFinance, $legacyPaid);
+            if ($totalTerbayar > $total) {
+                $totalTerbayar = $total;
+            }
+            $sisa = max(0, $total - $totalTerbayar);
+
+            $isLunas = ($sisa <= 0 && $total > 0);
+            $statusLabel = $isLunas ? 'Lunas' : ($totalTerbayar > 0 ? 'Dibayar Sebagian' : 'Belum Bayar');
+
+            $piutangPenjualan[] = [
+                'id' => $tx->id,
+                'nomor' => $tx->transaction_code ?: ('TRX-' . $tx->id),
+                'debtor' => $debtorName,
+                'debtor_id' => $tx->debtor_id,
+                'debtor_code' => $tx->debtors->code ?? '-',
+                'dokter' => $tx->doctors->name ?? '-',
+                'pasien' => $tx->patients->name ?? '-',
+                'apotek' => $tx->pharmacy->name ?? 'Apotek Utama',
+                'tanggal' => $tx->created_at ? \Carbon\Carbon::parse($tx->created_at)->format('d/m/Y') : '-',
+                'jatuhTempo' => $tx->created_at ? \Carbon\Carbon::parse($tx->created_at)->addDays(30)->format('d/m/Y') : '-',
+                'status' => $statusLabel,
+                'subtotal' => $total,
+                'total' => $total,
+                'terbayar' => $totalTerbayar,
+                'sisa' => $sisa,
+                'items' => $itemsList,
+                'payments' => $paymentHistory,
+                'lastModified' => $tx->updated_at ? \Carbon\Carbon::parse($tx->updated_at)->format('d M Y H:i') : '-',
+            ];
+        }
+
+        // Ambil kategori akun yang tersedia
+        $defaultCategories = [
+            'Kas & Bank',
+            'Piutang Usaha',
+            'Persediaan',
+            'Aktiva Lancar Lainnya',
+            'Aktiva Tetap',
+            'Hutang Usaha',
+            'Kewajiban Lancar Lainnya',
+            'Kewajiban Jangka Panjang',
+            'Ekuitas / Modal',
+            'Pendapatan',
+            'Harga Pokok Penjualan',
+            'Beban Operasional',
+            'Beban Lainnya',
+        ];
+        $existingCategories = FinanceAccount::select('category')->distinct()->pluck('category')->toArray();
+        $categories = array_values(array_unique(array_merge($defaultCategories, $existingCategories)));
+
+        // 4. Riwayat Mutasi Transaksi Kas & Bank (Debit / Kredit)
+        $mutasiKasBank = FinancePayment::with([
+            'account',
+            'creator',
+            'receivingDetail.creditor',
+            'transaction.debtors',
+            'transaction.patients',
+        ])
+            ->whereHas('account', function ($q) {
+                $q->where('category', 'Kas & Bank');
+            })
+            ->orderByDesc('payment_date')
+            ->orderByDesc('id')
+            ->take(500)
+            ->get()
+            ->map(function ($p) {
+                $isMasuk = ($p->payment_type === 'PIUTANG');
+                $tipeLabel = $isMasuk ? 'Masuk (Debit)' : 'Keluar (Kredit)';
+                
+                $pihakTerkait = '-';
+                $noDokumen = $p->reference_number ?: ('MUT-' . str_pad($p->id, 5, '0', STR_PAD_LEFT));
+                $deskripsi = $p->notes;
+
+                if ($p->payment_type === 'PIUTANG') {
+                    $pihakTerkait = $p->transaction->debtors->name ?? ($p->transaction->patients->name ?? 'Pelanggan Umum');
+                    $doc = $p->transaction->invoice_number ?? $p->reference_number;
+                    if ($doc) $noDokumen = $doc;
+                    if (!$deskripsi) {
+                        $deskripsi = "Penerimaan piutang penjualan dari {$pihakTerkait}";
+                    }
+                } elseif ($p->payment_type === 'KREDIT') {
+                    $pihakTerkait = $p->receivingDetail->creditor->name ?? ($p->receivingDetail->creditor_code ?? 'PBF / Vendor');
+                    $doc = $p->receivingDetail->invoice_number ?? $p->reference_number;
+                    if ($doc) $noDokumen = $doc;
+                    if (!$deskripsi) {
+                        $deskripsi = "Pelunasan hutang pembelian ke {$pihakTerkait}";
+                    }
+                } elseif ($p->payment_type === 'CASH') {
+                    $pihakTerkait = $p->receivingDetail->creditor->name ?? ($p->receivingDetail->creditor_code ?? 'PBF / Vendor');
+                    $doc = $p->receivingDetail->invoice_number ?? $p->reference_number;
+                    if ($doc) $noDokumen = $doc;
+                    if (!$deskripsi) {
+                        $deskripsi = "Pembelian tunai (cash) ke {$pihakTerkait}";
+                    }
+                }
+
+                return [
+                    'id' => $p->id,
+                    'account_id' => $p->account_id,
+                    'account_name' => $p->account->name ?? 'Akun Kas',
+                    'account_code' => $p->account->code ?? '-',
+                    'account_number' => $p->account->account_number ?? '-',
+                    'date' => \Carbon\Carbon::parse($p->payment_date)->format('d/m/Y'),
+                    'raw_date' => \Carbon\Carbon::parse($p->payment_date)->format('Y-m-d'),
+                    'amount' => (float) $p->amount,
+                    'direction' => $isMasuk ? 'IN' : 'OUT',
+                    'type_label' => $tipeLabel,
+                    'category_type' => $p->payment_type, // PIUTANG, KREDIT, CASH
+                    'document_no' => $noDokumen,
+                    'party' => $pihakTerkait,
+                    'description' => $deskripsi ?: 'Transaksi Keuangan',
+                    'user' => $p->creator->name ?? 'Admin',
+                ];
+            });
+
+        // Render via Inertia ke komponen resources/js/Pages/Finance/Index.jsx
+        return Inertia::render('Finance/Index', [
+            'hutangDagang' => $hutangDagang,
+            'pembelianCash' => $pembelianCash,
+            'piutangPenjualan' => $piutangPenjualan,
+            'accounts' => $accounts,
+            'categories' => $categories,
+            'creditors' => $creditors,
+            'debtors' => $debtors,
+            'mutasiKasBank' => $mutasiKasBank,
+        ]);
+    }
+
+    /**
+     * Catat pembayaran faktur hutang dagang (Kredit).
+     */
+    public function storePayment(Request $request)
+    {
+        $validated = $request->validate([
+            'receiving_detail_id' => 'required|exists:receiving_details,id',
+            'account_id' => 'required|exists:finance_accounts,id',
+            'payment_date' => 'required|date',
+            'amount' => 'required|numeric|min:1',
+            'reference_number' => 'nullable|string|max:100',
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        $detail = ReceivingDetails::with(['receiving_items', 'payments', 'receiving'])->findOrFail($validated['receiving_detail_id']);
+        $account = FinanceAccount::findOrFail($validated['account_id']);
+
+        // Verifikasi akun harus ber-kategori 'Kas & Bank'
+        if ($account->category !== 'Kas & Bank') {
+            return back()->withErrors(['account_id' => 'Akun pembayaran harus berkategori Kas & Bank.']);
+        }
+
+        DB::transaction(function () use ($validated, $detail, $account) {
+            // 1. Simpan Payment
+            FinancePayment::create([
+                'receiving_id' => $detail->receiving_id,
+                'receiving_detail_id' => $detail->id,
+                'account_id' => $account->id,
+                'payment_type' => 'KREDIT',
+                'payment_date' => $validated['payment_date'],
+                'amount' => $validated['amount'],
+                'reference_number' => $validated['reference_number'] ?? null,
+                'notes' => $validated['notes'] ?? null,
+                'created_by' => Auth::id(),
+            ]);
+
+            // 2. Kurangi saldo akun Kas & Bank
+            $account->decrement('balance', $validated['amount']);
+
+            // 3. Hitung total invoice
+            $subtotal = 0;
+            foreach ($detail->receiving_items as $item) {
+                $qty = (float) ($item->qty_received ?? 0);
+                $harga = (float) ($item->raw_price ?? ($item->order_items->price ?? 0));
+                $totalItem = (float) ($item->total ?? ($qty * $harga));
+                $subtotal += $totalItem;
+            }
+            $ppnNominal = ($detail->invoice_ppn === 'INCLUDE') ? 0 : round($subtotal * 0.11);
+            $totalInvoice = $subtotal + $ppnNominal;
+
+            // 4. Hitung akumulasi pembayaran yang sudah masuk
+            $totalTerbayar = FinancePayment::where('receiving_detail_id', $detail->id)->sum('amount');
+
+            // 5. Update status receiving jika sudah lunas
+            if ($totalTerbayar >= $totalInvoice && $detail->receiving) {
+                $detail->receiving->update(['status' => 3]);
+            }
+        });
+
+        return back()->with('success', 'Pembayaran hutang dagang berhasil dicatat.');
+    }
+
+    /**
+     * Tetapkan atau ubah akun Kas & Bank untuk Pembelian Cash (Tunai).
+     */
+    public function assignCashAccount(Request $request)
+    {
+        $validated = $request->validate([
+            'receiving_detail_id' => 'required|exists:receiving_details,id',
+            'account_id' => 'required|exists:finance_accounts,id',
+            'payment_date' => 'nullable|date',
+            'reference_number' => 'nullable|string|max:100',
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        $detail = ReceivingDetails::with(['receiving_items', 'receiving'])->findOrFail($validated['receiving_detail_id']);
+        $account = FinanceAccount::findOrFail($validated['account_id']);
+
+        if ($account->category !== 'Kas & Bank') {
+            return back()->withErrors(['account_id' => 'Akun pembayaran harus berkategori Kas & Bank.']);
+        }
+
+        DB::transaction(function () use ($validated, $detail, $account) {
+            // Hitung total invoice
+            $subtotal = 0;
+            foreach ($detail->receiving_items as $item) {
+                $qty = (float) ($item->qty_received ?? 0);
+                $harga = (float) ($item->raw_price ?? ($item->order_items->price ?? 0));
+                $totalItem = (float) ($item->total ?? ($qty * $harga));
+                $subtotal += $totalItem;
+            }
+            $ppnNominal = ($detail->invoice_ppn === 'INCLUDE') ? 0 : round($subtotal * 0.11);
+            $totalInvoice = $subtotal + $ppnNominal;
+
+            // Cek apakah sudah pernah ada payment record untuk detail ini
+            $existingPayment = FinancePayment::where('receiving_detail_id', $detail->id)->first();
+
+            if ($existingPayment) {
+                // Balikkan saldo akun lama dan kurangi saldo akun baru jika berbeda
+                if ($existingPayment->account_id != $account->id) {
+                    $oldAccount = FinanceAccount::find($existingPayment->account_id);
+                    if ($oldAccount) {
+                        $oldAccount->increment('balance', $existingPayment->amount);
+                    }
+                    $account->decrement('balance', $totalInvoice);
+                }
+                $existingPayment->update([
+                    'account_id' => $account->id,
+                    'payment_date' => $validated['payment_date'] ?? now()->toDateString(),
+                    'amount' => $totalInvoice,
+                    'reference_number' => $validated['reference_number'] ?? $existingPayment->reference_number,
+                    'notes' => $validated['notes'] ?? $existingPayment->notes,
+                    'created_by' => Auth::id(),
+                ]);
+            } else {
+                FinancePayment::create([
+                    'receiving_id' => $detail->receiving_id,
+                    'receiving_detail_id' => $detail->id,
+                    'account_id' => $account->id,
+                    'payment_type' => 'CASH',
+                    'payment_date' => $validated['payment_date'] ?? now()->toDateString(),
+                    'amount' => $totalInvoice,
+                    'reference_number' => $validated['reference_number'] ?? null,
+                    'notes' => $validated['notes'] ?? 'Pembelian Cash via ' . $account->name,
+                    'created_by' => Auth::id(),
+                ]);
+                $account->decrement('balance', $totalInvoice);
+            }
+
+            // Pastikan status receiving adalah 3 (Lunas)
+            if ($detail->receiving) {
+                $detail->receiving->update(['status' => 3]);
+            }
+        });
+
+        return back()->with('success', 'Akun pembayaran pembelian cash berhasil disimpan.');
+    }
+
+    /**
+     * Pelunasan massal (multi) faktur hutang dagang kredit (Maksimal 10 item).
+     */
+    public function storeBulkPayments(Request $request)
+    {
+        $validated = $request->validate([
+            'receiving_detail_ids' => 'required|array|min:1|max:10',
+            'receiving_detail_ids.*' => 'required|exists:receiving_details,id',
+            'account_id' => 'required|exists:finance_accounts,id',
+            'payment_date' => 'required|date',
+            'reference_number' => 'nullable|string|max:100',
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        $account = FinanceAccount::findOrFail($validated['account_id']);
+        if ($account->category !== 'Kas & Bank') {
+            return back()->withErrors(['account_id' => 'Akun pembayaran harus berkategori Kas & Bank.']);
+        }
+
+        $totalPaidAll = 0;
+        $processedCount = 0;
+
+        DB::transaction(function () use ($validated, $account, &$totalPaidAll, &$processedCount) {
+            foreach ($validated['receiving_detail_ids'] as $detailId) {
+                $detail = ReceivingDetails::with(['receiving_items', 'payments', 'receiving'])->find($detailId);
+                if (!$detail || $detail->invoice_payment !== 'KREDIT') continue;
+
+                // Hitung total invoice
+                $subtotal = 0;
+                foreach ($detail->receiving_items as $item) {
+                    $qty = (float) ($item->qty_received ?? 0);
+                    $harga = (float) ($item->raw_price ?? ($item->order_items->price ?? 0));
+                    $totalItem = (float) ($item->total ?? ($qty * $harga));
+                    $subtotal += $totalItem;
+                }
+                $ppnNominal = ($detail->invoice_ppn === 'INCLUDE') ? 0 : round($subtotal * 0.11);
+                $totalInvoice = $subtotal + $ppnNominal;
+
+                // Hitung sisa yang belum terbayar
+                $alreadyPaid = FinancePayment::where('receiving_detail_id', $detail->id)->sum('amount');
+                $remaining = max(0, $totalInvoice - $alreadyPaid);
+
+                if ($remaining <= 0) {
+                    if ($detail->receiving && (int)$detail->receiving->status !== 3) {
+                        $detail->receiving->update(['status' => 3]);
+                    }
+                    continue;
+                }
+
+                FinancePayment::create([
+                    'receiving_id' => $detail->receiving_id,
+                    'receiving_detail_id' => $detail->id,
+                    'account_id' => $account->id,
+                    'payment_type' => 'KREDIT',
+                    'payment_date' => $validated['payment_date'],
+                    'amount' => $remaining,
+                    'reference_number' => $validated['reference_number'] ?? null,
+                    'notes' => !empty($validated['notes'])
+                        ? ($validated['notes'] . ' (Pelunasan Massal)')
+                        : ('Pelunasan Massal via ' . $account->name),
+                    'created_by' => Auth::id(),
+                ]);
+
+                $totalPaidAll += $remaining;
+                $processedCount++;
+
+                if ($detail->receiving) {
+                    $detail->receiving->update(['status' => 3]);
+                }
+            }
+
+            if ($totalPaidAll > 0) {
+                $account->decrement('balance', $totalPaidAll);
+            }
+        });
+
+        $formattedTotal = number_format($totalPaidAll, 0, ',', '.');
+        return back()->with('success', "Berhasil melunasi {$processedCount} faktur hutang dagang sebesar Rp {$formattedTotal} via {$account->name}.");
+    }
+
+    /**
+     * Tetapkan akun Kas & Bank massal (multi) untuk Pembelian Cash (Maksimal 10 item).
+     */
+    public function assignBulkCashAccount(Request $request)
+    {
+        $validated = $request->validate([
+            'receiving_detail_ids' => 'required|array|min:1|max:10',
+            'receiving_detail_ids.*' => 'required|exists:receiving_details,id',
+            'account_id' => 'required|exists:finance_accounts,id',
+            'payment_date' => 'nullable|date',
+            'reference_number' => 'nullable|string|max:100',
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        $account = FinanceAccount::findOrFail($validated['account_id']);
+        if ($account->category !== 'Kas & Bank') {
+            return back()->withErrors(['account_id' => 'Akun pembayaran harus berkategori Kas & Bank.']);
+        }
+
+        $processedCount = 0;
+        $paymentDate = $validated['payment_date'] ?? now()->toDateString();
+
+        DB::transaction(function () use ($validated, $account, $paymentDate, &$processedCount) {
+            foreach ($validated['receiving_detail_ids'] as $detailId) {
+                $detail = ReceivingDetails::with(['receiving_items', 'receiving'])->find($detailId);
+                if (!$detail || $detail->invoice_payment !== 'TUNAI') continue;
+
+                $subtotal = 0;
+                foreach ($detail->receiving_items as $item) {
+                    $qty = (float) ($item->qty_received ?? 0);
+                    $harga = (float) ($item->raw_price ?? ($item->order_items->price ?? 0));
+                    $totalItem = (float) ($item->total ?? ($qty * $harga));
+                    $subtotal += $totalItem;
+                }
+                $ppnNominal = ($detail->invoice_ppn === 'INCLUDE') ? 0 : round($subtotal * 0.11);
+                $totalInvoice = $subtotal + $ppnNominal;
+
+                $existingPayment = FinancePayment::where('receiving_detail_id', $detail->id)->first();
+                if ($existingPayment) {
+                    if ($existingPayment->account_id != $account->id) {
+                        $oldAccount = FinanceAccount::find($existingPayment->account_id);
+                        if ($oldAccount) {
+                            $oldAccount->increment('balance', $existingPayment->amount);
+                        }
+                        $account->decrement('balance', $totalInvoice);
+                    }
+                    $existingPayment->update([
+                        'account_id' => $account->id,
+                        'payment_date' => $paymentDate,
+                        'amount' => $totalInvoice,
+                        'reference_number' => $validated['reference_number'] ?? $existingPayment->reference_number,
+                        'notes' => $validated['notes'] ?? $existingPayment->notes,
+                        'created_by' => Auth::id(),
+                    ]);
+                } else {
+                    FinancePayment::create([
+                        'receiving_id' => $detail->receiving_id,
+                        'receiving_detail_id' => $detail->id,
+                        'account_id' => $account->id,
+                        'payment_type' => 'CASH',
+                        'payment_date' => $paymentDate,
+                        'amount' => $totalInvoice,
+                        'reference_number' => $validated['reference_number'] ?? null,
+                        'notes' => $validated['notes'] ?? ('Pembelian Cash via ' . $account->name),
+                        'created_by' => Auth::id(),
+                    ]);
+                    $account->decrement('balance', $totalInvoice);
+                }
+
+                if ($detail->receiving) {
+                    $detail->receiving->update(['status' => 3]);
+                }
+
+                $processedCount++;
+            }
+        });
+
+        return back()->with('success', "Berhasil menetapkan akun {$account->name} untuk {$processedCount} transaksi pembelian cash.");
+    }
+
+    /**
+     * Helper untuk membuat kode akun otomatis melanjutkan nomor sebelumnya
+     */
+    protected function generateNextAccountCode(string $category): string
+    {
+        $prefixMap = [
+            'Kas & Bank' => '1-100',
+            'Piutang Usaha' => '1-102',
+            'Persediaan' => '1-103',
+            'Aktiva Lancar Lainnya' => '1-108',
+            'Aktiva Tetap' => '1-109',
+            'Hutang Usaha' => '2-201',
+            'Kewajiban Lancar Lainnya' => '2-202',
+            'Kewajiban Jangka Panjang' => '2-205',
+            'Ekuitas / Modal' => '3-300',
+            'Pendapatan' => '4-400',
+            'Harga Pokok Penjualan' => '5-500',
+            'Beban Operasional' => '6-600',
+            'Beban Lainnya' => '8-800',
+        ];
+
+        $prefix = $prefixMap[$category] ?? null;
+
+        if (!$prefix) {
+            $lastInSameCat = FinanceAccount::where('category', $category)->orderBy('code', 'desc')->first();
+            if ($lastInSameCat && preg_match('/^(.+?)(\d+)$/', $lastInSameCat->code, $matches)) {
+                $base = $matches[1];
+                $num = (int)$matches[2] + 1;
+                return $base . str_pad($num, strlen($matches[2]), '0', STR_PAD_LEFT);
+            }
+            $prefix = '9-900';
+        }
+
+        $existingCodes = FinanceAccount::where('code', 'LIKE', $prefix . '%')->pluck('code')->toArray();
+
+        if (empty($existingCodes)) {
+            return $prefix . '01';
+        }
+
+        $maxNum = 0;
+        foreach ($existingCodes as $c) {
+            if (preg_match('/^' . preg_quote($prefix, '/') . '(\d+)$/', $c, $m)) {
+                $n = (int)$m[1];
+                if ($n > $maxNum) {
+                    $maxNum = $n;
+                }
+            }
+        }
+
+        $nextNum = $maxNum + 1;
+        return $prefix . str_pad($nextNum, 2, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * Tambah akun baru (Chart of Accounts ala Kledo).
+     */
+    public function storeAccount(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'name_en' => 'nullable|string|max:255',
+            'code' => 'nullable|string|max:50|unique:finance_accounts,code',
+            'category' => 'required|string|max:100',
+            'account_number' => 'nullable|string|max:100',
+        ]);
+
+        // Jika kode tidak diisi, otomatis buat kode melanjutkan nomor sebelumnya
+        $code = !empty($validated['code'])
+            ? trim($validated['code'])
+            : $this->generateNextAccountCode($validated['category']);
+
+        FinanceAccount::create([
+            'name' => $validated['name'],
+            'name_en' => !empty($validated['name_en']) ? $validated['name_en'] : $validated['name'],
+            'code' => $code,
+            'category' => $validated['category'],
+            'account_number' => $validated['account_number'] ?? null,
+            'balance' => 0,
+            'is_active' => true,
+        ]);
+
+        return back()->with('success', "Akun baru '{$validated['name']}' dengan kode {$code} berhasil ditambahkan.");
+    }
+
+    /**
+     * Perbarui data akun yang ada.
+     */
+    public function updateAccount(Request $request, $id)
+    {
+        $account = FinanceAccount::findOrFail($id);
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'name_en' => 'nullable|string|max:255',
+            'code' => 'required|string|max:50|unique:finance_accounts,code,' . $account->id,
+            'category' => 'required|string|max:100',
+            'account_number' => 'nullable|string|max:100',
+        ]);
+
+        $account->update([
+            'name' => $validated['name'],
+            'name_en' => !empty($validated['name_en']) ? $validated['name_en'] : $validated['name'],
+            'code' => trim($validated['code']),
+            'category' => $validated['category'],
+            'account_number' => $validated['account_number'] ?? null,
+        ]);
+
+        return back()->with('success', "Akun '{$account->name}' berhasil diperbarui.");
+    }
+
+    /**
+     * Hapus akun keuangan jika belum ada transaksi pembayaran terkait.
+     */
+    public function destroyAccount($id)
+    {
+        $account = FinanceAccount::withCount('payments')->findOrFail($id);
+
+        if ($account->payments_count > 0) {
+            return back()->withErrors([
+                'account' => "Akun '{$account->name}' tidak dapat dihapus karena sudah memiliki riwayat {$account->payments_count} transaksi pembayaran."
+            ]);
+        }
+
+        $accountName = $account->name;
+        $account->delete();
+
+        return back()->with('success', "Akun '{$accountName}' berhasil dihapus.");
+    }
+
+    /**
+     * Catat penerimaan pembayaran piutang penjualan (Kredit).
+     */
+    public function storePiutangPayment(Request $request)
+    {
+        $validated = $request->validate([
+            'medicine_transaction_id' => 'required|exists:medicine_transactions,id',
+            'account_id' => 'required|exists:finance_accounts,id',
+            'payment_date' => 'required|date',
+            'amount' => 'required|numeric|min:1',
+            'reference_number' => 'nullable|string|max:100',
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        $tx = MedicineTransactions::with(['payments'])->findOrFail($validated['medicine_transaction_id']);
+        $account = FinanceAccount::findOrFail($validated['account_id']);
+
+        if ($account->category !== 'Kas & Bank') {
+            return back()->withErrors(['account_id' => 'Akun pembayaran harus berkategori Kas & Bank.']);
+        }
+
+        $totalTerbayarExisting = (float) $tx->payments->sum('amount');
+        $totalNominal = (float) $tx->subtotal;
+        $sisa = max(0, $totalNominal - $totalTerbayarExisting);
+
+        if ($validated['amount'] > $sisa) {
+            return back()->withErrors(['amount' => 'Nominal pembayaran tidak boleh melebihi sisa tagihan piutang (Rp ' . number_format($sisa, 0, ',', '.') . ').']);
+        }
+
+        DB::beginTransaction();
+        try {
+            FinancePayment::create([
+                'medicine_transaction_id' => $tx->id,
+                'account_id' => $account->id,
+                'payment_type' => 'PIUTANG',
+                'payment_date' => $validated['payment_date'],
+                'amount' => $validated['amount'],
+                'reference_number' => $validated['reference_number'],
+                'notes' => $validated['notes'],
+                'created_by' => Auth::id(),
+            ]);
+
+            $newTotalPaid = $totalTerbayarExisting + $validated['amount'];
+            $tx->paid = (string) $newTotalPaid;
+            $tx->save();
+
+            // Tambah saldo akun Kas & Bank (Penerimaan Piutang)
+            $account->increment('balance', $validated['amount']);
+
+            DB::commit();
+
+            return redirect()->back()->with('success', 'Penerimaan pembayaran piutang berhasil dicatat.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->withErrors(['error' => 'Gagal mencatat penerimaan pembayaran piutang: ' . $e->getMessage()]);
+        }
+    }
+
+    /**
+     * Pelunasan massal piutang penjualan (Maks. 10 Faktur).
+     */
+    public function bulkPiutangPayment(Request $request)
+    {
+        // Mendukung kedua nama parameter: transaction_ids dan medicine_transaction_ids
+        $ids = $request->input('transaction_ids') ?? $request->input('medicine_transaction_ids');
+        if ($ids) {
+            $request->merge(['transaction_ids' => $ids]);
+        }
+
+        $validated = $request->validate([
+            'transaction_ids' => 'required|array|min:1|max:10',
+            'transaction_ids.*' => 'required|exists:medicine_transactions,id',
+            'account_id' => 'required|exists:finance_accounts,id',
+            'payment_date' => 'required|date',
+            'reference_number' => 'nullable|string|max:100',
+            'notes' => 'nullable|string|max:500',
+        ], [
+            'transaction_ids.required' => 'Pilih minimal 1 transaksi piutang untuk dilunasi.',
+            'transaction_ids.min' => 'Pilih minimal 1 transaksi piutang.',
+            'transaction_ids.max' => 'Maksimal 10 transaksi piutang yang dapat dilunasi sekaligus.',
+            'account_id.required' => 'Silakan pilih akun Kas & Bank penerima.',
+        ]);
+
+        $account = FinanceAccount::findOrFail($validated['account_id']);
+        if ($account->category !== 'Kas & Bank') {
+            return back()->withErrors(['account_id' => 'Akun kas/bank yang dipilih harus berkategori Kas & Bank.']);
+        }
+
+        $transactions = MedicineTransactions::with(['payments'])
+            ->whereIn('id', $validated['transaction_ids'])
+            ->get();
+
+        DB::beginTransaction();
+        try {
+            $processedCount = 0;
+            foreach ($transactions as $tx) {
+                $totalPaid = (float) $tx->payments->sum('amount');
+                $totalNominal = (float) $tx->subtotal;
+                $sisa = max(0, $totalNominal - $totalPaid);
+
+                if ($sisa <= 0) continue;
+
+                FinancePayment::create([
+                    'medicine_transaction_id' => $tx->id,
+                    'account_id' => $account->id,
+                    'payment_type' => 'PIUTANG',
+                    'payment_date' => $validated['payment_date'],
+                    'amount' => $sisa,
+                    'reference_number' => $validated['reference_number'] ?: ('BULK-PIUTANG-' . date('YmdHis')),
+                    'notes' => $validated['notes'] ?: 'Pelunasan massal piutang penjualan',
+                    'created_by' => Auth::id(),
+                ]);
+
+                $tx->paid = (string) $totalNominal;
+                $tx->save();
+
+                // Tambah saldo akun Kas & Bank
+                $account->increment('balance', $sisa);
+
+                $processedCount++;
+            }
+
+            DB::commit();
+
+            return redirect()->back()->with('success', "Berhasil melunasi {$processedCount} tagihan piutang penjualan.");
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->withErrors(['error' => 'Gagal memproses pelunasan massal piutang: ' . $e->getMessage()]);
+        }
+    }
+}

@@ -33,4 +33,10 @@ class ReceivingDetails extends Model
     {
         return $this->belongsTo(Creditor::class, 'creditor_code', 'code');
     }
+
+    public function payments()
+    {
+        return $this->hasMany(FinancePayment::class, 'receiving_detail_id');
+    }
 }
+
