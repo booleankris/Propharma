@@ -93,32 +93,19 @@ class ReceivingController extends Controller
         $now = Carbon::now();
         $prefix = $now->format('ym') . 'LOG-';
 
-        $lastCode = ItemsLog::where('code', 'like', "{$prefix}%")
-            ->orderBy('id', 'desc')
-            ->value('code');
+        $codes = ItemsLog::where('code', 'like', "{$prefix}%")->pluck('code');
 
-        if (!$lastCode) {
-            $lastCode = ItemsLog::where('code', 'like', "{$prefix}%")
-                ->orderByRaw('LENGTH(code) DESC, code DESC')
-                ->value('code');
+        $maxNumber = 0;
+        foreach ($codes as $c) {
+            $parts = explode('LOG-', (string)$c);
+            $val = (int) ($parts[1] ?? substr($c, -4));
+            if ($val > $maxNumber) {
+                $maxNumber = $val;
+            }
         }
 
-        $nextNumber = 1;
-        if ($lastCode) {
-            $parts = explode('LOG-', $lastCode);
-            $nextNumber = ((int) ($parts[1] ?? substr($lastCode, -4))) + 1;
-        }
-
-        $serial = str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
-        $code = $prefix . $serial;
-
-        while (ItemsLog::where('code', $code)->exists()) {
-            $nextNumber++;
-            $serial = str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
-            $code = $prefix . $serial;
-        }
-
-        return $code;
+        $nextNumber = $maxNumber + 1;
+        return $prefix . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
     }
 
     public function searchBPBA(Request $request)
@@ -1659,21 +1646,19 @@ class ReceivingController extends Controller
         $month = now()->format('m');
         $prefix = $year . $month . 'RE';
 
-        $lastCode = Receiving::where('code', 'like', "{$prefix}%")
-            ->orderBy('code', 'desc')
-            ->value('code');
+        $codes = Receiving::where('code', 'like', "{$prefix}%")->pluck('code');
 
-        $nextNumber = $lastCode ? ((int) substr($lastCode, -4) + 1) : 1;
-        $serial = str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
-        $code = $prefix . $serial;
-
-        while (Receiving::where('code', $code)->exists()) {
-            $nextNumber++;
-            $serial = str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
-            $code = $prefix . $serial;
+        $maxNumber = 0;
+        foreach ($codes as $c) {
+            $numPart = substr((string)$c, strlen($prefix));
+            $val = (int) preg_replace('/[^\d]/', '', $numPart);
+            if ($val > $maxNumber) {
+                $maxNumber = $val;
+            }
         }
 
-        return $code;
+        $nextNumber = $maxNumber + 1;
+        return $prefix . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
     }
 
     public function generateReceivingDetailsCode($pharmacy_id)
@@ -1683,28 +1668,23 @@ class ReceivingController extends Controller
         $month = $now->format('m');
         $prefix = "NT-{$year}-{$month}/";
 
-        $lastCode = ReceivingDetails::whereHas('receiving', function ($q) use ($pharmacy_id) {
+        $codes = ReceivingDetails::whereHas('receiving', function ($q) use ($pharmacy_id) {
             $q->where('pharmacy_id', $pharmacy_id);
         })
             ->where('receiving_details_code', 'like', "{$prefix}%")
-            ->orderBy('receiving_details_code', 'desc')
-            ->value('receiving_details_code');
+            ->pluck('receiving_details_code');
 
-        $nextNumber = $lastCode ? ((int) substr($lastCode, -4) + 1) : 1;
-        $serial = str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
-        $code = $prefix . $serial;
-
-        $existsInPharmacy = fn($c) => ReceivingDetails::whereHas('receiving', function ($q) use ($pharmacy_id) {
-            $q->where('pharmacy_id', $pharmacy_id);
-        })->where('receiving_details_code', $c)->exists();
-
-        while ($existsInPharmacy($code)) {
-            $nextNumber++;
-            $serial = str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
-            $code = $prefix . $serial;
+        $maxNumber = 0;
+        foreach ($codes as $c) {
+            $numPart = substr((string)$c, strlen($prefix));
+            $val = (int) preg_replace('/[^\d]/', '', $numPart);
+            if ($val > $maxNumber) {
+                $maxNumber = $val;
+            }
         }
 
-        return $code;
+        $nextNumber = $maxNumber + 1;
+        return $prefix . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
     }
 
     public function updateReceivingItem(Request $request, $id)
@@ -2987,20 +2967,25 @@ class ReceivingController extends Controller
                 DB::rollBack();
                 return response()->json(['success' => false, 'message' => 'BPBA/PBF tidak sesuai atau jumlah/satuan melampaui pesanan konsolidasi. Muat ulang penerimaan.'], 422);
             }
-            $details = ReceivingDetails::updateOrCreate(
+            $details = ReceivingDetails::firstOrNew(
                 [
                     'receiving_id' => $request->receiving_id,
                     'invoice_number' => $request->invoice_number,
                     'creditor_code' => $request->creditor_code,
-                ],
-                [
-                    'invoice_date' => $request->invoice_date,
-                    'invoice_times' => $request->invoice_times,
-                    'invoice_due' => $request->invoice_due,
-                    'invoice_payment' => $request->invoice_payment,
-                    'invoice_ppn' => $request->invoice_ppn,
                 ]
             );
+            $details->fill([
+                'invoice_date' => $request->invoice_date,
+                'invoice_times' => $request->invoice_times,
+                'invoice_due' => $request->invoice_due,
+                'invoice_payment' => $request->invoice_payment,
+                'invoice_ppn' => $request->invoice_ppn,
+            ]);
+            if (empty($details->receiving_details_code)) {
+                $pId = $receiving->pharmacy_id ?? getPurchasingPharmacyId();
+                $details->receiving_details_code = $this->generateReceivingDetailsCode($pId);
+            }
+            $details->save();
 
             $itemData = [
                 'receiving_details_id' => $details->id,
@@ -3047,7 +3032,7 @@ class ReceivingController extends Controller
 
             DB::commit();
 
-            $receivingDetails = ReceivingDetails::with(['receiving_items.order_items.medicines', 'creditor'])
+            $receivingDetails = ReceivingDetails::with(['receiving_items.order_items', 'creditor'])
                 ->where('receiving_id', $receiving->id)
                 ->get();
 
@@ -3095,11 +3080,7 @@ class ReceivingController extends Controller
                 $d_total += $detailGrandTotal;
             }
 
-            if (empty($details->receiving_details_code)) {
-                $pId = $receiving->pharmacy_id ?? getPurchasingPharmacyId();
-                $details->receiving_details_code = $this->generateReceivingDetailsCode($pId);
-                $details->save();
-            }
+
 
             return response()->json([
                 'success' => true,
@@ -3259,32 +3240,19 @@ class ReceivingController extends Controller
         $now = Carbon::now();
         $prefix = $now->format('ym') . 'MUT';
 
-        $lastCode = MedicineTransfers::where('code', 'like', "{$prefix}%")
-            ->orderBy('id', 'desc')
-            ->value('code');
+        $codes = MedicineTransfers::where('code', 'like', "{$prefix}%")->pluck('code');
 
-        if (!$lastCode) {
-            $lastCode = MedicineTransfers::where('code', 'like', "{$prefix}%")
-                ->orderByRaw('LENGTH(code) DESC, code DESC')
-                ->value('code');
+        $maxNumber = 0;
+        foreach ($codes as $c) {
+            $parts = explode('MUT', (string)$c);
+            $val = (int) ($parts[1] ?? substr($c, -4));
+            if ($val > $maxNumber) {
+                $maxNumber = $val;
+            }
         }
 
-        $nextNumber = 1;
-        if ($lastCode) {
-            $parts = explode('MUT', $lastCode);
-            $nextNumber = ((int) ($parts[1] ?? substr($lastCode, -4))) + 1;
-        }
-
-        $serial = str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
-        $code = $prefix . $serial;
-
-        while (MedicineTransfers::where('code', $code)->exists()) {
-            $nextNumber++;
-            $serial = str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
-            $code = $prefix . $serial;
-        }
-
-        return $code;
+        $nextNumber = $maxNumber + 1;
+        return $prefix . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
     }
 
     public function saveOrder(Request $request)
