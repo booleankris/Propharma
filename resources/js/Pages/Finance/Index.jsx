@@ -7,7 +7,8 @@ import {
     Filter, Download, Eye, ExternalLink, Building2, ChevronDown, Scale, ChevronLeft, ChevronUp,
     Printer, MoreVertical, Plus, Calendar, Edit3, HelpCircle,
     BarChart3, FileSpreadsheet, ArrowRightLeft, TrendingUp, TrendingDown, SlidersHorizontal, List, Share2,
-    Check, X, ShieldCheck, History, Landmark, Banknote, Trash2, Layers, PieChart, ArrowDownUp
+    Check, X, ShieldCheck, History, Landmark, Banknote, Trash2, Layers, PieChart, ArrowDownUp,
+    LogOut, Home
 } from 'lucide-react';
 
 // Komponen Autocomplete Dropdown PBF / Kreditur dengan Rekomendasi Pintar
@@ -1278,6 +1279,16 @@ export default function Index({
 
                 {/* Navigasi Menu */}
                 <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto text-xs font-medium">
+                    {/* Tombol Navigasi Kembali ke Dashboard Utama */}
+                    <a
+                        href="/home"
+                        className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-slate-700 hover:text-blue-700 bg-slate-100/80 hover:bg-blue-50/80 rounded-xl transition border border-slate-200/70 mb-3 group"
+                        title="Kembali ke Dashboard Utama Apotek (/home)"
+                    >
+                        <ArrowLeft className="w-4 h-4 text-slate-500 group-hover:text-blue-600 transition" />
+                        <span>Menu Dashboard Utama</span>
+                    </a>
+
                     <div className="pb-1 px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                         Utama
                     </div>
@@ -1431,15 +1442,24 @@ export default function Index({
                             </div>
                         </div>
                     </div>
-                    <Link
-                        href="/logout"
-                        method="post"
-                        as="button"
-                        className="text-slate-400 hover:text-red-600 transition p-1"
-                        title="Keluar"
-                    >
-                        <ArrowLeft className="w-4 h-4" />
-                    </Link>
+                    <div className="flex items-center gap-1 shrink-0">
+                        <a
+                            href="/home"
+                            className="text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition p-1.5 rounded-lg"
+                            title="Kembali ke Dashboard Utama (/home)"
+                        >
+                            <ArrowLeft className="w-4 h-4" />
+                        </a>
+                        <Link
+                            href="/logout"
+                            method="post"
+                            as="button"
+                            className="text-slate-400 hover:text-red-600 hover:bg-red-50 transition p-1.5 rounded-lg"
+                            title="Keluar / Logout Akun"
+                        >
+                            <LogOut className="w-4 h-4" />
+                        </Link>
+                    </div>
                 </div>
             </aside>
 
@@ -1449,7 +1469,16 @@ export default function Index({
             <div className="flex-1 flex flex-col overflow-hidden">
                 {/* Header Atas */}
                 <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shrink-0">
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-3">
+                        <a
+                            href="/home"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-blue-600 hover:bg-slate-100 rounded-lg transition border border-slate-200/90 shadow-2xs"
+                            title="Kembali ke Dashboard Utama (/home)"
+                        >
+                            <ArrowLeft className="w-3.5 h-3.5 text-slate-500" />
+                            <span>Dashboard Utama</span>
+                        </a>
+                        <span className="text-slate-300">/</span>
                         <span className="text-xs text-slate-400 font-medium">Modul Keuangan Apotek</span>
                         <span className="text-slate-300">/</span>
                         <span className="text-xs font-semibold text-slate-700 capitalize">
