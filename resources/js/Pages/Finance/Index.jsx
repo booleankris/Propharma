@@ -1478,7 +1478,7 @@ export default function Index({
                             {activeTab === 'hutang' && (selectedHutang ? `Detil Tagihan #${selectedHutang.nomor}` : 'Hutang Dagang (Kredit)')}
                             {activeTab === 'cash' && (selectedCash ? `Detil Pembelian Cash #${selectedCash.nomor}` : 'Pembelian Tunai (Cash)')}
                             {activeTab === 'konsinyasi' && 'Konsinyasi'}
-                            {activeTab === 'kas_bank' && 'Kas & Bank (Bagan Akun Kledo)'}
+                            {activeTab === 'kas_bank' && 'Kas & Bank'}
                             {activeTab === 'piutang' && (selectedPiutang ? `Detil Tagihan Piutang #${selectedPiutang.nomor}` : 'Piutang Penjualan (Kredit)')}
                             {activeTab === 'biaya' && 'Beban & Biaya'}
                         </span>
