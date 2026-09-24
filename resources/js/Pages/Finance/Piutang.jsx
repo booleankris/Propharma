@@ -4,7 +4,8 @@ import FinanceLayout from './Layouts/FinanceLayout';
 import Drawer from './Components/Drawer';
 import { formatRupiah, formatNumberOnly } from './Components/Utils';
 import {
-    ShoppingCart, Search, Check, X, Calendar, AlertCircle, ChevronLeft, ChevronRight, User
+    ShoppingCart, Search, Check, X, Calendar, AlertCircle, ChevronLeft, ChevronRight, User,
+    ArrowLeft, Printer, Share2, MoreVertical, ChevronDown, History, Landmark, Maximize2, CreditCard
 } from 'lucide-react';
 
 export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAccounts = [], stats = {} }) {
@@ -18,8 +19,10 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
     const [selectedPiutangIds, setSelectedPiutangIds] = useState([]);
     const [selectionWarning, setSelectionWarning] = useState('');
 
-    // State Drawer Detail Transaksi
-    const [selectedPiutang, setSelectedPiutang] = useState(null);
+    // State Halaman Detil Penuh & Quick Preview Drawer
+    const [detailViewPiutang, setDetailViewPiutang] = useState(null);
+    const [drawerPiutang, setDrawerPiutang] = useState(null);
+    const [isShippingOpen, setIsShippingOpen] = useState(true);
 
     // State Modal Terima Pembayaran Satuan
     const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -84,6 +87,12 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
     const totalSelectedPiutangSisa = useMemo(() => {
         return selectedPiutangItems.reduce((acc, curr) => acc + (curr.sisa || 0), 0);
     }, [selectedPiutangItems]);
+
+    // Total kuantitas barang pada halaman detil penuh
+    const totalDetailQty = useMemo(() => {
+        if (!detailViewPiutang || !detailViewPiutang.items) return 0;
+        return detailViewPiutang.items.reduce((acc, curr) => acc + (Number(curr.qty) || 0), 0);
+    }, [detailViewPiutang]);
 
     // Checkbox Handlers
     const handleTogglePiutang = (item) => {
@@ -173,8 +182,11 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
             onSuccess: () => {
                 setIsPaymentModalOpen(false);
                 setIsSubmittingPayment(false);
-                if (selectedPiutang && selectedPiutang.id === paymentForm.medicine_transaction_id) {
-                    setSelectedPiutang(null);
+                if (drawerPiutang && drawerPiutang.id === paymentForm.medicine_transaction_id) {
+                    setDrawerPiutang(null);
+                }
+                if (detailViewPiutang && detailViewPiutang.id === paymentForm.medicine_transaction_id) {
+                    setDetailViewPiutang(null);
                 }
             },
             onError: (errs) => {
@@ -231,7 +243,328 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
             subtitle="Tagihan piutang transaksi penjualan obat kepada pelanggan & instansi mitra"
             stats={stats}
         >
-            <div className="space-y-6">
+            {detailViewPiutang ? (
+                /* SUB-VIEW A: DETIL TAGIHAN PIUTANG LENGKAP */
+                <div className="space-y-6 max-w-5xl">
+                    {/* Navigasi Kembali */}
+                    <button
+                        type="button"
+                        onClick={() => setDetailViewPiutang(null)}
+                        className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 font-medium transition cursor-pointer"
+                    >
+                        <ArrowLeft className="w-3.5 h-3.5" />
+                        <span>Kembali ke Daftar</span>
+                    </button>
+
+                    {/* Judul & Action Kanan */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+                            Detil Tagihan Piutang {detailViewPiutang.nomor}
+                        </h1>
+
+                        <div className="flex items-center gap-2 flex-wrap">
+                            {detailViewPiutang.sisa > 0.005 && (
+                                <button
+                                    type="button"
+                                    onClick={() => openPaymentModal(detailViewPiutang)}
+                                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white bg-amber-600 rounded-lg hover:bg-amber-700 transition shadow-xs cursor-pointer"
+                                >
+                                    <CreditCard className="w-3.5 h-3.5" />
+                                    <span>Terima Pembayaran</span>
+                                </button>
+                            )}
+
+                            <div className="relative">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (navigator.clipboard) {
+                                            navigator.clipboard.writeText(window.location.href);
+                                            alert('Tautan halaman berhasil disalin!');
+                                        }
+                                    }}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition cursor-pointer"
+                                >
+                                    <Share2 className="w-3.5 h-3.5 text-slate-500" />
+                                    <span>Bagikan</span>
+                                    <ChevronDown className="w-3 h-3 text-slate-400" />
+                                </button>
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={() => window.print()}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition cursor-pointer"
+                            >
+                                <Printer className="w-3.5 h-3.5 text-slate-500" />
+                                <span>Print</span>
+                                <ChevronDown className="w-3 h-3 text-slate-400" />
+                            </button>
+
+                            <button
+                                type="button"
+                                className="p-1.5 text-slate-400 hover:text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition cursor-pointer"
+                            >
+                                <MoreVertical className="w-4 h-4" />
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* KARTU UTAMA DETIL PIUTANG */}
+                    <div className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-xs space-y-6">
+                        {/* Status Badge */}
+                        <div className="flex items-center justify-between">
+                            <span
+                                className={`inline-block px-3 py-1 text-xs font-semibold rounded-full ${
+                                    detailViewPiutang.status === 'Lunas' || detailViewPiutang.sisa <= 0.005
+                                        ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'
+                                        : detailViewPiutang.status === 'Dibayar Sebagian'
+                                        ? 'bg-amber-50 text-amber-600 border border-amber-100'
+                                        : 'bg-red-50 text-red-600 border border-red-100'
+                                }`}
+                            >
+                                {detailViewPiutang.status}
+                            </span>
+
+                            <span className="text-xs text-slate-400">
+                                Jenis Transaksi: <strong className="text-slate-700 font-semibold">PENJUALAN KREDIT (Tempo)</strong>
+                            </span>
+                        </div>
+
+                        {/* Metadata Piutang (2 Kolom) */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-xs">
+                            <div className="space-y-4">
+                                <div>
+                                    <span className="text-slate-400 block text-[11px] mb-1">Pelanggan / Debitur</span>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-amber-600 font-bold text-sm">
+                                            {detailViewPiutang.debtor}
+                                        </span>
+                                        {detailViewPiutang.debtor_code && detailViewPiutang.debtor_code !== '-' && (
+                                            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 font-semibold border border-amber-200">
+                                                {detailViewPiutang.debtor_code}
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                                <div>
+                                    <span className="text-slate-400 block text-[11px] mb-1">Pasien Terkait</span>
+                                    <span className="font-semibold text-slate-800 text-sm">{detailViewPiutang.pasien || '-'}</span>
+                                </div>
+                                <div>
+                                    <span className="text-slate-400 block text-[11px] mb-1">Dokter Pemeriksa</span>
+                                    <span className="text-slate-700 font-medium">{detailViewPiutang.dokter || '-'}</span>
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <span className="text-slate-400 block text-[11px] mb-1">No. Faktur / Resep</span>
+                                    <span className="font-bold text-slate-900 text-sm">{detailViewPiutang.nomor}</span>
+                                </div>
+                                <div>
+                                    <span className="text-slate-400 block text-[11px] mb-1">Tgl. Transaksi</span>
+                                    <span className="font-semibold text-slate-800 text-sm">{detailViewPiutang.tanggal}</span>
+                                </div>
+                                <div>
+                                    <span className="text-slate-400 block text-[11px] mb-1">Tgl. Jatuh Tempo</span>
+                                    <span className="font-semibold text-red-600 text-sm">{detailViewPiutang.jatuhTempo}</span>
+                                </div>
+                                <div>
+                                    <span className="text-slate-400 block text-[11px] mb-1">Apotek / Unit Layanan</span>
+                                    <span className="font-medium text-slate-800">{detailViewPiutang.apotek}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Informasi Penyerahan & Resep */}
+                        <div className="pt-2 border-t border-slate-100">
+                            <button
+                                type="button"
+                                onClick={() => setIsShippingOpen(!isShippingOpen)}
+                                className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 transition cursor-pointer"
+                            >
+                                {isShippingOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                                <span>Informasi Penyerahan & Resep</span>
+                            </button>
+                            {isShippingOpen && (
+                                <div className="pl-5 pt-3 text-xs grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50/70 p-3 rounded-xl mt-2">
+                                    <div>
+                                        <span className="text-slate-400 block text-[11px]">Tanggal Transaksi</span>
+                                        <span className="font-medium text-slate-800">{detailViewPiutang.tanggal}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-slate-400 block text-[11px]">Unit Apotek Penyerah</span>
+                                        <span className="font-medium text-slate-800">{detailViewPiutang.apotek}</span>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Tabel Item Obat */}
+                        <div className="pt-4 overflow-x-auto">
+                            <table className="w-full text-left text-xs">
+                                <thead className="text-slate-400 border-b border-slate-100 pb-2 text-[11px]">
+                                    <tr>
+                                        <th className="py-2.5 font-normal">Produk / Obat</th>
+                                        <th className="py-2.5 font-normal">Deskripsi</th>
+                                        <th className="py-2.5 font-normal text-center">Kuantitas</th>
+                                        <th className="py-2.5 font-normal">Satuan</th>
+                                        <th className="py-2.5 font-normal text-center">Discount</th>
+                                        <th className="py-2.5 font-normal text-right">Harga</th>
+                                        <th className="py-2.5 font-normal text-center">Pajak</th>
+                                        <th className="py-2.5 font-normal text-right">Jumlah</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 text-slate-700">
+                                    {detailViewPiutang.items && detailViewPiutang.items.length > 0 ? (
+                                        detailViewPiutang.items.map((it, idx) => (
+                                            <tr key={idx}>
+                                                <td className="py-3">
+                                                    <span className="text-amber-700 font-medium">
+                                                        {it.sku} - {it.nama}
+                                                    </span>
+                                                </td>
+                                                <td className="py-3 text-slate-400">-</td>
+                                                <td className="py-3 text-center font-medium">{it.qty}</td>
+                                                <td className="py-3">{it.satuan}</td>
+                                                <td className="py-3 text-center">{it.diskon}</td>
+                                                <td className="py-3 text-right">{formatNumberOnly(it.harga)}</td>
+                                                <td className="py-3 text-center text-slate-500">{it.pajak}</td>
+                                                <td className="py-3 text-right font-semibold text-slate-900">
+                                                    {formatNumberOnly(it.jumlah)}
+                                                </td>
+                                            </tr>
+                                        ))
+                                    ) : (
+                                        <tr>
+                                            <td colSpan={8} className="py-6 text-center text-slate-400">
+                                                Tidak ada rincian item obat.
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                                <tfoot className="border-t border-slate-200">
+                                    <tr>
+                                        <td colSpan={2} className="py-3 text-right font-semibold text-slate-600">
+                                            Total Kuantitas
+                                        </td>
+                                        <td className="py-3 text-center font-bold text-slate-900">{totalDetailQty}</td>
+                                        <td colSpan={5}></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+
+                        {/* Summary Bawah */}
+                        <div className="pt-6 border-t border-slate-100 flex justify-end">
+                            <div className="w-80 space-y-2 text-xs">
+                                <div className="flex justify-between text-slate-600">
+                                    <span>Sub Total</span>
+                                    <span className="font-medium text-slate-800">{formatNumberOnly(detailViewPiutang.subtotal)}</span>
+                                </div>
+                                <div className="flex justify-between text-slate-800 font-bold pt-1">
+                                    <span>Total Tagihan</span>
+                                    <span>{formatNumberOnly(detailViewPiutang.total)}</span>
+                                </div>
+
+                                {detailViewPiutang.terbayar > 0 && (
+                                    <div className="flex justify-between text-emerald-600 font-semibold pt-1">
+                                        <span>Sudah Diterima</span>
+                                        <span>- {formatNumberOnly(detailViewPiutang.terbayar)}</span>
+                                    </div>
+                                )}
+
+                                <div className="bg-amber-50/80 border border-amber-200 p-3.5 rounded-xl flex justify-between items-center text-amber-900 font-bold mt-3">
+                                    <span className="text-xs">Sisa Piutang</span>
+                                    <span className="text-sm font-extrabold text-amber-700">{formatNumberOnly(detailViewPiutang.sisa)}</span>
+                                </div>
+
+                                {detailViewPiutang.sisa > 0.005 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => openPaymentModal(detailViewPiutang)}
+                                        className="w-full mt-2 py-2.5 px-4 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-semibold transition flex items-center justify-center gap-2 shadow-xs cursor-pointer"
+                                    >
+                                        <CreditCard className="w-4 h-4" />
+                                        <span>Terima Pembayaran Sekarang</span>
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* KARTU AUDIT TRAIL & RIWAYAT PENERIMAAN PEMBAYARAN */}
+                    <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                            <div className="flex items-center gap-2.5">
+                                <History className="w-5 h-5 text-amber-600" />
+                                <div>
+                                    <h3 className="font-bold text-slate-900 text-sm">
+                                        Pantau log perubahan data
+                                    </h3>
+                                    <p className="text-[11px] text-slate-400">
+                                        Catatan penerimaan pembayaran piutang penjualan, akun kas/bank, dan nama staf pemroses.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <span className="text-xs font-semibold text-slate-600">
+                                Total Diterima: <strong className="text-emerald-600">{formatRupiah(detailViewPiutang.terbayar)}</strong>
+                            </span>
+                        </div>
+
+                        {detailViewPiutang.payments && detailViewPiutang.payments.length > 0 ? (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left text-xs">
+                                    <thead className="text-slate-400 bg-slate-50/50 border-b border-slate-100">
+                                        <tr>
+                                            <th className="py-2.5 px-3 font-medium">Tanggal</th>
+                                            <th className="py-2.5 px-3 font-medium">Akun Kas & Bank</th>
+                                            <th className="py-2.5 px-3 font-medium">No. Referensi</th>
+                                            <th className="py-2.5 px-3 font-medium text-right">Nominal Diterima</th>
+                                            <th className="py-2.5 px-3 font-medium">Dicatat Oleh</th>
+                                            <th className="py-2.5 px-3 font-medium">Waktu Audit</th>
+                                            <th className="py-2.5 px-3 font-medium">Catatan</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100 text-slate-700">
+                                        {detailViewPiutang.payments.map((pay) => (
+                                            <tr key={pay.id} className="hover:bg-slate-50/50">
+                                                <td className="py-3 px-3 font-medium text-slate-900">{pay.tanggal}</td>
+                                                <td className="py-3 px-3">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <Landmark className="w-3.5 h-3.5 text-amber-500" />
+                                                        <span className="font-semibold text-slate-800">{pay.akunNama}</span>
+                                                        <span className="text-[10px] text-slate-400">({pay.akunKode})</span>
+                                                    </div>
+                                                </td>
+                                                <td className="py-3 px-3 font-mono text-[11px] text-slate-600">{pay.noReferensi}</td>
+                                                <td className="py-3 px-3 text-right font-bold text-emerald-600">
+                                                    {formatRupiah(pay.nominal)}
+                                                </td>
+                                                <td className="py-3 px-3 font-medium text-slate-800">{pay.diprosesOleh}</td>
+                                                <td className="py-3 px-3 text-slate-500 text-[11px]">{pay.waktuAudit}</td>
+                                                <td className="py-3 px-3 text-slate-500 text-[11px]">{pay.catatan}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ) : (
+                            <div className="py-8 text-center text-slate-400 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+                                <History className="w-8 h-8 mx-auto text-slate-300 mb-2" />
+                                <p className="text-xs font-medium text-slate-600">Belum ada penerimaan pembayaran yang dicatat untuk piutang ini.</p>
+                                <p className="text-[11px] text-slate-400 mt-0.5">
+                                    Gunakan tombol <strong>"Terima Pembayaran"</strong> untuk mencatat pembayaran bertahap atau lunas.
+                                </p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            ) : (
+                /* SUB-VIEW B: TABEL DAFTAR PIUTANG PENJUALAN */
+                <div className="space-y-6">
                 {/* Banner Summary */}
                 <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs flex flex-wrap items-center justify-between gap-4">
                     <div>
@@ -370,7 +703,7 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                                         return (
                                             <tr
                                                 key={item.id}
-                                                onClick={() => setSelectedPiutang(item)}
+                                                onClick={() => setDrawerPiutang(item)}
                                                 className="hover:bg-amber-50/40 cursor-pointer transition group"
                                             >
                                                 <td className="px-4 py-3.5" onClick={(e) => e.stopPropagation()}>
@@ -388,7 +721,16 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-3.5">
-                                                    <div className="font-bold text-slate-900 group-hover:text-amber-700 transition">{item.nomor}</div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setDetailViewPiutang(item);
+                                                        }}
+                                                        className="font-bold text-amber-700 hover:text-amber-800 hover:underline transition text-left cursor-pointer"
+                                                    >
+                                                        {item.nomor}
+                                                    </button>
                                                     <div className="text-[11px] text-slate-400 mt-0.5">{item.tanggal}</div>
                                                 </td>
                                                 <td className="px-4 py-3.5">
@@ -431,7 +773,7 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                                                         )}
                                                         <button
                                                             type="button"
-                                                            onClick={() => setSelectedPiutang(item)}
+                                                            onClick={() => setDetailViewPiutang(item)}
                                                             className="px-2.5 py-1 border border-slate-200 text-slate-600 hover:bg-slate-100 rounded-lg text-xs font-semibold transition cursor-pointer"
                                                         >
                                                             Detil
@@ -475,6 +817,7 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                     )}
                 </div>
             </div>
+            )}
 
             {/* Modal Terima Pembayaran Piutang Satuan */}
             {isPaymentModalOpen && (
@@ -714,24 +1057,40 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
 
             {/* Drawer Detail Piutang */}
             <Drawer
-                item={selectedPiutang}
-                onClose={() => setSelectedPiutang(null)}
+                item={drawerPiutang}
+                onClose={() => setDrawerPiutang(null)}
+                onExpand={(item) => {
+                    setDrawerPiutang(null);
+                    setDetailViewPiutang(item);
+                }}
                 title="Rincian Transaksi Piutang"
                 subtitle={(item) => item.nomor}
                 renderFooter={(item) => (
-                    item.sisa > 0.005 ? (
+                    <div className="space-y-2">
+                        {item.sisa > 0.005 && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    const target = item;
+                                    setDrawerPiutang(null);
+                                    openPaymentModal(target);
+                                }}
+                                className="w-full py-2.5 bg-amber-600 hover:bg-amber-700 active:scale-[0.99] text-white rounded-xl text-xs font-bold transition shadow-xs text-center cursor-pointer"
+                            >
+                                Terima Pembayaran ({formatRupiah(item.sisa)})
+                            </button>
+                        )}
                         <button
                             type="button"
                             onClick={() => {
-                                const target = item;
-                                setSelectedPiutang(null);
-                                openPaymentModal(target);
+                                setDrawerPiutang(null);
+                                setDetailViewPiutang(item);
                             }}
-                            className="w-full py-2.5 bg-amber-600 hover:bg-amber-700 active:scale-[0.99] text-white rounded-xl text-xs font-bold transition shadow-xs text-center cursor-pointer"
+                            className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition text-center cursor-pointer"
                         >
-                            Terima Pembayaran ({formatRupiah(item.sisa)})
+                            Buka Halaman Lengkap
                         </button>
-                    ) : null
+                    </div>
                 )}
             >
                 {(item) => (
