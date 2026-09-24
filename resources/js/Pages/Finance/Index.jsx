@@ -366,6 +366,7 @@ export default function Index({
         account_id: '',
         payment_date: new Date().toISOString().split('T')[0],
         amount: 0,
+        sisa: 0,
         reference_number: '',
         notes: '',
     });
@@ -631,20 +632,26 @@ export default function Index({
         return filteredMutasiKasBank.slice(start, start + mutasiItemsPerPage);
     }, [filteredMutasiKasBank, mutasiCurrentPage, mutasiItemsPerPage]);
 
-    // Helper Format Rupiah Standar
+    // Helper Format Rupiah Standar (mendukung desimal jika ada, misal: 0,60)
     const formatRupiah = (num) => {
+        const val = Number(num || 0);
+        const hasDecimals = val % 1 !== 0;
         return new Intl.NumberFormat('id-ID', {
             style: 'currency',
             currency: 'IDR',
-            minimumFractionDigits: 0,
-        }).format(num || 0);
+            minimumFractionDigits: hasDecimals ? 2 : 0,
+            maximumFractionDigits: 2,
+        }).format(val);
     };
 
-    // Helper Format Angka Bersih (sesuai format screenshot: 299.700)
+    // Helper Format Angka Bersih (sesuai format screenshot: 299.700 atau 0,60 jika desimal)
     const formatNumberOnly = (num) => {
+        const val = Number(num || 0);
+        const hasDecimals = val % 1 !== 0;
         return new Intl.NumberFormat('id-ID', {
-            minimumFractionDigits: 0,
-        }).format(num || 0);
+            minimumFractionDigits: hasDecimals ? 2 : 0,
+            maximumFractionDigits: 2,
+        }).format(val);
     };
 
     // Master Daftar Seluruh PBF / Kreditur
@@ -883,11 +890,12 @@ export default function Index({
             alert('Silakan pilih akun Kas & Bank penerima.');
             return;
         }
-        if (piutangPaymentForm.amount <= 0) {
+        const amt = parseFloat(piutangPaymentForm.amount);
+        if (isNaN(amt) || amt <= 0) {
             alert('Nominal pembayaran harus lebih dari 0.');
             return;
         }
-        if (piutangPaymentForm.amount > piutangPaymentForm.sisa) {
+        if (piutangPaymentForm.sisa && Math.round(amt * 100) > Math.round(parseFloat(piutangPaymentForm.sisa) * 100)) {
             alert(`Nominal pembayaran melebihi sisa tagihan (${formatRupiah(piutangPaymentForm.sisa)}).`);
             return;
         }
@@ -1136,6 +1144,7 @@ export default function Index({
             account_id: defaultAccount,
             payment_date: new Date().toISOString().split('T')[0],
             amount: item.sisa,
+            sisa: item.sisa,
             reference_number: '',
             notes: `Pelunasan tagihan faktur ${item.nomor} kepada ${item.vendor}`,
         });
@@ -1149,8 +1158,13 @@ export default function Index({
             alert('Pilih akun kas & bank terlebih dahulu.');
             return;
         }
-        if (paymentForm.amount <= 0) {
+        const amt = parseFloat(paymentForm.amount);
+        if (isNaN(amt) || amt <= 0) {
             alert('Nominal pembayaran harus lebih dari 0.');
+            return;
+        }
+        if (paymentForm.sisa && Math.round(amt * 100) > Math.round(parseFloat(paymentForm.sisa) * 100)) {
+            alert(`Nominal pembayaran melebihi sisa tagihan (${formatRupiah(paymentForm.sisa)}).`);
             return;
         }
 
@@ -4004,12 +4018,25 @@ export default function Index({
                                     </label>
                                     <input
                                         type="number"
-                                        min="1"
+                                        step="any"
+                                        min="0.01"
                                         value={paymentForm.amount}
-                                        onChange={(e) => setPaymentForm({ ...paymentForm, amount: Number(e.target.value) })}
+                                        onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value === '' ? '' : parseFloat(e.target.value) })}
                                         required
                                         className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                                     />
+                                    {paymentForm.sisa > 0 && (
+                                        <div className="flex items-center justify-between mt-1 text-[11px] text-slate-400">
+                                            <span>Sisa: {formatRupiah(paymentForm.sisa)}</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => setPaymentForm({ ...paymentForm, amount: paymentForm.sisa })}
+                                                className="text-blue-600 hover:underline font-semibold"
+                                            >
+                                                Set Lunas Penuh
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
@@ -4898,10 +4925,10 @@ export default function Index({
                                 </label>
                                 <input
                                     type="number"
-                                    min="1"
-                                    max={piutangPaymentForm.sisa}
+                                    step="any"
+                                    min="0.01"
                                     value={piutangPaymentForm.amount}
-                                    onChange={(e) => setPiutangPaymentForm({ ...piutangPaymentForm, amount: parseFloat(e.target.value) || 0 })}
+                                    onChange={(e) => setPiutangPaymentForm({ ...piutangPaymentForm, amount: e.target.value === '' ? '' : parseFloat(e.target.value) })}
                                     required
                                     className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-amber-900 focus:ring-2 focus:ring-amber-500 focus:outline-none"
                                 />

@@ -90,8 +90,9 @@ class FinanceController extends Controller
                     ];
                 }
 
-                $ppnNominal = ($detail->invoice_ppn === 'INCLUDE') ? 0 : round($subtotal * 0.11);
-                $total = $subtotal + $ppnNominal;
+                $ppnType = strtoupper(trim($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA'));
+                $ppnNominal = ($ppnType === 'EXCLUDE') ? round($subtotal * 0.11, 2) : 0;
+                $total = round($subtotal + $ppnNominal, 2);
 
                 // Hitung riwayat pembayaran dan total terbayar
                 $paymentHistory = [];
@@ -114,8 +115,9 @@ class FinanceController extends Controller
                     ];
                 }
 
-                $isLunas = ((int) $rec->status === 3) || ($totalTerbayar >= $total && $total > 0);
-                $sisa = $isLunas ? 0 : max(0, $total - $totalTerbayar);
+                $totalTerbayar = round($totalTerbayar, 2);
+                $isLunas = ((int) $rec->status === 3) || ($totalTerbayar >= $total && $total > 0) || (($total - $totalTerbayar) < 0.005 && $total > 0);
+                $sisa = $isLunas ? 0 : round(max(0, $total - $totalTerbayar), 2);
 
                 $statusLabel = 'Belum Dibayar';
                 if ($isLunas) {
@@ -198,8 +200,9 @@ class FinanceController extends Controller
                     ];
                 }
 
-                $ppnNominal = ($detail->invoice_ppn === 'INCLUDE') ? 0 : round($subtotal * 0.11);
-                $total = $subtotal + $ppnNominal;
+                $ppnType = strtoupper(trim($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA'));
+                $ppnNominal = ($ppnType === 'EXCLUDE') ? round($subtotal * 0.11, 2) : 0;
+                $total = round($subtotal + $ppnNominal, 2);
 
                 // Cari akun pembayaran yang dipakai jika sudah dicatat
                 $latestPayment = $detail->payments->last();
@@ -304,13 +307,15 @@ class FinanceController extends Controller
             }
 
             $legacyPaid = (float) ($tx->paid ?? 0);
-            $totalTerbayar = max($totalTerbayarViaFinance, $legacyPaid);
+            $totalTerbayar = round(max($totalTerbayarViaFinance, $legacyPaid), 2);
+            $total = round($total, 2);
             if ($totalTerbayar > $total) {
                 $totalTerbayar = $total;
             }
-            $sisa = max(0, $total - $totalTerbayar);
+            $sisa = round(max(0, $total - $totalTerbayar), 2);
 
-            $isLunas = ($sisa <= 0 && $total > 0);
+            $isLunas = ($sisa < 0.005 && $total > 0);
+            $sisa = $isLunas ? 0 : $sisa;
             $statusLabel = $isLunas ? 'Lunas' : ($totalTerbayar > 0 ? 'Dibayar Sebagian' : 'Belum Bayar');
 
             $piutangPenjualan[] = [
@@ -441,7 +446,7 @@ class FinanceController extends Controller
             'receiving_detail_id' => 'required|exists:receiving_details,id',
             'account_id' => 'required|exists:finance_accounts,id',
             'payment_date' => 'required|date',
-            'amount' => 'required|numeric|min:1',
+            'amount' => 'required|numeric|gt:0',
             'reference_number' => 'nullable|string|max:100',
             'notes' => 'nullable|string|max:500',
         ]);
@@ -454,7 +459,28 @@ class FinanceController extends Controller
             return back()->withErrors(['account_id' => 'Akun pembayaran harus berkategori Kas & Bank.']);
         }
 
-        DB::transaction(function () use ($validated, $detail, $account) {
+        // Hitung total invoice
+        $subtotal = 0;
+        foreach ($detail->receiving_items as $item) {
+            $qty = (float) ($item->qty_received ?? 0);
+            $harga = (float) ($item->raw_price ?? ($item->order_items->price ?? 0));
+            $totalItem = (float) ($item->total ?? ($qty * $harga));
+            $subtotal += $totalItem;
+        }
+        $ppnType = strtoupper(trim($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA'));
+        $ppnNominal = ($ppnType === 'EXCLUDE') ? round($subtotal * 0.11, 2) : 0;
+        $totalInvoice = round($subtotal + $ppnNominal, 2);
+
+        // Akumulasi yang sudah terbayar
+        $alreadyPaid = (float) FinancePayment::where('receiving_detail_id', $detail->id)->sum('amount');
+        $sisaHutang = round(max(0, $totalInvoice - $alreadyPaid), 2);
+
+        if (round($validated['amount'], 2) > $sisaHutang) {
+            $formattedSisa = fmod($sisaHutang, 1) !== 0.0 ? number_format($sisaHutang, 2, ',', '.') : number_format($sisaHutang, 0, ',', '.');
+            return back()->withErrors(['amount' => 'Nominal pembayaran tidak boleh melebihi sisa tagihan (Rp ' . $formattedSisa . ').']);
+        }
+
+        DB::transaction(function () use ($validated, $detail, $account, $totalInvoice) {
             // 1. Simpan Payment
             FinancePayment::create([
                 'receiving_id' => $detail->receiving_id,
@@ -471,22 +497,11 @@ class FinanceController extends Controller
             // 2. Kurangi saldo akun Kas & Bank
             $account->decrement('balance', $validated['amount']);
 
-            // 3. Hitung total invoice
-            $subtotal = 0;
-            foreach ($detail->receiving_items as $item) {
-                $qty = (float) ($item->qty_received ?? 0);
-                $harga = (float) ($item->raw_price ?? ($item->order_items->price ?? 0));
-                $totalItem = (float) ($item->total ?? ($qty * $harga));
-                $subtotal += $totalItem;
-            }
-            $ppnNominal = ($detail->invoice_ppn === 'INCLUDE') ? 0 : round($subtotal * 0.11);
-            $totalInvoice = $subtotal + $ppnNominal;
+            // 3. Hitung akumulasi pembayaran yang sudah masuk
+            $totalTerbayar = (float) FinancePayment::where('receiving_detail_id', $detail->id)->sum('amount');
 
-            // 4. Hitung akumulasi pembayaran yang sudah masuk
-            $totalTerbayar = FinancePayment::where('receiving_detail_id', $detail->id)->sum('amount');
-
-            // 5. Update status receiving jika sudah lunas
-            if ($totalTerbayar >= $totalInvoice && $detail->receiving) {
+            // 4. Update status receiving jika sudah lunas
+            if ((round($totalTerbayar, 2) >= round($totalInvoice, 2) || ($totalInvoice - $totalTerbayar) < 0.005) && $detail->receiving) {
                 $detail->receiving->update(['status' => 3]);
             }
         });
@@ -523,8 +538,9 @@ class FinanceController extends Controller
                 $totalItem = (float) ($item->total ?? ($qty * $harga));
                 $subtotal += $totalItem;
             }
-            $ppnNominal = ($detail->invoice_ppn === 'INCLUDE') ? 0 : round($subtotal * 0.11);
-            $totalInvoice = $subtotal + $ppnNominal;
+            $ppnType = strtoupper(trim($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA'));
+            $ppnNominal = ($ppnType === 'EXCLUDE') ? round($subtotal * 0.11, 2) : 0;
+            $totalInvoice = round($subtotal + $ppnNominal, 2);
 
             // Cek apakah sudah pernah ada payment record untuk detail ini
             $existingPayment = FinancePayment::where('receiving_detail_id', $detail->id)->first();
@@ -605,14 +621,15 @@ class FinanceController extends Controller
                     $totalItem = (float) ($item->total ?? ($qty * $harga));
                     $subtotal += $totalItem;
                 }
-                $ppnNominal = ($detail->invoice_ppn === 'INCLUDE') ? 0 : round($subtotal * 0.11);
-                $totalInvoice = $subtotal + $ppnNominal;
+                $ppnType = strtoupper(trim($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA'));
+                $ppnNominal = ($ppnType === 'EXCLUDE') ? round($subtotal * 0.11, 2) : 0;
+                $totalInvoice = round($subtotal + $ppnNominal, 2);
 
                 // Hitung sisa yang belum terbayar
-                $alreadyPaid = FinancePayment::where('receiving_detail_id', $detail->id)->sum('amount');
-                $remaining = max(0, $totalInvoice - $alreadyPaid);
+                $alreadyPaid = (float) FinancePayment::where('receiving_detail_id', $detail->id)->sum('amount');
+                $remaining = round(max(0, $totalInvoice - $alreadyPaid), 2);
 
-                if ($remaining <= 0) {
+                if ($remaining < 0.005) {
                     if ($detail->receiving && (int)$detail->receiving->status !== 3) {
                         $detail->receiving->update(['status' => 3]);
                     }
@@ -684,8 +701,9 @@ class FinanceController extends Controller
                     $totalItem = (float) ($item->total ?? ($qty * $harga));
                     $subtotal += $totalItem;
                 }
-                $ppnNominal = ($detail->invoice_ppn === 'INCLUDE') ? 0 : round($subtotal * 0.11);
-                $totalInvoice = $subtotal + $ppnNominal;
+                $ppnType = strtoupper(trim($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA'));
+                $ppnNominal = ($ppnType === 'EXCLUDE') ? round($subtotal * 0.11, 2) : 0;
+                $totalInvoice = round($subtotal + $ppnNominal, 2);
 
                 $existingPayment = FinancePayment::where('receiving_detail_id', $detail->id)->first();
                 if ($existingPayment) {
@@ -868,7 +886,7 @@ class FinanceController extends Controller
             'medicine_transaction_id' => 'required|exists:medicine_transactions,id',
             'account_id' => 'required|exists:finance_accounts,id',
             'payment_date' => 'required|date',
-            'amount' => 'required|numeric|min:1',
+            'amount' => 'required|numeric|gt:0',
             'reference_number' => 'nullable|string|max:100',
             'notes' => 'nullable|string|max:500',
         ]);
@@ -882,10 +900,11 @@ class FinanceController extends Controller
 
         $totalTerbayarExisting = (float) $tx->payments->sum('amount');
         $totalNominal = (float) $tx->subtotal;
-        $sisa = max(0, $totalNominal - $totalTerbayarExisting);
+        $sisa = round(max(0, $totalNominal - $totalTerbayarExisting), 2);
 
-        if ($validated['amount'] > $sisa) {
-            return back()->withErrors(['amount' => 'Nominal pembayaran tidak boleh melebihi sisa tagihan piutang (Rp ' . number_format($sisa, 0, ',', '.') . ').']);
+        if (round($validated['amount'], 2) > $sisa) {
+            $formattedSisa = fmod($sisa, 1) !== 0.0 ? number_format($sisa, 2, ',', '.') : number_format($sisa, 0, ',', '.');
+            return back()->withErrors(['amount' => 'Nominal pembayaran tidak boleh melebihi sisa tagihan piutang (Rp ' . $formattedSisa . ').']);
         }
 
         DB::beginTransaction();
@@ -901,7 +920,7 @@ class FinanceController extends Controller
                 'created_by' => Auth::id(),
             ]);
 
-            $newTotalPaid = $totalTerbayarExisting + $validated['amount'];
+            $newTotalPaid = round($totalTerbayarExisting + $validated['amount'], 2);
             $tx->paid = (string) $newTotalPaid;
             $tx->save();
 
@@ -957,9 +976,9 @@ class FinanceController extends Controller
             foreach ($transactions as $tx) {
                 $totalPaid = (float) $tx->payments->sum('amount');
                 $totalNominal = (float) $tx->subtotal;
-                $sisa = max(0, $totalNominal - $totalPaid);
+                $sisa = round(max(0, $totalNominal - $totalPaid), 2);
 
-                if ($sisa <= 0) continue;
+                if ($sisa < 0.005) continue;
 
                 FinancePayment::create([
                     'medicine_transaction_id' => $tx->id,
