@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { router } from '@inertiajs/react';
 import FinanceLayout from './Layouts/FinanceLayout';
+import Drawer from './Components/Drawer';
 import { formatRupiah, formatNumberOnly } from './Components/Utils';
 import {
     ShoppingCart, Search, Check, X, Calendar, AlertCircle, ChevronLeft, ChevronRight, User
@@ -706,130 +707,120 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
             )}
 
             {/* Drawer Detail Piutang */}
-            {selectedPiutang && (
-                <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/40 backdrop-blur-2xs animate-in fade-in duration-200">
-                    <div className="w-full max-w-xl bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-200">
-                        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-                            <div>
-                                <h3 className="font-bold text-slate-900 text-base">Rincian Transaksi Piutang</h3>
-                                <p className="text-xs text-slate-400 mt-0.5">{selectedPiutang.nomor}</p>
+            <Drawer
+                item={selectedPiutang}
+                onClose={() => setSelectedPiutang(null)}
+                title="Rincian Transaksi Piutang"
+                subtitle={(item) => item.nomor}
+                renderFooter={(item) => (
+                    item.sisa > 0.005 ? (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                const target = item;
+                                setSelectedPiutang(null);
+                                openPaymentModal(target);
+                            }}
+                            className="w-full py-2.5 bg-amber-600 hover:bg-amber-700 active:scale-[0.99] text-white rounded-xl text-xs font-bold transition shadow-xs text-center cursor-pointer"
+                        >
+                            Terima Pembayaran ({formatRupiah(item.sisa)})
+                        </button>
+                    ) : null
+                )}
+            >
+                {(item) => (
+                    <>
+                        <div className="p-4 bg-slate-50 rounded-xl space-y-2">
+                            <div className="flex justify-between">
+                                <span className="text-slate-500">Debitur / Instansi:</span>
+                                <span className="font-bold text-slate-800">{item.debtor}</span>
                             </div>
-                            <button
-                                onClick={() => setSelectedPiutang(null)}
-                                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition"
-                            >
-                                <X className="w-5 h-5" />
-                            </button>
+                            <div className="flex justify-between">
+                                <span className="text-slate-500">Pasien:</span>
+                                <span className="font-medium text-slate-700">{item.pasien || '-'}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-slate-500">Dokter:</span>
+                                <span className="font-medium text-slate-700">{item.dokter || '-'}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-slate-500">Tanggal Transaksi:</span>
+                                <span className="font-medium text-slate-700">{item.tanggal}</span>
+                            </div>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-6 space-y-6 text-xs">
-                            <div className="p-4 bg-slate-50 rounded-xl space-y-2">
-                                <div className="flex justify-between">
-                                    <span className="text-slate-500">Debitur / Instansi:</span>
-                                    <span className="font-bold text-slate-800">{selectedPiutang.debtor}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span className="text-slate-500">Pasien:</span>
-                                    <span className="font-medium text-slate-700">{selectedPiutang.pasien || '-'}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span className="text-slate-500">Dokter:</span>
-                                    <span className="font-medium text-slate-700">{selectedPiutang.dokter || '-'}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span className="text-slate-500">Tanggal Transaksi:</span>
-                                    <span className="font-medium text-slate-700">{selectedPiutang.tanggal}</span>
-                                </div>
-                            </div>
-
-                            {/* Daftar Obat */}
-                            <div>
-                                <h4 className="font-bold text-slate-900 mb-3">Item Obat Terjual</h4>
-                                <div className="border border-slate-200 rounded-xl overflow-hidden">
-                                    <table className="w-full text-left text-xs divide-y divide-slate-100">
-                                        <thead className="bg-slate-50 text-slate-600 text-[11px] font-semibold uppercase">
-                                            <tr>
-                                                <th className="p-3">Nama Obat</th>
-                                                <th className="p-3 text-center">Qty</th>
-                                                <th className="p-3 text-right">Harga</th>
-                                                <th className="p-3 text-right">Total</th>
+                        {/* Daftar Obat */}
+                        <div>
+                            <h4 className="font-bold text-slate-900 mb-3">Item Obat Terjual</h4>
+                            <div className="border border-slate-200 rounded-xl overflow-hidden">
+                                <table className="w-full text-left text-xs divide-y divide-slate-100">
+                                    <thead className="bg-slate-50 text-slate-600 text-[11px] font-semibold uppercase">
+                                        <tr>
+                                            <th className="p-3">Nama Obat</th>
+                                            <th className="p-3 text-center">Qty</th>
+                                            <th className="p-3 text-right">Harga</th>
+                                            <th className="p-3 text-right">Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {(item.items || []).map((it, idx) => (
+                                            <tr key={idx}>
+                                                <td className="p-3">
+                                                    <div className="font-semibold text-slate-800">{it.nama}</div>
+                                                    <div className="text-[10px] text-slate-400">{it.sku}</div>
+                                                </td>
+                                                <td className="p-3 text-center font-medium">
+                                                    {it.qty} {it.satuan}
+                                                </td>
+                                                <td className="p-3 text-right">{formatNumberOnly(it.harga)}</td>
+                                                <td className="p-3 text-right font-semibold text-slate-900">{formatNumberOnly(it.jumlah)}</td>
                                             </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-100">
-                                            {(selectedPiutang.items || []).map((it, idx) => (
-                                                <tr key={idx}>
-                                                    <td className="p-3">
-                                                        <div className="font-semibold text-slate-800">{it.nama}</div>
-                                                        <div className="text-[10px] text-slate-400">{it.sku}</div>
-                                                    </td>
-                                                    <td className="p-3 text-center font-medium">
-                                                        {it.qty} {it.satuan}
-                                                    </td>
-                                                    <td className="p-3 text-right">{formatNumberOnly(it.harga)}</td>
-                                                    <td className="p-3 text-right font-semibold text-slate-900">{formatNumberOnly(it.jumlah)}</td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-
-                            {/* Ringkasan Biaya */}
-                            <div className="p-4 bg-slate-50 rounded-xl space-y-1.5 font-medium">
-                                <div className="flex justify-between text-base font-bold text-slate-900">
-                                    <span>Total Tagihan:</span>
-                                    <span>{formatRupiah(selectedPiutang.total)}</span>
-                                </div>
-                                <div className="flex justify-between text-emerald-600 font-semibold">
-                                    <span>Sudah Terbayar:</span>
-                                    <span>{formatRupiah(selectedPiutang.terbayar)}</span>
-                                </div>
-                                <div className="flex justify-between text-amber-700 font-bold text-sm pt-1 border-t border-slate-200">
-                                    <span>Sisa Piutang:</span>
-                                    <span>{formatRupiah(selectedPiutang.sisa)}</span>
-                                </div>
-                            </div>
-
-                            {/* Riwayat Pembayaran */}
-                            <div>
-                                <h4 className="font-bold text-slate-900 mb-3">Riwayat Pembayaran</h4>
-                                {(selectedPiutang.payments || []).length === 0 ? (
-                                    <p className="text-slate-400 italic">Belum ada pembayaran yang dicatat untuk transaksi ini.</p>
-                                ) : (
-                                    <div className="space-y-2">
-                                        {selectedPiutang.payments.map((p) => (
-                                            <div key={p.id} className="p-3 bg-slate-50 border border-slate-100 rounded-xl space-y-1">
-                                                <div className="flex justify-between items-center">
-                                                    <span className="font-bold text-slate-900">{formatRupiah(p.nominal)}</span>
-                                                    <span className="text-[11px] text-slate-400">{p.tanggal}</span>
-                                                </div>
-                                                <div className="text-[11px] text-slate-500">
-                                                    Masuk ke: <strong>{p.akunNama}</strong> ({p.akunKode}) • Ref: {p.noReferensi}
-                                                </div>
-                                            </div>
                                         ))}
-                                    </div>
-                                )}
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
 
-                        {selectedPiutang.sisa > 0.005 && (
-                            <div className="p-6 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-3">
-                                <button
-                                    onClick={() => {
-                                        const target = selectedPiutang;
-                                        setSelectedPiutang(null);
-                                        openPaymentModal(target);
-                                    }}
-                                    className="w-full py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition shadow-xs text-center"
-                                >
-                                    Terima Pembayaran ({formatRupiah(selectedPiutang.sisa)})
-                                </button>
+                        {/* Ringkasan Biaya */}
+                        <div className="p-4 bg-slate-50 rounded-xl space-y-1.5 font-medium">
+                            <div className="flex justify-between text-base font-bold text-slate-900">
+                                <span>Total Tagihan:</span>
+                                <span>{formatRupiah(item.total)}</span>
                             </div>
-                        )}
-                    </div>
-                </div>
-            )}
+                            <div className="flex justify-between text-emerald-600 font-semibold">
+                                <span>Sudah Terbayar:</span>
+                                <span>{formatRupiah(item.terbayar)}</span>
+                            </div>
+                            <div className="flex justify-between text-amber-700 font-bold text-sm pt-1 border-t border-slate-200">
+                                <span>Sisa Piutang:</span>
+                                <span>{formatRupiah(item.sisa)}</span>
+                            </div>
+                        </div>
+
+                        {/* Riwayat Pembayaran */}
+                        <div>
+                            <h4 className="font-bold text-slate-900 mb-3">Riwayat Pembayaran</h4>
+                            {(item.payments || []).length === 0 ? (
+                                <p className="text-slate-400 italic">Belum ada pembayaran yang dicatat untuk transaksi ini.</p>
+                            ) : (
+                                <div className="space-y-2">
+                                    {item.payments.map((p) => (
+                                        <div key={p.id} className="p-3 bg-slate-50 border border-slate-100 rounded-xl space-y-1">
+                                            <div className="flex justify-between items-center">
+                                                <span className="font-bold text-slate-900">{formatRupiah(p.nominal)}</span>
+                                                <span className="text-[11px] text-slate-400">{p.tanggal}</span>
+                                            </div>
+                                            <div className="text-[11px] text-slate-500">
+                                                Masuk ke: <strong>{p.akunNama}</strong> ({p.akunKode}) • Ref: {p.noReferensi}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </>
+                )}
+            </Drawer>
         </FinanceLayout>
     );
 }
