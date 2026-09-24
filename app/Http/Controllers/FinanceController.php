@@ -30,17 +30,140 @@ class FinanceController extends Controller
     }
 
     /**
-     * Tampilkan halaman utama modul SAHABAT Finances (React Realtime SPA).
+     * Tampilkan halaman Ringkasan (Dashboard) Keuangan Eksekutif.
      */
-    public function index()
+    public function index(Request $request)
     {
+        // Dukung backward-compatibility jika ada query ?tab=
+        if ($request->has('tab')) {
+            $tab = $request->query('tab');
+            if ($tab === 'hutang') return redirect()->route('finance.hutang');
+            if ($tab === 'cash') return redirect()->route('finance.cash');
+            if ($tab === 'piutang') return redirect()->route('finance.piutang');
+            if ($tab === 'kas-bank' || $tab === 'bank') return redirect()->route('finance.kasBank');
+        }
+
+        $hutang = $this->getHutangData();
+        $cash = $this->getCashData();
+        $piutang = $this->getPiutangData();
+        $stats = $this->getStats($hutang, $cash, $piutang);
+        $recentMutasi = $this->getMutasiData(10);
+        $accounts = FinanceAccount::where('category', 'Kas & Bank')->where('is_active', true)->orderBy('code')->get();
+
+        // 5 Faktur Hutang yang mendekati atau melewati jatuh tempo
+        $upcomingHutang = [];
+        foreach ($hutang as $h) {
+            if ($h['sisa'] > 0) {
+                $dueDateStr = $h['raw_jatuh_tempo'] ?? null;
+                $diffDays = 0;
+                $isOverdue = false;
+                if ($dueDateStr) {
+                    $due = \Carbon\Carbon::parse($dueDateStr)->startOfDay();
+                    $now = \Carbon\Carbon::now()->startOfDay();
+                    $diffDays = $now->diffInDays($due, false);
+                    $isOverdue = $diffDays < 0;
+                }
+                $upcomingHutang[] = [
+                    'id' => $h['id'],
+                    'no_faktur' => $h['nomor'],
+                    'no_penerimaan' => $h['referensi'] ?? '',
+                    'pbf_name' => $h['vendor'],
+                    'due_date' => $h['jatuhTempo'],
+                    'sisa_bayar' => $h['sisa'],
+                    'is_overdue' => $isOverdue,
+                    'days_diff' => abs((int) $diffDays),
+                    'diff_raw' => $diffDays,
+                ];
+            }
+        }
+        usort($upcomingHutang, fn($a, $b) => $a['diff_raw'] <=> $b['diff_raw']);
+        $upcomingHutang = array_slice($upcomingHutang, 0, 5);
+
+        return Inertia::render('Finance/Dashboard', [
+            'stats' => $stats,
+            'recentMutasi' => $recentMutasi,
+            'upcomingHutang' => $upcomingHutang,
+            'accounts' => $accounts,
+        ]);
+    }
+
+    /**
+     * Halaman Pengelolaan Hutang Dagang (Faktur Pembelian Kredit).
+     */
+    public function hutang()
+    {
+        $hutangDagang = $this->getHutangData();
         $creditors = Creditor::orderBy('name')->get(['code', 'name']);
+        $kasBankAccounts = FinanceAccount::where('category', 'Kas & Bank')->where('is_active', true)->orderBy('code')->get();
+        $stats = $this->getStats($hutangDagang, null, null);
+
+        return Inertia::render('Finance/Hutang', [
+            'hutangDagang' => $hutangDagang,
+            'creditors' => $creditors,
+            'kasBankAccounts' => $kasBankAccounts,
+            'stats' => $stats,
+        ]);
+    }
+
+    /**
+     * Halaman Pengelolaan Pembelian Cash (Tunai).
+     */
+    public function cash()
+    {
+        $pembelianCash = $this->getCashData();
+        $creditors = Creditor::orderBy('name')->get(['code', 'name']);
+        $kasBankAccounts = FinanceAccount::where('category', 'Kas & Bank')->where('is_active', true)->orderBy('code')->get();
+        $stats = $this->getStats(null, $pembelianCash, null);
+
+        return Inertia::render('Finance/Cash', [
+            'pembelianCash' => $pembelianCash,
+            'creditors' => $creditors,
+            'kasBankAccounts' => $kasBankAccounts,
+            'stats' => $stats,
+        ]);
+    }
+
+    /**
+     * Halaman Pengelolaan Piutang Penjualan (Kredit Pelanggan).
+     */
+    public function piutang()
+    {
+        $piutangPenjualan = $this->getPiutangData();
         $debtors = Debtors::orderBy('name')->get(['id', 'code', 'name', 'phone', 'city']);
+        $kasBankAccounts = FinanceAccount::where('category', 'Kas & Bank')->where('is_active', true)->orderBy('code')->get();
+        $stats = $this->getStats(null, null, $piutangPenjualan);
 
-        // Ambil master akun (Chart of Accounts ala Kledo)
+        return Inertia::render('Finance/Piutang', [
+            'piutangPenjualan' => $piutangPenjualan,
+            'debtors' => $debtors,
+            'kasBankAccounts' => $kasBankAccounts,
+            'stats' => $stats,
+        ]);
+    }
+
+    /**
+     * Halaman Pengelolaan Kas & Bank, Mutasi Kas, dan Bagan Akun (COA).
+     */
+    public function kasBank()
+    {
         $accounts = FinanceAccount::orderBy('code')->get();
+        $categories = $this->getCategories();
+        $mutasiKasBank = $this->getMutasiData(500);
+        $stats = $this->getStats(null, null, null);
 
-        // 1. Ambil data faktur pembelian KREDIT (Hutang Dagang)
+        return Inertia::render('Finance/KasBank', [
+            'accounts' => $accounts,
+            'categories' => $categories,
+            'mutasiKasBank' => $mutasiKasBank,
+            'stats' => $stats,
+        ]);
+    }
+
+    /**
+     * Helper: Ambil data faktur pembelian KREDIT (Hutang Dagang).
+     */
+    protected function getHutangData()
+    {
         $receivingsKredit = Receiving::with([
             'receiving_details' => function ($query) {
                 $query->where('invoice_payment', 'KREDIT');
@@ -94,7 +217,6 @@ class FinanceController extends Controller
                 $ppnNominal = ($ppnType === 'EXCLUDE') ? round($subtotal * 0.11, 2) : 0;
                 $total = round($subtotal + $ppnNominal, 2);
 
-                // Hitung riwayat pembayaran dan total terbayar
                 $paymentHistory = [];
                 $totalTerbayar = 0;
 
@@ -134,6 +256,7 @@ class FinanceController extends Controller
                     'referensi' => $detail->receiving_details_code ?: $rec->code,
                     'tanggal' => $detail->invoice_date ? \Carbon\Carbon::parse($detail->invoice_date)->format('d/m/Y') : ($rec->date ?: '-'),
                     'jatuhTempo' => $detail->invoice_due ? \Carbon\Carbon::parse($detail->invoice_due)->format('d/m/Y') : '-',
+                    'raw_jatuh_tempo' => $detail->invoice_due ? \Carbon\Carbon::parse($detail->invoice_due)->format('Y-m-d') : null,
                     'tanggalBayar' => $isLunas ? \Carbon\Carbon::parse($rec->updated_at)->format('d/m/Y') : '',
                     'status' => $statusLabel,
                     'subtotal' => $subtotal,
@@ -149,8 +272,14 @@ class FinanceController extends Controller
                 ];
             }
         }
+        return $hutangDagang;
+    }
 
-        // 2. Ambil data faktur pembelian CASH (Tunai)
+    /**
+     * Helper: Ambil data faktur pembelian CASH (Tunai).
+     */
+    protected function getCashData()
+    {
         $receivingsCash = Receiving::with([
             'receiving_details' => function ($query) {
                 $query->where('invoice_payment', 'TUNAI');
@@ -204,7 +333,6 @@ class FinanceController extends Controller
                 $ppnNominal = ($ppnType === 'EXCLUDE') ? round($subtotal * 0.11, 2) : 0;
                 $total = round($subtotal + $ppnNominal, 2);
 
-                // Cari akun pembayaran yang dipakai jika sudah dicatat
                 $latestPayment = $detail->payments->last();
                 $akunPembayaran = null;
                 if ($latestPayment && $latestPayment->account) {
@@ -238,8 +366,14 @@ class FinanceController extends Controller
                 ];
             }
         }
+        return $pembelianCash;
+    }
 
-        // 3. Ambil data penjualan KREDIT (Piutang Penjualan / Piutang Usaha)
+    /**
+     * Helper: Ambil data penjualan KREDIT (Piutang Penjualan).
+     */
+    protected function getPiutangData()
+    {
         $creditTransactions = MedicineTransactions::with([
             'debtors',
             'doctors',
@@ -286,7 +420,6 @@ class FinanceController extends Controller
 
             $total = (float) ($tx->subtotal > 0 ? $tx->subtotal : $calcSubtotal);
 
-            // Riwayat pembayaran piutang dari finance_payments
             $paymentHistory = [];
             $totalTerbayarViaFinance = 0;
             foreach ($tx->payments as $payment) {
@@ -339,28 +472,15 @@ class FinanceController extends Controller
                 'lastModified' => $tx->updated_at ? \Carbon\Carbon::parse($tx->updated_at)->format('d M Y H:i') : '-',
             ];
         }
+        return $piutangPenjualan;
+    }
 
-        // Ambil kategori akun yang tersedia
-        $defaultCategories = [
-            'Kas & Bank',
-            'Piutang Usaha',
-            'Persediaan',
-            'Aktiva Lancar Lainnya',
-            'Aktiva Tetap',
-            'Hutang Usaha',
-            'Kewajiban Lancar Lainnya',
-            'Kewajiban Jangka Panjang',
-            'Ekuitas / Modal',
-            'Pendapatan',
-            'Harga Pokok Penjualan',
-            'Beban Operasional',
-            'Beban Lainnya',
-        ];
-        $existingCategories = FinanceAccount::select('category')->distinct()->pluck('category')->toArray();
-        $categories = array_values(array_unique(array_merge($defaultCategories, $existingCategories)));
-
-        // 4. Riwayat Mutasi Transaksi Kas & Bank (Debit / Kredit)
-        $mutasiKasBank = FinancePayment::with([
+    /**
+     * Helper: Ambil riwayat Mutasi Transaksi Kas & Bank.
+     */
+    protected function getMutasiData($limit = 500)
+    {
+        return FinancePayment::with([
             'account',
             'creator',
             'receivingDetail.creditor',
@@ -372,7 +492,7 @@ class FinanceController extends Controller
             })
             ->orderByDesc('payment_date')
             ->orderByDesc('id')
-            ->take(500)
+            ->take($limit)
             ->get()
             ->map(function ($p) {
                 $isMasuk = ($p->payment_type === 'PIUTANG');
@@ -423,18 +543,117 @@ class FinanceController extends Controller
                     'user' => $p->creator->name ?? 'Admin',
                 ];
             });
+    }
 
-        // Render via Inertia ke komponen resources/js/Pages/Finance/Index.jsx
-        return Inertia::render('Finance/Index', [
-            'hutangDagang' => $hutangDagang,
-            'pembelianCash' => $pembelianCash,
-            'piutangPenjualan' => $piutangPenjualan,
-            'accounts' => $accounts,
-            'categories' => $categories,
-            'creditors' => $creditors,
-            'debtors' => $debtors,
-            'mutasiKasBank' => $mutasiKasBank,
-        ]);
+    /**
+     * Helper: Ambil kategori akun.
+     */
+    protected function getCategories()
+    {
+        $defaultCategories = [
+            'Kas & Bank',
+            'Piutang Usaha',
+            'Persediaan',
+            'Aktiva Lancar Lainnya',
+            'Aktiva Tetap',
+            'Hutang Usaha',
+            'Kewajiban Lancar Lainnya',
+            'Kewajiban Jangka Panjang',
+            'Ekuitas / Modal',
+            'Pendapatan',
+            'Harga Pokok Penjualan',
+            'Beban Operasional',
+            'Beban Lainnya',
+        ];
+        $existingCategories = FinanceAccount::select('category')->distinct()->pluck('category')->toArray();
+        return array_values(array_unique(array_merge($defaultCategories, $existingCategories)));
+    }
+
+    /**
+     * Helper: Hitung ringkasan statistik modul finance.
+     */
+    protected function getStats($hutang = null, $cash = null, $piutang = null)
+    {
+        $totalSaldoKasBank = (float) FinanceAccount::where('category', 'Kas & Bank')->where('is_active', true)->sum('balance');
+        $accountsCount = FinanceAccount::where('category', 'Kas & Bank')->where('is_active', true)->count();
+
+        $kasMasuk = (float) FinancePayment::where('payment_type', 'PIUTANG')->sum('amount');
+        $kasKeluar = (float) FinancePayment::whereIn('payment_type', ['KREDIT', 'CASH'])->sum('amount');
+        $netCashflow = $kasMasuk - $kasKeluar;
+
+        // Hutang Stats
+        $countHutangBelumLunas = 0;
+        $countBelumBayar = 0;
+        $countSebagian = 0;
+        $countLunas = 0;
+        $totalHutangSisa = 0;
+
+        if ($hutang !== null) {
+            foreach ($hutang as $h) {
+                $totalHutangSisa += $h['sisa'];
+                if ($h['status'] === 'Lunas') {
+                    $countLunas++;
+                } elseif ($h['status'] === 'Dibayar Sebagian') {
+                    $countSebagian++;
+                    $countHutangBelumLunas++;
+                } else {
+                    $countBelumBayar++;
+                    $countHutangBelumLunas++;
+                }
+            }
+        } else {
+            $countHutangBelumLunas = Receiving::whereIn('status', [1, 2])
+                ->whereHas('receiving_details', fn($q) => $q->where('invoice_payment', 'KREDIT'))
+                ->count();
+        }
+
+        // Cash Stats
+        $totalCashPurchases = 0;
+        $totalCashCount = 0;
+        if ($cash !== null) {
+            $totalCashPurchases = array_sum(array_column($cash, 'total'));
+            $totalCashCount = count($cash);
+        } else {
+            $totalCashCount = Receiving::whereHas('receiving_details', fn($q) => $q->where('invoice_payment', 'TUNAI'))->count();
+        }
+
+        // Piutang Stats
+        $totalPiutangSisa = 0;
+        $countPiutangBelumBayar = 0;
+        $countPiutangLunas = 0;
+        if ($piutang !== null) {
+            foreach ($piutang as $p) {
+                $totalPiutangSisa += $p['sisa'];
+                if ($p['status'] === 'Lunas') {
+                    $countPiutangLunas++;
+                } else {
+                    $countPiutangBelumBayar++;
+                }
+            }
+        } else {
+            $countPiutangBelumBayar = MedicineTransactions::where('transaction_type', 'KREDIT')->where('status', 1)->count();
+        }
+
+        return [
+            'totalSaldoKasBank' => $totalSaldoKasBank,
+            'accountsCount' => $accountsCount,
+            'kasMasuk' => $kasMasuk,
+            'kasKeluar' => $kasKeluar,
+            'netCashflow' => $netCashflow,
+            'totalHutangSisa' => $totalHutangSisa,
+            'totalSisaHutang' => $totalHutangSisa,
+            'countHutangBelumLunas' => $countHutangBelumLunas,
+            'countBelumBayar' => $countBelumBayar,
+            'countSebagian' => $countSebagian,
+            'countLunas' => $countLunas,
+            'totalCashPurchases' => $totalCashPurchases,
+            'totalCashSpent' => $totalCashPurchases,
+            'totalCashCount' => $totalCashCount,
+            'totalPiutangSisa' => $totalPiutangSisa,
+            'totalSisaPiutang' => $totalPiutangSisa,
+            'countPiutangBelumBayar' => $countPiutangBelumBayar,
+            'countPiutangLunas' => $countPiutangLunas,
+        ];
     }
 
     /**

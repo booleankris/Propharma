@@ -535,6 +535,11 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
     // SAHABAT Finances (Dedicated ERP Module)
     Route::prefix('finance')->name('finance.')->middleware(['role:Finance|General Manager|administrator'])->group(function () {
         Route::get('/', [\App\Http\Controllers\FinanceController::class, 'index'])->name('index');
+        Route::get('/hutang', [\App\Http\Controllers\FinanceController::class, 'hutang'])->name('hutang');
+        Route::get('/cash', [\App\Http\Controllers\FinanceController::class, 'cash'])->name('cash');
+        Route::get('/piutang', [\App\Http\Controllers\FinanceController::class, 'piutang'])->name('piutang');
+        Route::get('/kas-bank', [\App\Http\Controllers\FinanceController::class, 'kasBank'])->name('kasBank');
+
         Route::post('/payments', [\App\Http\Controllers\FinanceController::class, 'storePayment'])->name('payments.store');
         Route::post('/bulk-payments', [\App\Http\Controllers\FinanceController::class, 'storeBulkPayments'])->name('payments.bulkStore');
         Route::post('/accounts', [\App\Http\Controllers\FinanceController::class, 'storeAccount'])->name('accounts.store');
