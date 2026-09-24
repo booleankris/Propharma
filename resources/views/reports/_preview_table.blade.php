@@ -91,7 +91,7 @@
                                         'kasir', 'user', 'resep', 'ed', 'barcode', 'satuan', 'kategori', 'pabrik', 'alamat'
                                     ];
                                     $numericKeywords = [
-                                        'total', 'diskon', 'discount', 'potongan', 'harga', 'price', 'qty', 'jumlah',
+                                        'total', 'diskon', 'discount', 'disc', 'value', 'potongan', 'harga', 'price', 'qty', 'jumlah',
                                         'nominal', 'subtotal', 'sub total', 'bayar', 'kembali', 'netto', 'bruto',
                                         'dpp', 'ppn', 'lembar', 'r/', 'jasa', 'embalase', 'nilai', 'omzet', 'saldo',
                                         'uang', 'kurang', 'masuk', 'keluar', 'awal', 'fisik', 'selisih', 'kredit', 'penjualan', 'pembelian'
