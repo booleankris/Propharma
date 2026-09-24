@@ -5,7 +5,8 @@ import PbfCombobox from './Components/PbfCombobox';
 import Drawer from './Components/Drawer';
 import { formatRupiah, formatNumberOnly } from './Components/Utils';
 import {
-    Banknote, Search, Check, X, Calendar, AlertCircle, ChevronLeft, ChevronRight
+    Banknote, Search, Check, X, Calendar, AlertCircle, ChevronLeft, ChevronRight,
+    ArrowLeft, Printer, Share2, MoreVertical, ChevronDown, History, Landmark, Maximize2, CreditCard
 } from 'lucide-react';
 
 export default function Cash({ pembelianCash = [], creditors = [], kasBankAccounts = [], stats = {} }) {
@@ -18,8 +19,10 @@ export default function Cash({ pembelianCash = [], creditors = [], kasBankAccoun
     const [selectedCashIds, setSelectedCashIds] = useState([]);
     const [selectionWarning, setSelectionWarning] = useState('');
 
-    // State Drawer Detail Faktur
-    const [selectedCash, setSelectedCash] = useState(null);
+    // State Halaman Detil Penuh & Quick Preview Drawer
+    const [detailViewCash, setDetailViewCash] = useState(null);
+    const [drawerCash, setDrawerCash] = useState(null);
+    const [isShippingOpen, setIsShippingOpen] = useState(true);
 
     // State Modal Tetapkan Akun Kas Satuan
     const [isCashModalOpen, setIsCashModalOpen] = useState(false);
@@ -71,6 +74,12 @@ export default function Cash({ pembelianCash = [], creditors = [], kasBankAccoun
     const totalSelectedCashNominal = useMemo(() => {
         return selectedCashItems.reduce((acc, curr) => acc + (curr.total || 0), 0);
     }, [selectedCashItems]);
+
+    // Total kuantitas barang pada halaman detil penuh Cash
+    const totalDetailCashQty = useMemo(() => {
+        if (!detailViewCash || !detailViewCash.items) return 0;
+        return detailViewCash.items.reduce((acc, curr) => acc + (Number(curr.qty) || 0), 0);
+    }, [detailViewCash]);
 
     // Handlers Checkbox
     const handleToggleCash = (item) => {
@@ -135,6 +144,8 @@ export default function Cash({ pembelianCash = [], creditors = [], kasBankAccoun
             onSuccess: () => {
                 setIsCashModalOpen(false);
                 setIsSubmittingCash(false);
+                setDrawerCash(null);
+                setDetailViewCash(null);
             },
             onError: (errs) => {
                 setIsSubmittingCash(false);
@@ -185,11 +196,331 @@ export default function Cash({ pembelianCash = [], creditors = [], kasBankAccoun
 
     return (
         <FinanceLayout
-            title="Pembelian Cash (Tunai)"
-            subtitle="Faktur pembelian barang/obat tunai dan pembebanan akun Kas & Bank"
-            stats={stats}
+            title={detailViewCash ? `Detil Pembelian Tunai (Cash) ${detailViewCash.nomor}` : "Pembelian Cash (Tunai)"}
+            subtitle={detailViewCash ? undefined : "Faktur pembelian barang/obat tunai dan pembebanan akun Kas & Bank"}
+            stats={detailViewCash ? undefined : stats}
         >
-            <div className="space-y-6">
+            {detailViewCash ? (
+                /* SUB-VIEW A: DETIL PEMBELIAN CASH (PERSIS SEPERTI KREDIT) */
+                <div className="space-y-6 max-w-[1300px] mx-auto animate-in fade-in duration-200">
+                    {/* Link Kembali ke Daftar */}
+                    <button
+                        type="button"
+                        onClick={() => setDetailViewCash(null)}
+                        className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 font-medium transition cursor-pointer"
+                    >
+                        <ArrowLeft className="w-3.5 h-3.5" />
+                        <span>Kembali ke Daftar</span>
+                    </button>
+
+                    {/* Judul & Action Kanan */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+                            Detil Pembelian Tunai (Cash) {detailViewCash.nomor}
+                        </h1>
+
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <button
+                                type="button"
+                                onClick={() => openCashModal(detailViewCash)}
+                                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition shadow-xs cursor-pointer"
+                            >
+                                <Landmark className="w-3.5 h-3.5" />
+                                <span>{detailViewCash.akunPembayaran ? 'Ubah Akun Kas/Bank' : 'Tetapkan Akun Kas/Bank'}</span>
+                            </button>
+
+                            <div className="relative">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (navigator.clipboard) {
+                                            navigator.clipboard.writeText(window.location.href);
+                                            alert('Tautan halaman berhasil disalin!');
+                                        }
+                                    }}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition cursor-pointer"
+                                >
+                                    <Share2 className="w-3.5 h-3.5 text-slate-500" />
+                                    <span>Bagikan</span>
+                                    <ChevronDown className="w-3 h-3 text-slate-400" />
+                                </button>
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={() => window.print()}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition cursor-pointer"
+                            >
+                                <Printer className="w-3.5 h-3.5 text-slate-500" />
+                                <span>Print</span>
+                                <ChevronDown className="w-3 h-3 text-slate-400" />
+                            </button>
+
+                            <button
+                                type="button"
+                                className="p-1.5 text-slate-400 hover:text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition cursor-pointer"
+                            >
+                                <MoreVertical className="w-4 h-4" />
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* KARTU UTAMA DETIL FAKTUR CASH */}
+                    <div className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-xs space-y-6">
+                        {/* Status Badge */}
+                        <div className="flex items-center justify-between">
+                            <span className="inline-block px-3 py-1 text-xs font-semibold rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100">
+                                Lunas (Cash)
+                            </span>
+
+                            <span className="text-xs text-slate-400">
+                                Jenis Pembayaran: <strong className="text-slate-700 font-semibold">TUNAI (Langsung Lunas)</strong>
+                            </span>
+                        </div>
+
+                        {/* Metadata Faktur (2 Kolom) */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-xs">
+                            <div className="space-y-4">
+                                <div>
+                                    <span className="text-slate-400 block text-[11px] mb-1">PBF / Vendor</span>
+                                    <span className="text-blue-600 font-semibold text-sm hover:underline cursor-pointer">
+                                        {detailViewCash.vendor}
+                                    </span>
+                                </div>
+                                <div>
+                                    <span className="text-slate-400 block text-[11px] mb-1">Tgl. Transaksi</span>
+                                    <span className="font-semibold text-slate-800 text-sm">{detailViewCash.tanggal}</span>
+                                </div>
+                                <div>
+                                    <span className="text-slate-400 block text-[11px] mb-1">Apotek Penerima</span>
+                                    <span className="text-blue-600 font-medium hover:underline cursor-pointer">
+                                        {detailViewCash.gudang}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <span className="text-slate-400 block text-[11px] mb-1">Nomor Faktur</span>
+                                    <span className="font-bold text-slate-900 text-sm">{detailViewCash.nomor}</span>
+                                </div>
+                                <div>
+                                    <span className="text-slate-400 block text-[11px] mb-1">Referensi / Kode Penerimaan</span>
+                                    <span className="font-medium text-slate-800">{detailViewCash.referensi}</span>
+                                </div>
+                                <div>
+                                    <span className="text-slate-400 block text-[11px] mb-1">Akun Pembayaran (Kas & Bank)</span>
+                                    {detailViewCash.akunPembayaran ? (
+                                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-lg">
+                                            <Landmark className="w-3.5 h-3.5 text-emerald-600" />
+                                            <span className="font-semibold">{detailViewCash.akunPembayaran.nama}</span>
+                                            {detailViewCash.akunPembayaran.noRekening && (
+                                                <span className="text-[10px] text-slate-500 font-mono">({detailViewCash.akunPembayaran.noRekening})</span>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-amber-600 bg-amber-50 px-2 py-0.5 rounded text-[11px] font-medium border border-amber-200">
+                                                Belum Ditentukan Akun
+                                            </span>
+                                            <button
+                                                type="button"
+                                                onClick={() => openCashModal(detailViewCash)}
+                                                className="text-xs text-blue-600 hover:text-blue-800 font-semibold underline cursor-pointer"
+                                            >
+                                                Pilih Akun
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Informasi Pengiriman */}
+                        <div className="pt-2 border-t border-slate-100">
+                            <button
+                                type="button"
+                                onClick={() => setIsShippingOpen(!isShippingOpen)}
+                                className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 cursor-pointer"
+                            >
+                                {isShippingOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                                <span>Informasi pengiriman</span>
+                            </button>
+                            {isShippingOpen && (
+                                <div className="pl-5 pt-3 text-xs">
+                                    <span className="text-slate-400 block text-[11px]">Tanggal Pengiriman / Penerimaan</span>
+                                    <span className="font-medium text-slate-800">{detailViewCash.tanggal}</span>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Tabel Item Obat */}
+                        <div className="pt-4 overflow-x-auto">
+                            <table className="w-full text-left text-xs">
+                                <thead className="text-slate-400 border-b border-slate-100 pb-2 text-[11px]">
+                                    <tr>
+                                        <th className="py-2.5 font-normal">Produk</th>
+                                        <th className="py-2.5 font-normal">Deskripsi</th>
+                                        <th className="py-2.5 font-normal text-center">Kuantitas</th>
+                                        <th className="py-2.5 font-normal">Satuan</th>
+                                        <th className="py-2.5 font-normal text-center">Discount</th>
+                                        <th className="py-2.5 font-normal text-right">Harga</th>
+                                        <th className="py-2.5 font-normal text-center">Pajak</th>
+                                        <th className="py-2.5 font-normal text-right">Jumlah</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 text-slate-700">
+                                    {detailViewCash.items && detailViewCash.items.length > 0 ? (
+                                        detailViewCash.items.map((it, idx) => (
+                                            <tr key={idx}>
+                                                <td className="py-3">
+                                                    <span className="text-blue-600 font-medium">
+                                                        {it.sku} - {it.nama}
+                                                    </span>
+                                                </td>
+                                                <td className="py-3 text-slate-400">-</td>
+                                                <td className="py-3 text-center font-medium">{it.qty}</td>
+                                                <td className="py-3">{it.satuan}</td>
+                                                <td className="py-3 text-center">{it.diskon || '0%'}</td>
+                                                <td className="py-3 text-right">{formatNumberOnly(it.harga)}</td>
+                                                <td className="py-3 text-center text-slate-500">{it.pajak || 'PPN11'}</td>
+                                                <td className="py-3 text-right font-semibold text-slate-900">
+                                                    {formatNumberOnly(it.jumlah)}
+                                                </td>
+                                            </tr>
+                                        ))
+                                    ) : (
+                                        <tr>
+                                            <td colSpan={8} className="py-6 text-center text-slate-400">
+                                                Tidak ada rincian item.
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                                <tfoot className="border-t border-slate-200">
+                                    <tr>
+                                        <td colSpan={2} className="py-3 text-right font-semibold text-slate-600">
+                                            Total Kuantitas
+                                        </td>
+                                        <td className="py-3 text-center font-bold text-slate-900">{totalDetailCashQty}</td>
+                                        <td colSpan={5}></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+
+                        {/* Summary Bawah */}
+                        <div className="pt-6 border-t border-slate-100 flex justify-end">
+                            <div className="w-80 space-y-2 text-xs">
+                                <div className="flex justify-between text-slate-600">
+                                    <span>Sub Total</span>
+                                    <span className="font-medium text-slate-800">{formatNumberOnly(detailViewCash.subtotal)}</span>
+                                </div>
+                                <div className="flex justify-between text-slate-600">
+                                    <span>PPN11</span>
+                                    <span className="font-medium text-slate-800">{formatNumberOnly(detailViewCash.ppn)}</span>
+                                </div>
+                                <div className="flex justify-between text-slate-800 font-bold pt-1">
+                                    <span>Total Pembelian Cash</span>
+                                    <span>{formatNumberOnly(detailViewCash.total)}</span>
+                                </div>
+
+                                <div className="bg-emerald-50 border border-emerald-200/80 p-4 rounded-xl flex justify-between items-center text-emerald-800 font-bold mt-3">
+                                    <span className="text-xs">Status Pembayaran</span>
+                                    <span className="text-xs px-2.5 py-1 bg-emerald-600 text-white rounded-lg">LUNAS (CASH)</span>
+                                </div>
+
+                                {!detailViewCash.akunPembayaran && (
+                                    <button
+                                        type="button"
+                                        onClick={() => openCashModal(detailViewCash)}
+                                        className="w-full mt-2 py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold transition flex items-center justify-center gap-2 shadow-xs cursor-pointer"
+                                    >
+                                        <Landmark className="w-4 h-4" />
+                                        <span>Pilih Akun Kas & Bank</span>
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* KARTU AUDIT TRAIL / AKUN PEMBAYARAN */}
+                    <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                            <div className="flex items-center gap-2.5">
+                                <History className="w-5 h-5 text-emerald-600" />
+                                <div>
+                                    <h3 className="font-bold text-slate-900 text-sm">
+                                        Pantau log perubahan data
+                                    </h3>
+                                    <p className="text-[11px] text-slate-400">
+                                        Rincian akun kas drawer atau rekening bank yang digunakan untuk mendanai pembelian obat tunai ini.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <span className="text-xs font-semibold text-slate-600">
+                                Total Pembayaran: <strong className="text-emerald-600">{formatRupiah(detailViewCash.total)}</strong>
+                            </span>
+                        </div>
+
+                        {detailViewCash.akunPembayaran ? (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left text-xs">
+                                    <thead className="text-slate-400 bg-slate-50/50 border-b border-slate-100">
+                                        <tr>
+                                            <th className="py-2.5 px-3 font-medium">Tanggal Transaksi</th>
+                                            <th className="py-2.5 px-3 font-medium">Akun Kas & Bank</th>
+                                            <th className="py-2.5 px-3 font-medium">No. Rekening</th>
+                                            <th className="py-2.5 px-3 font-medium">No. Referensi / Bukti</th>
+                                            <th className="py-2.5 px-3 font-medium text-right">Nominal Bayar</th>
+                                            <th className="py-2.5 px-3 font-medium">Diproses Oleh</th>
+                                            <th className="py-2.5 px-3 font-medium text-center">Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100 text-slate-700">
+                                        <tr className="hover:bg-slate-50/50">
+                                            <td className="py-3 px-3 font-medium text-slate-900">{detailViewCash.akunPembayaran.tanggal || detailViewCash.tanggal}</td>
+                                            <td className="py-3 px-3">
+                                                <div className="flex items-center gap-1.5">
+                                                    <Landmark className="w-3.5 h-3.5 text-emerald-500" />
+                                                    <span className="font-semibold text-slate-800">{detailViewCash.akunPembayaran.nama}</span>
+                                                    <span className="text-[10px] text-slate-400">({detailViewCash.akunPembayaran.kategori || 'Kas & Bank'})</span>
+                                                </div>
+                                            </td>
+                                            <td className="py-3 px-3 font-mono text-[11px] text-slate-600">{detailViewCash.akunPembayaran.noRekening || '-'}</td>
+                                            <td className="py-3 px-3 font-mono text-[11px] text-slate-600">{detailViewCash.akunPembayaran.noReferensi || detailViewCash.referensi}</td>
+                                            <td className="py-3 px-3 text-right font-bold text-emerald-600">
+                                                {formatRupiah(detailViewCash.total)}
+                                            </td>
+                                            <td className="py-3 px-3 font-medium text-slate-800">{detailViewCash.akunPembayaran.diprosesOleh || 'Staff Kasir'}</td>
+                                            <td className="py-3 px-3 text-center">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => openCashModal(detailViewCash)}
+                                                    className="px-2.5 py-1 text-xs font-semibold text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition cursor-pointer"
+                                                >
+                                                    Ubah Akun
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        ) : (
+                            <div className="py-8 text-center text-slate-400 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+                                <History className="w-8 h-8 mx-auto text-slate-300 mb-2" />
+                                <p className="text-xs font-medium text-slate-600">Belum ada akun kas/bank yang ditetapkan untuk transaksi pembelian tunai ini.</p>
+                                <p className="text-[11px] text-slate-400 mt-0.5">
+                                    Klik tombol <strong>"Tetapkan Akun Kas/Bank"</strong> untuk mencatat sumber pengeluaran dana.
+                                </p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            ) : (
+                /* SUB-VIEW B: TABEL DAFTAR PEMBELIAN CASH */
+                <div className="space-y-6">
                 {/* Banner Summary */}
                 <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs flex flex-wrap items-center justify-between gap-4">
                     <div>
@@ -286,8 +617,12 @@ export default function Cash({ pembelianCash = [], creditors = [], kasBankAccoun
                                     </tr>
                                 ) : (
                                     paginatedCash.map((item) => (
-                                        <tr key={item.id} className="hover:bg-slate-50/80 transition">
-                                            <td className="px-4 py-3.5">
+                                        <tr
+                                            key={item.id}
+                                            onClick={() => setDrawerCash(item)}
+                                            className="hover:bg-emerald-50/40 cursor-pointer transition group"
+                                        >
+                                            <td className="px-4 py-3.5" onClick={(e) => e.stopPropagation()}>
                                                 <input
                                                     type="checkbox"
                                                     checked={selectedCashIds.includes(item.id)}
@@ -296,7 +631,17 @@ export default function Cash({ pembelianCash = [], creditors = [], kasBankAccoun
                                                 />
                                             </td>
                                             <td className="px-4 py-3.5">
-                                                <div className="font-bold text-slate-900">{item.nomor}</div>
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setDetailViewCash(item);
+                                                    }}
+                                                    className="font-bold text-slate-900 hover:text-emerald-600 text-left transition group-hover:text-emerald-600 cursor-pointer"
+                                                    title="Buka Halaman Detil Lengkap"
+                                                >
+                                                    {item.nomor}
+                                                </button>
                                                 <div className="text-[11px] text-slate-400 mt-0.5">
                                                     {item.referensi} • Tgl: {item.tanggal}
                                                 </div>
@@ -327,17 +672,20 @@ export default function Cash({ pembelianCash = [], creditors = [], kasBankAccoun
                                                     Lunas (Cash)
                                                 </span>
                                             </td>
-                                            <td className="px-4 py-3.5 text-center">
+                                            <td className="px-4 py-3.5 text-center" onClick={(e) => e.stopPropagation()}>
                                                 <div className="flex items-center justify-center gap-1.5">
                                                     <button
+                                                        type="button"
                                                         onClick={() => openCashModal(item)}
-                                                        className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition"
+                                                        className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition cursor-pointer"
                                                     >
                                                         {item.akunPembayaran ? 'Ubah Akun' : 'Tetapkan'}
                                                     </button>
                                                     <button
-                                                        onClick={() => setSelectedCash(item)}
-                                                        className="px-2.5 py-1 border border-slate-200 text-slate-600 hover:bg-slate-100 rounded-lg text-xs font-semibold transition"
+                                                        type="button"
+                                                        onClick={() => setDetailViewCash(item)}
+                                                        className="px-2.5 py-1 border border-slate-200 text-slate-600 hover:bg-slate-100 rounded-lg text-xs font-semibold transition cursor-pointer"
+                                                        title="Buka Halaman Detil Lengkap"
                                                     >
                                                         Detil
                                                     </button>
@@ -379,6 +727,7 @@ export default function Cash({ pembelianCash = [], creditors = [], kasBankAccoun
                     )}
                 </div>
             </div>
+        )}
 
             {/* Modal Tetapkan Akun Kas Satuan */}
             {isCashModalOpen && (
@@ -537,12 +886,42 @@ export default function Cash({ pembelianCash = [], creditors = [], kasBankAccoun
                 </div>
             )}
 
-            {/* Drawer Detail Faktur */}
+            {/* Drawer Detail Faktur (Quick Preview Slide-in) */}
             <Drawer
-                item={selectedCash}
-                onClose={() => setSelectedCash(null)}
+                item={drawerCash}
+                onClose={() => setDrawerCash(null)}
+                onExpand={(item) => {
+                    setDrawerCash(null);
+                    setDetailViewCash(item);
+                }}
                 title="Rincian Pembelian Tunai"
                 subtitle={(item) => `${item.nomor} • ${item.referensi}`}
+                renderFooter={(item) => (
+                    <div className="flex items-center gap-2 w-full">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                const target = item;
+                                setDrawerCash(null);
+                                setDetailViewCash(target);
+                            }}
+                            className="flex-1 py-2.5 border border-slate-200 text-slate-700 hover:bg-slate-50 active:scale-[0.99] rounded-xl text-xs font-bold transition text-center cursor-pointer"
+                        >
+                            Buka Halaman Lengkap
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                const target = item;
+                                setDrawerCash(null);
+                                openCashModal(target);
+                            }}
+                            className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white rounded-xl text-xs font-bold transition shadow-xs text-center cursor-pointer"
+                        >
+                            {item.akunPembayaran ? 'Ubah Akun' : 'Tetapkan Akun'}
+                        </button>
+                    </div>
+                )}
             >
                 {(item) => (
                     <>

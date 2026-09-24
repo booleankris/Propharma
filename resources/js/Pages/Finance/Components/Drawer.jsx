@@ -1,10 +1,11 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { X } from 'lucide-react';
+import { X, Maximize2 } from 'lucide-react';
 
 export default function Drawer({
     item,
     isOpen: propIsOpen,
     onClose,
+    onExpand,
     title,
     subtitle,
     children,
@@ -104,14 +105,29 @@ export default function Drawer({
                             <p className="text-xs text-slate-400 mt-0.5">{resolvedSubtitle}</p>
                         )}
                     </div>
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 active:scale-95 rounded-xl transition cursor-pointer"
-                        title="Tutup (Esc)"
-                    >
-                        <X className="w-5 h-5" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                        {onExpand && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    onClose?.();
+                                    onExpand(currentItem);
+                                }}
+                                className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 active:scale-95 rounded-xl transition cursor-pointer"
+                                title="Buka Halaman Lengkap"
+                            >
+                                <Maximize2 className="w-4 h-4" />
+                            </button>
+                        )}
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 active:scale-95 rounded-xl transition cursor-pointer"
+                            title="Tutup (Esc)"
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
+                    </div>
                 </div>
 
                 {/* Drawer Body with subtle reveal animation */}
