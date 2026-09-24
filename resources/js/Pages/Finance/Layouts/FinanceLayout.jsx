@@ -12,21 +12,23 @@ import {
 } from 'lucide-react';
 
 export default function FinanceLayout({ title, subtitle, children, stats = {} }) {
-    const { auth, flash, errors, url } = usePage().props;
+    const page = usePage();
+    const { auth, flash, errors } = page.props || {};
+    const currentUrl = page.url || (typeof window !== 'undefined' ? window.location.pathname : '');
 
     const navItems = [
         {
             name: 'Ringkasan',
             href: '/finance',
             icon: LayoutDashboard,
-            active: url === '/finance' || url === '/finance/',
+            active: currentUrl === '/finance' || currentUrl === '/finance/',
             badge: null,
         },
         {
             name: 'Hutang Dagang',
             href: '/finance/hutang',
             icon: CreditCard,
-            active: url.startsWith('/finance/hutang'),
+            active: currentUrl.startsWith('/finance/hutang'),
             badge: stats.countHutangBelumLunas > 0 ? {
                 text: stats.countHutangBelumLunas,
                 color: 'bg-red-50 text-red-600',
@@ -36,7 +38,7 @@ export default function FinanceLayout({ title, subtitle, children, stats = {} })
             name: 'Pembelian Cash',
             href: '/finance/cash',
             icon: Banknote,
-            active: url.startsWith('/finance/cash'),
+            active: currentUrl.startsWith('/finance/cash'),
             badge: stats.totalCashCount ? {
                 text: stats.totalCashCount,
                 color: 'bg-emerald-50 text-emerald-600',
@@ -46,14 +48,14 @@ export default function FinanceLayout({ title, subtitle, children, stats = {} })
             name: 'Kas & Bank',
             href: '/finance/kas-bank',
             icon: Landmark,
-            active: url.startsWith('/finance/kas-bank'),
+            active: currentUrl.startsWith('/finance/kas-bank'),
             badge: null,
         },
         {
             name: 'Piutang',
             href: '/finance/piutang',
             icon: ShoppingCart,
-            active: url.startsWith('/finance/piutang'),
+            active: currentUrl.startsWith('/finance/piutang'),
             badge: stats.countPiutangBelumBayar > 0 ? {
                 text: stats.countPiutangBelumBayar,
                 color: 'bg-amber-100 text-amber-700',
