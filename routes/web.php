@@ -447,6 +447,7 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
     Route::get('/creditors/all', [MedicineController::class, 'getAll'])->name('creditors.all');
     // =================== Smart Order ===================
     Route::get('/orders/smart-medicines', [OrdersController::class, 'smartMedicines'])->name('orders.smartMedicines');
+    Route::get('/orders/smart-medicines/export', [OrdersController::class, 'exportSmartMedicines'])->name('orders.smartMedicines.export');
     Route::post('/orders/addItemsBulk', [OrdersController::class, 'addItemsBulk'])->name('orders.addItemsBulk');
 
     // Receiving

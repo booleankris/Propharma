@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Orders;
 
 use App\Exports\Export\OrdersExport as ExportOrdersExport;
 use App\Exports\Orders\OrdersExport;
+use App\Exports\Orders\SmartOrderExport;
 use App\Http\Controllers\Controller;
 use App\Models\MedicineCart;
 use App\Models\Medicines;
@@ -11,6 +12,7 @@ use App\Models\MedicineTransfers;
 use App\Models\Order;
 use App\Models\OrderItemMovement;
 use App\Models\OrderItems;
+use App\Models\Pharmacies;
 use App\Models\Receiving;
 use App\Models\ReceivingDetails;
 use App\Models\ReceivingItems;
@@ -828,11 +830,11 @@ class OrdersController extends Controller
         return view('orders.printSPB', compact('grouped'));
     }
 
-    public function smartMedicines(Request $request)
+    private function buildSmartMedicinesQuery(Request $request): array
     {
         $yesterday = now()->subDay()->format('Y-m-d');
-        $dateFrom = $request->date_from ?? $yesterday;
-        $dateTo = $request->date_to ?? $yesterday;
+        $dateFrom = $request->date_from ?: $yesterday;
+        $dateTo = $request->date_to ?: $yesterday;
         $search = $request->search;
         $orderId = $request->order_id;
         $sort = $request->sort ?? 'name_asc';
@@ -913,6 +915,13 @@ class OrdersController extends Controller
             $query->orderBy('medicines.name', 'asc');
         }
 
+        return [$query, $salesPharmacyId, $order, $dateFrom, $dateTo, $search, $sort, $pharmacyId];
+    }
+
+    public function smartMedicines(Request $request)
+    {
+        [$query, $salesPharmacyId] = $this->buildSmartMedicinesQuery($request);
+
         $results = $query->paginate(20);
 
         // Fetch 1-month (30 days) and 3-month (90 days) total sales for the paginated items
@@ -959,6 +968,72 @@ class OrdersController extends Controller
         });
 
         return response()->json($results);
+    }
+
+    public function exportSmartMedicines(Request $request)
+    {
+        [$query, $salesPharmacyId, $order, $dateFrom, $dateTo, $search, $sort, $pharmacyId] = $this->buildSmartMedicinesQuery($request);
+
+        $pharmacy = Pharmacies::find($pharmacyId);
+        $allRows = $query->get();
+
+        $medicineIds = $allRows->pluck('medicine_id')->filter()->unique()->values()->all();
+        $salesAggMap = [];
+
+        if (!empty($medicineIds)) {
+            $oneMonthAgo = now()->subDays(30)->toDateTimeString();
+            $threeMonthsAgo = now()->subDays(90)->toDateTimeString();
+
+            foreach (array_chunk($medicineIds, 1000) as $chunkIds) {
+                $salesAggChunk = MedicineCart::select('medicine_cart.medicine_id')
+                    ->selectRaw('COALESCE(SUM(CASE WHEN medicine_transactions.created_at >= ? THEN medicine_cart.quantity ELSE 0 END), 0) as sold_1_month', [$oneMonthAgo])
+                    ->selectRaw('COALESCE(SUM(medicine_cart.quantity), 0) as sold_3_months')
+                    ->join('medicine_transactions', 'medicine_transactions.id', '=', 'medicine_cart.transaction_id')
+                    ->where('medicine_transactions.pharmacy_id', $salesPharmacyId)
+                    ->where('medicine_transactions.status', 1)
+                    ->where('medicine_transactions.created_at', '>=', $threeMonthsAgo)
+                    ->whereIn('medicine_cart.medicine_id', $chunkIds)
+                    ->groupBy('medicine_cart.medicine_id')
+                    ->get();
+
+                foreach ($salesAggChunk as $agg) {
+                    $salesAggMap[$agg->medicine_id] = $agg;
+                }
+            }
+        }
+
+        $exportItems = $allRows->map(function ($row) use ($salesAggMap) {
+            $totalStocks = (int) ($row->batch_stock ?? 0) + (int) ($row->transfer_stock ?? 0);
+            $medId = $row->medicine_id;
+            $sold1Month = isset($salesAggMap[$medId]) ? (int) $salesAggMap[$medId]->sold_1_month : 0;
+            $sold3Months = isset($salesAggMap[$medId]) ? (int) $salesAggMap[$medId]->sold_3_months : 0;
+
+            return [
+                'medicine_id' => $row->medicine_id,
+                'code' => $row->code,
+                'name' => $row->name,
+                'packaging' => $row->packaging,
+                'raw_price' => $row->raw_price,
+                'total_sold' => (int) $row->total_sold,
+                'min_stock' => $row->minimal_stock,
+                'stocks' => $totalStocks,
+                'sold_1_month' => $sold1Month,
+                'sold_3_months' => $sold3Months,
+            ];
+        })->all();
+
+        $filters = [
+            'date_from' => $dateFrom,
+            'date_to' => $dateTo,
+            'search' => $search,
+            'sort' => $sort,
+            'pharmacy_name' => $pharmacy?->name ?? 'Apotek',
+            'order_code' => $order?->code ?? '-',
+        ];
+
+        $filename = 'SMART_ORDER_' . ($order?->code ? $order->code . '_' : '') . $dateFrom . '_sd_' . $dateTo . '.xlsx';
+
+        return Excel::download(new SmartOrderExport($exportItems, $filters), $filename);
     }
 
     public function addItemsBulk(Request $request)
