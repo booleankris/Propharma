@@ -396,178 +396,201 @@ class StockOpnameImportService
         DB::beginTransaction();
 
         try {
+            // Group valid rows by medicine_id to perform accurate reconciliation & stock adjustment per medicine
+            $rowsByMedicine = [];
             foreach ($validRows as $row) {
-                $medicineId = (int) $row['medicine_id'];
-                $stockPhysic = (int) $row['stock'];
-                $expiredDate = $row['expired_date'];
-                $etalasesId = $row['etalases_id'];
+                $rowsByMedicine[(int) $row['medicine_id']][] = $row;
+            }
 
-                // 1. Resolve target batch
-                // Look for existing batch with matching medicine_id, pharmacy_id, and expired_date
-                $batch = Batches::where('medicine_id', $medicineId)
-                    ->where('pharmacy_id', $batchTargetPharmacyId)
-                    ->whereDate('expired_date', $expiredDate)
-                    ->orderBy('id', 'asc')
-                    ->first();
+            foreach ($rowsByMedicine as $medicineId => $medRows) {
+                $totalPhysical = (int) array_sum(array_column($medRows, 'stock'));
 
-                if (!$batch) {
-                    try {
-                        $edSlug = Carbon::parse($expiredDate)->format('Ymd');
-                    } catch (\Throwable $e) {
-                        $edSlug = date('Ymd');
-                    }
-                    $batch = Batches::create([
-                        'medicine_id'  => $medicineId,
-                        'pharmacy_id'  => $batchTargetPharmacyId,
-                        'name'         => "OPN-{$edSlug}",
-                        'expired_date' => $expiredDate,
-                        'stock'        => 0,
-                    ]);
+                // Calculate current existing stock for this medicine before this opname
+                if ($targetMode === 'gudang') {
+                    $existingBatches = Batches::where('medicine_id', $medicineId)
+                        ->where('pharmacy_id', $batchTargetPharmacyId)
+                        ->get();
+                    $totalBefore = (int) $existingBatches->sum('stock');
+                } else {
+                    $existingBatches = Batches::where('medicine_id', $medicineId)
+                        ->where('pharmacy_id', $counterPharmacyId)
+                        ->get();
+
+                    $existingTransfers = MedicineTransferItems::whereIn('batches_id', $existingBatches->pluck('id'))
+                        ->where('status', 1)
+                        ->where(function ($q) {
+                            $q->whereNull('source_type')->orWhere('source_type', '!=', 'retur_gudang');
+                        })
+                        ->get();
+                    $totalBefore = (int) $existingTransfers->sum('qty');
                 }
 
+                $discrepancy = $totalPhysical - $totalBefore;
+                $status      = $discrepancy >= 0 ? 5 : 6;
+
+                $assignedBatchIds = [];
+                $lastResolvedBatch = null;
+
+                // Process each row/batch for this medicine
+                foreach ($medRows as $row) {
+                    $stockPhysic = (int) $row['stock'];
+                    $expiredDate = $row['expired_date'];
+                    $etalasesId  = $row['etalases_id'];
+
+                    // 1. Resolve target batch
+                    // a. Exact date match
+                    $batch = $existingBatches->first(function ($b) use ($expiredDate) {
+                        try {
+                            return $b->expired_date && Carbon::parse($b->expired_date)->toDateString() === Carbon::parse($expiredDate)->toDateString();
+                        } catch (\Throwable $e) {
+                            return false;
+                        }
+                    });
+
+                    // b. Year-Month match if exact day is not matched (e.g. 2029-10-31 vs 2029-10-01)
+                    if (!$batch && $expiredDate) {
+                        try {
+                            $targetYm = Carbon::parse($expiredDate)->format('Y-m');
+                            $batch = $existingBatches->first(function ($b) use ($targetYm, $assignedBatchIds) {
+                                return !in_array($b->id, $assignedBatchIds) && $b->expired_date && Carbon::parse($b->expired_date)->format('Y-m') === $targetYm;
+                            });
+                            if ($batch) {
+                                $batch->expired_date = $expiredDate;
+                                $batch->save();
+                            }
+                        } catch (\Throwable $e) {}
+                    }
+
+                    // c. Fallback: create new batch if none matched
+                    if (!$batch) {
+                        try {
+                            $edSlug = Carbon::parse($expiredDate)->format('Ymd');
+                        } catch (\Throwable $e) {
+                            $edSlug = date('Ymd');
+                        }
+                        $batch = Batches::create([
+                            'medicine_id'  => $medicineId,
+                            'pharmacy_id'  => $batchTargetPharmacyId,
+                            'name'         => "OPN-{$edSlug}",
+                            'expired_date' => $expiredDate,
+                            'stock'        => 0,
+                        ]);
+                    }
+
+                    $assignedBatchIds[] = $batch->id;
+                    $lastResolvedBatch  = $batch;
+
+                    // 2. Set physical stock for the resolved batch
+                    if ($targetMode === 'gudang') {
+                        $batch->stock = $stockPhysic;
+                        $batch->save();
+                    } else {
+                        $transfers = MedicineTransferItems::where('batches_id', $batch->id)
+                            ->where('status', 1)
+                            ->where(function ($q) {
+                                $q->whereNull('source_type')->orWhere('source_type', '!=', 'retur_gudang');
+                            })
+                            ->get();
+
+                        if ($transfers->isNotEmpty()) {
+                            $primary = $transfers->first();
+                            $primary->qty = $stockPhysic;
+                            if ($etalasesId) {
+                                $primary->etalases_id = $etalasesId;
+                            }
+                            $primary->save();
+
+                            foreach ($transfers->slice(1) as $secondary) {
+                                if ($secondary->qty != 0) {
+                                    $secondary->qty = 0;
+                                    $secondary->save();
+                                }
+                            }
+                        } else {
+                            $mutSeq++;
+                            $mutCode = $transfersPrefix . str_pad($mutSeq, 4, '0', STR_PAD_LEFT);
+
+                            $transferHeader = MedicineTransfers::create([
+                                'code'    => $mutCode,
+                                'status'  => 1,
+                                'user_id' => $userId,
+                            ]);
+
+                            MedicineTransferItems::create([
+                                'medicine_transfer_id' => $transferHeader->id,
+                                'batches_id'           => $batch->id,
+                                'source_batches_id'    => $batch->id,
+                                'qty'                  => $stockPhysic,
+                                'status'               => 1,
+                                'source_type'          => 'pelayanan',
+                                'etalases_id'          => $etalasesId,
+                            ]);
+                        }
+                    }
+                }
+
+                // 3. ZERO OUT all other batches/transfers of this medicine in this pharmacy not included in the opname!
+                // This ensures total stock becomes EXACTLY the physical stock, never duplicated or accumulated!
+                if ($targetMode === 'gudang') {
+                    Batches::where('medicine_id', $medicineId)
+                        ->where('pharmacy_id', $batchTargetPharmacyId)
+                        ->whereNotIn('id', $assignedBatchIds)
+                        ->where('stock', '!=', 0)
+                        ->update(['stock' => 0]);
+                } else {
+                    $otherBatchIds = Batches::where('medicine_id', $medicineId)
+                        ->where('pharmacy_id', $counterPharmacyId)
+                        ->whereNotIn('id', $assignedBatchIds)
+                        ->pluck('id');
+
+                    if ($otherBatchIds->isNotEmpty()) {
+                        MedicineTransferItems::whereIn('batches_id', $otherBatchIds)
+                            ->where('status', 1)
+                            ->where('qty', '!=', 0)
+                            ->update(['qty' => 0]);
+                    }
+                }
+
+                // 4. Record Opname header & ItemsLog adjustment
                 $opnameSeq++;
                 $opnameCode = $opnamePrefix . str_pad($opnameSeq, 4, '0', STR_PAD_LEFT);
 
                 $logSeq++;
                 $logCode = $itemsLogPrefix . str_pad($logSeq, 4, '0', STR_PAD_LEFT);
 
-                // 2. Process according to target_mode
-                if ($targetMode === 'gudang') {
-                    if ($stockPhysic === 0) {
-                        // Jika opname menyatakan stok = 0 (habis di gudang), nolkan seluruh batch gudang lainnya untuk obat ini
-                        Batches::where('medicine_id', $medicineId)
-                            ->where('pharmacy_id', $batchTargetPharmacyId)
-                            ->where('id', '!=', $batch->id)
-                            ->where('stock', '!=', 0)
-                            ->update(['stock' => 0]);
-                    }
+                $logBatchId = $lastResolvedBatch ? $lastResolvedBatch->id : null;
 
-                    $storageBefore = (int) $batch->stock;
-                    $discrepancy   = $stockPhysic - $storageBefore;
-                    $status        = $discrepancy >= 0 ? 5 : 6;
+                StockOpname::create([
+                    'users_id'          => $userId,
+                    'batches_id'        => $logBatchId,
+                    'stock_physical'    => $totalPhysical,
+                    'stock_discrepancy' => $discrepancy,
+                    'stock_total'       => $totalPhysical,
+                    'date'              => now()->toDateString(),
+                    'status'            => $status,
+                ]);
 
-                    $batch->stock = $stockPhysic;
-                    $batch->save();
-
-                    StockOpname::create([
-                        'users_id'          => $userId,
-                        'batches_id'        => $batch->id,
-                        'stock_physical'    => $stockPhysic,
-                        'stock_discrepancy' => $discrepancy,
-                        'stock_total'       => $stockPhysic,
-                        'date'              => now()->toDateString(),
-                        'status'            => $status,
-                    ]);
-
-                    ItemsLog::create([
-                        'batches_id'       => $batch->id,
-                        'transaction_code' => $opnameCode,
-                        'code'             => $logCode,
-                        'type'             => "SO",
-                        'medicine_id'      => $medicineId,
-                        'qty'              => abs($discrepancy),
-                        'qty_before'       => $storageBefore,
-                        'qty_after'        => $stockPhysic,
-                        'total'            => $discrepancy,
-                        'date'             => now()->toDateTimeString(),
-                        'status'           => $status,
-                        'user_id'          => $userId,
-                    ]);
-                } else {
-                    // Pelayanan mode
-                    if ($stockPhysic === 0) {
-                        // Jika opname menyatakan stok = 0 (habis di etalase cabang), nolkan seluruh transfer items lama obat ini di cabang ini
-                        $otherBatchIds = Batches::where('medicine_id', $medicineId)
-                            ->where('pharmacy_id', $counterPharmacyId)
-                            ->where('id', '!=', $batch->id)
-                            ->pluck('id');
-
-                        if ($otherBatchIds->isNotEmpty()) {
-                            MedicineTransferItems::whereIn('batches_id', $otherBatchIds)
-                                ->where('status', 1)
-                                ->where('qty', '!=', 0)
-                                ->update(['qty' => 0]);
-                        }
-                    }
-
-                    $transfers = MedicineTransferItems::where('batches_id', $batch->id)
-                        ->where('status', 1)
-                        ->where(function ($q) {
-                            $q->whereNull('source_type')->orWhere('source_type', '!=', 'retur_gudang');
-                        })
-                        ->get();
-
-                    $counterBefore = (int) $transfers->sum('qty');
-                    $discrepancy   = $stockPhysic - $counterBefore;
-                    $status        = $discrepancy >= 0 ? 5 : 6;
-
-                    if ($transfers->isNotEmpty()) {
-                        $primary = $transfers->first();
-                        $primary->qty = $stockPhysic;
-                        if ($etalasesId) {
-                            $primary->etalases_id = $etalasesId;
-                        }
-                        $primary->save();
-
-                        foreach ($transfers->slice(1) as $secondary) {
-                            if ($secondary->qty != 0) {
-                                $secondary->qty = 0;
-                                $secondary->save();
-                            }
-                        }
-                    } else {
-                        $mutSeq++;
-                        $mutCode = $transfersPrefix . str_pad($mutSeq, 4, '0', STR_PAD_LEFT);
-
-                        $transferHeader = MedicineTransfers::create([
-                            'code'    => $mutCode,
-                            'status'  => 1,
-                            'user_id' => $userId,
-                        ]);
-
-                        MedicineTransferItems::create([
-                            'medicine_transfer_id' => $transferHeader->id,
-                            'batches_id'           => $batch->id,
-                            'source_batches_id'    => $batch->id,
-                            'qty'                  => $stockPhysic,
-                            'status'               => 1,
-                            'source_type'          => 'pelayanan',
-                            'etalases_id'          => $etalasesId,
-                        ]);
-                    }
-
-                    StockOpname::create([
-                        'users_id'          => $userId,
-                        'batches_id'        => $batch->id,
-                        'stock_physical'    => $stockPhysic,
-                        'stock_discrepancy' => $discrepancy,
-                        'stock_total'       => $stockPhysic,
-                        'date'              => now()->toDateString(),
-                        'status'            => $status,
-                    ]);
-
-                    ItemsLog::create([
-                        'batches_id'       => $batch->id,
-                        'transaction_code' => $opnameCode,
-                        'code'             => $logCode,
-                        'type'             => "SO",
-                        'medicine_id'      => $medicineId,
-                        'qty'              => abs($discrepancy),
-                        'qty_before'       => $counterBefore,
-                        'qty_after'        => $stockPhysic,
-                        'total'            => $discrepancy,
-                        'date'             => now()->toDateTimeString(),
-                        'status'           => $status,
-                        'user_id'          => $userId,
-                    ]);
-                }
+                ItemsLog::create([
+                    'batches_id'       => $logBatchId,
+                    'transaction_code' => $opnameCode,
+                    'code'             => $logCode,
+                    'type'             => "SO",
+                    'medicine_id'      => $medicineId,
+                    'qty'              => abs($discrepancy),
+                    'qty_before'       => $totalBefore,
+                    'qty_after'        => $totalPhysical,
+                    'total'            => $discrepancy,
+                    'date'             => now()->toDateTimeString(),
+                    'status'           => $status,
+                    'user_id'          => $userId,
+                ]);
 
                 $touchedMedicineIds[$medicineId] = true;
-                $processedCount++;
+                $processedCount += count($medRows);
 
-                if ($exportJob && $totalValid > 0 && ($processedCount % 10 === 0 || $processedCount === $totalValid)) {
+                if ($exportJob && $totalValid > 0 && ($processedCount % 10 === 0 || $processedCount >= $totalValid)) {
                     $percent = (int) round(($processedCount / $totalValid) * 90);
-                    $exportJob->setProgress($percent);
+                    $exportJob->setProgress(min(90, $percent));
                 }
             }
 
@@ -784,8 +807,11 @@ class StockOpnameImportService
         if (is_numeric($raw) && (int) $raw > 30000 && (int) $raw < 70000) {
             try {
                 $dt = ExcelDate::excelToDateTimeObject((float) $raw);
-                // If formattedVal is formatted as Month-Year (e.g. Jun-26, mmm-yy), set to end of month
-                if ($formatted && preg_match('/^[a-zA-Z]{3,}[-\s\/]\d{2,4}$/u', $formatted)) {
+                // If formattedVal is formatted as Month-Year (e.g. Jun-26, mmm-yy, 10/29, 10/2029), set to end of month
+                if ($formatted && (
+                    preg_match('/^[a-zA-Z]{3,}[-\s\/]\d{2,4}$/u', $formatted) ||
+                    preg_match('/^\d{1,2}[-\s\/]\d{2,4}$/u', $formatted)
+                )) {
                     return Carbon::instance($dt)->endOfMonth()->toDateString();
                 }
                 return $dt->format('Y-m-d');
