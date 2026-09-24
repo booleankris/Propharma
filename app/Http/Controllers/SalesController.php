@@ -318,6 +318,34 @@ class SalesController extends Controller
             ->limit(40)
             ->get();
 
+        $medicineIds = $items->pluck('id')->filter()->toArray();
+        if (!empty($medicineIds)) {
+            $branchStocks = DB::table('medicine_transfer_items as mt')
+                ->join('batches as b', 'b.id', '=', 'mt.batches_id')
+                ->select(
+                    'b.medicine_id',
+                    DB::raw('COALESCE(SUM(CASE WHEN b.pharmacy_id = 2 THEN mt.qty ELSE 0 END), 0) as stock_asm'),
+                    DB::raw('COALESCE(SUM(CASE WHEN b.pharmacy_id = 3 THEN mt.qty ELSE 0 END), 0) as stock_mim'),
+                    DB::raw('COALESCE(SUM(CASE WHEN b.pharmacy_id = 5 THEN mt.qty ELSE 0 END), 0) as stock_asa')
+                )
+                ->where('mt.status', 1)
+                ->whereIn('b.medicine_id', $medicineIds)
+                ->whereIn('b.pharmacy_id', [2, 3, 5])
+                ->where(function ($q) {
+                    $q->whereNull('mt.source_type')->orWhere('mt.source_type', '!=', 'retur_gudang');
+                })
+                ->groupBy('b.medicine_id')
+                ->get()
+                ->keyBy('medicine_id');
+
+            foreach ($items as $item) {
+                $bs = $branchStocks->get($item->id);
+                $item->stock_asm = (int) ($bs?->stock_asm ?? 0);
+                $item->stock_mim = (int) ($bs?->stock_mim ?? 0);
+                $item->stock_asa = (int) ($bs?->stock_asa ?? 0);
+            }
+        }
+
         return response()->json($items);
     }
     // public function search(Request $request)

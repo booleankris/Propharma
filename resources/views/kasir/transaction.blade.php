@@ -2367,6 +2367,24 @@
                     <span class="text-[10px] text-amber-600 font-medium">Pelayanan</span>
                     <span class="text-xs font-bold text-amber-700">${escapeHtml(String(it.counter_stock || '—'))}</span>
                 </div>
+                <!-- ASM (pharmacy_id 2) - Hijau -->
+                <div class="flex items-center gap-1 bg-emerald-50 border border-emerald-300 rounded-md px-2 py-1" title="Stok Etalase Sahabat Mulawarman (ASM)">
+                    <span class="w-1 h-1 rounded-full bg-emerald-500"></span>
+                    <span class="text-[10px] text-emerald-700 font-bold">ASM</span>
+                    <span class="text-xs font-bold text-emerald-800">${escapeHtml(String(it.stock_asm !== undefined && it.stock_asm !== null ? it.stock_asm : '0'))}</span>
+                </div>
+                <!-- MIM (pharmacy_id 3) - Biru -->
+                <div class="flex items-center gap-1 bg-sky-50 border border-sky-300 rounded-md px-2 py-1" title="Stok Etalase Sahabat MIM (MIM)">
+                    <span class="w-1 h-1 rounded-full bg-sky-500"></span>
+                    <span class="text-[10px] text-sky-700 font-bold">MIM</span>
+                    <span class="text-xs font-bold text-sky-800">${escapeHtml(String(it.stock_mim !== undefined && it.stock_mim !== null ? it.stock_mim : '0'))}</span>
+                </div>
+                <!-- ASA (pharmacy_id 5) - Ungu -->
+                <div class="flex items-center gap-1 bg-fuchsia-50 border border-fuchsia-300 rounded-md px-2 py-1" title="Stok Etalase Sahabat Antasari (ASA)">
+                    <span class="w-1 h-1 rounded-full bg-fuchsia-500"></span>
+                    <span class="text-[10px] text-fuchsia-700 font-bold">ASA</span>
+                    <span class="text-xs font-bold text-fuchsia-800">${escapeHtml(String(it.stock_asa !== undefined && it.stock_asa !== null ? it.stock_asa : '0'))}</span>
+                </div>
             </div>
         </div>
  
