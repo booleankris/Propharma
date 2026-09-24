@@ -117,7 +117,7 @@ export default function PbfCombobox({ pbfs = [], selectedPbf = '', onSelectPbf, 
                                     <span className="truncate">{p.name}</span>
                                 </div>
                                 {p.code && (
-                                    <span className="shrink-0 text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">
+                                    <span className="shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">
                                         {p.code}
                                     </span>
                                 )}

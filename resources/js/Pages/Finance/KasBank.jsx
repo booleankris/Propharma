@@ -350,7 +350,7 @@ export default function KasBank({
                             </div>
                         </div>
                         <div className="mt-3">
-                            <div className="text-xl font-bold text-slate-900 tracking-tight font-mono">
+                            <div className={`text-xl font-bold tracking-tight ${Number(kasBankSummary.totalSaldo || 0) < 0 ? 'text-rose-600' : 'text-slate-900'}`}>
                                 {formatRupiah(kasBankSummary.totalSaldo)}
                             </div>
                             <div className="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
@@ -368,7 +368,7 @@ export default function KasBank({
                             </div>
                         </div>
                         <div className="mt-3">
-                            <div className="text-xl font-bold text-emerald-600 tracking-tight font-mono">
+                            <div className="text-xl font-bold text-emerald-600 tracking-tight">
                                 + {formatRupiah(kasBankSummary.totalMasuk)}
                             </div>
                             <div className="text-[11px] text-slate-400 mt-1">
@@ -386,7 +386,7 @@ export default function KasBank({
                             </div>
                         </div>
                         <div className="mt-3">
-                            <div className="text-xl font-bold text-rose-600 tracking-tight font-mono">
+                            <div className="text-xl font-bold text-rose-600 tracking-tight">
                                 - {formatRupiah(kasBankSummary.totalKeluar)}
                             </div>
                             <div className="text-[11px] text-slate-400 mt-1">
@@ -404,7 +404,7 @@ export default function KasBank({
                             </div>
                         </div>
                         <div className="mt-3">
-                            <div className={`text-xl font-bold tracking-tight font-mono ${kasBankSummary.netCashflow >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                            <div className={`text-xl font-bold tracking-tight ${kasBankSummary.netCashflow >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
                                 {kasBankSummary.netCashflow >= 0 ? '+ ' : ''}{formatRupiah(kasBankSummary.netCashflow)}
                             </div>
                             <div className="text-[11px] text-slate-400 mt-1">
@@ -478,7 +478,7 @@ export default function KasBank({
                                                 <div className="font-bold text-slate-900 text-xs truncate">
                                                     {acc.name}
                                                 </div>
-                                                <div className="text-[11px] text-slate-400 font-mono mt-0.5">
+                                                <div className="text-[11px] text-slate-500 font-medium mt-0.5">
                                                     {acc.code} {acc.account_number ? `• ${acc.account_number}` : ''}
                                                 </div>
                                             </div>
@@ -509,7 +509,7 @@ export default function KasBank({
                                             </div>
 
                                             <div className="flex items-center justify-between text-[10px] text-slate-400 pt-0.5">
-                                                <span>Saldo Buku: <strong className="font-mono text-slate-700">{formatRupiah(acc.balance)}</strong></span>
+                                                <span>Saldo Buku: <strong className="font-semibold text-slate-700">{formatRupiah(acc.balance)}</strong></span>
                                                 <span className="font-medium text-slate-500">{acc.txCount} Mutasi</span>
                                             </div>
                                         </div>
@@ -572,7 +572,7 @@ export default function KasBank({
                                         <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
                                             Net Flow
                                         </span>
-                                        <span className={`text-xs font-bold font-mono ${kasBankSummary.netCashflow >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                                        <span className={`text-xs font-bold ${kasBankSummary.netCashflow >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
                                             {kasBankSummary.netCashflow >= 0 ? '+' : ''}
                                             {Math.abs(kasBankSummary.netCashflow) > 1000000
                                                 ? `${(kasBankSummary.netCashflow / 1000000).toFixed(1)}Jt`
@@ -590,7 +590,7 @@ export default function KasBank({
                                     <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
                                     <span className="font-semibold text-emerald-900">Uang Masuk (Debit)</span>
                                 </div>
-                                <span className="font-mono font-bold text-emerald-700">
+                                <span className="font-bold text-emerald-700">
                                     {formatRupiah(kasBankSummary.totalMasuk)}
                                 </span>
                             </div>
@@ -600,7 +600,7 @@ export default function KasBank({
                                     <div className="w-2.5 h-2.5 rounded-full bg-rose-500" />
                                     <span className="font-semibold text-rose-900">Uang Keluar (Kredit)</span>
                                 </div>
-                                <span className="font-mono font-bold text-rose-700">
+                                <span className="font-bold text-rose-700">
                                     {formatRupiah(kasBankSummary.totalKeluar)}
                                 </span>
                             </div>
@@ -710,8 +710,8 @@ export default function KasBank({
                                             <td className="px-4 py-3 font-medium text-slate-700 whitespace-nowrap">
                                                 {item.date}
                                             </td>
-                                            <td className="px-4 py-3 font-mono font-semibold text-slate-900 whitespace-nowrap">
-                                                <span className="px-2 py-0.5 rounded-md bg-slate-100 border border-slate-200">
+                                            <td className="px-4 py-3 font-semibold text-slate-900 whitespace-nowrap">
+                                                <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-medium border border-slate-200/70">
                                                     {item.document_no}
                                                 </span>
                                             </td>
@@ -720,7 +720,7 @@ export default function KasBank({
                                                     <Landmark className="w-3.5 h-3.5 text-blue-600" />
                                                     <span>{item.account_name}</span>
                                                 </div>
-                                                <div className="text-[10px] text-slate-400 font-mono">
+                                                <div className="text-[10px] text-slate-500 font-medium">
                                                     {item.account_code}
                                                 </div>
                                             </td>
@@ -747,7 +747,7 @@ export default function KasBank({
                                             <td className="px-4 py-3 text-slate-500 max-w-xs truncate" title={item.description}>
                                                 {item.description}
                                             </td>
-                                            <td className="px-4 py-3 text-right font-mono whitespace-nowrap">
+                                            <td className="px-4 py-3 text-right whitespace-nowrap">
                                                 {item.direction === 'IN' ? (
                                                     <span className="font-bold text-emerald-600 inline-flex items-center justify-end gap-1">
                                                         <ArrowDownLeft className="w-3 h-3" />
@@ -757,7 +757,7 @@ export default function KasBank({
                                                     <span className="text-slate-300">-</span>
                                                 )}
                                             </td>
-                                            <td className="px-4 py-3 text-right font-mono whitespace-nowrap">
+                                            <td className="px-4 py-3 text-right whitespace-nowrap">
                                                 {item.direction === 'OUT' ? (
                                                     <span className="font-bold text-rose-600 inline-flex items-center justify-end gap-1">
                                                         <ArrowUpRight className="w-3 h-3" />
@@ -852,7 +852,7 @@ export default function KasBank({
                             <tbody className="divide-y divide-slate-100">
                                 {accounts.map((acc) => (
                                     <tr key={acc.id} className="hover:bg-slate-50/70 transition">
-                                        <td className="px-4 py-3 font-mono font-semibold text-blue-600">{acc.code}</td>
+                                        <td className="px-4 py-3 font-semibold text-blue-600">{acc.code}</td>
                                         <td className="px-4 py-3 font-bold text-slate-900">{acc.name}</td>
                                         <td className="px-4 py-3 text-slate-500">{acc.name_en || '-'}</td>
                                         <td className="px-4 py-3">
@@ -863,8 +863,8 @@ export default function KasBank({
                                                 {acc.category}
                                             </span>
                                         </td>
-                                        <td className="px-4 py-3 font-mono text-slate-600">{acc.account_number || '-'}</td>
-                                        <td className="px-4 py-3 font-mono text-slate-800 font-semibold text-right">
+                                        <td className="px-4 py-3 text-slate-600">{acc.account_number || '-'}</td>
+                                        <td className="px-4 py-3 text-slate-800 font-semibold text-right">
                                             {acc.category === 'Kas & Bank' ? formatRupiah(acc.balance) : '-'}
                                         </td>
                                         <td className="px-4 py-3">
@@ -967,7 +967,7 @@ export default function KasBank({
                                     placeholder={`Otomatis (contoh: ${getNextCodeForCategory(accountForm.category || 'Kas & Bank')})`}
                                     value={accountForm.code}
                                     onChange={(e) => setAccountForm({ ...accountForm, code: e.target.value })}
-                                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-mono focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
                                 />
                             </div>
 
@@ -1052,7 +1052,7 @@ export default function KasBank({
                                         placeholder="Nomor rekening bank..."
                                         value={accountForm.account_number}
                                         onChange={(e) => setAccountForm({ ...accountForm, account_number: e.target.value })}
-                                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-mono focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
                                     />
                                 </div>
                             )}

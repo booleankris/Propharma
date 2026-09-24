@@ -308,7 +308,7 @@ export default function Cash({ pembelianCash = [], creditors = [], kasBankAccoun
                                                 {item.akunPembayaran ? (
                                                     <div>
                                                         <span className="font-bold text-slate-800">{item.akunPembayaran.nama}</span>
-                                                        <span className="text-[10px] text-slate-400 block font-mono">
+                                                        <span className="text-[10px] text-slate-500 block font-medium">
                                                             {item.akunPembayaran.kode}
                                                         </span>
                                                     </div>

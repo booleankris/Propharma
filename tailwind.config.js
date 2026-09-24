@@ -9,10 +9,10 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
+        sans: ['"Plus Jakarta Sans"', 'Inter', 'system-ui', '-apple-system', 'sans-serif'],
         montserrat: ['Montserrat', 'sans-serif'],
         nunito: ['Nunito Sans', 'sans-serif'],
         quicksand: ['Quicksand'],
-
       },
     },
   },

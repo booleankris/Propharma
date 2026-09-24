@@ -47,7 +47,7 @@ export default function Dashboard({
                             </div>
                         </div>
                         <div className="mt-3">
-                            <div className="text-2xl font-bold text-slate-900 tracking-tight font-mono">
+                            <div className={`text-2xl font-bold tracking-tight ${Number(stats.totalSaldoKasBank || 0) < 0 ? 'text-rose-600' : 'text-slate-900'}`}>
                                 {formatRupiah(stats.totalSaldoKasBank || 0)}
                             </div>
                             <div className="text-[11px] text-blue-600 font-medium mt-1 flex items-center gap-1">
@@ -69,7 +69,7 @@ export default function Dashboard({
                             </div>
                         </div>
                         <div className="mt-3">
-                            <div className="text-2xl font-bold text-red-600 tracking-tight font-mono">
+                            <div className="text-2xl font-bold text-red-600 tracking-tight">
                                 {formatRupiah(stats.totalSisaHutang || 0)}
                             </div>
                             <div className="text-[11px] text-red-600 font-medium mt-1 flex items-center gap-1">
@@ -91,7 +91,7 @@ export default function Dashboard({
                             </div>
                         </div>
                         <div className="mt-3">
-                            <div className="text-2xl font-bold text-slate-900 tracking-tight font-mono">
+                            <div className="text-2xl font-bold text-slate-900 tracking-tight">
                                 {formatRupiah(stats.totalCashSpent || 0)}
                             </div>
                             <div className="text-[11px] text-emerald-600 font-medium mt-1 flex items-center gap-1">
@@ -113,7 +113,7 @@ export default function Dashboard({
                             </div>
                         </div>
                         <div className="mt-3">
-                            <div className="text-2xl font-bold text-amber-700 tracking-tight font-mono">
+                            <div className="text-2xl font-bold text-amber-700 tracking-tight">
                                 {formatRupiah(stats.totalSisaPiutang || 0)}
                             </div>
                             <div className="text-[11px] text-amber-600 font-medium mt-1 flex items-center gap-1">
@@ -149,7 +149,7 @@ export default function Dashboard({
                                         <div className="text-[10px] text-emerald-700">Piutang & penjualan</div>
                                     </div>
                                 </div>
-                                <div className="text-right font-mono font-bold text-emerald-700 text-sm">
+                                <div className="text-right font-bold text-emerald-700 text-sm">
                                     +{formatRupiah(stats.kasMasuk || 0)}
                                 </div>
                             </div>
@@ -164,7 +164,7 @@ export default function Dashboard({
                                         <div className="text-[10px] text-rose-700">Hutang & pembelian</div>
                                     </div>
                                 </div>
-                                <div className="text-right font-mono font-bold text-rose-700 text-sm">
+                                <div className="text-right font-bold text-rose-700 text-sm">
                                     -{formatRupiah(stats.kasKeluar || 0)}
                                 </div>
                             </div>
@@ -179,7 +179,7 @@ export default function Dashboard({
                                         <div className="text-[10px] text-slate-500">Selisih masuk & keluar</div>
                                     </div>
                                 </div>
-                                <div className={`text-right font-mono font-bold text-sm ${stats.netCashflow >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                                <div className={`text-right font-bold text-sm ${stats.netCashflow >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
                                     {stats.netCashflow >= 0 ? '+ ' : ''}{formatRupiah(stats.netCashflow || 0)}
                                 </div>
                             </div>
@@ -207,7 +207,7 @@ export default function Dashboard({
                                     <div key={h.id} className="py-2.5 flex items-center justify-between text-xs hover:bg-slate-50/60 px-2 rounded-lg transition">
                                         <div className="space-y-0.5">
                                             <div className="flex items-center gap-2">
-                                                <span className="font-mono font-bold text-slate-900">{h.no_faktur || h.no_penerimaan}</span>
+                                                <span className="font-semibold text-slate-900">{h.no_faktur || h.no_penerimaan}</span>
                                                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${h.is_overdue ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
                                                     {h.is_overdue ? `Terlambat ${h.days_diff} hari` : `${h.days_diff} hari lagi`}
                                                 </span>
@@ -217,7 +217,7 @@ export default function Dashboard({
                                             </div>
                                         </div>
                                         <div className="text-right">
-                                            <div className="font-mono font-bold text-red-600">
+                                            <div className="font-bold text-red-600 text-sm">
                                                 {formatRupiah(h.sisa_bayar)}
                                             </div>
                                             <Link
@@ -272,8 +272,8 @@ export default function Dashboard({
                                     recentMutasi.map((m) => (
                                         <tr key={m.id} className="hover:bg-slate-50/70 transition">
                                             <td className="px-4 py-3 font-medium text-slate-700 whitespace-nowrap">{m.date}</td>
-                                            <td className="px-4 py-3 font-mono font-semibold text-slate-900 whitespace-nowrap">
-                                                <span className="px-2 py-0.5 rounded-md bg-slate-100 border border-slate-200">
+                                            <td className="px-4 py-3 font-semibold text-slate-900 whitespace-nowrap">
+                                                <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-medium border border-slate-200/70">
                                                     {m.document_no}
                                                 </span>
                                             </td>
@@ -296,14 +296,14 @@ export default function Dashboard({
                                                 )}
                                             </td>
                                             <td className="px-4 py-3 font-medium text-slate-800">{m.party}</td>
-                                            <td className="px-4 py-3 text-right font-mono whitespace-nowrap">
+                                            <td className="px-4 py-3 text-right whitespace-nowrap">
                                                 {m.direction === 'IN' ? (
                                                     <span className="font-bold text-emerald-600 inline-flex items-center gap-1">
                                                         <ArrowDownLeft className="w-3 h-3" />+{formatRupiah(m.amount)}
                                                     </span>
                                                 ) : '-'}
                                             </td>
-                                            <td className="px-4 py-3 text-right font-mono whitespace-nowrap">
+                                            <td className="px-4 py-3 text-right whitespace-nowrap">
                                                 {m.direction === 'OUT' ? (
                                                     <span className="font-bold text-rose-600 inline-flex items-center gap-1">
                                                         <ArrowUpRight className="w-3 h-3" />-{formatRupiah(m.amount)}
