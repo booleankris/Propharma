@@ -83,7 +83,7 @@ export default function FinanceLayout({ title, subtitle, children, stats = {} })
                 </div>
 
                 {/* Navigasi Menu Finance */}
-                <nav className="flex-1 p-3 space-y-1 overflow-y-auto text-xs font-medium">
+                <nav className="flex-1 p-3 space-y-1 overflow-y-auto text-xs">
                     <div className="pt-2 pb-1 px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                         Menu Utama
                     </div>
@@ -94,18 +94,18 @@ export default function FinanceLayout({ title, subtitle, children, stats = {} })
                             <Link
                                 key={item.name}
                                 href={item.href}
-                                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition ${
+                                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-colors duration-150 ${
                                     item.active
-                                        ? 'bg-blue-50 text-blue-600 font-bold shadow-xs'
+                                        ? 'bg-blue-50/80 text-blue-600 shadow-xs'
                                         : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                                 }`}
                             >
                                 <div className="flex items-center gap-3">
-                                    <Icon className={`w-4 h-4 ${item.active ? 'text-blue-600' : 'text-slate-400'}`} />
+                                    <Icon className={`w-4 h-4 transition-colors ${item.active ? 'text-blue-600' : 'text-slate-400'}`} />
                                     <span>{item.name}</span>
                                 </div>
                                 {item.badge && (
-                                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${item.badge.color}`}>
+                                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${item.badge.color}`}>
                                         {item.badge.text}
                                     </span>
                                 )}

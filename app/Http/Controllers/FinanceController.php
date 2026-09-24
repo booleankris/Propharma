@@ -12,6 +12,7 @@ use App\Models\Receiving;
 use App\Models\ReceivingDetails;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
@@ -574,6 +575,25 @@ class FinanceController extends Controller
      */
     protected function getStats($hutang = null, $cash = null, $piutang = null)
     {
+        // Jika data lengkap tidak disediakan, gunakan cache agar angka badge dan ringkasan selalu konsisten di semua halaman
+        $isFullData = ($hutang !== null && $cash !== null && $piutang !== null);
+        if (!$isFullData) {
+            $cached = Cache::get('finance_stats_summary');
+            if ($cached) {
+                return $cached;
+            }
+        }
+
+        if ($hutang === null) {
+            $hutang = $this->getHutangData();
+        }
+        if ($cash === null) {
+            $cash = $this->getCashData();
+        }
+        if ($piutang === null) {
+            $piutang = $this->getPiutangData();
+        }
+
         $totalSaldoKasBank = (float) FinanceAccount::where('category', 'Kas & Bank')->where('is_active', true)->sum('balance');
         $accountsCount = FinanceAccount::where('category', 'Kas & Bank')->where('is_active', true)->count();
 
@@ -588,53 +608,37 @@ class FinanceController extends Controller
         $countLunas = 0;
         $totalHutangSisa = 0;
 
-        if ($hutang !== null) {
-            foreach ($hutang as $h) {
-                $totalHutangSisa += $h['sisa'];
-                if ($h['status'] === 'Lunas') {
-                    $countLunas++;
-                } elseif ($h['status'] === 'Dibayar Sebagian') {
-                    $countSebagian++;
-                    $countHutangBelumLunas++;
-                } else {
-                    $countBelumBayar++;
-                    $countHutangBelumLunas++;
-                }
+        foreach ($hutang as $h) {
+            $totalHutangSisa += $h['sisa'];
+            if ($h['status'] === 'Lunas') {
+                $countLunas++;
+            } elseif ($h['status'] === 'Dibayar Sebagian') {
+                $countSebagian++;
+                $countHutangBelumLunas++;
+            } else {
+                $countBelumBayar++;
+                $countHutangBelumLunas++;
             }
-        } else {
-            $countHutangBelumLunas = Receiving::whereIn('status', [1, 2])
-                ->whereHas('receiving_details', fn($q) => $q->where('invoice_payment', 'KREDIT'))
-                ->count();
         }
 
         // Cash Stats
-        $totalCashPurchases = 0;
-        $totalCashCount = 0;
-        if ($cash !== null) {
-            $totalCashPurchases = array_sum(array_column($cash, 'total'));
-            $totalCashCount = count($cash);
-        } else {
-            $totalCashCount = Receiving::whereHas('receiving_details', fn($q) => $q->where('invoice_payment', 'TUNAI'))->count();
-        }
+        $totalCashPurchases = array_sum(array_column($cash, 'total'));
+        $totalCashCount = count($cash);
 
         // Piutang Stats
         $totalPiutangSisa = 0;
         $countPiutangBelumBayar = 0;
         $countPiutangLunas = 0;
-        if ($piutang !== null) {
-            foreach ($piutang as $p) {
-                $totalPiutangSisa += $p['sisa'];
-                if ($p['status'] === 'Lunas') {
-                    $countPiutangLunas++;
-                } else {
-                    $countPiutangBelumBayar++;
-                }
+        foreach ($piutang as $p) {
+            $totalPiutangSisa += $p['sisa'];
+            if ($p['status'] === 'Lunas') {
+                $countPiutangLunas++;
+            } else {
+                $countPiutangBelumBayar++;
             }
-        } else {
-            $countPiutangBelumBayar = MedicineTransactions::where('transaction_type', 'KREDIT')->where('status', 1)->count();
         }
 
-        return [
+        $stats = [
             'totalSaldoKasBank' => $totalSaldoKasBank,
             'accountsCount' => $accountsCount,
             'kasMasuk' => $kasMasuk,
@@ -654,6 +658,18 @@ class FinanceController extends Controller
             'countPiutangBelumBayar' => $countPiutangBelumBayar,
             'countPiutangLunas' => $countPiutangLunas,
         ];
+
+        Cache::put('finance_stats_summary', $stats, 60);
+
+        return $stats;
+    }
+
+    /**
+     * Helper: Hapus cache ringkasan statistik modul finance.
+     */
+    protected function clearStatsCache()
+    {
+        Cache::forget('finance_stats_summary');
     }
 
     /**
@@ -725,6 +741,7 @@ class FinanceController extends Controller
             }
         });
 
+        $this->clearStatsCache();
         return back()->with('success', 'Pembayaran hutang dagang berhasil dicatat.');
     }
 
@@ -802,6 +819,7 @@ class FinanceController extends Controller
             }
         });
 
+        $this->clearStatsCache();
         return back()->with('success', 'Akun pembayaran pembelian cash berhasil disimpan.');
     }
 
@@ -882,6 +900,7 @@ class FinanceController extends Controller
             }
         });
 
+        $this->clearStatsCache();
         $formattedTotal = number_format($totalPaidAll, 0, ',', '.');
         return back()->with('success', "Berhasil melunasi {$processedCount} faktur hutang dagang sebesar Rp {$formattedTotal} via {$account->name}.");
     }
@@ -964,6 +983,7 @@ class FinanceController extends Controller
             }
         });
 
+        $this->clearStatsCache();
         return back()->with('success', "Berhasil menetapkan akun {$account->name} untuk {$processedCount} transaksi pembelian cash.");
     }
 
@@ -1048,6 +1068,7 @@ class FinanceController extends Controller
             'is_active' => true,
         ]);
 
+        $this->clearStatsCache();
         return back()->with('success', "Akun baru '{$validated['name']}' dengan kode {$code} berhasil ditambahkan.");
     }
 
@@ -1074,6 +1095,7 @@ class FinanceController extends Controller
             'account_number' => $validated['account_number'] ?? null,
         ]);
 
+        $this->clearStatsCache();
         return back()->with('success', "Akun '{$account->name}' berhasil diperbarui.");
     }
 
@@ -1093,6 +1115,7 @@ class FinanceController extends Controller
         $accountName = $account->name;
         $account->delete();
 
+        $this->clearStatsCache();
         return back()->with('success', "Akun '{$accountName}' berhasil dihapus.");
     }
 
@@ -1148,6 +1171,7 @@ class FinanceController extends Controller
 
             DB::commit();
 
+            $this->clearStatsCache();
             return redirect()->back()->with('success', 'Penerimaan pembayaran piutang berhasil dicatat.');
         } catch (\Exception $e) {
             DB::rollBack();
@@ -1221,6 +1245,7 @@ class FinanceController extends Controller
 
             DB::commit();
 
+            $this->clearStatsCache();
             return redirect()->back()->with('success', "Berhasil melunasi {$processedCount} tagihan piutang penjualan.");
         } catch (\Exception $e) {
             DB::rollBack();
