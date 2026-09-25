@@ -8,7 +8,7 @@ import { formatRupiah, formatNumberOnly } from './Components/Utils';
 import {
     CreditCard, Search, Filter, Check, X, Building2,
     Calendar, CheckCircle2, AlertCircle, Eye, ChevronLeft, ChevronRight,
-    ArrowLeft, Printer, Share2, MoreVertical, ChevronDown, History, Landmark, Maximize2
+    ArrowLeft, Printer, Share2, MoreVertical, ChevronDown, History, Landmark, Maximize2, Download
 } from 'lucide-react';
 
 export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccounts = [], stats = {} }) {
@@ -623,6 +623,16 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                                     Lunas
                                 </button>
                             </div>
+
+                            {/* Tombol Export Data */}
+                            <a
+                                href={`/finance/export/hutang?search=${encodeURIComponent(searchTerm)}&status=${encodeURIComponent(statusFilter === 'ALL' ? '' : statusFilter)}&pbf=${encodeURIComponent(filterPbf)}`}
+                                className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 hover:text-slate-900 rounded-xl text-xs font-semibold transition shadow-xs cursor-pointer"
+                                title="Export data hutang dagang ke CSV/Excel dengan filter aktif"
+                            >
+                                <Download className="w-3.5 h-3.5 text-slate-500" />
+                                <span>Export Data</span>
+                            </a>
                         </div>
 
                         {/* Tombol Pelunasan Massal */}

@@ -7,7 +7,7 @@ import FloatingActionBar from './Components/FloatingActionBar';
 import { formatRupiah, formatNumberOnly } from './Components/Utils';
 import {
     Banknote, Search, Check, X, Calendar, AlertCircle, ChevronLeft, ChevronRight,
-    ArrowLeft, Printer, Share2, MoreVertical, ChevronDown, History, Landmark, Maximize2, CreditCard
+    ArrowLeft, Printer, Share2, MoreVertical, ChevronDown, History, Landmark, Maximize2, CreditCard, Download
 } from 'lucide-react';
 
 export default function Cash({ pembelianCash = [], creditors = [], kasBankAccounts = [], stats = {} }) {
@@ -563,6 +563,16 @@ export default function Cash({ pembelianCash = [], creditors = [], kasBankAccoun
                                 onSelectPbf={(val) => { setFilterPbf(val); setCurrentPage(1); }}
                                 placeholder="Filter PBF (Kreditur)..."
                             />
+
+                            {/* Tombol Export Data */}
+                            <a
+                                href={`/finance/export/cash?search=${encodeURIComponent(searchTerm)}&pbf=${encodeURIComponent(filterPbf)}`}
+                                className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 hover:text-slate-900 rounded-xl text-xs font-semibold transition shadow-xs cursor-pointer"
+                                title="Export data pembelian cash ke CSV/Excel dengan filter aktif"
+                            >
+                                <Download className="w-3.5 h-3.5 text-slate-500" />
+                                <span>Export Data</span>
+                            </a>
                         </div>
 
                         {selectedCashIds.length > 0 && (

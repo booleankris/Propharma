@@ -57,29 +57,29 @@ export default function FloatingActionBar({
 
     return (
         <div className="fixed bottom-6 inset-x-0 mx-auto w-[92%] max-w-4xl z-40 animate-in slide-in-from-bottom-6 fade-in duration-200 pointer-events-auto">
-            <div className={`bg-slate-900/95 backdrop-blur-md border border-slate-700/80 shadow-2xl ${themeStyles.glow} rounded-2xl p-3.5 sm:p-4 text-white flex flex-col md:flex-row md:items-center justify-between gap-3.5 sm:gap-4`}>
-                
+            <div className={`backdrop-blur-md shadow-2xl ${themeStyles.amount} rounded-2xl p-3.5 sm:p-4 text-white flex flex-col md:flex-row md:items-center justify-between gap-3.5 sm:gap-4`}>
+
                 {/* 1. SEKSI KIRI: Item Count & Batas */}
                 <div className="flex items-center gap-3 shrink-0">
-                    <div className="w-10 h-10 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 shrink-0 shadow-inner">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-slate-300 shrink-0 shadow-inner ${themeStyles.btn}`}>
                         <CheckSquare className="w-5 h-5 text-white" />
                     </div>
                     <div>
                         <div className="flex items-center gap-2">
-                            <span className="text-sm font-bold text-white tracking-wide">
+                            <span className={`text-xs font-bold py-[4px] rounded-full px-[8px] text-[#ffffff] tracking-wide ${themeStyles.btn}`}>
                                 {selectedCount} {itemLabel}
                             </span>
-                            <span className="text-xs text-slate-400">terpilih</span>
+                            <span className="text-xs text-slate-800">terpilih</span>
                         </div>
                         <div className="flex items-center gap-1.5 mt-0.5">
                             {isLimitReached ? (
-                                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-300 bg-amber-500/20 border border-amber-500/40 px-2.5 py-0.5 rounded-full animate-pulse">
-                                    <AlertTriangle className="w-3 h-3 text-amber-400" />
+                                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#eb4d25] bg-amber-500/20 border border-amber-500/40 px-2.5 py-0.5 rounded-full animate-pulse">
+                                    <AlertTriangle className="w-3 h-3 text-[#eb4d25]" />
                                     Batas Maksimal ({maxLimit}) Tercapai
                                 </span>
                             ) : (
-                                <span className="inline-flex items-center text-[11px] font-medium text-slate-400 bg-slate-800 border border-slate-700 px-2 py-0.5 rounded-full">
-                                    Batas: <strong className="text-white ml-1">{selectedCount}</strong> / {maxLimit} {itemLabel}
+                                <span className="inline-flex items-center text-[11px] text-[#eb4d25] font-bold rounded-full">
+                                    Batas: <strong className=" ml-1">{selectedCount}</strong> / {maxLimit} {itemLabel}
                                 </span>
                             )}
                         </div>
@@ -88,10 +88,10 @@ export default function FloatingActionBar({
 
                 {/* 2. SEKSI TENGAH: Total Nominal (Sangat Sensitif & Akurat) */}
                 <div className="flex-1 md:border-l md:border-r border-slate-800 md:px-5 flex flex-col justify-center">
-                    <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                    <div className="text-[11px] font-semibold text-slate-800 uppercase tracking-wider flex items-center justify-between">
                         <span>{titleAmount}</span>
                         {cleanFullAmount != null && cleanFullAmount !== cleanAmount && (
-                            <span className="text-[10px] text-slate-500 font-normal">
+                            <span className="text-[10px] text-slate-800 font-medium">
                                 Total Tagihan: {formatRupiah(cleanFullAmount)}
                             </span>
                         )}
@@ -99,7 +99,7 @@ export default function FloatingActionBar({
                     <div className={`text-xl sm:text-2xl font-black ${themeStyles.amount} tracking-tight leading-none mt-1`}>
                         {formatRupiah(cleanAmount)}
                     </div>
-                    <div className="text-[10px] text-slate-400 mt-1 flex items-center gap-1.5">
+                    <div className="text-[10px] text-slate-800 mt-1 flex items-center gap-1.5">
                         <span className={`w-1.5 h-1.5 rounded-full ${themeStyles.dot} inline-block shrink-0`} />
                         <span>Akumulasi nominal {selectedCount} {itemLabel} yang dicentang</span>
                     </div>
@@ -110,7 +110,7 @@ export default function FloatingActionBar({
                     <button
                         type="button"
                         onClick={onClear}
-                        className="px-3 py-2 text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800/80 rounded-xl transition flex items-center gap-1.5 cursor-pointer"
+                        className="px-3 py-2 bg-[#e61818] text-xs font-semibold text-[#fff] hover:text-white hover:bg-slate-800/80 rounded-xl transition flex items-center gap-1.5 cursor-pointer"
                         title="Batalkan semua pilihan"
                     >
                         <X className="w-4 h-4" />

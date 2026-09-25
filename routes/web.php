@@ -550,6 +550,10 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
         Route::post('/bulk-cash-payment', [\App\Http\Controllers\FinanceController::class, 'assignBulkCashAccount'])->name('cash.bulkAssign');
         Route::post('/piutang-payments', [\App\Http\Controllers\FinanceController::class, 'storePiutangPayment'])->name('piutang.store');
         Route::post('/bulk-piutang-payments', [\App\Http\Controllers\FinanceController::class, 'bulkPiutangPayment'])->name('piutang.bulkStore');
+
+        Route::get('/export/piutang', [\App\Http\Controllers\FinanceController::class, 'exportPiutang'])->name('export.piutang');
+        Route::get('/export/hutang', [\App\Http\Controllers\FinanceController::class, 'exportHutang'])->name('export.hutang');
+        Route::get('/export/cash', [\App\Http\Controllers\FinanceController::class, 'exportCash'])->name('export.cash');
     });
 
     Route::get('/compositions/select', [CompositionsController::class, 'select'])->name('composition.select');
