@@ -1140,17 +1140,15 @@
                     }
 
                     res.data.forEach((item, index) => {
-                        tbody.insertAdjacentHTML('beforeend',
-                            `
-                                                                                                                                                <tr 
-                                                                                                                                                    data-item='${JSON.stringify(item)}'
-                                                                                                                                                    tabindex="0"
-                                                                                                                                                >
-                                                                                                                                                    <td>${((page - 1) * res.per_page) + index + 1}</td>
-                                                                                                                                                    <td>${item.name}</td>
-                                                                                                                                                </tr>
-                                                                                                                                            `
-                        );
+                        const tr = document.createElement('tr');
+                        tr.tabIndex = 0;
+                        tr.dataset.item = JSON.stringify(item);
+                        tr._itemData = item;
+                        tr.innerHTML = `
+                            <td>${((page - 1) * res.per_page) + index + 1}</td>
+                            <td>${item.name ?? ''}</td>
+                        `;
+                        tbody.appendChild(tr);
                     });
 
                     hasMore = res.current_page < res.last_page;
@@ -1368,7 +1366,17 @@
 
         // Select
         function selectRow(row) {
-            const item = JSON.parse(row.dataset.item);
+            let item = row._itemData;
+            if (!item && row.dataset.item) {
+                try {
+                    item = JSON.parse(row.dataset.item);
+                } catch (e) {
+                    console.error('Error parsing row item:', e);
+                    return;
+                }
+            }
+            if (!item) return;
+
             itemrawprice = parseFloat(item.raw_price) || 0;
             itemcontent = parseFloat(item.content) || 1;
             itemcreditor = item.creditors_id;
