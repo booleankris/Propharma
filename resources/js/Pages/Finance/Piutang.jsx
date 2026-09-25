@@ -9,7 +9,7 @@ import { formatRupiah, formatNumberOnly } from './Components/Utils';
 import {
     ShoppingCart, Search, Check, X, Calendar, AlertCircle, ChevronLeft, ChevronRight, User,
     ArrowLeft, Printer, MoreVertical, ChevronDown, History, Landmark, Maximize2, CreditCard,
-    Download, ArrowUp, ArrowDown, Clock, AlertTriangle, FileText, CheckCircle2
+    Download, ArrowUp, ArrowDown, Clock, AlertTriangle, FileText, CheckCircle2, FileSpreadsheet
 } from 'lucide-react';
 
 export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAccounts = [], stats = {} }) {
@@ -787,14 +787,14 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                                     )}
                                 </div>
 
-                                {/* Tombol Export Data */}
+                                {/* Tombol Export Excel */}
                                 <a
                                     href={`/finance/export/piutang?search=${encodeURIComponent(searchTerm)}&status=${encodeURIComponent(statusFilter === 'ALL' ? '' : statusFilter)}&debtor_id=${encodeURIComponent(debtorFilter)}&sort_by=${dueFilter.startsWith('due_') ? 'due_date' : 'created_at'}&sort_order=${sortCreatedAt}&due_mode=${encodeURIComponent(dueFilter)}`}
-                                    className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 hover:text-slate-900 rounded-xl text-xs font-semibold transition shadow-xs cursor-pointer"
-                                    title="Export data piutang ke CSV/Excel dengan filter aktif"
+                                    className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100/80 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-semibold transition shadow-2xs cursor-pointer"
+                                    title="Export data piutang ke Excel (.xlsx) dengan format rapi dan estetik"
                                 >
-                                    <Download className="w-3.5 h-3.5 text-slate-500" />
-                                    <span>Export Data</span>
+                                    <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                                    <span>Export Excel</span>
                                 </a>
                             </div>
 

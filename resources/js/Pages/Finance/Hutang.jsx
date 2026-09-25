@@ -8,7 +8,7 @@ import { formatRupiah, formatNumberOnly } from './Components/Utils';
 import {
     CreditCard, Search, Filter, Check, X, Building2,
     Calendar, CheckCircle2, AlertCircle, Eye, ChevronLeft, ChevronRight,
-    ArrowLeft, Printer, Share2, MoreVertical, ChevronDown, History, Landmark, Maximize2, Download
+    ArrowLeft, Printer, Share2, MoreVertical, ChevronDown, History, Landmark, Maximize2, Download, FileSpreadsheet
 } from 'lucide-react';
 
 export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccounts = [], stats = {} }) {
@@ -624,14 +624,14 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                                 </button>
                             </div>
 
-                            {/* Tombol Export Data */}
+                            {/* Tombol Export Excel */}
                             <a
                                 href={`/finance/export/hutang?search=${encodeURIComponent(searchTerm)}&status=${encodeURIComponent(statusFilter === 'ALL' ? '' : statusFilter)}&pbf=${encodeURIComponent(filterPbf)}`}
-                                className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 hover:text-slate-900 rounded-xl text-xs font-semibold transition shadow-xs cursor-pointer"
-                                title="Export data hutang dagang ke CSV/Excel dengan filter aktif"
+                                className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100/80 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-semibold transition shadow-2xs cursor-pointer"
+                                title="Export data hutang dagang ke Excel (.xlsx) dengan format rapi dan estetik"
                             >
-                                <Download className="w-3.5 h-3.5 text-slate-500" />
-                                <span>Export Data</span>
+                                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                                <span>Export Excel</span>
                             </a>
                         </div>
 

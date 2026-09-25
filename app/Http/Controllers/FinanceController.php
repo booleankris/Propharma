@@ -17,6 +17,10 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Maatwebsite\Excel\Facades\Excel;
+use App\Exports\Finance\PiutangExport;
+use App\Exports\Finance\HutangExport;
+use App\Exports\Finance\CashExport;
 
 class FinanceController extends Controller
 {
@@ -1381,364 +1385,60 @@ class FinanceController extends Controller
     }
 
     /**
-     * Export data Piutang Penjualan (Streaming CSV dengan performa tinggi & hemat memori).
+     * Export data Piutang Penjualan ke format Excel (.xlsx) dengan tampilan rapi & estetik.
      */
-    public function exportPiutang(Request $request): StreamedResponse
+    public function exportPiutang(Request $request)
     {
         $targetPharmacyIds = $this->getTargetPharmacyIds();
         $activePharmacy = Pharmacies::find(getActivePharmacyId()) ?? Pharmacies::find(1);
         $branchName = $activePharmacy ? preg_replace('/[^A-Za-z0-9_]/', '_', $activePharmacy->name) : 'Apotek';
-        $filename = "Export_Piutang_Penjualan_{$branchName}_" . date('Ymd_His') . ".csv";
+        $filename = "Laporan_Piutang_Penjualan_{$branchName}_" . date('Ymd_His') . ".xlsx";
 
-        $headers = [
-            'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
-            'Pragma' => 'no-cache',
-            'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
-            'Expires' => '0',
+        $filters = [
+            'search' => $request->query('search', ''),
+            'debtor_id' => $request->query('debtor_id', ''),
+            'status' => $request->query('status', ''),
+            'sort_order' => $request->query('sort_order', 'desc'),
+            'due_mode' => $request->query('due_mode', 'all'),
         ];
 
-        return response()->stream(function () use ($targetPharmacyIds, $request) {
-            $handle = fopen('php://output', 'w');
-            fprintf($handle, chr(0xEF).chr(0xBB).chr(0xBF)); // UTF-8 BOM
-
-            fputcsv($handle, [
-                'No',
-                'No Transaksi',
-                'Debitur / Instansi',
-                'Kode Debitur',
-                'Dokter',
-                'Pasien',
-                'Apotek Cabang',
-                'Tanggal Transaksi',
-                'Jatuh Tempo',
-                'Status Jatuh Tempo',
-                'Status Pembayaran',
-                'Total Penjualan (Rp)',
-                'Sudah Terbayar (Rp)',
-                'Sisa Piutang (Rp)',
-            ], ';');
-
-            $query = MedicineTransactions::with([
-                'debtors',
-                'doctors',
-                'patients',
-                'pharmacy',
-                'payments',
-                'transactions.medicine',
-            ])
-                ->where('transaction_type', 'KREDIT')
-                ->where('status', 1)
-                ->whereIn('pharmacy_id', $targetPharmacyIds);
-
-            if ($request->filled('search')) {
-                $s = trim($request->search);
-                $query->where(function ($q) use ($s) {
-                    $q->where('transaction_code', 'like', "%{$s}%")
-                      ->orWhereHas('debtors', fn($qd) => $qd->where('name', 'like', "%{$s}%"))
-                      ->orWhereHas('patients', fn($qp) => $qp->where('name', 'like', "%{$s}%"))
-                      ->orWhereHas('doctors', fn($qdc) => $qdc->where('name', 'like', "%{$s}%"));
-                });
-            }
-
-            if ($request->filled('debtor_id')) {
-                $query->where('debtor_id', $request->debtor_id);
-            }
-
-            $sortBy = $request->get('sort_by', 'created_at');
-            $sortOrder = strtolower($request->get('sort_order', 'desc')) === 'asc' ? 'asc' : 'desc';
-            if ($sortBy === 'due_date') {
-                $query->orderBy('created_at', $sortOrder);
-            } else {
-                $query->orderBy('created_at', $sortOrder);
-            }
-
-            $no = 1;
-            foreach ($query->cursor() as $tx) {
-                $calcSubtotal = 0;
-                foreach ($tx->transactions as $cart) {
-                    $qty = (float) ($cart->quantity ?? 0);
-                    $harga = (float) ($cart->item_price ?? 0);
-                    $calcSubtotal += (float) ($cart->final_price ?: ($cart->total_price ?: ($qty * $harga)));
-                }
-
-                $total = (float) ($tx->subtotal > 0 ? $tx->subtotal : $calcSubtotal);
-                $totalTerbayarViaFinance = (float) $tx->payments->sum('amount');
-                $legacyPaid = (float) ($tx->paid ?? 0);
-                $totalTerbayar = round(max($totalTerbayarViaFinance, $legacyPaid), 2);
-                if ($totalTerbayar > $total) $totalTerbayar = $total;
-                $sisa = round(max(0, $total - $totalTerbayar), 2);
-                $isLunas = ($sisa < 0.005 && $total > 0);
-                $statusLabel = $isLunas ? 'Lunas' : ($totalTerbayar > 0 ? 'Dibayar Sebagian' : 'Belum Bayar');
-
-                if ($request->filled('status')) {
-                    if ($request->status === 'LUNAS' && !$isLunas) continue;
-                    if ($request->status === 'BELUM_LUNAS' && $isLunas) continue;
-                }
-
-                $createdDate = $tx->created_at ? $tx->created_at->format('d/m/Y') : '-';
-                $dueDate = $tx->created_at ? $tx->created_at->copy()->addDays(30) : null;
-                $dueDateStr = $dueDate ? $dueDate->format('d/m/Y') : '-';
-                
-                $dueStatus = 'Aman';
-                if (!$isLunas && $dueDate) {
-                    if ($dueDate->isPast()) {
-                        $days = (int) $dueDate->diffInDays(now());
-                        $dueStatus = "Lewat {$days} Hari";
-                    } else {
-                        $days = (int) now()->diffInDays($dueDate);
-                        $dueStatus = "Sisa {$days} Hari";
-                    }
-                } elseif ($isLunas) {
-                    $dueStatus = 'Lunas';
-                }
-
-                if ($request->get('due_mode') === 'overdue' && ($isLunas || !$dueDate || !$dueDate->isPast())) {
-                    continue;
-                }
-                if ($request->get('due_mode') === 'due_soon' && ($isLunas || !$dueDate || $dueDate->isPast() || now()->diffInDays($dueDate) > 7)) {
-                    continue;
-                }
-
-                fputcsv($handle, [
-                    $no++,
-                    $tx->transaction_code ?: ('TRX-' . $tx->id),
-                    $tx->debtors->name ?? ($tx->patient_id ? ('Pasien: ' . ($tx->patients->name ?? 'Umum')) : 'Pelanggan Umum'),
-                    $tx->debtors->code ?? '-',
-                    $tx->doctors->name ?? '-',
-                    $tx->patients->name ?? '-',
-                    $tx->pharmacy->name ?? '-',
-                    $createdDate,
-                    $dueDateStr,
-                    $dueStatus,
-                    $statusLabel,
-                    number_format($total, 2, ',', '.'),
-                    number_format($totalTerbayar, 2, ',', '.'),
-                    number_format($sisa, 2, ',', '.'),
-                ], ';');
-            }
-
-            fclose($handle);
-        }, 200, $headers);
+        return Excel::download(new PiutangExport($targetPharmacyIds, $filters, $activePharmacy), $filename);
     }
 
     /**
-     * Export data Hutang Dagang (Streaming CSV dengan performa tinggi & hemat memori).
+     * Export data Hutang Dagang ke format Excel (.xlsx) dengan tampilan rapi & estetik.
      */
-    public function exportHutang(Request $request): StreamedResponse
+    public function exportHutang(Request $request)
     {
         $targetPharmacyIds = $this->getTargetPharmacyIds();
         $activePharmacy = Pharmacies::find(getActivePharmacyId()) ?? Pharmacies::find(1);
         $branchName = $activePharmacy ? preg_replace('/[^A-Za-z0-9_]/', '_', $activePharmacy->name) : 'Apotek';
-        $filename = "Export_Hutang_Dagang_{$branchName}_" . date('Ymd_His') . ".csv";
+        $filename = "Laporan_Hutang_Dagang_{$branchName}_" . date('Ymd_His') . ".xlsx";
 
-        $headers = [
-            'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
-            'Pragma' => 'no-cache',
-            'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
-            'Expires' => '0',
+        $filters = [
+            'search' => $request->query('search', ''),
+            'pbf' => $request->query('pbf', ''),
+            'status' => $request->query('status', ''),
         ];
 
-        return response()->stream(function () use ($targetPharmacyIds, $request) {
-            $handle = fopen('php://output', 'w');
-            fprintf($handle, chr(0xEF).chr(0xBB).chr(0xBF)); // UTF-8 BOM
-
-            fputcsv($handle, [
-                'No',
-                'No Faktur / Penerimaan',
-                'Vendor (PBF)',
-                'Kode NT',
-                'Tanggal Faktur',
-                'Jatuh Tempo',
-                'Status',
-                'Subtotal (Rp)',
-                'PPN (Rp)',
-                'Total Tagihan (Rp)',
-                'Sudah Terbayar (Rp)',
-                'Sisa Tagihan (Rp)',
-                'Gudang / Cabang',
-            ], ';');
-
-            $query = Receiving::with([
-                'receiving_details' => function ($query) {
-                    $query->where('invoice_payment', 'KREDIT')->with(['creditor', 'payments', 'receiving_items.order_items.medicines']);
-                },
-                'pharmacy',
-            ])
-                ->whereIn('pharmacy_id', $targetPharmacyIds)
-                ->whereHas('receiving_details', function ($query) {
-                    $query->where('invoice_payment', 'KREDIT');
-                })
-                ->latest('updated_at');
-
-            $no = 1;
-            foreach ($query->cursor() as $rec) {
-                foreach ($rec->receiving_details as $detail) {
-                    if ($detail->invoice_payment !== 'KREDIT') continue;
-
-                    $vendorName = $detail->creditor->name ?? ($detail->creditor_code ?: 'PBF / Vendor');
-                    
-                    if ($request->filled('search')) {
-                        $s = strtolower(trim($request->search));
-                        $nomor = strtolower($detail->invoice_number ?: $rec->code);
-                        $ref = strtolower($detail->receiving_details_code ?: $rec->code);
-                        $vnd = strtolower($vendorName);
-                        if (!str_contains($nomor, $s) && !str_contains($ref, $s) && !str_contains($vnd, $s)) {
-                            continue;
-                        }
-                    }
-
-                    if ($request->filled('pbf')) {
-                        if (!str_contains(strtolower($vendorName), strtolower($request->pbf))) {
-                            continue;
-                        }
-                    }
-
-                    $subtotal = 0;
-                    foreach ($detail->receiving_items as $item) {
-                        $qty = (float) ($item->qty_received ?? 0);
-                        $harga = (float) ($item->raw_price ?? ($item->order_items->price ?? 0));
-                        $subtotal += (float) ($item->total ?? ($qty * $harga));
-                    }
-
-                    $ppnType = strtoupper(trim($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA'));
-                    $ppnNominal = ($ppnType === 'EXCLUDE') ? round($subtotal * 0.11, 2) : 0;
-                    $total = round($subtotal + $ppnNominal, 2);
-                    $totalTerbayar = round((float) $detail->payments->sum('amount'), 2);
-                    $isLunas = ((int) $rec->status === 3) || ($totalTerbayar >= $total && $total > 0) || (($total - $totalTerbayar) < 0.005 && $total > 0);
-                    $sisa = $isLunas ? 0 : round(max(0, $total - $totalTerbayar), 2);
-                    $statusLabel = $isLunas ? 'Lunas' : ($totalTerbayar > 0 ? 'Dibayar Sebagian' : 'Belum Dibayar');
-
-                    if ($request->filled('status')) {
-                        if ($request->status === 'LUNAS' && !$isLunas) continue;
-                        if ($request->status === 'BELUM_LUNAS' && $isLunas) continue;
-                    }
-
-                    fputcsv($handle, [
-                        $no++,
-                        $detail->invoice_number ?: $rec->code,
-                        $vendorName,
-                        $detail->receiving_details_code ?: $rec->code,
-                        $detail->invoice_date ? \Carbon\Carbon::parse($detail->invoice_date)->format('d/m/Y') : ($rec->date ?: '-'),
-                        $detail->invoice_due ? \Carbon\Carbon::parse($detail->invoice_due)->format('d/m/Y') : '-',
-                        $statusLabel,
-                        number_format($subtotal, 2, ',', '.'),
-                        number_format($ppnNominal, 2, ',', '.'),
-                        number_format($total, 2, ',', '.'),
-                        number_format($totalTerbayar, 2, ',', '.'),
-                        number_format($sisa, 2, ',', '.'),
-                        $rec->pharmacy->name ?? 'Gudang Utama',
-                    ], ';');
-                }
-            }
-
-            fclose($handle);
-        }, 200, $headers);
+        return Excel::download(new HutangExport($targetPharmacyIds, $filters, $activePharmacy), $filename);
     }
 
     /**
-     * Export data Pembelian Cash (Streaming CSV dengan performa tinggi & hemat memori).
+     * Export data Pembelian Cash ke format Excel (.xlsx) dengan tampilan rapi & estetik.
      */
-    public function exportCash(Request $request): StreamedResponse
+    public function exportCash(Request $request)
     {
         $targetPharmacyIds = $this->getTargetPharmacyIds();
         $activePharmacy = Pharmacies::find(getActivePharmacyId()) ?? Pharmacies::find(1);
         $branchName = $activePharmacy ? preg_replace('/[^A-Za-z0-9_]/', '_', $activePharmacy->name) : 'Apotek';
-        $filename = "Export_Pembelian_Cash_{$branchName}_" . date('Ymd_His') . ".csv";
+        $filename = "Laporan_Pembelian_Cash_{$branchName}_" . date('Ymd_His') . ".xlsx";
 
-        $headers = [
-            'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
-            'Pragma' => 'no-cache',
-            'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
-            'Expires' => '0',
+        $filters = [
+            'search' => $request->query('search', ''),
+            'pbf' => $request->query('pbf', ''),
         ];
 
-        return response()->stream(function () use ($targetPharmacyIds, $request) {
-            $handle = fopen('php://output', 'w');
-            fprintf($handle, chr(0xEF).chr(0xBB).chr(0xBF)); // UTF-8 BOM
-
-            fputcsv($handle, [
-                'No',
-                'No Faktur / Pembelian',
-                'Vendor (PBF)',
-                'Kode NT',
-                'Tanggal Faktur',
-                'Status',
-                'Subtotal (Rp)',
-                'PPN (Rp)',
-                'Total Pembelian (Rp)',
-                'Akun Pembayaran',
-                'Gudang / Cabang',
-            ], ';');
-
-            $query = Receiving::with([
-                'receiving_details' => function ($query) {
-                    $query->where('invoice_payment', 'TUNAI')->with(['creditor', 'payments.account', 'receiving_items.order_items.medicines']);
-                },
-                'pharmacy',
-            ])
-                ->whereIn('pharmacy_id', $targetPharmacyIds)
-                ->whereHas('receiving_details', function ($query) {
-                    $query->where('invoice_payment', 'TUNAI');
-                })
-                ->latest('updated_at');
-
-            $no = 1;
-            foreach ($query->cursor() as $rec) {
-                foreach ($rec->receiving_details as $detail) {
-                    if ($detail->invoice_payment !== 'TUNAI') continue;
-
-                    $vendorName = $detail->creditor->name ?? ($detail->creditor_code ?: 'PBF / Vendor');
-                    
-                    if ($request->filled('search')) {
-                        $s = strtolower(trim($request->search));
-                        $nomor = strtolower($detail->invoice_number ?: $rec->code);
-                        $ref = strtolower($detail->receiving_details_code ?: $rec->code);
-                        $vnd = strtolower($vendorName);
-                        if (!str_contains($nomor, $s) && !str_contains($ref, $s) && !str_contains($vnd, $s)) {
-                            continue;
-                        }
-                    }
-
-                    if ($request->filled('pbf')) {
-                        if (!str_contains(strtolower($vendorName), strtolower($request->pbf))) {
-                            continue;
-                        }
-                    }
-
-                    $subtotal = 0;
-                    foreach ($detail->receiving_items as $item) {
-                        $qty = (float) ($item->qty_received ?? 0);
-                        $harga = (float) ($item->raw_price ?? ($item->order_items->price ?? 0));
-                        $subtotal += (float) ($item->total ?? ($qty * $harga));
-                    }
-
-                    $ppnType = strtoupper(trim($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA'));
-                    $ppnNominal = ($ppnType === 'EXCLUDE') ? round($subtotal * 0.11, 2) : 0;
-                    $total = round($subtotal + $ppnNominal, 2);
-
-                    $latestPayment = $detail->payments->last();
-                    $akunName = $latestPayment && $latestPayment->account ? "{$latestPayment->account->name} ({$latestPayment->account->code})" : '-';
-
-                    fputcsv($handle, [
-                        $no++,
-                        $detail->invoice_number ?: $rec->code,
-                        $vendorName,
-                        $detail->receiving_details_code ?: $rec->code,
-                        $detail->invoice_date ? \Carbon\Carbon::parse($detail->invoice_date)->format('d/m/Y') : ($rec->date ?: '-'),
-                        'Lunas (Cash)',
-                        number_format($subtotal, 2, ',', '.'),
-                        number_format($ppnNominal, 2, ',', '.'),
-                        number_format($total, 2, ',', '.'),
-                        $akunName,
-                        $rec->pharmacy->name ?? 'Gudang Utama',
-                    ], ';');
-                }
-            }
-
-            fclose($handle);
-        }, 200, $headers);
+        return Excel::download(new CashExport($targetPharmacyIds, $filters, $activePharmacy), $filename);
     }
 }
