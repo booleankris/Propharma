@@ -327,12 +327,11 @@ class SalesController extends Controller
                     DB::raw('COALESCE(SUM(CASE WHEN b.pharmacy_id = 1 THEN mt.qty ELSE 0 END), 0) as stock_pmi'),
                     DB::raw('COALESCE(SUM(CASE WHEN b.pharmacy_id = 2 THEN mt.qty ELSE 0 END), 0) as stock_asm'),
                     DB::raw('COALESCE(SUM(CASE WHEN b.pharmacy_id = 3 THEN mt.qty ELSE 0 END), 0) as stock_mim'),
-                    DB::raw('COALESCE(SUM(CASE WHEN b.pharmacy_id = 4 THEN mt.qty ELSE 0 END), 0) as stock_sutomo'),
                     DB::raw('COALESCE(SUM(CASE WHEN b.pharmacy_id = 5 THEN mt.qty ELSE 0 END), 0) as stock_asa')
                 )
                 ->where('mt.status', 1)
                 ->whereIn('b.medicine_id', $medicineIds)
-                ->whereIn('b.pharmacy_id', [1, 2, 3, 4, 5])
+                ->whereIn('b.pharmacy_id', [1, 2, 3, 5])
                 ->where(function ($q) {
                     $q->whereNull('mt.source_type')->orWhere('mt.source_type', '!=', 'retur_gudang');
                 })
@@ -345,7 +344,6 @@ class SalesController extends Controller
                 $item->stock_pmi = (int) ($bs?->stock_pmi ?? 0);
                 $item->stock_asm = (int) ($bs?->stock_asm ?? 0);
                 $item->stock_mim = (int) ($bs?->stock_mim ?? 0);
-                $item->stock_sutomo = (int) ($bs?->stock_sutomo ?? 0);
                 $item->stock_asa = (int) ($bs?->stock_asa ?? 0);
                 $item->active_pharmacy_id = (int) $pharmacyId;
             }
@@ -354,7 +352,6 @@ class SalesController extends Controller
                 $item->stock_pmi = 0;
                 $item->stock_asm = 0;
                 $item->stock_mim = 0;
-                $item->stock_sutomo = 0;
                 $item->stock_asa = 0;
                 $item->active_pharmacy_id = (int) $pharmacyId;
             }

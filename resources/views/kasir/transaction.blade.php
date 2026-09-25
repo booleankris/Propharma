@@ -2355,44 +2355,26 @@
                     textLabel: 'text-emerald-700',
                     textValue: 'text-emerald-800',
                     title: 'Stok Etalase Sahabat Mulawarman (ASM)'
-                },
-                4: {
-                    code: 'SUTOMO',
-                    key: 'stock_sutomo',
-                    bg: 'bg-indigo-50',
-                    border: 'border-indigo-300',
-                    dot: 'bg-indigo-500',
-                    textLabel: 'text-indigo-700',
-                    textValue: 'text-indigo-800',
-                    title: 'Stok Etalase Sahabat Sutomo'
                 }
             };
 
             // Urutan tampilan cabang lain disesuaikan dengan cabang yang sedang login
             let otherBranchIds = [];
             if (isPmi) {
-                // Jika PMI -> MIM, ASA, ASM (dan Sutomo jika ada stok)
+                // Jika PMI -> MIM, ASA, ASM
                 otherBranchIds = [3, 5, 2];
-                if (Number(it.stock_sutomo) > 0) otherBranchIds.push(4);
             } else if (currentId === 3) {
-                // Jika MIM -> PMI (Pelayanan saja), ASA, ASM (dan Sutomo jika ada stok)
+                // Jika MIM -> PMI (Pelayanan saja), ASA, ASM
                 otherBranchIds = [1, 5, 2];
-                if (Number(it.stock_sutomo) > 0) otherBranchIds.push(4);
             } else if (currentId === 5) {
-                // Jika ASA -> PMI, MIM, ASM (dan Sutomo jika ada stok)
+                // Jika ASA -> PMI, MIM, ASM
                 otherBranchIds = [1, 3, 2];
-                if (Number(it.stock_sutomo) > 0) otherBranchIds.push(4);
             } else if (currentId === 2) {
-                // Jika ASM -> PMI, MIM, ASA (dan Sutomo jika ada stok)
+                // Jika ASM -> PMI, MIM, ASA
                 otherBranchIds = [1, 3, 5];
-                if (Number(it.stock_sutomo) > 0) otherBranchIds.push(4);
-            } else if (currentId === 4) {
-                // Jika Sutomo -> PMI, MIM, ASA, ASM
-                otherBranchIds = [1, 3, 5, 2];
             } else {
                 // Cabang lain / HO
                 otherBranchIds = [1, 3, 5, 2].filter(id => id !== currentId);
-                if (Number(it.stock_sutomo) > 0 && currentId !== 4) otherBranchIds.push(4);
             }
 
             const otherBranchesHtml = otherBranchIds.map(branchId => {
