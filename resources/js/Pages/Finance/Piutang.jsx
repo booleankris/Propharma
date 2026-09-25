@@ -245,7 +245,7 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
         >
             {detailViewPiutang ? (
                 /* SUB-VIEW A: DETIL TAGIHAN PIUTANG LENGKAP */
-                <div className="space-y-6 max-w-5xl">
+                <div className="space-y-6">
                     {/* Navigasi Kembali */}
                     <button
                         type="button"
@@ -315,13 +315,12 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                         {/* Status Badge */}
                         <div className="flex items-center justify-between">
                             <span
-                                className={`inline-block px-3 py-1 text-xs font-semibold rounded-full ${
-                                    detailViewPiutang.status === 'Lunas' || detailViewPiutang.sisa <= 0.005
+                                className={`inline-block px-3 py-1 text-xs font-semibold rounded-full ${detailViewPiutang.status === 'Lunas' || detailViewPiutang.sisa <= 0.005
                                         ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'
                                         : detailViewPiutang.status === 'Dibayar Sebagian'
-                                        ? 'bg-amber-50 text-amber-600 border border-amber-100'
-                                        : 'bg-red-50 text-red-600 border border-red-100'
-                                }`}
+                                            ? 'bg-amber-50 text-amber-600 border border-amber-100'
+                                            : 'bg-red-50 text-red-600 border border-red-100'
+                                    }`}
                             >
                                 {detailViewPiutang.status}
                             </span>
@@ -565,258 +564,257 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
             ) : (
                 /* SUB-VIEW B: TABEL DAFTAR PIUTANG PENJUALAN */
                 <div className="space-y-6">
-                {/* Banner Summary */}
-                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs flex flex-wrap items-center justify-between gap-4">
-                    <div>
-                        <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                            Total Sisa Piutang Usaha
+                    {/* Banner Summary */}
+                    <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs flex flex-wrap items-center justify-between gap-4">
+                        <div>
+                            <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                Total Sisa Piutang Usaha
+                            </div>
+                            <div className="text-2xl font-black text-amber-700 mt-1">
+                                {formatRupiah(stats.totalPiutangSisa || 0)}
+                            </div>
+                            <p className="text-xs text-slate-400 mt-0.5">
+                                Dari total {piutangPenjualan.length} transaksi piutang penjualan
+                            </p>
                         </div>
-                        <div className="text-2xl font-black text-amber-700 mt-1">
-                            {formatRupiah(stats.totalPiutangSisa || 0)}
+
+                        <div className="flex items-center gap-3">
+                            <span className="px-3 py-1.5 rounded-xl bg-amber-50 text-amber-700 text-xs font-bold border border-amber-100">
+                                {stats.countPiutangBelumBayar || 0} Belum Lunas
+                            </span>
+                            <span className="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-100">
+                                {stats.countPiutangLunas || 0} Lunas
+                            </span>
                         </div>
-                        <p className="text-xs text-slate-400 mt-0.5">
-                            Dari total {piutangPenjualan.length} transaksi piutang penjualan
-                        </p>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                        <span className="px-3 py-1.5 rounded-xl bg-amber-50 text-amber-700 text-xs font-bold border border-amber-100">
-                            {stats.countPiutangBelumBayar || 0} Belum Lunas
-                        </span>
-                        <span className="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-100">
-                            {stats.countPiutangLunas || 0} Lunas
-                        </span>
-                    </div>
-                </div>
+                    {/* Filter & Toolbar */}
+                    <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div className="flex flex-wrap items-center gap-2.5 flex-1">
+                                <div className="relative w-full sm:w-64">
+                                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                    <input
+                                        type="text"
+                                        placeholder="Cari transaksi, debitur, pasien..."
+                                        value={searchTerm}
+                                        onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                                        className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-amber-500 focus:bg-white focus:outline-none"
+                                    />
+                                </div>
 
-                {/* Filter & Toolbar */}
-                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs space-y-3">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div className="flex flex-wrap items-center gap-2.5 flex-1">
-                            <div className="relative w-full sm:w-64">
-                                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                <input
-                                    type="text"
-                                    placeholder="Cari transaksi, debitur, pasien..."
-                                    value={searchTerm}
-                                    onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-                                    className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-amber-500 focus:bg-white focus:outline-none"
-                                />
+                                {/* Filter Debitur Dropdown */}
+                                <select
+                                    value={debtorFilter}
+                                    onChange={(e) => { setDebtorFilter(e.target.value); setCurrentPage(1); }}
+                                    className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-amber-500 focus:bg-white focus:outline-none"
+                                >
+                                    <option value="">Semua Debitur / Instansi</option>
+                                    {debtors.map((d) => (
+                                        <option key={d.id} value={d.id}>
+                                            {d.name} {d.code ? `(${d.code})` : ''}
+                                        </option>
+                                    ))}
+                                </select>
+
+                                {/* Status Filter */}
+                                <div className="flex items-center bg-slate-100 p-1 rounded-xl text-xs">
+                                    <button
+                                        onClick={() => { setStatusFilter('ALL'); setCurrentPage(1); }}
+                                        className={`px-3 py-1.5 rounded-lg font-semibold transition ${statusFilter === 'ALL' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
+                                    >
+                                        Semua
+                                    </button>
+                                    <button
+                                        onClick={() => { setStatusFilter('BELUM_LUNAS'); setCurrentPage(1); }}
+                                        className={`px-3 py-1.5 rounded-lg font-semibold transition ${statusFilter === 'BELUM_LUNAS' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
+                                    >
+                                        Belum Lunas
+                                    </button>
+                                    <button
+                                        onClick={() => { setStatusFilter('LUNAS'); setCurrentPage(1); }}
+                                        className={`px-3 py-1.5 rounded-lg font-semibold transition ${statusFilter === 'LUNAS' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
+                                    >
+                                        Lunas
+                                    </button>
+                                </div>
                             </div>
 
-                            {/* Filter Debitur Dropdown */}
-                            <select
-                                value={debtorFilter}
-                                onChange={(e) => { setDebtorFilter(e.target.value); setCurrentPage(1); }}
-                                className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-amber-500 focus:bg-white focus:outline-none"
-                            >
-                                <option value="">Semua Debitur / Instansi</option>
-                                {debtors.map((d) => (
-                                    <option key={d.id} value={d.id}>
-                                        {d.name} {d.code ? `(${d.code})` : ''}
-                                    </option>
-                                ))}
-                            </select>
-
-                            {/* Status Filter */}
-                            <div className="flex items-center bg-slate-100 p-1 rounded-xl text-xs">
+                            {selectedPiutangIds.length > 0 && (
                                 <button
-                                    onClick={() => { setStatusFilter('ALL'); setCurrentPage(1); }}
-                                    className={`px-3 py-1.5 rounded-lg font-semibold transition ${statusFilter === 'ALL' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
+                                    onClick={openBulkModal}
+                                    className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center gap-2 animate-in zoom-in-95 duration-150"
                                 >
-                                    Semua
+                                    <ShoppingCart className="w-4 h-4" />
+                                    <span>Pelunasan Massal ({selectedPiutangIds.length} Transaksi)</span>
                                 </button>
-                                <button
-                                    onClick={() => { setStatusFilter('BELUM_LUNAS'); setCurrentPage(1); }}
-                                    className={`px-3 py-1.5 rounded-lg font-semibold transition ${statusFilter === 'BELUM_LUNAS' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
-                                >
-                                    Belum Lunas
-                                </button>
-                                <button
-                                    onClick={() => { setStatusFilter('LUNAS'); setCurrentPage(1); }}
-                                    className={`px-3 py-1.5 rounded-lg font-semibold transition ${statusFilter === 'LUNAS' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
-                                >
-                                    Lunas
-                                </button>
-                            </div>
+                            )}
                         </div>
 
-                        {selectedPiutangIds.length > 0 && (
-                            <button
-                                onClick={openBulkModal}
-                                className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center gap-2 animate-in zoom-in-95 duration-150"
-                            >
-                                <ShoppingCart className="w-4 h-4" />
-                                <span>Pelunasan Massal ({selectedPiutangIds.length} Transaksi)</span>
-                            </button>
+                        {selectionWarning && (
+                            <div className="text-xs text-amber-700 bg-amber-50 px-3 py-2 rounded-xl flex items-center gap-2 border border-amber-200">
+                                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                                <span>{selectionWarning}</span>
+                            </div>
                         )}
                     </div>
 
-                    {selectionWarning && (
-                        <div className="text-xs text-amber-700 bg-amber-50 px-3 py-2 rounded-xl flex items-center gap-2 border border-amber-200">
-                            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-                            <span>{selectionWarning}</span>
-                        </div>
-                    )}
-                </div>
-
-                {/* Tabel Piutang Penjualan */}
-                <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse text-xs">
-                            <thead>
-                                <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-600 font-semibold uppercase tracking-wider text-[11px]">
-                                    <th className="px-4 py-3.5 w-10">
-                                        <input
-                                            type="checkbox"
-                                            checked={
-                                                paginatedPiutang.filter(i => i.status !== 'Lunas' && i.sisa > 0.005).length > 0 &&
-                                                paginatedPiutang
-                                                    .filter(i => i.status !== 'Lunas' && i.sisa > 0.005)
-                                                    .every(i => selectedPiutangIds.includes(i.id))
-                                            }
-                                            onChange={handleSelectAllPiutang}
-                                            className="rounded border-slate-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
-                                            title="Pilih semua di halaman ini"
-                                        />
-                                    </th>
-                                    <th className="px-4 py-3.5">No. Transaksi & Tgl</th>
-                                    <th className="px-4 py-3.5">Debitur / Pasien</th>
-                                    <th className="px-4 py-3.5">Apotek</th>
-                                    <th className="px-4 py-3.5 text-right">Total Tagihan</th>
-                                    <th className="px-4 py-3.5 text-right">Terbayar</th>
-                                    <th className="px-4 py-3.5 text-right">Sisa Piutang</th>
-                                    <th className="px-4 py-3.5 text-center">Status</th>
-                                    <th className="px-4 py-3.5 text-center w-28">Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {paginatedPiutang.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={9} className="text-center py-12 text-slate-400">
-                                            Tidak ada data piutang yang sesuai dengan filter.
-                                        </td>
+                    {/* Tabel Piutang Penjualan */}
+                    <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse text-xs">
+                                <thead>
+                                    <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-600 font-semibold uppercase tracking-wider text-[11px]">
+                                        <th className="px-4 py-3.5 w-10">
+                                            <input
+                                                type="checkbox"
+                                                checked={
+                                                    paginatedPiutang.filter(i => i.status !== 'Lunas' && i.sisa > 0.005).length > 0 &&
+                                                    paginatedPiutang
+                                                        .filter(i => i.status !== 'Lunas' && i.sisa > 0.005)
+                                                        .every(i => selectedPiutangIds.includes(i.id))
+                                                }
+                                                onChange={handleSelectAllPiutang}
+                                                className="rounded border-slate-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                                                title="Pilih semua di halaman ini"
+                                            />
+                                        </th>
+                                        <th className="px-4 py-3.5">No. Transaksi & Tgl</th>
+                                        <th className="px-4 py-3.5">Debitur / Pasien</th>
+                                        <th className="px-4 py-3.5">Apotek</th>
+                                        <th className="px-4 py-3.5 text-right">Total Tagihan</th>
+                                        <th className="px-4 py-3.5 text-right">Terbayar</th>
+                                        <th className="px-4 py-3.5 text-right">Sisa Piutang</th>
+                                        <th className="px-4 py-3.5 text-center">Status</th>
+                                        <th className="px-4 py-3.5 text-center w-28">Aksi</th>
                                     </tr>
-                                ) : (
-                                    paginatedPiutang.map((item) => {
-                                        const isLunas = item.status === 'Lunas' || item.sisa <= 0.005;
-                                        return (
-                                            <tr
-                                                key={item.id}
-                                                onClick={() => setDrawerPiutang(item)}
-                                                className="hover:bg-amber-50/40 cursor-pointer transition group"
-                                            >
-                                                <td className="px-4 py-3.5" onClick={(e) => e.stopPropagation()}>
-                                                    {isLunas ? (
-                                                        <span title="Piutang sudah lunas" className="inline-block p-0.5 text-emerald-500">
-                                                            <Check className="w-3.5 h-3.5" />
-                                                        </span>
-                                                    ) : (
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={selectedPiutangIds.includes(item.id)}
-                                                            onChange={() => handleTogglePiutang(item)}
-                                                            className="rounded border-slate-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
-                                                        />
-                                                    )}
-                                                </td>
-                                                <td className="px-4 py-3.5">
-                                                    <button
-                                                        type="button"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setDetailViewPiutang(item);
-                                                        }}
-                                                        className="font-bold text-amber-700 hover:text-amber-800 hover:underline transition text-left cursor-pointer"
-                                                    >
-                                                        {item.nomor}
-                                                    </button>
-                                                    <div className="text-[11px] text-slate-400 mt-0.5">{item.tanggal}</div>
-                                                </td>
-                                                <td className="px-4 py-3.5">
-                                                    <div className="font-semibold text-slate-800">{item.debtor}</div>
-                                                    <div className="text-[10px] text-slate-400">
-                                                        {item.pasien && item.pasien !== '-' ? `Pasien: ${item.pasien}` : ''}
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 py-3.5 text-slate-600">{item.apotek}</td>
-                                                <td className="px-4 py-3.5 text-right font-medium text-slate-800">
-                                                    {formatNumberOnly(item.total)}
-                                                </td>
-                                                <td className="px-4 py-3.5 text-right text-emerald-600 font-medium">
-                                                    {formatNumberOnly(item.terbayar)}
-                                                </td>
-                                                <td className="px-4 py-3.5 text-right font-bold text-amber-700">
-                                                    {formatNumberOnly(item.sisa)}
-                                                </td>
-                                                <td className="px-4 py-3.5 text-center">
-                                                    <span className={`inline-block px-2.5 py-1 rounded-full text-[11px] font-bold ${
-                                                        isLunas
-                                                            ? 'bg-emerald-50 text-emerald-700'
-                                                            : item.status === 'Dibayar Sebagian'
-                                                            ? 'bg-amber-50 text-amber-700'
-                                                            : 'bg-red-50 text-red-700'
-                                                    }`}>
-                                                        {item.status}
-                                                    </span>
-                                                </td>
-                                                <td className="px-4 py-3.5 text-center" onClick={(e) => e.stopPropagation()}>
-                                                    <div className="flex items-center justify-center gap-1.5">
-                                                        {item.sisa > 0.005 && (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => openPaymentModal(item)}
-                                                                className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-semibold transition cursor-pointer"
-                                                            >
-                                                                Terima
-                                                            </button>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {paginatedPiutang.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={9} className="text-center py-12 text-slate-400">
+                                                Tidak ada data piutang yang sesuai dengan filter.
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        paginatedPiutang.map((item) => {
+                                            const isLunas = item.status === 'Lunas' || item.sisa <= 0.005;
+                                            return (
+                                                <tr
+                                                    key={item.id}
+                                                    onClick={() => setDrawerPiutang(item)}
+                                                    className="hover:bg-amber-50/40 cursor-pointer transition group"
+                                                >
+                                                    <td className="px-4 py-3.5" onClick={(e) => e.stopPropagation()}>
+                                                        {isLunas ? (
+                                                            <span title="Piutang sudah lunas" className="inline-block p-0.5 text-emerald-500">
+                                                                <Check className="w-3.5 h-3.5" />
+                                                            </span>
+                                                        ) : (
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={selectedPiutangIds.includes(item.id)}
+                                                                onChange={() => handleTogglePiutang(item)}
+                                                                className="rounded border-slate-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                                                            />
                                                         )}
+                                                    </td>
+                                                    <td className="px-4 py-3.5">
                                                         <button
                                                             type="button"
-                                                            onClick={() => setDetailViewPiutang(item)}
-                                                            className="px-2.5 py-1 border border-slate-200 text-slate-600 hover:bg-slate-100 rounded-lg text-xs font-semibold transition cursor-pointer"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setDetailViewPiutang(item);
+                                                            }}
+                                                            className="font-bold text-amber-700 hover:text-amber-800 hover:underline transition text-left cursor-pointer"
                                                         >
-                                                            Detil
+                                                            {item.nomor}
                                                         </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    {/* Pagination */}
-                    {totalPages > 1 && (
-                        <div className="p-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-                            <div>
-                                Menampilkan {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, filteredPiutang.length)} dari {filteredPiutang.length} transaksi
-                            </div>
-                            <div className="flex items-center gap-1">
-                                <button
-                                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                                    disabled={currentPage === 1}
-                                    className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50"
-                                >
-                                    <ChevronLeft className="w-4 h-4" />
-                                </button>
-                                <span className="px-3 py-1 font-semibold text-slate-800">
-                                    {currentPage} / {totalPages}
-                                </span>
-                                <button
-                                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                                    disabled={currentPage === totalPages}
-                                    className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50"
-                                >
-                                    <ChevronRight className="w-4 h-4" />
-                                </button>
-                            </div>
+                                                        <div className="text-[11px] text-slate-400 mt-0.5">{item.tanggal}</div>
+                                                    </td>
+                                                    <td className="px-4 py-3.5">
+                                                        <div className="font-semibold text-slate-800">{item.debtor}</div>
+                                                        <div className="text-[10px] text-slate-400">
+                                                            {item.pasien && item.pasien !== '-' ? `Pasien: ${item.pasien}` : ''}
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-4 py-3.5 text-slate-600">{item.apotek}</td>
+                                                    <td className="px-4 py-3.5 text-right font-medium text-slate-800">
+                                                        {formatNumberOnly(item.total)}
+                                                    </td>
+                                                    <td className="px-4 py-3.5 text-right text-emerald-600 font-medium">
+                                                        {formatNumberOnly(item.terbayar)}
+                                                    </td>
+                                                    <td className="px-4 py-3.5 text-right font-bold text-amber-700">
+                                                        {formatNumberOnly(item.sisa)}
+                                                    </td>
+                                                    <td className="px-4 py-3.5 text-center">
+                                                        <span className={`inline-block px-2.5 py-1 rounded-full text-[11px] font-bold ${isLunas
+                                                                ? 'bg-emerald-50 text-emerald-700'
+                                                                : item.status === 'Dibayar Sebagian'
+                                                                    ? 'bg-amber-50 text-amber-700'
+                                                                    : 'bg-red-50 text-red-700'
+                                                            }`}>
+                                                            {item.status}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-4 py-3.5 text-center" onClick={(e) => e.stopPropagation()}>
+                                                        <div className="flex items-center justify-center gap-1.5">
+                                                            {item.sisa > 0.005 && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => openPaymentModal(item)}
+                                                                    className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-semibold transition cursor-pointer"
+                                                                >
+                                                                    Terima
+                                                                </button>
+                                                            )}
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setDetailViewPiutang(item)}
+                                                                className="px-2.5 py-1 border border-slate-200 text-slate-600 hover:bg-slate-100 rounded-lg text-xs font-semibold transition cursor-pointer"
+                                                            >
+                                                                Detil
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })
+                                    )}
+                                </tbody>
+                            </table>
                         </div>
-                    )}
+
+                        {/* Pagination */}
+                        {totalPages > 1 && (
+                            <div className="p-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                                <div>
+                                    Menampilkan {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, filteredPiutang.length)} dari {filteredPiutang.length} transaksi
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    <button
+                                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                                        disabled={currentPage === 1}
+                                        className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50"
+                                    >
+                                        <ChevronLeft className="w-4 h-4" />
+                                    </button>
+                                    <span className="px-3 py-1 font-semibold text-slate-800">
+                                        {currentPage} / {totalPages}
+                                    </span>
+                                    <button
+                                        onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                                        disabled={currentPage === totalPages}
+                                        className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50"
+                                    >
+                                        <ChevronRight className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
-            </div>
             )}
 
             {/* Modal Terima Pembayaran Piutang Satuan */}

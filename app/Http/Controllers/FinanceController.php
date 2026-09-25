@@ -8,6 +8,7 @@ use App\Models\FinanceAccount;
 use App\Models\FinancePayment;
 use App\Models\MedicineCart;
 use App\Models\MedicineTransactions;
+use App\Models\Pharmacies;
 use App\Models\Receiving;
 use App\Models\ReceivingDetails;
 use Illuminate\Http\Request;
@@ -23,8 +24,8 @@ class FinanceController extends Controller
         $this->middleware('auth');
         $this->middleware(function ($request, $next) {
             $user = auth()->user();
-            if (!$user || (!$user->hasRole('Finance') && !$user->hasRole('General Manager') && !$user->hasRole('administrator'))) {
-                abort(403, 'Akses ditolak: Modul SAHABAT Finances hanya dapat diakses oleh role Finance dan General Manager.');
+            if (!$user || (!$user->hasRole('Finance') && !$user->hasRole('General Manager') && !$user->hasRole('administrator') && !$user->hasRole('HO'))) {
+                abort(403, 'Akses ditolak: Modul SAHABAT Finances hanya dapat diakses oleh role Finance, General Manager, dan Administrator.');
             }
             return $next($request);
         });
@@ -35,6 +36,10 @@ class FinanceController extends Controller
      */
     public function index(Request $request)
     {
+        if ($request->filled('pharmacy_id') && auth()->check() && (auth()->user()->hasRole('HO') || auth()->user()->hasRole('administrator') || auth()->user()->hasRole('General Manager'))) {
+            session(['ho_pharmacy_id' => (int) $request->pharmacy_id]);
+        }
+
         // Dukung backward-compatibility jika ada query ?tab=
         if ($request->has('tab')) {
             $tab = $request->query('tab');
@@ -85,14 +90,19 @@ class FinanceController extends Controller
             'recentMutasi' => $recentMutasi,
             'upcomingHutang' => $upcomingHutang,
             'accounts' => $accounts,
+            'branchContext' => $this->getBranchContext(),
         ]);
     }
 
     /**
      * Halaman Pengelolaan Hutang Dagang (Faktur Pembelian Kredit).
      */
-    public function hutang()
+    public function hutang(Request $request)
     {
+        if ($request->filled('pharmacy_id') && auth()->check() && (auth()->user()->hasRole('HO') || auth()->user()->hasRole('administrator') || auth()->user()->hasRole('General Manager'))) {
+            session(['ho_pharmacy_id' => (int) $request->pharmacy_id]);
+        }
+
         $hutangDagang = $this->getHutangData();
         $creditors = Creditor::orderBy('name')->get(['code', 'name']);
         $kasBankAccounts = FinanceAccount::where('category', 'Kas & Bank')->where('is_active', true)->orderBy('code')->get();
@@ -103,14 +113,19 @@ class FinanceController extends Controller
             'creditors' => $creditors,
             'kasBankAccounts' => $kasBankAccounts,
             'stats' => $stats,
+            'branchContext' => $this->getBranchContext(),
         ]);
     }
 
     /**
      * Halaman Pengelolaan Pembelian Cash (Tunai).
      */
-    public function cash()
+    public function cash(Request $request)
     {
+        if ($request->filled('pharmacy_id') && auth()->check() && (auth()->user()->hasRole('HO') || auth()->user()->hasRole('administrator') || auth()->user()->hasRole('General Manager'))) {
+            session(['ho_pharmacy_id' => (int) $request->pharmacy_id]);
+        }
+
         $pembelianCash = $this->getCashData();
         $creditors = Creditor::orderBy('name')->get(['code', 'name']);
         $kasBankAccounts = FinanceAccount::where('category', 'Kas & Bank')->where('is_active', true)->orderBy('code')->get();
@@ -121,14 +136,19 @@ class FinanceController extends Controller
             'creditors' => $creditors,
             'kasBankAccounts' => $kasBankAccounts,
             'stats' => $stats,
+            'branchContext' => $this->getBranchContext(),
         ]);
     }
 
     /**
      * Halaman Pengelolaan Piutang Penjualan (Kredit Pelanggan).
      */
-    public function piutang()
+    public function piutang(Request $request)
     {
+        if ($request->filled('pharmacy_id') && auth()->check() && (auth()->user()->hasRole('HO') || auth()->user()->hasRole('administrator') || auth()->user()->hasRole('General Manager'))) {
+            session(['ho_pharmacy_id' => (int) $request->pharmacy_id]);
+        }
+
         $piutangPenjualan = $this->getPiutangData();
         $debtors = Debtors::orderBy('name')->get(['id', 'code', 'name', 'phone', 'city']);
         $kasBankAccounts = FinanceAccount::where('category', 'Kas & Bank')->where('is_active', true)->orderBy('code')->get();
@@ -139,14 +159,19 @@ class FinanceController extends Controller
             'debtors' => $debtors,
             'kasBankAccounts' => $kasBankAccounts,
             'stats' => $stats,
+            'branchContext' => $this->getBranchContext(),
         ]);
     }
 
     /**
      * Halaman Pengelolaan Kas & Bank, Mutasi Kas, dan Bagan Akun (COA).
      */
-    public function kasBank()
+    public function kasBank(Request $request)
     {
+        if ($request->filled('pharmacy_id') && auth()->check() && (auth()->user()->hasRole('HO') || auth()->user()->hasRole('administrator') || auth()->user()->hasRole('General Manager'))) {
+            session(['ho_pharmacy_id' => (int) $request->pharmacy_id]);
+        }
+
         $accounts = FinanceAccount::orderBy('code')->get();
         $categories = $this->getCategories();
         $mutasiKasBank = $this->getMutasiData(500);
@@ -157,7 +182,61 @@ class FinanceController extends Controller
             'categories' => $categories,
             'mutasiKasBank' => $mutasiKasBank,
             'stats' => $stats,
+            'branchContext' => $this->getBranchContext(),
         ]);
+    }
+
+    /**
+     * Helper: Ambil target pharmacy ID untuk filter data transaksi cabang.
+     */
+    protected function getTargetPharmacyIds(): array
+    {
+        $activeId = getActivePharmacyId();
+
+        // Jika Gudang PMI (9) atau SAHABAT PMI (1) atau HO (6)
+        if (in_array((int) $activeId, [1, 9, 6])) {
+            return [1, 9];
+        }
+
+        if ($activeId > 0) {
+            return [(int) $activeId];
+        }
+
+        return [1, 9];
+    }
+
+    /**
+     * Helper: Ambil konteks cabang aktif untuk frontend.
+     */
+    protected function getBranchContext(): array
+    {
+        $activePharmacyId = getActivePharmacyId();
+        $activePharmacy = Pharmacies::find($activePharmacyId);
+        if (!$activePharmacy && in_array((int) $activePharmacyId, [1, 9, 6])) {
+            $activePharmacy = Pharmacies::find(1);
+        }
+
+        $user = auth()->user();
+        $isHoOrAdmin = $user && ($user->hasRole('HO') || $user->hasRole('administrator') || $user->hasRole('General Manager'));
+
+        $branches = [];
+        if ($isHoOrAdmin) {
+            $branches = Pharmacies::whereIn('id', [1, 9, 2, 3, 4, 5])
+                ->orderByRaw('FIELD(id, 1, 9, 2, 3, 4, 5)')
+                ->get(['id', 'name']);
+        }
+
+        return [
+            'activePharmacy' => $activePharmacy ? [
+                'id' => $activePharmacy->id,
+                'name' => $activePharmacy->name,
+            ] : [
+                'id' => $activePharmacyId,
+                'name' => 'Apotek Cabang',
+            ],
+            'branches' => $branches,
+            'canSwitchBranch' => $isHoOrAdmin,
+        ];
     }
 
     /**
@@ -165,6 +244,8 @@ class FinanceController extends Controller
      */
     protected function getHutangData()
     {
+        $targetPharmacyIds = $this->getTargetPharmacyIds();
+
         $receivingsKredit = Receiving::with([
             'receiving_details' => function ($query) {
                 $query->where('invoice_payment', 'KREDIT');
@@ -176,6 +257,7 @@ class FinanceController extends Controller
             'pharmacy'
         ])
             ->whereIn('status', [1, 2, 3])
+            ->whereIn('pharmacy_id', $targetPharmacyIds)
             ->whereHas('receiving_details', function ($query) {
                 $query->where('invoice_payment', 'KREDIT');
             })
@@ -281,6 +363,8 @@ class FinanceController extends Controller
      */
     protected function getCashData()
     {
+        $targetPharmacyIds = $this->getTargetPharmacyIds();
+
         $receivingsCash = Receiving::with([
             'receiving_details' => function ($query) {
                 $query->where('invoice_payment', 'TUNAI');
@@ -292,6 +376,7 @@ class FinanceController extends Controller
             'pharmacy'
         ])
             ->whereIn('status', [1, 2, 3])
+            ->whereIn('pharmacy_id', $targetPharmacyIds)
             ->whereHas('receiving_details', function ($query) {
                 $query->where('invoice_payment', 'TUNAI');
             })
@@ -375,6 +460,8 @@ class FinanceController extends Controller
      */
     protected function getPiutangData()
     {
+        $targetPharmacyIds = $this->getTargetPharmacyIds();
+
         $creditTransactions = MedicineTransactions::with([
             'debtors',
             'doctors',
@@ -386,6 +473,7 @@ class FinanceController extends Controller
         ])
             ->where('transaction_type', 'KREDIT')
             ->where('status', 1)
+            ->whereIn('pharmacy_id', $targetPharmacyIds)
             ->latest('id')
             ->take(300)
             ->get();
@@ -481,6 +569,8 @@ class FinanceController extends Controller
      */
     protected function getMutasiData($limit = 500)
     {
+        $targetPharmacyIds = $this->getTargetPharmacyIds();
+
         return FinancePayment::with([
             'account',
             'creator',
@@ -490,6 +580,13 @@ class FinanceController extends Controller
         ])
             ->whereHas('account', function ($q) {
                 $q->where('category', 'Kas & Bank');
+            })
+            ->where(function ($query) use ($targetPharmacyIds) {
+                $query->whereHas('receiving', function ($q) use ($targetPharmacyIds) {
+                    $q->whereIn('pharmacy_id', $targetPharmacyIds);
+                })->orWhereHas('transaction', function ($q) use ($targetPharmacyIds) {
+                    $q->whereIn('pharmacy_id', $targetPharmacyIds);
+                });
             })
             ->orderByDesc('payment_date')
             ->orderByDesc('id')
@@ -575,10 +672,13 @@ class FinanceController extends Controller
      */
     protected function getStats($hutang = null, $cash = null, $piutang = null)
     {
+        $targetPharmacyIds = $this->getTargetPharmacyIds();
+        $cacheKey = 'finance_stats_summary_' . implode('_', $targetPharmacyIds);
+
         // Jika data lengkap tidak disediakan, gunakan cache agar angka badge dan ringkasan selalu konsisten di semua halaman
         $isFullData = ($hutang !== null && $cash !== null && $piutang !== null);
         if (!$isFullData) {
-            $cached = Cache::get('finance_stats_summary');
+            $cached = Cache::get($cacheKey);
             if ($cached) {
                 return $cached;
             }
@@ -597,8 +697,18 @@ class FinanceController extends Controller
         $totalSaldoKasBank = (float) FinanceAccount::where('category', 'Kas & Bank')->where('is_active', true)->sum('balance');
         $accountsCount = FinanceAccount::where('category', 'Kas & Bank')->where('is_active', true)->count();
 
-        $kasMasuk = (float) FinancePayment::where('payment_type', 'PIUTANG')->sum('amount');
-        $kasKeluar = (float) FinancePayment::whereIn('payment_type', ['KREDIT', 'CASH'])->sum('amount');
+        $kasMasuk = (float) FinancePayment::where('payment_type', 'PIUTANG')
+            ->whereHas('transaction', function ($q) use ($targetPharmacyIds) {
+                $q->whereIn('pharmacy_id', $targetPharmacyIds);
+            })
+            ->sum('amount');
+
+        $kasKeluar = (float) FinancePayment::whereIn('payment_type', ['KREDIT', 'CASH'])
+            ->whereHas('receiving', function ($q) use ($targetPharmacyIds) {
+                $q->whereIn('pharmacy_id', $targetPharmacyIds);
+            })
+            ->sum('amount');
+
         $netCashflow = $kasMasuk - $kasKeluar;
 
         // Hutang Stats
@@ -659,7 +769,7 @@ class FinanceController extends Controller
             'countPiutangLunas' => $countPiutangLunas,
         ];
 
-        Cache::put('finance_stats_summary', $stats, 60);
+        Cache::put($cacheKey, $stats, 60);
 
         return $stats;
     }
@@ -670,6 +780,11 @@ class FinanceController extends Controller
     protected function clearStatsCache()
     {
         Cache::forget('finance_stats_summary');
+        $branches = [1, 2, 3, 4, 5, 6, 9];
+        foreach ($branches as $b) {
+            Cache::forget('finance_stats_summary_' . $b);
+        }
+        Cache::forget('finance_stats_summary_1_9');
     }
 
     /**

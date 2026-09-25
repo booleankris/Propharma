@@ -1,5 +1,5 @@
 import React from 'react';
-import { Head, Link, usePage } from '@inertiajs/react';
+import { Head, Link, usePage, router } from '@inertiajs/react';
 import {
     LayoutDashboard,
     CreditCard,
@@ -9,12 +9,26 @@ import {
     ArrowLeft,
     CheckCircle2,
     AlertCircle,
+    Building2,
 } from 'lucide-react';
 
 export default function FinanceLayout({ title, subtitle, children, stats = {} }) {
     const page = usePage();
-    const { auth, flash, errors } = page.props || {};
+    const { auth, flash, errors, branchContext } = page.props || {};
     const currentUrl = page.url || (typeof window !== 'undefined' ? window.location.pathname : '');
+
+    const activeBranchName = branchContext?.activePharmacy?.name || 'Apotek Sahabat';
+    const activeBranchId = branchContext?.activePharmacy?.id;
+    const canSwitchBranch = !!branchContext?.canSwitchBranch && (branchContext?.branches?.length > 0);
+    const branches = branchContext?.branches || [];
+
+    const handleBranchChange = (e) => {
+        const branchId = e.target.value;
+        router.post('/pharmacy/switch', { pharmacy_id: branchId }, {
+            preserveScroll: true,
+            preserveState: false,
+        });
+    };
 
     const navItems = [
         {
@@ -73,12 +87,14 @@ export default function FinanceLayout({ title, subtitle, children, stats = {} })
             <aside className="w-64 bg-white border-r border-slate-200 flex flex-col shrink-0 select-none shadow-xs">
                 {/* Brand / Logo Apotek */}
                 <div className="h-16 flex items-center px-6 border-b border-slate-100 gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white font-black text-sm tracking-wider shadow-sm shadow-blue-500/20">
+                    <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white font-black text-sm tracking-wider shadow-sm shadow-blue-500/20 shrink-0">
                         FP
                     </div>
-                    <div className="leading-tight">
-                        <span className="font-bold text-slate-900 text-sm block">Sahabat Finance</span>
-                        <span className="text-[11px] font-medium text-slate-400">Modul Keuangan Apotek</span>
+                    <div className="leading-tight overflow-hidden">
+                        <span className="font-bold text-slate-900 text-sm block truncate">Sahabat Finance</span>
+                        <span className="text-[11px] font-semibold text-blue-600 truncate block" title={activeBranchName}>
+                            {activeBranchName}
+                        </span>
                     </div>
                 </div>
 
@@ -170,6 +186,29 @@ export default function FinanceLayout({ title, subtitle, children, stats = {} })
                     </div>
 
                     <div className="flex items-center gap-3">
+                        {canSwitchBranch ? (
+                            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200/90 rounded-xl px-2.5 py-1 shadow-2xs hover:border-blue-400 transition-colors">
+                                <Building2 className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                                <span className="text-[11px] font-semibold text-slate-500 shrink-0">Cabang:</span>
+                                <select
+                                    value={activeBranchId || ''}
+                                    onChange={handleBranchChange}
+                                    className="bg-transparent border-0 text-xs font-bold text-slate-800 focus:ring-0 focus:outline-none cursor-pointer py-0.5 pr-6 pl-1"
+                                >
+                                    {branches.map((b) => (
+                                        <option key={b.id} value={b.id}>
+                                            {b.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        ) : (
+                            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-50/80 border border-blue-200/80 rounded-xl text-xs font-semibold text-blue-700 shadow-2xs">
+                                <Building2 className="w-3.5 h-3.5 text-blue-600" />
+                                <span>{activeBranchName}</span>
+                            </div>
+                        )}
+
                         <span className="text-[11px] font-medium text-slate-400 bg-slate-50 border border-slate-200/80 px-2.5 py-1 rounded-full">
                             Tahun Buku {new Date().getFullYear()}
                         </span>

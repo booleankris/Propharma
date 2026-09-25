@@ -36,6 +36,15 @@ class HandleInertiaRequests extends Middleware
     public function share(Request $request): array
     {
         $user = $request->user();
+        $activePharmacyId = $user ? getActivePharmacyId() : 0;
+        $activePharmacy = $activePharmacyId ? \App\Models\Pharmacies::find($activePharmacyId) : null;
+        if (!$activePharmacy && in_array((int) $activePharmacyId, [1, 9, 6])) {
+            $activePharmacy = \App\Models\Pharmacies::find(1);
+        }
+        $isHoOrAdmin = $user && ($user->hasRole('HO') || $user->hasRole('administrator') || $user->hasRole('General Manager'));
+        $branches = $isHoOrAdmin ? \App\Models\Pharmacies::whereIn('id', [1, 9, 2, 3, 4, 5])
+            ->orderByRaw('FIELD(id, 1, 9, 2, 3, 4, 5)')
+            ->get(['id', 'name']) : [];
 
         return [
             ...parent::share($request),
@@ -46,7 +55,19 @@ class HandleInertiaRequests extends Middleware
                     'email' => $user->email ?? null,
                     'username' => $user->username,
                     'role' => $user->roles?->pluck('name')->first() ?? 'Staff',
+                    'pharmacy_id' => $user->pharmacy_id,
                 ] : null,
+            ],
+            'branchContext' => [
+                'activePharmacy' => $activePharmacy ? [
+                    'id' => $activePharmacy->id,
+                    'name' => $activePharmacy->name,
+                ] : [
+                    'id' => $activePharmacyId,
+                    'name' => 'Apotek Cabang',
+                ],
+                'branches' => $branches,
+                'canSwitchBranch' => $isHoOrAdmin,
             ],
         ];
     }
