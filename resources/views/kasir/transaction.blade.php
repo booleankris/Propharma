@@ -2306,9 +2306,107 @@
             li.dataset.id = it.id;
 
             const canSeeWarehouse = {{ canAccessWarehouseStock() ? 'true' : 'false' }};
+            const defaultActivePharmacyId = {{ getActivePharmacyId() }};
+            const currentId = Number(it.active_pharmacy_id || defaultActivePharmacyId);
+            const isPmi = (currentId === 1 || currentId === 9);
+
             const stock = canSeeWarehouse ?
                 ((Number(it.storage_stock) || 0) + (Number(it.counter_stock) || 0)) :
                 (Number(it.counter_stock) || 0);
+
+            // Definisi badge stok untuk cabang-cabang lain
+            const branchPillsDef = {
+                1: {
+                    code: 'PMI',
+                    key: 'stock_pmi',
+                    bg: 'bg-rose-50',
+                    border: 'border-rose-300',
+                    dot: 'bg-rose-500',
+                    textLabel: 'text-rose-700',
+                    textValue: 'text-rose-800',
+                    title: 'Stok Pelayanan Sahabat PMI (PMI)'
+                },
+                3: {
+                    code: 'MIM',
+                    key: 'stock_mim',
+                    bg: 'bg-sky-50',
+                    border: 'border-sky-300',
+                    dot: 'bg-sky-500',
+                    textLabel: 'text-sky-700',
+                    textValue: 'text-sky-800',
+                    title: 'Stok Etalase Sahabat MIM (MIM)'
+                },
+                5: {
+                    code: 'ASA',
+                    key: 'stock_asa',
+                    bg: 'bg-fuchsia-50',
+                    border: 'border-fuchsia-300',
+                    dot: 'bg-fuchsia-500',
+                    textLabel: 'text-fuchsia-700',
+                    textValue: 'text-fuchsia-800',
+                    title: 'Stok Etalase Sahabat Antasari (ASA)'
+                },
+                2: {
+                    code: 'ASM',
+                    key: 'stock_asm',
+                    bg: 'bg-emerald-50',
+                    border: 'border-emerald-300',
+                    dot: 'bg-emerald-500',
+                    textLabel: 'text-emerald-700',
+                    textValue: 'text-emerald-800',
+                    title: 'Stok Etalase Sahabat Mulawarman (ASM)'
+                },
+                4: {
+                    code: 'SUTOMO',
+                    key: 'stock_sutomo',
+                    bg: 'bg-indigo-50',
+                    border: 'border-indigo-300',
+                    dot: 'bg-indigo-500',
+                    textLabel: 'text-indigo-700',
+                    textValue: 'text-indigo-800',
+                    title: 'Stok Etalase Sahabat Sutomo'
+                }
+            };
+
+            // Urutan tampilan cabang lain disesuaikan dengan cabang yang sedang login
+            let otherBranchIds = [];
+            if (isPmi) {
+                // Jika PMI -> MIM, ASA, ASM (dan Sutomo jika ada stok)
+                otherBranchIds = [3, 5, 2];
+                if (Number(it.stock_sutomo) > 0) otherBranchIds.push(4);
+            } else if (currentId === 3) {
+                // Jika MIM -> PMI (Pelayanan saja), ASA, ASM (dan Sutomo jika ada stok)
+                otherBranchIds = [1, 5, 2];
+                if (Number(it.stock_sutomo) > 0) otherBranchIds.push(4);
+            } else if (currentId === 5) {
+                // Jika ASA -> PMI, MIM, ASM (dan Sutomo jika ada stok)
+                otherBranchIds = [1, 3, 2];
+                if (Number(it.stock_sutomo) > 0) otherBranchIds.push(4);
+            } else if (currentId === 2) {
+                // Jika ASM -> PMI, MIM, ASA (dan Sutomo jika ada stok)
+                otherBranchIds = [1, 3, 5];
+                if (Number(it.stock_sutomo) > 0) otherBranchIds.push(4);
+            } else if (currentId === 4) {
+                // Jika Sutomo -> PMI, MIM, ASA, ASM
+                otherBranchIds = [1, 3, 5, 2];
+            } else {
+                // Cabang lain / HO
+                otherBranchIds = [1, 3, 5, 2].filter(id => id !== currentId);
+                if (Number(it.stock_sutomo) > 0 && currentId !== 4) otherBranchIds.push(4);
+            }
+
+            const otherBranchesHtml = otherBranchIds.map(branchId => {
+                const b = branchPillsDef[branchId];
+                if (!b) return '';
+                const val = (it[b.key] !== undefined && it[b.key] !== null) ? it[b.key] : '0';
+                return `
+                    <div class="flex items-center gap-1 ${b.bg} border ${b.border} rounded-md px-2 py-1" title="${b.title}">
+                        <span class="w-1 h-1 rounded-full ${b.dot}"></span>
+                        <span class="text-[10px] ${b.textLabel} font-bold">${b.code}</span>
+                        <span class="text-xs font-bold ${b.textValue}">${escapeHtml(String(val))}</span>
+                    </div>
+                `;
+            }).join('');
 
             li.innerHTML = `
         <div class="flex flex-col gap-1.5 min-w-0">
@@ -2350,41 +2448,24 @@
             </div>
  
             <div class="flex gap-1.5 flex-wrap mt-1.5">
-                <div class="flex items-center gap-1 bg-emerald-50 border border-emerald-200 rounded-md px-2 py-1">
+                <div class="flex items-center gap-1 bg-emerald-50 border border-emerald-200 rounded-md px-2 py-1" title="Total Stok">
                     <span class="w-1 h-1 rounded-full bg-emerald-500"></span>
                     <span class="text-[10px] text-emerald-600 font-medium">Stok</span>
                     <span class="text-xs font-bold text-emerald-700">${escapeHtml(String(stock || '—'))}</span>
                 </div>
                 ${canSeeWarehouse ? `
-                <div class="flex items-center gap-1 bg-violet-50 border border-violet-200 rounded-md px-2 py-1">
+                <div class="flex items-center gap-1 bg-violet-50 border border-violet-200 rounded-md px-2 py-1" title="Stok Gudang PMI">
                     <span class="w-1 h-1 rounded-full bg-violet-500"></span>
                     <span class="text-[10px] text-violet-600 font-medium">Gudang</span>
                     <span class="text-xs font-bold text-violet-700">${escapeHtml(String(it.storage_stock || '—'))}</span>
                 </div>
                 ` : ''}
-                <div class="flex items-center gap-1 bg-amber-50 border border-amber-200 rounded-md px-2 py-1">
+                <div class="flex items-center gap-1 bg-amber-50 border border-amber-200 rounded-md px-2 py-1" title="Stok Pelayanan Cabang Ini">
                     <span class="w-1 h-1 rounded-full bg-amber-500"></span>
                     <span class="text-[10px] text-amber-600 font-medium">Pelayanan</span>
                     <span class="text-xs font-bold text-amber-700">${escapeHtml(String(it.counter_stock || '—'))}</span>
                 </div>
-                <!-- ASM (pharmacy_id 2) - Hijau -->
-                <div class="flex items-center gap-1 bg-emerald-50 border border-emerald-300 rounded-md px-2 py-1" title="Stok Etalase Sahabat Mulawarman (ASM)">
-                    <span class="w-1 h-1 rounded-full bg-emerald-500"></span>
-                    <span class="text-[10px] text-emerald-700 font-bold">ASM</span>
-                    <span class="text-xs font-bold text-emerald-800">${escapeHtml(String(it.stock_asm !== undefined && it.stock_asm !== null ? it.stock_asm : '0'))}</span>
-                </div>
-                <!-- MIM (pharmacy_id 3) - Biru -->
-                <div class="flex items-center gap-1 bg-sky-50 border border-sky-300 rounded-md px-2 py-1" title="Stok Etalase Sahabat MIM (MIM)">
-                    <span class="w-1 h-1 rounded-full bg-sky-500"></span>
-                    <span class="text-[10px] text-sky-700 font-bold">MIM</span>
-                    <span class="text-xs font-bold text-sky-800">${escapeHtml(String(it.stock_mim !== undefined && it.stock_mim !== null ? it.stock_mim : '0'))}</span>
-                </div>
-                <!-- ASA (pharmacy_id 5) - Ungu -->
-                <div class="flex items-center gap-1 bg-fuchsia-50 border border-fuchsia-300 rounded-md px-2 py-1" title="Stok Etalase Sahabat Antasari (ASA)">
-                    <span class="w-1 h-1 rounded-full bg-fuchsia-500"></span>
-                    <span class="text-[10px] text-fuchsia-700 font-bold">ASA</span>
-                    <span class="text-xs font-bold text-fuchsia-800">${escapeHtml(String(it.stock_asa !== undefined && it.stock_asa !== null ? it.stock_asa : '0'))}</span>
-                </div>
+                ${otherBranchesHtml}
             </div>
         </div>
  
