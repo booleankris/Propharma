@@ -3,6 +3,7 @@ import { router } from '@inertiajs/react';
 import FinanceLayout from './Layouts/FinanceLayout';
 import PbfCombobox from './Components/PbfCombobox';
 import Drawer from './Components/Drawer';
+import FloatingActionBar from './Components/FloatingActionBar';
 import { formatRupiah, formatNumberOnly } from './Components/Utils';
 import {
     Banknote, Search, Check, X, Calendar, AlertCircle, ChevronLeft, ChevronRight,
@@ -72,7 +73,8 @@ export default function Cash({ pembelianCash = [], creditors = [], kasBankAccoun
     }, [pembelianCash, selectedCashIds]);
 
     const totalSelectedCashNominal = useMemo(() => {
-        return selectedCashItems.reduce((acc, curr) => acc + (curr.total || 0), 0);
+        const sum = selectedCashItems.reduce((acc, curr) => acc + (Number(curr.total) || 0), 0);
+        return Math.round(sum * 100) / 100;
     }, [selectedCashItems]);
 
     // Total kuantitas barang pada halaman detil penuh Cash
@@ -992,6 +994,21 @@ export default function Cash({ pembelianCash = [], creditors = [], kasBankAccoun
                     </>
                 )}
             </Drawer>
+
+            {/* Floating Action Bar saat faktur cash dicentang */}
+            <FloatingActionBar
+                selectedCount={selectedCashIds.length}
+                maxLimit={10}
+                totalAmount={totalSelectedCashNominal}
+                itemLabel="faktur"
+                titleAmount="Total Pembelian Tunai (Cash)"
+                actionLabel={`Tetapkan Akun (${selectedCashIds.length} Faktur)`}
+                actionIcon={Landmark}
+                onAction={openBulkCashModal}
+                onClear={() => setSelectedCashIds([])}
+                isSubmitting={isSubmittingBulkCash}
+                themeColor="emerald"
+            />
         </FinanceLayout>
     );
 }

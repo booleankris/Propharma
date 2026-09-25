@@ -3,6 +3,7 @@ import { router } from '@inertiajs/react';
 import FinanceLayout from './Layouts/FinanceLayout';
 import PbfCombobox from './Components/PbfCombobox';
 import Drawer from './Components/Drawer';
+import FloatingActionBar from './Components/FloatingActionBar';
 import { formatRupiah, formatNumberOnly } from './Components/Utils';
 import {
     CreditCard, Search, Filter, Check, X, Building2,
@@ -85,7 +86,13 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
     }, [hutangDagang, selectedHutangIds]);
 
     const totalSelectedHutangSisa = useMemo(() => {
-        return selectedHutangItems.reduce((acc, curr) => acc + (curr.sisa || 0), 0);
+        const sum = selectedHutangItems.reduce((acc, curr) => acc + (Number(curr.sisa) || 0), 0);
+        return Math.round(sum * 100) / 100;
+    }, [selectedHutangItems]);
+
+    const totalSelectedHutangTotal = useMemo(() => {
+        const sum = selectedHutangItems.reduce((acc, curr) => acc + (Number(curr.total) || 0), 0);
+        return Math.round(sum * 100) / 100;
     }, [selectedHutangItems]);
 
     // Total kuantitas barang pada halaman detil penuh
@@ -1170,6 +1177,22 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                     </>
                 )}
             </Drawer>
+
+            {/* Floating Action Bar saat faktur dicentang */}
+            <FloatingActionBar
+                selectedCount={selectedHutangIds.length}
+                maxLimit={10}
+                totalAmount={totalSelectedHutangSisa}
+                totalFullAmount={totalSelectedHutangTotal}
+                itemLabel="faktur"
+                titleAmount="Total Sisa Tagihan Hutang"
+                actionLabel={`Bayar Massal (${selectedHutangIds.length} Faktur)`}
+                actionIcon={CreditCard}
+                onAction={openBulkModal}
+                onClear={() => setSelectedHutangIds([])}
+                isSubmitting={isSubmittingBulk}
+                themeColor="blue"
+            />
         </FinanceLayout>
     );
 }

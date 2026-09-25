@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { router } from '@inertiajs/react';
 import FinanceLayout from './Layouts/FinanceLayout';
 import Drawer from './Components/Drawer';
+import FloatingActionBar from './Components/FloatingActionBar';
 import { formatRupiah, formatNumberOnly } from './Components/Utils';
 import {
     ShoppingCart, Search, Check, X, Calendar, AlertCircle, ChevronLeft, ChevronRight, User,
@@ -85,7 +86,13 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
     }, [piutangPenjualan, selectedPiutangIds]);
 
     const totalSelectedPiutangSisa = useMemo(() => {
-        return selectedPiutangItems.reduce((acc, curr) => acc + (curr.sisa || 0), 0);
+        const sum = selectedPiutangItems.reduce((acc, curr) => acc + (Number(curr.sisa) || 0), 0);
+        return Math.round(sum * 100) / 100;
+    }, [selectedPiutangItems]);
+
+    const totalSelectedPiutangTotal = useMemo(() => {
+        const sum = selectedPiutangItems.reduce((acc, curr) => acc + (Number(curr.total) || 0), 0);
+        return Math.round(sum * 100) / 100;
     }, [selectedPiutangItems]);
 
     // Total kuantitas barang pada halaman detil penuh
@@ -1184,6 +1191,22 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                     </>
                 )}
             </Drawer>
+
+            {/* Floating Action Bar saat transaksi piutang dicentang */}
+            <FloatingActionBar
+                selectedCount={selectedPiutangIds.length}
+                maxLimit={10}
+                totalAmount={totalSelectedPiutangSisa}
+                totalFullAmount={totalSelectedPiutangTotal}
+                itemLabel="transaksi"
+                titleAmount="Total Sisa Piutang Penjualan"
+                actionLabel={`Terima Pembayaran (${selectedPiutangIds.length} Transaksi)`}
+                actionIcon={CreditCard}
+                onAction={openBulkModal}
+                onClear={() => setSelectedPiutangIds([])}
+                isSubmitting={isSubmittingBulk}
+                themeColor="amber"
+            />
         </FinanceLayout>
     );
 }
