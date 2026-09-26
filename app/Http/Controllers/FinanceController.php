@@ -336,6 +336,11 @@ class FinanceController extends Controller
                     $statusLabel = 'Dibayar Sebagian';
                 }
 
+                $dueCarbon = $detail->invoice_due ? \Carbon\Carbon::parse($detail->invoice_due)->endOfDay() : null;
+                $isOverdue = ($dueCarbon && !$isLunas) ? $dueCarbon->isPast() : false;
+                $daysOverdue = ($isOverdue && $dueCarbon) ? (int) $dueCarbon->diffInDays(now()) : 0;
+                $daysRemaining = (!$isOverdue && $dueCarbon && !$isLunas) ? (int) now()->diffInDays($dueCarbon) : 0;
+
                 $hutangDagang[] = [
                     'id' => $detail->id,
                     'receiving_id' => $rec->id,
@@ -343,8 +348,12 @@ class FinanceController extends Controller
                     'vendor' => $vendorName,
                     'referensi' => $detail->receiving_details_code ?: $rec->code,
                     'tanggal' => $detail->invoice_date ? \Carbon\Carbon::parse($detail->invoice_date)->format('d/m/Y') : ($rec->date ?: '-'),
-                    'jatuhTempo' => $detail->invoice_due ? \Carbon\Carbon::parse($detail->invoice_due)->format('d/m/Y') : '-',
-                    'raw_jatuh_tempo' => $detail->invoice_due ? \Carbon\Carbon::parse($detail->invoice_due)->format('Y-m-d') : null,
+                    'raw_tanggal' => $detail->invoice_date ? \Carbon\Carbon::parse($detail->invoice_date)->format('Y-m-d') : ($rec->date ?: null),
+                    'jatuhTempo' => $dueCarbon ? $dueCarbon->format('d/m/Y') : '-',
+                    'raw_jatuh_tempo' => $dueCarbon ? $dueCarbon->format('Y-m-d') : null,
+                    'is_overdue' => $isOverdue,
+                    'days_overdue' => $daysOverdue,
+                    'days_remaining' => $daysRemaining,
                     'tanggalBayar' => $isLunas ? \Carbon\Carbon::parse($rec->updated_at)->format('d/m/Y') : '',
                     'status' => $statusLabel,
                     'subtotal' => $subtotal,

@@ -8,8 +8,59 @@ import { formatRupiah, formatNumberOnly } from './Components/Utils';
 import {
     CreditCard, Search, Filter, Check, X, Building2,
     Calendar, CheckCircle2, AlertCircle, Eye, ChevronLeft, ChevronRight,
-    ArrowLeft, Printer, Share2, MoreVertical, ChevronDown, History, Landmark, Maximize2, Download, FileSpreadsheet
+    ArrowLeft, Printer, Share2, MoreVertical, ChevronDown, History, Landmark, Maximize2, Download, FileSpreadsheet,
+    AlertTriangle, Clock, ArrowUp, ArrowDown, ArrowUpDown
 } from 'lucide-react';
+
+// Helper fungsi menghitung status jatuh tempo secara presisi
+const computeDueInfo = (item) => {
+    if (!item) return { isLunas: false, isOverdue: false, daysOverdue: 0, daysRemaining: 0, hasDate: false };
+    const isLunas = item.status === 'Lunas' || (Number(item.sisa) || 0) <= 0.005;
+    const hasDate = !!item.raw_jatuh_tempo || (!!item.jatuhTempo && item.jatuhTempo !== '-');
+
+    if (isLunas) {
+        return { isLunas: true, isOverdue: false, daysOverdue: 0, daysRemaining: 0, hasDate };
+    }
+
+    if (!hasDate) {
+        return { isLunas: false, isOverdue: false, daysOverdue: 0, daysRemaining: 0, hasDate: false };
+    }
+
+    if (typeof item.is_overdue === 'boolean' && item.is_overdue !== undefined) {
+        return {
+            isLunas: false,
+            isOverdue: item.is_overdue,
+            daysOverdue: Number(item.days_overdue) || 0,
+            daysRemaining: Number(item.days_remaining) || 0,
+            hasDate: true
+        };
+    }
+
+    try {
+        let dueDate;
+        if (item.raw_jatuh_tempo) {
+            dueDate = new Date(item.raw_jatuh_tempo);
+        } else if (item.jatuhTempo && item.jatuhTempo.includes('/')) {
+            const [d, m, y] = item.jatuhTempo.split('/');
+            dueDate = new Date(y, m - 1, d);
+        }
+        if (dueDate && !isNaN(dueDate.getTime())) {
+            dueDate.setHours(23, 59, 59, 999);
+            const now = new Date();
+            const diffMs = dueDate.getTime() - now.getTime();
+            const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+            return {
+                isLunas: false,
+                isOverdue: diffDays < 0,
+                daysOverdue: diffDays < 0 ? Math.abs(diffDays) : 0,
+                daysRemaining: diffDays >= 0 ? diffDays : 0,
+                hasDate: true
+            };
+        }
+    } catch (e) {}
+
+    return { isLunas: false, isOverdue: false, daysOverdue: 0, daysRemaining: 0, hasDate: false };
+};
 
 export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccounts = [], stats = {} }) {
     // State Filter & Pagination
@@ -18,6 +69,11 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
     const [filterPbf, setFilterPbf] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 10;
+
+    // State Sorting & Filter Jatuh Tempo
+    const [sortOrder, setSortOrder] = useState('desc'); // 'desc' | 'asc'
+    const [dueFilter, setDueFilter] = useState('all'); // 'all' | 'overdue' | 'due_soon' | 'due_nearest' | 'due_furthest'
+    const [isDueDropdownOpen, setIsDueDropdownOpen] = useState(false);
 
     // Selection untuk Pelunasan Massal (Maks 10)
     const [selectedHutangIds, setSelectedHutangIds] = useState([]);
@@ -51,9 +107,23 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
     });
     const [isSubmittingBulk, setIsSubmittingBulk] = useState(false);
 
-    // Filter data
+    // Statistik Jatuh Tempo
+    const dueStats = useMemo(() => {
+        let overdue = 0;
+        let dueSoon = 0;
+        hutangDagang.forEach((item) => {
+            const info = computeDueInfo(item);
+            if (!info.isLunas) {
+                if (info.isOverdue) overdue++;
+                else if (info.hasDate && info.daysRemaining <= 7) dueSoon++;
+            }
+        });
+        return { overdue, dueSoon };
+    }, [hutangDagang]);
+
+    // Filter & Sorting data
     const filteredHutang = useMemo(() => {
-        return hutangDagang.filter((item) => {
+        let result = hutangDagang.filter((item) => {
             const matchSearch =
                 (item.nomor && item.nomor.toLowerCase().includes(searchTerm.toLowerCase())) ||
                 (item.vendor && item.vendor.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -61,18 +131,45 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
 
             let matchStatus = true;
             if (statusFilter === 'LUNAS') {
-                matchStatus = item.status === 'Lunas';
+                matchStatus = item.status === 'Lunas' || item.sisa <= 0.005;
             } else if (statusFilter === 'BELUM_LUNAS') {
-                matchStatus = item.status === 'Belum Dibayar' || item.status === 'Dibayar Sebagian';
+                matchStatus = item.status !== 'Lunas' && item.sisa > 0.005;
             }
 
             const matchPbf = filterPbf
                 ? (item.vendor && item.vendor.toLowerCase().includes(filterPbf.toLowerCase()))
                 : true;
 
-            return matchSearch && matchStatus && matchPbf;
+            const dueInfo = computeDueInfo(item);
+            let matchDue = true;
+            if (dueFilter === 'overdue') {
+                matchDue = dueInfo.isOverdue && !dueInfo.isLunas;
+            } else if (dueFilter === 'due_soon') {
+                matchDue = !dueInfo.isOverdue && dueInfo.daysRemaining <= 7 && !dueInfo.isLunas && dueInfo.hasDate;
+            }
+
+            return matchSearch && matchStatus && matchPbf && matchDue;
         });
-    }, [hutangDagang, searchTerm, statusFilter, filterPbf]);
+
+        // Sorting berdasarkan pilihan pengguna
+        return result.sort((a, b) => {
+            if (dueFilter === 'due_nearest') {
+                const dateA = a.raw_jatuh_tempo ? new Date(a.raw_jatuh_tempo).getTime() : 9999999999999;
+                const dateB = b.raw_jatuh_tempo ? new Date(b.raw_jatuh_tempo).getTime() : 9999999999999;
+                return dateA - dateB;
+            }
+            if (dueFilter === 'due_furthest') {
+                const dateA = a.raw_jatuh_tempo ? new Date(a.raw_jatuh_tempo).getTime() : 0;
+                const dateB = b.raw_jatuh_tempo ? new Date(b.raw_jatuh_tempo).getTime() : 0;
+                return dateB - dateA;
+            }
+
+            // Default: Urutkan Waktu Faktur/Penerimaan (ASC atau DESC)
+            const timeA = a.raw_tanggal ? new Date(a.raw_tanggal).getTime() : (Number(a.id) || 0);
+            const timeB = b.raw_tanggal ? new Date(b.raw_tanggal).getTime() : (Number(b.id) || 0);
+            return sortOrder === 'asc' ? timeA - timeB : timeB - timeA;
+        });
+    }, [hutangDagang, searchTerm, statusFilter, filterPbf, sortOrder, dueFilter]);
 
     const totalPages = Math.ceil(filteredHutang.length / itemsPerPage) || 1;
     const paginatedHutang = useMemo(() => {
@@ -355,8 +452,44 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                                     <span className="font-bold text-slate-900 text-sm">{detailViewHutang.nomor}</span>
                                 </div>
                                 <div>
-                                    <span className="text-slate-400 block text-[11px] mb-1">Tgl. Jatuh Tempo</span>
-                                    <span className="font-semibold text-slate-800 text-sm">{detailViewHutang.jatuhTempo}</span>
+                                    <span className="text-slate-400 block text-[11px] mb-1 font-semibold uppercase">Tgl. Jatuh Tempo</span>
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="font-extrabold text-slate-900 text-base">{detailViewHutang.jatuhTempo || '-'}</span>
+                                        {(() => {
+                                            const dueInfo = computeDueInfo(detailViewHutang);
+                                            if (dueInfo.isLunas) {
+                                                return (
+                                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                                        <span>Lunas</span>
+                                                    </span>
+                                                );
+                                            }
+                                            if (!dueInfo.hasDate) return null;
+                                            if (dueInfo.isOverdue || dueInfo.daysOverdue > 0) {
+                                                return (
+                                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-black bg-red-100 text-red-800 border border-red-300 animate-pulse">
+                                                        <AlertTriangle className="w-3.5 h-3.5 text-red-600" />
+                                                        <span>Lewat {dueInfo.daysOverdue} Hari</span>
+                                                    </span>
+                                                );
+                                            }
+                                            if (dueInfo.daysRemaining <= 7) {
+                                                return (
+                                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                                                        <Clock className="w-3.5 h-3.5 text-amber-600" />
+                                                        <span>Sisa {dueInfo.daysRemaining} Hari</span>
+                                                    </span>
+                                                );
+                                            }
+                                            return (
+                                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-700 border border-slate-200">
+                                                    <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                                                    <span>Sisa {dueInfo.daysRemaining} Hari</span>
+                                                </span>
+                                            );
+                                        })()}
+                                    </div>
                                 </div>
                                 <div>
                                     <span className="text-slate-400 block text-[11px] mb-1">Referensi</span>
@@ -565,7 +698,19 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                         </p>
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                        {dueStats.overdue > 0 && (
+                            <span className="px-3 py-1.5 rounded-xl bg-red-100 text-red-800 text-xs font-black border border-red-200 flex items-center gap-1.5 shadow-2xs">
+                                <AlertTriangle className="w-3.5 h-3.5 text-red-600" />
+                                <span>{dueStats.overdue} Lewat Tempo</span>
+                            </span>
+                        )}
+                        {dueStats.dueSoon > 0 && (
+                            <span className="px-3 py-1.5 rounded-xl bg-amber-100 text-amber-900 text-xs font-bold border border-amber-200 flex items-center gap-1.5 shadow-2xs">
+                                <Clock className="w-3.5 h-3.5 text-amber-700" />
+                                <span>{dueStats.dueSoon} Tempo ≤ 7 Hari</span>
+                            </span>
+                        )}
                         <span className="px-3 py-1.5 rounded-xl bg-red-50 text-red-700 text-xs font-bold border border-red-100">
                             {stats.countBelumBayar || 0} Belum Dibayar
                         </span>
@@ -624,9 +769,104 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                                 </button>
                             </div>
 
+                            {/* Filter 1: Waktu Pembuatan ASC / DESC */}
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+                                    setCurrentPage(1);
+                                }}
+                                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+                                    sortOrder === 'asc'
+                                        ? 'bg-amber-50 border-amber-300 text-amber-800 font-bold shadow-2xs'
+                                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                                }`}
+                                title="Klik untuk mengubah urutan waktu faktur"
+                            >
+                                {sortOrder === 'asc' ? (
+                                    <ArrowUp className="w-3.5 h-3.5 text-amber-600" />
+                                ) : (
+                                    <ArrowDown className="w-3.5 h-3.5 text-slate-500" />
+                                )}
+                                <span>Waktu: {sortOrder === 'asc' ? 'Terlama (ASC)' : 'Terbaru (DESC)'}</span>
+                            </button>
+
+                            {/* Filter 2: Berdasarkan Jatuh Tempo */}
+                            <div className="relative">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsDueDropdownOpen(!isDueDropdownOpen)}
+                                    className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+                                        dueFilter !== 'all'
+                                            ? 'bg-amber-50 border-amber-300 text-amber-800 font-bold shadow-2xs'
+                                            : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                                    }`}
+                                >
+                                    <Clock className={`w-3.5 h-3.5 ${dueFilter !== 'all' ? 'text-amber-600' : 'text-slate-500'}`} />
+                                    <span>
+                                        {dueFilter === 'overdue' && 'Tempo: Lewat Tempo'}
+                                        {dueFilter === 'due_soon' && 'Tempo: Mendekati (≤ 7 Hari)'}
+                                        {dueFilter === 'due_nearest' && 'Tempo: Terdekat'}
+                                        {dueFilter === 'due_furthest' && 'Tempo: Terjauh'}
+                                        {dueFilter === 'all' && 'Filter Jatuh Tempo'}
+                                    </span>
+                                    <ChevronDown className="w-3 h-3 text-slate-400" />
+                                </button>
+                                {isDueDropdownOpen && (
+                                    <div className="absolute left-0 mt-1.5 w-60 bg-white border border-slate-200 rounded-xl shadow-xl z-50 py-1 divide-y divide-slate-100 text-xs animate-in fade-in zoom-in-95 duration-150">
+                                        <button
+                                            type="button"
+                                            onClick={() => { setDueFilter('all'); setIsDueDropdownOpen(false); setCurrentPage(1); }}
+                                            className={`w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center justify-between cursor-pointer ${dueFilter === 'all' ? 'font-bold text-amber-700 bg-amber-50/50' : 'text-slate-700'}`}
+                                        >
+                                            <span>Semua Jatuh Tempo</span>
+                                            {dueFilter === 'all' && <Check className="w-3.5 h-3.5 text-amber-600" />}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setDueFilter('overdue'); setIsDueDropdownOpen(false); setCurrentPage(1); }}
+                                            className={`w-full text-left px-3.5 py-2 hover:bg-red-50 flex items-center justify-between text-red-700 cursor-pointer ${dueFilter === 'overdue' ? 'font-bold bg-red-50' : ''}`}
+                                        >
+                                            <div className="flex items-center gap-1.5">
+                                                <AlertTriangle className="w-3.5 h-3.5 text-red-600" />
+                                                <span>Lewat Jatuh Tempo (Overdue)</span>
+                                            </div>
+                                            {dueFilter === 'overdue' && <Check className="w-3.5 h-3.5 text-red-600" />}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setDueFilter('due_soon'); setIsDueDropdownOpen(false); setCurrentPage(1); }}
+                                            className={`w-full text-left px-3.5 py-2 hover:bg-amber-50 flex items-center justify-between text-amber-800 cursor-pointer ${dueFilter === 'due_soon' ? 'font-bold bg-amber-50' : ''}`}
+                                        >
+                                            <div className="flex items-center gap-1.5">
+                                                <Clock className="w-3.5 h-3.5 text-amber-600" />
+                                                <span>Mendekati Tempo (≤ 7 Hari)</span>
+                                            </div>
+                                            {dueFilter === 'due_soon' && <Check className="w-3.5 h-3.5 text-amber-600" />}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setDueFilter('due_nearest'); setIsDueDropdownOpen(false); setCurrentPage(1); }}
+                                            className={`w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center justify-between cursor-pointer ${dueFilter === 'due_nearest' ? 'font-bold text-blue-700 bg-blue-50/50' : 'text-slate-700'}`}
+                                        >
+                                            <span>Tempo Terdekat (Urutkan)</span>
+                                            {dueFilter === 'due_nearest' && <Check className="w-3.5 h-3.5 text-blue-600" />}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setDueFilter('due_furthest'); setIsDueDropdownOpen(false); setCurrentPage(1); }}
+                                            className={`w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center justify-between cursor-pointer ${dueFilter === 'due_furthest' ? 'font-bold text-blue-700 bg-blue-50/50' : 'text-slate-700'}`}
+                                        >
+                                            <span>Tempo Terjauh (Urutkan)</span>
+                                            {dueFilter === 'due_furthest' && <Check className="w-3.5 h-3.5 text-blue-600" />}
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+
                             {/* Tombol Export Excel */}
                             <a
-                                href={`/finance/export/hutang?search=${encodeURIComponent(searchTerm)}&status=${encodeURIComponent(statusFilter === 'ALL' ? '' : statusFilter)}&pbf=${encodeURIComponent(filterPbf)}`}
+                                href={`/finance/export/hutang?search=${encodeURIComponent(searchTerm)}&status=${encodeURIComponent(statusFilter === 'ALL' ? '' : statusFilter)}&pbf=${encodeURIComponent(filterPbf)}&sort_order=${encodeURIComponent(sortOrder)}&due_mode=${encodeURIComponent(dueFilter)}`}
                                 className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100/80 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-semibold transition shadow-2xs cursor-pointer"
                                 title="Export data hutang dagang ke Excel (.xlsx) dengan format rapi dan estetik"
                             >
@@ -676,6 +916,7 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                                         />
                                     </th>
                                     <th className="px-4 py-3.5">Faktur & Tanggal</th>
+                                    <th className="px-4 py-3.5 whitespace-nowrap">Jatuh Tempo</th>
                                     <th className="px-4 py-3.5">Vendor (PBF)</th>
                                     <th className="px-4 py-3.5">Gudang</th>
                                     <th className="px-4 py-3.5 text-right">Total Faktur</th>
@@ -688,7 +929,7 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                             <tbody className="divide-y divide-slate-100">
                                 {paginatedHutang.length === 0 ? (
                                     <tr>
-                                        <td colSpan={9} className="text-center py-12 text-slate-400">
+                                        <td colSpan={10} className="text-center py-12 text-slate-400">
                                             Tidak ada data hutang dagang yang sesuai dengan filter.
                                         </td>
                                     </tr>
@@ -729,9 +970,55 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                                                     {item.referensi} • Tgl: {item.tanggal}
                                                 </div>
                                             </td>
+                                            {/* Kolom Jatuh Tempo Visual Jelas & Menonjol */}
+                                            <td className="px-4 py-3.5 whitespace-nowrap">
+                                                {(() => {
+                                                    const dueInfo = computeDueInfo(item);
+                                                    if (dueInfo.isLunas) {
+                                                        return (
+                                                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-semibold border border-emerald-200">
+                                                                <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                                                <span>{item.jatuhTempo || '-'}</span>
+                                                                <span className="text-[10px] text-emerald-600 font-bold ml-0.5">• Lunas</span>
+                                                            </span>
+                                                        );
+                                                    }
+                                                    if (!dueInfo.hasDate) {
+                                                        return <span className="text-slate-400 text-xs italic">-</span>;
+                                                    }
+                                                    if (dueInfo.isOverdue || dueInfo.daysOverdue > 0) {
+                                                        return (
+                                                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-red-100 text-red-800 text-xs font-bold border border-red-300 shadow-2xs">
+                                                                <AlertTriangle className="w-3.5 h-3.5 text-red-600 shrink-0" />
+                                                                <span>{item.jatuhTempo}</span>
+                                                                <span className="text-[10px] bg-red-600 text-white px-1.5 py-0.5 rounded-md font-black">
+                                                                    Lewat {dueInfo.daysOverdue} hr
+                                                                </span>
+                                                            </div>
+                                                        );
+                                                    }
+                                                    if (dueInfo.daysRemaining <= 7) {
+                                                        return (
+                                                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-100 text-amber-900 text-xs font-bold border border-amber-300 shadow-2xs">
+                                                                <Clock className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                                                                <span>{item.jatuhTempo}</span>
+                                                                <span className="text-[10px] bg-amber-600 text-white px-1.5 py-0.5 rounded-md font-bold">
+                                                                    Sisa {dueInfo.daysRemaining} hr
+                                                                </span>
+                                                            </div>
+                                                        );
+                                                    }
+                                                    return (
+                                                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-xs font-medium border border-slate-200">
+                                                            <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                                            <span>{item.jatuhTempo}</span>
+                                                            <span className="text-[10px] text-slate-500 font-normal">({dueInfo.daysRemaining} hr)</span>
+                                                        </div>
+                                                    );
+                                                })()}
+                                            </td>
                                             <td className="px-4 py-3.5">
                                                 <div className="font-semibold text-slate-800">{item.vendor}</div>
-                                                <div className="text-[10px] text-slate-400">Tempo: {item.jatuhTempo}</div>
                                             </td>
                                             <td className="px-4 py-3.5 text-slate-600">
                                                 {item.gudang}
@@ -1090,9 +1377,52 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                                 <span className="text-slate-500">Tanggal Faktur:</span>
                                 <span className="font-medium text-slate-700">{item.tanggal}</span>
                             </div>
-                            <div className="flex justify-between">
+                            <div className="flex justify-between items-center">
                                 <span className="text-slate-500">Jatuh Tempo:</span>
-                                <span className="font-medium text-red-600">{item.jatuhTempo}</span>
+                                {(() => {
+                                    const dueInfo = computeDueInfo(item);
+                                    if (dueInfo.isLunas) {
+                                        return (
+                                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-semibold border border-emerald-200">
+                                                <Check className="w-3 h-3 text-emerald-600" />
+                                                <span>{item.jatuhTempo || '-'}</span>
+                                                <span className="text-[10px] text-emerald-600 font-bold ml-0.5">• Lunas</span>
+                                            </span>
+                                        );
+                                    }
+                                    if (!dueInfo.hasDate) {
+                                        return <span className="text-slate-400 text-xs italic">-</span>;
+                                    }
+                                    if (dueInfo.isOverdue || dueInfo.daysOverdue > 0) {
+                                        return (
+                                            <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-red-100 text-red-800 text-xs font-bold border border-red-300">
+                                                <AlertTriangle className="w-3 h-3 text-red-600 shrink-0" />
+                                                <span>{item.jatuhTempo}</span>
+                                                <span className="text-[10px] bg-red-600 text-white px-1.5 py-0.2 rounded font-black">
+                                                    Lewat {dueInfo.daysOverdue} hr
+                                                </span>
+                                            </div>
+                                        );
+                                    }
+                                    if (dueInfo.daysRemaining <= 7) {
+                                        return (
+                                            <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-amber-100 text-amber-900 text-xs font-bold border border-amber-300">
+                                                <Clock className="w-3 h-3 text-amber-700 shrink-0" />
+                                                <span>{item.jatuhTempo}</span>
+                                                <span className="text-[10px] bg-amber-600 text-white px-1.5 py-0.2 rounded font-bold">
+                                                    Sisa {dueInfo.daysRemaining} hr
+                                                </span>
+                                            </div>
+                                        );
+                                    }
+                                    return (
+                                        <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-slate-100 text-slate-700 text-xs font-medium border border-slate-200">
+                                            <Calendar className="w-3 h-3 text-slate-400 shrink-0" />
+                                            <span>{item.jatuhTempo}</span>
+                                            <span className="text-[10px] text-slate-500">({dueInfo.daysRemaining} hr)</span>
+                                        </div>
+                                    );
+                                })()}
                             </div>
                             <div className="flex justify-between">
                                 <span className="text-slate-500">Gudang Penerima:</span>

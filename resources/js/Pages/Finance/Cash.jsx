@@ -523,223 +523,223 @@ export default function Cash({ pembelianCash = [], creditors = [], kasBankAccoun
             ) : (
                 /* SUB-VIEW B: TABEL DAFTAR PEMBELIAN CASH */
                 <div className="space-y-6">
-                {/* Banner Summary */}
-                <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs flex flex-wrap items-center justify-between gap-4">
-                    <div>
-                        <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                            Total Pembelian Tunai (Cash)
+                    {/* Banner Summary */}
+                    <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs flex flex-wrap items-center justify-between gap-4">
+                        <div>
+                            <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                Total Pembelian Tunai (Cash)
+                            </div>
+                            <div className="text-2xl font-black text-slate-900 mt-1">
+                                {formatRupiah(stats.totalCashPurchases || 0)}
+                            </div>
+                            <p className="text-xs text-slate-400 mt-0.5">
+                                Dari {pembelianCash.length} faktur pembelian tunai
+                            </p>
                         </div>
-                        <div className="text-2xl font-black text-slate-900 mt-1">
-                            {formatRupiah(stats.totalCashPurchases || 0)}
-                        </div>
-                        <p className="text-xs text-slate-400 mt-0.5">
-                            Dari {pembelianCash.length} faktur pembelian tunai
-                        </p>
+
+                        <span className="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-100">
+                            {pembelianCash.length} Faktur Lunas (Cash)
+                        </span>
                     </div>
 
-                    <span className="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-100">
-                        {pembelianCash.length} Faktur Lunas (Cash)
-                    </span>
-                </div>
+                    {/* Toolbar Filter */}
+                    <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div className="flex flex-wrap items-center gap-2.5 flex-1">
+                                <div className="relative w-full sm:w-64">
+                                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                    <input
+                                        type="text"
+                                        placeholder="Cari faktur, PBF, atau kode NT..."
+                                        value={searchTerm}
+                                        onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                                        className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:bg-white focus:outline-none"
+                                    />
+                                </div>
 
-                {/* Toolbar Filter */}
-                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs space-y-3">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div className="flex flex-wrap items-center gap-2.5 flex-1">
-                            <div className="relative w-full sm:w-64">
-                                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                <input
-                                    type="text"
-                                    placeholder="Cari faktur, PBF, atau kode NT..."
-                                    value={searchTerm}
-                                    onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-                                    className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:bg-white focus:outline-none"
+                                <PbfCombobox
+                                    pbfs={creditors}
+                                    selectedPbf={filterPbf}
+                                    onSelectPbf={(val) => { setFilterPbf(val); setCurrentPage(1); }}
+                                    placeholder="Filter PBF (Kreditur)..."
                                 />
+
+                                {/* Tombol Export Excel */}
+                                <a
+                                    href={`/finance/export/cash?search=${encodeURIComponent(searchTerm)}&pbf=${encodeURIComponent(filterPbf)}`}
+                                    className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100/80 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-semibold transition shadow-2xs cursor-pointer"
+                                    title="Export data pembelian cash ke Excel (.xlsx) dengan format rapi dan estetik"
+                                >
+                                    <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                                    <span>Export Excel</span>
+                                </a>
                             </div>
 
-                            <PbfCombobox
-                                pbfs={creditors}
-                                selectedPbf={filterPbf}
-                                onSelectPbf={(val) => { setFilterPbf(val); setCurrentPage(1); }}
-                                placeholder="Filter PBF (Kreditur)..."
-                            />
-
-                            {/* Tombol Export Excel */}
-                            <a
-                                href={`/finance/export/cash?search=${encodeURIComponent(searchTerm)}&pbf=${encodeURIComponent(filterPbf)}`}
-                                className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100/80 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-semibold transition shadow-2xs cursor-pointer"
-                                title="Export data pembelian cash ke Excel (.xlsx) dengan format rapi dan estetik"
-                            >
-                                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-                                <span>Export Excel</span>
-                            </a>
+                            {selectedCashIds.length > 0 && (
+                                <button
+                                    onClick={openBulkCashModal}
+                                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center gap-2 animate-in zoom-in-95 duration-150"
+                                >
+                                    <Banknote className="w-4 h-4" />
+                                    <span>Tetapkan Akun ({selectedCashIds.length} Faktur)</span>
+                                </button>
+                            )}
                         </div>
 
-                        {selectedCashIds.length > 0 && (
-                            <button
-                                onClick={openBulkCashModal}
-                                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center gap-2 animate-in zoom-in-95 duration-150"
-                            >
-                                <Banknote className="w-4 h-4" />
-                                <span>Tetapkan Akun ({selectedCashIds.length} Faktur)</span>
-                            </button>
+                        {selectionWarning && (
+                            <div className="text-xs text-amber-700 bg-amber-50 px-3 py-2 rounded-xl flex items-center gap-2 border border-amber-200">
+                                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                                <span>{selectionWarning}</span>
+                            </div>
                         )}
                     </div>
 
-                    {selectionWarning && (
-                        <div className="text-xs text-amber-700 bg-amber-50 px-3 py-2 rounded-xl flex items-center gap-2 border border-amber-200">
-                            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-                            <span>{selectionWarning}</span>
-                        </div>
-                    )}
-                </div>
-
-                {/* Tabel Pembelian Cash */}
-                <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse text-xs">
-                            <thead>
-                                <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-600 font-semibold uppercase tracking-wider text-[11px]">
-                                    <th className="px-4 py-3.5 w-10">
-                                        <input
-                                            type="checkbox"
-                                            checked={
-                                                paginatedCash.length > 0 &&
-                                                paginatedCash.every(i => selectedCashIds.includes(i.id))
-                                            }
-                                            onChange={handleSelectAllCash}
-                                            className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
-                                            title="Pilih semua di halaman ini"
-                                        />
-                                    </th>
-                                    <th className="px-4 py-3.5">Faktur & Tanggal</th>
-                                    <th className="px-4 py-3.5">Vendor (PBF)</th>
-                                    <th className="px-4 py-3.5">Akun Kas / Bank Pembebanan</th>
-                                    <th className="px-4 py-3.5 text-right">Total Faktur</th>
-                                    <th className="px-4 py-3.5 text-center">Status</th>
-                                    <th className="px-4 py-3.5 text-center w-28">Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {paginatedCash.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={7} className="text-center py-12 text-slate-400">
-                                            Tidak ada data pembelian cash yang sesuai dengan filter.
-                                        </td>
+                    {/* Tabel Pembelian Cash */}
+                    <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse text-xs">
+                                <thead>
+                                    <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-600 font-semibold uppercase tracking-wider text-[11px]">
+                                        <th className="px-4 py-3.5 w-10">
+                                            <input
+                                                type="checkbox"
+                                                checked={
+                                                    paginatedCash.length > 0 &&
+                                                    paginatedCash.every(i => selectedCashIds.includes(i.id))
+                                                }
+                                                onChange={handleSelectAllCash}
+                                                className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                                                title="Pilih semua di halaman ini"
+                                            />
+                                        </th>
+                                        <th className="px-4 py-3.5">Faktur & Tanggal</th>
+                                        <th className="px-4 py-3.5">Vendor (PBF)</th>
+                                        <th className="px-4 py-3.5">Akun</th>
+                                        <th className="px-4 py-3.5 text-right">Total Faktur</th>
+                                        <th className="px-4 py-3.5 text-center">Status</th>
+                                        <th className="px-4 py-3.5 text-center">Aksi</th>
                                     </tr>
-                                ) : (
-                                    paginatedCash.map((item) => (
-                                        <tr
-                                            key={item.id}
-                                            onClick={() => setDrawerCash(item)}
-                                            className="hover:bg-emerald-50/40 cursor-pointer transition group"
-                                        >
-                                            <td className="px-4 py-3.5" onClick={(e) => e.stopPropagation()}>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedCashIds.includes(item.id)}
-                                                    onChange={() => handleToggleCash(item)}
-                                                    className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
-                                                />
-                                            </td>
-                                            <td className="px-4 py-3.5">
-                                                <button
-                                                    type="button"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setDetailViewCash(item);
-                                                    }}
-                                                    className="font-bold text-slate-900 hover:text-emerald-600 text-left transition group-hover:text-emerald-600 cursor-pointer"
-                                                    title="Buka Halaman Detil Lengkap"
-                                                >
-                                                    {item.nomor}
-                                                </button>
-                                                <div className="text-[11px] text-slate-400 mt-0.5">
-                                                    {item.referensi} • Tgl: {item.tanggal}
-                                                </div>
-                                            </td>
-                                            <td className="px-4 py-3.5">
-                                                <div className="font-semibold text-slate-800">{item.vendor}</div>
-                                                <div className="text-[10px] text-slate-400">{item.gudang}</div>
-                                            </td>
-                                            <td className="px-4 py-3.5">
-                                                {item.akunPembayaran ? (
-                                                    <div>
-                                                        <span className="font-bold text-slate-800">{item.akunPembayaran.nama}</span>
-                                                        <span className="text-[10px] text-slate-500 block font-medium">
-                                                            {item.akunPembayaran.kode}
-                                                        </span>
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-amber-600 font-semibold italic text-[11px]">
-                                                        Belum ditetapkan
-                                                    </span>
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-3.5 text-right font-bold text-slate-900">
-                                                {formatNumberOnly(item.total)}
-                                            </td>
-                                            <td className="px-4 py-3.5 text-center">
-                                                <span className="inline-block px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700">
-                                                    Lunas (Cash)
-                                                </span>
-                                            </td>
-                                            <td className="px-4 py-3.5 text-center" onClick={(e) => e.stopPropagation()}>
-                                                <div className="flex items-center justify-center gap-1.5">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => openCashModal(item)}
-                                                        className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition cursor-pointer"
-                                                    >
-                                                        {item.akunPembayaran ? 'Ubah Akun' : 'Tetapkan'}
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setDetailViewCash(item)}
-                                                        className="px-2.5 py-1 border border-slate-200 text-slate-600 hover:bg-slate-100 rounded-lg text-xs font-semibold transition cursor-pointer"
-                                                        title="Buka Halaman Detil Lengkap"
-                                                    >
-                                                        Detil
-                                                    </button>
-                                                </div>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {paginatedCash.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={7} className="text-center py-12 text-slate-400">
+                                                Tidak ada data pembelian cash yang sesuai dengan filter.
                                             </td>
                                         </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    {/* Pagination */}
-                    {totalPages > 1 && (
-                        <div className="p-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-                            <div>
-                                Menampilkan {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, filteredCash.length)} dari {filteredCash.length} faktur
-                            </div>
-                            <div className="flex items-center gap-1">
-                                <button
-                                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                                    disabled={currentPage === 1}
-                                    className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50"
-                                >
-                                    <ChevronLeft className="w-4 h-4" />
-                                </button>
-                                <span className="px-3 py-1 font-semibold text-slate-800">
-                                    {currentPage} / {totalPages}
-                                </span>
-                                <button
-                                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                                    disabled={currentPage === totalPages}
-                                    className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50"
-                                >
-                                    <ChevronRight className="w-4 h-4" />
-                                </button>
-                            </div>
+                                    ) : (
+                                        paginatedCash.map((item) => (
+                                            <tr
+                                                key={item.id}
+                                                onClick={() => setDrawerCash(item)}
+                                                className="hover:bg-emerald-50/40 cursor-pointer transition group"
+                                            >
+                                                <td className="px-4 py-3.5" onClick={(e) => e.stopPropagation()}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedCashIds.includes(item.id)}
+                                                        onChange={() => handleToggleCash(item)}
+                                                        className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                                                    />
+                                                </td>
+                                                <td className="px-4 py-3.5">
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setDetailViewCash(item);
+                                                        }}
+                                                        className="font-bold text-slate-900 hover:text-emerald-600 text-left transition group-hover:text-emerald-600 cursor-pointer"
+                                                        title="Buka Halaman Detil Lengkap"
+                                                    >
+                                                        {item.nomor}
+                                                    </button>
+                                                    <div className="text-[11px] text-slate-400 mt-0.5">
+                                                        {item.referensi} • Tgl: {item.tanggal}
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-3.5">
+                                                    <div className="font-semibold text-slate-800">{item.vendor}</div>
+                                                    <div className="text-[10px] text-slate-400">{item.gudang}</div>
+                                                </td>
+                                                <td className="px-4 py-3.5">
+                                                    {item.akunPembayaran ? (
+                                                        <div>
+                                                            <span className="font-bold text-slate-800">{item.akunPembayaran.nama}</span>
+                                                            <span className="text-[10px] text-slate-500 block font-medium">
+                                                                {item.akunPembayaran.kode}
+                                                            </span>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-amber-600 font-semibold italic text-[11px]">
+                                                            Belum ditetapkan
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3.5 text-right font-bold text-slate-900">
+                                                    {formatNumberOnly(item.total)}
+                                                </td>
+                                                <td className="px-4 py-3.5 text-center">
+                                                    <span className="inline-block px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700">
+                                                        Lunas (Cash)
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3.5 text-center" onClick={(e) => e.stopPropagation()}>
+                                                    <div className="flex items-center justify-center gap-1.5">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => openCashModal(item)}
+                                                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition cursor-pointer"
+                                                        >
+                                                            {item.akunPembayaran ? 'Ubah Akun' : 'Tetapkan'}
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setDetailViewCash(item)}
+                                                            className="px-2.5 py-1 border border-slate-200 text-slate-600 hover:bg-slate-100 rounded-lg text-xs font-semibold transition cursor-pointer"
+                                                            title="Buka Halaman Detil Lengkap"
+                                                        >
+                                                            Detil
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
                         </div>
-                    )}
+
+                        {/* Pagination */}
+                        {totalPages > 1 && (
+                            <div className="p-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                                <div>
+                                    Menampilkan {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, filteredCash.length)} dari {filteredCash.length} faktur
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    <button
+                                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                                        disabled={currentPage === 1}
+                                        className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50"
+                                    >
+                                        <ChevronLeft className="w-4 h-4" />
+                                    </button>
+                                    <span className="px-3 py-1 font-semibold text-slate-800">
+                                        {currentPage} / {totalPages}
+                                    </span>
+                                    <button
+                                        onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                                        disabled={currentPage === totalPages}
+                                        className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50"
+                                    >
+                                        <ChevronRight className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
-            </div>
-        )}
+            )}
 
             {/* Modal Tetapkan Akun Kas Satuan */}
             {isCashModalOpen && (
