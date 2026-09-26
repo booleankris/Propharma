@@ -47,10 +47,16 @@ class CashExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
             if ($pbf) $filterPbf = $pbf->name;
         }
 
+        $filterAkun = 'Semua Status Akun';
+        if (!empty($this->filters['account_status'])) {
+            if ($this->filters['account_status'] === 'ASSIGNED') $filterAkun = 'Sudah Pilih Akun';
+            elseif ($this->filters['account_status'] === 'UNASSIGNED') $filterAkun = 'Belum Pilih Akun';
+        }
+
         $rows = [
             ["APOTEK PROPHARMA - {$branchName}"],
             ["LAPORAN PEMBELIAN TUNAI (CASH / LANGSUNG LUNAS)"],
-            ["Dicetak: " . date('d/m/Y H:i') . " | Filter PBF: {$filterPbf}"],
+            ["Dicetak: " . date('d/m/Y H:i') . " | PBF: {$filterPbf} | Status Akun: {$filterAkun}"],
             [''], // Row 4 Blank
             // Row 5 Table Headers
             [
@@ -61,7 +67,7 @@ class CashExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                 'Apotek Cabang',
                 'Tgl. Pembelian',
                 'Akun Kas / Bank',
-                'Status Pembayaran',
+                'Status Akun & Pembayaran',
                 'Subtotal (Rp)',
                 'PPN 11% (Rp)',
                 'Total Pembelian (Rp)',
@@ -69,6 +75,7 @@ class CashExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         ];
 
         // 2. Query Data
+        $sortOrder = strtolower($this->filters['sort_order'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
         $query = Receiving::with([
             'receiving_details' => function ($q) {
                 $q->where('invoice_payment', 'TUNAI')
@@ -80,7 +87,7 @@ class CashExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
             ->whereHas('receiving_details', function ($q) {
                 $q->where('invoice_payment', 'TUNAI');
             })
-            ->latest('date');
+            ->orderBy('date', $sortOrder);
 
         $no = 1;
         $totalSubtotalSemua = 0;
@@ -112,6 +119,18 @@ class CashExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                     }
                 }
 
+                $payment = $detail->payments->first();
+                $hasAccount = ($payment && $payment->account);
+
+                if (!empty($this->filters['account_status']) && $this->filters['account_status'] !== 'ALL') {
+                    if ($this->filters['account_status'] === 'ASSIGNED' && !$hasAccount) {
+                        continue;
+                    }
+                    if ($this->filters['account_status'] === 'UNASSIGNED' && $hasAccount) {
+                        continue;
+                    }
+                }
+
                 $items = $detail->receiving_items ?? collect();
                 $subtotal = 0;
                 foreach ($items as $item) {
@@ -123,8 +142,13 @@ class CashExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                 $nominal = (float) ($detail->nominal ?? $calculatedTotal);
                 $finalTotal = $nominal > 0 ? $nominal : $calculatedTotal;
 
-                $payment = $detail->payments->first();
-                $accountName = $payment && $payment->account ? $payment->account->name : 'Kas Toko / Tunai';
+                if ($hasAccount) {
+                    $accountName = $payment->account->name . ($payment->account->code ? " ({$payment->account->code})" : '');
+                    $statusText = 'LUNAS (AKUN SIAP)';
+                } else {
+                    $accountName = 'BELUM DITETAPKAN';
+                    $statusText = 'LUNAS (BELUM PILIH AKUN)';
+                }
 
                 $tglBeli = $this->safeFormatDate($rcv->date);
 
@@ -140,7 +164,7 @@ class CashExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                     $rcv->pharmacy->name ?? '-',
                     $tglBeli,
                     $accountName,
-                    'LUNAS (CASH)',
+                    $statusText,
                     $subtotal,
                     $ppn,
                     $finalTotal,

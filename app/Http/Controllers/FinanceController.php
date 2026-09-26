@@ -455,12 +455,14 @@ class FinanceController extends Controller
                     'vendor' => $vendorName,
                     'referensi' => $detail->receiving_details_code ?: $rec->code,
                     'tanggal' => $detail->invoice_date ? \Carbon\Carbon::parse($detail->invoice_date)->format('d/m/Y') : ($rec->date ?: '-'),
+                    'raw_tanggal' => $detail->invoice_date ? \Carbon\Carbon::parse($detail->invoice_date)->format('Y-m-d') : ($rec->date ?: null),
                     'status' => 'Lunas (Cash)',
                     'subtotal' => $subtotal,
                     'ppn' => $ppnNominal,
                     'total' => $total,
                     'gudang' => $rec->pharmacy->name ?? 'Gudang Utama',
                     'akunPembayaran' => $akunPembayaran,
+                    'has_account' => !empty($akunPembayaran),
                     'items' => $itemsList,
                     'lastModified' => \Carbon\Carbon::parse($rec->updated_at)->format('d M Y H:i'),
                 ];
@@ -759,6 +761,17 @@ class FinanceController extends Controller
         // Cash Stats
         $totalCashPurchases = array_sum(array_column($cash, 'total'));
         $totalCashCount = count($cash);
+        $countSudahPilihAkun = 0;
+        $countBelumPilihAkun = 0;
+        $totalNominalBelumPilihAkun = 0;
+        foreach ($cash as $c) {
+            if (!empty($c['akunPembayaran'])) {
+                $countSudahPilihAkun++;
+            } else {
+                $countBelumPilihAkun++;
+                $totalNominalBelumPilihAkun += (float) ($c['total'] ?? 0);
+            }
+        }
 
         // Piutang Stats
         $totalPiutangSisa = 0;
@@ -788,6 +801,9 @@ class FinanceController extends Controller
             'totalCashPurchases' => $totalCashPurchases,
             'totalCashSpent' => $totalCashPurchases,
             'totalCashCount' => $totalCashCount,
+            'countSudahPilihAkun' => $countSudahPilihAkun,
+            'countBelumPilihAkun' => $countBelumPilihAkun,
+            'totalNominalBelumPilihAkun' => $totalNominalBelumPilihAkun,
             'totalPiutangSisa' => $totalPiutangSisa,
             'totalSisaPiutang' => $totalPiutangSisa,
             'countPiutangBelumBayar' => $countPiutangBelumBayar,
@@ -1446,6 +1462,8 @@ class FinanceController extends Controller
         $filters = [
             'search' => $request->query('search', ''),
             'pbf' => $request->query('pbf', ''),
+            'account_status' => $request->query('account_status', 'ALL'),
+            'sort_order' => $request->query('sort_order', 'desc'),
         ];
 
         return Excel::download(new CashExport($targetPharmacyIds, $filters, $activePharmacy), $filename);

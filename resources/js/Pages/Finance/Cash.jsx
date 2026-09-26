@@ -7,12 +7,15 @@ import FloatingActionBar from './Components/FloatingActionBar';
 import { formatRupiah, formatNumberOnly } from './Components/Utils';
 import {
     Banknote, Search, Check, X, Calendar, AlertCircle, ChevronLeft, ChevronRight,
-    ArrowLeft, Printer, Share2, MoreVertical, ChevronDown, History, Landmark, Maximize2, CreditCard, Download, FileSpreadsheet
+    ArrowLeft, Printer, Share2, MoreVertical, ChevronDown, History, Landmark, Maximize2, CreditCard, Download, FileSpreadsheet,
+    CheckCircle2, AlertTriangle, ArrowUp, ArrowDown
 } from 'lucide-react';
 
 export default function Cash({ pembelianCash = [], creditors = [], kasBankAccounts = [], stats = {} }) {
     const [searchTerm, setSearchTerm] = useState('');
     const [filterPbf, setFilterPbf] = useState('');
+    const [accountFilter, setAccountFilter] = useState('ALL'); // 'ALL' | 'UNASSIGNED' | 'ASSIGNED'
+    const [sortOrder, setSortOrder] = useState('desc'); // 'desc' | 'asc'
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 10;
 
@@ -46,9 +49,29 @@ export default function Cash({ pembelianCash = [], creditors = [], kasBankAccoun
     });
     const [isSubmittingBulkCash, setIsSubmittingBulkCash] = useState(false);
 
+    // Statistik penetapan akun kas
+    const accountStats = useMemo(() => {
+        let sudah = 0;
+        let belum = 0;
+        let nominalBelum = 0;
+        pembelianCash.forEach((item) => {
+            if (item.akunPembayaran) {
+                sudah++;
+            } else {
+                belum++;
+                nominalBelum += Number(item.total) || 0;
+            }
+        });
+        return {
+            sudah: stats.countSudahPilihAkun ?? sudah,
+            belum: stats.countBelumPilihAkun ?? belum,
+            nominalBelum: stats.totalNominalBelumPilihAkun ?? nominalBelum,
+        };
+    }, [pembelianCash, stats]);
+
     // Filter
     const filteredCash = useMemo(() => {
-        return pembelianCash.filter((item) => {
+        const result = pembelianCash.filter((item) => {
             const matchSearch =
                 (item.nomor && item.nomor.toLowerCase().includes(searchTerm.toLowerCase())) ||
                 (item.vendor && item.vendor.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -58,9 +81,22 @@ export default function Cash({ pembelianCash = [], creditors = [], kasBankAccoun
                 ? (item.vendor && item.vendor.toLowerCase().includes(filterPbf.toLowerCase()))
                 : true;
 
-            return matchSearch && matchPbf;
+            let matchAccount = true;
+            if (accountFilter === 'ASSIGNED') {
+                matchAccount = !!item.akunPembayaran;
+            } else if (accountFilter === 'UNASSIGNED') {
+                matchAccount = !item.akunPembayaran;
+            }
+
+            return matchSearch && matchPbf && matchAccount;
         });
-    }, [pembelianCash, searchTerm, filterPbf]);
+
+        return result.sort((a, b) => {
+            const timeA = a.raw_tanggal ? new Date(a.raw_tanggal).getTime() : (Number(a.id) || 0);
+            const timeB = b.raw_tanggal ? new Date(b.raw_tanggal).getTime() : (Number(b.id) || 0);
+            return sortOrder === 'asc' ? timeA - timeB : timeB - timeA;
+        });
+    }, [pembelianCash, searchTerm, filterPbf, accountFilter, sortOrder]);
 
     const totalPages = Math.ceil(filteredCash.length / itemsPerPage) || 1;
     const paginatedCash = useMemo(() => {
@@ -271,9 +307,22 @@ export default function Cash({ pembelianCash = [], creditors = [], kasBankAccoun
                     <div className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-xs space-y-6">
                         {/* Status Badge */}
                         <div className="flex items-center justify-between">
-                            <span className="inline-block px-3 py-1 text-xs font-semibold rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100">
-                                Lunas (Cash)
-                            </span>
+                            <div className="flex items-center gap-2">
+                                <span className="inline-block px-3 py-1 text-xs font-semibold rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                    Lunas (Cash)
+                                </span>
+                                {detailViewCash.akunPembayaran ? (
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                        <span>Akun Kas Terhubung</span>
+                                    </span>
+                                ) : (
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold rounded-full bg-amber-100 text-amber-900 border border-amber-300">
+                                        <AlertCircle className="w-3.5 h-3.5 text-amber-700" />
+                                        <span>Belum Pilih Akun Kas</span>
+                                    </span>
+                                )}
+                            </div>
 
                             <span className="text-xs text-slate-400">
                                 Jenis Pembayaran: <strong className="text-slate-700 font-semibold">TUNAI (Langsung Lunas)</strong>
@@ -313,24 +362,27 @@ export default function Cash({ pembelianCash = [], creditors = [], kasBankAccoun
                                 <div>
                                     <span className="text-slate-400 block text-[11px] mb-1">Akun Pembayaran (Kas & Bank)</span>
                                     {detailViewCash.akunPembayaran ? (
-                                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-lg">
-                                            <Landmark className="w-3.5 h-3.5 text-emerald-600" />
-                                            <span className="font-semibold">{detailViewCash.akunPembayaran.nama}</span>
-                                            {detailViewCash.akunPembayaran.noRekening && (
-                                                <span className="text-[10px] text-slate-500 font-mono">({detailViewCash.akunPembayaran.noRekening})</span>
-                                            )}
+                                        <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl shadow-2xs">
+                                            <Landmark className="w-4 h-4 text-emerald-600" />
+                                            <div>
+                                                <span className="font-bold text-xs block">{detailViewCash.akunPembayaran.nama}</span>
+                                                <span className="text-[10px] text-slate-500 font-mono block">
+                                                    {detailViewCash.akunPembayaran.kode} {detailViewCash.akunPembayaran.noRekening ? `• ${detailViewCash.akunPembayaran.noRekening}` : ''}
+                                                </span>
+                                            </div>
                                         </div>
                                     ) : (
                                         <div className="flex items-center gap-2">
-                                            <span className="text-amber-600 bg-amber-50 px-2 py-0.5 rounded text-[11px] font-medium border border-amber-200">
-                                                Belum Ditentukan Akun
+                                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-100/90 text-amber-900 border border-amber-300 shadow-2xs">
+                                                <AlertCircle className="w-3.5 h-3.5 text-amber-700" />
+                                                <span>Belum Ditetapkan Akun</span>
                                             </span>
                                             <button
                                                 type="button"
                                                 onClick={() => openCashModal(detailViewCash)}
-                                                className="text-xs text-blue-600 hover:text-blue-800 font-semibold underline cursor-pointer"
+                                                className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-lg shadow-2xs transition cursor-pointer"
                                             >
-                                                Pilih Akun
+                                                Pilih Akun Sekarang
                                             </button>
                                         </div>
                                     )}
@@ -537,20 +589,35 @@ export default function Cash({ pembelianCash = [], creditors = [], kasBankAccoun
                             </p>
                         </div>
 
-                        <span className="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-100">
-                            {pembelianCash.length} Faktur Lunas (Cash)
-                        </span>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <div className="px-3.5 py-2 rounded-xl bg-emerald-50 text-emerald-800 text-xs font-bold border border-emerald-200 flex items-center gap-1.5 shadow-2xs">
+                                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                                <span>{accountStats.sudah} Sudah Pilih Akun</span>
+                            </div>
+
+                            {accountStats.belum > 0 ? (
+                                <div className="px-3.5 py-2 rounded-xl bg-amber-50 text-amber-900 text-xs font-bold border border-amber-300 flex items-center gap-1.5 shadow-2xs">
+                                    <AlertCircle className="w-4 h-4 text-amber-600" />
+                                    <span>{accountStats.belum} Belum Pilih Akun ({formatRupiah(accountStats.nominalBelum)})</span>
+                                </div>
+                            ) : (
+                                <div className="px-3.5 py-2 rounded-xl bg-slate-50 text-slate-600 text-xs font-semibold border border-slate-200 flex items-center gap-1.5">
+                                    <Check className="w-4 h-4 text-emerald-500" />
+                                    <span>Semua Akun Sudah Ditetapkan</span>
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                     {/* Toolbar Filter */}
                     <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs space-y-3">
                         <div className="flex flex-wrap items-center justify-between gap-3">
                             <div className="flex flex-wrap items-center gap-2.5 flex-1">
-                                <div className="relative w-full sm:w-64">
+                                <div className="relative w-full sm:w-60">
                                     <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                                     <input
                                         type="text"
-                                        placeholder="Cari faktur, PBF, atau kode NT..."
+                                        placeholder="Cari faktur, PBF, kode NT..."
                                         value={searchTerm}
                                         onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                                         className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:bg-white focus:outline-none"
@@ -561,12 +628,68 @@ export default function Cash({ pembelianCash = [], creditors = [], kasBankAccoun
                                     pbfs={creditors}
                                     selectedPbf={filterPbf}
                                     onSelectPbf={(val) => { setFilterPbf(val); setCurrentPage(1); }}
-                                    placeholder="Filter PBF (Kreditur)..."
+                                    placeholder="Filter PBF..."
                                 />
+
+                                {/* Segmented Filter Status Akun: Semua / Belum Pilih / Sudah Pilih */}
+                                <div className="inline-flex p-1 bg-slate-100 rounded-xl border border-slate-200/80 text-xs">
+                                    <button
+                                        type="button"
+                                        onClick={() => { setAccountFilter('ALL'); setCurrentPage(1); }}
+                                        className={`px-3 py-1.5 rounded-lg font-semibold transition cursor-pointer ${
+                                            accountFilter === 'ALL'
+                                                ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                                                : 'text-slate-600 hover:text-slate-900'
+                                        }`}
+                                    >
+                                        Semua ({pembelianCash.length})
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => { setAccountFilter('UNASSIGNED'); setCurrentPage(1); }}
+                                        className={`px-3 py-1.5 rounded-lg font-semibold transition flex items-center gap-1.5 cursor-pointer ${
+                                            accountFilter === 'UNASSIGNED'
+                                                ? 'bg-amber-500 text-white shadow-2xs font-bold'
+                                                : 'text-amber-800 hover:text-amber-900 bg-amber-50/50'
+                                        }`}
+                                        title="Tampilkan hanya faktur tunai yang belum ditetapkan akun kas/bank"
+                                    >
+                                        <AlertCircle className={`w-3.5 h-3.5 ${accountFilter === 'UNASSIGNED' ? 'text-white' : 'text-amber-600'}`} />
+                                        <span>Belum Pilih ({accountStats.belum})</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => { setAccountFilter('ASSIGNED'); setCurrentPage(1); }}
+                                        className={`px-3 py-1.5 rounded-lg font-semibold transition flex items-center gap-1.5 cursor-pointer ${
+                                            accountFilter === 'ASSIGNED'
+                                                ? 'bg-emerald-600 text-white shadow-2xs font-bold'
+                                                : 'text-emerald-800 hover:text-emerald-900 bg-emerald-50/40'
+                                        }`}
+                                        title="Tampilkan hanya faktur tunai yang sudah memiliki akun kas/bank"
+                                    >
+                                        <CheckCircle2 className={`w-3.5 h-3.5 ${accountFilter === 'ASSIGNED' ? 'text-white' : 'text-emerald-600'}`} />
+                                        <span>Sudah Pilih ({accountStats.sudah})</span>
+                                    </button>
+                                </div>
+
+                                {/* Filter: Waktu Pembelian ASC / DESC */}
+                                <button
+                                    type="button"
+                                    onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
+                                    className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition border cursor-pointer ${
+                                        sortOrder === 'asc'
+                                            ? 'bg-blue-50 text-blue-800 border-blue-200'
+                                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                                    }`}
+                                    title={sortOrder === 'asc' ? 'Urutan: Waktu Pembelian Terlama (ASC)' : 'Urutan: Waktu Pembelian Terbaru (DESC)'}
+                                >
+                                    {sortOrder === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-blue-600" /> : <ArrowDown className="w-3.5 h-3.5 text-slate-500" />}
+                                    <span>Waktu: {sortOrder === 'asc' ? 'Terlama (ASC)' : 'Terbaru (DESC)'}</span>
+                                </button>
 
                                 {/* Tombol Export Excel */}
                                 <a
-                                    href={`/finance/export/cash?search=${encodeURIComponent(searchTerm)}&pbf=${encodeURIComponent(filterPbf)}`}
+                                    href={`/finance/export/cash?search=${encodeURIComponent(searchTerm)}&pbf=${encodeURIComponent(filterPbf)}&account_status=${encodeURIComponent(accountFilter)}&sort_order=${encodeURIComponent(sortOrder)}`}
                                     className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100/80 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-semibold transition shadow-2xs cursor-pointer"
                                     title="Export data pembelian cash ke Excel (.xlsx) dengan format rapi dan estetik"
                                 >
@@ -578,7 +701,7 @@ export default function Cash({ pembelianCash = [], creditors = [], kasBankAccoun
                             {selectedCashIds.length > 0 && (
                                 <button
                                     onClick={openBulkCashModal}
-                                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center gap-2 animate-in zoom-in-95 duration-150"
+                                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center gap-2 animate-in zoom-in-95 duration-150 cursor-pointer"
                                 >
                                     <Banknote className="w-4 h-4" />
                                     <span>Tetapkan Akun ({selectedCashIds.length} Faktur)</span>
@@ -614,7 +737,7 @@ export default function Cash({ pembelianCash = [], creditors = [], kasBankAccoun
                                         </th>
                                         <th className="px-4 py-3.5">Faktur & Tanggal</th>
                                         <th className="px-4 py-3.5">Vendor (PBF)</th>
-                                        <th className="px-4 py-3.5">Akun</th>
+                                        <th className="px-4 py-3.5">Akun Kas & Bank</th>
                                         <th className="px-4 py-3.5 text-right">Total Faktur</th>
                                         <th className="px-4 py-3.5 text-center">Status</th>
                                         <th className="px-4 py-3.5 text-center">Aksi</th>
@@ -628,83 +751,122 @@ export default function Cash({ pembelianCash = [], creditors = [], kasBankAccoun
                                             </td>
                                         </tr>
                                     ) : (
-                                        paginatedCash.map((item) => (
-                                            <tr
-                                                key={item.id}
-                                                onClick={() => setDrawerCash(item)}
-                                                className="hover:bg-emerald-50/40 cursor-pointer transition group"
-                                            >
-                                                <td className="px-4 py-3.5" onClick={(e) => e.stopPropagation()}>
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={selectedCashIds.includes(item.id)}
-                                                        onChange={() => handleToggleCash(item)}
-                                                        className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
-                                                    />
-                                                </td>
-                                                <td className="px-4 py-3.5">
-                                                    <button
-                                                        type="button"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setDetailViewCash(item);
-                                                        }}
-                                                        className="font-bold text-slate-900 hover:text-emerald-600 text-left transition group-hover:text-emerald-600 cursor-pointer"
-                                                        title="Buka Halaman Detil Lengkap"
-                                                    >
-                                                        {item.nomor}
-                                                    </button>
-                                                    <div className="text-[11px] text-slate-400 mt-0.5">
-                                                        {item.referensi} • Tgl: {item.tanggal}
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 py-3.5">
-                                                    <div className="font-semibold text-slate-800">{item.vendor}</div>
-                                                    <div className="text-[10px] text-slate-400">{item.gudang}</div>
-                                                </td>
-                                                <td className="px-4 py-3.5">
-                                                    {item.akunPembayaran ? (
-                                                        <div>
-                                                            <span className="font-bold text-slate-800">{item.akunPembayaran.nama}</span>
-                                                            <span className="text-[10px] text-slate-500 block font-medium">
-                                                                {item.akunPembayaran.kode}
-                                                            </span>
-                                                        </div>
-                                                    ) : (
-                                                        <span className="text-amber-600 font-semibold italic text-[11px]">
-                                                            Belum ditetapkan
-                                                        </span>
-                                                    )}
-                                                </td>
-                                                <td className="px-4 py-3.5 text-right font-bold text-slate-900">
-                                                    {formatNumberOnly(item.total)}
-                                                </td>
-                                                <td className="px-4 py-3.5 text-center">
-                                                    <span className="inline-block px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700">
-                                                        Lunas (Cash)
-                                                    </span>
-                                                </td>
-                                                <td className="px-4 py-3.5 text-center" onClick={(e) => e.stopPropagation()}>
-                                                    <div className="flex items-center justify-center gap-1.5">
+                                        paginatedCash.map((item) => {
+                                            const hasAccount = !!item.akunPembayaran;
+                                            return (
+                                                <tr
+                                                    key={item.id}
+                                                    onClick={() => setDrawerCash(item)}
+                                                    className={`cursor-pointer transition group ${
+                                                        hasAccount
+                                                            ? 'hover:bg-slate-50/70'
+                                                            : 'bg-amber-50/25 hover:bg-amber-50/45 border-l-4 border-l-amber-400'
+                                                    }`}
+                                                >
+                                                    <td className="px-4 py-3.5" onClick={(e) => e.stopPropagation()}>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={selectedCashIds.includes(item.id)}
+                                                            onChange={() => handleToggleCash(item)}
+                                                            className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                                                        />
+                                                    </td>
+                                                    <td className="px-4 py-3.5">
                                                         <button
                                                             type="button"
-                                                            onClick={() => openCashModal(item)}
-                                                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition cursor-pointer"
-                                                        >
-                                                            {item.akunPembayaran ? 'Ubah Akun' : 'Tetapkan'}
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setDetailViewCash(item)}
-                                                            className="px-2.5 py-1 border border-slate-200 text-slate-600 hover:bg-slate-100 rounded-lg text-xs font-semibold transition cursor-pointer"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setDetailViewCash(item);
+                                                            }}
+                                                            className="font-bold text-slate-900 hover:text-emerald-600 text-left transition group-hover:text-emerald-600 cursor-pointer"
                                                             title="Buka Halaman Detil Lengkap"
                                                         >
-                                                            Detil
+                                                            {item.nomor}
                                                         </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))
+                                                        <div className="text-[11px] text-slate-400 mt-0.5">
+                                                            {item.referensi} • Tgl: {item.tanggal}
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-4 py-3.5">
+                                                        <div className="font-semibold text-slate-800">{item.vendor}</div>
+                                                        <div className="text-[10px] text-slate-400">{item.gudang}</div>
+                                                    </td>
+                                                    {/* Kolom Akun Kas & Bank - Diberi Pembeda Visual Jelas */}
+                                                    <td className="px-4 py-3.5">
+                                                        {hasAccount ? (
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0 border border-emerald-200/60">
+                                                                    <Landmark className="w-3.5 h-3.5" />
+                                                                </div>
+                                                                <div>
+                                                                    <span className="font-bold text-slate-800 block text-xs">
+                                                                        {item.akunPembayaran.nama}
+                                                                    </span>
+                                                                    <span className="text-[10px] text-slate-500 font-mono block">
+                                                                        {item.akunPembayaran.kode} {item.akunPembayaran.noRekening ? `• ${item.akunPembayaran.noRekening}` : ''}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-100/80 text-amber-900 text-xs font-bold border border-amber-300 shadow-2xs">
+                                                                <AlertCircle className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                                                                <span>Belum Pilih Akun</span>
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-4 py-3.5 text-right font-bold text-slate-900">
+                                                        {formatNumberOnly(item.total)}
+                                                    </td>
+                                                    {/* Kolom Status - Diberi Pembeda Visual Jelas */}
+                                                    <td className="px-4 py-3.5 text-center">
+                                                        {hasAccount ? (
+                                                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                                                <span>Lunas • Akun Siap</span>
+                                                            </span>
+                                                        ) : (
+                                                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-300">
+                                                                <AlertCircle className="w-3 h-3 text-amber-600" />
+                                                                <span>Perlu Pilih Akun</span>
+                                                            </span>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-4 py-3.5 text-center" onClick={(e) => e.stopPropagation()}>
+                                                        <div className="flex items-center justify-center gap-1.5">
+                                                            {hasAccount ? (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => openCashModal(item)}
+                                                                    className="px-2.5 py-1.5 border border-slate-200 hover:bg-slate-100 text-slate-700 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1"
+                                                                    title="Ubah akun kas & bank yang ditetapkan"
+                                                                >
+                                                                    <Landmark className="w-3.5 h-3.5 text-slate-500" />
+                                                                    <span>Ubah</span>
+                                                                </button>
+                                                            ) : (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => openCashModal(item)}
+                                                                    className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 active:scale-95 text-white rounded-lg text-xs font-bold transition shadow-xs cursor-pointer flex items-center gap-1"
+                                                                    title="Tetapkan akun kas & bank untuk faktur tunai ini"
+                                                                >
+                                                                    <Landmark className="w-3.5 h-3.5" />
+                                                                    <span>Pilih Akun</span>
+                                                                </button>
+                                                            )}
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setDetailViewCash(item)}
+                                                                className="px-2.5 py-1.5 border border-slate-200 text-slate-600 hover:bg-slate-100 rounded-lg text-xs font-semibold transition cursor-pointer"
+                                                                title="Buka Halaman Detil Lengkap"
+                                                            >
+                                                                Detil
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })
                                     )}
                                 </tbody>
                             </table>
@@ -946,11 +1108,19 @@ export default function Cash({ pembelianCash = [], creditors = [], kasBankAccoun
                                 <span className="text-slate-500">Tanggal Faktur:</span>
                                 <span className="font-medium text-slate-700">{item.tanggal}</span>
                             </div>
-                            <div className="flex justify-between">
+                            <div className="flex justify-between items-center">
                                 <span className="text-slate-500">Akun Kas / Bank:</span>
-                                <span className="font-bold text-emerald-700">
-                                    {item.akunPembayaran ? item.akunPembayaran.nama : 'Belum Ditetapkan'}
-                                </span>
+                                {item.akunPembayaran ? (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-emerald-50 text-emerald-800 text-xs font-bold border border-emerald-200">
+                                        <Landmark className="w-3 h-3 text-emerald-600" />
+                                        <span>{item.akunPembayaran.nama}</span>
+                                    </span>
+                                ) : (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-amber-50 text-amber-800 text-xs font-bold border border-amber-300">
+                                        <AlertCircle className="w-3 h-3 text-amber-600" />
+                                        <span>Belum Ditetapkan</span>
+                                    </span>
+                                )}
                             </div>
                         </div>
 
