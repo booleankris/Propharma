@@ -812,8 +812,8 @@
             </div>
         </div>
     </div>
-    {{-- Sahabat Finance Button (Khusus Finance & General Manager) --}}
-    @hasanyrole('Finance|General Manager|administrator')
+    {{-- Sahabat Finance Button (Khusus Finance, General Manager, & HO) --}}
+    @hasanyrole('Finance|General Manager|administrator|HO')
         <div class="finance-wrap">
             <a href="{{ route('finance.index') }}" class="finance-btn {{ request()->is('finance*') || request()->is('pareto*') ? 'active' : '' }}"
                 title="Sahabat Finance - Analisis Pareto & Profit">
@@ -991,7 +991,7 @@
             </a>
         @endif
 
-        @hasanyrole('Finance|General Manager|administrator')
+        @hasanyrole('Finance|General Manager|administrator|HO')
             @if (!isWarehousePharmacy() && !isOnlineRole())
                 <a href="{{ route('pareto.index') }}" class="nav-item" style="cursor:pointer;">
 

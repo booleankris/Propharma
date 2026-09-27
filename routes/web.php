@@ -534,7 +534,7 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
     });
 
     // SAHABAT Finances (Dedicated ERP Module)
-    Route::prefix('finance')->name('finance.')->middleware(['role:Finance|General Manager|administrator'])->group(function () {
+    Route::prefix('finance')->name('finance.')->middleware(['role:Finance|General Manager|administrator|HO'])->group(function () {
         Route::get('/', [\App\Http\Controllers\FinanceController::class, 'index'])->name('index');
         Route::get('/hutang', [\App\Http\Controllers\FinanceController::class, 'hutang'])->name('hutang');
         Route::get('/cash', [\App\Http\Controllers\FinanceController::class, 'cash'])->name('cash');
