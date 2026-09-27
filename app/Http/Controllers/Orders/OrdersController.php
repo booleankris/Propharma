@@ -82,11 +82,46 @@ class OrdersController extends Controller
             ->orderBy('active_creditors.name', 'asc')
             ->orderBy('order_items.id', 'asc');
 
+        $targetPharmacyId = null;
+        if ($orderId) {
+            $targetPharmacyId = Order::where('id', $orderId)->value('pharmacy_id');
+        }
+        if (!$targetPharmacyId) {
+            $targetPharmacyId = getPurchasingPharmacyId();
+        }
+
+        $counterStocks = null;
+        $getBranchStock = function ($medicineId) use (&$counterStocks, $targetPharmacyId, $query) {
+            if ($counterStocks === null) {
+                $medIds = (clone $query)->pluck('order_items.medicine_id')->filter()->unique()->toArray();
+                if (!empty($medIds)) {
+                    $counterStocks = \App\Models\MedicineTransferItems::join('batches', 'batches.id', '=', 'medicine_transfer_items.batches_id')
+                        ->where('batches.pharmacy_id', $targetPharmacyId)
+                        ->whereIn('batches.medicine_id', $medIds)
+                        ->where('medicine_transfer_items.status', 1)
+                        ->where(function ($q) {
+                            $q->whereNull('medicine_transfer_items.source_type')
+                              ->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang');
+                        })
+                        ->groupBy('batches.medicine_id')
+                        ->select('batches.medicine_id', \Illuminate\Support\Facades\DB::raw('COALESCE(SUM(medicine_transfer_items.qty), 0) as total_qty'))
+                        ->pluck('total_qty', 'batches.medicine_id')
+                        ->toArray();
+                } else {
+                    $counterStocks = [];
+                }
+            }
+            return (int) ($counterStocks[$medicineId] ?? 0);
+        };
+
         return DataTables::of($query)
             ->orderColumn('creditors', function ($q, $order) {
                 $q->orderByRaw("CASE WHEN active_creditors.name IS NOT NULL AND active_creditors.name != '' THEN 0 ELSE 1 END ASC")
                   ->orderBy('active_creditors.name', $order)
                   ->orderBy('order_items.id', 'asc');
+            })
+            ->editColumn('medicines.stock', function ($data) use ($getBranchStock) {
+                return $getBranchStock($data->medicine_id);
             })
             ->addColumn(
                 'item_total',

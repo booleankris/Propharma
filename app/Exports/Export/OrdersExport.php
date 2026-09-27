@@ -2,9 +2,11 @@
 
 namespace App\Exports\Export;
 
+use App\Models\MedicineTransferItems;
 use App\Models\Order;
 use App\Models\OrderItems;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithColumnFormatting;
@@ -95,6 +97,26 @@ class OrdersExport implements FromArray, ShouldAutoSize, WithStyles, WithTitle, 
         $subtotalHna = 0;
         $no = 1;
 
+        $targetPharmacyId = $order?->pharmacy_id ?? (function_exists('getActivePharmacyId') ? getActivePharmacyId() : 1);
+
+        // Ambil stok etalase per cabang dari medicine_transfer_items
+        $medicineIds = $items->pluck('medicine_id')->filter()->unique()->toArray();
+        $counterStocks = [];
+        if (!empty($medicineIds)) {
+            $counterStocks = MedicineTransferItems::join('batches', 'batches.id', '=', 'medicine_transfer_items.batches_id')
+                ->where('batches.pharmacy_id', $targetPharmacyId)
+                ->whereIn('batches.medicine_id', $medicineIds)
+                ->where('medicine_transfer_items.status', 1)
+                ->where(function ($q) {
+                    $q->whereNull('medicine_transfer_items.source_type')
+                      ->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang');
+                })
+                ->groupBy('batches.medicine_id')
+                ->select('batches.medicine_id', DB::raw('COALESCE(SUM(medicine_transfer_items.qty), 0) as total_qty'))
+                ->pluck('total_qty', 'batches.medicine_id')
+                ->toArray();
+        }
+
         if ($items->isEmpty()) {
             $rows[] = ['-', 'Tidak ada item obat dalam pemesanan ini.', 0, '-', 0, 0, '-', '-', 0];
         } else {
@@ -117,7 +139,8 @@ class OrdersExport implements FromArray, ShouldAutoSize, WithStyles, WithTitle, 
                     $discFormatted = $disc ? ($disc == (int) $disc ? (int) $disc : $disc) . '%' : '0%';
                 }
 
-                $sisaStock = $item->medicines?->stock !== null ? (int) $item->medicines->stock : 0;
+                // Sisa stok riil etalase cabang dari medicine_transfer_items
+                $sisaStock = isset($counterStocks[$item->medicine_id]) ? (int) $counterStocks[$item->medicine_id] : 0;
 
                 $rows[] = [
                     $no++,
