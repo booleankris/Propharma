@@ -50,12 +50,9 @@ class OrdersExport implements FromArray, ShouldAutoSize, WithStyles, WithTitle, 
         $order = $this->order;
         $pharmacy = $order?->pharmacy;
         $pharmacyName = $pharmacy ? strtoupper($pharmacy->name) : 'APOTEK PROPHARMA';
-        $pharmacyCity = $pharmacy?->city ?? 'Samarinda';
         $orderCode = $order?->code ?? '-';
         $orderDate = $order?->date ? (string) $order->date : Carbon::now()->format('d/m/Y');
         $downloadTime = Carbon::now()->translatedFormat('d F Y H:i');
-        $creatorName = $order?->user?->name ?? 'Petugas Apotek';
-        $pharmacistName = $pharmacy?->pharmacist ?? 'Apoteker Pengelola Apotek (APA)';
 
         $items = OrderItems::query()
             ->select('order_items.*')
@@ -145,15 +142,6 @@ class OrdersExport implements FromArray, ShouldAutoSize, WithStyles, WithTitle, 
         $rows[] = ['', '', '', 'SUBTOTAL HNA', '', $subtotalHna, '', '', ''];
         $rows[] = ['', '', '', 'PPN (11%)', '', $ppn, '', '', ''];
         $rows[] = ['', '', '', 'TOTAL PEMESANAN', '', $grandTotal, '', '', ''];
-
-        // 4. FOOTER TANDA TANGAN
-        $rows[] = ['']; // Baris kosong
-        $rows[] = ['', "Pemesan / Petugas:", '', '', '', '', "{$pharmacyCity}, {$orderDate}", '', ''];
-        $rows[] = ['', '', '', '', '', '', "Apoteker Pengelola Apotek (APA):", '', ''];
-        $rows[] = [''];
-        $rows[] = [''];
-        $rows[] = [''];
-        $rows[] = ['', "( {$creatorName} )", '', '', '', '', "( {$pharmacistName} )", '', ''];
 
         return $rows;
     }
@@ -294,23 +282,6 @@ class OrdersExport implements FromArray, ShouldAutoSize, WithStyles, WithTitle, 
                 'color' => ['rgb' => '0369A1'], // Sky 700
             ],
         ]);
-
-        // 5. Signature Styling
-        $signHeaderRow = $totalRow + 2;
-        $signSubHeaderRow = $signHeaderRow + 1;
-        $signNameRow = $signHeaderRow + 5;
-
-        $sheet->mergeCells("B{$signHeaderRow}:D{$signHeaderRow}");
-        $sheet->mergeCells("B{$signNameRow}:D{$signNameRow}");
-        $sheet->mergeCells("G{$signHeaderRow}:I{$signHeaderRow}");
-        $sheet->mergeCells("G{$signSubHeaderRow}:I{$signSubHeaderRow}");
-        $sheet->mergeCells("G{$signNameRow}:I{$signNameRow}");
-
-        $sheet->getStyle("B{$signHeaderRow}:D{$signNameRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-        $sheet->getStyle("G{$signHeaderRow}:I{$signNameRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-
-        $sheet->getStyle("B{$signHeaderRow}:I{$signHeaderRow}")->getFont()->setBold(true)->setSize(9.5);
-        $sheet->getStyle("B{$signNameRow}:I{$signNameRow}")->getFont()->setBold(true)->setSize(9.5);
 
         return [];
     }
