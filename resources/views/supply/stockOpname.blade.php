@@ -751,6 +751,23 @@
                                         </div>
                                     </div>
 
+                                    {{-- Opsi Perhitungkan Penjualan Berjalan (Stok Minus) --}}
+                                    <div class="p-3.5 bg-indigo-50/70 border border-indigo-200/80 rounded-xl space-y-1.5">
+                                        <label class="flex items-start gap-2.5 cursor-pointer text-xs text-slate-800">
+                                            <input type="checkbox" id="import_adjust_minus_stock" name="adjust_minus_stock" value="1" checked
+                                                class="mt-0.5 rounded border-indigo-300 text-indigo-600 focus:ring-indigo-500">
+                                            <div class="space-y-0.5">
+                                                <span class="font-bold flex items-center gap-1.5 text-indigo-950 text-xs">
+                                                    <span>⚡ Perhitungkan Penjualan Berjalan (Otomatis Potong Stok Minus)</span>
+                                                    <span class="px-1.5 py-0.5 rounded text-[10px] bg-indigo-200/80 text-indigo-800 font-extrabold">Direkomendasikan</span>
+                                                </span>
+                                                <span class="text-[11px] text-slate-600 block leading-relaxed">
+                                                    Gunakan ini jika file Excel adalah <strong>stok awal sebelum kasir mulai jualan</strong>. Sistem akan otomatis memotongkan penjualan yang sudah terjadi (stok minus di sistem) dari stok Excel, sehingga stok fisik rak dan sistem tidak berlebih/selisih.
+                                                </span>
+                                            </div>
+                                        </label>
+                                    </div>
+
                                     {{-- Format Rules Highlight --}}
                                     <div
                                         class="p-4 bg-slate-50 rounded-xl border border-slate-200/80 text-xs text-slate-600 space-y-2">
@@ -846,6 +863,23 @@
                                             <span>Penyesuaian Etalase Cerdas (Auto-Corrected Typo):</span>
                                         </div>
                                         <div id="import_typo_badges" class="flex flex-wrap gap-2 text-[11px]"></div>
+                                    </div>
+
+                                    {{-- Minus Stock Adjustment Alert / Banner --}}
+                                    <div id="import_minus_adjustment_section"
+                                        class="hidden p-3.5 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl space-y-2">
+                                        <div class="flex items-center justify-between text-xs font-bold text-amber-900">
+                                            <div class="flex items-center gap-2">
+                                                <span class="text-base">⚡</span>
+                                                <span>Penyesuaian Penjualan Berjalan Aktif (Stok Minus Terpotong):</span>
+                                            </div>
+                                            <span class="px-2 py-0.5 rounded-full bg-amber-200/80 text-amber-900 text-[10px] font-extrabold" id="badge_minus_adjusted_count">
+                                                0 Obat Disesuaikan
+                                            </span>
+                                        </div>
+                                        <p class="text-[11px] text-amber-800 leading-relaxed">
+                                            Ditemukan <strong id="desc_minus_med_count">0</strong> obat yang sudah laku terjual saat stok sistem 0/minus (total <strong id="desc_minus_qty">0</strong> pcs). Stok di Excel telah otomatis dipotongkan agar saldo akhir sama persis dengan sisa fisik nyata di rak apotek saat ini.
+                                        </p>
                                     </div>
 
                                     {{-- Anomalies / Warnings (If any) --}}
@@ -1826,6 +1860,7 @@
                     return;
                 }
                 const targetMode = $('input[name="import_target_mode"]:checked').val() || 'pelayanan';
+                const adjustMinusStock = $('#import_adjust_minus_stock').is(':checked') ? 1 : 0;
 
                 const btn = $(this);
                 btn.prop('disabled', true).addClass('opacity-70');
@@ -1840,6 +1875,7 @@
                 const formData = new FormData();
                 formData.append('file', file);
                 formData.append('target_mode', targetMode);
+                formData.append('adjust_minus_stock', adjustMinusStock);
                 formData.append('_token', '{{ csrf_token() }}');
 
                 axios.post('{{ route('supplies.stockOpname.analyze') }}', formData, {
@@ -1899,6 +1935,16 @@
                             $('#import_typo_section').addClass('hidden');
                         }
 
+                        // Render Minus Stock Adjustment Banner
+                        if (data.stats && data.stats.minus_adjusted_count > 0) {
+                            $('#import_minus_adjustment_section').removeClass('hidden');
+                            $('#badge_minus_adjusted_count').text(`${data.stats.minus_adjusted_count} Obat Disesuaikan (-${data.stats.minus_deducted_qty} pcs)`);
+                            $('#desc_minus_med_count').text(data.stats.minus_adjusted_count);
+                            $('#desc_minus_qty').text(data.stats.minus_deducted_qty);
+                        } else {
+                            $('#import_minus_adjustment_section').addClass('hidden');
+                        }
+
                         // Render Anomalies / Warnings
                         const anomaliesSection = $('#import_anomalies_section');
                         const anomaliesList = $('#import_anomalies_list');
@@ -1953,6 +1999,13 @@
                                 stockDisplay = `<span class="inline-flex items-center px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-bold text-xs" title="Stok Habis / Nihil (0)">0 (Nihil)</span>`;
                             } else {
                                 stockDisplay = `<span class="font-black text-slate-800">${row.stock}</span> <span class="text-[10px] font-normal text-slate-400">${row.medicine_unit || ''}</span>`;
+                            }
+
+                            if (row.is_minus_adjusted && row.minus_deduction > 0) {
+                                stockDisplay += `<div class="text-[10px] text-amber-700 font-medium mt-0.5" title="Stok Excel: ${row.original_stock}, Terjual saat minus: ${row.minus_deduction}">
+                                    <span class="line-through text-slate-400 mr-1">${row.original_stock}</span>
+                                    <span class="bg-amber-100/90 text-amber-800 px-1 py-0.5 rounded font-bold">-${row.minus_deduction} laku</span>
+                                </div>`;
                             }
 
                             let edDisplay = '';

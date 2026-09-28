@@ -1338,10 +1338,11 @@ class SuppliesController extends Controller
             $targetMode = 'pelayanan';
         }
 
+        $adjustMinusStock = $request->boolean('adjust_minus_stock', true);
         $filePath = $file->getRealPath();
 
         try {
-            $result = $importService->analyze($filePath, $pharmacyId, $targetMode);
+            $result = $importService->analyze($filePath, $pharmacyId, $targetMode, $adjustMinusStock);
             return response()->json($result);
         } catch (\Throwable $e) {
             return response()->json([

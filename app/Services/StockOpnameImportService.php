@@ -29,7 +29,7 @@ class StockOpnameImportService
      * @param string $targetMode 'pelayanan' or 'gudang'
      * @return array
      */
-    public function analyze(string $filePath, int $pharmacyId, string $targetMode = 'pelayanan'): array
+    public function analyze(string $filePath, int $pharmacyId, string $targetMode = 'pelayanan', bool $adjustMinusStock = false): array
     {
         @ini_set('memory_limit', '512M');
         @set_time_limit(300);
@@ -45,6 +45,36 @@ class StockOpnameImportService
         $defaultEtalase = Etalases::where(function ($q) use ($pharmacyId) {
             $q->where('pharmacy_id', $pharmacyId)->orWhereNull('pharmacy_id');
         })->first();
+
+        // Preload current stocks if minus stock adjustment is requested
+        $warehouseId = function_exists('getWarehousePharmacyId') ? getWarehousePharmacyId() : 9;
+        $counterPharmacyId = (function_exists('isWarehousePharmacy') && isWarehousePharmacy($pharmacyId)) ? 1 : $pharmacyId;
+        $batchTargetPharmacyId = ($targetMode === 'gudang') ? $warehouseId : $counterPharmacyId;
+
+        $currentStocks = [];
+        if ($adjustMinusStock) {
+            if ($targetMode === 'gudang') {
+                $currentStocks = Batches::where('pharmacy_id', $batchTargetPharmacyId)
+                    ->groupBy('medicine_id')
+                    ->selectRaw('medicine_id, SUM(stock) as total_stock')
+                    ->pluck('total_stock', 'medicine_id')
+                    ->map(fn($v) => (int) $v)
+                    ->toArray();
+            } else {
+                $currentStocks = MedicineTransferItems::where('medicine_transfer_items.status', 1)
+                    ->where(function ($q) {
+                        $q->whereNull('medicine_transfer_items.source_type')
+                          ->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang');
+                    })
+                    ->join('batches', 'medicine_transfer_items.batches_id', '=', 'batches.id')
+                    ->where('batches.pharmacy_id', $counterPharmacyId)
+                    ->groupBy('batches.medicine_id')
+                    ->selectRaw('batches.medicine_id, SUM(medicine_transfer_items.qty) as total_stock')
+                    ->pluck('total_stock', 'batches.medicine_id')
+                    ->map(fn($v) => (int) $v)
+                    ->toArray();
+            }
+        }
 
         // Preload all medicines indexed by trimmed uppercase code
         $medicines = Medicines::select('id', 'code', 'name', 'unit')->get();
@@ -283,6 +313,10 @@ class StockOpnameImportService
                 'medicine_name'        => $matchedMed ? $matchedMed->name : '-',
                 'medicine_unit'        => $matchedMed ? $matchedMed->unit : '-',
                 'stock'                => $stockPhysic,
+                'original_stock'       => $stockPhysic,
+                'minus_deduction'      => 0,
+                'is_minus_adjusted'    => false,
+                'current_stock_before' => 0,
                 'raw_stock'            => $rawStock,
                 'is_empty_stock'       => $isStockBlank,
                 'is_empty_ed'          => $isEmptyEd,
@@ -296,6 +330,92 @@ class StockOpnameImportService
             ];
         }
 
+        // Apply minus stock adjustments if requested
+        $minusAdjustedMedicinesCount = 0;
+        $totalMinusQtyDeducted = 0;
+        $minusAdjustedSummary = [];
+
+        if ($adjustMinusStock) {
+            $medRowMap = [];
+            foreach ($parsedRows as $idx => $pRow) {
+                if ($pRow['is_valid'] && !empty($pRow['medicine_id'])) {
+                    $medRowMap[$pRow['medicine_id']][] = $idx;
+                }
+            }
+
+            foreach ($medRowMap as $mId => $rowIndices) {
+                $curStock = (int) ($currentStocks[$mId] ?? 0);
+                if ($curStock < 0) {
+                    $neededDeduction = abs($curStock);
+                    $minusAdjustedMedicinesCount++;
+
+                    // Sort row indices of this medicine by expired_date ASC (FEFO: earlier expiry date deducted first)
+                    usort($rowIndices, function ($a, $b) use ($parsedRows) {
+                        $edA = $parsedRows[$a]['expired_date'] ?? '9999-12-31';
+                        $edB = $parsedRows[$b]['expired_date'] ?? '9999-12-31';
+                        return strcmp($edA, $edB);
+                    });
+
+                    $medName = $parsedRows[$rowIndices[0]]['medicine_name'] ?? "ID {$mId}";
+                    $medCode = $parsedRows[$rowIndices[0]]['medicine_code'] ?? '';
+                    $deductedForThisMed = 0;
+
+                    foreach ($rowIndices as $rIdx) {
+                        if ($neededDeduction <= 0) break;
+
+                        $avail = (int) $parsedRows[$rIdx]['stock'];
+                        if ($avail <= 0) continue;
+
+                        $deduct = min($avail, $neededDeduction);
+                        $parsedRows[$rIdx]['original_stock'] = $avail;
+                        $parsedRows[$rIdx]['minus_deduction'] = $deduct;
+                        $parsedRows[$rIdx]['stock'] = $avail - $deduct;
+                        $parsedRows[$rIdx]['current_stock_before'] = $curStock;
+                        $parsedRows[$rIdx]['is_minus_adjusted'] = true;
+
+                        $neededDeduction -= $deduct;
+                        $deductedForThisMed += $deduct;
+                    }
+
+                    $totalMinusQtyDeducted += $deductedForThisMed;
+
+                    if ($neededDeduction > 0) {
+                        $anomalies[] = [
+                            'row'      => $parsedRows[$rowIndices[0]]['row_index'],
+                            'code'     => $medCode,
+                            'name'     => $medName,
+                            'errors'   => [],
+                            'warnings' => ["Penjualan berjalan (" . abs($curStock) . " pcs) melampaui stok Excel ({$deductedForThisMed} pcs). Sisa stok disetel ke 0."],
+                        ];
+                    }
+
+                    $minusAdjustedSummary[] = [
+                        'medicine_id'   => $mId,
+                        'medicine_code' => $medCode,
+                        'medicine_name' => $medName,
+                        'current_minus' => $curStock,
+                        'deducted_qty'  => $deductedForThisMed,
+                    ];
+                }
+            }
+        }
+
+        // Preview sample: prioritize showing adjusted rows so user can visually verify the calculation
+        $previewRows = [];
+        $adjustedRows = array_values(array_filter($parsedRows, fn($r) => !empty($r['is_minus_adjusted'])));
+        if (!empty($adjustedRows)) {
+            $previewRows = array_slice($adjustedRows, 0, 5);
+        }
+        $remainingSlots = 15 - count($previewRows);
+        foreach ($parsedRows as $pRow) {
+            if ($remainingSlots <= 0) break;
+            if (!in_array($pRow['row_index'], array_column($previewRows, 'row_index'))) {
+                $previewRows[] = $pRow;
+                $remainingSlots--;
+            }
+        }
+        usort($previewRows, fn($a, $b) => $a['row_index'] <=> $b['row_index']);
+
         // Cache parsed rows to storage with token
         $token = 'so_import_' . Str::random(24);
         $tempDir = storage_path('app/opname_imports');
@@ -304,11 +424,12 @@ class StockOpnameImportService
         }
 
         $cacheData = [
-            'token'        => $token,
-            'pharmacy_id'  => $pharmacyId,
-            'target_mode'  => $targetMode,
-            'created_at'   => now()->toDateTimeString(),
-            'rows'         => $parsedRows,
+            'token'              => $token,
+            'pharmacy_id'        => $pharmacyId,
+            'target_mode'        => $targetMode,
+            'adjust_minus_stock' => $adjustMinusStock,
+            'created_at'         => now()->toDateTimeString(),
+            'rows'               => $parsedRows,
         ];
         File::put("{$tempDir}/{$token}.json", json_encode($cacheData));
 
@@ -326,9 +447,13 @@ class StockOpnameImportService
                 'etalases_matched_count'   => $etalasesMatchedCount,
                 'etalases_corrected_count' => $etalasesCorrectedCount,
                 'etalases_unmatched_count' => $etalasesUnmatchedCount,
+                'adjust_minus_stock'       => $adjustMinusStock,
+                'minus_adjusted_count'     => $minusAdjustedMedicinesCount,
+                'minus_deducted_qty'       => $totalMinusQtyDeducted,
+                'minus_adjusted_summary'   => array_slice($minusAdjustedSummary, 0, 50),
             ],
             'anomalies'    => array_slice($anomalies, 0, 50),
-            'preview_rows' => array_slice($parsedRows, 0, 15),
+            'preview_rows' => $previewRows,
         ];
     }
 
