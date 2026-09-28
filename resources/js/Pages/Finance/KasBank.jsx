@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Head, router } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import FinanceLayout from './Layouts/FinanceLayout';
 import { formatRupiah, formatNumberOnly } from './Components/Utils';
 import {
@@ -34,14 +34,12 @@ export default function KasBank({
     const [mutasiCurrentPage, setMutasiCurrentPage] = useState(1);
     const mutasiItemsPerPage = 15;
 
-    // State Account Modal
+    // State Account Modal (Khusus Kas & Bank)
     const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
     const [isSubmittingAccount, setIsSubmittingAccount] = useState(false);
     const [editingAccount, setEditingAccount] = useState(null);
     const [deletingAccount, setDeletingAccount] = useState(null);
     const [isDeletingAccount, setIsDeletingAccount] = useState(false);
-    const [isCustomCategory, setIsCustomCategory] = useState(false);
-    const [customCategoryInput, setCustomCategoryInput] = useState('');
 
     const [accountForm, setAccountForm] = useState({
         name: '',
@@ -51,24 +49,8 @@ export default function KasBank({
         account_number: '',
     });
 
-    const prefixMap = {
-        'Kas & Bank': '1-100',
-        'Piutang Usaha': '1-102',
-        'Persediaan': '1-104',
-        'Aktiva Lancar Lainnya': '1-108',
-        'Aktiva Tetap': '1-120',
-        'Hutang Usaha': '2-201',
-        'Kewajiban Lancar Lainnya': '2-202',
-        'Kewajiban Jangka Panjang': '2-205',
-        'Ekuitas / Modal': '3-300',
-        'Pendapatan': '4-400',
-        'Harga Pokok Penjualan': '5-500',
-        'Beban Operasional': '6-600',
-        'Beban Lainnya': '8-800',
-    };
-
-    const getNextCodeForCategory = (cat) => {
-        const prefix = prefixMap[cat] || '9-900';
+    const getNextCodeForKasBank = () => {
+        const prefix = '1-100';
         const existing = accounts
             .map((a) => a.code)
             .filter((c) => c && c.startsWith(prefix));
@@ -90,35 +72,14 @@ export default function KasBank({
         return `${prefix}${String(next).padStart(2, '0')}`;
     };
 
-    const categoryList = useMemo(() => {
-        const defaults = [
-            'Kas & Bank',
-            'Piutang Usaha',
-            'Persediaan',
-            'Aktiva Lancar Lainnya',
-            'Aktiva Tetap',
-            'Hutang Usaha',
-            'Kewajiban Lancar Lainnya',
-            'Kewajiban Jangka Panjang',
-            'Ekuitas / Modal',
-            'Pendapatan',
-            'Harga Pokok Penjualan',
-            'Beban Operasional',
-            'Beban Lainnya',
-        ];
-        return Array.from(new Set([...defaults, ...(categories || []), ...accounts.map((a) => a.category).filter(Boolean)]));
-    }, [categories, accounts]);
-
-    const openAccountModal = (initialCat = 'Kas & Bank') => {
+    const openAccountModal = () => {
         setEditingAccount(null);
-        setIsCustomCategory(false);
-        setCustomCategoryInput('');
-        const nextCode = getNextCodeForCategory(initialCat);
+        const nextCode = getNextCodeForKasBank();
         setAccountForm({
             name: '',
             name_en: '',
             code: nextCode,
-            category: initialCat,
+            category: 'Kas & Bank',
             account_number: '',
         });
         setIsAccountModalOpen(true);
@@ -126,13 +87,11 @@ export default function KasBank({
 
     const openEditAccountModal = (acc) => {
         setEditingAccount(acc);
-        setIsCustomCategory(false);
-        setCustomCategoryInput('');
         setAccountForm({
             name: acc.name || '',
             name_en: acc.name_en || '',
             code: acc.code || '',
-            category: acc.category || 'Kas & Bank',
+            category: 'Kas & Bank',
             account_number: acc.account_number || '',
         });
         setIsAccountModalOpen(true);
@@ -154,31 +113,10 @@ export default function KasBank({
         });
     };
 
-    const handleCategoryChange = (cat) => {
-        if (cat === '__NEW__') {
-            setIsCustomCategory(true);
-            setCustomCategoryInput('');
-            setAccountForm((prev) => ({
-                ...prev,
-                category: '',
-                code: getNextCodeForCategory('Kategori Baru'),
-            }));
-        } else {
-            setIsCustomCategory(false);
-            const nextCode = getNextCodeForCategory(cat);
-            setAccountForm((prev) => ({
-                ...prev,
-                category: cat,
-                code: nextCode,
-            }));
-        }
-    };
-
     const handleAccountSubmit = (e) => {
         e.preventDefault();
-        const finalCategory = isCustomCategory ? customCategoryInput.trim() : accountForm.category;
-        if (!accountForm.name || !finalCategory) {
-            alert('Nama (ID) dan Kategori akun wajib diisi.');
+        if (!accountForm.name) {
+            alert('Nama akun kas / rekening bank wajib diisi.');
             return;
         }
 
@@ -188,15 +126,13 @@ export default function KasBank({
 
         router[method](url, {
             ...accountForm,
-            category: finalCategory,
+            category: 'Kas & Bank',
         }, {
             preserveScroll: true,
             onSuccess: () => {
                 setIsAccountModalOpen(false);
                 setIsSubmittingAccount(false);
                 setEditingAccount(null);
-                setIsCustomCategory(false);
-                setCustomCategoryInput('');
                 setAccountForm({
                     name: '',
                     name_en: '',
@@ -207,7 +143,7 @@ export default function KasBank({
             },
             onError: (errors) => {
                 setIsSubmittingAccount(false);
-                alert(Object.values(errors)[0] || 'Gagal memproses data akun.');
+                alert(Object.values(errors)[0] || 'Gagal memproses data akun kas/bank.');
             }
         });
     };
@@ -313,7 +249,7 @@ export default function KasBank({
     return (
         <FinanceLayout
             title="Kas & Bank"
-            subtitle="Kelola rekening kas & bank, mutasi buku kas, dan daftar bagan akun (Chart of Accounts)"
+            subtitle="Kelola rekening kas & bank dan mutasi buku kas apotek"
             stats={stats}
         >
             <Head title="Kas & Bank - Keuangan Apotek" />
@@ -322,19 +258,26 @@ export default function KasBank({
                 {/* Header Action Toolbar */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
                     <div>
-                        <h2 className="text-base font-bold text-slate-900">Rekening Kas, Bank & Bagan Akun</h2>
+                        <h2 className="text-base font-bold text-slate-900">Buku Kas & Rekening Bank</h2>
                         <p className="text-xs text-slate-500 mt-0.5">
-                            Total {kasBankAccounts.length} rekening aktif terdaftar dalam sistem
+                            Total {kasBankAccounts.length} rekening aktif kas & bank terdaftar dalam sistem
                         </p>
                     </div>
 
                     <div className="flex items-center gap-2.5">
+                        <Link
+                            href="/finance/accounts"
+                            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 hover:text-blue-600 transition shadow-xs"
+                        >
+                            <Layers className="w-4 h-4 text-blue-600" />
+                            <span>Bagan Akun (COA)</span>
+                        </Link>
                         <button
-                            onClick={() => openAccountModal('Kas & Bank')}
+                            onClick={openAccountModal}
                             className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition shadow-sm"
                         >
                             <Plus className="w-4 h-4" />
-                            <span>Tambah Akun Kas/Bank</span>
+                            <span>Tambah Kas / Bank</span>
                         </button>
                     </div>
                 </div>
@@ -459,28 +402,51 @@ export default function KasBank({
                                             setSelectedKasBankFilter(isSelected ? 'all' : String(acc.id));
                                             setMutasiCurrentPage(1);
                                         }}
-                                        className={`p-4 rounded-xl border-2 transition cursor-pointer relative ${isSelected
+                                        className={`p-4 rounded-xl border-2 transition cursor-pointer relative group ${isSelected
                                             ? 'bg-blue-50/40 border-blue-500 shadow-sm'
                                             : 'bg-slate-50/60 border-slate-200/80 hover:border-blue-300 hover:bg-white'
                                             }`}
                                     >
-                                        {isSelected && (
-                                            <span className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-600 text-white shadow-xs">
-                                                Terpilih
-                                            </span>
-                                        )}
-
-                                        <div className="flex items-start gap-3">
-                                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 ${isSelected ? 'bg-blue-600 text-white shadow-xs' : 'bg-white text-blue-600 border border-slate-200'}`}>
-                                                <Landmark className="w-4 h-4" />
+                                        <div className="flex items-start justify-between gap-2">
+                                            <div className="flex items-start gap-3 min-w-0">
+                                                <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 ${isSelected ? 'bg-blue-600 text-white shadow-xs' : 'bg-white text-blue-600 border border-slate-200'}`}>
+                                                    <Landmark className="w-4 h-4" />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                                        <span className="font-bold text-slate-900 text-xs truncate">
+                                                            {acc.name}
+                                                        </span>
+                                                        {isSelected && (
+                                                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-600 text-white">
+                                                                Terpilih
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-[11px] text-slate-500 font-medium mt-0.5">
+                                                        {acc.code} {acc.account_number ? `• ${acc.account_number}` : ''}
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="font-bold text-slate-900 text-xs truncate">
-                                                    {acc.name}
-                                                </div>
-                                                <div className="text-[11px] text-slate-500 font-medium mt-0.5">
-                                                    {acc.code} {acc.account_number ? `• ${acc.account_number}` : ''}
-                                                </div>
+
+                                            {/* Quick Actions (Edit & Delete) */}
+                                            <div className="flex items-center gap-0.5 shrink-0 opacity-80 group-hover:opacity-100 transition" onClick={(e) => e.stopPropagation()}>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => openEditAccountModal(acc)}
+                                                    className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                                                    title="Edit Rekening"
+                                                >
+                                                    <Edit3 className="w-3.5 h-3.5" />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setDeletingAccount(acc)}
+                                                    className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                                                    title="Hapus Rekening"
+                                                >
+                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                </button>
                                             </div>
                                         </div>
 
@@ -821,91 +787,21 @@ export default function KasBank({
                     )}
                 </div>
 
-                {/* 4. MASTER SELURUH AKUN KEUANGAN (BAGAN AKUN / COA) */}
-                <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-                    <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-                        <div>
-                            <h3 className="font-bold text-slate-900 text-xs flex items-center gap-2">
-                                <Layers className="w-4 h-4 text-blue-600" />
-                                Master Seluruh Bagan Akun (Chart of Accounts)
-                            </h3>
-                            <p className="text-[11px] text-slate-400 mt-0.5">
-                                Daftar akun akuntansi apotek terintegrasi standar Kledo.
-                            </p>
-                        </div>
-                        <span className="text-[11px] text-slate-400 font-semibold">{accounts.length} Akun Terdaftar</span>
-                    </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left text-xs">
-                            <thead className="bg-[#F8FAFC] border-b border-slate-200 text-slate-600 font-semibold">
-                                <tr>
-                                    <th className="px-4 py-3">Kode Akun</th>
-                                    <th className="px-4 py-3">Nama Akun (ID)</th>
-                                    <th className="px-4 py-3">Nama (EN)</th>
-                                    <th className="px-4 py-3">Kategori</th>
-                                    <th className="px-4 py-3">No. Rekening</th>
-                                    <th className="px-4 py-3 text-right">Saldo Saat Ini</th>
-                                    <th className="px-4 py-3">Status</th>
-                                    <th className="px-4 py-3 text-center">Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {accounts.map((acc) => (
-                                    <tr key={acc.id} className="hover:bg-slate-50/70 transition">
-                                        <td className="px-4 py-3 font-semibold text-blue-600">{acc.code}</td>
-                                        <td className="px-4 py-3 font-bold text-slate-900">{acc.name}</td>
-                                        <td className="px-4 py-3 text-slate-500">{acc.name_en || '-'}</td>
-                                        <td className="px-4 py-3">
-                                            <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${acc.category === 'Kas & Bank'
-                                                ? 'bg-blue-50 text-blue-600'
-                                                : 'bg-slate-100 text-slate-600'
-                                                }`}>
-                                                {acc.category}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-3 text-slate-600">{acc.account_number || '-'}</td>
-                                        <td className="px-4 py-3 text-slate-800 font-semibold text-right">
-                                            {acc.category === 'Kas & Bank' ? formatRupiah(acc.balance) : '-'}
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <span className="text-emerald-600 font-semibold text-[11px] flex items-center gap-1">
-                                                <Check className="w-3 h-3" /> Aktif
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-3 text-center">
-                                            <div className="flex items-center justify-center gap-1">
-                                                <button
-                                                    onClick={() => openEditAccountModal(acc)}
-                                                    className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                                                    title="Edit Akun"
-                                                >
-                                                    <Edit3 className="w-3.5 h-3.5" />
-                                                </button>
-                                                <button
-                                                    onClick={() => setDeletingAccount(acc)}
-                                                    className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
-                                                    title="Hapus Akun"
-                                                >
-                                                    <Trash2 className="w-3.5 h-3.5" />
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
             </div>
 
-            {/* MODAL TAMBAH / EDIT AKUN */}
+            {/* MODAL TAMBAH / EDIT REKENING KAS & BANK */}
             {isAccountModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
                     <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden animate-in fade-in duration-200">
                         <div className="px-6 py-4 flex items-center justify-between border-b border-slate-100">
-                            <h3 className="font-bold text-slate-900 text-base">
-                                {editingAccount ? 'Edit Akun' : 'Tambah Akun'}
-                            </h3>
+                            <div>
+                                <h3 className="font-bold text-slate-900 text-base">
+                                    {editingAccount ? 'Edit Rekening Kas / Bank' : 'Tambah Rekening Kas / Bank'}
+                                </h3>
+                                <p className="text-[11px] text-slate-400 mt-0.5">
+                                    Rekening khusus pencatatan kas laci, kasir, atau bank operasional apotek.
+                                </p>
+                            </div>
                             <button
                                 onClick={() => {
                                     setIsAccountModalOpen(false);
@@ -921,11 +817,11 @@ export default function KasBank({
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-slate-700 font-semibold mb-1">
-                                        <span className="text-red-500">*</span> Nama (ID)
+                                        <span className="text-red-500">*</span> Nama Rekening / Kas
                                     </label>
                                     <input
                                         type="text"
-                                        placeholder="Nama"
+                                        placeholder="Contoh: BCA Operasional Apotek"
                                         value={accountForm.name}
                                         onChange={(e) => setAccountForm({ ...accountForm, name: e.target.value })}
                                         required
@@ -938,7 +834,7 @@ export default function KasBank({
                                     </label>
                                     <input
                                         type="text"
-                                        placeholder="Nama"
+                                        placeholder="Contoh: Operational Bank"
                                         value={accountForm.name_en}
                                         onChange={(e) => setAccountForm({ ...accountForm, name_en: e.target.value })}
                                         className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
@@ -948,23 +844,23 @@ export default function KasBank({
 
                             <div className="p-3 bg-blue-50/70 border border-blue-100 rounded-xl flex items-center gap-2 text-blue-700 text-xs">
                                 <HelpCircle className="w-4 h-4 shrink-0 text-blue-600" />
-                                <span>Jika EN kosong, sistem otomatis menggunakan ID</span>
+                                <span>Akun ini otomatis dikategorikan ke <strong>Kas & Bank (1-100)</strong></span>
                             </div>
 
                             <div>
                                 <div className="flex items-center justify-between mb-1">
                                     <label className="block text-slate-700 font-semibold">
-                                        Kode <span className="text-[11px] font-normal text-slate-400">(Otomatis jika kosong)</span>
+                                        Kode Akun <span className="text-[11px] font-normal text-slate-400">(Otomatis jika kosong)</span>
                                     </label>
                                     {!editingAccount && (
                                         <span className="text-[10px] text-blue-600 font-medium">
-                                            Saran: {getNextCodeForCategory(accountForm.category || 'Kas & Bank')}
+                                            Saran: {getNextCodeForKasBank()}
                                         </span>
                                     )}
                                 </div>
                                 <input
                                     type="text"
-                                    placeholder={`Otomatis (contoh: ${getNextCodeForCategory(accountForm.category || 'Kas & Bank')})`}
+                                    placeholder={`Otomatis (contoh: ${getNextCodeForKasBank()})`}
                                     value={accountForm.code}
                                     onChange={(e) => setAccountForm({ ...accountForm, code: e.target.value })}
                                     className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
@@ -972,90 +868,17 @@ export default function KasBank({
                             </div>
 
                             <div>
-                                <div className="flex items-center justify-between mb-1">
-                                    <label className="block text-slate-700 font-semibold">
-                                        <span className="text-red-500">*</span> Kategori
-                                    </label>
-                                    {!isCustomCategory ? (
-                                        <button
-                                            type="button"
-                                            onClick={() => handleCategoryChange('__NEW__')}
-                                            className="text-blue-600 hover:text-blue-800 text-[11px] font-semibold flex items-center gap-1 transition"
-                                        >
-                                            <Plus className="w-3 h-3" />
-                                            <span>+ Kategori Baru</span>
-                                        </button>
-                                    ) : (
-                                        <button
-                                            type="button"
-                                            onClick={() => handleCategoryChange('Kas & Bank')}
-                                            className="text-slate-500 hover:text-slate-800 text-[11px] font-medium flex items-center gap-1 transition"
-                                        >
-                                            <X className="w-3 h-3" />
-                                            <span>Pilih dari Daftar</span>
-                                        </button>
-                                    )}
-                                </div>
-
-                                {isCustomCategory ? (
-                                    <div className="space-y-1.5">
-                                        <div className="flex items-center gap-2">
-                                            <input
-                                                type="text"
-                                                placeholder="Ketik nama kategori baru (contoh: Pajak & Retribusi)..."
-                                                value={customCategoryInput}
-                                                onChange={(e) => {
-                                                    const val = e.target.value;
-                                                    setCustomCategoryInput(val);
-                                                    setAccountForm((prev) => ({
-                                                        ...prev,
-                                                        category: val,
-                                                    }));
-                                                }}
-                                                autoFocus
-                                                required
-                                                className="w-full px-3 py-2 bg-white border border-blue-500 ring-2 ring-blue-100 rounded-lg text-xs font-semibold focus:outline-none"
-                                            />
-                                            <button
-                                                type="button"
-                                                onClick={() => handleCategoryChange('Kas & Bank')}
-                                                className="px-2.5 py-2 text-xs border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg shrink-0 font-medium transition"
-                                            >
-                                                Batal
-                                            </button>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <select
-                                        value={accountForm.category}
-                                        onChange={(e) => handleCategoryChange(e.target.value)}
-                                        required
-                                        className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-800 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                                    >
-                                        {categoryList.map((cat) => (
-                                            <option key={cat} value={cat}>{cat}</option>
-                                        ))}
-                                        <option value="__NEW__" className="font-bold text-blue-600">
-                                            + Tambah Kategori Baru...
-                                        </option>
-                                    </select>
-                                )}
+                                <label className="block text-slate-700 font-semibold mb-1">
+                                    Nomor Rekening Bank (Opsional)
+                                </label>
+                                <input
+                                    type="text"
+                                    placeholder="Contoh: 8271928192 (BCA a/n Apotek)"
+                                    value={accountForm.account_number}
+                                    onChange={(e) => setAccountForm({ ...accountForm, account_number: e.target.value })}
+                                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                                />
                             </div>
-
-                            {(accountForm.category === 'Kas & Bank' || isCustomCategory) && (
-                                <div>
-                                    <label className="block text-slate-700 font-semibold mb-1">
-                                        Nomor Rekening Bank (Opsional)
-                                    </label>
-                                    <input
-                                        type="text"
-                                        placeholder="Nomor rekening bank..."
-                                        value={accountForm.account_number}
-                                        onChange={(e) => setAccountForm({ ...accountForm, account_number: e.target.value })}
-                                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                                    />
-                                </div>
-                            )}
 
                             <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-100">
                                 <button
@@ -1076,7 +899,7 @@ export default function KasBank({
                                 >
                                     {editingAccount ? <Check className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
                                     <span>
-                                        {isSubmittingAccount ? 'Menyimpan...' : editingAccount ? 'Simpan Perubahan' : 'Tambah'}
+                                        {isSubmittingAccount ? 'Menyimpan...' : editingAccount ? 'Simpan Perubahan' : 'Tambah Rekening'}
                                     </span>
                                 </button>
                             </div>

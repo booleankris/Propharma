@@ -2,6 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\Finance\BiayaExport;
+use App\Exports\Finance\CashExport;
+use App\Exports\Finance\HutangExport;
+use App\Exports\Finance\PiutangExport;
 use App\Models\Creditor;
 use App\Models\Debtors;
 use App\Models\FinanceAccount;
@@ -16,11 +20,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 use Maatwebsite\Excel\Facades\Excel;
-use App\Exports\Finance\PiutangExport;
-use App\Exports\Finance\HutangExport;
-use App\Exports\Finance\CashExport;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class FinanceController extends Controller
 {
@@ -48,10 +49,14 @@ class FinanceController extends Controller
         // Dukung backward-compatibility jika ada query ?tab=
         if ($request->has('tab')) {
             $tab = $request->query('tab');
-            if ($tab === 'hutang') return redirect()->route('finance.hutang');
-            if ($tab === 'cash') return redirect()->route('finance.cash');
-            if ($tab === 'piutang') return redirect()->route('finance.piutang');
-            if ($tab === 'kas-bank' || $tab === 'bank') return redirect()->route('finance.kasBank');
+            if ($tab === 'hutang')
+                return redirect()->route('finance.hutang');
+            if ($tab === 'cash')
+                return redirect()->route('finance.cash');
+            if ($tab === 'piutang')
+                return redirect()->route('finance.piutang');
+            if ($tab === 'kas-bank' || $tab === 'bank')
+                return redirect()->route('finance.kasBank');
         }
 
         $hutang = $this->getHutangData();
@@ -169,7 +174,7 @@ class FinanceController extends Controller
     }
 
     /**
-     * Halaman Pengelolaan Kas & Bank, Mutasi Kas, dan Bagan Akun (COA).
+     * Halaman Pengelolaan Rekening Kas & Bank serta Buku Mutasi Kas.
      */
     public function kasBank(Request $request)
     {
@@ -177,8 +182,9 @@ class FinanceController extends Controller
             session(['ho_pharmacy_id' => (int) $request->pharmacy_id]);
         }
 
-        $accounts = FinanceAccount::orderBy('code')->get();
-        $categories = $this->getCategories();
+        // Hanya akun berkategori Kas & Bank untuk halaman Kas & Bank
+        $accounts = FinanceAccount::where('category', 'Kas & Bank')->where('is_active', true)->orderBy('code')->get();
+        $categories = ['Kas & Bank'];
         $mutasiKasBank = $this->getMutasiData(500);
         $stats = $this->getStats(null, null, null);
 
@@ -187,6 +193,56 @@ class FinanceController extends Controller
             'categories' => $categories,
             'mutasiKasBank' => $mutasiKasBank,
             'stats' => $stats,
+            'branchContext' => $this->getBranchContext(),
+        ]);
+    }
+
+    /**
+     * Halaman Pengelolaan Master Bagan Akun (Chart of Accounts / COA).
+     */
+    public function accounts(Request $request)
+    {
+        if ($request->filled('pharmacy_id') && auth()->check() && (auth()->user()->hasRole('HO') || auth()->user()->hasRole('administrator') || auth()->user()->hasRole('General Manager'))) {
+            session(['ho_pharmacy_id' => (int) $request->pharmacy_id]);
+        }
+
+        $accounts = FinanceAccount::orderBy('code')->get();
+        $categories = $this->getCategories();
+        $stats = $this->getStats(null, null, null);
+
+        return Inertia::render('Finance/Accounts', [
+            'accounts' => $accounts,
+            'categories' => $categories,
+            'stats' => $stats,
+            'branchContext' => $this->getBranchContext(),
+        ]);
+    }
+
+    public function biaya(Request $request)
+    {
+        if ($request->filled('pharmacy_id') && auth()->check() && (auth()->user()->hasRole('HO') || auth()->user()->hasRole('administrator') || auth()->user()->hasRole('General Manager'))) {
+            session(['ho_pharmacy_id' => (int) $request->pharmacy_id]);
+        }
+
+        $targetPharmacyIds = $this->getTargetPharmacyIds();
+        $biayaList = $this->getBiayaData();
+        $expenseAccounts = FinanceAccount::whereIn('category', ['Beban Operasional', 'Beban Lainnya'])
+            ->where('is_active', true)
+            ->orderBy('code')
+            ->get(['id', 'code', 'name', 'category', 'balance']);
+        $kasBankAccounts = FinanceAccount::where('category', 'Kas & Bank')
+            ->where('is_active', true)
+            ->orderBy('code')
+            ->get(['id', 'code', 'name', 'balance', 'account_number']);
+        $stats = $this->getStats(null, null, null);
+        $summary = $this->getBiayaSummary($targetPharmacyIds);
+
+        return Inertia::render('Finance/Biaya', [
+            'biayaList' => $biayaList,
+            'expenseAccounts' => $expenseAccounts,
+            'kasBankAccounts' => $kasBankAccounts,
+            'stats' => $stats,
+            'summary' => $summary,
             'branchContext' => $this->getBranchContext(),
         ]);
     }
@@ -273,7 +329,8 @@ class FinanceController extends Controller
         $hutangDagang = [];
         foreach ($receivingsKredit as $rec) {
             foreach ($rec->receiving_details as $detail) {
-                if ($detail->invoice_payment !== 'KREDIT') continue;
+                if ($detail->invoice_payment !== 'KREDIT')
+                    continue;
 
                 $vendorName = $detail->creditor->name ?? ($detail->creditor_code ?: 'PBF / Vendor');
                 $itemsList = [];
@@ -401,7 +458,8 @@ class FinanceController extends Controller
         $pembelianCash = [];
         foreach ($receivingsCash as $rec) {
             foreach ($rec->receiving_details as $detail) {
-                if ($detail->invoice_payment !== 'TUNAI') continue;
+                if ($detail->invoice_payment !== 'TUNAI')
+                    continue;
 
                 $vendorName = $detail->creditor->name ?? ($detail->creditor_code ?: 'PBF / Vendor');
                 $itemsList = [];
@@ -600,7 +658,9 @@ class FinanceController extends Controller
 
         return FinancePayment::with([
             'account',
+            'expenseAccount',
             'creator',
+            'pharmacy',
             'receivingDetail.creditor',
             'transaction.debtors',
             'transaction.patients',
@@ -613,6 +673,12 @@ class FinanceController extends Controller
                     $q->whereIn('pharmacy_id', $targetPharmacyIds);
                 })->orWhereHas('transaction', function ($q) use ($targetPharmacyIds) {
                     $q->whereIn('pharmacy_id', $targetPharmacyIds);
+                })->orWhere(function ($q) use ($targetPharmacyIds) {
+                    $q->where('payment_type', 'BIAYA')
+                        ->where(function ($sub) use ($targetPharmacyIds) {
+                            $sub->whereIn('pharmacy_id', $targetPharmacyIds)
+                                ->orWhereNull('pharmacy_id');
+                        });
                 });
             })
             ->orderByDesc('payment_date')
@@ -622,7 +688,7 @@ class FinanceController extends Controller
             ->map(function ($p) {
                 $isMasuk = ($p->payment_type === 'PIUTANG');
                 $tipeLabel = $isMasuk ? 'Masuk (Debit)' : 'Keluar (Kredit)';
-                
+
                 $pihakTerkait = '-';
                 $noDokumen = $p->reference_number ?: ('MUT-' . str_pad($p->id, 5, '0', STR_PAD_LEFT));
                 $deskripsi = $p->notes;
@@ -630,23 +696,34 @@ class FinanceController extends Controller
                 if ($p->payment_type === 'PIUTANG') {
                     $pihakTerkait = $p->transaction->debtors->name ?? ($p->transaction->patients->name ?? 'Pelanggan Umum');
                     $doc = $p->transaction->invoice_number ?? $p->reference_number;
-                    if ($doc) $noDokumen = $doc;
+                    if ($doc)
+                        $noDokumen = $doc;
                     if (!$deskripsi) {
                         $deskripsi = "Penerimaan piutang penjualan dari {$pihakTerkait}";
                     }
                 } elseif ($p->payment_type === 'KREDIT') {
                     $pihakTerkait = $p->receivingDetail->creditor->name ?? ($p->receivingDetail->creditor_code ?? 'PBF / Vendor');
                     $doc = $p->receivingDetail->invoice_number ?? $p->reference_number;
-                    if ($doc) $noDokumen = $doc;
+                    if ($doc)
+                        $noDokumen = $doc;
                     if (!$deskripsi) {
                         $deskripsi = "Pelunasan hutang pembelian ke {$pihakTerkait}";
                     }
                 } elseif ($p->payment_type === 'CASH') {
                     $pihakTerkait = $p->receivingDetail->creditor->name ?? ($p->receivingDetail->creditor_code ?? 'PBF / Vendor');
                     $doc = $p->receivingDetail->invoice_number ?? $p->reference_number;
-                    if ($doc) $noDokumen = $doc;
+                    if ($doc)
+                        $noDokumen = $doc;
                     if (!$deskripsi) {
                         $deskripsi = "Pembelian tunai (cash) ke {$pihakTerkait}";
+                    }
+                } elseif ($p->payment_type === 'BIAYA') {
+                    $pihakTerkait = $p->recipient ?: ($p->expenseAccount->name ?? 'Biaya Operasional');
+                    $doc = $p->reference_number ?: ('BY-' . str_pad($p->id, 5, '0', STR_PAD_LEFT));
+                    if ($doc)
+                        $noDokumen = $doc;
+                    if (!$deskripsi) {
+                        $deskripsi = "Pengeluaran biaya: " . ($p->expenseAccount->name ?? 'Operasional');
                     }
                 }
 
@@ -661,13 +738,101 @@ class FinanceController extends Controller
                     'amount' => (float) $p->amount,
                     'direction' => $isMasuk ? 'IN' : 'OUT',
                     'type_label' => $tipeLabel,
-                    'category_type' => $p->payment_type, // PIUTANG, KREDIT, CASH
+                    'category_type' => $p->payment_type,  // PIUTANG, KREDIT, CASH
                     'document_no' => $noDokumen,
                     'party' => $pihakTerkait,
                     'description' => $deskripsi ?: 'Transaksi Keuangan',
                     'user' => $p->creator->name ?? 'Admin',
                 ];
             });
+    }
+
+    /**
+     * Helper: Ambil data biaya operasional.
+     */
+    protected function getBiayaData()
+    {
+        $targetPharmacyIds = $this->getTargetPharmacyIds();
+
+        return FinancePayment::with(['account', 'expenseAccount', 'creator', 'pharmacy'])
+            ->where('payment_type', 'BIAYA')
+            ->where(function ($q) use ($targetPharmacyIds) {
+                $q->whereIn('pharmacy_id', $targetPharmacyIds)
+                    ->orWhereNull('pharmacy_id');
+            })
+            ->latest('payment_date')
+            ->latest('id')
+            ->take(500)
+            ->get()
+            ->map(function ($p) {
+                return [
+                    'id' => $p->id,
+                    'reference_number' => $p->reference_number ?: ('BY-' . str_pad($p->id, 5, '0', STR_PAD_LEFT)),
+                    'payment_date' => $p->payment_date,
+                    'formatted_date' => \Carbon\Carbon::parse($p->payment_date)->format('d/m/Y'),
+                    'account_id' => $p->account_id,
+                    'account_name' => $p->account->name ?? 'Kas / Bank',
+                    'account_code' => $p->account->code ?? '-',
+                    'expense_account_id' => $p->expense_account_id,
+                    'expense_account_name' => $p->expenseAccount->name ?? 'Biaya Operasional',
+                    'expense_account_code' => $p->expenseAccount->code ?? '-',
+                    'expense_category' => $p->expenseAccount->category ?? 'Beban Operasional',
+                    'amount' => (float) $p->amount,
+                    'recipient' => $p->recipient ?: '-',
+                    'notes' => $p->notes ?: '',
+                    'user_name' => $p->creator->name ?? 'Petugas',
+                    'pharmacy_name' => $p->pharmacy->name ?? null,
+                    'created_at' => $p->created_at ? $p->created_at->format('d/m/Y H:i') : '-',
+                ];
+            });
+    }
+
+    /**
+     * Helper: Ringkasan statistik modul biaya operasional.
+     */
+    protected function getBiayaSummary(array $targetPharmacyIds): array
+    {
+        $baseQuery = FinancePayment::where('payment_type', 'BIAYA')
+            ->where(function ($q) use ($targetPharmacyIds) {
+                $q->whereIn('pharmacy_id', $targetPharmacyIds)
+                    ->orWhereNull('pharmacy_id');
+            });
+
+        $startOfMonth = \Carbon\Carbon::now()->startOfMonth()->toDateString();
+        $endOfMonth = \Carbon\Carbon::now()->endOfMonth()->toDateString();
+        $today = \Carbon\Carbon::today()->toDateString();
+
+        $totalAllTime = (float) (clone $baseQuery)->sum('amount');
+        $totalMonth = (float) (clone $baseQuery)->whereBetween('payment_date', [$startOfMonth, $endOfMonth])->sum('amount');
+        $totalToday = (float) (clone $baseQuery)->whereDate('payment_date', $today)->sum('amount');
+        $countTotal = (int) (clone $baseQuery)->count();
+        $countMonth = (int) (clone $baseQuery)->whereBetween('payment_date', [$startOfMonth, $endOfMonth])->count();
+
+        // Breakdown top 5 kategori beban
+        $topExpenses = (clone $baseQuery)
+            ->select('expense_account_id', DB::raw('SUM(amount) as total_amount'), DB::raw('COUNT(id) as total_count'))
+            ->with('expenseAccount:id,code,name')
+            ->groupBy('expense_account_id')
+            ->orderByDesc('total_amount')
+            ->limit(5)
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'account_name' => $item->expenseAccount->name ?? 'Lain-lain',
+                    'account_code' => $item->expenseAccount->code ?? '-',
+                    'total_amount' => (float) $item->total_amount,
+                    'total_count' => (int) $item->total_count,
+                ];
+            });
+
+        return [
+            'totalAllTime' => $totalAllTime,
+            'totalMonth' => $totalMonth,
+            'totalToday' => $totalToday,
+            'countTotal' => $countTotal,
+            'countMonth' => $countMonth,
+            'topExpenses' => $topExpenses,
+        ];
     }
 
     /**
@@ -730,11 +895,20 @@ class FinanceController extends Controller
             })
             ->sum('amount');
 
-        $kasKeluar = (float) FinancePayment::whereIn('payment_type', ['KREDIT', 'CASH'])
+        $kasKeluarHutangCash = (float) FinancePayment::whereIn('payment_type', ['KREDIT', 'CASH'])
             ->whereHas('receiving', function ($q) use ($targetPharmacyIds) {
                 $q->whereIn('pharmacy_id', $targetPharmacyIds);
             })
             ->sum('amount');
+
+        $kasKeluarBiaya = (float) FinancePayment::where('payment_type', 'BIAYA')
+            ->where(function ($sub) use ($targetPharmacyIds) {
+                $sub->whereIn('pharmacy_id', $targetPharmacyIds)
+                    ->orWhereNull('pharmacy_id');
+            })
+            ->sum('amount');
+
+        $kasKeluar = $kasKeluarHutangCash + $kasKeluarBiaya;
 
         $netCashflow = $kasMasuk - $kasKeluar;
 
@@ -786,6 +960,24 @@ class FinanceController extends Controller
             }
         }
 
+        $countBiayaTotal = (int) FinancePayment::where('payment_type', 'BIAYA')
+            ->where(function ($sub) use ($targetPharmacyIds) {
+                $sub->whereIn('pharmacy_id', $targetPharmacyIds)
+                    ->orWhereNull('pharmacy_id');
+            })
+            ->count();
+
+        $countBiayaMonth = (int) FinancePayment::where('payment_type', 'BIAYA')
+            ->where(function ($sub) use ($targetPharmacyIds) {
+                $sub->whereIn('pharmacy_id', $targetPharmacyIds)
+                    ->orWhereNull('pharmacy_id');
+            })
+            ->whereBetween('payment_date', [
+                \Carbon\Carbon::now()->startOfMonth()->toDateString(),
+                \Carbon\Carbon::now()->endOfMonth()->toDateString(),
+            ])
+            ->count();
+
         $stats = [
             'totalSaldoKasBank' => $totalSaldoKasBank,
             'accountsCount' => $accountsCount,
@@ -808,6 +1000,9 @@ class FinanceController extends Controller
             'totalSisaPiutang' => $totalPiutangSisa,
             'countPiutangBelumBayar' => $countPiutangBelumBayar,
             'countPiutangLunas' => $countPiutangLunas,
+            'totalBiaya' => $kasKeluarBiaya,
+            'countBiayaTotal' => $countBiayaTotal,
+            'countBiayaMonth' => $countBiayaMonth,
         ];
 
         Cache::put($cacheKey, $stats, 60);
@@ -1004,7 +1199,8 @@ class FinanceController extends Controller
         DB::transaction(function () use ($validated, $account, &$totalPaidAll, &$processedCount) {
             foreach ($validated['receiving_detail_ids'] as $detailId) {
                 $detail = ReceivingDetails::with(['receiving_items', 'payments', 'receiving'])->find($detailId);
-                if (!$detail || $detail->invoice_payment !== 'KREDIT') continue;
+                if (!$detail || $detail->invoice_payment !== 'KREDIT')
+                    continue;
 
                 // Hitung total invoice
                 $subtotal = 0;
@@ -1023,7 +1219,7 @@ class FinanceController extends Controller
                 $remaining = round(max(0, $totalInvoice - $alreadyPaid), 2);
 
                 if ($remaining < 0.005) {
-                    if ($detail->receiving && (int)$detail->receiving->status !== 3) {
+                    if ($detail->receiving && (int) $detail->receiving->status !== 3) {
                         $detail->receiving->update(['status' => 3]);
                     }
                     continue;
@@ -1086,7 +1282,8 @@ class FinanceController extends Controller
         DB::transaction(function () use ($validated, $account, $paymentDate, &$processedCount) {
             foreach ($validated['receiving_detail_ids'] as $detailId) {
                 $detail = ReceivingDetails::with(['receiving_items', 'receiving'])->find($detailId);
-                if (!$detail || $detail->invoice_payment !== 'TUNAI') continue;
+                if (!$detail || $detail->invoice_payment !== 'TUNAI')
+                    continue;
 
                 $subtotal = 0;
                 foreach ($detail->receiving_items as $item) {
@@ -1170,7 +1367,7 @@ class FinanceController extends Controller
             $lastInSameCat = FinanceAccount::where('category', $category)->orderBy('code', 'desc')->first();
             if ($lastInSameCat && preg_match('/^(.+?)(\d+)$/', $lastInSameCat->code, $matches)) {
                 $base = $matches[1];
-                $num = (int)$matches[2] + 1;
+                $num = (int) $matches[2] + 1;
                 return $base . str_pad($num, strlen($matches[2]), '0', STR_PAD_LEFT);
             }
             $prefix = '9-900';
@@ -1185,7 +1382,7 @@ class FinanceController extends Controller
         $maxNum = 0;
         foreach ($existingCodes as $c) {
             if (preg_match('/^' . preg_quote($prefix, '/') . '(\d+)$/', $c, $m)) {
-                $n = (int)$m[1];
+                $n = (int) $m[1];
                 if ($n > $maxNum) {
                     $maxNum = $n;
                 }
@@ -1377,7 +1574,8 @@ class FinanceController extends Controller
                 $totalNominal = (float) $tx->subtotal;
                 $sisa = round(max(0, $totalNominal - $totalPaid), 2);
 
-                if ($sisa < 0.005) continue;
+                if ($sisa < 0.005)
+                    continue;
 
                 FinancePayment::create([
                     'medicine_transaction_id' => $tx->id,
@@ -1417,7 +1615,7 @@ class FinanceController extends Controller
         $targetPharmacyIds = $this->getTargetPharmacyIds();
         $activePharmacy = Pharmacies::find(getActivePharmacyId()) ?? Pharmacies::find(1);
         $branchName = $activePharmacy ? preg_replace('/[^A-Za-z0-9_]/', '_', $activePharmacy->name) : 'Apotek';
-        $filename = "Laporan_Piutang_Penjualan_{$branchName}_" . date('Ymd_His') . ".xlsx";
+        $filename = "Laporan_Piutang_Penjualan_{$branchName}_" . date('Ymd_His') . '.xlsx';
 
         $filters = [
             'search' => $request->query('search', ''),
@@ -1438,7 +1636,7 @@ class FinanceController extends Controller
         $targetPharmacyIds = $this->getTargetPharmacyIds();
         $activePharmacy = Pharmacies::find(getActivePharmacyId()) ?? Pharmacies::find(1);
         $branchName = $activePharmacy ? preg_replace('/[^A-Za-z0-9_]/', '_', $activePharmacy->name) : 'Apotek';
-        $filename = "Laporan_Hutang_Dagang_{$branchName}_" . date('Ymd_His') . ".xlsx";
+        $filename = "Laporan_Hutang_Dagang_{$branchName}_" . date('Ymd_His') . '.xlsx';
 
         $filters = [
             'search' => $request->query('search', ''),
@@ -1457,7 +1655,7 @@ class FinanceController extends Controller
         $targetPharmacyIds = $this->getTargetPharmacyIds();
         $activePharmacy = Pharmacies::find(getActivePharmacyId()) ?? Pharmacies::find(1);
         $branchName = $activePharmacy ? preg_replace('/[^A-Za-z0-9_]/', '_', $activePharmacy->name) : 'Apotek';
-        $filename = "Laporan_Pembelian_Cash_{$branchName}_" . date('Ymd_His') . ".xlsx";
+        $filename = "Laporan_Pembelian_Cash_{$branchName}_" . date('Ymd_His') . '.xlsx';
 
         $filters = [
             'search' => $request->query('search', ''),
@@ -1467,5 +1665,141 @@ class FinanceController extends Controller
         ];
 
         return Excel::download(new CashExport($targetPharmacyIds, $filters, $activePharmacy), $filename);
+    }
+
+    /**
+     * Simpan transaksi biaya operasional baru.
+     */
+    public function storeBiaya(Request $request)
+    {
+        $validated = $request->validate([
+            'account_id' => 'required|exists:finance_accounts,id',
+            'expense_account_id' => 'required|exists:finance_accounts,id',
+            'payment_date' => 'required|date',
+            'amount' => 'required|numeric|gt:0',
+            'recipient' => 'nullable|string|max:150',
+            'reference_number' => 'nullable|string|max:100',
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        $account = FinanceAccount::findOrFail($validated['account_id']);
+        if ($account->category !== 'Kas & Bank') {
+            return back()->withErrors(['account_id' => 'Akun sumber dana harus berkategori Kas & Bank.']);
+        }
+
+        $activePharmacyId = getActivePharmacyId();
+
+        DB::transaction(function () use ($validated, $account, $activePharmacyId) {
+            FinancePayment::create([
+                'pharmacy_id' => $activePharmacyId > 0 ? $activePharmacyId : null,
+                'account_id' => $account->id,
+                'expense_account_id' => $validated['expense_account_id'],
+                'payment_type' => 'BIAYA',
+                'payment_date' => $validated['payment_date'],
+                'amount' => $validated['amount'],
+                'recipient' => $validated['recipient'] ?? null,
+                'reference_number' => $validated['reference_number'] ?? null,
+                'notes' => $validated['notes'] ?? null,
+                'created_by' => Auth::id(),
+            ]);
+
+            // Kurangi saldo akun Kas & Bank
+            $account->decrement('balance', $validated['amount']);
+
+            // Bersihkan cache statistik
+            $this->clearStatsCache();
+        });
+
+        return back()->with('success', 'Biaya operasional berhasil dicatat.');
+    }
+
+    /**
+     * Perbarui transaksi biaya operasional yang sudah ada.
+     */
+    public function updateBiaya(Request $request, $id)
+    {
+        $payment = FinancePayment::where('payment_type', 'BIAYA')->findOrFail($id);
+
+        $validated = $request->validate([
+            'account_id' => 'required|exists:finance_accounts,id',
+            'expense_account_id' => 'required|exists:finance_accounts,id',
+            'payment_date' => 'required|date',
+            'amount' => 'required|numeric|gt:0',
+            'recipient' => 'nullable|string|max:150',
+            'reference_number' => 'nullable|string|max:100',
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        $newAccount = FinanceAccount::findOrFail($validated['account_id']);
+        if ($newAccount->category !== 'Kas & Bank') {
+            return back()->withErrors(['account_id' => 'Akun sumber dana harus berkategori Kas & Bank.']);
+        }
+
+        DB::transaction(function () use ($payment, $validated, $newAccount) {
+            // Revert saldo akun lama (tambahkan kembali nominal lama)
+            if ($payment->account_id) {
+                FinanceAccount::where('id', $payment->account_id)->increment('balance', $payment->amount);
+            }
+
+            // Kurangi saldo akun kas yang baru dipilih
+            $newAccount->decrement('balance', $validated['amount']);
+
+            // Perbarui data record pembayaran
+            $payment->update([
+                'account_id' => $newAccount->id,
+                'expense_account_id' => $validated['expense_account_id'],
+                'payment_date' => $validated['payment_date'],
+                'amount' => $validated['amount'],
+                'recipient' => $validated['recipient'] ?? null,
+                'reference_number' => $validated['reference_number'] ?? null,
+                'notes' => $validated['notes'] ?? null,
+            ]);
+
+            $this->clearStatsCache();
+        });
+
+        return back()->with('success', 'Biaya operasional berhasil diperbarui.');
+    }
+
+    /**
+     * Hapus transaksi biaya operasional (dan kembalikan saldo kas).
+     */
+    public function destroyBiaya($id)
+    {
+        $payment = FinancePayment::where('payment_type', 'BIAYA')->findOrFail($id);
+
+        DB::transaction(function () use ($payment) {
+            if ($payment->account_id) {
+                FinanceAccount::where('id', $payment->account_id)->increment('balance', $payment->amount);
+            }
+
+            $payment->delete();
+
+            $this->clearStatsCache();
+        });
+
+        return back()->with('success', 'Transaksi biaya berhasil dihapus dan saldo kas dikembalikan.');
+    }
+
+    /**
+     * Export data Biaya Operasional ke Excel (.xlsx).
+     */
+    public function exportBiaya(Request $request)
+    {
+        $targetPharmacyIds = $this->getTargetPharmacyIds();
+        $activePharmacy = Pharmacies::find(getActivePharmacyId()) ?? Pharmacies::find(1);
+        $branchName = $activePharmacy ? preg_replace('/[^A-Za-z0-9_]/', '_', $activePharmacy->name) : 'Apotek';
+        $filename = "Laporan_Biaya_Operasional_{$branchName}_" . date('Ymd_His') . '.xlsx';
+
+        $filters = [
+            'search' => $request->query('search', ''),
+            'expense_account_id' => $request->query('expense_account_id', ''),
+            'account_id' => $request->query('account_id', ''),
+            'start_date' => $request->query('start_date', ''),
+            'end_date' => $request->query('end_date', ''),
+            'sort_order' => $request->query('sort_order', 'desc'),
+        ];
+
+        return Excel::download(new BiayaExport($targetPharmacyIds, $filters, $activePharmacy), $filename);
     }
 }

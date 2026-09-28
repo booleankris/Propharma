@@ -10,6 +10,8 @@ import {
     CheckCircle2,
     AlertCircle,
     Building2,
+    CircleDollarSign,
+    Layers,
 } from 'lucide-react';
 
 export default function FinanceLayout({ title, subtitle, children, stats = {} }) {
@@ -75,6 +77,23 @@ export default function FinanceLayout({ title, subtitle, children, stats = {} })
                 color: 'bg-amber-100 text-amber-700',
             } : null,
         },
+        {
+            name: 'Biaya',
+            href: '/finance/biaya',
+            icon: CircleDollarSign,
+            active: currentUrl.startsWith('/finance/biaya'),
+            badge: stats.countBiayaTotal > 0 ? {
+                text: stats.countBiayaTotal,
+                color: 'bg-amber-100 text-amber-700',
+            } : null,
+        },
+        {
+            name: 'Bagan Akun',
+            href: '/finance/accounts',
+            icon: Layers,
+            active: currentUrl.startsWith('/finance/accounts'),
+            badge: null,
+        },
     ];
 
     return (
@@ -110,11 +129,10 @@ export default function FinanceLayout({ title, subtitle, children, stats = {} })
                             <Link
                                 key={item.name}
                                 href={item.href}
-                                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-colors duration-150 ${
-                                    item.active
-                                        ? 'bg-blue-50/80 text-blue-600 shadow-xs'
-                                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                                }`}
+                                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-colors duration-150 ${item.active
+                                    ? 'bg-blue-50/80 text-blue-600 shadow-xs'
+                                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                                    }`}
                             >
                                 <div className="flex items-center gap-3">
                                     <Icon className={`w-4 h-4 transition-colors ${item.active ? 'text-blue-600' : 'text-slate-400'}`} />

@@ -16,6 +16,7 @@ export default function Drawer({
     const isActuallyOpen = propIsOpen !== undefined ? Boolean(propIsOpen) : Boolean(item);
     const [rendered, setRendered] = useState(isActuallyOpen);
     const [animating, setAnimating] = useState(false);
+    const drawerRef = useRef(null);
     const activeItemRef = useRef(item);
 
     if (item) {
@@ -24,31 +25,32 @@ export default function Drawer({
 
     const currentItem = item || activeItemRef.current;
 
+    // Handle mount/unmount timing
     useEffect(() => {
-        let timer;
-        let r1, r2;
-
         if (isActuallyOpen) {
             setRendered(true);
-            // Double requestAnimationFrame ensures DOM is mounted in initial closed state before animating open
-            r1 = requestAnimationFrame(() => {
-                r2 = requestAnimationFrame(() => {
-                    setAnimating(true);
-                });
-            });
-        } else if (rendered) {
+        } else {
             setAnimating(false);
-            timer = setTimeout(() => {
+            const timer = setTimeout(() => {
                 setRendered(false);
             }, 320);
+            return () => clearTimeout(timer);
         }
+    }, [isActuallyOpen]);
 
-        return () => {
-            if (r1) cancelAnimationFrame(r1);
-            if (r2) cancelAnimationFrame(r2);
-            if (timer) clearTimeout(timer);
-        };
-    }, [isActuallyOpen, rendered]);
+    // Handle open animation: once mounted, force reflow so initial translate-x-full is computed, then animate
+    useEffect(() => {
+        if (rendered && isActuallyOpen) {
+            if (drawerRef.current) {
+                // Force synchronous style calculation / reflow
+                void drawerRef.current.offsetHeight;
+            }
+            const frame = requestAnimationFrame(() => {
+                setAnimating(true);
+            });
+            return () => cancelAnimationFrame(frame);
+        }
+    }, [rendered, isActuallyOpen]);
 
     // Handle Escape key to close
     useEffect(() => {
@@ -74,13 +76,13 @@ export default function Drawer({
         }
     }, [rendered]);
 
-    if (!rendered || !currentItem) return null;
+    if (!rendered || (propIsOpen === undefined && !currentItem)) return null;
 
-    const resolvedTitle = typeof title === 'function' ? title(currentItem) : title;
-    const resolvedSubtitle = typeof subtitle === 'function' ? subtitle(currentItem) : subtitle;
+    const resolvedTitle = typeof title === 'function' ? (currentItem ? title(currentItem) : '') : title;
+    const resolvedSubtitle = typeof subtitle === 'function' ? (currentItem ? subtitle(currentItem) : '') : subtitle;
     const resolvedFooter = typeof renderFooter === 'function'
-        ? renderFooter(currentItem)
-        : (typeof footer === 'function' ? footer(currentItem) : footer);
+        ? (currentItem ? renderFooter(currentItem) : null)
+        : (typeof footer === 'function' ? (currentItem ? footer(currentItem) : null) : footer);
 
     return (
         <div
@@ -92,7 +94,8 @@ export default function Drawer({
             role="dialog"
         >
             <div
-                className={`w-full ${maxWidth} bg-white h-full shadow-2xl flex flex-col transform transition-transform duration-320 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                ref={drawerRef}
+                className={`w-full ${maxWidth} bg-white h-full shadow-2xl flex flex-col transform-gpu transition-transform duration-320 ease-[cubic-bezier(0.16,1,0.3,1)] ${
                     animating ? 'translate-x-0' : 'translate-x-full'
                 }`}
                 onClick={(e) => e.stopPropagation()}
@@ -130,13 +133,13 @@ export default function Drawer({
                     </div>
                 </div>
 
-                {/* Drawer Body with subtle reveal animation */}
+                {/* Drawer Body */}
                 <div
-                    className={`flex-1 overflow-y-auto p-6 space-y-6 text-xs transition-all duration-300 delay-75 ${
-                        animating ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'
+                    className={`flex-1 overflow-y-auto p-6 space-y-6 text-xs transition-opacity duration-300 delay-75 ${
+                        animating ? 'opacity-100' : 'opacity-0'
                     }`}
                 >
-                    {typeof children === 'function' ? children(currentItem) : children}
+                    {typeof children === 'function' ? (currentItem ? children(currentItem) : null) : children}
                 </div>
 
                 {/* Drawer Footer */}

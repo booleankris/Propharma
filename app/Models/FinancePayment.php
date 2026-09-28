@@ -12,13 +12,16 @@ class FinancePayment extends Model
     protected $table = 'finance_payments';
 
     protected $fillable = [
+        'pharmacy_id',
         'receiving_id',
         'receiving_detail_id',
         'medicine_transaction_id',
         'account_id',
+        'expense_account_id',
         'payment_type',
         'payment_date',
         'amount',
+        'recipient',
         'reference_number',
         'notes',
         'created_by',
@@ -32,6 +35,16 @@ class FinancePayment extends Model
     public function account()
     {
         return $this->belongsTo(FinanceAccount::class, 'account_id');
+    }
+
+    public function expenseAccount()
+    {
+        return $this->belongsTo(FinanceAccount::class, 'expense_account_id');
+    }
+
+    public function pharmacy()
+    {
+        return $this->belongsTo(Pharmacies::class, 'pharmacy_id');
     }
 
     public function receiving()

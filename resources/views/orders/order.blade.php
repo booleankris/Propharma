@@ -750,6 +750,19 @@
         let currentMedicineId = null;
 
         var pack = document.getElementById('pack');
+        let selectedMedicinePackaging = '';
+        let selectedMedicineUnit = '';
+
+        function updateUnitDisplay() {
+            const unitInput = document.getElementById('unit');
+            if (!unitInput) return;
+            if (pack && pack.checked) {
+                unitInput.value = selectedMedicinePackaging || selectedMedicineUnit || '';
+            } else {
+                unitInput.value = selectedMedicineUnit || selectedMedicinePackaging || '';
+            }
+        }
+
         let orderItemsTable;
         let selectedRowData = null;
         let selectedRowIndex = null;
@@ -892,9 +905,11 @@
             itemcontent = parseFloat(data.medicines?.content) || 1;
             itemqty = data.quantity;
 
+            selectedMedicinePackaging = data.medicines?.packaging ?? '';
+            selectedMedicineUnit = data.medicines?.unit ?? '';
+
             // Fill inputs
             document.getElementById('medicine_name').value = data.medicines?.name ?? '';
-            document.getElementById('unit').value = data.medicines?.packaging ?? '';
             document.getElementById('content').value = data.medicines?.content ?? '';
             document.getElementById('item_price').value = formatRupiah(itemrawprice);
             document.getElementById('qty').value = data.quantity;
@@ -910,6 +925,7 @@
                 itempack = 0;
             }
 
+            updateUnitDisplay();
             updateBoxPriceInfo();
             counttotal();
             document.getElementById('qty').focus();
@@ -1384,7 +1400,9 @@
 
             document.getElementById('medicine_code').value = item.code ?? '';
             document.getElementById('medicine_name').value = item.name ?? '';
-            document.getElementById('unit').value = item.packaging ?? '';
+            selectedMedicinePackaging = item.packaging ?? '';
+            selectedMedicineUnit = item.unit ?? '';
+            updateUnitDisplay();
             document.getElementById('content').value = item.content ?? '';
             document.getElementById('item_price').value = formatRupiah(itemrawprice);
 
@@ -1423,6 +1441,7 @@
                 itempack = 0;
             }
 
+            updateUnitDisplay();
             updateBoxPriceInfo();
             counttotal();
         });
@@ -1473,6 +1492,8 @@
             itemtotal = '';
             itemcreditor = null;
             selectedRowData = null;
+            selectedMedicinePackaging = '';
+            selectedMedicineUnit = '';
             updateBoxPriceInfo();
             document.getElementById('searchInput').focus();
             resetCreditorPills();

@@ -121,10 +121,33 @@ class OrdersExport implements FromArray, ShouldAutoSize, WithStyles, WithTitle, 
             $rows[] = ['-', 'Tidak ada item obat dalam pemesanan ini.', 0, '-', 0, 0, '-', '-', 0];
         } else {
             foreach ($items as $item) {
-                // Harga satuan wajib dari medicines.raw_price (fallback ke item->price jika kosong)
-                $rawPrice = (float) ($item->medicines?->raw_price ?? $item->price ?? 0);
+                $isPack = (int) ($item->pack ?? 0) === 1;
+                $med = $item->medicines;
+
+                $packaging = trim((string) ($med?->packaging ?? ''));
+                $unit = trim((string) ($med?->unit ?? ''));
+                $content = (float) ($med?->content ?? 1);
+                if ($content <= 0) {
+                    $content = 1;
+                }
+
+                if ($isPack) {
+                    // Pilihan user: Kemasan Utuh (satuan terbesar)
+                    $satuan = $packaging ?: ($unit ?: 'BOX');
+                    $itemPrice = (float) ($item->price ?? 0);
+                    $priceHna = $itemPrice > 0 ? $itemPrice : ((float) ($med?->raw_price ?? 0) * $content);
+                } else {
+                    // Pilihan user: Tidak Utuh / Eceran (satuan terkecil)
+                    $satuan = $unit ?: ($packaging ?: '-');
+                    $itemPrice = (float) ($item->price ?? 0);
+                    $priceHna = $itemPrice > 0 ? $itemPrice : (float) ($med?->raw_price ?? 0);
+                }
+
                 $qty = (float) ($item->quantity ?? 0);
-                $totalRow = (float) ($qty * $rawPrice);
+                $totalRow = (float) ($item->total ?? 0);
+                if ($totalRow <= 0) {
+                    $totalRow = (float) ($qty * $priceHna);
+                }
                 $subtotalHna += $totalRow;
 
                 $credCode = $item->creditor_code ?? optional($item->creditors)->code;
@@ -146,8 +169,8 @@ class OrdersExport implements FromArray, ShouldAutoSize, WithStyles, WithTitle, 
                     $no++,
                     (string) ($item->medicines?->name ?? '-'),
                     $qty,
-                    (string) ($item->medicines?->packaging ?? '-'),
-                    $rawPrice,
+                    $satuan,
+                    $priceHna,
                     $totalRow,
                     $creditorName,
                     $discFormatted,

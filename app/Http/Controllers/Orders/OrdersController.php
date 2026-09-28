@@ -123,6 +123,20 @@ class OrdersController extends Controller
             ->editColumn('medicines.stock', function ($data) use ($getBranchStock) {
                 return $getBranchStock($data->medicine_id);
             })
+            ->editColumn('medicines.packaging', function ($data) {
+                $isPack = (int) ($data->pack ?? 0) === 1;
+                if ($isPack) {
+                    return $data->medicines?->packaging ?: ($data->medicines?->unit ?: '-');
+                }
+                return $data->medicines?->unit ?: ($data->medicines?->packaging ?: '-');
+            })
+            ->addColumn('satuan', function ($data) {
+                $isPack = (int) ($data->pack ?? 0) === 1;
+                if ($isPack) {
+                    return $data->medicines?->packaging ?: ($data->medicines?->unit ?: '-');
+                }
+                return $data->medicines?->unit ?: ($data->medicines?->packaging ?: '-');
+            })
             ->addColumn(
                 'item_total',
                 fn($data) =>
@@ -582,6 +596,7 @@ class OrdersController extends Controller
                 'factory_id' => $item->factory?->id,
                 'factory_name' => $item->factory?->name,
                 'packaging' => $item->packaging,
+                'unit' => $item->unit,
                 'content' => $item->content,
                 'raw_price' => $item->raw_price,
             ];

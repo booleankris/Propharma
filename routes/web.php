@@ -540,6 +540,8 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
         Route::get('/cash', [\App\Http\Controllers\FinanceController::class, 'cash'])->name('cash');
         Route::get('/piutang', [\App\Http\Controllers\FinanceController::class, 'piutang'])->name('piutang');
         Route::get('/kas-bank', [\App\Http\Controllers\FinanceController::class, 'kasBank'])->name('kasBank');
+        Route::get('/biaya', [\App\Http\Controllers\FinanceController::class, 'biaya'])->name('biaya');
+        Route::get('/accounts', [\App\Http\Controllers\FinanceController::class, 'accounts'])->name('accounts');
 
         Route::post('/payments', [\App\Http\Controllers\FinanceController::class, 'storePayment'])->name('payments.store');
         Route::post('/bulk-payments', [\App\Http\Controllers\FinanceController::class, 'storeBulkPayments'])->name('payments.bulkStore');
@@ -551,6 +553,10 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
         Route::post('/piutang-payments', [\App\Http\Controllers\FinanceController::class, 'storePiutangPayment'])->name('piutang.store');
         Route::post('/bulk-piutang-payments', [\App\Http\Controllers\FinanceController::class, 'bulkPiutangPayment'])->name('piutang.bulkStore');
 
+        Route::post('/biaya', [\App\Http\Controllers\FinanceController::class, 'storeBiaya'])->name('biaya.store');
+        Route::put('/biaya/{id}', [\App\Http\Controllers\FinanceController::class, 'updateBiaya'])->name('biaya.update');
+        Route::delete('/biaya/{id}', [\App\Http\Controllers\FinanceController::class, 'destroyBiaya'])->name('biaya.destroy');
+        Route::get('/export/biaya', [\App\Http\Controllers\FinanceController::class, 'exportBiaya'])->name('export.biaya');
         Route::get('/export/piutang', [\App\Http\Controllers\FinanceController::class, 'exportPiutang'])->name('export.piutang');
         Route::get('/export/hutang', [\App\Http\Controllers\FinanceController::class, 'exportHutang'])->name('export.hutang');
         Route::get('/export/cash', [\App\Http\Controllers\FinanceController::class, 'exportCash'])->name('export.cash');

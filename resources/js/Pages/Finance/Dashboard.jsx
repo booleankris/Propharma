@@ -16,6 +16,7 @@ import {
     Receipt,
     Calendar,
     ArrowRight,
+    CircleDollarSign,
 } from 'lucide-react';
 
 export default function Dashboard({
@@ -161,13 +162,25 @@ export default function Dashboard({
                                     </div>
                                     <div>
                                         <div className="text-xs font-bold text-rose-950">Kas Keluar (Kredit)</div>
-                                        <div className="text-[10px] text-rose-700">Hutang & pembelian</div>
+                                        <div className="text-[10px] text-rose-700">Hutang, tunai & biaya</div>
                                     </div>
                                 </div>
                                 <div className="text-right font-bold text-rose-700 text-sm">
                                     -{formatRupiah(stats.kasKeluar || 0)}
                                 </div>
                             </div>
+
+                            {Number(stats.totalBiaya || 0) > 0 && (
+                                <div className="px-3.5 py-2 rounded-xl bg-rose-50/40 border border-dashed border-rose-200/80 flex items-center justify-between text-xs">
+                                    <span className="text-slate-600 flex items-center gap-1.5 text-[11px]">
+                                        <CircleDollarSign className="w-3.5 h-3.5 text-rose-500" />
+                                        Biaya Operasional:
+                                    </span>
+                                    <Link href="/finance/biaya" className="font-semibold text-rose-600 hover:underline text-xs">
+                                        {formatRupiah(stats.totalBiaya || 0)}
+                                    </Link>
+                                </div>
+                            )}
 
                             <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
                                 <div className="flex items-center gap-2.5">
