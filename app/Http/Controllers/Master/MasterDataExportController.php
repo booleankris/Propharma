@@ -38,7 +38,7 @@ class MasterDataExportController extends Controller
                 array_keys(array_values($export['columns']))
             );
 
-            foreach ($query->lazyById(self::CHUNK_SIZE, $export['table'] . '.id', 'export_id') as $row) {
+            foreach ($query->lazyById(self::CHUNK_SIZE, $export['table'].'.id', 'export_id') as $row) {
                 $values = [];
 
                 foreach ($aliases as $alias) {
@@ -71,10 +71,10 @@ class MasterDataExportController extends Controller
             });
         }
 
-        $selects = [$export['table'] . '.id as export_id'];
+        $selects = [$export['table'].'.id as export_id'];
 
         foreach (array_values($export['columns']) as $index => $column) {
-            $selects[] = $column . " as export_column_{$index}";
+            $selects[] = $column." as export_column_{$index}";
         }
 
         return $query->select($selects);
@@ -89,8 +89,8 @@ class MasterDataExportController extends Controller
         $value = (string) $value;
 
         // Prevent spreadsheet programs from evaluating exported user input as a formula.
-        if (!is_numeric($value) && preg_match('/^\s*[=+\-@]/u', $value) === 1) {
-            return "'" . $value;
+        if (! is_numeric($value) && preg_match('/^\s*[=+\-@]/u', $value) === 1) {
+            return "'".$value;
         }
 
         return $value;

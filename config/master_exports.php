@@ -149,7 +149,6 @@ return [
             'Kota' => 'patients.city',
             'Telepon' => 'patients.phone',
             'Tanggal Lahir' => 'patients.birth',
-            'Total Harga' => 'patients.total_price',
             'Status' => 'patients.status',
             'Dibuat' => 'patients.created_at',
             'Diubah' => 'patients.updated_at',

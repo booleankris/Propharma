@@ -50,7 +50,7 @@ class MasterDataExportTest extends TestCase
 
         $this->assertStringStartsWith("\xEF\xBB\xBFID,Nama\n", $csv);
         $this->assertStringContainsString("1,\"'=HYPERLINK(\"\"https://example.test\"\")\"", $csv);
-        $this->assertStringContainsString("2105,\"Baris 2105\"", $csv);
+        $this->assertStringContainsString('2105,"Baris 2105"', $csv);
         $this->assertSame(2106, substr_count($csv, "\n"));
         $this->assertSame('text/csv; charset=UTF-8', $response->headers->get('Content-Type'));
     }
