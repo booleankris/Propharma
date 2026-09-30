@@ -1,5 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Head, Link, router } from '@inertiajs/react';
+import TransactionCategory from './Components/TransactionCategory';
+import CashFlowChart from './Components/CashFlowChart';
 import FinanceLayout from './Layouts/FinanceLayout';
 import { formatRupiah, formatNumberOnly } from './Components/Utils';
 import {
@@ -254,7 +256,7 @@ export default function KasBank({
         >
             <Head title="Kas & Bank - Keuangan Apotek" />
 
-            <div className="space-y-6">
+            <div className="finance-kas-bank space-y-6">
                 {/* Header Action Toolbar */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
                     <div>
@@ -358,17 +360,17 @@ export default function KasBank({
                 </div>
 
                 {/* 2. VISUALISASI CHART & GRAPH AKUN KAS & BANK */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <div className="finance-account-panels grid grid-cols-1 xl:grid-cols-12 gap-6">
                     {/* Panel Kiri (8 cols): Distribusi Aliran Kas & Kartu Rekening Interaktif */}
-                    <div className="lg:col-span-8 bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-5">
+                    <div className="xl:col-span-8 bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-5">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-4">
                             <div>
                                 <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
                                     <BarChart3 className="w-4 h-4 text-blue-600" />
-                                    Visualisasi Aliran Dana per Rekening Kas & Bank
+                                    Rekening Kas & Bank
                                 </h3>
                                 <p className="text-xs text-slate-400 mt-0.5">
-                                    Klik pada salah satu akun untuk menyaring rincian mutasi transaksi di bawah.
+                                    Pilih rekening untuk melihat mutasi. Masuk dan keluar menunjukkan arus dana tercatat.
                                 </p>
                             </div>
 
@@ -388,7 +390,7 @@ export default function KasBank({
                         </div>
 
                         {/* Grid Kartu Akun Interaktif dengan Visual Bar */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                        <div className="finance-account-grid grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                             {kasBankSummary.accountStats.map((acc) => {
                                 const isSelected = String(selectedKasBankFilter) === String(acc.id);
                                 const flowVolume = acc.inflow + acc.outflow;
@@ -398,11 +400,23 @@ export default function KasBank({
                                 return (
                                     <div
                                         key={acc.id}
+                                        role="button"
+                                        tabIndex={0}
+                                        aria-label={`Filter mutasi ${acc.name}`}
+                                        aria-pressed={isSelected}
+                                        onKeyDown={(event) => {
+                                            if (event.target !== event.currentTarget) return;
+                                            if (event.key === 'Enter' || event.key === ' ') {
+                                                event.preventDefault();
+                                                setSelectedKasBankFilter(isSelected ? 'all' : String(acc.id));
+                                                setMutasiCurrentPage(1);
+                                            }
+                                        }}
                                         onClick={() => {
                                             setSelectedKasBankFilter(isSelected ? 'all' : String(acc.id));
                                             setMutasiCurrentPage(1);
                                         }}
-                                        className={`p-4 rounded-xl border-2 transition cursor-pointer relative group ${isSelected
+                                        className={`finance-account-card p-4 rounded-xl border-2 transition cursor-pointer relative group ${isSelected
                                             ? 'bg-blue-50/40 border-blue-500 shadow-sm'
                                             : 'bg-slate-50/60 border-slate-200/80 hover:border-blue-300 hover:bg-white'
                                             }`}
@@ -452,30 +466,30 @@ export default function KasBank({
 
                                         {/* Visual Bar Distribusi Aliran (Inflow vs Outflow) */}
                                         <div className="mt-3.5 space-y-1.5">
-                                            <div className="flex items-center justify-between text-[11px]">
+                                            <div className="finance-account-amounts flex items-center justify-between text-[11px]">
                                                 <span className="text-emerald-700 font-semibold flex items-center gap-1">
-                                                    <ArrowDownLeft className="w-3 h-3" /> +{formatRupiah(acc.inflow)}
+                                                    <ArrowDownLeft className="w-3 h-3" /> Masuk {formatRupiah(acc.inflow)}
                                                 </span>
                                                 <span className="text-rose-700 font-semibold flex items-center gap-1">
-                                                    <ArrowUpRight className="w-3 h-3" /> -{formatRupiah(acc.outflow)}
+                                                    <ArrowUpRight className="w-3 h-3" /> Keluar {formatRupiah(acc.outflow)}
                                                 </span>
                                             </div>
 
                                             <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden flex">
                                                 <div
-                                                    style={{ width: `${flowVolume > 0 ? inPercent : 50}%` }}
+                                                    style={{ width: `${flowVolume > 0 ? inPercent : 0}%` }}
                                                     className="bg-emerald-500 h-full transition-all duration-500"
                                                     title={`Masuk: ${inPercent}%`}
                                                 />
                                                 <div
-                                                    style={{ width: `${flowVolume > 0 ? outPercent : 50}%` }}
+                                                    style={{ width: `${flowVolume > 0 ? outPercent : 0}%` }}
                                                     className="bg-rose-500 h-full transition-all duration-500"
                                                     title={`Keluar: ${outPercent}%`}
                                                 />
                                             </div>
 
-                                            <div className="flex items-center justify-between text-[10px] text-slate-400 pt-0.5">
-                                                <span>Saldo Buku: <strong className="font-semibold text-slate-700">{formatRupiah(acc.balance)}</strong></span>
+                                            <div className="finance-account-balance flex items-center justify-between text-[10px] text-slate-400 pt-0.5">
+                                                <span>Saldo Buku: <strong className={`font-semibold ${acc.balance < 0 ? 'text-rose-700' : 'text-slate-900'}`}>{formatRupiah(acc.balance)}</strong></span>
                                                 <span className="font-medium text-slate-500">{acc.txCount} Mutasi</span>
                                             </div>
                                         </div>
@@ -486,91 +500,22 @@ export default function KasBank({
                     </div>
 
                     {/* Panel Kanan (4 cols): Rasio Arus Kas Donut / Ring Graph */}
-                    <div className="lg:col-span-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-xs flex flex-col justify-between space-y-5">
+                    <div className="finance-cash-panel xl:col-span-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-5">
                         <div>
                             <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2 border-b border-slate-100 pb-4">
                                 <PieChart className="w-4 h-4 text-emerald-600" />
-                                Rasio Arus Kas (In vs Out)
+                                Perbandingan Arus Kas
                             </h3>
 
-                            <div className="mt-6 flex flex-col items-center justify-center">
-                                <div className="relative w-40 h-40 flex items-center justify-center">
-                                    <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
-                                        <circle
-                                            cx="50"
-                                            cy="50"
-                                            r="38"
-                                            fill="transparent"
-                                            stroke="#F1F5F9"
-                                            strokeWidth="12"
-                                        />
-                                        {kasBankSummary.totalFlowVolume > 0 && (
-                                            <circle
-                                                cx="50"
-                                                cy="50"
-                                                r="38"
-                                                fill="transparent"
-                                                stroke="#10B981"
-                                                strokeWidth="12"
-                                                strokeDasharray={`${(kasBankSummary.totalMasuk / kasBankSummary.totalFlowVolume) * 238.76} 238.76`}
-                                                strokeDashoffset="0"
-                                                strokeLinecap="round"
-                                                className="transition-all duration-700"
-                                            />
-                                        )}
-                                        {kasBankSummary.totalFlowVolume > 0 && (
-                                            <circle
-                                                cx="50"
-                                                cy="50"
-                                                r="38"
-                                                fill="transparent"
-                                                stroke="#F43F5E"
-                                                strokeWidth="12"
-                                                strokeDasharray={`${(kasBankSummary.totalKeluar / kasBankSummary.totalFlowVolume) * 238.76} 238.76`}
-                                                strokeDashoffset={`-${(kasBankSummary.totalMasuk / kasBankSummary.totalFlowVolume) * 238.76}`}
-                                                strokeLinecap="round"
-                                                className="transition-all duration-700"
-                                            />
-                                        )}
-                                    </svg>
-
-                                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-2">
-                                        <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
-                                            Net Flow
-                                        </span>
-                                        <span className={`text-xs font-bold ${kasBankSummary.netCashflow >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
-                                            {kasBankSummary.netCashflow >= 0 ? '+' : ''}
-                                            {Math.abs(kasBankSummary.netCashflow) > 1000000
-                                                ? `${(kasBankSummary.netCashflow / 1000000).toFixed(1)}Jt`
-                                                : formatNumberOnly(kasBankSummary.netCashflow)
-                                            }
-                                        </span>
-                                    </div>
+                            <div className="mt-5">
+                                <CashFlowChart incoming={kasBankSummary.totalMasuk} outgoing={kasBankSummary.totalKeluar} compact />
+                                <div className="mt-4 text-sm text-slate-600">Arus kas bersih
+                                    <strong className={`block mt-1 text-lg ${kasBankSummary.netCashflow >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{formatRupiah(kasBankSummary.netCashflow)}</strong>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="space-y-2.5 pt-4 border-t border-slate-100 text-xs">
-                            <div className="flex items-center justify-between p-2 rounded-xl bg-emerald-50/60 border border-emerald-100">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                                    <span className="font-semibold text-emerald-900">Uang Masuk (Debit)</span>
-                                </div>
-                                <span className="font-bold text-emerald-700">
-                                    {formatRupiah(kasBankSummary.totalMasuk)}
-                                </span>
-                            </div>
 
-                            <div className="flex items-center justify-between p-2 rounded-xl bg-rose-50/60 border border-rose-100">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-2.5 h-2.5 rounded-full bg-rose-500" />
-                                    <span className="font-semibold text-rose-900">Uang Keluar (Kredit)</span>
-                                </div>
-                                <span className="font-bold text-rose-700">
-                                    {formatRupiah(kasBankSummary.totalKeluar)}
-                                </span>
-                            </div>
-                        </div>
                     </div>
                 </div>
 
@@ -691,21 +636,7 @@ export default function KasBank({
                                                 </div>
                                             </td>
                                             <td className="px-4 py-3 whitespace-nowrap">
-                                                {item.category_type === 'PIUTANG' && (
-                                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                                                        Piutang Penjualan
-                                                    </span>
-                                                )}
-                                                {item.category_type === 'CASH' && (
-                                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                                        Pembelian Cash
-                                                    </span>
-                                                )}
-                                                {item.category_type === 'KREDIT' && (
-                                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                                                        Hutang Dagang
-                                                    </span>
-                                                )}
+                                                <TransactionCategory type={item.category_type} />
                                             </td>
                                             <td className="px-4 py-3 font-medium text-slate-800">
                                                 {item.party}

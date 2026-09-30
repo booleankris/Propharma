@@ -21,7 +21,7 @@ class BiayaExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
     protected array $filters;
     protected ?Pharmacies $activePharmacy;
     protected int $lastRow = 5;
-    protected int $dataStartRow = 7;
+    protected int $dataStartRow = 6;
     protected int $dataRowCount = 0;
 
     public function __construct(array $targetPharmacyIds, array $filters = [], ?Pharmacies $activePharmacy = null)
@@ -42,56 +42,76 @@ class BiayaExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
 
         $filterExpenseName = 'Semua Kategori Beban';
         if (!empty($this->filters['expense_account_id'])) {
-            $acc = FinanceAccount::find($this->filters['expense_account_id']);
-            if ($acc) $filterExpenseName = "{$acc->code} - {$acc->name}";
+            $val = $this->filters['expense_account_id'];
+            $acc = is_numeric($val)
+                ? FinanceAccount::find($val)
+                : FinanceAccount::where('name', 'LIKE', "%{$val}%")->orWhere('code', $val)->first();
+            if ($acc) {
+                $filterExpenseName = ($acc->code ? "{$acc->code} - " : '') . $acc->name;
+            } else {
+                $filterExpenseName = (string) $val;
+            }
         }
 
         $filterKasName = 'Semua Akun Kas/Bank';
         if (!empty($this->filters['account_id'])) {
-            $kas = FinanceAccount::find($this->filters['account_id']);
-            if ($kas) $filterKasName = "{$kas->code} - {$kas->name}";
+            $val = $this->filters['account_id'];
+            $kas = is_numeric($val)
+                ? FinanceAccount::find($val)
+                : FinanceAccount::where('name', 'LIKE', "%{$val}%")->orWhere('code', $val)->first();
+            if ($kas) {
+                $filterKasName = ($kas->code ? "{$kas->code} - " : '') . $kas->name;
+            } else {
+                $filterKasName = (string) $val;
+            }
         }
 
-        $filterDateStr = 'Semua Tanggal';
+        $filterDateStr = 'Semua Periode';
         if (!empty($this->filters['start_date']) && !empty($this->filters['end_date'])) {
             $filterDateStr = Carbon::parse($this->filters['start_date'])->format('d/m/Y') . ' s/d ' . Carbon::parse($this->filters['end_date'])->format('d/m/Y');
         } elseif (!empty($this->filters['start_date'])) {
             $filterDateStr = 'Mulai ' . Carbon::parse($this->filters['start_date'])->format('d/m/Y');
+        } elseif (!empty($this->filters['end_date'])) {
+            $filterDateStr = 'Sampai ' . Carbon::parse($this->filters['end_date'])->format('d/m/Y');
         }
 
         // Header Title Block
         $rows = [
-            ['APOTEK SAHABAT - LAPORAN BIAYA OPERASIONAL & PENGELUARAN'],
-            ["Unit / Cabang: {$branchName} | Kategori Beban: {$filterExpenseName} | Sumber Dana: {$filterKasName}"],
-            ["Periode Transaksi: {$filterDateStr} | Dicetak Pada: " . Carbon::now()->format('d/m/Y H:i:s')],
-            [],
-            [
-                'NO',
-                'NO. BUKTI / REF',
-                'TANGGAL',
-                'KODE AKUN',
-                'NAMA AKUN BEBAN',
-                'KATEGORI BEBAN',
-                'SUMBER DANA (KAS/BANK)',
-                'PENERIMA / VENDOR',
-                'KETERANGAN / CATATAN',
-                'JUMLAH (RP)',
-                'PETUGAS',
-            ]
+            ["APOTEK PROPHARMA - {$branchName}"],
+            ['LAPORAN BIAYA OPERASIONAL & PENGELUARAN'],
+            ["Periode: {$filterDateStr} | Kategori Beban: {$filterExpenseName} | Sumber Dana: {$filterKasName} | Dicetak: " . Carbon::now()->format('d/m/Y H:i')],
+            [], // Row 4 Blank
+            [   // Row 5 Table Headers
+                'No',
+                'No. Bukti / Ref',
+                'Tanggal',
+                'Apotek Cabang',
+                'Kode Akun',
+                'Nama Akun Beban',
+                'Kategori Beban',
+                'Sumber Kas / Bank',
+                'Penerima / Vendor',
+                'Keterangan / Catatan',
+                'Petugas',
+                'Jumlah (Rp)',
+            ],
         ];
-
-        $this->dataStartRow = 6;
 
         // Query Data
         $query = FinancePayment::with(['account', 'expenseAccount', 'creator', 'pharmacy'])
-            ->where('payment_type', 'BIAYA')
-            ->where(function ($q) {
+            ->where('payment_type', 'BIAYA');
+
+        if (!empty($this->filters['pharmacy_id'])) {
+            $query->where('pharmacy_id', (int) $this->filters['pharmacy_id']);
+        } else {
+            $query->where(function ($q) {
                 $q->whereIn('pharmacy_id', $this->targetPharmacyIds)
                   ->orWhereNull('pharmacy_id');
             });
+        }
 
         if (!empty($this->filters['search'])) {
-            $s = $this->filters['search'];
+            $s = trim($this->filters['search']);
             $query->where(function ($q) use ($s) {
                 $q->where('reference_number', 'LIKE', "%{$s}%")
                     ->orWhere('recipient', 'LIKE', "%{$s}%")
@@ -103,16 +123,35 @@ class BiayaExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                     ->orWhereHas('account', function ($sub) use ($s) {
                         $sub->where('name', 'LIKE', "%{$s}%")
                             ->orWhere('code', 'LIKE', "%{$s}%");
+                    })
+                    ->orWhereHas('creator', function ($sub) use ($s) {
+                        $sub->where('name', 'LIKE', "%{$s}%");
                     });
             });
         }
 
         if (!empty($this->filters['expense_account_id'])) {
-            $query->where('expense_account_id', $this->filters['expense_account_id']);
+            $val = $this->filters['expense_account_id'];
+            if (is_numeric($val)) {
+                $query->where('expense_account_id', $val);
+            } else {
+                $query->whereHas('expenseAccount', function ($sub) use ($val) {
+                    $sub->where('name', 'LIKE', "%{$val}%")
+                        ->orWhere('code', 'LIKE', "%{$val}%");
+                });
+            }
         }
 
         if (!empty($this->filters['account_id'])) {
-            $query->where('account_id', $this->filters['account_id']);
+            $val = $this->filters['account_id'];
+            if (is_numeric($val)) {
+                $query->where('account_id', $val);
+            } else {
+                $query->whereHas('account', function ($sub) use ($val) {
+                    $sub->where('name', 'LIKE', "%{$val}%")
+                        ->orWhere('code', 'LIKE', "%{$val}%");
+                });
+            }
         }
 
         if (!empty($this->filters['start_date'])) {
@@ -123,7 +162,7 @@ class BiayaExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
             $query->whereDate('payment_date', '<=', $this->filters['end_date']);
         }
 
-        $sortOrder = $this->filters['sort_order'] ?? 'desc';
+        $sortOrder = strtolower($this->filters['sort_order'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
         $query->orderBy('payment_date', $sortOrder)->orderBy('id', $sortOrder);
 
         $no = 1;
@@ -138,35 +177,34 @@ class BiayaExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
             $rows[] = [
                 $no++,
                 $item->reference_number ?: ('BY-' . str_pad($item->id, 5, '0', STR_PAD_LEFT)),
-                Carbon::parse($item->payment_date)->format('d/m/Y'),
+                $this->safeFormatDate($item->payment_date),
+                $item->pharmacy->name ?? ($branchName ?: 'Pusat'),
                 $item->expenseAccount->code ?? '-',
                 $item->expenseAccount->name ?? 'Biaya Operasional',
                 $item->expenseAccount->category ?? 'Beban Operasional',
                 $item->account->name ?? 'Kas / Bank',
                 $item->recipient ?: '-',
                 $item->notes ?: '-',
-                $amount,
                 $item->creator->name ?? 'Petugas',
+                $amount,
             ];
         }
 
-        // Summary Row
-        $summaryRowIndex = count($rows) + 1;
-        $rows[] = [
-            'TOTAL PENGELUARAN BIAYA',
-            '',
-            '',
-            '',
-            '',
-            '',
-            '',
-            '',
-            '',
-            $totalNominal,
-            '',
-        ];
-
-        $this->lastRow = count($rows);
+        // Summary or Empty State Row
+        if ($this->dataRowCount > 0) {
+            $rows[] = [
+                'TOTAL PENGELUARAN BIAYA',
+                '', '', '', '', '', '', '', '', '', '',
+                $totalNominal,
+            ];
+            $this->lastRow = count($rows);
+        } else {
+            $rows[] = [
+                'Tidak ada data pengeluaran biaya operasional yang sesuai dengan filter yang dipilih.',
+                '', '', '', '', '', '', '', '', '', '', ''
+            ];
+            $this->lastRow = count($rows);
+        }
 
         return $rows;
     }
@@ -174,84 +212,160 @@ class BiayaExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
     public function columnWidths(): array
     {
         return [
-            'A' => 6,   // NO
-            'B' => 18,  // NO BUKTI
-            'C' => 14,  // TANGGAL
-            'D' => 14,  // KODE AKUN
-            'E' => 30,  // NAMA AKUN BEBAN
-            'F' => 22,  // KATEGORI BEBAN
-            'G' => 26,  // SUMBER DANA
-            'H' => 24,  // PENERIMA
-            'I' => 35,  // KETERANGAN
-            'J' => 20,  // JUMLAH RP
-            'K' => 18,  // PETUGAS
+            'A' => 6,   // No
+            'B' => 18,  // No Bukti / Ref
+            'C' => 14,  // Tanggal
+            'D' => 24,  // Apotek Cabang
+            'E' => 14,  // Kode Akun
+            'F' => 30,  // Nama Akun Beban
+            'G' => 22,  // Kategori Beban
+            'H' => 24,  // Sumber Kas / Bank
+            'I' => 24,  // Penerima / Vendor
+            'J' => 32,  // Keterangan / Catatan
+            'K' => 18,  // Petugas
+            'L' => 22,  // Jumlah (Rp)
         ];
     }
 
     public function styles(Worksheet $sheet)
     {
-        // Title banner
-        $sheet->mergeCells('A1:K1');
-        $sheet->mergeCells('A2:K2');
-        $sheet->mergeCells('A3:K3');
+        // 1. Title Styling
+        $sheet->mergeCells('A1:L1');
+        $sheet->mergeCells('A2:L2');
+        $sheet->mergeCells('A3:L3');
 
         $sheet->getStyle('A1')->applyFromArray([
-            'font' => ['bold' => true, 'size' => 15, 'color' => ['argb' => 'FFFFFFFF']],
-            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
-            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['argb' => 'FF047857']], // Emerald 700
+            'font' => ['bold' => true, 'size' => 14, 'color' => ['rgb' => '0F172A']],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_LEFT, 'vertical' => Alignment::VERTICAL_CENTER],
         ]);
-        $sheet->getRowDimension(1)->setRowHeight(30);
+        $sheet->getRowDimension(1)->setRowHeight(24);
 
-        $sheet->getStyle('A2:A3')->applyFromArray([
-            'font' => ['size' => 10, 'italic' => true, 'color' => ['argb' => 'FF334155']],
-            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
+        $sheet->getStyle('A2')->applyFromArray([
+            'font' => ['bold' => true, 'size' => 11, 'color' => ['rgb' => '047857']], // Emerald 700
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_LEFT, 'vertical' => Alignment::VERTICAL_CENTER],
         ]);
+        $sheet->getRowDimension(2)->setRowHeight(20);
 
-        // Table Header
-        $sheet->getStyle('A5:K5')->applyFromArray([
-            'font' => ['bold' => true, 'size' => 11, 'color' => ['argb' => 'FFFFFFFF']],
-            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
-            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['argb' => 'FF065F46']], // Emerald 800
+        $sheet->getStyle('A3')->applyFromArray([
+            'font' => ['italic' => true, 'size' => 9, 'color' => ['rgb' => '64748B']], // Slate 500
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_LEFT, 'vertical' => Alignment::VERTICAL_CENTER],
         ]);
-        $sheet->getRowDimension(5)->setRowHeight(26);
+        $sheet->getRowDimension(3)->setRowHeight(18);
 
-        // Body rows border & alignment
+        // 2. Table Headers (Row 5)
+        $sheet->getStyle('A5:L5')->applyFromArray([
+            'font' => ['bold' => true, 'size' => 10, 'color' => ['rgb' => 'FFFFFF']],
+            'fill' => [
+                'fillType' => Fill::FILL_SOLID,
+                'startColor' => ['rgb' => '1E293B'], // Dark Corporate Slate
+            ],
+            'alignment' => [
+                'horizontal' => Alignment::HORIZONTAL_CENTER,
+                'vertical' => Alignment::VERTICAL_CENTER,
+                'wrapText' => true,
+            ],
+            'borders' => [
+                'allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => '0F172A']],
+            ],
+        ]);
+        $sheet->getRowDimension(5)->setRowHeight(28);
+
+        // 3. Data Rows Styling
         if ($this->dataRowCount > 0) {
-            $endDataRow = $this->dataStartRow + $this->dataRowCount - 1;
+            $start = $this->dataStartRow;
+            $end = $start + $this->dataRowCount - 1;
 
-            $sheet->getStyle("A{$this->dataStartRow}:K{$endDataRow}")->applyFromArray([
+            for ($row = $start; $row <= $end; $row++) {
+                $sheet->getRowDimension($row)->setRowHeight(20);
+
+                // Zebra striping for readability
+                if ($row % 2 == 1) {
+                    $sheet->getStyle("A{$row}:L{$row}")->getFill()
+                        ->setFillType(Fill::FILL_SOLID)
+                        ->getStartColor()->setRGB('F8FAFC');
+                }
+            }
+
+            // General Grid Borders & Alignments
+            $sheet->getStyle("A{$start}:L{$end}")->applyFromArray([
                 'borders' => [
-                    'allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['argb' => 'FFE2E8F0']],
+                    'allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'E2E8F0']],
                 ],
                 'alignment' => ['vertical' => Alignment::VERTICAL_CENTER],
             ]);
 
-            // Number formatting for nominal
-            $sheet->getStyle("J{$this->dataStartRow}:J{$endDataRow}")->getNumberFormat()->setFormatCode('#,##0');
-            $sheet->getStyle("A{$this->dataStartRow}:A{$endDataRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle("B{$this->dataStartRow}:B{$endDataRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle("C{$this->dataStartRow}:C{$endDataRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle("D{$this->dataStartRow}:D{$endDataRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle("J{$this->dataStartRow}:J{$endDataRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+            $sheet->getStyle("A{$start}:A{$end}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle("B{$start}:B{$end}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle("B{$start}:B{$end}")->getFont()->setBold(true);
+            $sheet->getStyle("C{$start}:C{$end}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle("D{$start}:D{$end}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
+            $sheet->getStyle("E{$start}:E{$end}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle("F{$start}:F{$end}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
+            $sheet->getStyle("G{$start}:G{$end}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
+            $sheet->getStyle("H{$start}:H{$end}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
+            $sheet->getStyle("I{$start}:I{$end}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
+            $sheet->getStyle("J{$start}:J{$end}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
+            $sheet->getStyle("K{$start}:K{$end}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle("L{$start}:L{$end}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+            $sheet->getStyle("L{$start}:L{$end}")->getNumberFormat()->setFormatCode('#,##0');
+            $sheet->getStyle("L{$start}:L{$end}")->getFont()->setBold(true);
+
+            // Summary Row Style
+            $totalRow = $this->lastRow;
+            $sheet->mergeCells("A{$totalRow}:K{$totalRow}");
+            $sheet->getStyle("A{$totalRow}:L{$totalRow}")->applyFromArray([
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => 'ECFDF5'], // Emerald-50 highlight
+                ],
+                'borders' => [
+                    'top' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => '10B981']],
+                    'bottom' => ['borderStyle' => Border::BORDER_DOUBLE, 'color' => ['rgb' => '047857']],
+                    'allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'A7F3D0']],
+                ],
+                'alignment' => ['vertical' => Alignment::VERTICAL_CENTER],
+            ]);
+
+            $sheet->getStyle("A{$totalRow}")->applyFromArray([
+                'font' => ['bold' => true, 'size' => 10, 'color' => ['rgb' => '047857']],
+                'alignment' => ['horizontal' => Alignment::HORIZONTAL_RIGHT],
+            ]);
+
+            $sheet->getStyle("L{$totalRow}")->applyFromArray([
+                'font' => ['bold' => true, 'size' => 11, 'color' => ['rgb' => '047857']],
+                'alignment' => ['horizontal' => Alignment::HORIZONTAL_RIGHT],
+                'numberFormat' => ['formatCode' => '#,##0'],
+            ]);
+            $sheet->getRowDimension($totalRow)->setRowHeight(24);
+        } else {
+            // Empty State Row
+            $emptyRow = $this->dataStartRow;
+            $sheet->mergeCells("A{$emptyRow}:L{$emptyRow}");
+            $sheet->getStyle("A{$emptyRow}:L{$emptyRow}")->applyFromArray([
+                'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
+                'font' => ['italic' => true, 'color' => ['rgb' => '94A3B8']],
+                'borders' => [
+                    'allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'E2E8F0']],
+                ],
+            ]);
+            $sheet->getRowDimension($emptyRow)->setRowHeight(30);
         }
+    }
 
-        // Summary row style
-        $summaryRow = $this->lastRow;
-        $sheet->mergeCells("A{$summaryRow}:I{$summaryRow}");
-        $sheet->getStyle("A{$summaryRow}:K{$summaryRow}")->applyFromArray([
-            'font' => ['bold' => true, 'size' => 11, 'color' => ['argb' => 'FF065F46']],
-            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['argb' => 'FFD1FAE5']], // Emerald 100
-            'borders' => [
-                'top' => ['borderStyle' => Border::BORDER_MEDIUM, 'color' => ['argb' => 'FF047857']],
-                'bottom' => ['borderStyle' => Border::BORDER_DOUBLE, 'color' => ['argb' => 'FF047857']],
-            ],
-            'alignment' => ['vertical' => Alignment::VERTICAL_CENTER],
-        ]);
-        $sheet->getStyle("A{$summaryRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
-        $sheet->getStyle("J{$summaryRow}")->getNumberFormat()->setFormatCode('#,##0');
-        $sheet->getStyle("J{$summaryRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
-        $sheet->getRowDimension($summaryRow)->setRowHeight(24);
-
-        return [];
+    protected function safeFormatDate($date): string
+    {
+        if (empty($date)) return '-';
+        if ($date instanceof \DateTimeInterface) {
+            return $date->format('d/m/Y');
+        }
+        $str = trim((string) $date);
+        if (preg_match('/^\d{2}\/\d{2}\/\d{4}/', $str)) {
+            return substr($str, 0, 10);
+        }
+        try {
+            return Carbon::parse($str)->format('d/m/Y');
+        } catch (\Throwable $e) {
+            return $str;
+        }
     }
 }

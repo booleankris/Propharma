@@ -495,6 +495,7 @@
                 <h1 class="param-page-title">Parameters</h1>
                 <p class="param-page-sub">Manage pricing parameters per debitur</p>
             </div>
+            @include('master.partials.export-button', ['type' => 'parameters'])
             <button class="btn-back" onclick="window.location.href='{{ route('home') }}'">
                 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M10 3L5 8l5 5" />

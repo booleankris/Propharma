@@ -144,6 +144,7 @@
                             <h2 class="text-2xl font-bold text-gray-800">Data Obat</h2>
                         </div>
                         <div class="flex items-center gap-2">
+                            @include('master.partials.export-button', ['type' => 'medicines'])
                             <button type="button" id="btnOpenImport"
                                 class="inline-flex items-center px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shadow-sm transition gap-1.5 cursor-pointer">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

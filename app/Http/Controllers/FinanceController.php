@@ -226,7 +226,7 @@ class FinanceController extends Controller
 
         $targetPharmacyIds = $this->getTargetPharmacyIds();
         $biayaList = $this->getBiayaData();
-        $expenseAccounts = FinanceAccount::whereIn('category', ['Beban Operasional', 'Beban Lainnya'])
+        $expenseAccounts = FinanceAccount::whereNotIn('category', ['Kas & Bank'])
             ->where('is_active', true)
             ->orderBy('code')
             ->get(['id', 'code', 'name', 'category', 'balance']);
@@ -1786,6 +1786,10 @@ class FinanceController extends Controller
      */
     public function exportBiaya(Request $request)
     {
+        if ($request->filled('pharmacy_id') && auth()->check() && (auth()->user()->hasRole('HO') || auth()->user()->hasRole('administrator') || auth()->user()->hasRole('General Manager'))) {
+            session(['ho_pharmacy_id' => (int) $request->pharmacy_id]);
+        }
+
         $targetPharmacyIds = $this->getTargetPharmacyIds();
         $activePharmacy = Pharmacies::find(getActivePharmacyId()) ?? Pharmacies::find(1);
         $branchName = $activePharmacy ? preg_replace('/[^A-Za-z0-9_]/', '_', $activePharmacy->name) : 'Apotek';
@@ -1798,6 +1802,7 @@ class FinanceController extends Controller
             'start_date' => $request->query('start_date', ''),
             'end_date' => $request->query('end_date', ''),
             'sort_order' => $request->query('sort_order', 'desc'),
+            'pharmacy_id' => $request->query('pharmacy_id', ''),
         ];
 
         return Excel::download(new BiayaExport($targetPharmacyIds, $filters, $activePharmacy), $filename);

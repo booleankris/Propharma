@@ -24,6 +24,7 @@
                                 d="M16 11c1.657 0 3-1.343 3-3S17.657 5 16 5s-3 1.343-3 3 1.343 3 3 3zM8 11c1.657 0 3-1.343 3-3S9.657 5 8 5 5 6.343 5 8s1.343 3 3 3zm0 2c-2.5 0-4.5 1.5-4.5 3.5V19h9v-2.5C12.5 14.5 10.5 13 8 13zm8 0c-2.5 0-4.5 1.5-4.5 3.5V19h9v-2.5c0-2-2-3.5-4.5-3.5z" />
                         </svg>
                         <h2 class="text-2xl font-bold text-gray-800 tracking-wide drop-shadow-sm">Data Dokter</h2>
+                        @include('master.partials.export-button', ['type' => 'doctors'])
                     </div>
 
                     <div class="overflow-x-auto p-3">

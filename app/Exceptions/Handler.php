@@ -63,6 +63,13 @@ class Handler extends ExceptionHandler
     {
         // Tangani Page Expired (419 / CSRF Token Mismatch) secara halus
         if ($e instanceof TokenMismatchException) {
+
+            // 1. Tangani request Inertia terlebih dahulu
+            if ($request->inertia()) {
+                return \Inertia\Inertia::location(route('login'));
+            }
+
+            // 2. Tangani request AJAX murni atau API (Non-Inertia)
             if ($request->expectsJson() || $request->ajax()) {
                 return response()->json([
                     'message' => 'Sesi Anda telah berakhir. Silakan login kembali.',
@@ -71,6 +78,7 @@ class Handler extends ExceptionHandler
                 ], 419);
             }
 
+            // 3. Tangani request web tradisional
             return redirect()->route('login')->with('warning', 'Sesi Anda telah berakhir karena tidak aktif atau telah logout di tab lain. Silakan login kembali.');
         }
 

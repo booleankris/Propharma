@@ -21,6 +21,7 @@
                                 d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" />
                         </svg>
                         <h2 class="text-2xl font-bold text-gray-800 drop-shadow-sm">Data Categories</h2>
+                        @include('master.partials.export-button', ['type' => 'categories'])
                     </div>
 
                     <div class="overflow-x-auto p-3">

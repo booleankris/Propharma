@@ -26,6 +26,7 @@ use App\Http\Controllers\Master\DoctorsController;
 use App\Http\Controllers\Master\FactoriesController;
 use App\Http\Controllers\Master\ItemsController;
 use App\Http\Controllers\Master\LocationsController;
+use App\Http\Controllers\Master\MasterDataExportController;
 use App\Http\Controllers\Master\MedicineController;
 use App\Http\Controllers\Master\ParametersController;
 use App\Http\Controllers\Master\PatientsController;
@@ -236,6 +237,10 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
 
     // Master Data (Role HO & Operator)
     Route::middleware(['role:HO|operator|Operator|administrator'])->group(function () {
+        Route::get('/master-data/{type}/export', MasterDataExportController::class)
+            ->whereIn('type', array_keys(config('master_exports')))
+            ->name('master-data.export');
+
         Route::resource('creditors', CreditorsController::class)->except(['show']);
         Route::resource('debtors', DebtorsController::class)->except(['show']);
         Route::resource('patients', PatientsController::class)->except(['show']);

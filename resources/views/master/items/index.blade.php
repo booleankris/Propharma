@@ -29,6 +29,7 @@
                             </svg>
                             <h2 class="text-2xl font-bold text-gray-800 drop-shadow-sm">Data Etalase</h2>
                         </div>
+                        @include('master.partials.export-button', ['type' => 'items'])
                         <div class="w-56">
                             <select id="filter_pharmacy" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs focus:ring-2 focus:ring-blue-200">
                                 <option value="">Semua Cabang / Sesuai User</option>

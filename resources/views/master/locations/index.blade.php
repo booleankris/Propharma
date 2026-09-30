@@ -27,6 +27,7 @@
                             </g>
                         </svg>
                         <h2 class="text-2xl font-bold text-gray-800 drop-shadow-sm">Data Lokasi</h2>
+                        @include('master.partials.export-button', ['type' => 'locations'])
                     </div>
 
                     <div class="overflow-x-auto p-3">

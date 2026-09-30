@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import '../finance.css';
 import { Head, Link, usePage, router } from '@inertiajs/react';
 import {
     LayoutDashboard,
@@ -12,12 +13,15 @@ import {
     Building2,
     CircleDollarSign,
     Layers,
+    Menu,
+    X,
 } from 'lucide-react';
 
 export default function FinanceLayout({ title, subtitle, children, stats = {} }) {
+    const [menuOpen, setMenuOpen] = useState(false);
     const page = usePage();
     const { auth, flash, errors, branchContext } = page.props || {};
-    const currentUrl = page.url || (typeof window !== 'undefined' ? window.location.pathname : '');
+    const currentUrl = (page.url || (typeof window !== 'undefined' ? window.location.pathname : '')).split('?')[0];
 
     const activeBranchName = branchContext?.activePharmacy?.name || 'Apotek Sahabat';
     const activeBranchId = branchContext?.activePharmacy?.id;
@@ -88,7 +92,7 @@ export default function FinanceLayout({ title, subtitle, children, stats = {} })
             } : null,
         },
         {
-            name: 'Bagan Akun',
+            name: 'Akun',
             href: '/finance/accounts',
             icon: Layers,
             active: currentUrl.startsWith('/finance/accounts'),
@@ -97,13 +101,13 @@ export default function FinanceLayout({ title, subtitle, children, stats = {} })
     ];
 
     return (
-        <div className="flex h-screen bg-slate-50 font-sans antialiased text-slate-800">
+        <div className="finance-shell flex h-screen bg-slate-50 font-sans antialiased text-slate-800">
             <Head title={title ? `${title} - Finance ERP` : 'Finance ERP - Sahabat'} />
 
             {/* ======================================================== */}
             {/* 1. SIDEBAR KIRI PERSISTEN                                 */}
             {/* ======================================================== */}
-            <aside className="w-64 bg-white border-r border-slate-200 flex flex-col shrink-0 select-none shadow-xs">
+            <aside id="finance-navigation" aria-label="Navigasi keuangan" className={`${menuOpen ? 'finance-nav-open' : ''} finance-sidebar w-64 bg-white border-r border-slate-200 flex flex-col shrink-0 select-none shadow-xs`}>
                 {/* Brand / Logo Apotek */}
                 <div className="h-16 flex items-center px-6 border-b border-slate-100 gap-3">
                     <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white font-black text-sm tracking-wider shadow-sm shadow-blue-500/20 shrink-0">
@@ -128,6 +132,8 @@ export default function FinanceLayout({ title, subtitle, children, stats = {} })
                         return (
                             <Link
                                 key={item.name}
+                                aria-current={item.active ? 'page' : undefined}
+                                onClick={() => setMenuOpen(false)}
                                 href={item.href}
                                 className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-colors duration-150 ${item.active
                                     ? 'bg-blue-50/80 text-blue-600 shadow-xs'
@@ -176,10 +182,13 @@ export default function FinanceLayout({ title, subtitle, children, stats = {} })
             {/* ======================================================== */}
             {/* 2. AREA KONTEN UTAMA                                     */}
             {/* ======================================================== */}
-            <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="finance-content min-w-0 flex-1 flex flex-col overflow-hidden">
                 {/* Header Atas */}
-                <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shrink-0">
-                    <div className="flex items-center gap-4">
+                <header className="finance-header h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shrink-0">
+                    <div className="finance-heading flex items-center gap-4">
+                        <button type="button" className="finance-menu-button" onClick={() => setMenuOpen(!menuOpen)} aria-expanded={menuOpen} aria-controls="finance-navigation" aria-label={menuOpen ? 'Tutup navigasi keuangan' : 'Buka navigasi keuangan'}>
+                            {menuOpen ? <X size={22} /> : <Menu size={22} />}
+                        </button>
                         <a
                             href="/home"
                             className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-blue-600 hover:bg-slate-100 rounded-lg transition border border-slate-200/90 shadow-2xs"
@@ -203,12 +212,13 @@ export default function FinanceLayout({ title, subtitle, children, stats = {} })
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    <div className="finance-branch flex items-center gap-3">
                         {canSwitchBranch ? (
                             <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200/90 rounded-xl px-2.5 py-1 shadow-2xs hover:border-blue-400 transition-colors">
                                 <Building2 className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                                 <span className="text-[11px] font-semibold text-slate-500 shrink-0">Cabang:</span>
                                 <select
+                                    aria-label="Cabang aktif"
                                     value={activeBranchId || ''}
                                     onChange={handleBranchChange}
                                     className="bg-transparent border-0 text-xs font-bold text-slate-800 focus:ring-0 focus:outline-none cursor-pointer py-0.5 pr-6 pl-1"
@@ -235,20 +245,20 @@ export default function FinanceLayout({ title, subtitle, children, stats = {} })
 
                 {/* Flash Messages */}
                 {flash?.success && (
-                    <div className="bg-emerald-50 border-b border-emerald-200 px-8 py-2.5 flex items-center gap-2 text-xs font-semibold text-emerald-800 animate-in fade-in">
+                    <div role="status" className="bg-emerald-50 border-b border-emerald-200 px-8 py-2.5 flex items-center gap-2 text-xs font-semibold text-emerald-800 animate-in fade-in">
                         <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                         <span>{flash.success}</span>
                     </div>
                 )}
                 {flash?.error && (
-                    <div className="bg-red-50 border-b border-red-200 px-8 py-2.5 flex items-center gap-2 text-xs font-semibold text-red-800 animate-in fade-in">
+                    <div role="alert" className="bg-red-50 border-b border-red-200 px-8 py-2.5 flex items-center gap-2 text-xs font-semibold text-red-800 animate-in fade-in">
                         <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
                         <span>{flash.error}</span>
                     </div>
                 )}
 
                 {/* Konten Halaman */}
-                <main className="flex-1 overflow-y-auto p-8">
+                <main id="finance-main" className="finance-main flex-1 overflow-y-auto p-8">
                     {children}
                 </main>
             </div>
