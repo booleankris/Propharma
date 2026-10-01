@@ -15,6 +15,7 @@ import {
     Layers,
     Menu,
     X,
+    HandCoins,
 } from 'lucide-react';
 
 export default function FinanceLayout({ title, subtitle, children, stats = {} }) {
@@ -65,6 +66,16 @@ export default function FinanceLayout({ title, subtitle, children, stats = {} })
             } : null,
         },
         {
+            name: 'Konsinyasi',
+            href: '/finance/konsinyasi',
+            icon: HandCoins,
+            active: currentUrl.startsWith('/finance/konsinyasi'),
+            badge: stats.countKonsinyasiSiapBayar > 0 ? {
+                text: stats.countKonsinyasiSiapBayar,
+                color: 'bg-violet-50 text-violet-700',
+            } : null,
+        },
+        {
             name: 'Kas & Bank',
             href: '/finance/kas-bank',
             icon: Landmark,
@@ -110,8 +121,8 @@ export default function FinanceLayout({ title, subtitle, children, stats = {} })
             <aside id="finance-navigation" aria-label="Navigasi keuangan" className={`${menuOpen ? 'finance-nav-open' : ''} finance-sidebar w-64 bg-white border-r border-slate-200 flex flex-col shrink-0 select-none shadow-xs`}>
                 {/* Brand / Logo Apotek */}
                 <div className="h-16 flex items-center px-6 border-b border-slate-100 gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white font-black text-sm tracking-wider shadow-sm shadow-blue-500/20 shrink-0">
-                        FP
+                    <div className="w-6 h-6 rounded-xl flex items-center justify-center text-white font-black text-sm tracking-wider shadow-sm shadow-blue-500/20 shrink-0">
+                        <img src="/img/sahabat-mascot.png" alt="" />
                     </div>
                     <div className="leading-tight overflow-hidden">
                         <span className="font-bold text-slate-900 text-sm block truncate">Sahabat Finance</span>

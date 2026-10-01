@@ -15,6 +15,7 @@ use App\Models\Medicines;
 use App\Models\MedicineTransfers;
 use App\Models\MedicineTransferItems;
 use App\Models\ReceivingItems;
+use App\Models\Etalases;
 use App\Models\StockOpname;
 use App\Services\StockOpnameImportService;
 use Carbon\Carbon;
@@ -27,6 +28,37 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class SuppliesController extends Controller
 {
+    private function stockLogDelta(ItemsLog $log): int
+    {
+        $status = (int) $log->status;
+
+        if ($status === 1 || $status === 4) {
+            return -abs((int) $log->qty);
+        }
+
+        if (in_array($status, [2, 3], true)) {
+            return abs((int) $log->qty);
+        }
+
+        // Opname (status 5): prefer the `total` field which stores the actual
+        // signed discrepancy (counterPhysic - counterBefore). The qty_before /
+        // qty_after columns on legacy rows may contain global medicines.stock
+        // snapshots rather than branch-specific values, making the difference
+        // unreliable. Fall back to qty_after - qty_before only when `total` is
+        // missing or is a non-numeric placeholder (e.g. "-").
+        if ($status === 5) {
+            $totalVal = $log->total;
+            if ($totalVal !== null && $totalVal !== '' && $totalVal !== '-' && is_numeric($totalVal)) {
+                return (int) $totalVal;
+            }
+            // Fallback: use qty delta
+            return (int) $log->qty_after - (int) $log->qty_before;
+        }
+
+        // Adjustment (status 6) and Mutation (status 7): use qty_after - qty_before
+        return (int) $log->qty_after - (int) $log->qty_before;
+    }
+
     private function calculateRealtimeStock($medicineId, $pharmacyId, $type = 'total')
     {
         if (!$medicineId) return 0;
@@ -184,49 +216,36 @@ class SuppliesController extends Controller
                     : Medicines::where('name', $searchValue)->orWhere('code', $searchValue)->first();
             }
 
-            // Hitung running balance sekuensial HANYA jika ada filter spesifik 1 obat
+            // Hitung running balance sekuensial HANYA jika ada filter spesifik 1 obat.
+            // Uses the same stockLogDelta() + anchor-to-realtime approach as
+            // medicineStockLog() so that Stock Opname / Adjustment rows are
+            // properly accounted for even though they are hidden from the
+            // table (itemsQuery excludes status 5, 6).
             $runningMap = [];
             $initialStartBalance = 0;
 
             if ($med) {
-                $allRows = (clone $itemsQuery)->get();
-                $firstRow = $allRows->first();
+                // Load ALL rows (including SO/Adjustment) for correct running balance
+                $allRowsForBalance = (clone $baseQuery)->with(['medicines', 'batches'])
+                    ->orderBy('updated_at', 'asc')
+                    ->orderBy('id', 'asc')
+                    ->get();
 
-                if ($firstRow) {
-                    $prevRecord = (clone $baseQuery)
-                        ->where(function ($q) use ($firstRow) {
-                            $q->where('updated_at', '<', $firstRow->updated_at)
-                              ->orWhere(function ($sq) use ($firstRow) {
-                                  $sq->where('updated_at', '=', $firstRow->updated_at)
-                                    ->where('id', '<', $firstRow->id);
-                              });
-                        })
-                        ->orderBy('updated_at', 'desc')
-                        ->orderBy('id', 'desc')
-                        ->first();
+                if ($allRowsForBalance->isNotEmpty()) {
+                    // Anchor to real-time stock and replay backwards to find opening
+                    $currentStock = $this->calculateRealtimeStock($med->id, $pharmacyId, 'total');
+                    $totalMovement = $allRowsForBalance->sum(fn($log) => $this->stockLogDelta($log));
+                    $currRunning = $currentStock - $totalMovement;
+                    $initialStartBalance = $currRunning;
 
-                    $initialStartBalance = $prevRecord ? (int) $prevRecord->qty_after : (int) $firstRow->qty_before;
-
-                    $currRunning = $initialStartBalance;
-                    foreach ($allRows as $r) {
-                        $delta = 0;
-                        if ($r->status == 1) { // Penjualan (-)
-                            $delta = -$r->qty;
-                        } else if ($r->status == 2) { // Pembelian (+)
-                            $delta = $r->qty;
-                        } else if ($r->status == 3) { // Retur Jual (+)
-                            $delta = $r->qty;
-                        } else if ($r->status == 4) { // Retur Beli (-)
-                            $delta = -$r->qty;
-                        } else if ($r->status == 7) { // Mutasi
-                            $isOutgoing = (int) $r->qty_after < (int) $r->qty_before;
-                            $delta = $isOutgoing ? -$r->qty : $r->qty;
-                        }
-
+                    foreach ($allRowsForBalance as $r) {
                         $rowStart = $currRunning;
+                        $delta = $this->stockLogDelta($r);
                         $rowEnd = $rowStart + $delta;
                         $currRunning = $rowEnd;
 
+                        // Store for all rows; the display will only use entries
+                        // matching displayed row IDs (status != 5, 6)
                         $runningMap[$r->id] = [
                             'start' => $rowStart,
                             'end'   => $rowEnd,
@@ -971,6 +990,41 @@ class SuppliesController extends Controller
                 return $q;
             };
 
+            // Build one branch-aware running ledger and anchor it to the current
+            // real-time stock. items_log.qty_before/qty_after on older sales were
+            // snapshots of the global medicines.stock value, not branch stock.
+            // Replaying the movements keeps historical rows internally consistent
+            // while ensuring the last balance equals the real stock source.
+            $ledgerRows = $request->filled('searchMedicine')
+                ? $baseMedicineLogQuery()
+                    ->orderBy('date', 'asc')
+                    ->orderBy('id', 'asc')
+                    ->get(['id', 'medicine_id', 'qty', 'qty_before', 'qty_after', 'total', 'status', 'date'])
+                : collect();
+
+            $runningMap = [];
+            $openingByMedicine = [];
+
+            foreach ($ledgerRows->groupBy('medicine_id') as $medicineId => $medicineLogs) {
+                if (!$medicineId) {
+                    continue;
+                }
+
+                $currentStock = $this->calculateRealtimeStock((int) $medicineId, $activePharmacyId, 'total');
+                $totalMovement = $medicineLogs->sum(fn($log) => $this->stockLogDelta($log));
+                $running = $currentStock - $totalMovement;
+                $openingByMedicine[$medicineId] = $running;
+
+                foreach ($medicineLogs as $log) {
+                    $before = $running;
+                    $running += $this->stockLogDelta($log);
+                    $runningMap[$log->id] = [
+                        'before' => $before,
+                        'after' => $running,
+                    ];
+                }
+            }
+
             // Calculate Period Summaries (unfiltered by quick type chip)
             $periodQuery = $baseMedicineLogQuery();
             if ($request->filled('start_date')) {
@@ -983,23 +1037,18 @@ class SuppliesController extends Controller
             $total_sales = (clone $periodQuery)->where('status', 1)->sum('qty');
             $total_orders = (clone $periodQuery)->where('status', 2)->sum('qty');
 
-            // Calculate Saldo Awal for period
-            if ($request->filled('start_date')) {
-                $lastLogBefore = $baseMedicineLogQuery()
-                    ->whereDate('date', '<', $request->start_date)
-                    ->orderBy('date', 'desc')
-                    ->orderBy('id', 'desc')
-                    ->first();
-
-                if ($lastLogBefore) {
-                    $qty_awal = (int) $lastLogBefore->qty_after;
-                } else {
-                    $firstLogInPeriod = (clone $periodQuery)->orderBy('date', 'asc')->orderBy('id', 'asc')->first();
-                    $qty_awal = $firstLogInPeriod ? (int) $firstLogInPeriod->qty_before : 0;
+            // Calculate the period opening from the same reconstructed ledger.
+            // Quick-filter chips must not alter balances, only which rows are shown.
+            $qty_awal = 0;
+            foreach ($ledgerRows->groupBy('medicine_id') as $medicineId => $medicineLogs) {
+                $opening = (int) ($openingByMedicine[$medicineId] ?? 0);
+                if ($request->filled('start_date')) {
+                    $movementBeforePeriod = $medicineLogs
+                        ->filter(fn($log) => $log->date && $log->date->toDateString() < $request->start_date)
+                        ->sum(fn($log) => $this->stockLogDelta($log));
+                    $opening += $movementBeforePeriod;
                 }
-            } else {
-                $firstLog = $baseMedicineLogQuery()->orderBy('date', 'asc')->orderBy('id', 'asc')->first();
-                $qty_awal = $firstLog ? (int) $firstLog->qty_before : 0;
+                $qty_awal += $opening;
             }
 
             // Main items query for DataTable with eager loaded relationships
@@ -1098,33 +1147,12 @@ class SuppliesController extends Controller
                         <span class="text-[10px] text-slate-400">ED: ' . $ed . '</span>
                     </div>';
                 })
-                ->addColumn('qty_before', function ($row) {
-                    return '<span class="font-semibold text-slate-600 text-xs">' . number_format($row->qty_before) . '</span>';
+                ->addColumn('qty_before', function ($row) use ($runningMap) {
+                    $value = $runningMap[$row->id]['before'] ?? (int) $row->qty_before;
+                    return '<span class="font-semibold text-slate-600 text-xs">' . number_format($value) . '</span>';
                 })
                 ->addColumn('stock', function ($row) {
-                    $status = (int) $row->status;
-                    $delta = 0;
-                    if ($status === 1) {
-                        // Penjualan -> outflow
-                        $delta = - abs($row->qty);
-                    } elseif ($status === 2) {
-                        // Pembelian -> inflow
-                        $delta = abs($row->qty);
-                    } elseif ($status === 3) {
-                        // Retur Jual -> inflow
-                        $delta = abs($row->qty);
-                    } elseif ($status === 4) {
-                        // Retur Beli -> outflow
-                        $delta = - abs($row->qty);
-                    } elseif ($status === 5) {
-                        // Stock Opname -> difference between after and before
-                        $delta = $row->qty_after - $row->qty_before;
-                        if ($delta == 0 && $row->total != 0) {
-                            $delta = (int) $row->total;
-                        }
-                    } else {
-                        $delta = $row->qty_after - $row->qty_before;
-                    }
+                    $delta = $this->stockLogDelta($row);
 
                     if ($delta > 0) {
                         return '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 whitespace-nowrap">+ ' . number_format($delta) . '</span>';
@@ -1134,8 +1162,9 @@ class SuppliesController extends Controller
                         return '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-slate-500 bg-slate-50 border border-slate-200 whitespace-nowrap">0</span>';
                     }
                 })
-                ->addColumn('qty_after', function ($row) {
-                    return '<span class="font-bold text-slate-800 text-xs">' . number_format($row->qty_after) . '</span>';
+                ->addColumn('qty_after', function ($row) use ($runningMap) {
+                    $value = $runningMap[$row->id]['after'] ?? (int) $row->qty_after;
+                    return '<span class="font-bold text-slate-800 text-xs">' . number_format($value) . '</span>';
                 })
                 ->addColumn('user_name', function ($row) {
                     $name = $row->users?->name;

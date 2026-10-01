@@ -15,10 +15,12 @@ use App\Models\MedicineTransactions;
 use App\Models\Pharmacies;
 use App\Models\Receiving;
 use App\Models\ReceivingDetails;
+use App\Services\ConsignmentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -53,6 +55,8 @@ class FinanceController extends Controller
                 return redirect()->route('finance.hutang');
             if ($tab === 'cash')
                 return redirect()->route('finance.cash');
+            if ($tab === 'konsinyasi')
+                return redirect()->route('finance.konsinyasi');
             if ($tab === 'piutang')
                 return redirect()->route('finance.piutang');
             if ($tab === 'kas-bank' || $tab === 'bank')
@@ -146,6 +150,40 @@ class FinanceController extends Controller
             'creditors' => $creditors,
             'kasBankAccounts' => $kasBankAccounts,
             'stats' => $stats,
+            'branchContext' => $this->getBranchContext(),
+        ]);
+    }
+
+    /**
+     * Halaman konsinyasi: kewajiban hanya terbentuk atas barang yang terjual.
+     */
+    public function konsinyasi(Request $request, ConsignmentService $consignmentService)
+    {
+        if ($request->filled('pharmacy_id') && auth()->check() && (auth()->user()->hasRole('HO') || auth()->user()->hasRole('administrator') || auth()->user()->hasRole('General Manager'))) {
+            session(['ho_pharmacy_id' => (int) $request->pharmacy_id]);
+        }
+
+        $consignments = $consignmentService->getData($this->getTargetPharmacyIds());
+        $kasBankAccounts = FinanceAccount::where('category', 'Kas & Bank')
+            ->where('is_active', true)
+            ->orderBy('code')
+            ->get();
+
+        return Inertia::render('Finance/Konsinyasi', [
+            'consignments' => $consignments,
+            'kasBankAccounts' => $kasBankAccounts,
+            'summary' => [
+                'invoice_count' => count($consignments),
+                'qty_received' => array_sum(array_column($consignments, 'qty_received')),
+                'qty_sold' => array_sum(array_column($consignments, 'qty_sold')),
+                'payable' => array_sum(array_column($consignments, 'payable')),
+                'paid' => array_sum(array_column($consignments, 'paid')),
+                'due' => array_sum(array_column($consignments, 'due')),
+                'ready_count' => count(array_filter($consignments, fn ($item) => $item['due'] > 0)),
+            ],
+            'stats' => [
+                'countKonsinyasiSiapBayar' => count(array_filter($consignments, fn ($item) => $item['due'] > 0)),
+            ],
             'branchContext' => $this->getBranchContext(),
         ]);
     }
@@ -717,6 +755,14 @@ class FinanceController extends Controller
                     if (!$deskripsi) {
                         $deskripsi = "Pembelian tunai (cash) ke {$pihakTerkait}";
                     }
+                } elseif ($p->payment_type === 'KONSINYASI') {
+                    $pihakTerkait = $p->receivingDetail->creditor->name ?? ($p->receivingDetail->creditor_code ?? 'PBF / Vendor');
+                    $doc = $p->receivingDetail->invoice_number ?? $p->reference_number;
+                    if ($doc)
+                        $noDokumen = $doc;
+                    if (!$deskripsi) {
+                        $deskripsi = "Pembayaran barang konsinyasi terjual ke {$pihakTerkait}";
+                    }
                 } elseif ($p->payment_type === 'BIAYA') {
                     $pihakTerkait = $p->recipient ?: ($p->expenseAccount->name ?? 'Biaya Operasional');
                     $doc = $p->reference_number ?: ('BY-' . str_pad($p->id, 5, '0', STR_PAD_LEFT));
@@ -895,7 +941,7 @@ class FinanceController extends Controller
             })
             ->sum('amount');
 
-        $kasKeluarHutangCash = (float) FinancePayment::whereIn('payment_type', ['KREDIT', 'CASH'])
+        $kasKeluarHutangCash = (float) FinancePayment::whereIn('payment_type', ['KREDIT', 'CASH', 'KONSINYASI'])
             ->whereHas('receiving', function ($q) use ($targetPharmacyIds) {
                 $q->whereIn('pharmacy_id', $targetPharmacyIds);
             })
@@ -1094,6 +1140,68 @@ class FinanceController extends Controller
 
         $this->clearStatsCache();
         return back()->with('success', 'Pembayaran hutang dagang berhasil dicatat.');
+    }
+
+    /**
+     * Bayar kewajiban konsinyasi yang sudah terbentuk dari penjualan bersih.
+     */
+    public function storeConsignmentPayment(Request $request, ConsignmentService $consignmentService)
+    {
+        $validated = $request->validate([
+            'receiving_detail_id' => 'required|exists:receiving_details,id',
+            'account_id' => 'required|exists:finance_accounts,id',
+            'payment_date' => 'required|date',
+            'amount' => 'required|numeric|gt:0',
+            'reference_number' => 'nullable|string|max:100',
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        $detail = ReceivingDetails::with('receiving')->findOrFail($validated['receiving_detail_id']);
+        abort_unless(in_array((int) $detail->receiving?->pharmacy_id, $this->getTargetPharmacyIds(), true), 403);
+
+        if (strtoupper((string) $detail->invoice_payment) !== 'KONSINYASI') {
+            return back()->withErrors(['receiving_detail_id' => 'Faktur ini bukan pembelian konsinyasi.']);
+        }
+
+        $account = FinanceAccount::findOrFail($validated['account_id']);
+        if ($account->category !== 'Kas & Bank') {
+            return back()->withErrors(['account_id' => 'Akun pembayaran harus berkategori Kas & Bank.']);
+        }
+
+        $amount = round((float) $validated['amount'], 2);
+
+        DB::transaction(function () use ($validated, $detail, $account, $amount, $consignmentService): void {
+            ReceivingDetails::whereKey($detail->id)->lockForUpdate()->firstOrFail();
+            $lockedAccount = FinanceAccount::whereKey($account->id)->lockForUpdate()->firstOrFail();
+            $consignments = $consignmentService->getData([(int) $detail->receiving->pharmacy_id]);
+            $consignment = collect($consignments)->firstWhere('id', $detail->id);
+            $due = round((float) ($consignment['due'] ?? 0), 2);
+
+            if ($amount > $due || $due <= 0) {
+                throw ValidationException::withMessages([
+                    'amount' => 'Nominal pembayaran tidak boleh melebihi nilai barang terjual yang belum dibayar (Rp '.number_format($due, 0, ',', '.').').',
+                ]);
+            }
+
+            FinancePayment::create([
+                'pharmacy_id' => $detail->receiving->pharmacy_id,
+                'receiving_id' => $detail->receiving_id,
+                'receiving_detail_id' => $detail->id,
+                'account_id' => $lockedAccount->id,
+                'payment_type' => 'KONSINYASI',
+                'payment_date' => $validated['payment_date'],
+                'amount' => $amount,
+                'reference_number' => $validated['reference_number'] ?? null,
+                'notes' => $validated['notes'] ?? 'Pembayaran barang konsinyasi yang telah terjual',
+                'created_by' => Auth::id(),
+            ]);
+
+            $lockedAccount->decrement('balance', $amount);
+        });
+
+        $this->clearStatsCache();
+
+        return back()->with('success', 'Pembayaran konsinyasi berhasil dicatat sesuai nilai barang yang telah terjual.');
     }
 
     /**

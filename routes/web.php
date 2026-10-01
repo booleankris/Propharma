@@ -543,12 +543,14 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
         Route::get('/', [\App\Http\Controllers\FinanceController::class, 'index'])->name('index');
         Route::get('/hutang', [\App\Http\Controllers\FinanceController::class, 'hutang'])->name('hutang');
         Route::get('/cash', [\App\Http\Controllers\FinanceController::class, 'cash'])->name('cash');
+        Route::get('/konsinyasi', [\App\Http\Controllers\FinanceController::class, 'konsinyasi'])->name('konsinyasi');
         Route::get('/piutang', [\App\Http\Controllers\FinanceController::class, 'piutang'])->name('piutang');
         Route::get('/kas-bank', [\App\Http\Controllers\FinanceController::class, 'kasBank'])->name('kasBank');
         Route::get('/biaya', [\App\Http\Controllers\FinanceController::class, 'biaya'])->name('biaya');
         Route::get('/accounts', [\App\Http\Controllers\FinanceController::class, 'accounts'])->name('accounts');
 
         Route::post('/payments', [\App\Http\Controllers\FinanceController::class, 'storePayment'])->name('payments.store');
+        Route::post('/consignment-payments', [\App\Http\Controllers\FinanceController::class, 'storeConsignmentPayment'])->name('consignmentPayments.store');
         Route::post('/bulk-payments', [\App\Http\Controllers\FinanceController::class, 'storeBulkPayments'])->name('payments.bulkStore');
         Route::post('/accounts', [\App\Http\Controllers\FinanceController::class, 'storeAccount'])->name('accounts.store');
         Route::put('/accounts/{id}', [\App\Http\Controllers\FinanceController::class, 'updateAccount'])->name('accounts.update');

@@ -876,9 +876,19 @@ class SalesController extends Controller
 
             foreach ($txWithItems->transactions as $cart) {
                 $medicine = $cart->medicine;
-                $qty_before = $medicine->stock;
                 $medicine_id = $medicine->id;
                 $qty_bought = $cart->quantity;
+                $batchDeductions = [];
+                $pharmacyId = getActivePharmacyId();
+                $counterQtyBefore = (int) MedicineTransferItems::join('batches', 'medicine_transfer_items.batches_id', '=', 'batches.id')
+                    ->where('batches.medicine_id', $medicine_id)
+                    ->where('batches.pharmacy_id', $pharmacyId)
+                    ->where('medicine_transfer_items.status', 1)
+                    ->where(function ($q) {
+                        $q->whereNull('medicine_transfer_items.source_type')
+                            ->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang');
+                    })
+                    ->sum('medicine_transfer_items.qty');
 
                 \Log::info('Sale debug', [
                     'medicine_id' => $medicine_id,
@@ -924,16 +934,22 @@ class SalesController extends Controller
                         }
 
                         // Kurangi langsung semua sisa qty ke batch ini (akan jadi minus)
+                        $deductedQty = (float) $qty_bought;
                         $transfer->qty -= $qty_bought;
                         $transfer->save();
+                        $batchDeductions[$transfer->batches_id] = ($batchDeductions[$transfer->batches_id] ?? 0) + $deductedQty;
                         $qty_bought = 0;
                     } else {
                         if ($transfer->qty >= $qty_bought) {
+                            $deductedQty = (float) $qty_bought;
                             $transfer->qty -= $qty_bought;
                             $transfer->save();
+                            $batchDeductions[$transfer->batches_id] = ($batchDeductions[$transfer->batches_id] ?? 0) + $deductedQty;
                             $qty_bought = 0;
                         } else {
-                            $qty_bought -= $transfer->qty;
+                            $deductedQty = (float) $transfer->qty;
+                            $qty_bought -= $deductedQty;
+                            $batchDeductions[$transfer->batches_id] = ($batchDeductions[$transfer->batches_id] ?? 0) + $deductedQty;
                             $transfer->qty = 0;
                             $transfer->save();
                         }
@@ -942,20 +958,32 @@ class SalesController extends Controller
 
                 $medicine->stock -= $cart->quantity;
                 $medicine->save();
-                ItemsLog::create([
-                    'transaction_code' => $txWithItems->transaction_code,
-                    'code' => $this->generateItemsLogCode(),
-                    'type' => $cart->cart_type,
-                    'medicine_id' => $cart->medicine_id,
-                    'qty' => $cart->quantity,
-                    'qty_before' => $qty_before,
-                    'qty_after' => $medicine->stock,
-                    'total' => $cart->final_price,
-                    'date' => $now,
-                    'status' => 1,
-                    'batches_id' => $transfer?->batches_id ?? null,
-                    'user_id' => auth()->user()->id,
-                ]);
+
+                $trackedQty = array_sum($batchDeductions);
+                if ($trackedQty < (float) $cart->quantity) {
+                    $batchDeductions['untracked'] = (float) $cart->quantity - $trackedQty;
+                }
+
+                $runningCounterQty = $counterQtyBefore;
+                foreach ($batchDeductions as $batchId => $deductedQty) {
+                    $portion = (float) $cart->quantity > 0 ? $deductedQty / (float) $cart->quantity : 0;
+                    $counterQtyAfter = $runningCounterQty - $deductedQty;
+                    ItemsLog::create([
+                        'transaction_code' => $txWithItems->transaction_code,
+                        'code' => $this->generateItemsLogCode(),
+                        'type' => $cart->cart_type,
+                        'medicine_id' => $cart->medicine_id,
+                        'qty' => $deductedQty,
+                        'qty_before' => $runningCounterQty,
+                        'qty_after' => $counterQtyAfter,
+                        'total' => round((float) $cart->final_price * $portion, 2),
+                        'date' => $now,
+                        'status' => 1,
+                        'batches_id' => $batchId === 'untracked' ? null : $batchId,
+                        'user_id' => auth()->user()->id,
+                    ]);
+                    $runningCounterQty = $counterQtyAfter;
+                }
             }
 
             DB::commit();

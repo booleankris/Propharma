@@ -643,8 +643,9 @@
                         searchable: false,
                         render: (d) => {
                             const trxId = d.transactions?.id || d.transaction_id;
+                            const trxType = d.type || '';
                             return `<div class="flex items-center gap-1 justify-center">
-                                <button class="btn-print" onclick="event.stopPropagation(); window.open('/print/receipt/${trxId}','_blank')" title="Cetak Struk POS Thermal">
+                                <button class="btn-print" onclick="event.stopPropagation(); printStruk('${trxId}', '${trxType}')" title="Cetak Struk POS Thermal">
                                     <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
                                         <polyline points="4 6 4 1 12 1 12 6"/>
                                         <path d="M4 12H3a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1"/>
@@ -672,6 +673,7 @@
 
             // ── Row click → load items ────────────────────────────────────────
             let currentSelectedTrxId = null;
+            let currentSelectedTrxType = null;
 
             $('#table-data tbody').on('click', 'tr', function() {
                 const data = tableData.row(this).data();
@@ -679,6 +681,7 @@
                 $('#table-data tbody tr').removeClass('active');
                 $(this).addClass('active');
                 currentSelectedTrxId = data.transactions?.id || data.transaction_id;
+                currentSelectedTrxType = data.type || '';
                 document.getElementById('detail-code').textContent = data.code;
                 document.getElementById('detail-channel-badge').innerHTML = data.channel || '';
                 document.getElementById('detail-patient').textContent = data.name || 'Umum / Tanpa Pasien';
@@ -688,7 +691,7 @@
 
             $('#btn-detail-struk').on('click', function() {
                 if (currentSelectedTrxId) {
-                    window.open(`/print/receipt/${currentSelectedTrxId}`, '_blank');
+                    printStruk(currentSelectedTrxId, currentSelectedTrxType);
                 }
             });
 
@@ -698,6 +701,29 @@
                 }
             });
         });
+
+        // ── Print Struk with optional full receipt for Resep Tunai ─────────
+        function printStruk(trxId, trxType) {
+            window.open(`/print/receipt/${trxId}`, '_blank');
+
+            // If RESEP TUNAI (UM), ask to also print detail/full receipt
+            if (trxType === 'UM') {
+                Swal.fire({
+                    title: 'Cetak Struk Detail?',
+                    text: 'Apakah Anda ingin mencetak struk detail (semua obat racikan)?',
+                    icon: 'question',
+                    showCancelButton: true,
+                    confirmButtonColor: '#3085d6',
+                    cancelButtonColor: '#6b7280',
+                    confirmButtonText: 'Ya, Cetak Detail',
+                    cancelButtonText: 'Tidak'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        window.open(`/print/fullreceipt/${trxId}`, '_blank');
+                    }
+                });
+            }
+        }
 
         // ── Load items table ──────────────────────────────────────────────────
         function loadItems(transactionId, totalPrice, subtotal, totaldiscount) {

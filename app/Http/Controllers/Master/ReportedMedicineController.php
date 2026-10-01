@@ -56,16 +56,16 @@ class ReportedMedicineController extends Controller
             $selectedPharmacyId = $userPharmacyId ?: 1;
             $pharmacies = Pharmacies::where('id', $selectedPharmacyId)->get();
         } else {
-            $selectedPharmacyId = $request->filled('pharmacy_id') ? (int)$request->pharmacy_id : getActivePharmacyId();
+            $selectedPharmacyId = $request->filled('pharmacy_id') ? (int) $request->pharmacy_id : getActivePharmacyId();
             if (!$selectedPharmacyId || $selectedPharmacyId === 6) {
-                $selectedPharmacyId = 1; // Default ke Sahabat PMI jika HO atau 0
+                $selectedPharmacyId = 1;  // Default ke Sahabat PMI jika HO atau 0
             }
             $pharmacies = Pharmacies::whereNotIn('id', [6, 8])->orderBy('id', 'asc')->get();
         }
 
         if ($request->ajax()) {
             $pharmacyId = $canSwitch && $request->filled('pharmacy_id')
-                ? (int)$request->pharmacy_id 
+                ? (int) $request->pharmacy_id
                 : $selectedPharmacyId;
 
             $query = ReportedMedicine::with(['medicine.category', 'medicine.factory', 'user', 'pharmacy'])
@@ -89,8 +89,9 @@ class ReportedMedicineController extends Controller
                     ->where('medicine_transfer_items.status', 1)
                     ->where('medicine_transfer_items.qty', '>', 0)
                     ->where(function ($q) {
-                        $q->whereNull('medicine_transfer_items.source_type')
-                          ->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang');
+                        $q
+                            ->whereNull('medicine_transfer_items.source_type')
+                            ->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang');
                     })
                     ->groupBy('batches.medicine_id')
                     ->select('batches.medicine_id', DB::raw('SUM(medicine_transfer_items.qty) as total_qty'))
@@ -117,8 +118,8 @@ class ReportedMedicineController extends Controller
                 ->addColumn('stock', function ($row) use ($batchesStocks, $counterStocks, $pharmacyId) {
                     $medId = $row->medicine_id;
                     $stock = $pharmacyId === 9
-                        ? (int)($batchesStocks[$medId] ?? 0)
-                        : (int)($counterStocks[$medId] ?? 0);
+                        ? (int) ($batchesStocks[$medId] ?? 0)
+                        : (int) ($counterStocks[$medId] ?? 0);
                     return '<span style="display:inline-flex; align-items:center; padding:2px 8px; border-radius:9999px; font-weight:700; font-size:11px; background-color:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe;">' . number_format($stock) . '</span>';
                 })
                 ->addColumn('added_by', function ($row) {
@@ -131,11 +132,11 @@ class ReportedMedicineController extends Controller
                     $medName = htmlspecialchars($row->medicine?->name ?? 'Obat', ENT_QUOTES);
                     $notes = htmlspecialchars($row->notes ?? '', ENT_QUOTES);
                     return '<div style="display:flex; align-items:center; justify-content:center; gap:6px;">
-                                <button type="button" class="btn-action-edit" onclick="openEditModal(' . $row->id . ', \'' . $medName . '\', \'' . $notes . '\')">
+                                <button type="button" class="btn-action-edit" onclick="openEditModal(' . $row->id . ", '" . $medName . "', '" . $notes . '\')">
                                     <svg style="width:13px; height:13px;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                                     <span>Edit</span>
                                 </button>
-                                <button type="button" class="btn-action-delete" onclick="deleteReportedMedicine(' . $row->id . ', \'' . $medName . '\')">
+                                <button type="button" class="btn-action-delete" onclick="deleteReportedMedicine(' . $row->id . ", '" . $medName . '\')">
                                     <svg style="width:13px; height:13px;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                                     <span>Hapus</span>
                                 </button>
@@ -158,10 +159,10 @@ class ReportedMedicineController extends Controller
      */
     public function searchMedicines(Request $request)
     {
-        $q = trim((string)$request->q);
+        $q = trim((string) $request->q);
         $pharmacyId = $this->canSwitchBranch() && $request->filled('pharmacy_id')
-            ? (int)$request->pharmacy_id
-            : (int)(auth()->user()?->pharmacy_id ?: getActivePharmacyId());
+            ? (int) $request->pharmacy_id
+            : (int) (auth()->user()?->pharmacy_id ?: getActivePharmacyId());
         if (!$pharmacyId || $pharmacyId === 6) {
             $pharmacyId = 1;
         }
@@ -175,9 +176,10 @@ class ReportedMedicineController extends Controller
 
         if (!empty($q)) {
             $query->where(function ($b) use ($q) {
-                $b->where('name', 'like', "%{$q}%")
-                  ->orWhere('code', 'like', "%{$q}%")
-                  ->orWhere('barcode', 'like', "%{$q}%");
+                $b
+                    ->where('name', 'like', "%{$q}%")
+                    ->orWhere('code', 'like', "%{$q}%")
+                    ->orWhere('barcode', 'like', "%{$q}%");
             });
         }
 
@@ -203,8 +205,9 @@ class ReportedMedicineController extends Controller
                 ->where('medicine_transfer_items.status', 1)
                 ->where('medicine_transfer_items.qty', '>', 0)
                 ->where(function ($q) {
-                    $q->whereNull('medicine_transfer_items.source_type')
-                      ->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang');
+                    $q
+                        ->whereNull('medicine_transfer_items.source_type')
+                        ->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang');
                 })
                 ->groupBy('batches.medicine_id')
                 ->select('batches.medicine_id', DB::raw('SUM(medicine_transfer_items.qty) as total_qty'))
@@ -214,13 +217,13 @@ class ReportedMedicineController extends Controller
         $results = [];
         foreach ($items as $item) {
             $branchStock = $pharmacyId === 9
-                ? (int)($batchesStocks[$item->id] ?? 0)
-                : (int)($counterStocks[$item->id] ?? 0);
+                ? (int) ($batchesStocks[$item->id] ?? 0)
+                : (int) ($counterStocks[$item->id] ?? 0);
             $results[] = [
-                'id'    => $item->id,
-                'text'  => $item->name . ' (' . ($item->code ?: 'No Code') . ')' . ($item->unit ? ' - ' . $item->unit : '') . ' [Stok Cabang: ' . number_format($branchStock) . ']',
+                'id' => $item->id,
+                'text' => $item->name . ' (' . ($item->code ?: 'No Code') . ')' . ($item->unit ? ' - ' . $item->unit : '') . ' [Stok Cabang: ' . number_format($branchStock) . ']',
                 'stock' => $branchStock,
-                'code'  => $item->code,
+                'code' => $item->code,
             ];
         }
 
@@ -233,7 +236,7 @@ class ReportedMedicineController extends Controller
     public function store(Request $request)
     {
         $targetPharmacyId = $this->canSwitchBranch() && $request->filled('pharmacy_id')
-            ? (int) $request->pharmacy_id 
+            ? (int) $request->pharmacy_id
             : (int) (auth()->user()?->pharmacy_id ?: getActivePharmacyId());
         if (!$targetPharmacyId || $targetPharmacyId === 6) {
             $targetPharmacyId = 1;
@@ -243,12 +246,12 @@ class ReportedMedicineController extends Controller
         $request->validate([
             'medicine_id' => 'required|exists:medicines,id',
             'pharmacy_id' => 'required|exists:pharmacies,id',
-            'notes'       => 'nullable|string|max:255',
+            'notes' => 'nullable|string|max:255',
         ], [
             'medicine_id.required' => 'Silakan pilih obat yang ingin ditambahkan.',
-            'medicine_id.exists'   => 'Obat yang dipilih tidak valid.',
+            'medicine_id.exists' => 'Obat yang dipilih tidak valid.',
             'pharmacy_id.required' => 'Silakan tentukan cabang apotek.',
-            'pharmacy_id.exists'   => 'Cabang apotek tidak valid.',
+            'pharmacy_id.exists' => 'Cabang apotek tidak valid.',
         ]);
 
         $exists = ReportedMedicine::where('medicine_id', $request->medicine_id)
@@ -257,7 +260,7 @@ class ReportedMedicineController extends Controller
 
         if ($exists) {
             return response()->json([
-                'status'  => 'error',
+                'status' => 'error',
                 'message' => 'Obat ini sudah terdaftar dalam daftar pelaporan apotek cabang ini.',
             ], 422);
         }
@@ -265,12 +268,12 @@ class ReportedMedicineController extends Controller
         ReportedMedicine::create([
             'pharmacy_id' => $request->pharmacy_id,
             'medicine_id' => $request->medicine_id,
-            'user_id'     => auth()->id(),
-            'notes'       => $request->notes,
+            'user_id' => auth()->id(),
+            'notes' => $request->notes,
         ]);
 
         return response()->json([
-            'status'  => 'success',
+            'status' => 'success',
             'message' => 'Obat berhasil ditambahkan ke daftar wajib lapor cabang.',
         ]);
     }
@@ -290,7 +293,7 @@ class ReportedMedicineController extends Controller
         ]);
 
         return response()->json([
-            'status'  => 'success',
+            'status' => 'success',
             'message' => 'Catatan pelaporan obat berhasil diperbarui.',
         ]);
     }
@@ -304,7 +307,7 @@ class ReportedMedicineController extends Controller
         $item->delete();
 
         return response()->json([
-            'status'  => 'success',
+            'status' => 'success',
             'message' => 'Obat berhasil dihapus dari daftar wajib lapor cabang.',
         ]);
     }
@@ -314,15 +317,12 @@ class ReportedMedicineController extends Controller
      */
     public function export(Request $request)
     {
-        $pharmacyId = $this->canSwitchBranch() && $request->filled('pharmacy_id') 
-            ? (int)$request->pharmacy_id 
+        $pharmacyId = $this->canSwitchBranch() && $request->filled('pharmacy_id')
+            ? (int) $request->pharmacy_id
             : (int) (auth()->user()?->pharmacy_id ?: getActivePharmacyId());
 
-        $year  = (int) ($request->input('year', now()->year));
-        $month = (int) ($request->input('month', now()->month));
-
         $startDate = Carbon::createFromDate($year, $month, 1)->startOfMonth();
-        $endDate   = Carbon::createFromDate($year, $month, 1)->endOfMonth();
+        $endDate = Carbon::createFromDate($year, $month, 1)->endOfMonth();
 
         $monthNames = [
             1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',

@@ -692,8 +692,16 @@ class MobileSyncController extends Controller
 
                 // Pemotongan Stok Cabang (FIFO / FEFO)
                 $qty_bought = $qty;
-                $qty_before = $medicine->stock;
                 $lastBatchId = null;
+                $counterQtyBefore = (int) MedicineTransferItems::join('batches', 'medicine_transfer_items.batches_id', '=', 'batches.id')
+                    ->where('batches.medicine_id', $medicine->id)
+                    ->where('batches.pharmacy_id', $webPharmacyId)
+                    ->where('medicine_transfer_items.status', 1)
+                    ->where(function ($q) {
+                        $q->whereNull('medicine_transfer_items.source_type')
+                            ->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang');
+                    })
+                    ->sum('medicine_transfer_items.qty');
 
                 while ($qty_bought > 0) {
                     // Cari transfer item counter dengan stok > 0
@@ -755,6 +763,16 @@ class MobileSyncController extends Controller
                 $medicine->stock -= $qty;
                 $medicine->save();
 
+                $counterQtyAfter = (int) MedicineTransferItems::join('batches', 'medicine_transfer_items.batches_id', '=', 'batches.id')
+                    ->where('batches.medicine_id', $medicine->id)
+                    ->where('batches.pharmacy_id', $webPharmacyId)
+                    ->where('medicine_transfer_items.status', 1)
+                    ->where(function ($q) {
+                        $q->whereNull('medicine_transfer_items.source_type')
+                            ->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang');
+                    })
+                    ->sum('medicine_transfer_items.qty');
+
                 // Items Log untuk audit trail & LIPH
                 $currentLogNum++;
                 $logCode = $prefixLog . str_pad($currentLogNum, 4, '0', STR_PAD_LEFT);
@@ -765,8 +783,8 @@ class MobileSyncController extends Controller
                     'type' => 'ONLINE',  // Tipe log ONLINE
                     'medicine_id' => $medicine->id,
                     'qty' => $qty,
-                    'qty_before' => $qty_before,
-                    'qty_after' => $medicine->stock,
+                    'qty_before' => $counterQtyBefore,
+                    'qty_after' => $counterQtyAfter,
                     'total' => $totalPrice,
                     'date' => now()->format('Y-m-d H:i:s'),
                     'status' => 1,
