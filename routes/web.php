@@ -153,6 +153,7 @@ Route::middleware(['auth', 'role:HO|administrator'])->group(function () {
     Route::get('/ho/analytics', [\App\Http\Controllers\HO\HODashboardController::class, 'index'])->name('ho.analytics');
     Route::get('/ho/analytics/data', [\App\Http\Controllers\HO\HODashboardController::class, 'getData'])->name('ho.analytics.data');
     Route::get('/ho/analytics/export-stock', [\App\Http\Controllers\HO\HODashboardController::class, 'exportStock'])->name('ho.analytics.export-stock');
+    Route::get('/ho/analytics/stock-table', [\App\Http\Controllers\HO\HODashboardController::class, 'getStockTable'])->name('ho.analytics.stock-table');
 });
 
 // Master Pelaporan Obat (General Manager & Koordinator)

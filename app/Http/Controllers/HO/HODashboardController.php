@@ -62,6 +62,67 @@ class HODashboardController extends Controller
         return Excel::download(new StockExport($periodLabel), 'Laporan_Stok_Semua_Cabang_' . date('Ymd_His') . '.xlsx');
     }
 
+    public function getStockTable(Request $request)
+    {
+        $search = $request->get('search', '');
+        $filter = $request->get('filter', 'all'); // 'all', 'available', 'empty'
+        
+        $query = DB::table('medicines as m')
+            ->leftJoin(DB::raw("(SELECT medicine_id, SUM(stock) as gudang_qty FROM batches WHERE pharmacy_id = 9 GROUP BY medicine_id) as g"), 'g.medicine_id', '=', 'm.id')
+            ->leftJoin(DB::raw("(
+                SELECT b.medicine_id, SUM(mt.qty) as pmi_qty
+                FROM medicine_transfer_items mt
+                JOIN batches b ON b.id = mt.batches_id
+                WHERE mt.status = 1 AND b.pharmacy_id = 1 
+                AND (mt.source_type IS NULL OR mt.source_type != 'retur_gudang')
+                GROUP BY b.medicine_id
+            ) as pmi"), 'pmi.medicine_id', '=', 'm.id')
+            ->leftJoin(DB::raw("(
+                SELECT b.medicine_id, SUM(mt.qty) as asm_qty
+                FROM medicine_transfer_items mt
+                JOIN batches b ON b.id = mt.batches_id
+                WHERE mt.status = 1 AND b.pharmacy_id = 2 
+                AND (mt.source_type IS NULL OR mt.source_type != 'retur_gudang')
+                GROUP BY b.medicine_id
+            ) as asm"), 'asm.medicine_id', '=', 'm.id')
+            ->leftJoin(DB::raw("(
+                SELECT b.medicine_id, SUM(mt.qty) as mim_qty
+                FROM medicine_transfer_items mt
+                JOIN batches b ON b.id = mt.batches_id
+                WHERE mt.status = 1 AND b.pharmacy_id = 3 
+                AND (mt.source_type IS NULL OR mt.source_type != 'retur_gudang')
+                GROUP BY b.medicine_id
+            ) as mim"), 'mim.medicine_id', '=', 'm.id')
+            ->leftJoin(DB::raw("(
+                SELECT b.medicine_id, SUM(mt.qty) as asa_qty
+                FROM medicine_transfer_items mt
+                JOIN batches b ON b.id = mt.batches_id
+                WHERE mt.status = 1 AND b.pharmacy_id = 5 
+                AND (mt.source_type IS NULL OR mt.source_type != 'retur_gudang')
+                GROUP BY b.medicine_id
+            ) as asa"), 'asa.medicine_id', '=', 'm.id')
+            ->select('m.name', 'g.gudang_qty', 'pmi.pmi_qty', 'asm.asm_qty', 'mim.mim_qty', 'asa.asa_qty');
+
+        if (!empty($search)) {
+            $query->where('m.name', 'LIKE', '%' . $search . '%');
+        }
+
+        // Apply Stock Filter using HAVING so we can reference the aliases
+        if ($filter === 'available') {
+            $query->havingRaw('(COALESCE(gudang_qty, 0) > 0 OR COALESCE(pmi_qty, 0) > 0 OR COALESCE(asm_qty, 0) > 0 OR COALESCE(mim_qty, 0) > 0 OR COALESCE(asa_qty, 0) > 0)');
+        } elseif ($filter === 'empty') {
+            $query->havingRaw('(COALESCE(gudang_qty, 0) = 0 AND COALESCE(pmi_qty, 0) = 0 AND COALESCE(asm_qty, 0) = 0 AND COALESCE(mim_qty, 0) = 0 AND COALESCE(asa_qty, 0) = 0)');
+        }
+
+        $query->orderBy('m.name', 'asc');
+        
+        // Use standard pagination. Wait, simplePaginate or pagination with HAVING might throw counts off, 
+        // but Laravel 9/10 handles count queries for HAVING relatively well by wrapping in a subquery if necessary.
+        $paginator = $query->paginate(20);
+        
+        return response()->json($paginator);
+    }
+
     private function calculateAnalytics(Request $request): array
     {
         $period = $request->get('period', 'this_month'); // today, this_month, this_year, custom

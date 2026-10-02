@@ -389,16 +389,18 @@
                             </span>
                             <h3 class="text-base sm:text-lg font-black text-slate-900 mt-1">Estimasi Nilai & Kuantitas Stok Obat</h3>
                         </div>
-                        <a id="export_stock_btn" href="{{ route('ho.analytics.export-stock') }}" class="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all shadow-sm">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-file-spreadsheet" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                                <path d="M14 3v4a1 1 0 0 0 1 1h4"></path>
-                                <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z"></path>
-                                <path d="M8 11h8v7h-8z"></path>
-                                <path d="M8 15h8"></path>
-                                <path d="M11 11v7"></path>
-                            </svg>
-                            Export Excel
+                        <a id="export_stock_btn" href="{{ route('ho.analytics.export-stock') }}" class="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all shadow-sm" onclick="showExportLoading(this)">
+                            <span id="export_stock_icon" class="flex items-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-file-spreadsheet" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                    <path d="M14 3v4a1 1 0 0 0 1 1h4"></path>
+                                    <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z"></path>
+                                    <path d="M8 11h8v7h-8z"></path>
+                                    <path d="M8 15h8"></path>
+                                    <path d="M11 11v7"></path>
+                                </svg>
+                            </span>
+                            <span id="export_stock_text">Export Excel</span>
                         </a>
                     </div>
                     <div class="relative z-10 space-y-5">
@@ -833,6 +835,66 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- TABLE: REAL-TIME STOCK BREAKDOWN -->
+                <div class="bg-white border border-slate-200/80 rounded-3xl p-5 sm:p-6 text-slate-900 shadow-sm relative overflow-hidden mb-6">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
+                        <div>
+                            <span class="text-[9px] font-black uppercase tracking-widest text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-200">
+                                Rincian Obat
+                            </span>
+                            <h3 class="text-base sm:text-lg font-black text-slate-900 mt-1">Stok Per Cabang (Real-time)</h3>
+                        </div>
+                        <div class="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+                            <select id="filter_stock_table" class="w-full sm:w-40 pl-3 pr-8 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all appearance-none bg-white">
+                                <option value="all">Semua Status</option>
+                                <option value="available">Stok Tersedia</option>
+                                <option value="empty">Stok Kosong</option>
+                            </select>
+                            <div class="relative w-full sm:w-64">
+                                <input type="text" id="search_stock_table" placeholder="Cari obat..." class="w-full pl-10 pr-4 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search absolute left-3 top-2.5 text-slate-400" width="18" height="18" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                    <path d="M10 10m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0"></path>
+                                    <path d="M21 21l-6 -6"></path>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="overflow-x-auto rounded-xl border border-slate-100">
+                        <table class="w-full text-left border-collapse min-w-max">
+                            <thead>
+                                <tr class="bg-slate-50 border-b border-slate-100 text-[10px] font-black uppercase tracking-widest text-slate-500">
+                                    <th class="p-4 rounded-tl-xl">Nama Obat</th>
+                                    <th class="p-4 text-center">Stok Gudang</th>
+                                    <th class="p-4 text-center">Stok PMI</th>
+                                    <th class="p-4 text-center">Stok ASM</th>
+                                    <th class="p-4 text-center">Stok MIM</th>
+                                    <th class="p-4 rounded-tr-xl text-center">Stok ASA</th>
+                                </tr>
+                            </thead>
+                            <tbody id="stock_table_body" class="text-xs sm:text-sm text-slate-700 divide-y divide-slate-50">
+                                <tr>
+                                    <td colspan="6" class="p-8 text-center text-slate-400">
+                                        <svg class="animate-spin h-6 w-6 text-indigo-500 mx-auto mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                        Memuat data...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="mt-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+                        <div class="text-[11px] text-slate-500 font-medium" id="stock_table_info">
+                            Menampilkan - data
+                        </div>
+                        <div class="flex items-center gap-1" id="stock_table_pagination">
+                            <!-- Pagination buttons will be rendered here -->
+                        </div>
+                    </div>
+                </div>
+
             </div>
         </div>
     </div>
@@ -1299,5 +1361,184 @@
             typeChart = new ApexCharts(document.querySelector("#transactionTypeChart"), typeOptions);
             typeChart.render();
         }
+
+        function showExportLoading(btn) {
+            const iconSpan = document.getElementById('export_stock_icon');
+            const textSpan = document.getElementById('export_stock_text');
+            
+            if (!iconSpan || !textSpan) return;
+
+            const originalIcon = iconSpan.innerHTML;
+            const originalText = textSpan.innerHTML;
+            
+            btn.classList.add('opacity-75', 'cursor-not-allowed');
+            btn.style.pointerEvents = 'none';
+            
+            iconSpan.innerHTML = `<svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
+            textSpan.innerHTML = 'Mengekspor...';
+            
+            if (window.iziToast) {
+                iziToast.info({
+                    title: 'Info',
+                    message: 'Sedang menyiapkan file Excel. Mohon tunggu...',
+                    position: 'topRight',
+                    timeout: 7000
+                });
+            }
+            
+            setTimeout(() => {
+                btn.classList.remove('opacity-75', 'cursor-not-allowed');
+                btn.style.pointerEvents = 'auto';
+                iconSpan.innerHTML = originalIcon;
+                textSpan.innerHTML = originalText;
+            }, 8000);
+        }
+
+        // ==========================
+        // REAL-TIME STOCK TABLE LOGIC
+        // ==========================
+        let currentStockPage = 1;
+        let stockSearchQuery = '';
+        let stockFilterValue = 'all';
+        let stockSearchTimer = null;
+
+        async function fetchStockTable(page = 1) {
+            currentStockPage = page;
+            const tbody = document.getElementById('stock_table_body');
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="p-8 text-center text-slate-400">
+                        <svg class="animate-spin h-6 w-6 text-indigo-500 mx-auto mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                        Memuat data...
+                    </td>
+                </tr>
+            `;
+
+            try {
+                const url = new URL("{{ route('ho.analytics.stock-table') }}", window.location.origin);
+                url.searchParams.append('page', page);
+                url.searchParams.append('filter', stockFilterValue);
+                
+                if (stockSearchQuery) {
+                    url.searchParams.append('search', stockSearchQuery);
+                }
+
+                const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
+                if (!res.ok) throw new Error('Gagal memuat tabel stok');
+                const data = await res.json();
+                
+                renderStockTable(data);
+            } catch (err) {
+                console.error(err);
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="p-8 text-center text-red-500">
+                            Gagal memuat data stok. Silakan coba lagi.
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+
+        function renderStockTable(data) {
+            const tbody = document.getElementById('stock_table_body');
+            const info = document.getElementById('stock_table_info');
+            const pagination = document.getElementById('stock_table_pagination');
+
+            if (!data.data || data.data.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="p-8 text-center text-slate-400">
+                            Tidak ada data obat ditemukan.
+                        </td>
+                    </tr>
+                `;
+                info.innerText = 'Menampilkan 0 data';
+                pagination.innerHTML = '';
+                return;
+            }
+
+            // Render Rows
+            tbody.innerHTML = data.data.map(item => `
+                <tr class="hover:bg-slate-50 transition-colors">
+                    <td class="p-4 font-medium">${item.name}</td>
+                    <td class="p-4 text-center">
+                        <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-bold ${item.gudang_qty > 0 ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-500'}">
+                            ${parseInt(item.gudang_qty || 0).toLocaleString('id-ID')}
+                        </span>
+                    </td>
+                    <td class="p-4 text-center">
+                        <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-bold ${item.pmi_qty > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}">
+                            ${parseInt(item.pmi_qty || 0).toLocaleString('id-ID')}
+                        </span>
+                    </td>
+                    <td class="p-4 text-center">
+                        <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-bold ${item.asm_qty > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}">
+                            ${parseInt(item.asm_qty || 0).toLocaleString('id-ID')}
+                        </span>
+                    </td>
+                    <td class="p-4 text-center">
+                        <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-bold ${item.mim_qty > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}">
+                            ${parseInt(item.mim_qty || 0).toLocaleString('id-ID')}
+                        </span>
+                    </td>
+                    <td class="p-4 text-center">
+                        <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-bold ${item.asa_qty > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}">
+                            ${parseInt(item.asa_qty || 0).toLocaleString('id-ID')}
+                        </span>
+                    </td>
+                </tr>
+            `).join('');
+
+            // Render Info
+            info.innerText = `Menampilkan ${data.from} - ${data.to} dari ${data.total} obat`;
+
+            // Render Pagination Buttons
+            let buttonsHtml = '';
+            
+            // Prev Button
+            if (data.current_page > 1) {
+                buttonsHtml += `<button onclick="fetchStockTable(${data.current_page - 1})" class="px-3 py-1 text-xs font-bold bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50">&laquo; Prev</button>`;
+            } else {
+                buttonsHtml += `<button disabled class="px-3 py-1 text-xs font-bold bg-slate-50 border border-slate-100 text-slate-400 rounded-lg cursor-not-allowed">&laquo; Prev</button>`;
+            }
+            
+            // Page Indicator
+            buttonsHtml += `<span class="px-3 py-1 text-xs font-bold text-slate-700">Hal ${data.current_page} / ${data.last_page}</span>`;
+            
+            // Next Button
+            if (data.current_page < data.last_page) {
+                buttonsHtml += `<button onclick="fetchStockTable(${data.current_page + 1})" class="px-3 py-1 text-xs font-bold bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50">Next &raquo;</button>`;
+            } else {
+                buttonsHtml += `<button disabled class="px-3 py-1 text-xs font-bold bg-slate-50 border border-slate-100 text-slate-400 rounded-lg cursor-not-allowed">Next &raquo;</button>`;
+            }
+
+            pagination.innerHTML = buttonsHtml;
+        }
+
+        // Initialize table events
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchStockTable(1);
+
+            const searchInput = document.getElementById('search_stock_table');
+            if (searchInput) {
+                searchInput.addEventListener('input', (e) => {
+                    stockSearchQuery = e.target.value.trim();
+                    clearTimeout(stockSearchTimer);
+                    stockSearchTimer = setTimeout(() => {
+                        fetchStockTable(1);
+                    }, 500); // Debounce 500ms
+                });
+            }
+
+            const statusFilter = document.getElementById('filter_stock_table');
+            if (statusFilter) {
+                statusFilter.addEventListener('change', (e) => {
+                    stockFilterValue = e.target.value;
+                    fetchStockTable(1);
+                });
+            }
+        });
+
     </script>
 @endsection
