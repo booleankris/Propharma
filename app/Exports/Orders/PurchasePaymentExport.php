@@ -5,6 +5,7 @@ namespace App\Exports\Orders;
 use App\Models\Pharmacies;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use App\Support\InvoiceDateFilter;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\WithColumnWidths;
 use Maatwebsite\Excel\Concerns\WithStyles;
@@ -72,13 +73,11 @@ class PurchasePaymentExport implements FromArray, WithStyles, WithColumnWidths, 
 
         // Filter by Report Type
         if ($this->reportType === 'Konsinyasi') {
-            $query->where('receiving_details.invoice_payment', 'KONSINYASI')
-                ->whereDate('receiving_details.invoice_date', '>=', $this->startDate->toDateString())
-                ->whereDate('receiving_details.invoice_date', '<=', $this->endDate->toDateString());
+            $query->where('receiving_details.invoice_payment', 'KONSINYASI');
+            InvoiceDateFilter::apply($query, 'receiving_details.invoice_date', $this->startDate, $this->endDate);
         } elseif ($this->reportType === 'Tunai') {
-            $query->where('receiving_details.invoice_payment', 'TUNAI')
-                ->whereDate('receiving_details.invoice_date', '>=', $this->startDate->toDateString())
-                ->whereDate('receiving_details.invoice_date', '<=', $this->endDate->toDateString());
+            $query->where('receiving_details.invoice_payment', 'TUNAI');
+            InvoiceDateFilter::apply($query, 'receiving_details.invoice_date', $this->startDate, $this->endDate);
         } elseif ($this->reportType === 'Jatuh Tempo') {
             // Jatuh Tempo filters by invoice_due date range
             $query->where('receiving_details.invoice_payment', '!=', 'TUNAI')
@@ -92,8 +91,7 @@ class PurchasePaymentExport implements FromArray, WithStyles, WithColumnWidths, 
                     });
                 });
         } else {
-            $query->whereDate('receiving_details.invoice_date', '>=', $this->startDate->toDateString())
-                ->whereDate('receiving_details.invoice_date', '<=', $this->endDate->toDateString());
+            InvoiceDateFilter::apply($query, 'receiving_details.invoice_date', $this->startDate, $this->endDate);
         }
 
         // Filter by Creditor / PBF (if selected)

@@ -5,6 +5,7 @@ namespace App\Exports\Orders;
 use App\Models\Pharmacies;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use App\Support\InvoiceDateFilter;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\WithColumnWidths;
 use Maatwebsite\Excel\Concerns\WithStyles;
@@ -74,9 +75,8 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
             ->join('orders', 'orders.id', '=', 'order_items.order_id')
             ->leftJoin('creditors', 'creditors.code', '=', 'order_items.creditor_code')
             ->whereIn('receiving.pharmacy_id', $targetPharmacyIds)
-            ->whereNotNull('receiving_items.batches_id')
-            ->whereDate('receiving_details.invoice_date', '>=', $this->startDate->toDateString())
-            ->whereDate('receiving_details.invoice_date', '<=', $this->endDate->toDateString());
+            ->whereNotNull('receiving_items.batches_id');
+        InvoiceDateFilter::apply($query, 'receiving_details.invoice_date', $this->startDate, $this->endDate);
 
         if ($this->paymentType !== null) {
             if ($this->paymentType === 'OTHER') {

@@ -4,6 +4,7 @@ namespace App\Exports\Orders;
 
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use App\Support\InvoiceDateFilter;
 use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 
 class OrdersExport implements WithMultipleSheets
@@ -25,11 +26,11 @@ class OrdersExport implements WithMultipleSheets
             ? [9, 1]
             : [(int) $this->pharmacyId];
 
-        $distinctPayments = DB::table('receiving_details')
+        $paymentQuery = DB::table('receiving_details')
             ->join('receiving', 'receiving.id', '=', 'receiving_details.receiving_id')
-            ->whereIn('receiving.pharmacy_id', $targetPharmacyIds)
-            ->whereDate('receiving_details.invoice_date', '>=', $this->startDate->toDateString())
-            ->whereDate('receiving_details.invoice_date', '<=', $this->endDate->toDateString())
+            ->whereIn('receiving.pharmacy_id', $targetPharmacyIds);
+        InvoiceDateFilter::apply($paymentQuery, 'receiving_details.invoice_date', $this->startDate, $this->endDate);
+        $distinctPayments = $paymentQuery
             ->whereNotNull('receiving_details.invoice_payment')
             ->where('receiving_details.invoice_payment', '!=', '')
             ->distinct()
@@ -56,12 +57,11 @@ class OrdersExport implements WithMultipleSheets
             }
         }
 
-        $hasNullPayment = DB::table('receiving_details')
+        $nullPaymentQuery = DB::table('receiving_details')
             ->join('receiving', 'receiving.id', '=', 'receiving_details.receiving_id')
-            ->whereIn('receiving.pharmacy_id', $targetPharmacyIds)
-            ->whereDate('receiving_details.invoice_date', '>=', $this->startDate->toDateString())
-            ->whereDate('receiving_details.invoice_date', '<=', $this->endDate->toDateString())
-            ->where(function ($q) {
+            ->whereIn('receiving.pharmacy_id', $targetPharmacyIds);
+        InvoiceDateFilter::apply($nullPaymentQuery, 'receiving_details.invoice_date', $this->startDate, $this->endDate);
+        $hasNullPayment = $nullPaymentQuery->where(function ($q) {
                 $q->whereNull('receiving_details.invoice_payment')
                   ->orWhere('receiving_details.invoice_payment', '');
             })

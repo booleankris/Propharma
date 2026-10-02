@@ -4,6 +4,7 @@ namespace App\Exports\Orders;
 
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use App\Support\InvoiceDateFilter;
 use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 
 class InvoiceExport implements WithMultipleSheets
@@ -31,9 +32,8 @@ class InvoiceExport implements WithMultipleSheets
 
         $baseQ = DB::table('receiving_details')
             ->join('receiving', 'receiving.id', '=', 'receiving_details.receiving_id')
-            ->whereIn('receiving.pharmacy_id', $targetPharmacyIds)
-            ->whereDate('receiving_details.invoice_date', '>=', $this->startDate->toDateString())
-            ->whereDate('receiving_details.invoice_date', '<=', $this->endDate->toDateString());
+            ->whereIn('receiving.pharmacy_id', $targetPharmacyIds);
+        InvoiceDateFilter::apply($baseQ, 'receiving_details.invoice_date', $this->startDate, $this->endDate);
 
         if ($this->supplier) {
             $supplier = $this->supplier;
