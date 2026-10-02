@@ -58,6 +58,13 @@
             height: 40px !important;
             right: 8px !important;
         }
+        #orderReportModal.select2-open {
+            overflow: visible !important;
+        }
+        #orderReportModal .select2-container--open,
+        #orderReportModal .select2-dropdown {
+            z-index: 10010 !important;
+        }
         html, body {
             overflow-x: hidden !important;
             max-width: 100vw;
@@ -873,6 +880,19 @@
                 allowClear: true,
                 width: '100%',
                 dropdownParent: $('#orderReportModal')
+            }).on('select2:open', function() {
+                document.getElementById('orderReportModal')?.classList.add('select2-open');
+                window.setTimeout(() => {
+                    const searchInput = document.querySelector(
+                        '#orderReportModal .select2-container--open .select2-search__field'
+                    );
+                    if (searchInput) {
+                        searchInput.focus({ preventScroll: true });
+                        searchInput.select();
+                    }
+                }, 50);
+            }).on('select2:close', function() {
+                document.getElementById('orderReportModal')?.classList.remove('select2-open');
             });
         }
 
