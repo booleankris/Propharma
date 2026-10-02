@@ -73,10 +73,12 @@ class PurchasePaymentExport implements FromArray, WithStyles, WithColumnWidths, 
         // Filter by Report Type
         if ($this->reportType === 'Konsinyasi') {
             $query->where('receiving_details.invoice_payment', 'KONSINYASI')
-                ->whereBetween('receiving_details.created_at', [$this->startDate, $this->endDate]);
+                ->whereDate('receiving_details.invoice_date', '>=', $this->startDate->toDateString())
+                ->whereDate('receiving_details.invoice_date', '<=', $this->endDate->toDateString());
         } elseif ($this->reportType === 'Tunai') {
             $query->where('receiving_details.invoice_payment', 'TUNAI')
-                ->whereBetween('receiving_details.created_at', [$this->startDate, $this->endDate]);
+                ->whereDate('receiving_details.invoice_date', '>=', $this->startDate->toDateString())
+                ->whereDate('receiving_details.invoice_date', '<=', $this->endDate->toDateString());
         } elseif ($this->reportType === 'Jatuh Tempo') {
             // Jatuh Tempo filters by invoice_due date range
             $query->where('receiving_details.invoice_payment', '!=', 'TUNAI')
@@ -90,7 +92,8 @@ class PurchasePaymentExport implements FromArray, WithStyles, WithColumnWidths, 
                     });
                 });
         } else {
-            $query->whereBetween('receiving_details.created_at', [$this->startDate, $this->endDate]);
+            $query->whereDate('receiving_details.invoice_date', '>=', $this->startDate->toDateString())
+                ->whereDate('receiving_details.invoice_date', '<=', $this->endDate->toDateString());
         }
 
         // Filter by Creditor / PBF (if selected)
