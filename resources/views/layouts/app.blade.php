@@ -9,7 +9,7 @@
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <link href="/src/style.css" rel="stylesheet">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
-    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <link href="{{ asset('templates/library/select2/dist/css/select2.min.css') }}" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
     <style>
@@ -86,11 +86,11 @@
         @yield('content')
     </main>
 
-    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="{{ asset('templates/library/jquery/dist/jquery.min.js') }}"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <script src="{{ asset('templates/library/select2/dist/js/select2.full.min.js') }}"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://npmcdn.com/flatpickr/dist/l10n/id.js"></script>
 
@@ -858,8 +858,6 @@
         };
         // Order Initial Setup
         document.addEventListener("DOMContentLoaded", function() {
-            initOrderSupplierSelect();
-
             // Set initial state based on data-active button
             const activeBtn = document.querySelector('.order-report-btn[data-active="true"]');
             if (activeBtn) {
@@ -869,10 +867,7 @@
 
         function initOrderSupplierSelect() {
             const el = $('#order_supplier');
-            if (!el.length || typeof el.select2 !== 'function') return;
-            if (el.hasClass("select2-hidden-accessible")) {
-                el.select2('destroy');
-            }
+            if (!el.length || !$.fn.select2 || el.hasClass("select2-hidden-accessible")) return;
             el.select2({
                 placeholder: 'Semua PBF / Kreditur',
                 allowClear: true,

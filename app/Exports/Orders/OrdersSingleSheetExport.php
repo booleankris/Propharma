@@ -5,7 +5,7 @@ namespace App\Exports\Orders;
 use App\Models\Pharmacies;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use App\Support\InvoiceDateFilter;
+use App\Support\ReceivingDateFilter;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\WithColumnWidths;
 use Maatwebsite\Excel\Concerns\WithStyles;
@@ -54,7 +54,7 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
             [$pharmacy->address ?? ''],
             [''],
             [$reportTitle],
-            ['Tanggal Faktur : ' . $this->startDate->format('d/m/Y') . ' s/d ' . $this->endDate->format('d/m/Y')],
+            ['Tanggal Terima : ' . $this->startDate->format('d/m/Y') . ' s/d ' . $this->endDate->format('d/m/Y')],
             [''],
         ];
 
@@ -76,7 +76,7 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
             ->leftJoin('creditors', 'creditors.code', '=', 'order_items.creditor_code')
             ->whereIn('receiving.pharmacy_id', $targetPharmacyIds)
             ->whereNotNull('receiving_items.batches_id');
-        InvoiceDateFilter::apply($query, 'receiving_details.invoice_date', $this->startDate, $this->endDate);
+        ReceivingDateFilter::apply($query, $this->startDate, $this->endDate);
 
         if ($this->paymentType !== null) {
             if ($this->paymentType === 'OTHER') {
@@ -108,6 +108,7 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
                 'receiving_details.invoice_payment',
                 'receiving_details.invoice_ppn',
                 'receiving.updated_at as receiving_updated_at',
+                'receiving.date as receiving_date',
                 'receiving_details.created_at as receiving_details_created_at',
                 'order_items.creditor_code',
                 'order_items.price as order_items_price',
@@ -189,9 +190,7 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
             $jumlah = $dpp + $ppn;
             $hargaPpn = round($rawPrice * (1 + self::PPN));
 
-            $tglTerima = $item->receiving_details_created_at
-                ? Carbon::parse($item->receiving_details_created_at)->format('d/m/Y')
-                : '-';
+            $tglTerima = ReceivingDateFilter::format($item->receiving_date, $item->receiving_details_created_at);
             $tglFaktur = $item->invoice_date
                 ? Carbon::parse($item->invoice_date)->format('d/m/Y')
                 : '-';

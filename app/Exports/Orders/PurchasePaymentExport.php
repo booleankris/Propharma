@@ -5,7 +5,7 @@ namespace App\Exports\Orders;
 use App\Models\Pharmacies;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
-use App\Support\InvoiceDateFilter;
+use App\Support\ReceivingDateFilter;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\WithColumnWidths;
 use Maatwebsite\Excel\Concerns\WithStyles;
@@ -51,7 +51,7 @@ class PurchasePaymentExport implements FromArray, WithStyles, WithColumnWidths, 
             [$pharmacy->address ?? ''],
             [''],
             ['LAPORAN PEMBELIAN (' . strtoupper($this->reportType) . ')'],
-            ['TANGGAL : ' . $this->startDate->format('d/m/Y') . '  s/d  ' . $this->endDate->format('d/m/Y')],
+            ['TANGGAL TERIMA : ' . $this->startDate->format('d/m/Y') . '  s/d  ' . $this->endDate->format('d/m/Y')],
             [''],
         ];
 
@@ -74,24 +74,15 @@ class PurchasePaymentExport implements FromArray, WithStyles, WithColumnWidths, 
         // Filter by Report Type
         if ($this->reportType === 'Konsinyasi') {
             $query->where('receiving_details.invoice_payment', 'KONSINYASI');
-            InvoiceDateFilter::apply($query, 'receiving_details.invoice_date', $this->startDate, $this->endDate);
+            ReceivingDateFilter::apply($query, $this->startDate, $this->endDate);
         } elseif ($this->reportType === 'Tunai') {
             $query->where('receiving_details.invoice_payment', 'TUNAI');
-            InvoiceDateFilter::apply($query, 'receiving_details.invoice_date', $this->startDate, $this->endDate);
+            ReceivingDateFilter::apply($query, $this->startDate, $this->endDate);
         } elseif ($this->reportType === 'Jatuh Tempo') {
-            // Jatuh Tempo filters by invoice_due date range
-            $query->where('receiving_details.invoice_payment', '!=', 'TUNAI')
-                ->where(function ($q) {
-                    $q->whereBetween('receiving_details.invoice_due', [
-                        $this->startDate->format('Y-m-d'),
-                        $this->endDate->format('Y-m-d'),
-                    ])->orWhere(function ($sub) {
-                        $sub->whereNull('receiving_details.invoice_due')
-                            ->whereBetween('receiving_details.created_at', [$this->startDate, $this->endDate]);
-                    });
-                });
+            $query->where('receiving_details.invoice_payment', '!=', 'TUNAI');
+            ReceivingDateFilter::apply($query, $this->startDate, $this->endDate);
         } else {
-            InvoiceDateFilter::apply($query, 'receiving_details.invoice_date', $this->startDate, $this->endDate);
+            ReceivingDateFilter::apply($query, $this->startDate, $this->endDate);
         }
 
         // Filter by Creditor / PBF (if selected)
@@ -120,6 +111,7 @@ class PurchasePaymentExport implements FromArray, WithStyles, WithColumnWidths, 
                 'receiving_details.receiving_id',
                 'receiving_details.receiving_details_code',
                 'receiving.updated_at as receiving_updated_at',
+                'receiving.date as receiving_date',
                 'receiving_details.created_at as receiving_details_created_at',
                 'order_items.creditor_code',
                 'creditors.name as creditor_name',
@@ -160,6 +152,7 @@ class PurchasePaymentExport implements FromArray, WithStyles, WithColumnWidths, 
                     'invoice_payment' => $item->invoice_payment,
                     'receiving_details_code' => $item->receiving_details_code,
                     'receiving_updated_at' => $item->receiving_updated_at,
+                    'receiving_date' => $item->receiving_date,
                     'receiving_details_created_at' => $item->receiving_details_created_at,
                     'creditor_code' => $item->creditor_code,
                     'creditor_name' => $item->creditor_name,
@@ -204,8 +197,7 @@ class PurchasePaymentExport implements FromArray, WithStyles, WithColumnWidths, 
         foreach ($invoices as $inv) {
             $tglFaktur = $inv['invoice_date']
                 ? Carbon::parse($inv['invoice_date'])->format('d/m/Y') : '-';
-            $tglTerima = $inv['receiving_details_created_at']
-                ? Carbon::parse($inv['receiving_details_created_at'])->format('d/m/Y') : '-';
+            $tglTerima = ReceivingDateFilter::format($inv['receiving_date'], $inv['receiving_details_created_at']);
             $jatuhTempo = $inv['invoice_due']
                 ? Carbon::parse($inv['invoice_due'])->format('d/m/Y') : '-';
 

@@ -5,7 +5,7 @@ namespace App\Exports\Orders;
 use App\Models\Pharmacies;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use App\Support\InvoiceDateFilter;
+use App\Support\ReceivingDateFilter;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\WithColumnWidths;
 use Maatwebsite\Excel\Concerns\WithStyles;
@@ -61,7 +61,7 @@ class InvoiceSingleSheetExport implements FromArray, WithStyles, WithColumnWidth
             [$pharmacy->address ?? ''],
             [''],
             ['Laporan Data Faktur Pembelian (' . $typeLabel . $paymentLabel . ')'],
-            ['Tanggal Faktur : ' . $this->startDate->format('d/m/Y') . ' s/d ' . $this->endDate->format('d/m/Y')],
+            ['Tanggal Terima : ' . $this->startDate->format('d/m/Y') . ' s/d ' . $this->endDate->format('d/m/Y')],
             [''],
         ];
 
@@ -86,7 +86,7 @@ class InvoiceSingleSheetExport implements FromArray, WithStyles, WithColumnWidth
             ->leftJoin('creditors', 'creditors.code', '=', 'order_items.creditor_code')
             ->whereIn('receiving.pharmacy_id', $targetPharmacyIds)
             ->whereNotNull('receiving_items.batches_id');
-        InvoiceDateFilter::apply($query, 'receiving_details.invoice_date', $this->startDate, $this->endDate);
+        ReceivingDateFilter::apply($query, $this->startDate, $this->endDate);
 
         if ($this->paymentType !== null) {
             if ($this->paymentType === 'OTHER') {
@@ -125,6 +125,7 @@ class InvoiceSingleSheetExport implements FromArray, WithStyles, WithColumnWidth
                 'receiving_details.receiving_id',
                 'receiving_details.receiving_details_code',
                 'receiving.updated_at as receiving_updated_at',
+                'receiving.date as receiving_date',
                 'receiving_details.created_at as receiving_details_created_at',
                 'order_items.creditor_code',
                 'creditors.name as creditor_name',
@@ -165,6 +166,7 @@ class InvoiceSingleSheetExport implements FromArray, WithStyles, WithColumnWidth
                     'invoice_payment'              => $item->invoice_payment,
                     'receiving_details_code'       => $item->receiving_details_code,
                     'receiving_updated_at'         => $item->receiving_updated_at,
+                    'receiving_date'               => $item->receiving_date,
                     'receiving_details_created_at' => $item->receiving_details_created_at,
                     'creditor_code'                => $item->creditor_code,
                     'creditor_name'                => $item->creditor_name,
@@ -208,8 +210,7 @@ class InvoiceSingleSheetExport implements FromArray, WithStyles, WithColumnWidth
         foreach ($invoices as $inv) {
             $tglFaktur  = $inv['invoice_date']
                 ? Carbon::parse($inv['invoice_date'])->format('d/m/Y') : '-';
-            $tglTerima  = $inv['receiving_details_created_at']
-                ? Carbon::parse($inv['receiving_details_created_at'])->format('d/m/Y') : '-';
+            $tglTerima  = ReceivingDateFilter::format($inv['receiving_date'], $inv['receiving_details_created_at']);
             $jatuhTempo = $inv['invoice_due']
                 ? Carbon::parse($inv['invoice_due'])->format('d/m/Y') : '-';
 
