@@ -32,7 +32,8 @@ class InvoiceExport implements WithMultipleSheets
         $baseQ = DB::table('receiving_details')
             ->join('receiving', 'receiving.id', '=', 'receiving_details.receiving_id')
             ->whereIn('receiving.pharmacy_id', $targetPharmacyIds)
-            ->whereBetween('receiving_details.created_at', [$this->startDate, $this->endDate]);
+            ->whereDate('receiving_details.invoice_date', '>=', $this->startDate->toDateString())
+            ->whereDate('receiving_details.invoice_date', '<=', $this->endDate->toDateString());
 
         if ($this->supplier) {
             $supplier = $this->supplier;

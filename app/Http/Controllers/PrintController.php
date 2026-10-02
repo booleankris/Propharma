@@ -87,7 +87,9 @@ class PrintController extends Controller
 
     public function kwitansi($id)
     {
-        $transaction = MedicineTransactions::with(['patients', 'doctors', 'user', 'pharmacy'])->findOrFail($id);
+        $transaction = MedicineTransactions::with(['patients', 'doctors', 'user', 'pharmacy'])
+            ->where('pharmacy_id', getActivePharmacyId())->findOrFail($id);
+        abort_if($transaction->kwitansi_printed_at !== null, 409, 'Kwitansi sudah pernah dicetak.');
 
         $items = MedicineCart::with('medicine')
             ->where('transaction_id', $id)
@@ -129,4 +131,17 @@ class PrintController extends Controller
             'paymentFor'
         ));
     }
+    public function claimKwitansiPrint(Request $request, $id)
+    {
+        $transaction = MedicineTransactions::where('pharmacy_id', getActivePharmacyId())->findOrFail($id);
+        $updated = MedicineTransactions::whereKey($transaction->id)
+            ->whereNull('kwitansi_printed_at')
+            ->toBase()
+            ->update(['kwitansi_printed_at' => now()]);
+
+        abort_unless($updated === 1, 409, 'Kwitansi sudah pernah dicetak.');
+
+        return response()->json(['message' => 'Kesempatan cetak kwitansi telah digunakan.']);
+    }
+
 }

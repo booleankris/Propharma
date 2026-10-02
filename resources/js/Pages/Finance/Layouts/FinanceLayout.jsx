@@ -16,6 +16,7 @@ import {
     Menu,
     X,
     HandCoins,
+    ArrowDownUp,
 } from 'lucide-react';
 
 export default function FinanceLayout({ title, subtitle, children, stats = {} }) {
@@ -59,11 +60,18 @@ export default function FinanceLayout({ title, subtitle, children, stats = {} })
             name: 'Pembelian Cash',
             href: '/finance/cash',
             icon: Banknote,
-            active: currentUrl.startsWith('/finance/cash'),
+            active: currentUrl === '/finance/cash' || currentUrl.startsWith('/finance/cash/'),
             badge: stats.totalCashCount ? {
                 text: stats.totalCashCount,
                 color: 'bg-emerald-50 text-emerald-600',
             } : null,
+        },
+        {
+            name: 'Cashflow',
+            href: '/finance/cashflow',
+            icon: ArrowDownUp,
+            active: currentUrl.startsWith('/finance/cashflow'),
+            badge: null,
         },
         {
             name: 'Konsinyasi',

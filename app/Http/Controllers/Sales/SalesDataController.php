@@ -128,6 +128,7 @@ class SalesDataController extends Controller
                 ->addColumn('time', function ($row) {
                     return Carbon::parse($row->updated_at)->format('H:i:s');
                 })
+                ->addColumn('kwitansi_printed_at', fn ($row) => $row->transactions?->kwitansi_printed_at)
                 ->addColumn('code', function ($row) {
                     return $row->transactions?->transaction_code ?? '-';
                 })

@@ -152,6 +152,7 @@ Route::middleware(['auth', 'role:HO|administrator'])->group(function () {
     Route::post('/pharmacy/switch', [\App\Http\Controllers\PharmacySelectorController::class, 'switch'])->name('pharmacy.switch');
     Route::get('/ho/analytics', [\App\Http\Controllers\HO\HODashboardController::class, 'index'])->name('ho.analytics');
     Route::get('/ho/analytics/data', [\App\Http\Controllers\HO\HODashboardController::class, 'getData'])->name('ho.analytics.data');
+    Route::get('/ho/analytics/export-stock', [\App\Http\Controllers\HO\HODashboardController::class, 'exportStock'])->name('ho.analytics.export-stock');
 });
 
 // Master Pelaporan Obat (General Manager & Koordinator)
@@ -225,6 +226,7 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
     Route::get('/print/receipt/{id}', [PrintController::class, 'receipt'])->name('sales.print');
     Route::get('/print/fullreceipt/{id}', [PrintController::class, 'fullReceipt'])->name('salesrecipe.print');
     Route::get('/print/kwitansi/{id}', [PrintController::class, 'kwitansi'])->name('sales.kwitansi');
+    Route::post('/print/kwitansi/{id}/claim', [PrintController::class, 'claimKwitansiPrint'])->name('sales.kwitansi.claim');
     Route::get('/kasir/print-smart-receipt/{id}', [PrintController::class, 'printSmartReceipt'])->name('transaction.printSmartReceipt');
 
     // ================================================================== Add Data =========================================================================
@@ -543,6 +545,8 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
         Route::get('/', [\App\Http\Controllers\FinanceController::class, 'index'])->name('index');
         Route::get('/hutang', [\App\Http\Controllers\FinanceController::class, 'hutang'])->name('hutang');
         Route::get('/cash', [\App\Http\Controllers\FinanceController::class, 'cash'])->name('cash');
+        Route::get('/cashflow', [\App\Http\Controllers\FinanceController::class, 'cashflow'])->name('cashflow');
+        Route::get('/cashflow/export', [\App\Http\Controllers\FinanceController::class, 'exportCashflow'])->name('cashflow.export');
         Route::get('/konsinyasi', [\App\Http\Controllers\FinanceController::class, 'konsinyasi'])->name('konsinyasi');
         Route::get('/piutang', [\App\Http\Controllers\FinanceController::class, 'piutang'])->name('piutang');
         Route::get('/kas-bank', [\App\Http\Controllers\FinanceController::class, 'kasBank'])->name('kasBank');

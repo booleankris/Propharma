@@ -194,6 +194,16 @@
             border-color: #6ee7b7;
         }
 
+        .btn-kwitansi:disabled,
+        .btn-kwitansi:disabled:hover,
+        #btn-detail-kwitansi:disabled,
+        #btn-detail-kwitansi:disabled:hover {
+            background: #e5e7eb !important;
+            color: #6b7280 !important;
+            border-color: #d1d5db !important;
+            cursor: not-allowed;
+        }
+
         /* ── Qty badge ── */
         .qty-badge {
             display: inline-block;
@@ -497,7 +507,7 @@
                                 </svg>
                                 <span>Cetak Struk</span>
                             </button>
-                            <button type="button" id="btn-detail-kwitansi"
+                            <button type="button" id="btn-detail-kwitansi" disabled
                                 class="flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-semibold transition-all">
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -570,6 +580,7 @@
                 tableData.ajax.reload();
             });
 
+            const printedKwitansi = new Set();
             // ── Main sales table ──────────────────────────────────────────────
             tableData = $('#table-data').DataTable({
                 responsive: true,
@@ -644,6 +655,7 @@
                         render: (d) => {
                             const trxId = d.transactions?.id || d.transaction_id;
                             const trxType = d.type || '';
+                            const printed = !!(d.kwitansi_printed_at || d.transactions?.kwitansi_printed_at || printedKwitansi.has(String(trxId)));
                             return `<div class="flex items-center gap-1 justify-center">
                                 <button class="btn-print" onclick="event.stopPropagation(); printStruk('${trxId}', '${trxType}')" title="Cetak Struk POS Thermal">
                                     <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
@@ -652,13 +664,13 @@
                                         <rect x="4" y="10" width="8" height="5"/>
                                     </svg>Struk
                                 </button>
-                                <button class="btn-kwitansi" onclick="event.stopPropagation(); window.open('/print/kwitansi/${trxId}','_blank')" title="Cetak Kwitansi Format Apotek">
+                                <button class="btn-kwitansi" data-kwitansi-id="${trxId}" ${printed ? 'disabled' : ''} onclick="event.stopPropagation(); if (!this.disabled) window.open('/print/kwitansi/${trxId}','_blank')" title="${printed ? 'Kwitansi sudah dicetak' : 'Cetak Kwitansi Format Apotek'}">
                                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
                                         <polyline points="14 2 14 8 20 8"/>
                                         <line x1="16" y1="13" x2="8" y2="13"/>
                                         <line x1="16" y1="17" x2="8" y2="17"/>
-                                    </svg>Kwitansi
+                                    </svg><span>${printed ? 'Sudah Dicetak' : 'Kwitansi'}</span>
                                 </button>
                             </div>`;
                         }
@@ -675,6 +687,45 @@
             let currentSelectedTrxId = null;
             let currentSelectedTrxType = null;
 
+            function updateDetailKwitansi(data) {
+                const id = data?.transactions?.id || data?.transaction_id;
+                const printed = !!(data?.kwitansi_printed_at || data?.transactions?.kwitansi_printed_at || printedKwitansi.has(String(id)));
+                $('#btn-detail-kwitansi').prop('disabled', !id || printed)
+                    .attr('title', printed ? 'Kwitansi sudah dicetak' : 'Cetak Kwitansi')
+                    .find('span').text(printed ? 'Sudah Dicetak' : 'Cetak Kwitansi');
+            }
+
+            function markKwitansiPrinted(message) {
+                if (message?.type !== 'kwitansi-printed' || !/^\d+$/.test(String(message.transactionId))) return;
+                const id = String(message.transactionId);
+                printedKwitansi.add(id);
+                document.querySelectorAll('[data-kwitansi-id]').forEach(button => {
+                    if (button.dataset.kwitansiId !== id) return;
+                    button.disabled = true;
+                    button.title = 'Kwitansi sudah dicetak';
+                    button.querySelector('span').textContent = 'Sudah Dicetak';
+                });
+                if (String(currentSelectedTrxId) === id) updateDetailKwitansi({transaction_id: id});
+            }
+
+            window.addEventListener('message', event => {
+                if (event.origin === window.location.origin) markKwitansiPrinted(event.data);
+            });
+            window.addEventListener('storage', event => {
+                if (event.key !== 'kwitansi-printed') return;
+                try { markKwitansiPrinted(JSON.parse(event.newValue)); } catch (_) { /* Ignore invalid notifications. */ }
+            });
+            // Read the server status when returning from another tab or a cached page.
+            window.addEventListener('focus', () => tableData.ajax.reload(null, false));
+            window.addEventListener('pageshow', event => {
+                if (event.persisted) tableData.ajax.reload(null, false);
+            });
+            tableData.on('draw', function() {
+                if (!currentSelectedTrxId) return;
+                const selected = tableData.rows().data().toArray().find(row => String(row.transaction_id) === String(currentSelectedTrxId));
+                if (selected) updateDetailKwitansi(selected);
+            });
+
             $('#table-data tbody').on('click', 'tr', function() {
                 const data = tableData.row(this).data();
                 if (!data) return;
@@ -682,6 +733,7 @@
                 $(this).addClass('active');
                 currentSelectedTrxId = data.transactions?.id || data.transaction_id;
                 currentSelectedTrxType = data.type || '';
+                updateDetailKwitansi(data);
                 document.getElementById('detail-code').textContent = data.code;
                 document.getElementById('detail-channel-badge').innerHTML = data.channel || '';
                 document.getElementById('detail-patient').textContent = data.name || 'Umum / Tanpa Pasien';
@@ -696,7 +748,7 @@
             });
 
             $('#btn-detail-kwitansi').on('click', function() {
-                if (currentSelectedTrxId) {
+                if (currentSelectedTrxId && !this.disabled) {
                     window.open(`/print/kwitansi/${currentSelectedTrxId}`, '_blank');
                 }
             });

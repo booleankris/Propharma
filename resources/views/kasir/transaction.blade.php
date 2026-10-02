@@ -15,7 +15,12 @@
         .payment-option {
             position: relative;
         }
-
+        .bg-searchhover{
+            background-color: #fff;
+        }
+        .bg-searchhover:hover{
+            background-color: #e4efff;
+        }
         .payment-option:focus-within .payment-card {
             outline: 2.5px solid #3b82f6 !important;
             outline-offset: 2px !important;
@@ -2294,14 +2299,14 @@
             list.innerHTML = `<li class="px-4 py-3 text-sm text-gray-500">Tidak ada hasil</li>`;
             return;
         }
-
+        // Search Obat JS
         items.forEach((it, index) => {
             const li = document.createElement('li');
             li.setAttribute('role', 'option');
             // border-l dipakai sebagai accent bar; warnanya sama yang di-toggle highlight()
             // di atas, jadi hover mouse & keyboard-active kelihatan sama persis
             li.className =
-                'flex items-start justify-between gap-4 mx-1.5 my-1 p-3 rounded-xl cursor-pointer border-l-[3px] border-transparent transition-all duration-200 ease-out hover:border-blue-400 hover:bg-slate-50 opacity-0 animate-fade-slide-in';
+                'flex items-start justify-between gap-4 mx-1.5 my-1 p-3 rounded-xl cursor-pointer border-l-[3px] border-transparent transition-all duration-200 ease-out hover:border-blue-400 bg-searchhover opacity-0 animate-fade-slide-in';
             li.style.animationDelay = `${index * 35}ms`;
             li.dataset.id = it.id;
 

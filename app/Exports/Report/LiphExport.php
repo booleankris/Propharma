@@ -3,6 +3,7 @@
 namespace App\Exports\Report;
 
 use App\Models\MedicineTransactions;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\WithStyles;
@@ -87,6 +88,39 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         ];
     }
 
+    private function hasShiftFilter(): bool
+    {
+        return in_array($this->shiftType, ['shift', 'online'], true) && !empty($this->shift);
+    }
+
+    private function applyReportPeriod(Builder $query): void
+    {
+        $start = $this->startDate;
+        $until = $this->endDate->copy()->addDay()->startOfDay();
+
+        // All LIPH modes use the same working date. The two branches are exclusive,
+        // so a sale crossing midnight can belong to only one reporting day.
+        $query->where(function (Builder $period) use ($start, $until) {
+            $period->whereHas('shift_logs', function (Builder $shiftQuery) use ($start, $until) {
+                $shiftQuery->where('clock_in', '>=', $start)->where('clock_in', '<', $until);
+            })->orWhere(function (Builder $withoutShiftTime) use ($start, $until) {
+                $withoutShiftTime->whereDoesntHave('shift_logs', fn (Builder $q) => $q->whereNotNull('clock_in'))
+                    ->where(function (Builder $recorded) use ($start, $until) {
+                        // Checkout records created_at; later edits must not move the report date.
+                        $recorded->where('created_at', '>=', $start)->where('created_at', '<', $until)
+                            ->orWhere(function (Builder $legacy) use ($start, $until) {
+                                $legacy->whereNull('created_at')
+                                    ->where('updated_at', '>=', $start)->where('updated_at', '<', $until);
+                            });
+                    });
+            });
+        });
+
+        if ($this->hasShiftFilter()) {
+            $query->whereHas('shift_logs', fn (Builder $q) => $q->where('shift_id', $this->shift));
+        }
+    }
+
     private function buildReportData(): array
     {
         $grouped = [];
@@ -98,14 +132,8 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
             ])
                 ->where('pharmacy_id', $this->pharmacyId)
                 ->where('status', 1)
-                ->whereDate('updated_at', '>=', $this->startDate->toDateString())
-                ->whereDate('updated_at', '<=', $this->endDate->toDateString())
+                ->tap(fn (Builder $query) => $this->applyReportPeriod($query))
                 ->whereIn('transaction_type', array_keys(self::TYPE_MAP))
-                ->when(!empty($this->shift), function ($q) {
-                    $q->whereHas('shift_logs', function ($shiftQuery) {
-                        $shiftQuery->where('shift_id', $this->shift);
-                    });
-                })
                 ->get();
 
             $grouped = $this->groupTransactions($transactions);
@@ -115,8 +143,7 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
             ])
                 ->where('pharmacy_id', $this->pharmacyId)
                 ->where('status', 1)
-                ->whereDate('updated_at', '>=', $this->startDate->toDateString())
-                ->whereDate('updated_at', '<=', $this->endDate->toDateString())
+                ->tap(fn (Builder $query) => $this->applyReportPeriod($query))
                 ->whereIn('transaction_type', array_keys(self::TYPE_MAP))
                 ->get();
 
@@ -131,8 +158,7 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
             ])
                 ->where('pharmacy_id', $this->pharmacyId)
                 ->where('status', 1)
-                ->whereDate('updated_at', '>=', $this->startDate->toDateString())
-                ->whereDate('updated_at', '<=', $this->endDate->toDateString())
+                ->tap(fn (Builder $query) => $this->applyReportPeriod($query))
                 ->whereIn('transaction_type', array_keys(self::TYPE_MAP))
                 ->where(function ($query) use ($roleName) {
                     $applyRoleFilter = function ($q) use ($roleName) {
@@ -152,11 +178,6 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                     $query->whereHas('user', $applyRoleFilter)
                         ->orWhereHas('transactions.user', $applyRoleFilter);
                 })
-                ->when(!empty($this->shift), function ($q) {
-                    $q->whereHas('shift_logs', function ($shiftQuery) {
-                        $shiftQuery->where('shift_id', $this->shift);
-                    });
-                })
                 ->get();
 
             $grouped = $this->groupTransactions($transactions);
@@ -167,8 +188,7 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
             ])
                 ->where('pharmacy_id', $this->pharmacyId)
                 ->where('status', 1)
-                ->whereDate('updated_at', '>=', $this->startDate->toDateString())
-                ->whereDate('updated_at', '<=', $this->endDate->toDateString())
+                ->tap(fn (Builder $query) => $this->applyReportPeriod($query))
                 ->whereIn('transaction_type', array_keys(self::TYPE_MAP))
                 ->get();
 
@@ -293,16 +313,18 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         // HEADER
         $rows[] = [$this->pharmacyName];
         $rows[] = [$this->pharmacyAddress];
-        $rows[] = [];
+        $rows[] = ['Dasar tanggal: mulai shift; tanpa waktu shift memakai tanggal pencatatan transaksi.'];
         $titleSuffix = $this->customTitle ? ' - ' . $this->customTitle : '';
         $shiftLabel = 'Seluruh';
-        if (!empty($this->shift)) {
+        if ($this->hasShiftFilter()) {
             $shiftObj = \App\Models\Shifts::find($this->shift);
             $shiftLabel = $shiftObj ? $shiftObj->name : 'Shift ' . $this->shift;
         }
         $rows[] = ['Laporan Penjualan Harian (LIPH)' . $titleSuffix];
-        $rows[] = ['Tanggal : ' . $this->startDate->format('d/m/Y') . ' s/d ' . $this->endDate->format('d/m/Y') . ' (' . $shiftLabel . ')'];
-        $rows[] = [];
+        $dateLabel = 'Tanggal kerja';
+        $rows[] = [$dateLabel . ' : ' . $this->startDate->format('d/m/Y') . ' s/d ' . $this->endDate->format('d/m/Y') . ' (' . $shiftLabel . ')'];
+        // A nonempty array preserves the spacer in Laravel Excel's row flattening.
+        $rows[] = [''];
 
         // TABLE HEADER
         $rows[] = ['No.', 'Pelanggan', 'Lembar', 'R/', 'Jasa', 'Embalase', 'Potongan', 'Netto', 'Potongan Transaksi', 'Netto Akhir'];
@@ -444,19 +466,20 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         $sheet->mergeCells("A2:{$lastCol}2");
         $sheet->mergeCells("A3:{$lastCol}3");
         $sheet->mergeCells("A4:{$lastCol}4");
+        $sheet->mergeCells("A5:{$lastCol}5");
 
         $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
 
-        $sheet->getStyle("A1:{$lastCol}4")
+        $sheet->getStyle("A1:{$lastCol}5")
             ->getAlignment()
             ->setVertical(Alignment::VERTICAL_CENTER);
-        $sheet->getStyle("A1:{$lastCol}4")
+        $sheet->getStyle("A1:{$lastCol}5")
             ->getAlignment()
             ->setHorizontal(Alignment::HORIZONTAL_LEFT);
         /*
-    | TABLE HEADER (ROW 5 — IMPORTANT)
+    | TABLE HEADER (ROW 7)
     */
-        $sheet->getStyle("A5:{$lastCol}5")->applyFromArray([
+        $sheet->getStyle("A7:{$lastCol}7")->applyFromArray([
             'font' => ['bold' => true],
             'alignment' => [
                 'horizontal' => Alignment::HORIZONTAL_CENTER,
@@ -470,7 +493,7 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         /*
     | CONTENT
     */
-        for ($row = 6; $row <= $lastRow; $row++) {
+        for ($row = 8; $row <= $lastRow; $row++) {
 
             $A = trim((string)$sheet->getCell("A{$row}")->getValue());
             $B = trim((string)$sheet->getCell("B{$row}")->getValue());

@@ -151,13 +151,16 @@
         #branch_cards_container::-webkit-scrollbar {
             width: 4px;
         }
+
         #branch_cards_container::-webkit-scrollbar-track {
             background: transparent;
         }
+
         #branch_cards_container::-webkit-scrollbar-thumb {
             background: rgba(203, 213, 225, 0.8);
             border-radius: 9999px;
         }
+
         #branch_cards_container::-webkit-scrollbar-thumb:hover {
             background: rgba(148, 163, 184, 1);
         }
@@ -180,14 +183,7 @@
 
                 <!-- Title & Badge -->
                 <div>
-                    <div class="flex items-center gap-2 mb-1">
-                        <span
-                            class="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[10px] font-black bg-gradient-to-r from-indigo-500/10 to-purple-500/10 text-indigo-700 border border-indigo-200/80 uppercase tracking-wider shadow-2xs">
-                            <span class="w-2 h-2 rounded-full bg-indigo-600 animate-ping"></span>
-                            HO Command Center
-                        </span>
-                        <span class="text-xs text-slate-400 font-semibold">| Real-time Business Intelligence</span>
-                    </div>
+
                     <h1 class="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight leading-tight">
                         Executive Analytics & Monitoring
                     </h1>
@@ -243,16 +239,8 @@
                     <span class="text-slate-400 font-medium ml-2">Outlet:</span>
                     <span id="active_outlet_badge"
                         class="font-extrabold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-xl border border-emerald-200">
-                        🏢 Konsolidasi Seluruh Cabang
+                        Konsolidasi Seluruh Cabang
                     </span>
-                </div>
-                <div class="flex items-center gap-2 text-slate-500 text-[11px] font-semibold">
-                    <span class="relative flex h-2 w-2">
-                        <span
-                            class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                        <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                    </span>
-                    <span>Live Data Sync</span>
                 </div>
             </div>
         </div>
@@ -261,7 +249,8 @@
         <div class="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
             <div class="xl:col-span-4 2xl:col-span-3 space-y-4 sticky top-6 self-start">
 
-                <div class="executive-surface rounded-3xl p-5 shadow-xs flex flex-col justify-between max-h-[calc(100vh-3rem)]">
+                <div
+                    class="executive-surface rounded-3xl p-5 shadow-xs flex flex-col justify-between max-h-[calc(100vh-3rem)]">
 
                     <!-- Panel Header -->
                     <div class="mb-4">
@@ -297,13 +286,26 @@
                     <div id="branch_cards_container" class="space-y-2.5 max-h-[calc(100vh-280px)] overflow-y-auto pr-1">
 
                         <!-- MASTER CARD: SEMUA CABANG (KONSOLIDASI) -->
-                        <div onclick="selectBranch('all', this, '🏢 Konsolidasi Seluruh Cabang')" id="branch_card_all"
+                        <div onclick="selectBranch('all', this, 'Konsolidasi Seluruh Cabang')" id="branch_card_all"
                             class="branch-card active p-3.5 rounded-2xl border border-slate-200/80 bg-white flex flex-col justify-between">
                             <div class="flex items-center justify-between">
                                 <div class="flex items-center gap-2.5">
                                     <div
                                         class="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-black text-sm shadow-xs shrink-0">
-                                        🏢
+                                        <svg xmlns="http://www.w3.org/2000/svg"
+                                            class="icon icon-tabler icon-tabler-building" width="20" height="20"
+                                            viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"
+                                            stroke-linecap="round" stroke-linejoin="round">
+                                            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                            <path d="M3 21l18 0" />
+                                            <path d="M9 8l1 0" />
+                                            <path d="M9 12l1 0" />
+                                            <path d="M9 16l1 0" />
+                                            <path d="M14 8l1 0" />
+                                            <path d="M14 12l1 0" />
+                                            <path d="M14 16l1 0" />
+                                            <path d="M5 21v-16a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v16" />
+                                        </svg>
                                     </div>
                                     <div>
                                         <h4 class="text-xs font-black text-slate-900 leading-tight">Semua Cabang (HO)</h4>
@@ -331,7 +333,9 @@
                                     <div class="flex items-center gap-2.5">
                                         <div
                                             class="w-9 h-9 rounded-xl {{ $b['is_warehouse'] ? 'bg-violet-100 text-violet-700' : 'bg-emerald-100 text-emerald-700' }} flex items-center justify-center font-black text-sm shrink-0">
-                                            {{ $b['is_warehouse'] ? '📦' : '🏥' }}
+                                            {!! $b['is_warehouse']
+                                                ? '<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-box" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 3l8 4.5l0 9l-8 4.5l-8 -4.5l0 -9l8 -4.5" /><path d="M12 12l8 -4.5" /><path d="M12 12l0 9" /><path d="M12 12l-8 -4.5" /><path d="M16 5.25l-8 4.5" /></svg>'
+                                                : '<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-building-hospital" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 21l18 0" /><path d="M5 21v-16a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v16" /><path d="M9 21v-4a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v4" /><path d="M10 9l4 0" /><path d="M12 7l0 4" /></svg>' !!}
                                         </div>
                                         <div class="overflow-hidden">
                                             <h4 class="text-xs font-black text-slate-900 truncate leading-tight">
@@ -375,10 +379,76 @@
             </div>
             <!-- LEFT / MAIN ANALYTICS SECTION (9 COLS) -->
             <div class="xl:col-span-8 2xl:col-span-9 space-y-6">
-
+                <div id="stock_info_section"
+                    class="hidden bg-white border border-slate-200/80 rounded-3xl p-5 sm:p-6 text-slate-900 shadow-sm relative overflow-hidden mb-6">
+                    <div class="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                        <div>
+                            <span
+                                class="text-[9px] font-black uppercase tracking-widest text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                                Informasi Stok
+                            </span>
+                            <h3 class="text-base sm:text-lg font-black text-slate-900 mt-1">Estimasi Nilai & Kuantitas Stok Obat</h3>
+                        </div>
+                        <a id="export_stock_btn" href="{{ route('ho.analytics.export-stock') }}" class="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all shadow-sm">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-file-spreadsheet" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                <path d="M14 3v4a1 1 0 0 0 1 1h4"></path>
+                                <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z"></path>
+                                <path d="M8 11h8v7h-8z"></path>
+                                <path d="M8 15h8"></path>
+                                <path d="M11 11v7"></path>
+                            </svg>
+                            Export Excel
+                        </a>
+                    </div>
+                    <div class="relative z-10 space-y-5">
+                        <!-- Etalase -->
+                        <div>
+                            <h4 class="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2 mb-2">
+                                <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                                Stok Etalase (Cabang)
+                            </h4>
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-100 flex flex-col justify-center">
+                                    <span class="text-[9px] text-slate-500 font-bold uppercase tracking-wide mb-1">Harga Stok</span>
+                                    <span id="stock_etalase_value" class="text-sm font-black text-slate-900">-</span>
+                                </div>
+                                <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-100 flex flex-col justify-center">
+                                    <span class="text-[9px] text-slate-500 font-bold uppercase tracking-wide mb-1">Total Stok Barang</span>
+                                    <span id="stock_etalase_qty" class="text-sm font-black text-slate-900">-</span>
+                                </div>
+                                <div class="p-3.5 rounded-2xl bg-orange-50/50 border border-orange-100/50 flex flex-col justify-center">
+                                    <span class="text-[9px] text-orange-600/80 font-bold uppercase tracking-wide mb-1">Stok Dekat ED (≤ 6 Bulan)</span>
+                                    <span id="stock_etalase_near_ed" class="text-sm font-black text-orange-700">-</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Gudang (PMI ONLY) -->
+                        <div id="stock_gudang_card" class="hidden">
+                            <h4 class="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2 mb-2">
+                                <span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+                                Stok Gudang (PMI)
+                            </h4>
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-100 flex flex-col justify-center">
+                                    <span class="text-[9px] text-slate-500 font-bold uppercase tracking-wide mb-1">Harga Stok</span>
+                                    <span id="stock_gudang_value" class="text-sm font-black text-slate-900">-</span>
+                                </div>
+                                <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-100 flex flex-col justify-center">
+                                    <span class="text-[9px] text-slate-500 font-bold uppercase tracking-wide mb-1">Total Stok Barang</span>
+                                    <span id="stock_gudang_qty" class="text-sm font-black text-slate-900">-</span>
+                                </div>
+                                <div class="p-3.5 rounded-2xl bg-orange-50/50 border border-orange-100/50 flex flex-col justify-center">
+                                    <span class="text-[9px] text-orange-600/80 font-bold uppercase tracking-wide mb-1">Stok Dekat ED (≤ 6 Bulan)</span>
+                                    <span id="stock_gudang_near_ed" class="text-sm font-black text-orange-700">-</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 <!-- 4 HERO KPI METRIC CARDS -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-4 gap-4 sm:gap-5">
-
                     <!-- CARD 1: TOTAL PENJUALAN (SALES) -->
                     <div class="kpi-deck-card mesh-emerald p-5 flex flex-col justify-between">
                         <div class="beam-top bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-500"></div>
@@ -660,9 +730,9 @@
 
                 </div>
 
-                <!-- EXECUTIVE FINANCIAL COCKPIT (NET TURNOVER & HIGHLIGHTS) -->
+                <!-- STOCK INFO SECTION (PER CABANG) -->
                 <div
-                    class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-3xl p-5 sm:p-6 text-white shadow-lg relative overflow-hidden">
+                    class="bg-white border border-slate-200/80 rounded-3xl p-5 sm:p-6 text-slate-900 shadow-sm relative overflow-hidden">
                     <div
                         class="absolute -right-10 -bottom-10 w-48 h-48 bg-indigo-500/20 rounded-full blur-2xl pointer-events-none">
                     </div>
@@ -673,16 +743,17 @@
                     <div class="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                         <div>
                             <span
-                                class="text-[9px] font-black uppercase tracking-widest text-indigo-300 bg-indigo-500/30 px-2.5 py-0.5 rounded-full border border-indigo-400/20">
+                                class="text-[9px] font-black uppercase tracking-widest text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-200">
                                 Executive Summary
                             </span>
-                            <h3 class="text-base sm:text-lg font-black text-white mt-1">Ringkasan Omset Bersih & Vitalitas
+                            <h3 class="text-base sm:text-lg font-black text-slate-900 mt-1">Ringkasan Omset Bersih &
+                                Vitalitas
                                 Bisnis</h3>
                         </div>
                         <div
-                            class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 text-xs">
-                            <span class="text-indigo-200 font-medium">Net Revenue:</span>
-                            <span id="metric_net_revenue_rp" class="font-black text-emerald-400 text-base tracking-tight">
+                            class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs">
+                            <span class="text-slate-500 font-medium">Net Revenue:</span>
+                            <span id="metric_net_revenue_rp" class="font-black text-emerald-600 text-base tracking-tight">
                                 {{ $analytics['net_revenue_rp'] }}
                             </span>
                         </div>
@@ -690,65 +761,80 @@
 
                     <!-- 3 Highlight Cockpit Cards -->
                     <div class="relative z-10 grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-                        <div
-                            class="p-3.5 rounded-2xl bg-white/5 backdrop-blur-md border border-white/10 flex items-center gap-3">
+                        <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-100 flex items-center gap-3">
                             <div
-                                class="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-400/30 text-emerald-400 flex items-center justify-center font-black text-lg shrink-0">
-                                💰
+                                class="w-10 h-10 rounded-xl bg-emerald-100 border-emerald-200 text-emerald-600 flex items-center justify-center font-black text-lg shrink-0">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-coin"
+                                    width="20" height="20" viewBox="0 0 24 24" stroke-width="2"
+                                    stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                    <path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" />
+                                    <path
+                                        d="M14.8 9a2 2 0 0 0 -1.8 -1h-2a2 2 0 1 0 0 4h2a2 2 0 1 1 0 4h-2a2 2 0 0 1 -1.8 -1" />
+                                    <path d="M12 7v10" />
+                                </svg>
                             </div>
                             <div>
-                                <span class="text-[10px] font-bold text-slate-300 uppercase tracking-wide">Omset Bersih
+                                <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Omset Bersih
                                     Riil</span>
                                 <h4 id="summary_net_revenue"
-                                    class="text-sm sm:text-base font-black text-white leading-tight mt-0.5">
+                                    class="text-sm sm:text-base font-black text-slate-900 leading-tight mt-0.5">
                                     {{ $analytics['net_revenue_rp'] }}
                                 </h4>
-                                <span class="text-[9px] text-emerald-300 font-medium">Penjualan Bruto – Retur Jual</span>
+                                <span class="text-[9px] text-slate-400 font-medium">Penjualan Bruto – Retur Jual</span>
                             </div>
                         </div>
 
-                        <div
-                            class="p-3.5 rounded-2xl bg-white/5 backdrop-blur-md border border-white/10 flex items-center gap-3">
+                        <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-100 flex items-center gap-3">
                             <div
-                                class="w-10 h-10 rounded-xl bg-indigo-500/20 border border-indigo-400/30 text-indigo-400 flex items-center justify-center font-black text-lg shrink-0">
-                                🏷️
+                                class="w-10 h-10 rounded-xl bg-indigo-100 border-indigo-200 text-indigo-600 flex items-center justify-center font-black text-lg shrink-0">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-tag"
+                                    width="20" height="20" viewBox="0 0 24 24" stroke-width="2"
+                                    stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                    <path d="M7.5 7.5m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" />
+                                    <path
+                                        d="M3 6v5.172a2 2 0 0 0 .586 1.414l7.71 7.71a2.41 2.41 0 0 0 3.408 0l5.592 -5.592a2.41 2.41 0 0 0 0 -3.408l-7.71 -7.71a2 2 0 0 0 -1.414 -.586h-5.172a3 3 0 0 0 -3 3z" />
+                                </svg>
                             </div>
                             <div>
-                                <span class="text-[10px] font-bold text-slate-300 uppercase tracking-wide">Total Potongan
+                                <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Total Potongan
                                     Diskon</span>
                                 <h4 id="summary_discount"
-                                    class="text-sm sm:text-base font-black text-white leading-tight mt-0.5">
+                                    class="text-sm sm:text-base font-black text-slate-900 leading-tight mt-0.5">
                                     {{ $analytics['total_discount'] }}
                                 </h4>
-                                <span class="text-[9px] text-indigo-300 font-medium">Diskon kasir diberikan</span>
+                                <span class="text-[9px] text-slate-400 font-medium">Diskon kasir diberikan</span>
                             </div>
                         </div>
 
-                        <div
-                            class="p-3.5 rounded-2xl bg-white/5 backdrop-blur-md border border-white/10 flex items-center gap-3">
+                        <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-100 flex items-center gap-3">
                             <div
-                                class="w-10 h-10 rounded-xl bg-purple-500/20 border border-purple-400/30 text-purple-400 flex items-center justify-center font-black text-lg shrink-0">
-                                📊
+                                class="w-10 h-10 rounded-xl bg-purple-100 border-purple-200 text-purple-600 flex items-center justify-center font-black text-lg shrink-0">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-chart-bar"
+                                    width="20" height="20" viewBox="0 0 24 24" stroke-width="2"
+                                    stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                    <path d="M3 13a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v6a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z" />
+                                    <path d="M15 9a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v10a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z" />
+                                    <path d="M9 5a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v14a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z" />
+                                    <path d="M4 20h14" />
+                                </svg>
                             </div>
                             <div>
-                                <span class="text-[10px] font-bold text-slate-300 uppercase tracking-wide">Rata-Rata Struk
+                                <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Rata-Rata Struk
                                     (AOV)</span>
                                 <h4 id="summary_aov"
-                                    class="text-sm sm:text-base font-black text-white leading-tight mt-0.5">
+                                    class="text-sm sm:text-base font-black text-slate-900 leading-tight mt-0.5">
                                     {{ $analytics['average_order_value'] }}
                                 </h4>
-                                <span class="text-[9px] text-purple-300 font-medium">Nilai rata-rata belanja</span>
+                                <span class="text-[9px] text-slate-400 font-medium">Nilai rata-rata belanja</span>
                             </div>
                         </div>
                     </div>
                 </div>
-
             </div>
-
-
-
         </div>
-
     </div>
 @endsection
 
@@ -867,6 +953,18 @@
                 url.searchParams.append('end_date', currentEndDate);
             }
 
+            // Update Export Button URL
+            const exportBtn = document.getElementById('export_stock_btn');
+            if (exportBtn) {
+                const exportUrl = new URL("{{ route('ho.analytics.export-stock') }}", window.location.origin);
+                exportUrl.searchParams.append('period', currentPeriod);
+                if (currentPeriod === 'custom') {
+                    exportUrl.searchParams.append('start_date', currentStartDate);
+                    exportUrl.searchParams.append('end_date', currentEndDate);
+                }
+                exportBtn.href = exportUrl.toString();
+            }
+
             try {
                 const res = await fetch(url.toString(), {
                     headers: {
@@ -918,6 +1016,36 @@
             document.getElementById('summary_net_revenue').innerText = data.net_revenue_rp;
             document.getElementById('summary_discount').innerText = data.total_discount;
             document.getElementById('summary_aov').innerText = data.average_order_value;
+
+            // Update Stock Info Section
+            const stockSection = document.getElementById('stock_info_section');
+            if (data.pharmacy_id === 'all') {
+                if (stockSection) stockSection.classList.add('hidden');
+            } else {
+                if (stockSection) stockSection.classList.remove('hidden');
+
+                if (data.stock_info) {
+                    document.getElementById('stock_etalase_qty').innerText = Number(data.stock_info.etalase_qty)
+                        .toLocaleString('id-ID') + ' item';
+                    document.getElementById('stock_etalase_value').innerText = data.stock_info.etalase_value_rp;
+                    const elEtalaseNearEd = document.getElementById('stock_etalase_near_ed');
+                    if (elEtalaseNearEd) elEtalaseNearEd.innerText = Number(data.stock_info.etalase_near_ed_qty || 0).toLocaleString('id-ID') + ' item';
+
+                    const gudangCard = document.getElementById('stock_gudang_card');
+                    if (data.pharmacy_id == 1 || data.pharmacy_id === '1') {
+                        if (gudangCard) gudangCard.classList.remove('hidden');
+                        const stockGudangQty = document.getElementById('stock_gudang_qty');
+                        const stockGudangValue = document.getElementById('stock_gudang_value');
+                        const stockGudangNearEd = document.getElementById('stock_gudang_near_ed');
+                        if (stockGudangQty) stockGudangQty.innerText = Number(data.stock_info.gudang_qty).toLocaleString(
+                            'id-ID') + ' item';
+                        if (stockGudangValue) stockGudangValue.innerText = data.stock_info.gudang_value_rp;
+                        if (stockGudangNearEd) stockGudangNearEd.innerText = Number(data.stock_info.gudang_near_ed_qty || 0).toLocaleString('id-ID') + ' item';
+                    } else {
+                        if (gudangCard) gudangCard.classList.add('hidden');
+                    }
+                }
+            }
 
             // Update Master Branch Card Total
             const masterCardTotal = document.getElementById('branch_card_total_omset');

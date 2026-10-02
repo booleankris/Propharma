@@ -10,6 +10,8 @@ use App\Models\Pharmacies;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Maatwebsite\Excel\Facades\Excel;
+use App\Exports\HO\StockExport;
 
 class HODashboardController extends Controller
 {
@@ -30,6 +32,34 @@ class HODashboardController extends Controller
     {
         $analytics = $this->calculateAnalytics($request);
         return response()->json($analytics);
+    }
+
+    public function exportStock(Request $request)
+    {
+        $now = Carbon::now();
+        $period = $request->get('period', 'today');
+        $startDateParam = $request->get('start_date');
+        $endDateParam = $request->get('end_date');
+
+        switch ($period) {
+            case 'today':
+                $periodLabel = 'Tanggal : ' . $now->translatedFormat('d F Y');
+                break;
+            case 'this_year':
+                $periodLabel = 'Periode : Tahun ' . $now->format('Y');
+                break;
+            case 'custom':
+                $startDate = $startDateParam ? Carbon::parse($startDateParam) : $now->copy()->startOfMonth();
+                $endDate   = $endDateParam ? Carbon::parse($endDateParam) : $now->copy()->endOfDay();
+                $periodLabel = 'Periode : ' . $startDate->format('d/m/Y') . ' - ' . $endDate->format('d/m/Y');
+                break;
+            case 'this_month':
+            default:
+                $periodLabel = 'Periode : ' . $now->translatedFormat('F Y');
+                break;
+        }
+
+        return Excel::download(new StockExport($periodLabel), 'Laporan_Stok_Semua_Cabang_' . date('Ymd_His') . '.xlsx');
     }
 
     private function calculateAnalytics(Request $request): array
@@ -271,6 +301,79 @@ class HODashboardController extends Controller
             ];
         }
 
+        // 9. STOCK INFO (ETALASE & GUDANG FOR PMI)
+        $stockInfo = null;
+        if ($pharmacyId !== 'all' && !empty($pharmacyId)) {
+            $etalaseQty = DB::table('medicine_transfer_items as mt')
+                ->join('batches as b', 'b.id', '=', 'mt.batches_id')
+                ->join('medicines as m', 'm.id', '=', 'b.medicine_id')
+                ->where('mt.status', 1)
+                ->where('b.pharmacy_id', $pharmacyId)
+                ->where(function ($q) {
+                    $q->whereNull('mt.source_type')
+                      ->orWhere('mt.source_type', '!=', 'retur_gudang');
+                })
+                ->sum('mt.qty');
+                
+            $etalaseValue = DB::table('medicine_transfer_items as mt')
+                ->join('batches as b', 'b.id', '=', 'mt.batches_id')
+                ->join('medicines as m', 'm.id', '=', 'b.medicine_id')
+                ->where('mt.status', 1)
+                ->where('b.pharmacy_id', $pharmacyId)
+                ->where(function ($q) {
+                    $q->whereNull('mt.source_type')
+                      ->orWhere('mt.source_type', '!=', 'retur_gudang');
+                })
+                ->sum(DB::raw('mt.qty * m.net_price'));
+                
+            $etalaseNearEdQty = DB::table('medicine_transfer_items as mt')
+                ->join('batches as b', 'b.id', '=', 'mt.batches_id')
+                ->join('medicines as m', 'm.id', '=', 'b.medicine_id')
+                ->where('mt.status', 1)
+                ->where('b.pharmacy_id', $pharmacyId)
+                ->where(function ($q) {
+                    $q->whereNull('mt.source_type')
+                      ->orWhere('mt.source_type', '!=', 'retur_gudang');
+                })
+                ->whereNotNull('b.expired_date')
+                ->where('b.expired_date', '!=', '')
+                ->where('b.expired_date', '<=', now()->addMonths(6)->format('Y-m-d'))
+                ->where('b.expired_date', '>=', now()->format('Y-m-d'))
+                ->sum('mt.qty');
+                
+            $stockInfo = [
+                'etalase_qty' => (int) $etalaseQty,
+                'etalase_near_ed_qty' => (int) $etalaseNearEdQty,
+                'etalase_value_rp' => 'Rp ' . number_format((float)$etalaseValue, 0, ',', '.'),
+            ];
+
+            // If PMI (id 1)
+            if ($pharmacyId == 1) {
+                $gudangQty = DB::table('batches')
+                    ->join('medicines as m', 'm.id', '=', 'batches.medicine_id')
+                    ->where('batches.pharmacy_id', 9)
+                    ->sum('batches.stock');
+
+                $gudangValue = DB::table('batches')
+                    ->join('medicines as m', 'm.id', '=', 'batches.medicine_id')
+                    ->where('batches.pharmacy_id', 9)
+                    ->sum(DB::raw('batches.stock * m.net_price'));
+
+                $gudangNearEdQty = DB::table('batches')
+                    ->join('medicines as m', 'm.id', '=', 'batches.medicine_id')
+                    ->where('batches.pharmacy_id', 9)
+                    ->whereNotNull('batches.expired_date')
+                    ->where('batches.expired_date', '!=', '')
+                    ->where('batches.expired_date', '<=', now()->addMonths(6)->format('Y-m-d'))
+                    ->where('batches.expired_date', '>=', now()->format('Y-m-d'))
+                    ->sum('batches.stock');
+
+                $stockInfo['gudang_qty'] = (int) $gudangQty;
+                $stockInfo['gudang_near_ed_qty'] = (int) $gudangNearEdQty;
+                $stockInfo['gudang_value_rp'] = 'Rp ' . number_format((float)$gudangValue, 0, ',', '.');
+            }
+        }
+
         return [
             'period'               => $period,
             'period_label'         => $periodLabel,
@@ -279,6 +382,7 @@ class HODashboardController extends Controller
             'target_year'          => $targetYear,
             'pharmacy_id'          => $pharmacyId,
             'branch_list'          => $branchList,
+            'stock_info'           => $stockInfo,
             
             // Metrics Summary
             'total_sales'          => $totalSalesAmount,

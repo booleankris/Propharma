@@ -53,7 +53,7 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
             [$pharmacy->address ?? ''],
             [''],
             [$reportTitle],
-            ['Tanggal : ' . $this->startDate->format('d/m/Y') . ' s/d ' . $this->endDate->format('d/m/Y')],
+            ['Tanggal Faktur : ' . $this->startDate->format('d/m/Y') . ' s/d ' . $this->endDate->format('d/m/Y')],
             [''],
         ];
 
@@ -75,7 +75,8 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
             ->leftJoin('creditors', 'creditors.code', '=', 'order_items.creditor_code')
             ->whereIn('receiving.pharmacy_id', $targetPharmacyIds)
             ->whereNotNull('receiving_items.batches_id')
-            ->whereBetween('receiving_details.created_at', [$this->startDate, $this->endDate]);
+            ->whereDate('receiving_details.invoice_date', '>=', $this->startDate->toDateString())
+            ->whereDate('receiving_details.invoice_date', '<=', $this->endDate->toDateString());
 
         if ($this->paymentType !== null) {
             if ($this->paymentType === 'OTHER') {
