@@ -94,7 +94,7 @@ class MedicineController extends Controller
             'name'                 => 'required|string|max:255',
             'packaging'            => 'nullable|string|max:255',
             'unit'                 => 'nullable|string|max:100',
-            'content'              => 'nullable|string|max:255',
+            'content'              => $request->has('is_active') ? 'required|numeric|min:1' : 'nullable|string|max:255',
             'dosage'               => 'nullable|string|max:255',
             'strip'               => 'nullable|string|max:255',
             'raw_price'            => 'nullable|numeric',
@@ -112,7 +112,12 @@ class MedicineController extends Controller
             'status'               => 'nullable|boolean',
         ]);
 
-        // Handle checkbox: if checked, set content to 1, otherwise use the input value
+        $priceMultiplier = $request->boolean('is_active') ? max((float) $request->input('content', 1), 1) : 1;
+        $enteredHna = (float) $request->input('pharmacy_net_price', 0);
+        $unitHna = $enteredHna / $priceMultiplier;
+        $unitNetPrice = floor($unitHna * 1.11);
+
+        // Utuh stores the selected pack content; otherwise the medicine is priced per unit.
         $contentValue = $request->has('is_active') ? ($request->input('content') ?: null) : 1;
 
         // Insert the new medicine record
@@ -132,15 +137,15 @@ class MedicineController extends Controller
             'content'              => $contentValue,  // Store content value (either 1 or user input)
             'dosage'               => $request->dosage,
             'strip'                => $request->strip,
-            'raw_price'            => $request->raw_price,
-            'pharmacy_net_price'   => $request->pharmacy_net_price,
-            'net_price'            => $request->net_price,
+            'raw_price'            => $unitHna,
+            'pharmacy_net_price'   => $unitHna,
+            'net_price'            => $unitNetPrice,
             'het_price'            => $request->het_price ?? 0,
             'minimal_stock'        => $request->minimal_stock ?? 0,
             'stock'                => $request->stock ?? 0,
             'psychotropic'         => $request->boolean('psychotropic') ? 1 : 0,
             'preparations'         => $request->preparations,
-            'whole'                => $request->boolean('whole') ? 1 : 0,
+            'whole'                => $request->boolean('is_active') ? 1 : 0,
             'precursor'            => $request->boolean('precursor') ? 1 : 0,
             'receipt'              => $request->boolean('receipt') ? 1 : 0,
             'etalase'              => $request->input('etalase'),
@@ -178,7 +183,7 @@ class MedicineController extends Controller
             'name'                 => 'required|string|max:255',
             'packaging'            => 'nullable|string|max:255',
             'unit'                 => 'nullable|string|max:100',
-            'content'              => 'nullable|string|max:255',
+            'content'              => $request->has('is_active') ? 'required|numeric|min:1' : 'nullable|string|max:255',
             'dosage'               => 'nullable|string|max:255',
             'strip'                => 'nullable|string|max:255',
             'raw_price'            => 'nullable|numeric',
@@ -199,9 +204,13 @@ class MedicineController extends Controller
         // Find the existing medicine record
         $medicine = Medicines::findOrFail($id);
 
-        // Check if checkbox is checked, if so, set content to 1, otherwise use the input value
+        // Utuh stores the selected pack content; otherwise the medicine is priced per unit.
         $contentValue = $request->has('is_active') ? ($request->input('content') ?: null) : 1;
         $oldPrice = $medicine->pharmacy_net_price;
+        $priceMultiplier = $request->boolean('is_active') ? max((float) $request->input('content', 1), 1) : 1;
+        $enteredHna = (float) $request->input('pharmacy_net_price', 0);
+        $unitHna = $enteredHna / $priceMultiplier;
+        $unitNetPrice = floor($unitHna * 1.11);
 
         // Update the medicine record
         $medicine->update([
@@ -220,15 +229,15 @@ class MedicineController extends Controller
             'content'              => $contentValue,  // Store the content value (either 1 or user input)
             'dosage'               => $request->dosage,
             'strip'                => $request->strip,
-            'raw_price'            => $request->raw_price,
-            'pharmacy_net_price'   => $request->pharmacy_net_price,
-            'net_price'            => $request->net_price,
+            'raw_price'            => $unitHna,
+            'pharmacy_net_price'   => $unitHna,
+            'net_price'            => $unitNetPrice,
             'het_price'            => $request->het_price ?? 0,
             'minimal_stock'        => $request->minimal_stock ?? 0,
             'stock'                => $request->stock ?? 0,
             'psychotropic'         => $request->boolean('psychotropic') ? 1 : 0,
             'preparations'         => $request->preparations,
-            'whole'                => $request->boolean('whole') ? 1 : 0,
+            'whole'                => $request->boolean('is_active') ? 1 : 0,
             'precursor'            => $request->boolean('precursor') ? 1 : 0,
             'receipt'              => $request->boolean('receipt') ? 1 : 0,
             'etalase'              => $request->input('etalase'),
@@ -242,7 +251,7 @@ class MedicineController extends Controller
             'user_id'      => auth()->user()->id,
             'medicine_id'  => $id,
             'old_price'    => $oldPrice,
-            'new_price'    => $request->pharmacy_net_price
+            'new_price'    => $unitHna
         ]);
 
         // Sync creditors (if applicable)

@@ -725,13 +725,8 @@ class ReceivingController extends Controller
         $query = MedicinePriceHistory::with(['medicines', 'user'])
             ->select('medicine_price_history.*');
 
-        if ($request->filled('search_medicine')) {
-            $kw = $request->search_medicine;
-            $query->whereHas('medicines', function ($q) use ($kw) {
-                $q
-                    ->where('name', 'like', "%{$kw}%")
-                    ->orWhere('code', 'like', "%{$kw}%");
-            });
+        if ($request->filled('medicine_id')) {
+            $query->where('medicine_id', $request->integer('medicine_id'));
         }
 
         if ($request->filled('start_date')) {
@@ -2049,8 +2044,9 @@ class ReceivingController extends Controller
     {
         $search = trim((string) $request->input('search', ''));
         $search = preg_replace('/\s+/', ' ', $search);
+        $historyFilter = $request->boolean('history_filter');
 
-        if (mb_strlen($search) < 2) {
+        if (mb_strlen($search) < ($historyFilter ? 1 : 2)) {
             return response()->json(['data' => []]);
         }
 
@@ -2083,7 +2079,7 @@ class ReceivingController extends Controller
                     ELSE 4
                 END, medicines.name ASC
             ", [$search . '%', '%-' . $search . '%', $search . '%'])
-            ->limit(20)
+            ->limit($historyFilter ? 10 : 20)
             ->get();
 
         return response()->json([

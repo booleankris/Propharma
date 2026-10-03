@@ -131,6 +131,7 @@
         /* ── Search bar ── */
         .filter-input {
             width: 100%;
+            height: 46px;
             border-radius: 10px;
             border: 1px solid #d1d5db;
             background: #fff;
@@ -147,10 +148,81 @@
 
         .filter-label {
             font-size: 12px;
-            font-weight: 600;
-            color: #374151;
-            margin-bottom: 5px;
+            font-weight: 700;
+            color: #334155;
+            margin-bottom: 7px;
+            letter-spacing: .01em;
         }
+
+        .medicine-filter-shell {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .medicine-filter-shell .filter-input {
+            height: 46px;
+            padding-left: 42px;
+            padding-right: 38px;
+            border-color: #dbe3ef;
+            border-radius: 12px;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, .03);
+        }
+
+        .medicine-filter-shell .filter-input:focus {
+            border-color: #60a5fa;
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, .12), 0 4px 12px rgba(15, 23, 42, .05);
+        }
+
+        .medicine-search-icon {
+            position: absolute;
+            left: 14px;
+            width: 17px;
+            height: 17px;
+            color: #94a3b8;
+            pointer-events: none;
+        }
+
+        .medicine-options-panel {
+            top: calc(100% + 8px);
+            overflow: hidden;
+            border: 1px solid #e2e8f0;
+            border-radius: 14px;
+            background: #fff;
+            box-shadow: 0 16px 38px rgba(15, 23, 42, .16), 0 3px 8px rgba(15, 23, 42, .06);
+        }
+
+        .medicine-option {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-height: 62px;
+            padding: 10px 14px;
+            border-bottom: 1px solid #f1f5f9;
+            transition: background-color .12s ease;
+        }
+
+        .medicine-option:last-child { border-bottom: 0; }
+        .medicine-option:hover, .medicine-option.is-active { background: #eff6ff; }
+
+        .medicine-option-mark {
+            display: flex;
+            width: 34px;
+            height: 34px;
+            flex: 0 0 34px;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            background: #eff6ff;
+            color: #2563eb;
+        }
+
+        .medicine-option.is-active .medicine-option-mark { background: #dbeafe; }
+
+        .medicine-option-copy { min-width: 0; flex: 1; }
+        .medicine-option-name { overflow: hidden; color: #1e293b; font-size: 13px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+        .medicine-option-code { margin-top: 2px; color: #64748b; font-size: 11px; }
+        .medicine-option-enter { color: #94a3b8; font-size: 11px; }
 
         /* ── Price value styling ── */
         .price-old {
@@ -227,14 +299,19 @@
             </div>
 
             {{-- ─── Filter bar ─── --}}
-            <div class="bg-white rounded-2xl shadow-sm p-5">
+            <div class="bg-white border border-slate-200/80 rounded-2xl shadow-sm p-5">
                 <div class="flex flex-wrap gap-3 items-end">
 
                     {{-- Medicine search --}}
-                    <div class="flex-1 min-w-[200px]">
+                    <div class="flex-1 min-w-[240px] relative">
                         <div class="filter-label">Cari Obat</div>
-                        <input type="text" id="searchMedicine" class="filter-input" placeholder="Nama atau kode obat..."
-                            autocomplete="off">
+                        <div class="medicine-filter-shell">
+                            <svg class="medicine-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg>
+                            <input type="text" id="searchMedicine" class="filter-input" placeholder="Cari nama atau kode obat..."
+                                autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="medicineOptions">
+                        </div>
+                        <input type="hidden" id="selectedMedicineId">
+                        <div id="medicineOptions" class="medicine-options-panel hidden absolute z-30 w-full max-h-72 overflow-y-auto" role="listbox" aria-label="Pilihan obat"></div>
                     </div>
 
                     {{-- Date range --}}
@@ -247,7 +324,7 @@
                     {{-- Reset --}}
                     <div>
                         <button id="btnReset"
-                            class="px-4 py-2.5 rounded-lg border border-gray-300 text-sm font-medium text-gray-600 hover:bg-gray-50 transition">
+                            class="h-[46px] px-4 rounded-lg border border-gray-300 text-sm font-medium text-gray-600 hover:bg-gray-50 transition">
                             Reset Filter
                         </button>
                     </div>
@@ -291,8 +368,70 @@
         // ════════════════════════════════════════
         let startDate = '';
         let endDate = '';
-        let searchTimer = null;
         let historyTable = null;
+        let medicineLookupTimer = null;
+        let activeMedicineOption = -1;
+
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, char => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
+            }[char]));
+        }
+
+        function closeMedicineOptions() {
+            document.getElementById('medicineOptions').classList.add('hidden');
+            document.getElementById('searchMedicine').setAttribute('aria-expanded', 'false');
+            activeMedicineOption = -1;
+        }
+
+        function setActiveMedicineOption(index) {
+            const buttons = [...document.querySelectorAll('#medicineOptions .medicine-option')];
+            if (!buttons.length) return;
+            activeMedicineOption = (index + buttons.length) % buttons.length;
+            buttons.forEach((button, i) => {
+                const isActive = i === activeMedicineOption;
+                button.classList.toggle('is-active', isActive);
+                button.setAttribute('aria-selected', isActive ? 'true' : 'false');
+            });
+            buttons[activeMedicineOption].scrollIntoView({ block: 'nearest' });
+        }
+
+        function renderMedicineOptions(items) {
+            const options = document.getElementById('medicineOptions');
+            if (!items.length) {
+                options.innerHTML = '<div class="px-4 py-5 text-center"><div class="text-sm font-semibold text-slate-700">Obat tidak ditemukan</div><div class="mt-1 text-xs text-slate-400">Coba kata kunci atau kode yang berbeda.</div></div>';
+            } else {
+                options.innerHTML = items.map(item => `
+                    <button type="button" role="option" aria-selected="false" class="medicine-option w-full text-left" data-id="${escapeHtml(item.id)}" data-code="${escapeHtml(item.code)}" data-name="${escapeHtml(item.name)}">
+                        <span class="medicine-option-mark"><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3h4v5.5l4.6 7.9A3 3 0 0 1 16 21H8a3 3 0 0 1-2.6-4.6L10 8.5V3Z"></path><path d="M9 14h6"></path></svg></span>
+                        <span class="medicine-option-copy"><span class="medicine-option-name block">${escapeHtml(item.name)}</span><span class="medicine-option-code block">Kode ${escapeHtml(item.code || '-')}</span></span>
+                        <span class="medicine-option-enter">Pilih ↵</span>
+                    </button>`).join('');
+            }
+            options.classList.remove('hidden');
+            document.getElementById('searchMedicine').setAttribute('aria-expanded', 'true');
+            activeMedicineOption = -1;
+        }
+
+        function searchMasterMedicines(term) {
+            clearTimeout(medicineLookupTimer);
+            medicineLookupTimer = setTimeout(async () => {
+                if (term.trim().length < 1) {
+                    closeMedicineOptions();
+                    return;
+                }
+                try {
+                    const response = await axios.get("{{ route('receiving.revision.searchMasterMedicine') }}", {
+                        params: { search: term.trim(), history_filter: 1 }
+                    });
+                    // Ignore a slower response if the user has typed a newer query.
+                    if (document.getElementById('searchMedicine').value.trim() !== term.trim()) return;
+                    renderMedicineOptions(response.data.data || []);
+                } catch (error) {
+                    closeMedicineOptions();
+                }
+            }, 250);
+        }
 
         // ════════════════════════════════════════
         // SUMMARY CARDS  – computed from current
@@ -353,7 +492,7 @@
                 ajax: {
                     url: "{{ route('receiving.gethistory') }}",
                     data: function(d) {
-                        d.search_medicine = document.getElementById('searchMedicine').value.trim();
+                        d.medicine_id = document.getElementById('selectedMedicineId').value;
                         d.start_date = startDate;
                         d.end_date = endDate;
                     }
@@ -420,17 +559,56 @@
                 }
             });
 
-            // ── Medicine search with 400 ms debounce ──
+            // ── Medicine search and select ──
             document.getElementById('searchMedicine').addEventListener('input', function() {
-                clearTimeout(searchTimer);
-                searchTimer = setTimeout(() => {
-                    historyTable.ajax.reload(null, false);
-                }, 400);
+                const hadSelection = !!document.getElementById('selectedMedicineId').value;
+                document.getElementById('selectedMedicineId').value = '';
+                if (hadSelection) historyTable.ajax.reload(null, false);
+                searchMasterMedicines(this.value);
+            });
+
+            document.getElementById('searchMedicine').addEventListener('keydown', function(event) {
+                const options = document.getElementById('medicineOptions');
+                const isOpen = !options.classList.contains('hidden');
+                const optionCount = options.querySelectorAll('.medicine-option').length;
+
+                if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                    if (!isOpen || !optionCount) return;
+                    event.preventDefault();
+                    const step = event.key === 'ArrowDown' ? 1 : -1;
+                    setActiveMedicineOption(activeMedicineOption === -1
+                        ? (step === 1 ? 0 : optionCount - 1)
+                        : activeMedicineOption + step);
+                } else if (event.key === 'Enter' && isOpen && optionCount) {
+                    event.preventDefault();
+                    const index = activeMedicineOption === -1 ? 0 : activeMedicineOption;
+                    options.querySelectorAll('.medicine-option')[index]?.click();
+                } else if (event.key === 'Escape' && isOpen) {
+                    event.preventDefault();
+                    closeMedicineOptions();
+                }
+            });
+
+            document.getElementById('medicineOptions').addEventListener('click', function(event) {
+                const option = event.target.closest('.medicine-option');
+                if (!option) return;
+                document.getElementById('selectedMedicineId').value = option.dataset.id;
+                document.getElementById('searchMedicine').value = `${option.dataset.code} - ${option.dataset.name}`;
+                closeMedicineOptions();
+                historyTable.ajax.reload(null, false);
+            });
+
+            document.addEventListener('click', function(event) {
+                if (!event.target.closest('#searchMedicine') && !event.target.closest('#medicineOptions')) {
+                    closeMedicineOptions();
+                }
             });
 
             // ── Reset button ──
             document.getElementById('btnReset').addEventListener('click', function() {
                 document.getElementById('searchMedicine').value = '';
+                document.getElementById('selectedMedicineId').value = '';
+                closeMedicineOptions();
                 document.getElementById('dateRange').value = '';
                 startDate = '';
                 endDate = '';

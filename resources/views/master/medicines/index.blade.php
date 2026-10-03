@@ -366,7 +366,7 @@
 
                             <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
                                 <div>
-                                    <label class="block text-xs font-bold text-gray-700 mb-1">Harga HNA (Beli)</label>
+                                    <label class="block text-xs font-bold text-gray-700 mb-1"><span>Harga HNA (Beli)</span> <span id="hnaUnitLabel" class="font-medium text-blue-600">(per satuan)</span></label>
                                     <input id="pharmacy_net_price" name="pharmacy_net_price" type="text"
                                         class="w-full rounded-lg border border-gray-300 px-3.5 py-2 text-xs font-semibold text-gray-800"
                                         placeholder="Rp 0">
@@ -685,11 +685,24 @@
             el.value = raw === '0' ? '' : toRupiah(parseInt(raw, 10));
         }
 
-        /** Recalculate PPN (11%) from HNA; also mirror raw_price = HNA */
+        function hnaMultiplier() {
+            const packChecked = document.getElementById('pack')?.checked;
+            const content = parseFloat(document.getElementById('content')?.value) || 1;
+            return packChecked && content > 0 ? content : 1;
+        }
+
+        function updateHnaUnitLabel() {
+            const label = document.getElementById('hnaUnitLabel');
+            if (label) label.textContent = document.getElementById('pack')?.checked ? '(per box)' : '(per satuan)';
+        }
+
+        /** HNA is entered at the selected pack size, while stored prices stay per unit. */
         function recalcPPN() {
-            const hna = parseInt(stripRupiah(elPNP.value), 10) || 0;
-            elNet.value = toRupiah(Math.floor(hna * 1.11));
-            elRaw.value = hna; // hidden raw_price mirrors HNA
+            const enteredHna = parseInt(stripRupiah(elPNP.value), 10) || 0;
+            const unitHna = enteredHna / hnaMultiplier();
+            elNet.value = toRupiah(Math.floor(unitHna * 1.11));
+            elRaw.value = unitHna;
+            updateHnaUnitLabel();
         }
 
         // ════════════════════════════════════════════════
@@ -748,6 +761,7 @@
             elNet.value = 'Rp 0';
             elHet.value = '';
             elRaw.value = '0';
+            updateHnaUnitLabel();
 
             originalCode = '';
             setManualCodeMode(false);
@@ -885,11 +899,13 @@
                 if (el) el.value = row[key] ?? '';
             });
 
-            // Price fields → format as rupiah
-            elPNP.value = row.pharmacy_net_price ? toRupiah(row.pharmacy_net_price) : '';
-            elNet.value = row.net_price ? toRupiah(row.net_price) : 'Rp 0';
+            // Price fields are stored per unit. Show the equivalent whole-box HNA when selected.
+            const packCheckbox = document.getElementById('pack');
+            if (packCheckbox) packCheckbox.checked = Number(row.whole) === 1;
+            const unitHna = Number(row.raw_price) || Number(row.pharmacy_net_price) || 0;
+            elPNP.value = unitHna ? toRupiah(Math.round(unitHna * hnaMultiplier())) : '';
             elHet.value = row.het_price ? toRupiah(row.het_price) : '';
-            elRaw.value = row.raw_price ?? 0;
+            recalcPPN();
 
             // Select2 AJAX fields
             setSelect2Value('#medicine_category_id', row.medicine_category_id, row.category_name);
@@ -902,13 +918,6 @@
             $('#type').val(row.type).trigger('change');
             $('#packaging').val(row.packaging).trigger('change');
             $('#unit').val(row.unit).trigger('change');
-
-            // Set the checkbox based on "content" value
-            const packCheckbox = document.getElementById('pack');
-            if (packCheckbox) {
-                // If content is not '1', check the checkbox; otherwise, uncheck it
-                packCheckbox.checked = row.content !== '1';
-            }
 
             // Code & manual edit reset
             originalCode = row.code ?? '';
@@ -948,7 +957,7 @@
 
             // send cleaned numeric values
             fd.set('generic', document.getElementById('generic_check').checked ? 1 : 0);
-            fd.set('raw_price', stripRupiah(elRaw.value));
+            fd.set('raw_price', elRaw.value || '0');
             fd.set('pharmacy_net_price', stripRupiah(elPNP.value));
             fd.set('net_price', stripRupiah(elNet.value));
 
@@ -1146,6 +1155,8 @@
                 formatField(this);
                 recalcPPN();
             });
+            document.getElementById('pack').addEventListener('change', recalcPPN);
+            document.getElementById('content').addEventListener('input', recalcPPN);
             elHet.addEventListener('input', function() {
                 formatField(this);
             });
