@@ -7,6 +7,13 @@ use Illuminate\Database\Query\Builder;
 
 class ReceivingDateFilter
 {
+    public static function applyToReceiptDetails(Builder $query, CarbonInterface $start, CarbonInterface $end): Builder
+    {
+        return $query
+            ->whereDate('receiving_details.created_at', '>=', $start->toDateString())
+            ->whereDate('receiving_details.created_at', '<=', $end->toDateString());
+    }
+
     public static function apply(Builder $query, CarbonInterface $start, CarbonInterface $end): Builder
     {
         $driver = $query->getConnection()->getDriverName();

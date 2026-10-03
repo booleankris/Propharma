@@ -86,7 +86,7 @@ class InvoiceSingleSheetExport implements FromArray, WithStyles, WithColumnWidth
             ->leftJoin('creditors', 'creditors.code', '=', 'order_items.creditor_code')
             ->whereIn('receiving.pharmacy_id', $targetPharmacyIds)
             ->whereNotNull('receiving_items.batches_id');
-        ReceivingDateFilter::apply($query, $this->startDate, $this->endDate);
+        ReceivingDateFilter::applyToReceiptDetails($query, $this->startDate, $this->endDate);
 
         if ($this->paymentType !== null) {
             if ($this->paymentType === 'OTHER') {
@@ -116,6 +116,7 @@ class InvoiceSingleSheetExport implements FromArray, WithStyles, WithColumnWidth
     {
         $items = $this->baseQuery()
             ->select([
+                'receiving_details.id as receiving_details_id',
                 'receiving_details.invoice_number',
                 'receiving_details.invoice_date',
                 'receiving_details.invoice_due',
@@ -156,7 +157,8 @@ class InvoiceSingleSheetExport implements FromArray, WithStyles, WithColumnWidth
 
         $invoices = [];
         foreach ($items as $item) {
-            $key = $item->invoice_number . '_' . $item->receiving_id;
+            // Each receipt detail owns its received items and receiving number.
+            $key = (string) $item->receiving_details_id;
             if (!isset($invoices[$key])) {
                 $invoices[$key] = [
                     'invoice_number'               => $item->invoice_number,
@@ -210,7 +212,7 @@ class InvoiceSingleSheetExport implements FromArray, WithStyles, WithColumnWidth
         foreach ($invoices as $inv) {
             $tglFaktur  = $inv['invoice_date']
                 ? Carbon::parse($inv['invoice_date'])->format('d/m/Y') : '-';
-            $tglTerima  = ReceivingDateFilter::format($inv['receiving_date'], $inv['receiving_details_created_at']);
+            $tglTerima  = ReceivingDateFilter::format(null, $inv['receiving_details_created_at']);
             $jatuhTempo = $inv['invoice_due']
                 ? Carbon::parse($inv['invoice_due'])->format('d/m/Y') : '-';
 
