@@ -17,6 +17,7 @@ use App\Models\Pharmacies;
 use App\Models\Receiving;
 use App\Models\ReceivingDetails;
 use App\Services\ConsignmentService;
+use App\Services\Finance\MonitoringPenjualanService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
@@ -159,7 +160,7 @@ class FinanceController extends Controller
      * Ringkasan omzet kasir per hari dan shift. Data bersumber dari transaksi
      * selesai; metode yang belum dikonfirmasi pemetaan akuntansinya tetap terpisah.
      */
-    public function cashflow(Request $request)
+    public function cashflow(Request $request, MonitoringPenjualanService $monitoringPenjualan)
     {
         $validated = $request->validate([
             'start_date' => 'nullable|date_format:Y-m-d',
@@ -282,15 +283,16 @@ class FinanceController extends Controller
 
         return Inertia::render('Finance/Cashflow', [
             'days' => $reportDays,
+            'monitoringDays' => $monitoringPenjualan->build($pharmacyIds, $startDate, $endDate),
             'filters' => ['start_date' => $startDate, 'end_date' => $endDate],
             'branchContext' => $this->getBranchContext(),
         ]);
     }
 
-    public function exportCashflow(Request $request)
+    public function exportCashflow(Request $request, MonitoringPenjualanService $monitoringPenjualan)
     {
         $request->merge(['download_xlsx' => true]);
-        return $this->cashflow($request);
+        return $this->cashflow($request, $monitoringPenjualan);
     }
 
     /**

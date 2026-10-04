@@ -3,6 +3,7 @@ import { router } from '@inertiajs/react';
 import { ArrowDownUp, CalendarDays, CreditCard, Landmark, Wallet, CircleHelp, Download } from 'lucide-react';
 import FinanceLayout from './Layouts/FinanceLayout';
 import { formatRupiah } from './Components/Utils';
+import MonitoringPenjualan from './MonitoringPenjualan';
 
 const banks = [
     { key: 'BNI', label: 'BNI' },
@@ -43,9 +44,10 @@ function AmountCell({ amount = 0, count = 0, detail = null }) {
 
 function shiftColumnCount() { return 1 + banks.length * 2 + 2; }
 
-export default function Cashflow({ days = [], filters = {} }) {
+export default function Cashflow({ days = [], monitoringDays = [], filters = {} }) {
     const [startDate, setStartDate] = useState(filters.start_date || '');
     const [endDate, setEndDate] = useState(filters.end_date || '');
+    const [activeTab, setActiveTab] = useState('sheet');
     const totals = useMemo(() => days.reduce((acc, day) => {
         for (const shift of [...shifts.map((item) => item.key), 'otherShift']) {
             const row = day[shift] || {};
@@ -82,10 +84,20 @@ export default function Cashflow({ days = [], filters = {} }) {
                         <label className="grid gap-1 text-xs font-semibold text-slate-600">Dari tanggal<input aria-label="Dari tanggal" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="rounded-lg border-slate-300 text-sm" /></label>
                         <label className="grid gap-1 text-xs font-semibold text-slate-600">Sampai tanggal<input aria-label="Sampai tanggal" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="rounded-lg border-slate-300 text-sm" /></label>
                         <button className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700">Terapkan</button>
-                        <a href={`/finance/cashflow/export?start_date=${encodeURIComponent(startDate)}&end_date=${encodeURIComponent(endDate)}`} className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-800 hover:bg-emerald-100"><Download className="h-4 w-4" />Export Excel</a>
+                        {activeTab === 'sheet' && <a href={`/finance/cashflow/export?start_date=${encodeURIComponent(startDate)}&end_date=${encodeURIComponent(endDate)}`} className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-800 hover:bg-emerald-100"><Download className="h-4 w-4" />Export Excel</a>}
                     </form>
                 </section>
 
+                <div role="tablist" aria-label="Laporan cashflow" className="flex w-fit flex-wrap gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+                    {[
+                        { key: 'sheet', label: 'Lembar Omzet Harian' },
+                        { key: 'monitoring', label: 'Monitoring Penjualan' },
+                    ].map((tab) => <button key={tab.key} role="tab" aria-selected={activeTab === tab.key} onClick={() => setActiveTab(tab.key)} className={`rounded-lg px-4 py-2.5 text-sm font-semibold transition ${activeTab === tab.key ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}>
+                        {tab.label}
+                    </button>)}
+                </div>
+
+                {activeTab === 'monitoring' ? <MonitoringPenjualan days={monitoringDays} /> : <>
                 <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                     <Metric label="Total setoran" value={totals.deposit} note="Cash + Transfer/QRIS; EDC pending dikecualikan" icon={CalendarDays} tone="bg-blue-50 text-blue-700" />
                     <Metric label="Cash" value={totals.cash} note="Penerimaan tunai" icon={Wallet} tone="bg-emerald-50 text-emerald-700" />
@@ -200,6 +212,7 @@ export default function Cashflow({ days = [], filters = {} }) {
                         ))))}
                     </div>
                 </section>}
+                </>}
             </div>
         </FinanceLayout>
     );

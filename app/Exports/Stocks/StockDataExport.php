@@ -87,6 +87,24 @@ class StockDataExport implements FromCollection, WithHeadings, WithStyles, Shoul
                     ->when($req && $req->filled('start_date'), fn($q) => $q->whereDate('items_log.date', '>=', $req->start_date))
                     ->when($req && $req->filled('end_date'), fn($q) => $q->whereDate('items_log.date', '<=', $req->end_date)),
 
+                // Net stock opname, adjustment, and mutation movements used to
+                // reconstruct the opening balance from realtime stock.
+                'qty_adjustments' => ItemsLog::select(DB::raw("COALESCE(SUM(CASE
+                    WHEN items_log.status = 5 THEN CASE
+                        WHEN items_log.total IS NOT NULL
+                            AND TRIM(items_log.total) REGEXP '^[+-]?[0-9]+([.][0-9]+)?([eE][+-]?[0-9]+)?$'
+                            THEN CAST(items_log.total AS SIGNED)
+                        ELSE CAST(items_log.qty_after AS SIGNED) - CAST(items_log.qty_before AS SIGNED)
+                    END
+                    ELSE CAST(items_log.qty_after AS SIGNED) - CAST(items_log.qty_before AS SIGNED)
+                END), 0)"))
+                    ->join('batches', 'batches.id', '=', 'items_log.batches_id')
+                    ->whereColumn('items_log.medicine_id', 'medicines.id')
+                    ->whereIn('items_log.status', [5, 6, 7])
+                    ->whereIn('batches.pharmacy_id', $startPharmacyIds)
+                    ->when($req && $req->filled('start_date'), fn($q) => $q->whereDate('items_log.date', '>=', $req->start_date))
+                    ->when($req && $req->filled('end_date'), fn($q) => $q->whereDate('items_log.date', '<=', $req->end_date)),
+
                 // Stok Gudang (hanya jika ada akses gudang)
                 'qty_storage' => $canSeeWarehouse
                     ? Batches::select(DB::raw('COALESCE(SUM(stock), 0)'))
@@ -145,9 +163,10 @@ class StockDataExport implements FromCollection, WithHeadings, WithStyles, Shoul
 
             $netIn = $qtyOrders - $qtyOrdersRt;
             $netOut = $qtySales - $qtySalesRt;
+            $adjustments = (int) ($m->qty_adjustments ?? 0);
 
-            $qtyStart = $totalStok - $netIn + $netOut;
-            $sisaStok = $qtyStart + $netIn - $netOut;
+            $qtyStart = $totalStok - $netIn + $netOut - $adjustments;
+            $sisaStok = $totalStok;
 
             $p = $m->payment_method ? strtoupper(trim($m->payment_method)) : null;
             $keterangan = ($p === 'TUNAI' || $p === 'CASH') ? 'Cash' : (($p === 'KREDIT') ? 'Kredit' : (($p === 'KONSINYASI') ? 'Konsinyasi' : ($p ? ucfirst(strtolower($p)) : '-')));

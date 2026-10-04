@@ -620,6 +620,24 @@ class SuppliesController extends Controller
                         ->when($request->filled('start_date'), fn($q) => $q->whereDate('items_log.date', '>=', $request->start_date))
                         ->when($request->filled('end_date'), fn($q) => $q->whereDate('items_log.date', '<=', $request->end_date)),
 
+                    // Net stock opname, adjustment, and mutation movements are
+                    // required to reconstruct the opening balance from realtime stock.
+                    'qty_adjustments' => ItemsLog::select(DB::raw("COALESCE(SUM(CASE
+                        WHEN items_log.status = 5 THEN CASE
+                            WHEN items_log.total IS NOT NULL
+                                AND TRIM(items_log.total) REGEXP '^[+-]?[0-9]+([.][0-9]+)?([eE][+-]?[0-9]+)?$'
+                                THEN CAST(items_log.total AS SIGNED)
+                            ELSE CAST(items_log.qty_after AS SIGNED) - CAST(items_log.qty_before AS SIGNED)
+                        END
+                        ELSE CAST(items_log.qty_after AS SIGNED) - CAST(items_log.qty_before AS SIGNED)
+                    END), 0)"))
+                        ->join('batches', 'batches.id', '=', 'items_log.batches_id')
+                        ->whereColumn('items_log.medicine_id', 'medicines.id')
+                        ->whereIn('items_log.status', [5, 6, 7])
+                        ->whereIn('batches.pharmacy_id', $startPharmacyIds)
+                        ->when($request->filled('start_date'), fn($q) => $q->whereDate('items_log.date', '>=', $request->start_date))
+                        ->when($request->filled('end_date'), fn($q) => $q->whereDate('items_log.date', '<=', $request->end_date)),
+
                     // Stok Gudang (hanya jika cabang memiliki/mengakses Gudang PMI)
                     'qty_storage' => $canSeeWarehouse
                         ? Batches::select(DB::raw('COALESCE(SUM(stock), 0)'))
@@ -669,8 +687,9 @@ class SuppliesController extends Controller
 
                     $netIn = (int) ($m->qty_orders ?? 0) - (int) ($m->qty_orders_rt ?? 0);
                     $netOut = (int) ($m->qty_sales ?? 0) - (int) ($m->qty_sales_rt ?? 0);
+                    $adjustments = (int) ($m->qty_adjustments ?? 0);
 
-                    return $totalNow - $netIn + $netOut;
+                    return $totalNow - $netIn + $netOut - $adjustments;
                 })
                 ->editColumn('qty_orders', fn($m) => (int) ($m->qty_orders ?? 0))
                 ->editColumn('qty_sales', fn($m) => (int) ($m->qty_sales ?? 0))
@@ -678,12 +697,7 @@ class SuppliesController extends Controller
                     $storage = $canSeeWarehouse ? (int) ($m->qty_storage ?? 0) : 0;
                     $counter = (int) ($m->qty_counter ?? 0);
                     $totalNow = $storage + $counter;
-
-                    $netIn = (int) ($m->qty_orders ?? 0) - (int) ($m->qty_orders_rt ?? 0);
-                    $netOut = (int) ($m->qty_sales ?? 0) - (int) ($m->qty_sales_rt ?? 0);
-                    $qtyStart = $totalNow - $netIn + $netOut;
-
-                    return $qtyStart + $netIn - $netOut;
+                    return $totalNow;
                 })
                 ->editColumn('qty_storage', fn($m) => (int) ($m->qty_storage ?? 0))
                 ->editColumn('qty_counter', fn($m) => (int) ($m->qty_counter ?? 0))
