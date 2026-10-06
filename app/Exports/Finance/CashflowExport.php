@@ -59,6 +59,22 @@ class CashflowExport implements FromArray, WithColumnWidths, WithEvents, WithSty
         return $rows;
     }
 
+    /** Return the same sheet data with concrete totals for the HTML preview. */
+    public function previewArray(): array
+    {
+        $rows = $this->array();
+        $totalIndex = count($rows) - 1;
+        for ($column = 1; $column < count($rows[$totalIndex]); $column++) {
+            $total = 0;
+            foreach (array_slice($rows, 3, count($this->days)) as $row) {
+                $value = $row[$column] ?? null;
+                if (is_numeric($value)) $total += (float) $value;
+            }
+            $rows[$totalIndex][$column] = $total;
+        }
+        return $rows;
+    }
+
     private function headerRowOne(): array
     {
         return array_merge(['TANGGAL', 'PAGI'], array_fill(0, 16, ''), ['MALAM'], array_fill(0, 16, ''), ['TOTAL SETORAN', '', '']);

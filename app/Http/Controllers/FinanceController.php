@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Exports\Finance\BiayaExport;
 use App\Exports\Finance\CashExport;
 use App\Exports\Finance\CashflowExport;
+use App\Exports\Finance\MonitoringPenjualanExport;
+use App\Exports\Finance\KinerjaOmzetExport;
 use App\Exports\Finance\HutangExport;
 use App\Exports\Finance\PiutangExport;
 use App\Models\Creditor;
@@ -17,7 +19,9 @@ use App\Models\Pharmacies;
 use App\Models\Receiving;
 use App\Models\ReceivingDetails;
 use App\Services\ConsignmentService;
+use App\Services\Finance\CashflowReportService;
 use App\Services\Finance\MonitoringPenjualanService;
+use App\Services\Finance\KinerjaOmzetService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
@@ -160,139 +164,75 @@ class FinanceController extends Controller
      * Ringkasan omzet kasir per hari dan shift. Data bersumber dari transaksi
      * selesai; metode yang belum dikonfirmasi pemetaan akuntansinya tetap terpisah.
      */
-    public function cashflow(Request $request, MonitoringPenjualanService $monitoringPenjualan)
+    public function cashflow(Request $request, CashflowReportService $cashflowReport, MonitoringPenjualanService $monitoringPenjualan, KinerjaOmzetService $kinerjaOmzet)
     {
         $validated = $request->validate([
-            'start_date' => 'nullable|date_format:Y-m-d',
-            'end_date' => 'nullable|date_format:Y-m-d|after_or_equal:start_date',
+            'month' => 'nullable|integer|min:1|max:12',
+            'year' => 'nullable|integer|min:2000|max:2100',
         ]);
 
-        $startDate = $validated['start_date'] ?? now()->startOfMonth()->toDateString();
-        $endDate = $validated['end_date'] ?? now()->toDateString();
+        $month = (int) ($validated['month'] ?? now()->month);
+        $year = (int) ($validated['year'] ?? now()->year);
+        $periodStart = \Carbon\Carbon::createFromDate($year, $month, 1)->startOfMonth();
+        $periodEnd = $periodStart->copy()->endOfMonth();
+        $startDate = $periodStart->toDateString();
+        $endDate = $periodEnd->toDateString();
         $pharmacyIds = $this->getTargetPharmacyIds();
 
-        $itemDiscounts = DB::table('medicine_cart')
-            ->select('transaction_id')
-            ->selectRaw("SUM(CAST(COALESCE(NULLIF(discount, ''), '0') AS DECIMAL(15,2))) as item_discount")
-            ->where('status', 1)
-            ->groupBy('transaction_id');
-
-        $records = DB::table('medicine_transactions as mt')
-            ->leftJoin('shift_logs as sl', 'sl.id', '=', 'mt.shift_logs_id')
-            ->leftJoin('shift as s', 's.id', '=', 'sl.shift_id')
-            ->leftJoinSub($itemDiscounts, 'cart_discounts', fn ($join) => $join->on('cart_discounts.transaction_id', '=', 'mt.id'))
-            ->where('mt.status', 1)
-            ->whereIn('mt.pharmacy_id', $pharmacyIds)
-            ->whereDate('mt.created_at', '>=', $startDate)
-            ->whereDate('mt.created_at', '<=', $endDate)
-            ->selectRaw("DATE(mt.created_at) as sale_date, s.name as shift_name, UPPER(TRIM(COALESCE(mt.payment_method, ''))) as payment_method, TRIM(COALESCE(mt.transfer_bank_name, '')) as bank_name, mt.transaction_type, COUNT(*) as transaction_count, SUM(CAST(COALESCE(NULLIF(mt.subtotal, ''), '0') AS DECIMAL(15,2))) as amount, SUM(CAST(COALESCE(NULLIF(mt.discount, ''), '0') AS DECIMAL(15,2))) as transaction_discount, SUM(COALESCE(cart_discounts.item_discount, 0)) as item_discount")
-            ->groupByRaw("DATE(mt.created_at), s.name, UPPER(TRIM(COALESCE(mt.payment_method, ''))), TRIM(COALESCE(mt.transfer_bank_name, '')), mt.transaction_type")
-            ->orderBy('sale_date')
-            ->get();
-
-        $bankOrder = ['BNI', 'BRI', 'MANDIRI', 'BCA', 'BPD', 'BTN', 'OTHER'];
-        $emptyShift = function () use ($bankOrder) {
-            $banks = [];
-            foreach ($bankOrder as $bank) {
-                $banks[$bank] = ['edc' => 0, 'transfer' => 0, 'qris' => 0, 'edcCount' => 0, 'transferCount' => 0, 'qrisCount' => 0];
-            }
-            return ['cash' => 0, 'cashCount' => 0, 'banks' => $banks, 'otherMethods' => [], 'discount' => 0, 'itemDiscount' => 0, 'total' => 0, 'edcPending' => 0, 'directDeposit' => 0, 'count' => 0];
-        };
-        $days = [];
-        foreach ($records as $record) {
-            $date = $record->sale_date;
-            $day = $days[$date] ?? [
-                'date' => $date,
-                'morning' => $emptyShift(),
-                'evening' => $emptyShift(),
-                'otherShift' => $emptyShift(),
-            ];
-
-            $shiftName = mb_strtolower(trim((string) $record->shift_name));
-            $shiftKey = str_contains($shiftName, 'pagi') ? 'morning' : (str_contains($shiftName, 'malam') ? 'evening' : 'otherShift');
-            $method = $record->payment_method;
-            $bank = mb_strtoupper(trim((string) $record->bank_name));
-            $bankKey = 'OTHER';
-            foreach (['BNI', 'BRI', 'MANDIRI', 'BCA', 'BPD', 'BTN'] as $knownBank) {
-                if (str_contains($bank, $knownBank)) {
-                    $bankKey = $knownBank;
-                    break;
-                }
-            }
-            $amount = (float) $record->amount;
-            if ($record->transaction_type === 'RETUR JUAL') {
-                $amount = -abs($amount);
-            }
-            $count = (int) $record->transaction_count;
-            $shift = &$day[$shiftKey];
-            $shift['count'] += $count;
-            $shift['discount'] += (float) $record->transaction_discount;
-            $shift['itemDiscount'] += (float) $record->item_discount;
-            $shift['total'] += $amount;
-            if (in_array($method, ['CASH', 'TUNAI'], true)) {
-                $shift['cash'] += $amount;
-                $shift['cashCount'] += $count;
-                $shift['directDeposit'] += $amount;
-            } elseif (in_array($method, ['DEBIT', 'EDC'], true)) {
-                $shift['banks'][$bankKey]['edc'] += $amount;
-                $shift['banks'][$bankKey]['edcCount'] += $count;
-                $shift['edcPending'] += $amount;
-            } elseif ($method === 'QRIS') {
-                $shift['banks'][$bankKey]['transfer'] += $amount;
-                $shift['banks'][$bankKey]['qris'] += $amount;
-                $shift['banks'][$bankKey]['transferCount'] += $count;
-                $shift['banks'][$bankKey]['qrisCount'] += $count;
-                $shift['directDeposit'] += $amount;
-            } else {
-                if ($method === 'TRANSFER') {
-                    $shift['banks'][$bankKey]['transfer'] += $amount;
-                    $shift['banks'][$bankKey]['transferCount'] += $count;
-                    $shift['directDeposit'] += $amount;
-                } else {
-                    $methodLabel = $method !== '' ? $method : 'Metode tidak tercatat';
-                    $shift['otherMethods'][$methodLabel] ??= ['label' => $methodLabel, 'amount' => 0, 'count' => 0];
-                    $shift['otherMethods'][$methodLabel]['amount'] += $amount;
-                    $shift['otherMethods'][$methodLabel]['count'] += $count;
-                }
-            }
-            unset($shift);
-            $days[$date] = $day;
-        }
-
-        $period = \Carbon\CarbonPeriod::create($startDate, $endDate);
-        foreach ($period as $date) {
-            $key = $date->toDateString();
-            $days[$key] ??= ['date' => $key, 'morning' => $emptyShift(), 'evening' => $emptyShift(), 'otherShift' => $emptyShift()];
-        }
-        ksort($days);
-        foreach ($days as &$day) {
-            foreach (['morning', 'evening', 'otherShift'] as $shiftKey) {
-                $day[$shiftKey]['otherMethods'] = array_values($day[$shiftKey]['otherMethods']);
-            }
-            $day['total'] = $day['morning']['total'] + $day['evening']['total'] + $day['otherShift']['total'];
-            $day['deposit'] = $day['morning']['directDeposit'] + $day['evening']['directDeposit'] + $day['otherShift']['directDeposit'];
-            $day['edcPending'] = $day['morning']['edcPending'] + $day['evening']['edcPending'] + $day['otherShift']['edcPending'];
-        }
-        unset($day);
-
-        $reportDays = array_values($days);
+        $reportDays = $cashflowReport->build($pharmacyIds, $startDate, $endDate);
         if ($request->boolean('download_xlsx')) {
             $fileName = 'cashflow-omzet_'.$startDate.'_sd_'.$endDate.'.xlsx';
             return Excel::download(new CashflowExport($reportDays), $fileName);
         }
+        $kinerjaDays = $kinerjaOmzet->build($pharmacyIds, $startDate, $endDate);
 
         return Inertia::render('Finance/Cashflow', [
             'days' => $reportDays,
             'monitoringDays' => $monitoringPenjualan->build($pharmacyIds, $startDate, $endDate),
-            'filters' => ['start_date' => $startDate, 'end_date' => $endDate],
+            'kinerjaDays' => $kinerjaDays['days'],
+            'kinerjaDebtors' => $kinerjaDays['debtors'],
+            'filters' => ['month' => $month, 'year' => $year],
             'branchContext' => $this->getBranchContext(),
         ]);
     }
 
-    public function exportCashflow(Request $request, MonitoringPenjualanService $monitoringPenjualan)
+    public function exportCashflow(Request $request, CashflowReportService $cashflowReport, MonitoringPenjualanService $monitoringPenjualan, KinerjaOmzetService $kinerjaOmzet)
     {
         $request->merge(['download_xlsx' => true]);
-        return $this->cashflow($request, $monitoringPenjualan);
+        return $this->cashflow($request, $cashflowReport, $monitoringPenjualan, $kinerjaOmzet);
+    }
+
+    public function exportMonitoringPenjualan(Request $request, MonitoringPenjualanService $monitoringPenjualan)
+    {
+        $validated = $request->validate([
+            'month' => 'required|integer|min:1|max:12',
+            'year' => 'required|integer|min:2000|max:2100',
+        ]);
+
+        $month = (int) $validated['month'];
+        $year = (int) $validated['year'];
+        $start = \Carbon\Carbon::createFromDate($year, $month, 1)->startOfMonth();
+        $end = $start->copy()->endOfMonth();
+        $days = $monitoringPenjualan->build($this->getTargetPharmacyIds(), $start->toDateString(), $end->toDateString());
+
+        return Excel::download(
+            new MonitoringPenjualanExport($days, $month, $year),
+            sprintf('monitoring-penjualan_%04d-%02d.xlsx', $year, $month)
+        );
+    }
+
+    public function exportKinerjaOmzet(Request $request, KinerjaOmzetService $kinerjaOmzet)
+    {
+        $validated = $request->validate([
+            'month' => 'required|integer|min:1|max:12',
+            'year' => 'required|integer|min:2000|max:2100',
+        ]);
+        $month = (int) $validated['month'];
+        $year = (int) $validated['year'];
+        $start = \Carbon\Carbon::createFromDate($year, $month, 1)->startOfMonth();
+        $end = $start->copy()->endOfMonth();
+        $data = $kinerjaOmzet->build($this->getTargetPharmacyIds(), $start->toDateString(), $end->toDateString());
+        return Excel::download(new KinerjaOmzetExport($data, $month, $year), sprintf('kinerja-omzet_%04d-%02d.xlsx', $year, $month));
     }
 
     /**

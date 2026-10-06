@@ -1574,12 +1574,32 @@
                         <span class="text-sm font-semibold text-slate-600">Bank</span>
                     </button>
 
+                    <button onclick="selectReport(this)"
+                        class="report-btn flex items-center gap-3 p-3 rounded-2xl border border-slate-100 bg-slate-50 text-left transition-all hover:border-slate-200 hover:bg-white">
+                        <div class="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M8 14h3M8 17h8"/>
+                            </svg>
+                        </div>
+                        <span class="text-sm font-semibold text-slate-600">Lembar Omzet Harian</span>
+                    </button>
+
+                    <button onclick="selectReport(this)"
+                        class="report-btn flex items-center gap-3 p-3 rounded-2xl border border-slate-100 bg-slate-50 text-left transition-all hover:border-slate-200 hover:bg-white">
+                        <div class="w-8 h-8 rounded-xl bg-cyan-50 flex items-center justify-center flex-shrink-0">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0891b2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M4 19V5M4 19h17M8 15l3-4 3 2 5-7"/><circle cx="19" cy="6" r="1"/>
+                            </svg>
+                        </div>
+                        <span class="text-sm font-semibold text-slate-600">Monitoring Penjualan</span>
+                    </button>
+
                 </div>
             </div>
 
             <div class="h-px bg-slate-100"></div>
 
-            <div>
+            <div id="date_range_filter">
                 <div class="flex items-center justify-between mb-3">
                     <p class="text-xs font-semibold tracking-widest uppercase text-slate-400 m-0">Rentang Tanggal</p>
                     <div id="quick_date_presets" class="flex items-center gap-1">
@@ -1605,6 +1625,22 @@
                     <input type="text" value="{{ \Carbon\Carbon::now()->format('Y-m-d') }}" id="sales_end_date"
                         name="end_date" autocomplete="off"
                         class="flatpickr-date flex-1 text-sm border border-slate-200 rounded-xl px-3 py-2 text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300 cursor-pointer" />
+                </div>
+            </div>
+
+            <div id="month_year_filter" style="display:none">
+                <p class="text-xs font-semibold tracking-widest uppercase text-slate-400 mb-3">Periode Laporan</p>
+                <div class="grid grid-cols-2 gap-3">
+                    <label class="text-xs font-medium text-slate-500">Bulan
+                        <select id="sales_month" class="mt-1 w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-violet-200">
+                            @foreach ([1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April', 5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus', 9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'] as $monthNumber => $monthName)
+                                <option value="{{ $monthNumber }}" @selected(now()->month === $monthNumber)>{{ $monthName }}</option>
+                            @endforeach
+                        </select>
+                    </label>
+                    <label class="text-xs font-medium text-slate-500">Tahun
+                        <input id="sales_year" type="number" min="2000" max="2100" value="{{ now()->year }}" class="mt-1 w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-violet-200" />
+                    </label>
                 </div>
             </div>
 

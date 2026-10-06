@@ -228,6 +228,22 @@
                 has_factory: false,
                 has_doctor: false
             },
+            "Lembar Omzet Harian": {
+                date_filter: false,
+                month_year_filter: true,
+                type_filter: false,
+                online_btn: false,
+                has_factory: false,
+                has_doctor: false
+            },
+            "Monitoring Penjualan": {
+                date_filter: false,
+                month_year_filter: true,
+                type_filter: false,
+                online_btn: false,
+                has_factory: false,
+                has_doctor: false
+            },
         };
 
         var selectedReport = "LIPH";
@@ -438,6 +454,8 @@
             }
 
             const dateFilterEl = document.getElementById('date_filter');
+            const dateRangeEl = document.getElementById('date_range_filter');
+            const monthYearFilterEl = document.getElementById('month_year_filter');
             const shiftSelectEl = document.getElementById('shift-select');
             const typeFilterEl = document.getElementById('type_filter');
             const factorySelectEl = document.getElementById('factory-select');
@@ -447,6 +465,8 @@
             if (dateFilterEl) {
                 dateFilterEl.style.display = config.date_filter ? 'block' : 'none';
             }
+            if (dateRangeEl) dateRangeEl.style.display = config.month_year_filter ? 'none' : 'block';
+            if (monthYearFilterEl) monthYearFilterEl.style.display = config.month_year_filter ? 'block' : 'none';
 
             if (btnOnline) {
                 btnOnline.style.display = config.online_btn ? 'flex' : 'none';
@@ -585,14 +605,25 @@
         }
 
         function getReport(mode = 'download') {
+            const config = salesReportFilters[selectedReport] ?? {};
+            const usesMonthYear = config.month_year_filter === true;
             const start_date = getDatePickerValue('sales_start_date');
             const end_date = getDatePickerValue('sales_end_date');
+            const month = document.getElementById('sales_month')?.value ?? '';
+            const year = document.getElementById('sales_year')?.value ?? '';
             const shift = document.getElementById('shift')?.value ?? '';
             const factory = document.getElementById('factory')?.value ?? '';
             const doctor = document.getElementById('doctor')?.value ?? '';
             const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
 
-            if (!start_date || !end_date) {
+            if (usesMonthYear && (!month || !year || !Number.isInteger(Number(year)) || Number(year) < 2000 || Number(year) > 2100)) {
+                const message = 'Silakan pilih bulan dan tahun yang valid.';
+                if (window.iziToast) iziToast.warning({ title: 'Peringatan', message, position: 'topRight' });
+                else alert(message);
+                return;
+            }
+
+            if (!usesMonthYear && (!start_date || !end_date)) {
                 if (window.iziToast) {
                     iziToast.warning({
                         title: 'Peringatan',
@@ -609,10 +640,8 @@
             const overlay = document.getElementById('loading-overlay');
             if (overlay) overlay.style.display = 'flex';
 
-            axios.post('/reports', {
+            const payload = {
                 _token: csrfToken,
-                start_date: start_date,
-                end_date: end_date,
                 selectedReport: selectedReport,
                 shiftType: selectedShiftType,
                 shift: shift,
@@ -620,7 +649,16 @@
                 factory: factory,
                 doctor: doctor,
                 mode: mode
-            }, {
+            };
+            if (usesMonthYear) {
+                payload.month = Number(month);
+                payload.year = Number(year);
+            } else {
+                payload.start_date = start_date;
+                payload.end_date = end_date;
+            }
+
+            axios.post('/reports', payload, {
                 headers: {
                     'X-CSRF-TOKEN': csrfToken
                 },

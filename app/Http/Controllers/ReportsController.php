@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Exports\Export\ParetoExport;
+use App\Exports\Finance\CashflowExport;
+use App\Exports\Finance\MonitoringPenjualanExport;
 use App\Exports\Orders\InvoiceExport;
 use App\Exports\Orders\OrdersExport;
 use App\Exports\Orders\PurchasePaymentExport;
@@ -21,6 +23,9 @@ use App\Jobs\TransactionExportJob;
 use App\Models\ExportJob;
 use App\Models\MedicineTransactions;
 use App\Models\Pharmacies;
+use App\Services\Finance\CashflowReportService;
+use App\Services\Finance\MonitoringPenjualanService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Maatwebsite\Excel\Concerns\WithMultipleSheets;
@@ -29,7 +34,7 @@ use Maatwebsite\Excel\Facades\Excel;
 class ReportsController extends Controller
 {
     // Report Data
-    public function reports(Request $request)
+    public function reports(Request $request, CashflowReportService $cashflowReport, MonitoringPenjualanService $monitoringPenjualan)
     {
         @ini_set('memory_limit', '512M');
         @ini_set('max_execution_time', '300');
@@ -56,7 +61,29 @@ class ReportsController extends Controller
 
         $pharmacy = Pharmacies::findOrFail($activeId);
 
-        [$export, $filename] = $this->resolveReportExport($report, $request, $pharmacy);
+        if (in_array($report, ['Lembar Omzet Harian', 'Monitoring Penjualan'], true)) {
+            $period = $request->validate([
+                'month' => 'required|integer|min:1|max:12',
+                'year' => 'required|integer|min:2000|max:2100',
+            ]);
+            $month = (int) $period['month'];
+            $year = (int) $period['year'];
+            $start = Carbon::createFromDate($year, $month, 1)->startOfMonth();
+            $end = $start->copy()->endOfMonth();
+            $startDate = $start->toDateString();
+            $endDate = $end->toDateString();
+            if ($report === 'Lembar Omzet Harian') {
+                $days = $cashflowReport->build([$pharmacy->id], $startDate, $endDate);
+                $export = new CashflowExport($days);
+                $filename = sprintf('lembar-omzet-harian_%s_%04d-%02d.xlsx', str_replace(' ', '_', $pharmacy->name), $year, $month);
+            } else {
+                $monitoringDays = $monitoringPenjualan->build([$pharmacy->id], $startDate, $endDate);
+                $export = new MonitoringPenjualanExport($monitoringDays, $month, $year);
+                $filename = sprintf('monitoring-penjualan_%s_%04d-%02d.xlsx', str_replace(' ', '_', $pharmacy->name), $year, $month);
+            }
+        } else {
+            [$export, $filename] = $this->resolveReportExport($report, $request, $pharmacy);
+        }
 
         if (!$export) {
             return response()->json(['message' => 'Laporan tidak ditemukan atau jenis laporan belum didukung.'], 422);
@@ -117,7 +144,7 @@ class ReportsController extends Controller
                 return response()->json(['status' => 'error', 'message' => 'Preview not supported for this report'], 422);
             }
 
-            $rawRows = $export->array();
+            $rawRows = method_exists($export, 'previewArray') ? $export->previewArray() : $export->array();
             if (count($rawRows) > 150) {
                 // Dynamically find table header row (usually contains 'No' / 'No.')
                 $headerEndIndex = 6;

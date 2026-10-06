@@ -189,7 +189,6 @@ export default function MonitoringPenjualan({ days = [] }) {
     return <section className="overflow-hidden rounded-xl border border-slate-300 bg-white shadow-sm">
         <div className="border-b-2 border-black px-4 py-3">
             <h2 className="text-lg font-bold uppercase tracking-wide text-slate-900">Monitoring Target Penjualan</h2>
-            <p className="mt-1 text-sm text-slate-600">{period} · Pagi menggabungkan shift pagi dan siang · Target bulanan/harian dikosongkan · Total kunjungan dikosongkan</p>
         </div>
         <div className="overflow-auto">
             <table className="w-max min-w-full border-collapse text-xs tabular-nums">

@@ -204,7 +204,7 @@ class SuppliesController extends Controller
                 'medicine_transaction.user',            // Fetch cashier user through transactions
                 'users'                                 // Fetch user for creator display
             ])->whereNotIn('status', [5, 6])
-              ->orderBy('updated_at', 'asc')
+              ->orderBy('date', 'asc')
               ->orderBy('id', 'asc');
 
             // Tentukan apakah ada filter 1 obat spesifik
@@ -226,8 +226,11 @@ class SuppliesController extends Controller
 
             if ($med) {
                 // Load ALL rows (including SO/Adjustment) for correct running balance
+                // Order by transaction date (not updated_at): SO-REBASE / SO-SALDO-AWAL
+                // rows are inserted later but carry the original movement date, so
+                // they must sit next to the logs they cancel.
                 $allRowsForBalance = (clone $baseQuery)->with(['medicines', 'batches'])
-                    ->orderBy('updated_at', 'asc')
+                    ->orderBy('date', 'asc')
                     ->orderBy('id', 'asc')
                     ->get();
 
@@ -575,6 +578,9 @@ class SuppliesController extends Controller
             $startPharmacyIds = $canSeeWarehouse ? [$warehouseId, $pmiPharmacyId] : [$pharmacyId];
             $counterPharmacyId = $canSeeWarehouse ? $pmiPharmacyId : $pharmacyId;
 
+            $openingDateExpression = "DATE(items_log.date) > COALESCE((SELECT DATE(MAX(opening_logs.date)) FROM items_log AS opening_logs INNER JOIN batches AS opening_batches ON opening_batches.id = opening_logs.batches_id WHERE opening_logs.medicine_id = medicines.id AND opening_logs.type = ? AND opening_batches.pharmacy_id IN (" . implode(',', array_fill(0, count($startPharmacyIds), '?')) . ")), '1000-01-01')";
+            $openingDateBindings = array_merge(['SO-SALDO-AWAL'], $startPharmacyIds);
+
             $medicines = Medicines::query()
                 ->where('medicines.status', 1)
                 ->select([
@@ -584,12 +590,20 @@ class SuppliesController extends Controller
                     'medicines.unit',
                 ])
                 ->addSelect([
+                    // Latest mass opening-balance baseline, if one was imported.
+                    'opening_balance_qty' => ItemsLog::select('items_log.qty_before')
+                        ->join('batches', 'batches.id', '=', 'items_log.batches_id')
+                        ->whereColumn('items_log.medicine_id', 'medicines.id')
+                        ->where('items_log.type', 'SO-SALDO-AWAL')
+                        ->whereIn('batches.pharmacy_id', $startPharmacyIds)
+                        ->orderByDesc('items_log.date')->orderByDesc('items_log.id')->limit(1),
                     // Qty Beli: Gudang PMI jika ada akses gudang, atau Pembelian cabang
                     'qty_orders' => ItemsLog::select(DB::raw('COALESCE(SUM(CAST(items_log.qty AS UNSIGNED)), 0)'))
                         ->join('batches', 'batches.id', '=', 'items_log.batches_id')
                         ->whereColumn('items_log.medicine_id', 'medicines.id')
                         ->where('items_log.status', 2)
                         ->where('batches.pharmacy_id', $ordersPharmacyId)
+                        ->when(!$request->filled('start_date') && !$request->filled('end_date'), fn($q) => $q->whereRaw($openingDateExpression, $openingDateBindings))
                         ->when($request->filled('start_date'), fn($q) => $q->whereDate('items_log.date', '>=', $request->start_date))
                         ->when($request->filled('end_date'), fn($q) => $q->whereDate('items_log.date', '<=', $request->end_date)),
 
@@ -599,6 +613,7 @@ class SuppliesController extends Controller
                         ->whereColumn('items_log.medicine_id', 'medicines.id')
                         ->where('items_log.status', 1)
                         ->where('batches.pharmacy_id', $salesPharmacyId)
+                        ->when(!$request->filled('start_date') && !$request->filled('end_date'), fn($q) => $q->whereRaw($openingDateExpression, $openingDateBindings))
                         ->when($request->filled('start_date'), fn($q) => $q->whereDate('items_log.date', '>=', $request->start_date))
                         ->when($request->filled('end_date'), fn($q) => $q->whereDate('items_log.date', '<=', $request->end_date)),
 
@@ -608,6 +623,7 @@ class SuppliesController extends Controller
                         ->whereColumn('items_log.medicine_id', 'medicines.id')
                         ->where('items_log.status', 4)
                         ->where('batches.pharmacy_id', $ordersPharmacyId)
+                        ->when(!$request->filled('start_date') && !$request->filled('end_date'), fn($q) => $q->whereRaw($openingDateExpression, $openingDateBindings))
                         ->when($request->filled('start_date'), fn($q) => $q->whereDate('items_log.date', '>=', $request->start_date))
                         ->when($request->filled('end_date'), fn($q) => $q->whereDate('items_log.date', '<=', $request->end_date)),
 
@@ -617,6 +633,7 @@ class SuppliesController extends Controller
                         ->whereColumn('items_log.medicine_id', 'medicines.id')
                         ->where('items_log.status', 3)
                         ->where('batches.pharmacy_id', $salesPharmacyId)
+                        ->when(!$request->filled('start_date') && !$request->filled('end_date'), fn($q) => $q->whereRaw($openingDateExpression, $openingDateBindings))
                         ->when($request->filled('start_date'), fn($q) => $q->whereDate('items_log.date', '>=', $request->start_date))
                         ->when($request->filled('end_date'), fn($q) => $q->whereDate('items_log.date', '<=', $request->end_date)),
 
@@ -635,6 +652,7 @@ class SuppliesController extends Controller
                         ->whereColumn('items_log.medicine_id', 'medicines.id')
                         ->whereIn('items_log.status', [5, 6, 7])
                         ->whereIn('batches.pharmacy_id', $startPharmacyIds)
+                        ->when(!$request->filled('start_date') && !$request->filled('end_date'), fn($q) => $q->whereRaw($openingDateExpression, $openingDateBindings))
                         ->when($request->filled('start_date'), fn($q) => $q->whereDate('items_log.date', '>=', $request->start_date))
                         ->when($request->filled('end_date'), fn($q) => $q->whereDate('items_log.date', '<=', $request->end_date)),
 
@@ -681,6 +699,11 @@ class SuppliesController extends Controller
             return DataTables::of($medicines)
                 ->addIndexColumn()
                 ->editColumn('qty_start', function ($m) use ($canSeeWarehouse) {
+                    // With no date filter, show the explicitly imported opening
+                    // balance rather than reverse-engineering it from late imports.
+                    if (request()->filled('start_date') === false && request()->filled('end_date') === false && $m->opening_balance_qty !== null) {
+                        return (int) $m->opening_balance_qty;
+                    }
                     $storage = $canSeeWarehouse ? (int) ($m->qty_storage ?? 0) : 0;
                     $counter = (int) ($m->qty_counter ?? 0);
                     $totalNow = $storage + $counter;
@@ -1357,6 +1380,9 @@ class SuppliesController extends Controller
         $request->validate([
             'file'        => 'required|file|max:102400',
             'target_mode' => 'nullable|in:pelayanan,gudang',
+            'import_mode' => 'nullable|in:penyesuaian,saldo_awal',
+            'effective_date' => 'required_if:import_mode,saldo_awal|nullable|date|before_or_equal:today',
+            'reconcile_opname_through' => 'required_if:import_mode,saldo_awal|nullable|date|after_or_equal:effective_date|before_or_equal:today',
         ], [
             'file.required' => 'File Excel wajib diunggah.',
             'file.file'     => 'File yang diunggah tidak valid.',
@@ -1382,10 +1408,13 @@ class SuppliesController extends Controller
         }
 
         $adjustMinusStock = $request->boolean('adjust_minus_stock', true);
+        $importMode = $request->input('import_mode', 'penyesuaian');
+        $effectiveDate = $request->input('effective_date');
+        $reconcileOpnameThrough = $request->input('reconcile_opname_through');
         $filePath = $file->getRealPath();
 
         try {
-            $result = $importService->analyze($filePath, $pharmacyId, $targetMode, $adjustMinusStock);
+            $result = $importService->analyze($filePath, $pharmacyId, $targetMode, $adjustMinusStock, $importMode, $effectiveDate, $reconcileOpnameThrough);
             return response()->json($result);
         } catch (\Throwable $e) {
             return response()->json([

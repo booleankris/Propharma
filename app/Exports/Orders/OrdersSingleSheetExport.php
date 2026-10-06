@@ -146,6 +146,7 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
             'Diskon',
             'Value Disc',
             'Extra Diskon',
+            'Value Extra Disc',
             'Jumlah',
             'Expired',
         ];
@@ -163,6 +164,7 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
         $grandDpp = 0;
         $grandPpn = 0;
         $grandNomDisc = 0;
+        $grandNomExtraDisc = 0;
         $grandTotal = 0;
 
         foreach ($items as $item) {
@@ -226,6 +228,7 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
                 $item->discount ?? 0,
                 round($nomDisc, 2),
                 $item->extra_discount ?? 0,
+                round($nomExtraDisc, 2),
                 $jumlah,
                 $expired,
             ];
@@ -233,6 +236,7 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
             $grandDpp += $dpp;
             $grandPpn += $ppn;
             $grandNomDisc += $nomDisc;
+            $grandNomExtraDisc += $nomExtraDisc;
             $grandTotal += $jumlah;
         }
 
@@ -259,6 +263,7 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
             '',
             round($grandNomDisc, 2),
             '',
+            round($grandNomExtraDisc, 2),
             $grandTotal,
             '',
         ];
@@ -301,8 +306,8 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
             ->getAlignment()
             ->setHorizontal(Alignment::HORIZONTAL_LEFT);
 
-        // Right-align & number format: H=DPP, I=PPN, R=HNA, S=HargaPPN, T=Diskon, U=Value Disc, V=ExtraDiskon, W=Jumlah
-        foreach (['H', 'I', 'R', 'S', 'T', 'U', 'V', 'W'] as $col) {
+        // Right-align & number format: H=DPP, I=PPN, R=HNA, S=HargaPPN, T=Diskon, U=Value Disc, V=ExtraDiskon, W=ValueExtraDisc, X=Jumlah
+        foreach (['H', 'I', 'R', 'S', 'T', 'U', 'V', 'W', 'X'] as $col) {
             $sheet
                 ->getStyle("{$col}{$dataStartRow}:{$col}{$lastRow}")
                 ->getAlignment()
@@ -339,8 +344,9 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
             'T' => 10,
             'U' => 15,
             'V' => 13,
-            'W' => 18,
-            'X' => 13,
+            'W' => 15,
+            'X' => 18,
+            'Y' => 13,
         ];
     }
 }

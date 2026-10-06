@@ -29,7 +29,7 @@ class StockOpnameImportService
      * @param string $targetMode 'pelayanan' or 'gudang'
      * @return array
      */
-    public function analyze(string $filePath, int $pharmacyId, string $targetMode = 'pelayanan', bool $adjustMinusStock = false): array
+    public function analyze(string $filePath, int $pharmacyId, string $targetMode = 'pelayanan', bool $adjustMinusStock = false, string $importMode = 'penyesuaian', ?string $effectiveDate = null, ?string $reconcileOpnameThrough = null): array
     {
         @ini_set('memory_limit', '512M');
         @set_time_limit(300);
@@ -416,6 +416,32 @@ class StockOpnameImportService
         }
         usort($previewRows, fn($a, $b) => $a['row_index'] <=> $b['row_index']);
 
+        $openingRebaseSummary = null;
+        if ($importMode === 'saldo_awal' && $effectiveDate && $reconcileOpnameThrough) {
+            $medicineIds = collect($parsedRows)->filter(fn($row) => !empty($row['is_valid']) && !empty($row['medicine_id']))
+                ->pluck('medicine_id')->unique()->values()->all();
+            $openingRebaseSummary = ItemsLog::query()
+                ->join('batches', 'batches.id', '=', 'items_log.batches_id')
+                ->whereIn('items_log.medicine_id', $medicineIds)
+                ->where('batches.pharmacy_id', $batchTargetPharmacyId)
+                ->where('items_log.status', 5)
+                ->where('items_log.date', '>', Carbon::parse($effectiveDate)->endOfDay()->toDateTimeString())
+                ->where('items_log.date', '<=', Carbon::parse($reconcileOpnameThrough)->endOfDay()->toDateTimeString())
+                ->whereNotExists(function ($query) {
+                    $query->select(DB::raw(1))->from('items_log as reversals')
+                        ->where('reversals.type', 'SO-REBASE')
+                        ->whereRaw("reversals.transaction_code = CONCAT('RB-', items_log.transaction_code)");
+                })
+                ->selectRaw("COUNT(*) AS row_count, COUNT(DISTINCT items_log.medicine_id) AS medicine_count, COALESCE(SUM(CASE WHEN items_log.total IS NOT NULL AND TRIM(items_log.total) REGEXP '^[+-]?[0-9]+([.][0-9]+)?([eE][+-]?[0-9]+)?$' THEN CAST(items_log.total AS SIGNED) ELSE CAST(items_log.qty_after AS SIGNED) - CAST(items_log.qty_before AS SIGNED) END), 0) AS net_delta")
+                ->first();
+            $openingRebaseSummary = [
+                'opname_rows_to_reverse' => (int) ($openingRebaseSummary->row_count ?? 0),
+                'medicines_affected' => (int) ($openingRebaseSummary->medicine_count ?? 0),
+                'net_delta_to_reverse' => (int) ($openingRebaseSummary->net_delta ?? 0),
+                'through_date' => $reconcileOpnameThrough,
+            ];
+        }
+
         // Cache parsed rows to storage with token
         $token = 'so_import_' . Str::random(24);
         $tempDir = storage_path('app/opname_imports');
@@ -428,6 +454,9 @@ class StockOpnameImportService
             'pharmacy_id'        => $pharmacyId,
             'target_mode'        => $targetMode,
             'adjust_minus_stock' => $adjustMinusStock,
+            'import_mode'        => $importMode,
+            'effective_date'     => $effectiveDate,
+            'reconcile_opname_through' => $reconcileOpnameThrough,
             'created_at'         => now()->toDateTimeString(),
             'rows'               => $parsedRows,
         ];
@@ -451,6 +480,7 @@ class StockOpnameImportService
                 'minus_adjusted_count'     => $minusAdjustedMedicinesCount,
                 'minus_deducted_qty'       => $totalMinusQtyDeducted,
                 'minus_adjusted_summary'   => array_slice($minusAdjustedSummary, 0, 50),
+                'opening_rebase_summary'   => $openingRebaseSummary,
             ],
             'anomalies'    => array_slice($anomalies, 0, 50),
             'preview_rows' => $previewRows,
@@ -479,6 +509,10 @@ class StockOpnameImportService
 
         $payload = json_decode(File::get($filePath), true);
         $rows = $payload['rows'] ?? [];
+
+        if (($payload['import_mode'] ?? 'penyesuaian') === 'saldo_awal') {
+            return $this->executeOpeningBalanceImport($payload, $pharmacyId, $targetMode, $userId, $filePath, $jobId);
+        }
 
         $exportJob = $jobId ? ExportJob::find($jobId) : null;
         if ($exportJob) {
@@ -521,33 +555,51 @@ class StockOpnameImportService
         DB::beginTransaction();
 
         try {
-            // Group valid rows by medicine_id to perform accurate reconciliation & stock adjustment per medicine
-            $rowsByMedicine = [];
-            foreach ($validRows as $row) {
-                $rowsByMedicine[(int) $row['medicine_id']][] = $row;
+            $medicineIds = array_keys($rowsByMedicine);
+
+            // 1. Preload all existing batches for these medicines
+            $allExistingBatches = Batches::whereIn('medicine_id', $medicineIds)
+                ->where('pharmacy_id', $batchTargetPharmacyId)
+                ->get()
+                ->groupBy('medicine_id');
+
+            // 2. Preload existing transfers if target mode is pelayanan
+            $allExistingTransfers = collect();
+            if ($targetMode === 'pelayanan') {
+                $batchIds = Batches::whereIn('medicine_id', $medicineIds)
+                    ->where('pharmacy_id', $counterPharmacyId)
+                    ->pluck('id')->all();
+
+                if (!empty($batchIds)) {
+                    $allExistingTransfers = MedicineTransferItems::whereIn('batches_id', $batchIds)
+                        ->where('status', 1)
+                        ->where(function ($q) {
+                            $q->whereNull('source_type')->orWhere('source_type', '!=', 'retur_gudang');
+                        })
+                        ->get()
+                        ->groupBy('batches_id');
+                }
             }
+
+            $insertStockOpnames = [];
+            $insertItemsLogs = [];
+            $allAssignedBatchIds = [];
 
             foreach ($rowsByMedicine as $medicineId => $medRows) {
                 $totalPhysical = (int) array_sum(array_column($medRows, 'stock'));
 
                 // Calculate current existing stock for this medicine before this opname
+                $existingBatches = $allExistingBatches->get($medicineId, collect());
+
                 if ($targetMode === 'gudang') {
-                    $existingBatches = Batches::where('medicine_id', $medicineId)
-                        ->where('pharmacy_id', $batchTargetPharmacyId)
-                        ->get();
                     $totalBefore = (int) $existingBatches->sum('stock');
                 } else {
-                    $existingBatches = Batches::where('medicine_id', $medicineId)
-                        ->where('pharmacy_id', $counterPharmacyId)
-                        ->get();
-
-                    $existingTransfers = MedicineTransferItems::whereIn('batches_id', $existingBatches->pluck('id'))
-                        ->where('status', 1)
-                        ->where(function ($q) {
-                            $q->whereNull('source_type')->orWhere('source_type', '!=', 'retur_gudang');
-                        })
-                        ->get();
-                    $totalBefore = (int) $existingTransfers->sum('qty');
+                    $medBatchIds = $existingBatches->pluck('id')->all();
+                    $totalBefore = 0;
+                    foreach ($medBatchIds as $bId) {
+                        $trans = $allExistingTransfers->get($bId, collect());
+                        $totalBefore += $trans->sum('qty');
+                    }
                 }
 
                 $discrepancy = $totalPhysical - $totalBefore;
@@ -600,6 +652,7 @@ class StockOpnameImportService
                             'expired_date' => $expiredDate,
                             'stock'        => 0,
                         ]);
+                        $existingBatches->push($batch);
                     }
 
                     $assignedBatchIds[] = $batch->id;
@@ -610,12 +663,7 @@ class StockOpnameImportService
                         $batch->stock = $stockPhysic;
                         $batch->save();
                     } else {
-                        $transfers = MedicineTransferItems::where('batches_id', $batch->id)
-                            ->where('status', 1)
-                            ->where(function ($q) {
-                                $q->whereNull('source_type')->orWhere('source_type', '!=', 'retur_gudang');
-                            })
-                            ->get();
+                        $transfers = clone $allExistingTransfers->get($batch->id, collect());
 
                         if ($transfers->isNotEmpty()) {
                             $primary = $transfers->first();
@@ -641,7 +689,7 @@ class StockOpnameImportService
                                 'user_id' => $userId,
                             ]);
 
-                            MedicineTransferItems::create([
+                            $newItem = MedicineTransferItems::create([
                                 'medicine_transfer_id' => $transferHeader->id,
                                 'batches_id'           => $batch->id,
                                 'source_batches_id'    => $batch->id,
@@ -650,31 +698,12 @@ class StockOpnameImportService
                                 'source_type'          => 'pelayanan',
                                 'etalases_id'          => $etalasesId,
                             ]);
+                            $allExistingTransfers->put($batch->id, collect([$newItem]));
                         }
                     }
                 }
 
-                // 3. ZERO OUT all other batches/transfers of this medicine in this pharmacy not included in the opname!
-                // This ensures total stock becomes EXACTLY the physical stock, never duplicated or accumulated!
-                if ($targetMode === 'gudang') {
-                    Batches::where('medicine_id', $medicineId)
-                        ->where('pharmacy_id', $batchTargetPharmacyId)
-                        ->whereNotIn('id', $assignedBatchIds)
-                        ->where('stock', '!=', 0)
-                        ->update(['stock' => 0]);
-                } else {
-                    $otherBatchIds = Batches::where('medicine_id', $medicineId)
-                        ->where('pharmacy_id', $counterPharmacyId)
-                        ->whereNotIn('id', $assignedBatchIds)
-                        ->pluck('id');
-
-                    if ($otherBatchIds->isNotEmpty()) {
-                        MedicineTransferItems::whereIn('batches_id', $otherBatchIds)
-                            ->where('status', 1)
-                            ->where('qty', '!=', 0)
-                            ->update(['qty' => 0]);
-                    }
-                }
+                $allAssignedBatchIds = array_merge($allAssignedBatchIds, $assignedBatchIds);
 
                 // 4. Record Opname header & ItemsLog adjustment
                 $opnameSeq++;
@@ -684,18 +713,22 @@ class StockOpnameImportService
                 $logCode = $itemsLogPrefix . str_pad($logSeq, 4, '0', STR_PAD_LEFT);
 
                 $logBatchId = $lastResolvedBatch ? $lastResolvedBatch->id : null;
+                $nowStr = now()->toDateTimeString();
+                $dateStr = now()->toDateString();
 
-                StockOpname::create([
+                $insertStockOpnames[] = [
                     'users_id'          => $userId,
                     'batches_id'        => $logBatchId,
                     'stock_physical'    => $totalPhysical,
                     'stock_discrepancy' => $discrepancy,
                     'stock_total'       => $totalPhysical,
-                    'date'              => now()->toDateString(),
+                    'date'              => $dateStr,
                     'status'            => $status,
-                ]);
+                    'created_at'        => $nowStr,
+                    'updated_at'        => $nowStr,
+                ];
 
-                ItemsLog::create([
+                $insertItemsLogs[] = [
                     'batches_id'       => $logBatchId,
                     'transaction_code' => $opnameCode,
                     'code'             => $logCode,
@@ -705,10 +738,12 @@ class StockOpnameImportService
                     'qty_before'       => $totalBefore,
                     'qty_after'        => $totalPhysical,
                     'total'            => $discrepancy,
-                    'date'             => now()->toDateTimeString(),
+                    'date'             => $nowStr,
                     'status'           => $status,
                     'user_id'          => $userId,
-                ]);
+                    'created_at'        => $nowStr,
+                    'updated_at'        => $nowStr,
+                ];
 
                 $touchedMedicineIds[$medicineId] = true;
                 $processedCount += count($medRows);
@@ -717,6 +752,38 @@ class StockOpnameImportService
                     $percent = (int) round(($processedCount / $totalValid) * 90);
                     $exportJob->setProgress(min(90, $percent));
                 }
+            }
+
+            // 3. ZERO OUT all other batches/transfers of medicines in this pharmacy not included in the opname!
+            // This ensures total stock becomes EXACTLY the physical stock, never duplicated or accumulated!
+            if (!empty($medicineIds)) {
+                if ($targetMode === 'gudang') {
+                    Batches::whereIn('medicine_id', $medicineIds)
+                        ->where('pharmacy_id', $batchTargetPharmacyId)
+                        ->whereNotIn('id', $allAssignedBatchIds)
+                        ->where('stock', '!=', 0)
+                        ->update(['stock' => 0]);
+                } else {
+                    $otherBatchIds = Batches::whereIn('medicine_id', $medicineIds)
+                        ->where('pharmacy_id', $counterPharmacyId)
+                        ->whereNotIn('id', $allAssignedBatchIds)
+                        ->pluck('id')->all();
+
+                    if (!empty($otherBatchIds)) {
+                        MedicineTransferItems::whereIn('batches_id', $otherBatchIds)
+                            ->where('status', 1)
+                            ->where('qty', '!=', 0)
+                            ->update(['qty' => 0]);
+                    }
+                }
+            }
+
+            // Bulk Insert Stock Opname and ItemsLog
+            foreach (array_chunk($insertStockOpnames, 500) as $chunk) {
+                StockOpname::insert($chunk);
+            }
+            foreach (array_chunk($insertItemsLogs, 500) as $chunk) {
+                ItemsLog::insert($chunk);
             }
 
             // Sync master medicines stock in fast bulk
@@ -753,10 +820,18 @@ class StockOpnameImportService
                     $exportJob->setProgress(96);
                 }
 
-                foreach (array_chunk($medIds, 200) as $chunk) {
+                foreach (array_chunk($medIds, 300) as $chunk) {
+                    $cases = [];
+                    $ids = [];
                     foreach ($chunk as $mId) {
                         $totalReal = (int) ($storageStocks[$mId] ?? 0) + (int) ($counterStocks[$mId] ?? 0);
-                        Medicines::where('id', $mId)->update(['stock' => $totalReal]);
+                        $cases[] = "WHEN {$mId} THEN {$totalReal}";
+                        $ids[] = $mId;
+                    }
+                    $idsStr = implode(',', $ids);
+                    $casesStr = implode(' ', $cases);
+                    if (!empty($ids)) {
+                        DB::update("UPDATE medicines SET stock = CASE id {$casesStr} END WHERE id IN ({$idsStr})");
                     }
                 }
             }
@@ -792,6 +867,332 @@ class StockOpnameImportService
 
             throw $e;
         }
+    }
+
+    /**
+     * Rebase stock from a late opening-count file. The file is treated as the
+     * physical balance at the end of effective_date. Movements after that date
+     * are replayed, while later-entered stock-opname deltas are reversed so the
+     * same opening count is not applied twice.
+     */
+    private function executeOpeningBalanceImport(array $payload, int $pharmacyId, string $targetMode, int $userId, string $filePath, ?int $jobId): array
+    {
+        $effectiveDate = Carbon::parse($payload['effective_date'] ?? '')->endOfDay();
+        $reconcileThrough = Carbon::parse($payload['reconcile_opname_through'] ?? $effectiveDate->toDateString())->endOfDay();
+        $allRows = $payload['rows'] ?? [];
+        $rows = array_values(array_filter($allRows, fn($r) => !empty($r['is_valid']) && !empty($r['medicine_id'])));
+        $skippedRows = count($allRows) - count($rows);
+        $exportJob = $jobId ? ExportJob::find($jobId) : null;
+        if (empty($rows)) {
+            if ($exportJob) $exportJob->update(['status' => ExportJob::STATUS_FAILED, 'progress' => 0]);
+            throw new \RuntimeException('Impor saldo awal dibatalkan: tidak ada baris obat valid di file.');
+        }
+        $exportJob?->markProcessing();
+
+        $warehouseId = getWarehousePharmacyId();
+        $counterPharmacyId = isWarehousePharmacy($pharmacyId) ? 1 : $pharmacyId;
+        $batchPharmacyId = $targetMode === 'gudang' ? $warehouseId : $counterPharmacyId;
+        $rowsByMedicine = [];
+        foreach ($rows as $row) {
+            $rowsByMedicine[(int) $row['medicine_id']][] = $row;
+        }
+        $medicineIds = array_map('intval', array_keys($rowsByMedicine));
+
+        DB::beginTransaction();
+        try {
+            $year = now()->format('y');
+            $month = now()->format('m');
+            $opnamePrefix = "SO-{$year}{$month}";
+            $lastOpnameCode = ItemsLog::where('code', 'like', "{$opnamePrefix}%")->where('status', 5)->orderBy('code', 'desc')->value('code');
+            $opnameSeq = $lastOpnameCode ? (int) substr($lastOpnameCode, -4) : 0;
+            $logPrefix = "{$year}{$month}LOG-";
+            $lastLogCode = ItemsLog::where('code', 'like', "{$logPrefix}%")->orderBy('code', 'desc')->value('code');
+            $logSeq = $lastLogCode ? (int) substr($lastLogCode, -4) : 0;
+            $processed = 0;
+            $touched = [];
+            $transferHeaderId = null;
+
+            // Load existing batches and active counter transfers once for the full
+            // medicine set instead of issuing one or more SELECTs per medicine/batch.
+            $batchesByMedicine = collect();
+            foreach (array_chunk($medicineIds, 500) as $medicineIdChunk) {
+                foreach (Batches::whereIn('medicine_id', $medicineIdChunk)
+                    ->where('pharmacy_id', $batchPharmacyId)
+                    ->get()
+                    ->groupBy('medicine_id') as $medicineId => $medicineBatches) {
+                    $batchesByMedicine->put((int) $medicineId, $medicineBatches);
+                }
+            }
+            $existingBatchIds = $batchesByMedicine->flatten()->pluck('id')->all();
+            $transfersByBatch = collect();
+            if ($targetMode !== 'gudang' && !empty($existingBatchIds)) {
+                foreach (array_chunk($existingBatchIds, 1000) as $batchIdChunk) {
+                    foreach (MedicineTransferItems::whereIn('batches_id', $batchIdChunk)
+                        ->where('status', 1)
+                        ->where(function ($q) {
+                            $q->whereNull('source_type')->orWhere('source_type', '!=', 'retur_gudang');
+                        })
+                        ->get()
+                        ->groupBy('batches_id') as $batchId => $transfers) {
+                        $transfersByBatch->put((int) $batchId, $transfers);
+                    }
+                }
+            }
+
+            // Preload all later logs for existing batches to avoid N+1 query
+            $allLaterLogsByBatch = collect();
+            if (!empty($existingBatchIds)) {
+                foreach (array_chunk($existingBatchIds, 500) as $chunk) {
+                    ItemsLog::whereIn('batches_id', $chunk)
+                        ->where('date', '>', $effectiveDate->toDateTimeString())
+                        ->orderBy('date')->orderBy('id')->get()
+                        ->each(function($log) use ($allLaterLogsByBatch) {
+                            if (!$allLaterLogsByBatch->has($log->batches_id)) {
+                                $allLaterLogsByBatch->put($log->batches_id, collect());
+                            }
+                            $allLaterLogsByBatch->get($log->batches_id)->push($log);
+                        });
+                }
+            }
+
+            $insertItemsLogs = [];
+            $insertStockOpnames = [];
+
+            foreach ($rowsByMedicine as $medicineId => $medicineRows) {
+                $batches = $batchesByMedicine->get($medicineId, collect());
+                $batchById = $batches->keyBy('id');
+                $openingByBatch = [];
+                $etalaseByBatch = [];
+
+                foreach ($medicineRows as $row) {
+                    $ed = $row['expired_date'] ?? now()->addYears(2)->toDateString();
+                    $batch = $batches->first(function ($b) use ($ed) {
+                        try { return $b->expired_date && Carbon::parse($b->expired_date)->toDateString() === Carbon::parse($ed)->toDateString(); }
+                        catch (\Throwable $e) { return false; }
+                    });
+                    if (!$batch && $ed) {
+                        try {
+                            $ym = Carbon::parse($ed)->format('Y-m');
+                            $batch = $batches->first(function ($b) use ($ym) {
+                                try { return $b->expired_date && Carbon::parse($b->expired_date)->format('Y-m') === $ym; }
+                                catch (\Throwable $e) { return false; }
+                            });
+                        } catch (\Throwable $e) {}
+                    }
+                    if (!$batch) {
+                        $batch = Batches::create([
+                            'medicine_id' => $medicineId,
+                            'pharmacy_id' => $batchPharmacyId,
+                            'name' => 'OPN-' . Carbon::parse($ed)->format('Ymd'),
+                            'expired_date' => $ed,
+                            'stock' => 0,
+                        ]);
+                        $batches->push($batch);
+                        $batchById[$batch->id] = $batch;
+                    }
+                    $openingByBatch[$batch->id] = ($openingByBatch[$batch->id] ?? 0) + (int) $row['stock'];
+                    if (!empty($row['etalases_id'])) $etalaseByBatch[$batch->id] = (int) $row['etalases_id'];
+                }
+
+                $allBatchIds = $batches->pluck('id')->map(fn($id) => (int) $id)->all();
+                $targetByBatch = array_fill_keys($allBatchIds, 0);
+                foreach ($openingByBatch as $batchId => $qty) $targetByBatch[$batchId] = (int) $qty;
+
+                $laterLogs = collect();
+                foreach ($allBatchIds as $bId) {
+                    if ($allLaterLogsByBatch->has($bId)) {
+                        $laterLogs = $laterLogs->merge($allLaterLogsByBatch->get($bId));
+                    }
+                }
+                $laterLogs = $laterLogs->sortBy([['date', 'asc'], ['id', 'asc']])->values();
+                $alreadyReversed = $laterLogs->where('type', 'SO-REBASE')->pluck('transaction_code')->flip();
+                $opnameDeltaByBatch = [];
+                foreach ($laterLogs as $log) {
+                    $batchId = (int) $log->batches_id;
+                    if ($log->type === 'SO-REBASE') continue;
+                    if (in_array((int) $log->status, [5, 6]) && $log->type === 'SO') {
+                        if (isset($alreadyReversed['RB-' . ($log->transaction_code ?: $log->id)])) continue;
+                        $delta = $this->signedLogDelta($log);
+                        if (Carbon::parse($log->date)->lte($reconcileThrough)) {
+                            $opnameDeltaByBatch[$batchId][] = [$log, $delta];
+                        } else {
+                            // Keep genuine later stocktakes as movements after the opening baseline.
+                            $targetByBatch[$batchId] = ($targetByBatch[$batchId] ?? 0) + $delta;
+                        }
+                        continue;
+                    }
+                    $targetByBatch[$batchId] = ($targetByBatch[$batchId] ?? 0) + $this->signedLogDelta($log);
+                }
+
+                // Preserve audit history while cancelling late opname movements superseded by this baseline.
+                foreach ($opnameDeltaByBatch as $batchId => $entries) {
+                    foreach ($entries as [$oldLog, $delta]) {
+                        if ($delta === 0) continue;
+                        $reverse = -$delta;
+                        $logSeq++;
+                        $nowStr = now()->toDateTimeString();
+                        $insertItemsLogs[] = [
+                            'batches_id' => $batchId,
+                            'transaction_code' => 'RB-' . ($oldLog->transaction_code ?: $oldLog->id),
+                            'code' => $logPrefix . str_pad($logSeq, 4, '0', STR_PAD_LEFT),
+                            'type' => 'SO-REBASE',
+                            'medicine_id' => $medicineId,
+                            'qty' => abs($reverse),
+                            'qty_before' => 0,
+                            'qty_after' => $reverse,
+                            'total' => $reverse,
+                            'date' => $oldLog->date,
+                            'status' => 6,
+                            'user_id' => $userId,
+                            'created_at' => $nowStr,
+                            'updated_at' => $nowStr,
+                        ];
+                    }
+                }
+
+                // Apply replayed balances to batch stock (warehouse) or active counter transfers.
+                foreach ($targetByBatch as $batchId => $qty) {
+                    $batch = $batchById[$batchId] ?? Batches::find($batchId);
+                    if (!$batch) continue;
+                    if ($targetMode === 'gudang') {
+                        $batch->stock = $qty;
+                        $batch->save();
+                    } else {
+                        $transfers = $transfersByBatch->get($batchId, collect());
+                        if ($transfers->isEmpty()) {
+                            if ((int) $qty === 0) continue;
+                            if (!$transferHeaderId) {
+                                $mutPrefix = now()->format('ym') . 'MUT';
+                                $lastMut = MedicineTransfers::where('code', 'like', "{$mutPrefix}%")->orderBy('code', 'desc')->value('code');
+                                $mutSeq = $lastMut ? (int) substr($lastMut, -4) : 0;
+                                $transferHeaderId = MedicineTransfers::create([
+                                    'code' => $mutPrefix . str_pad($mutSeq + 1, 4, '0', STR_PAD_LEFT),
+                                    'status' => 1,
+                                    'user_id' => $userId,
+                                ])->id;
+                            }
+                            MedicineTransferItems::create([
+                                'medicine_transfer_id' => $transferHeaderId,
+                                'batches_id' => $batchId,
+                                'source_batches_id' => $batchId,
+                                'qty' => $qty,
+                                'status' => 1,
+                                'source_type' => 'pelayanan',
+                                'etalases_id' => $etalaseByBatch[$batchId] ?? null,
+                            ]);
+                        } else {
+                            $primary = $transfers->first();
+                            $primary->qty = $qty;
+                            if (isset($etalaseByBatch[$batchId])) $primary->etalases_id = $etalaseByBatch[$batchId];
+                            $primary->save();
+                            foreach ($transfers->slice(1) as $extra) {
+                                if ((int) $extra->qty !== 0) { $extra->qty = 0; $extra->save(); }
+                            }
+                        }
+                    }
+                }
+
+                $openingQty = (int) array_sum(array_column($medicineRows, 'stock'));
+                $opnameSeq++;
+                $opnameCode = $opnamePrefix . str_pad($opnameSeq, 4, '0', STR_PAD_LEFT);
+                $logSeq++;
+                $logCode = $logPrefix . str_pad($logSeq, 4, '0', STR_PAD_LEFT);
+                $markerBatchId = array_key_first($openingByBatch) ?: $batches->first()?->id;
+                $nowStr = now()->toDateTimeString();
+                $insertStockOpnames[] = [
+                    'users_id' => $userId,
+                    'batches_id' => $markerBatchId,
+                    'stock_physical' => $openingQty,
+                    'stock_discrepancy' => 0,
+                    'stock_total' => $openingQty,
+                    'date' => $effectiveDate->toDateString(),
+                    'status' => 5,
+                    'created_at' => $nowStr,
+                    'updated_at' => $nowStr,
+                ];
+                $insertItemsLogs[] = [
+                    'batches_id' => $markerBatchId,
+                    'transaction_code' => $opnameCode,
+                    'code' => $logCode,
+                    'type' => 'SO-SALDO-AWAL',
+                    'medicine_id' => $medicineId,
+                    'qty' => 0,
+                    'qty_before' => $openingQty,
+                    'qty_after' => $openingQty,
+                    'total' => 0,
+                    'date' => $effectiveDate->toDateTimeString(),
+                    'status' => 5,
+                    'user_id' => $userId,
+                    'created_at' => $nowStr,
+                    'updated_at' => $nowStr,
+                ];
+                $touched[$medicineId] = true;
+                $processed++;
+
+                if ($exportJob && ($processed % 10 === 0 || $processed === count($rowsByMedicine))) {
+                    $exportJob->setProgress((int) round(($processed / max(1, count($rowsByMedicine))) * 90));
+                }
+            }
+
+            // Bulk Insert Stock Opnames and Logs
+            foreach (array_chunk($insertStockOpnames, 500) as $chunk) {
+                StockOpname::insert($chunk);
+            }
+            foreach (array_chunk($insertItemsLogs, 500) as $chunk) {
+                ItemsLog::insert($chunk);
+            }
+
+            $medIds = array_keys($touched);
+            if (!empty($medIds)) {
+                $counterStocks = MedicineTransferItems::where('medicine_transfer_items.status', 1)
+                    ->where(function ($q) { $q->whereNull('medicine_transfer_items.source_type')->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang'); })
+                    ->join('batches', 'medicine_transfer_items.batches_id', '=', 'batches.id')
+                    ->whereIn('batches.medicine_id', $medIds)->where('batches.pharmacy_id', $counterPharmacyId)
+                    ->groupBy('batches.medicine_id')->selectRaw('batches.medicine_id, SUM(medicine_transfer_items.qty) as total')
+                    ->pluck('total', 'batches.medicine_id')->all();
+                $storageStocks = canAccessWarehouseStock($pharmacyId)
+                    ? Batches::whereIn('medicine_id', $medIds)->where('pharmacy_id', $warehouseId)->groupBy('medicine_id')->selectRaw('medicine_id, SUM(stock) as total')->pluck('total', 'medicine_id')->all()
+                    : [];
+
+                foreach (array_chunk($medIds, 300) as $chunk) {
+                    $cases = [];
+                    $ids = [];
+                    foreach ($chunk as $medicineId) {
+                        $totalReal = (int) ($storageStocks[$medicineId] ?? 0) + (int) ($counterStocks[$medicineId] ?? 0);
+                        $cases[] = "WHEN {$medicineId} THEN {$totalReal}";
+                        $ids[] = $medicineId;
+                    }
+                    $idsStr = implode(',', $ids);
+                    $casesStr = implode(' ', $cases);
+                    if (!empty($ids)) {
+                        DB::update("UPDATE medicines SET stock = CASE id {$casesStr} END WHERE id IN ({$idsStr})");
+                    }
+                }
+            }
+
+            DB::commit();
+            $exportJob?->markFinished('saldo_awal_direkonsiliasi');
+            if (File::exists($filePath)) File::delete($filePath);
+            $message = "Saldo awal per {$effectiveDate->format('d/m/Y')} berhasil direkonsiliasi untuk {$processed} obat.";
+            if ($skippedRows > 0) {
+                $message .= " {$skippedRows} baris tidak valid/tidak cocok dilewati; lihat daftar temuan sebelum menganggap impor lengkap.";
+            }
+            return ['success' => true, 'message' => $message, 'processed_count' => $processed, 'skipped_count' => $skippedRows];
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            Log::error('Stock opening balance rebase failed: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
+            if ($exportJob) $exportJob->update(['status' => ExportJob::STATUS_FAILED, 'progress' => 0]);
+            throw $e;
+        }
+    }
+
+    private function signedLogDelta(ItemsLog $log): int
+    {
+        $status = (int) $log->status;
+        if ($status === 1 || $status === 4) return -abs((int) $log->qty);
+        if ($status === 2 || $status === 3) return abs((int) $log->qty);
+        if ($status === 5 && is_numeric($log->total)) return (int) $log->total;
+        return (int) $log->qty_after - (int) $log->qty_before;
     }
 
     private function calculateRealtimeStock($medicineId, $pharmacyId, $type = 'total'): int

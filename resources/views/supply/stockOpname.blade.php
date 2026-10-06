@@ -716,6 +716,27 @@
                                         <input type="hidden" name="import_target_mode" value="pelayanan">
                                     @endif
 
+                                    <div class="p-3.5 bg-white border border-slate-200 rounded-xl space-y-3">
+                                        <p class="text-xs font-bold text-slate-700">Cara memakai angka dari Excel</p>
+                                        <label class="flex items-start gap-2.5 cursor-pointer text-xs text-slate-700">
+                                            <input type="radio" name="import_mode" value="penyesuaian" checked class="mt-0.5 text-indigo-600">
+                                            <span><strong>Penyesuaian stok saat ini</strong><span class="block text-[11px] text-slate-500">Cocokkan stok sistem dengan hasil hitung fisik sekarang.</span></span>
+                                        </label>
+                                        <label class="flex items-start gap-2.5 cursor-pointer text-xs text-slate-700">
+                                            <input type="radio" name="import_mode" value="saldo_awal" class="mt-0.5 text-indigo-600">
+                                            <span><strong>Jadikan hasil opname sebagai saldo awal</strong><span class="block text-[11px] text-slate-500">Untuk file opname lama yang baru dikirim; transaksi setelah tanggal opname dihitung ulang.</span></span>
+                                        </label>
+                                        <div id="opening_balance_options" class="hidden pl-6 space-y-2">
+                                            <label for="opening_effective_date" class="block text-[11px] font-bold text-slate-600">Tanggal opname fisik</label>
+                                            <input type="date" id="opening_effective_date" class="w-full sm:w-64 rounded-lg border-slate-300 text-sm">
+                                            <label for="reconcile_opname_through" class="block text-[11px] font-bold text-slate-600">Tanggal terakhir opname terlambat yang diganti</label>
+                                            <input type="date" id="reconcile_opname_through" class="w-full sm:w-64 rounded-lg border-slate-300 text-sm">
+                                            <p class="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2.5 leading-relaxed">
+                                                Hanya opname yang tercatat setelah tanggal fisik sampai tanggal terakhir ini yang dibalik. Opname setelah tanggal terakhir tetap dihitung sebagai transaksi. Pastikan rentang ini hanya mencakup impor terlambat/keliru yang sedang diganti.
+                                            </p>
+                                        </div>
+                                    </div>
+
                                     {{-- File Dropzone --}}
                                     <div>
                                         <label
@@ -814,6 +835,9 @@
 
                                 {{-- STEP 2: Laporan Temuan & Pratinjau --}}
                                 <div id="import_container_step_2" class="space-y-5 hidden">
+                                    <div id="import_opening_rebase_notice" class="hidden p-3.5 bg-amber-50 border border-amber-300 rounded-xl text-xs text-amber-900 leading-relaxed">
+                                        <strong>Mode saldo awal aktif.</strong> Saldo file diperlakukan sebagai stok fisik pada akhir tanggal opname. Sampai batas tanggal yang dipilih, sistem akan membalik <strong id="opening_rebase_rows">0</strong> baris opname pada <strong id="opening_rebase_medicines">0</strong> obat (selisih bersih <strong id="opening_rebase_delta">0</strong>). Pastikan angka ini sesuai opname terlambat yang ingin diganti.
+                                    </div>
                                     {{-- KPI Stats Grid --}}
                                     <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
                                         <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 text-center">
@@ -1687,6 +1711,10 @@
 
                 // Reset inputs & steps
                 $('#import_excel_file').val('');
+                $('input[name="import_mode"][value="penyesuaian"]').prop('checked', true).trigger('change');
+                $('#opening_effective_date').val('');
+                $('#reconcile_opname_through').val('');
+                $('#import_adjust_minus_stock').prop('disabled', false);
                 $('#import_file_preview').addClass('hidden');
                 $('#import_dropzone').removeClass('border-emerald-500 bg-emerald-50/20');
                 currentImportToken = null;
@@ -1795,6 +1823,12 @@
 
             $('#btn_back_to_step1').on('click', () => switchImportStep(1));
 
+            $('input[name="import_mode"]').on('change', function() {
+                const openingMode = $('input[name="import_mode"]:checked').val() === 'saldo_awal';
+                $('#opening_balance_options').toggleClass('hidden', !openingMode);
+                $('#import_adjust_minus_stock').prop('disabled', openingMode);
+            });
+
             // Dropzone & File Select
             const dropzone = document.getElementById('import_dropzone');
             const fileInput = document.getElementById('import_excel_file');
@@ -1860,7 +1894,18 @@
                     return;
                 }
                 const targetMode = $('input[name="import_target_mode"]:checked').val() || 'pelayanan';
-                const adjustMinusStock = $('#import_adjust_minus_stock').is(':checked') ? 1 : 0;
+                const importMode = $('input[name="import_mode"]:checked').val() || 'penyesuaian';
+                const effectiveDate = $('#opening_effective_date').val();
+                const reconcileOpnameThrough = $('#reconcile_opname_through').val();
+                if (importMode === 'saldo_awal' && (!effectiveDate || !reconcileOpnameThrough)) {
+                    iziToast.warning({ title: 'Tanggal diperlukan', message: 'Isi tanggal opname fisik dan batas terakhir opname terlambat yang diganti.', position: 'topRight' });
+                    return;
+                }
+                if (importMode === 'saldo_awal' && reconcileOpnameThrough < effectiveDate) {
+                    iziToast.warning({ title: 'Rentang tanggal tidak valid', message: 'Tanggal terakhir opname yang diganti tidak boleh sebelum tanggal opname fisik.', position: 'topRight' });
+                    return;
+                }
+                const adjustMinusStock = importMode === 'saldo_awal' ? 0 : ($('#import_adjust_minus_stock').is(':checked') ? 1 : 0);
 
                 const btn = $(this);
                 btn.prop('disabled', true).addClass('opacity-70');
@@ -1876,6 +1921,11 @@
                 formData.append('file', file);
                 formData.append('target_mode', targetMode);
                 formData.append('adjust_minus_stock', adjustMinusStock);
+                formData.append('import_mode', importMode);
+                if (importMode === 'saldo_awal') {
+                    formData.append('effective_date', effectiveDate);
+                    formData.append('reconcile_opname_through', reconcileOpnameThrough);
+                }
                 formData.append('_token', '{{ csrf_token() }}');
 
                 axios.post('{{ route('supplies.stockOpname.analyze') }}', formData, {
@@ -1891,6 +1941,12 @@
 
                         currentImportToken = data.token;
                         currentImportStats = data.stats;
+                        $('#import_opening_rebase_notice').toggleClass('hidden', importMode !== 'saldo_awal');
+                        if (data.stats.opening_rebase_summary) {
+                            $('#opening_rebase_rows').text(data.stats.opening_rebase_summary.opname_rows_to_reverse);
+                            $('#opening_rebase_medicines').text(data.stats.opening_rebase_summary.medicines_affected);
+                            $('#opening_rebase_delta').text(data.stats.opening_rebase_summary.net_delta_to_reverse);
+                        }
 
                         // Render Stats
                         $('#stat_total_rows').text(data.stats.total_rows);

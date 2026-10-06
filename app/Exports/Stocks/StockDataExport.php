@@ -41,6 +41,8 @@ class StockDataExport implements FromCollection, WithHeadings, WithStyles, Shoul
         $salesPharmacyId = $canSeeWarehouse ? $pmiPharmacyId : $pharmacyId;
         $startPharmacyIds = $canSeeWarehouse ? [$warehouseId, $pmiPharmacyId] : [$pharmacyId];
         $counterPharmacyId = $canSeeWarehouse ? $pmiPharmacyId : $pharmacyId;
+        $openingDateExpression = "DATE(items_log.date) > COALESCE((SELECT DATE(MAX(opening_logs.date)) FROM items_log AS opening_logs INNER JOIN batches AS opening_batches ON opening_batches.id = opening_logs.batches_id WHERE opening_logs.medicine_id = medicines.id AND opening_logs.type = ? AND opening_batches.pharmacy_id IN (" . implode(',', array_fill(0, count($startPharmacyIds), '?')) . ")), '1000-01-01')";
+        $openingDateBindings = array_merge(['SO-SALDO-AWAL'], $startPharmacyIds);
 
         $medicines = Medicines::query()
             ->where('medicines.status', 1)
@@ -51,12 +53,19 @@ class StockDataExport implements FromCollection, WithHeadings, WithStyles, Shoul
                 'medicines.unit',
             ])
             ->addSelect([
+                'opening_balance_qty' => ItemsLog::select('items_log.qty_before')
+                    ->join('batches', 'batches.id', '=', 'items_log.batches_id')
+                    ->whereColumn('items_log.medicine_id', 'medicines.id')
+                    ->where('items_log.type', 'SO-SALDO-AWAL')
+                    ->whereIn('batches.pharmacy_id', $startPharmacyIds)
+                    ->orderByDesc('items_log.date')->orderByDesc('items_log.id')->limit(1),
                 // Qty Beli: Gudang PMI jika ada akses gudang, atau Pembelian cabang
                 'qty_orders' => ItemsLog::select(DB::raw('COALESCE(SUM(CAST(items_log.qty AS UNSIGNED)), 0)'))
                     ->join('batches', 'batches.id', '=', 'items_log.batches_id')
                     ->whereColumn('items_log.medicine_id', 'medicines.id')
                     ->where('items_log.status', 2)
                     ->where('batches.pharmacy_id', $ordersPharmacyId)
+                    ->when((!$req || (!$req->filled('start_date') && !$req->filled('end_date'))), fn($q) => $q->whereRaw($openingDateExpression, $openingDateBindings))
                     ->when($req && $req->filled('start_date'), fn($q) => $q->whereDate('items_log.date', '>=', $req->start_date))
                     ->when($req && $req->filled('end_date'), fn($q) => $q->whereDate('items_log.date', '<=', $req->end_date)),
 
@@ -66,6 +75,7 @@ class StockDataExport implements FromCollection, WithHeadings, WithStyles, Shoul
                     ->whereColumn('items_log.medicine_id', 'medicines.id')
                     ->where('items_log.status', 1)
                     ->where('batches.pharmacy_id', $salesPharmacyId)
+                    ->when((!$req || (!$req->filled('start_date') && !$req->filled('end_date'))), fn($q) => $q->whereRaw($openingDateExpression, $openingDateBindings))
                     ->when($req && $req->filled('start_date'), fn($q) => $q->whereDate('items_log.date', '>=', $req->start_date))
                     ->when($req && $req->filled('end_date'), fn($q) => $q->whereDate('items_log.date', '<=', $req->end_date)),
 
@@ -75,6 +85,7 @@ class StockDataExport implements FromCollection, WithHeadings, WithStyles, Shoul
                     ->whereColumn('items_log.medicine_id', 'medicines.id')
                     ->where('items_log.status', 4)
                     ->where('batches.pharmacy_id', $ordersPharmacyId)
+                    ->when((!$req || (!$req->filled('start_date') && !$req->filled('end_date'))), fn($q) => $q->whereRaw($openingDateExpression, $openingDateBindings))
                     ->when($req && $req->filled('start_date'), fn($q) => $q->whereDate('items_log.date', '>=', $req->start_date))
                     ->when($req && $req->filled('end_date'), fn($q) => $q->whereDate('items_log.date', '<=', $req->end_date)),
 
@@ -84,6 +95,7 @@ class StockDataExport implements FromCollection, WithHeadings, WithStyles, Shoul
                     ->whereColumn('items_log.medicine_id', 'medicines.id')
                     ->where('items_log.status', 3)
                     ->where('batches.pharmacy_id', $salesPharmacyId)
+                    ->when((!$req || (!$req->filled('start_date') && !$req->filled('end_date'))), fn($q) => $q->whereRaw($openingDateExpression, $openingDateBindings))
                     ->when($req && $req->filled('start_date'), fn($q) => $q->whereDate('items_log.date', '>=', $req->start_date))
                     ->when($req && $req->filled('end_date'), fn($q) => $q->whereDate('items_log.date', '<=', $req->end_date)),
 
@@ -102,6 +114,7 @@ class StockDataExport implements FromCollection, WithHeadings, WithStyles, Shoul
                     ->whereColumn('items_log.medicine_id', 'medicines.id')
                     ->whereIn('items_log.status', [5, 6, 7])
                     ->whereIn('batches.pharmacy_id', $startPharmacyIds)
+                    ->when((!$req || (!$req->filled('start_date') && !$req->filled('end_date'))), fn($q) => $q->whereRaw($openingDateExpression, $openingDateBindings))
                     ->when($req && $req->filled('start_date'), fn($q) => $q->whereDate('items_log.date', '>=', $req->start_date))
                     ->when($req && $req->filled('end_date'), fn($q) => $q->whereDate('items_log.date', '<=', $req->end_date)),
 
@@ -151,7 +164,7 @@ class StockDataExport implements FromCollection, WithHeadings, WithStyles, Shoul
             ->orderBy('medicines.id')
             ->get();
 
-        return $medicines->map(function ($m, $index) use ($canSeeWarehouse) {
+        return $medicines->map(function ($m, $index) use ($canSeeWarehouse, $req) {
             $qtyStorage = $canSeeWarehouse ? (int) ($m->qty_storage ?? 0) : 0;
             $qtyCounter = (int) ($m->qty_counter ?? 0);
             $totalStok = $qtyStorage + $qtyCounter;
@@ -165,7 +178,9 @@ class StockDataExport implements FromCollection, WithHeadings, WithStyles, Shoul
             $netOut = $qtySales - $qtySalesRt;
             $adjustments = (int) ($m->qty_adjustments ?? 0);
 
-            $qtyStart = $totalStok - $netIn + $netOut - $adjustments;
+            $qtyStart = (!$req || (!$req->filled('start_date') && !$req->filled('end_date'))) && $m->opening_balance_qty !== null
+                ? (int) $m->opening_balance_qty
+                : $totalStok - $netIn + $netOut - $adjustments;
             $sisaStok = $totalStok;
 
             $p = $m->payment_method ? strtoupper(trim($m->payment_method)) : null;
