@@ -42,12 +42,12 @@ class ReportsController extends Controller
         $activeId = $request->filled('pharmacy_id') ? (int) $request->pharmacy_id : getActivePharmacyId();
         $report = $request->selectedReport;
 
-        // Untuk Laporan Pembelian, Pembelian Faktur, Konsinyasi, Tunai, Jatuh Tempo:
+        // Untuk Laporan Pembelian, Pembelian Faktur, Kredit, Konsinyasi, Tunai, Jatuh Tempo:
         // Pembelian dan penerimaan pusat dicatat di Gudang PMI (pharmacy_id = 9).
         // Jika user HO atau activeId adalah 1 (Apotek PMI), 6 (HO), atau 9 (Gudang PMI),
         // gunakan Gudang PMI (9) agar laporan tidak kosong.
         $purchaseReports = [
-            'Pembelian', 'Pembelian Faktur', 'Konsinyasi', 'Tunai', 'Jatuh Tempo',
+            'Pembelian', 'Pembelian Faktur', 'Kredit', 'Konsinyasi', 'Tunai', 'Jatuh Tempo',
             'Laporan Pembelian', 'Faktur Pembelian'
         ];
         if (in_array($report, $purchaseReports) && !$request->filled('pharmacy_id')) {
@@ -312,12 +312,16 @@ class ReportsController extends Controller
                 'RETUR_JUAL_' . $pharmacy->name . '_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx',
             ],
             'Pembelian', 'Laporan Pembelian' => [
-                new OrdersExport($pharmacy->id, $request->start_date, $request->end_date),
+                new OrdersExport($pharmacy->id, $request->start_date, $request->end_date, $request->payment_type),
                 'DATA_PEMBELIAN_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx',
             ],
             'Pembelian Faktur', 'Faktur Pembelian' => [
-                new InvoiceExport($pharmacy->id, $request->start_date, $request->end_date, $request->selectedType, $request->supplier),
+                new InvoiceExport($pharmacy->id, $request->start_date, $request->end_date, $request->selectedType, $request->supplier, $request->payment_type),
                 'DATA_FAKTUR_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx',
+            ],
+            'Kredit' => [
+                new PurchasePaymentExport($pharmacy->id, $request->start_date, $request->end_date, 'Kredit', $request->supplier),
+                'PEMBELIAN_KREDIT_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx',
             ],
             'Konsinyasi' => [
                 new PurchasePaymentExport($pharmacy->id, $request->start_date, $request->end_date, 'Konsinyasi', $request->supplier),

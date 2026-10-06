@@ -1061,6 +1061,20 @@ class StockOpnameImportService
                         $transfers = $transfersByBatch->get($batchId, collect());
                         if ($transfers->isEmpty()) {
                             if ((int) $qty === 0) continue;
+                            if (empty($etalaseByBatch[$batchId])) {
+                                // Batch not in Excel: reuse this medicine's existing shelf, else any shelf of the pharmacy.
+                                $fallbackEtalase = null;
+                                foreach ($allBatchIds as $siblingId) {
+                                    $sib = $transfersByBatch->get($siblingId);
+                                    if ($sib && ($e = $sib->firstWhere('etalases_id', '!=', null)?->etalases_id)) { $fallbackEtalase = $e; break; }
+                                }
+                                if (!$fallbackEtalase && !empty($etalaseByBatch)) $fallbackEtalase = reset($etalaseByBatch);
+                                if (!$fallbackEtalase) {
+                                    $defaultEtalaseId ??= DB::table('etalases')->where('pharmacy_id', $pharmacyId)->orderByDesc('status')->orderBy('id')->value('id');
+                                    $fallbackEtalase = $defaultEtalaseId;
+                                }
+                                if ($fallbackEtalase) $etalaseByBatch[$batchId] = (int) $fallbackEtalase;
+                            }
                             if (!$transferHeaderId) {
                                 $mutPrefix = now()->format('ym') . 'MUT';
                                 $lastMut = MedicineTransfers::where('code', 'like', "{$mutPrefix}%")->orderBy('code', 'desc')->value('code');

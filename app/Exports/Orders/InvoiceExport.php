@@ -14,14 +14,16 @@ class InvoiceExport implements WithMultipleSheets
     protected $endDate;
     protected $selectedType;
     protected $supplier;
+    protected $paymentType;
 
-    public function __construct($pharmacyId, $startDate, $endDate, $selectedType = 'Detail', $supplier = null)
+    public function __construct($pharmacyId, $startDate, $endDate, $selectedType = 'Detail', $supplier = null, $paymentType = null)
     {
         $this->pharmacyId   = $pharmacyId;
         $this->startDate    = $startDate instanceof Carbon ? $startDate : Carbon::parse($startDate)->startOfDay();
         $this->endDate      = $endDate instanceof Carbon ? $endDate : Carbon::parse($endDate)->endOfDay();
         $this->selectedType = $selectedType ?: 'detail';
         $this->supplier     = $supplier;
+        $this->paymentType  = $paymentType;
     }
 
     public function sheets(): array
@@ -56,6 +58,29 @@ class InvoiceExport implements WithMultipleSheets
             ->unique()
             ->values()
             ->toArray();
+
+        // If a specific payment type is selected (and it's not 'SEMUA' or null)
+        if ($this->paymentType && strtoupper($this->paymentType) !== 'SEMUA') {
+            $ptype = strtoupper($this->paymentType);
+            $title = match($ptype) {
+                'KREDIT' => 'Kredit',
+                'TUNAI' => 'Tunai',
+                'KONSINYASI' => 'Konsinyasi',
+                default => ucfirst(strtolower($ptype))
+            };
+
+            return [
+                new InvoiceSingleSheetExport(
+                    $this->pharmacyId,
+                    $this->startDate,
+                    $this->endDate,
+                    $this->selectedType,
+                    $this->supplier,
+                    $ptype,
+                    $title
+                )
+            ];
+        }
 
         $sheetDefs = [
             ['title' => 'Semua', 'type' => null],

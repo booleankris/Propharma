@@ -1283,6 +1283,18 @@
 
                     <button onclick="selectOrderReport(this)"
                         class="order-report-btn flex items-center gap-3 p-3 rounded-2xl border border-slate-100 bg-slate-50 text-left transition-all hover:border-slate-200 hover:bg-white">
+                        <div class="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center flex-shrink-0">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#4f46e5"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="2" y="5" width="20" height="14" rx="2" />
+                                <line x1="2" y1="10" x2="22" y2="10" />
+                            </svg>
+                        </div>
+                        <span class="text-sm font-semibold text-slate-600">Kredit</span>
+                    </button>
+
+                    <button onclick="selectOrderReport(this)"
+                        class="order-report-btn flex items-center gap-3 p-3 rounded-2xl border border-slate-100 bg-slate-50 text-left transition-all hover:border-slate-200 hover:bg-white">
                         <div class="w-8 h-8 rounded-xl bg-amber-50 flex items-center justify-center flex-shrink-0">
                             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#d97706"
                                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1383,6 +1395,29 @@
                             <p class="order-opt-desc text-[9px] text-gray-400 m-0 mt-0.5">Menampilkan seluruh data</p>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            {{-- Payment type filter for Pembelian Faktur --}}
+            <div id="order_payment_type_filter" style="display:none;">
+                <p class="text-xs font-semibold tracking-widest uppercase text-slate-400 mb-3">Tipe Pembayaran</p>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <button type="button" data-value="Semua" onclick="selectOrderPaymentOption(this)"
+                        class="order-payment-opt flex items-center justify-center py-2.5 px-3 rounded-2xl border-2 border-emerald-500 bg-emerald-50 text-emerald-800 font-semibold text-xs transition-all duration-200 hover:-translate-y-0.5">
+                        Semua
+                    </button>
+                    <button type="button" data-value="Kredit" onclick="selectOrderPaymentOption(this)"
+                        class="order-payment-opt flex items-center justify-center py-2.5 px-3 rounded-2xl border-2 border-gray-200 bg-white text-gray-700 font-semibold text-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300">
+                        Kredit
+                    </button>
+                    <button type="button" data-value="Tunai" onclick="selectOrderPaymentOption(this)"
+                        class="order-payment-opt flex items-center justify-center py-2.5 px-3 rounded-2xl border-2 border-gray-200 bg-white text-gray-700 font-semibold text-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300">
+                        Tunai
+                    </button>
+                    <button type="button" data-value="Konsinyasi" onclick="selectOrderPaymentOption(this)"
+                        class="order-payment-opt flex items-center justify-center py-2.5 px-3 rounded-2xl border-2 border-gray-200 bg-white text-gray-700 font-semibold text-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300">
+                        Konsinyasi
+                    </button>
                 </div>
             </div>
 
@@ -3265,6 +3300,7 @@
         }, 1500);
     }
 </script>
+
 
 <div id="loading-overlay"
     class="hidden fixed inset-0 z-[100000] flex items-center justify-center bg-black/50 backdrop-blur-sm">

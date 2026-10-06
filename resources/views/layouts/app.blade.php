@@ -98,6 +98,36 @@
     <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="{{ asset('templates/library/select2/dist/js/select2.full.min.js') }}"></script>
+    <script>
+        (function() {
+            var s2 = window.jQuery && window.jQuery.fn && window.jQuery.fn.select2;
+            if (!s2) return;
+            var currentJq = window.jQuery;
+            try {
+                Object.defineProperty(window, 'jQuery', {
+                    configurable: true,
+                    get: function() { return currentJq; },
+                    set: function(newJq) {
+                        currentJq = newJq;
+                        if (newJq && newJq.fn && !newJq.fn.select2) {
+                            newJq.fn.select2 = s2;
+                        }
+                    }
+                });
+                var currentDollar = window.$;
+                Object.defineProperty(window, '$', {
+                    configurable: true,
+                    get: function() { return currentDollar || currentJq; },
+                    set: function(newDollar) {
+                        currentDollar = newDollar;
+                        if (newDollar && newDollar.fn && !newDollar.fn.select2) {
+                            newDollar.fn.select2 = s2;
+                        }
+                    }
+                });
+            } catch (e) {}
+        })();
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://npmcdn.com/flatpickr/dist/l10n/id.js"></script>
 
@@ -867,37 +897,50 @@
 
         var selectedOrderReport = "Pembelian";
         var selectedOrderType = "rekap";
+        var selectedOrderPaymentType = "Semua";
 
         // Visibility map: which filters each report type shows
         // Keys match the button label text exactly
         const orderReportFilters = {
             "Pembelian": {
                 type_filter: false,
+                payment_filter: true,
                 supplier_select: false
             },
             "Pembelian Faktur": {
                 type_filter: true,
+                payment_filter: true,
+                supplier_select: true
+            },
+            "Kredit": {
+                type_filter: false,
+                payment_filter: false,
                 supplier_select: true
             },
             "Konsinyasi": {
                 type_filter: false,
+                payment_filter: false,
                 supplier_select: true
             },
             "Tunai": {
                 type_filter: false,
+                payment_filter: false,
                 supplier_select: true
             },
             "Jatuh Tempo": {
                 type_filter: false,
+                payment_filter: false,
                 supplier_select: true
             },
             // Legacy fallbacks
             "Laporan Pembelian": {
                 type_filter: false,
+                payment_filter: true,
                 supplier_select: false
             },
             "Faktur Pembelian": {
                 type_filter: true,
+                payment_filter: true,
                 supplier_select: true
             },
         };
@@ -912,7 +955,12 @@
 
         function initOrderSupplierSelect() {
             const el = $('#order_supplier');
-            if (!el.length || !$.fn.select2 || el.hasClass("select2-hidden-accessible")) return;
+            if (!el.length || typeof el.select2 !== 'function') return;
+
+            if (el.hasClass("select2-hidden-accessible")) {
+                el.select2('destroy');
+            }
+
             el.select2({
                 placeholder: 'Semua PBF / Kreditur',
                 allowClear: true,
@@ -937,13 +985,16 @@
         function applyOrderFilters(reportLabel) {
             const config = orderReportFilters[reportLabel] ?? {
                 type_filter: false,
+                payment_filter: false,
                 supplier_select: false
             };
 
             const typeFilterEl = document.getElementById('order_type_filter');
+            const paymentFilterEl = document.getElementById('order_payment_type_filter');
             const supplierSelectEl = document.getElementById('order_supplier_select');
 
             if (typeFilterEl) typeFilterEl.style.display = config.type_filter ? 'block' : 'none';
+            if (paymentFilterEl) paymentFilterEl.style.display = config.payment_filter ? 'block' : 'none';
             if (supplierSelectEl) supplierSelectEl.style.display = config.supplier_select ? 'block' : 'none';
 
             if (config.supplier_select) {
@@ -955,6 +1006,11 @@
             selectedOrderType = 'rekap';
             const rekapOpt = document.querySelector('.order-opt[data-value="rekap"]');
             if (rekapOpt) selectOrderOption(rekapOpt);
+
+            // Reset payment type to Semua whenever report changes
+            selectedOrderPaymentType = 'Semua';
+            const semuaPayOpt = document.querySelector('.order-payment-opt[data-value="Semua"]');
+            if (semuaPayOpt) selectOrderPaymentOption(semuaPayOpt);
         }
 
         function selectOrderReport(el) {
@@ -1035,11 +1091,27 @@
             console.log('Order type:', selectedOrderType);
         }
 
+        function selectOrderPaymentOption(el) {
+            document.querySelectorAll('.order-payment-opt').forEach(btn => {
+                btn.classList.remove('border-emerald-500', 'bg-emerald-50', 'text-emerald-800');
+                btn.classList.add('border-gray-200', 'bg-white', 'text-gray-700');
+            });
+
+            el.classList.remove('border-gray-200', 'bg-white', 'text-gray-700');
+            el.classList.add('border-emerald-500', 'bg-emerald-50', 'text-emerald-800');
+
+            selectedOrderPaymentType = el.getAttribute('data-value') || el.textContent.trim();
+            console.log('Order payment type:', selectedOrderPaymentType);
+        }
+
         function getOrderReport(mode = 'download') {
             const start_date = getDatePickerValue('order_start_date');
             const end_date = getDatePickerValue('order_end_date');
             const supplier = document.getElementById('order_supplier')?.value ?? '';
             const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
+            const paymentType = (selectedOrderReport === 'Pembelian' || selectedOrderReport === 'Laporan Pembelian' || selectedOrderReport === 'Faktur Pembelian' || selectedOrderReport === 'Pembelian Faktur')
+                ? (typeof selectedOrderPaymentType !== 'undefined' ? selectedOrderPaymentType : 'Semua')
+                : null;
 
             if (!start_date || !end_date) {
                 if (window.iziToast) {
@@ -1064,6 +1136,7 @@
                 selectedReport: selectedOrderReport,
                 selectedType: selectedOrderType,
                 supplier: supplier,
+                payment_type: paymentType,
                 mode: mode
             }, {
                 headers: {

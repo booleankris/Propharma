@@ -12,16 +12,38 @@ class OrdersExport implements WithMultipleSheets
     protected $pharmacyId;
     protected $startDate;
     protected $endDate;
+    protected $paymentType;
 
-    public function __construct($pharmacyId, $startDate, $endDate)
+    public function __construct($pharmacyId, $startDate, $endDate, $paymentType = null)
     {
-        $this->pharmacyId = $pharmacyId;
-        $this->startDate  = $startDate instanceof Carbon ? $startDate : Carbon::parse($startDate)->startOfDay();
-        $this->endDate    = $endDate instanceof Carbon ? $endDate : Carbon::parse($endDate)->endOfDay();
+        $this->pharmacyId  = $pharmacyId;
+        $this->startDate   = $startDate instanceof Carbon ? $startDate : Carbon::parse($startDate)->startOfDay();
+        $this->endDate     = $endDate instanceof Carbon ? $endDate : Carbon::parse($endDate)->endOfDay();
+        $this->paymentType = $paymentType;
     }
 
     public function sheets(): array
     {
+        if ($this->paymentType && strtoupper($this->paymentType) !== 'SEMUA') {
+            $ptype = strtoupper($this->paymentType);
+            $title = match($ptype) {
+                'KREDIT' => 'Kredit',
+                'TUNAI' => 'Tunai',
+                'KONSINYASI' => 'Konsinyasi',
+                default => ucfirst(strtolower($ptype))
+            };
+
+            return [
+                new OrdersSingleSheetExport(
+                    $this->pharmacyId,
+                    $this->startDate,
+                    $this->endDate,
+                    $ptype,
+                    $title
+                )
+            ];
+        }
+
         $targetPharmacyIds = in_array((int) $this->pharmacyId, [1, 6, 9])
             ? [9, 1]
             : [(int) $this->pharmacyId];
@@ -93,12 +115,20 @@ class OrdersExport implements WithMultipleSheets
      */
     public function array(): array
     {
+        $ptype = ($this->paymentType && strtoupper($this->paymentType) !== 'SEMUA') ? strtoupper($this->paymentType) : null;
+        $title = match($ptype) {
+            'KREDIT' => 'Kredit',
+            'TUNAI' => 'Tunai',
+            'KONSINYASI' => 'Konsinyasi',
+            default => 'Semua'
+        };
+
         return (new OrdersSingleSheetExport(
             $this->pharmacyId,
             $this->startDate,
             $this->endDate,
-            null,
-            'Semua'
+            $ptype,
+            $title
         ))->array();
     }
 }

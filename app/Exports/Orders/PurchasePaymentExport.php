@@ -19,7 +19,7 @@ class PurchasePaymentExport implements FromArray, WithStyles, WithColumnWidths, 
     protected $pharmacyId;
     protected $startDate;
     protected $endDate;
-    protected $reportType; // 'Konsinyasi', 'Tunai', 'Jatuh Tempo'
+    protected $reportType; // 'Konsinyasi', 'Tunai', 'Kredit', 'Jatuh Tempo'
     protected $supplier;
 
     const PPN = 0.11;
@@ -77,6 +77,9 @@ class PurchasePaymentExport implements FromArray, WithStyles, WithColumnWidths, 
             ReceivingDateFilter::apply($query, $this->startDate, $this->endDate);
         } elseif ($this->reportType === 'Tunai') {
             $query->where('receiving_details.invoice_payment', 'TUNAI');
+            ReceivingDateFilter::apply($query, $this->startDate, $this->endDate);
+        } elseif ($this->reportType === 'Kredit') {
+            $query->where('receiving_details.invoice_payment', 'KREDIT');
             ReceivingDateFilter::apply($query, $this->startDate, $this->endDate);
         } elseif ($this->reportType === 'Jatuh Tempo') {
             $query->where('receiving_details.invoice_payment', '!=', 'TUNAI');
