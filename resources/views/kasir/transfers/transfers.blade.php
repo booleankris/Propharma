@@ -99,6 +99,11 @@
 
             {{-- RIGHT: TOMBOL AKSI --}}
             <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full md:w-auto">
+                <a href="{{ route('transfers.requests.create') }}" class="w-full sm:w-auto">
+                    <button type="button" class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg border border-indigo-100 transition">
+                        <span>Permintaan Mutasi</span>
+                    </button>
+                </a>
                 <a href="{{ route('transfers.create') }}" class="w-full sm:w-auto">
                     <button type="button"
                         class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
@@ -127,6 +132,72 @@
                 <button type="button" onclick="this.parentElement.remove()" class="text-emerald-500 hover:text-emerald-700 font-bold ml-2">×</button>
             </div>
         @endif
+
+        {{-- Requests use a separate approval stage before a stock transfer exists. --}}
+        <section class="mb-6 grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
+            <details class="bg-white border border-amber-200 rounded-2xl overflow-hidden group">
+                <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-4 sm:px-5 py-4 bg-amber-50/70 hover:bg-amber-50">
+                    <div class="flex items-center gap-3"><span class="grid place-items-center w-9 h-9 rounded-xl bg-white text-amber-700 border border-amber-100 font-bold">↓</span><div><h3 class="font-bold text-slate-800 text-sm">Permintaan Masuk</h3><p class="text-xs text-slate-500 mt-0.5">Tinjau item sebelum menyetujui mutasi keluar.</p></div></div>
+                    <div class="flex items-center gap-2"><span class="shrink-0 rounded-full bg-amber-100 text-amber-800 px-2.5 py-1 text-xs font-bold">{{ $pendingRequests->count() }} permintaan</span><span class="text-amber-700 transition-transform group-open:rotate-180">⌄</span></div>
+                </summary>
+                <div class="p-3 sm:p-4 space-y-3">
+                    @forelse ($pendingRequests as $requestTransfer)
+                        <article class="rounded-xl border border-slate-200 bg-white overflow-hidden">
+                            <div class="flex flex-wrap items-start justify-between gap-2 p-3 sm:p-4">
+                                <div><div class="font-bold text-sm text-slate-800">{{ $requestTransfer->code }}</div><div class="text-xs text-slate-500 mt-1">Dari {{ $requestTransfer->destinationPharmacy?->name ?? 'Cabang' }} · {{ $requestTransfer->created_at?->format('d M Y H:i') }}</div></div>
+                                <span class="rounded-full bg-amber-50 text-amber-700 border border-amber-100 px-2.5 py-1 text-[10px] font-bold">{{ $requestTransfer->items->count() }} item</span>
+                            </div>
+                            <details class="mx-3 sm:mx-4 mb-3 sm:mb-4 rounded-lg border border-slate-200 overflow-hidden group">
+                                <summary class="flex cursor-pointer list-none items-center justify-between gap-3 bg-slate-50 px-3 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100"><span>Lihat daftar item</span><span class="text-[10px] text-slate-400">{{ $requestTransfer->items->count() }} item <span class="inline-block transition-transform group-open:rotate-180">⌄</span></span></summary>
+                                <div class="max-h-56 overflow-y-auto divide-y divide-slate-100">
+                                    @foreach ($requestTransfer->items as $requestedItem)
+                                        <div class="flex items-center justify-between gap-3 px-3 py-2.5 text-xs"><div class="min-w-0"><div class="font-semibold text-slate-700 truncate">{{ $requestedItem->requestedMedicine?->name ?? 'Obat' }}</div><div class="text-[10px] text-slate-400 mt-0.5">Batch {{ $requestedItem->sourceBatch?->name ?? '—' }} · {{ $requestedItem->requestedMedicine?->unit ?? '' }}</div></div><span class="shrink-0 font-mono font-bold text-slate-700">× {{ $requestedItem->qty }}</span></div>
+                                    @endforeach
+                                </div>
+                            </details>
+                            <div class="flex flex-wrap gap-2 px-3 sm:px-4 pb-3 sm:pb-4">
+                                <form method="POST" action="{{ route('transfers.requests.approve', $requestTransfer) }}" onsubmit="return confirm('Setujui permintaan ini? Stok akan dikurangi sekarang.')">@csrf<button class="rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2.5 text-xs font-semibold">Setujui & Mutasi Keluar</button></form>
+                                <form method="POST" action="{{ route('transfers.requests.deny', $requestTransfer) }}" onsubmit="return confirm('Tolak permintaan ini?')">@csrf<button class="rounded-lg bg-white border border-rose-200 text-rose-700 hover:bg-rose-50 px-3.5 py-2.5 text-xs font-semibold">Tolak</button></form>
+                            </div>
+                        </article>
+                    @empty
+                        <div class="flex items-center gap-3 rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-5"><span class="grid place-items-center w-9 h-9 rounded-full bg-white border border-slate-200 text-slate-400">✓</span><div><p class="text-xs font-semibold text-slate-600">Tidak ada permintaan menunggu</p><p class="text-[11px] text-slate-400 mt-0.5">Permintaan baru dari cabang lain akan muncul di sini.</p></div></div>
+                    @endforelse
+                </div>
+            </details>
+
+            <details class="bg-white border border-indigo-200 rounded-2xl overflow-hidden group">
+                <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-4 sm:px-5 py-4 bg-indigo-50/60 hover:bg-indigo-50">
+                    <div class="flex items-center gap-3"><span class="grid place-items-center w-9 h-9 rounded-xl bg-white text-indigo-700 border border-indigo-100 font-bold">↑</span><div><h3 class="font-bold text-slate-800 text-sm">Permintaan Saya</h3><p class="text-xs text-slate-500 mt-0.5">Pantau status permintaan cabang ini.</p></div></div>
+                    <div class="flex items-center gap-2"><span class="shrink-0 rounded-full bg-indigo-100 text-indigo-800 px-2.5 py-1 text-xs font-bold">{{ $submittedRequests->count() }} permintaan</span><span class="text-indigo-700 transition-transform group-open:rotate-180">⌄</span></div>
+                </summary>
+                <div class="p-3 sm:p-4 space-y-3">
+                    @forelse ($submittedRequests as $requestTransfer)
+                        @php
+                            [$requestLabel, $requestClass] = match ((int) $requestTransfer->request_status) {
+                                0 => ['Menunggu ' . ($requestTransfer->sourcePharmacy?->name ?? 'pengirim'), 'bg-amber-50 text-amber-700 border-amber-100'],
+                                1 => match ((int) $requestTransfer->status) {
+                                    1 => ['Diterima', 'bg-emerald-50 text-emerald-700 border-emerald-100'],
+                                    2 => ['Ditolak setelah disetujui', 'bg-rose-50 text-rose-700 border-rose-100'],
+                                    default => ['Disetujui · menunggu penerimaan', 'bg-emerald-50 text-emerald-700 border-emerald-100'],
+                                },
+                                default => ['Ditolak', 'bg-rose-50 text-rose-700 border-rose-100'],
+                            };
+                        @endphp
+                        <article class="rounded-xl border border-slate-200 bg-white overflow-hidden">
+                            <div class="flex flex-wrap items-start justify-between gap-2 p-3 sm:p-4"><div><div class="font-bold text-sm text-slate-800">{{ $requestTransfer->code }}</div><div class="text-xs text-slate-500 mt-1">Ke {{ $requestTransfer->sourcePharmacy?->name ?? 'Cabang' }} · {{ $requestTransfer->created_at?->format('d M Y H:i') }}</div></div><span class="rounded-full border px-2.5 py-1 text-[10px] font-bold {{ $requestClass }}">{{ $requestLabel }}</span></div>
+                            <details class="mx-3 sm:mx-4 mb-3 sm:mb-4 rounded-lg border border-slate-200 overflow-hidden group"><summary class="flex cursor-pointer list-none items-center justify-between gap-3 bg-slate-50 px-3 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100"><span>Lihat daftar item</span><span class="text-[10px] text-slate-400">{{ $requestTransfer->items->count() }} item <span class="inline-block transition-transform group-open:rotate-180">⌄</span></span></summary><div class="max-h-56 overflow-y-auto divide-y divide-slate-100">
+                                @foreach ($requestTransfer->items as $requestedItem)
+                                    <div class="flex items-center justify-between gap-3 px-3 py-2.5 text-xs"><div class="min-w-0"><div class="font-semibold text-slate-700 truncate">{{ $requestedItem->requestedMedicine?->name ?? $requestedItem->batches?->medicines?->name ?? 'Obat' }}</div><div class="text-[10px] text-slate-400 mt-0.5">Batch {{ $requestedItem->sourceBatch?->name ?? '—' }} · {{ $requestedItem->requestedMedicine?->unit ?? '' }}</div></div><span class="shrink-0 font-mono font-bold text-slate-700">× {{ $requestedItem->qty }}</span></div>
+                                @endforeach
+                            </div></details>
+                        </article>
+                    @empty
+                        <div class="flex items-center gap-3 rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-5"><span class="grid place-items-center w-9 h-9 rounded-full bg-white border border-slate-200 text-indigo-400">↗</span><div><p class="text-xs font-semibold text-slate-600">Belum ada permintaan mutasi</p><p class="text-[11px] text-slate-400 mt-0.5">Permintaan yang Anda kirim akan tercatat di sini.</p></div></div>
+                    @endforelse
+                </div>
+            </details>
+        </section>
         @if (session('message'))
             <div class="mb-4 px-4 py-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs sm:text-sm font-medium flex items-center justify-between">
                 <div class="flex items-center gap-2">

@@ -11,6 +11,7 @@ class MedicineTransferItems extends Model
     protected $fillable = [
         'medicine_transfer_id',
         'batches_id',
+        'requested_medicine_id',
         'source_batches_id',
         'source_type',
         'etalases_id',
@@ -26,6 +27,11 @@ class MedicineTransferItems extends Model
     public function sourceBatch()
     {
         return $this->belongsTo(Batches::class, 'source_batches_id');
+    }
+
+    public function requestedMedicine()
+    {
+        return $this->belongsTo(Medicines::class, 'requested_medicine_id');
     }
     public function transfer()
     {

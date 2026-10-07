@@ -926,6 +926,8 @@ class OrdersController extends Controller
             'medicines.code',
             'medicines.name',
             'medicines.packaging',
+            'medicines.unit',
+            'medicines.content',
             'medicines.raw_price',
             'medicines.minimal_stock'
         )
@@ -945,6 +947,8 @@ class OrdersController extends Controller
                 'medicines.code',
                 'medicines.name',
                 'medicines.packaging',
+                'medicines.unit',
+                'medicines.content',
                 'medicines.raw_price',
                 'medicines.minimal_stock'
             );
@@ -1008,6 +1012,8 @@ class OrdersController extends Controller
                 'code' => $row->code,
                 'name' => $row->name,
                 'packaging' => $row->packaging,
+                'unit' => $row->unit,
+                'content' => (float) ($row->content ?: 1),
                 'raw_price' => $row->raw_price,
                 'total_sold' => (int) $row->total_sold,
                 'min_stock' => $row->minimal_stock,
@@ -1093,6 +1099,7 @@ class OrdersController extends Controller
             'items' => 'required|array|min:1',
             'items.*.medicine_id' => 'required|exists:medicines,id',
             'items.*.quantity' => 'required|integer|min:1',
+            'items.*.pack' => 'nullable|boolean',
         ]);
 
         try {
@@ -1101,7 +1108,9 @@ class OrdersController extends Controller
             foreach ($request->items as $item) {
                 $medicine = Medicines::find($item['medicine_id']);
                 $qty = $item['quantity'];
-                $price = $medicine->raw_price;
+                $isPack = filter_var($item['pack'] ?? false, FILTER_VALIDATE_BOOLEAN);
+                $content = max(1, (float) ($medicine->content ?: 1));
+                $price = (float) $medicine->raw_price * ($isPack ? $content : 1);
 
                 $itemCode = $this->getOrdersCode($item['medicine_id'], $request->order_id, null);
 
@@ -1110,7 +1119,7 @@ class OrdersController extends Controller
                     'order_id' => $request->order_id,
                     'medicine_id' => $item['medicine_id'],
                     'creditor_code' => null,
-                    'pack' => 0,
+                    'pack' => $isPack ? 1 : 0,
                     'price' => $price,
                     'quantity' => $qty,
                     'total' => $qty * $price,

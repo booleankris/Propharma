@@ -1831,23 +1831,27 @@
                     const medId = tr.getAttribute('data-med-id');
                     const checkbox = tr.querySelector('.smart-checkbox');
                     const qtyInput = tr.querySelector('.smart-qty');
+                    const packInput = tr.querySelector('.smart-pack');
                     const medData = tr._medData;
 
-                    if (checkbox && qtyInput && medData) {
+                    if (checkbox && qtyInput && packInput && medData) {
                         checkbox.checked = isChecked;
                         if (isChecked) {
                             qtyInput.classList.remove('opacity-40', 'bg-gray-100');
                             qtyInput.classList.add('bg-white', 'border-purple-300', 'ring-2', 'ring-purple-200');
                             qtyInput.removeAttribute('disabled');
+                            packInput.disabled = false;
                             smartSelected[medId] = {
                                 medicine: medData,
-                                quantity: parseInt(qtyInput.value) || 1
+                                quantity: parseInt(qtyInput.value) || 1,
+                                pack: packInput.checked
                             };
                             tr.classList.add('bg-purple-50/40');
                         } else {
                             qtyInput.classList.add('opacity-40', 'bg-gray-100');
                             qtyInput.classList.remove('bg-white', 'border-purple-300', 'ring-2', 'ring-purple-200');
                             qtyInput.setAttribute('disabled', 'disabled');
+                            packInput.disabled = true;
                             delete smartSelected[medId];
                             tr.classList.remove('bg-purple-50/40');
                         }
@@ -1918,6 +1922,7 @@
                             smartCurrentRowNumber++;
                             const isSelected = !!smartSelected[med.medicine_id];
                             const defaultQty = isSelected ? smartSelected[med.medicine_id].quantity : 1;
+                            const isPackSelected = isSelected && !!smartSelected[med.medicine_id].pack;
                             const isLowStock = med.stocks <= (med.min_stock || 0);
 
                             const tr = document.createElement('tr');
@@ -1968,30 +1973,44 @@
                                      <input type="number" min="1" value="${defaultQty}" data-id="${med.medicine_id}"
                                          ${!isSelected ? 'disabled' : ''}
                                          class="smart-qty w-16 rounded-lg border text-center font-bold text-xs py-1.5 transition-all ${isSelected ? 'bg-white border-purple-300 ring-2 ring-purple-200 text-purple-900' : 'opacity-40 bg-gray-100 border-gray-200 text-gray-400'}">
+                                     <label class="mt-1 flex items-center justify-center gap-1 text-[10px] font-semibold text-gray-600" title="${med.content > 1 ? `Harga utuh = harga satuan × ${med.content}` : 'Kemasan utuh'}">
+                                         <input type="checkbox" data-id="${med.medicine_id}" ${isPackSelected ? 'checked' : ''} ${!isSelected ? 'disabled' : ''} class="smart-pack h-3.5 w-3.5 rounded border-gray-300 text-purple-600 focus:ring-purple-500">
+                                         Utuh${med.content > 1 ? ` · 1 ${med.packaging || 'kemasan'} = ${med.content} ${med.unit || 'unit'}` : ''}
+                                     </label>
                                 </td>
                             `;
 
                             const checkbox = tr.querySelector('.smart-checkbox');
                             const qtyInput = tr.querySelector('.smart-qty');
+                            const packInput = tr.querySelector('.smart-pack');
 
                             checkbox.addEventListener('change', function() {
                                 if (this.checked) {
                                     qtyInput.classList.remove('opacity-40', 'bg-gray-100');
                                     qtyInput.classList.add('bg-white', 'border-purple-300', 'ring-2', 'ring-purple-200', 'text-purple-900');
                                     qtyInput.removeAttribute('disabled');
+                                    packInput.disabled = false;
                                     smartSelected[med.medicine_id] = {
                                         medicine: med,
-                                        quantity: parseInt(qtyInput.value) || 1
+                                        quantity: parseInt(qtyInput.value) || 1,
+                                        pack: packInput.checked
                                     };
                                     tr.classList.add('bg-purple-50/40');
                                 } else {
                                     qtyInput.classList.add('opacity-40', 'bg-gray-100');
                                     qtyInput.classList.remove('bg-white', 'border-purple-300', 'ring-2', 'ring-purple-200', 'text-purple-900');
                                     qtyInput.setAttribute('disabled', 'disabled');
+                                    packInput.disabled = true;
                                     delete smartSelected[med.medicine_id];
                                     tr.classList.remove('bg-purple-50/40');
                                 }
                                 updateSmartSelectedCount();
+                            });
+
+                            packInput.addEventListener('change', function() {
+                                if (smartSelected[med.medicine_id]) {
+                                    smartSelected[med.medicine_id].pack = this.checked;
+                                }
                             });
 
                             qtyInput.addEventListener('input', function() {
@@ -2033,7 +2052,8 @@
         function confirmSmartOrder() {
             const items = Object.values(smartSelected).map(s => ({
                 medicine_id: s.medicine.medicine_id,
-                quantity: s.quantity
+                quantity: s.quantity,
+                pack: !!s.pack
             }));
 
             if (!items.length) {

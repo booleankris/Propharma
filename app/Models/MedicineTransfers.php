@@ -13,7 +13,12 @@ class MedicineTransfers extends Model
         'code',
         'user_id',
         'status',
+        'is_request',
+        'source_pharmacy_id',
+        'destination_pharmacy_id',
+        'request_status',
     ];
+    protected $casts = ['is_request' => 'boolean'];
     public function batches()
     {
         return $this->belongsTo(Batches::class, 'batches_id', 'id');
@@ -29,5 +34,15 @@ class MedicineTransfers extends Model
     public function users()
     {
         return $this->belongsTo(User::class, 'user_id');
+    }
+
+    public function sourcePharmacy()
+    {
+        return $this->belongsTo(Pharmacies::class, 'source_pharmacy_id');
+    }
+
+    public function destinationPharmacy()
+    {
+        return $this->belongsTo(Pharmacies::class, 'destination_pharmacy_id');
     }
 }

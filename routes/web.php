@@ -247,6 +247,8 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
         Route::resource('creditors', CreditorsController::class)->except(['show']);
         Route::resource('debtors', DebtorsController::class)->except(['show']);
         Route::resource('patients', PatientsController::class)->except(['show']);
+        Route::get('doctors/duplicates', [DoctorsController::class, 'getDuplicates'])->name('doctors.duplicates');
+        Route::post('doctors/merge-duplicates', [DoctorsController::class, 'mergeDuplicates'])->name('doctors.mergeDuplicates');
         Route::resource('doctors', DoctorsController::class)->except(['show']);
         Route::resource('compositions', CompositionsController::class)->except(['show']);
         Route::resource('factories', FactoriesController::class)->except(['show']);
@@ -297,6 +299,8 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
     // Sales Reject
     Route::get('/reject', [RejectController::class, 'reject'])->name('sales.reject');
     Route::get('/getreject', [RejectController::class, 'getReject'])->name('sales.getreject');
+    Route::get('/reject/follow-up', [RejectController::class, 'followUpIndex'])->name('sales.reject.follow-up');
+    Route::put('/reject/{id}/follow-up', [RejectController::class, 'updateFollowUp'])->name('sales.reject.follow-up.update');
     Route::get('/reject/export', [RejectController::class, 'exportReject'])->name('sales.reject.export');
     Route::get('/reject/export/status/{id}', [RejectController::class, 'exportStatus'])->name('sales.reject.export.status');
     Route::get('reject/searchmedicine', [RejectController::class, 'searchMedicine'])->name('sales.searchmedicine');
@@ -356,6 +360,11 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
 
     // Transfers
     Route::get('/transfers/create', [TransfersController::class, 'transfersCreate'])->name('transfers.create');
+    Route::get('/transfers/requests/create', [TransfersController::class, 'createTransferRequest'])->name('transfers.requests.create');
+    Route::post('/transfers/requests', [TransfersController::class, 'storeTransferRequest'])->name('transfers.requests.store');
+    Route::get('/transfers/requests/medicines', [TransfersController::class, 'searchRequestMedicines'])->name('transfers.requests.medicines');
+    Route::post('/transfers/requests/{transfer}/approve', [TransfersController::class, 'approveTransferRequest'])->name('transfers.requests.approve');
+    Route::post('/transfers/requests/{transfer}/deny', [TransfersController::class, 'denyTransferRequest'])->name('transfers.requests.deny');
     Route::post('/transfer', [TransfersController::class, 'transfer'])->name('transfer');
     Route::get('/search/getbatches', [TransfersController::class, 'searchBatches'])->name('search.getbatches');
     Route::get('/etalases', [TransfersController::class, 'index'])->name('etalases.index');

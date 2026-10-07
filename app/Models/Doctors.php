@@ -20,8 +20,13 @@ class Doctors extends Model
         'phone',
         'status',
     ];
+    public function pharmacy()
+    {
+        return $this->belongsTo(Pharmacies::class, 'pharmacy_id', 'id');
+    }
+
     public function pharmacies()
     {
-        return $this->belongsTo(Pharmacies::class);
+        return $this->belongsTo(Pharmacies::class, 'pharmacy_id', 'id');
     }
 }

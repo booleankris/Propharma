@@ -15,12 +15,15 @@
         .payment-option {
             position: relative;
         }
-        .bg-searchhover{
+
+        .bg-searchhover {
             background-color: #fff;
         }
-        .bg-searchhover:hover{
+
+        .bg-searchhover:hover {
             background-color: #e4efff;
         }
+
         .payment-option:focus-within .payment-card {
             outline: 2.5px solid #3b82f6 !important;
             outline-offset: 2px !important;
@@ -949,6 +952,41 @@
     </div>
 </div>
 
+<!-- Doctor Confirmation Modal -->
+<div id="confirmDoctorModal"
+    class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center hidden z-[999999]">
+    <div class="bg-white p-6 rounded-xl shadow-xl w-[480px] max-w-full">
+        <div class="flex items-center text-amber-600 mb-2">
+            <svg class="w-6 h-6 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <h3 id="confirmDoctorTitle" class="text-lg font-bold">Dokter Sudah Ada</h3>
+        </div>
+        <p id="confirmDoctorDesc" class="text-sm text-gray-600 mb-3">Dokter dengan nama yang sama sudah ada di sistem.
+        </p>
+
+        <div id="confirmDoctorNote"
+            class="hidden mb-3 p-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg text-xs leading-relaxed">
+            💡 <b>Pemberitahuan:</b> Jika ini dokter yang berbeda, disarankan menggunakan pembeda (contoh: <i>"dr. Rizky
+                - RS Siloam"</i>) agar dokter mudah dikenali di laporan.
+        </div>
+
+        <div id="doctorSuggestionsList" class="space-y-2 mb-4 max-h-48 overflow-y-auto"></div>
+
+        <div class="flex justify-between items-center pt-3 border-t border-gray-100">
+            <button type="button" id="cancelConfirmDoctorBtn"
+                class="px-3 py-2 text-xs text-gray-600 hover:text-gray-800 bg-gray-100 rounded-lg font-medium">
+                Batal
+            </button>
+            <button type="button" id="forceCreateDoctorBtn"
+                class="px-4 py-2 text-xs bg-amber-500 hover:bg-amber-600 text-white font-medium rounded-lg shadow">
+                Tetap Buat Dokter Baru
+            </button>
+        </div>
+    </div>
+</div>
+
 @if ($check_transaction != 0)
     {{-- Modal Pembayaran --}}
     <div id="paymentModal" class="fixed inset-0 bg-black/50 hidden justify-center items-center z-[99999]">
@@ -1328,8 +1366,9 @@
                     class="modal-print-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 text-left transition-colors">
                     <div
                         class="modal-btn-icon w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 text-gray-500 flex-shrink-0 transition-colors">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+                            stroke-linejoin="round">
                             <polyline points="6 9 6 2 18 2 18 9" />
                             <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
                             <rect x="6" y="14" width="12" height="8" />
@@ -1347,8 +1386,9 @@
                     class="modal-print-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 text-left transition-colors">
                     <div
                         class="modal-btn-icon w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 text-gray-500 flex-shrink-0 transition-colors">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+                            stroke-linejoin="round">
                             <line x1="18" y1="6" x2="6" y2="18" />
                             <line x1="6" y1="6" x2="18" y2="18" />
                         </svg>
@@ -2411,13 +2451,7 @@
                         <div class="text-xs text-gray-700 truncate">${escapeHtml(it.etalases?.name || '—')}</div>
                     </div>
                 </div>
-                <div class="flex items-center gap-1.5">
-                    <svg class="w-3 h-3 text-gray-300 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z"/></svg>
-                    <div class="min-w-0">
-                        <div class="text-[9px] uppercase tracking-wider text-gray-400 leading-none">Lokasi</div>
-                        <div class="text-xs text-gray-700 truncate">${escapeHtml(it.locations?.name || '—')}</div>
-                    </div>
-                </div>
+               
                 <div class="flex items-center gap-1.5">
                     <svg class="w-3 h-3 text-gray-300 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.5v15m3-15v15m4.5-15v15m3-15v15m4.5-15v15"/></svg>
                     <div class="min-w-0">
@@ -3109,8 +3143,11 @@
     }
 
 
+    let doctorItems = [];
+
     const dodoctorSearch = debounce(async (term) => {
         if (!term.trim()) {
+            doctorItems = [];
             doctorlist.innerHTML = '';
             closedoctorBox();
             return;
@@ -3123,15 +3160,24 @@
         });
         if (!res.ok) return;
 
-        items = await res.json();
-        renderdoctor(items);
+        // Abaikan respons basi jika kasir sudah mengetik hal lain
+        if (inputdoctor.value.trim() !== term.trim()) return;
+
+        doctorItems = await res.json();
+        items = doctorItems;
+        renderdoctor(doctorItems);
         opendoctorBox();
     }, 250);
     if (inputdoctor) {
-        inputdoctor.addEventListener('input', (e) => dodoctorSearch(e.target.value));
+        inputdoctor.addEventListener('input', (e) => {
+            // Nama diubah → pilihan dokter sebelumnya tidak berlaku lagi
+            const doctorIdEl = document.getElementById('doctor_id');
+            if (doctorIdEl) doctorIdEl.value = doctorIdEl.defaultValue;
+            dodoctorSearch(e.target.value);
+        });
 
         inputdoctor.addEventListener('keydown', (e) => {
-            const max = items.length - 1;
+            const max = doctorItems.length - 1;
 
             if (e.key === 'ArrowDown') {
                 e.preventDefault();
@@ -3145,9 +3191,11 @@
                 activeIndex = Math.max(0, activeIndex - 1);
                 doctorhighlight();
                 ensuredoctorVisible();
-            } else if (e.key === 'Enter' && activeIndex >= 0 && items[activeIndex]) {
+            } else if (e.key === 'Enter') {
+                if (doctorbox.classList.contains('hidden') || max < 0) return;
                 e.preventDefault();
-                selectDoctor(items[activeIndex]);
+                // Tanpa panah: langsung pilih hasil teratas
+                selectDoctor(doctorItems[activeIndex >= 0 ? activeIndex : 0]);
             } else if (e.key === 'Escape') {
                 closedoctorBox();
             }
@@ -4658,42 +4706,124 @@
         });
 
         // Submit Doctor Form
-        newDoctorForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-
-            let formData = new FormData(this);
+        function submitDoctorForm(force = false) {
+            let formData = new FormData(newDoctorForm);
+            if (force) {
+                formData.append('force', '1');
+            }
 
             axios.post("{{ route('transaction.addDoctor') }}", formData, {
                     headers: {
-                        'X-CSRF-TOKEN': document.querySelector('meta[name=\"csrf-token\"]').content,
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
                         'Content-Type': 'multipart/form-data'
                     }
                 })
                 .then(response => {
-                    if (response.data.success) {
-
+                    if (response.data.existing) {
+                        alert(response.data.message || "Dokter sudah terdaftar, otomatis dipilih.");
+                        selectDoctorAndClose(response.data.doctor);
+                    } else if (response.data.needs_confirmation) {
+                        showDoctorConfirmation(response.data);
+                    } else if (response.data.success) {
                         alert("Dokter berhasil ditambahkan!");
-
-                        newDoctorModal.classList.add('hidden');
-                        newDoctorForm.reset();
-
-                        // Auto-fill doctor fields
-                        inputdoctor.value = response.data.doctor.name;
-                        document.getElementById("doctor_id").value = response.data.doctor.id;
-
-                        if (document.getElementById("selectedDoctorId")) {
-                            document.getElementById("selectedDoctorId").value = response.data.doctor.id;
-                        }
-
+                        selectDoctorAndClose(response.data.doctor);
                     } else {
-                        alert("Gagal menambahkan dokter.");
+                        alert(response.data.message || "Gagal menambahkan dokter.");
                     }
                 })
                 .catch(error => {
                     console.error(error);
-                    alert("Terjadi kesalahan, coba lagi.");
+                    let msg = error.response?.data?.message || "Terjadi kesalahan, coba lagi.";
+                    alert(msg);
                 });
+        }
+
+        function selectDoctorAndClose(doctor) {
+            newDoctorModal.classList.add('hidden');
+            const confirmModal = document.getElementById('confirmDoctorModal');
+            if (confirmModal) confirmModal.classList.add('hidden');
+            newDoctorForm.reset();
+
+            // Auto-fill doctor fields
+            if (typeof inputdoctor !== 'undefined' && inputdoctor) {
+                inputdoctor.value = doctor.name;
+            }
+            if (document.getElementById("doctor_id")) {
+                document.getElementById("doctor_id").value = doctor.id;
+            }
+            if (document.getElementById("selectedDoctorId")) {
+                document.getElementById("selectedDoctorId").value = doctor.id;
+            }
+        }
+
+        function showDoctorConfirmation(data) {
+            const confirmModal = document.getElementById('confirmDoctorModal');
+            const suggestionsList = document.getElementById('doctorSuggestionsList');
+            const confirmTitle = document.getElementById('confirmDoctorTitle');
+            const confirmDesc = document.getElementById('confirmDoctorDesc');
+            const confirmNote = document.getElementById('confirmDoctorNote');
+            if (!confirmModal || !suggestionsList) return;
+
+            const isExact = !!data.is_exact;
+            const suggestions = data.suggestions || [];
+
+            if (confirmTitle) {
+                confirmTitle.innerText = isExact ? "Data Dokter Sudah Ada" : "Dokter Serupa Ditemukan";
+            }
+            if (confirmDesc) {
+                confirmDesc.innerHTML = isExact ?
+                    (data.message || "Data dokter dengan nama yang sama sudah ada di dalam database.") :
+                    "Dokter dengan nama mirip sudah ada di sistem. Silakan pilih dokter yang sudah ada atau tetap buat dokter baru:";
+            }
+            if (confirmNote) {
+                if (isExact) {
+                    confirmNote.classList.remove('hidden');
+                } else {
+                    confirmNote.classList.add('hidden');
+                }
+            }
+
+            suggestionsList.innerHTML = '';
+            suggestions.forEach(doc => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className =
+                    'w-full text-left p-3 rounded-xl border border-blue-200 bg-blue-50/50 hover:bg-blue-100 hover:border-blue-400 transition-all flex items-center justify-between group shadow-sm';
+                btn.innerHTML = `
+                    <div>
+                        <div class="font-bold text-sm text-gray-800 group-hover:text-blue-700">${doc.name}</div>
+                        <div class="text-xs text-gray-500">${doc.specialist ? doc.specialist + ' • ' : ''}${doc.city || doc.address || 'Tanpa alamat'}</div>
+                    </div>
+                    <span class="text-xs bg-blue-600 text-white px-2.5 py-1 rounded-lg font-semibold shadow-sm group-hover:bg-blue-700">Pilih Dokter Ini (${doc.code})</span>
+                `;
+                btn.addEventListener('click', () => {
+                    selectDoctorAndClose(doc);
+                });
+                suggestionsList.appendChild(btn);
+            });
+
+            confirmModal.classList.remove('hidden');
+        }
+
+        newDoctorForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            submitDoctorForm(false);
         });
+
+        const cancelConfirmDoctorBtn = document.getElementById('cancelConfirmDoctorBtn');
+        if (cancelConfirmDoctorBtn) {
+            cancelConfirmDoctorBtn.addEventListener('click', () => {
+                document.getElementById('confirmDoctorModal').classList.add('hidden');
+            });
+        }
+
+        const forceCreateDoctorBtn = document.getElementById('forceCreateDoctorBtn');
+        if (forceCreateDoctorBtn) {
+            forceCreateDoctorBtn.addEventListener('click', () => {
+                document.getElementById('confirmDoctorModal').classList.add('hidden');
+                submitDoctorForm(true);
+            });
+        }
     }
 
 

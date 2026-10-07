@@ -12,6 +12,33 @@ use App\Jobs\ProcessRejectSalesExport;
 
 class RejectController extends Controller
 {
+    public function followUpIndex()
+    {
+        $rejects = Reject::with('medicines')
+            ->where('pharmacy_id', getActivePharmacyId())
+            ->orderByDesc('date')->orderByDesc('id')->paginate(25);
+
+        return view('kasir.reject.follow_up', compact('rejects'));
+    }
+
+    public function updateFollowUp(Request $request, $id)
+    {
+        $validated = $request->validate([
+            'source_type' => 'nullable|in:Resep,UPDS',
+            'doctor_name' => 'nullable|string|max:255|required_if:source_type,Resep',
+            'stock_status' => 'nullable|string|max:100',
+            'equivalent' => 'nullable|string|max:255',
+            'follow_up' => 'nullable|string|max:2000',
+            'follow_up_note' => 'nullable|string|max:2000',
+            'follow_up_update' => 'nullable|string|max:2000',
+        ]);
+
+        $reject = Reject::where('pharmacy_id', getActivePharmacyId())->findOrFail($id);
+        $reject->update($validated);
+
+        return redirect()->route('sales.reject.follow-up')->with('success', 'Tindak lanjut penolakan berhasil disimpan.');
+    }
+
     function generateRejectionCode()
     {
         $now = Carbon::now();

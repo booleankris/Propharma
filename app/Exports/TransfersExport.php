@@ -31,9 +31,13 @@ class TransfersExport implements FromQuery, WithHeadings, WithMapping, ShouldAut
     {
         $query = MedicineTransferItems::with([
             'transfer.users.pharmacy',
+            'transfer.sourcePharmacy',
+            'transfer.destinationPharmacy',
             'batches.medicines',
             'batches.pharmacy',
-            'etalases'
+            'etalases',
+            'requestedMedicine',
+            'sourceBatch.pharmacy',
         ])->whereNull('receiving_items_id');
 
         if ($this->startDate && $this->endDate) {
@@ -44,27 +48,26 @@ class TransfersExport implements FromQuery, WithHeadings, WithMapping, ShouldAut
         }
 
         if ($this->search) {
-            $query->whereIn('batches_id', function($q) {
-                $q->select('id')->from('batches')
+            $query->where(function ($query) {
+                $query->whereIn('batches_id', function($q) {
+                  $q->select('id')->from('batches')
                   ->whereIn('medicine_id', function($q2) {
                       $q2->select('id')->from('medicines')->where('name', 'like', "%{$this->search}%");
                   });
+                })->orWhereHas('requestedMedicine', fn($medicine) => $medicine->where('name', 'like', "%{$this->search}%"));
             });
         }
 
-        $targetPharmacyIds = in_array((int) $this->pharmacyId, [1, 6, 9])
-            ? [9, 1, 6]
-            : [(int) $this->pharmacyId];
-
-        $query->where(function ($q) use ($targetPharmacyIds) {
-            $q->whereIn('medicine_transfer_id', function ($sub1) use ($targetPharmacyIds) {
-                $sub1->select('id')->from('medicine_transfers')
-                    ->whereIn('user_id', function ($sub2) use ($targetPharmacyIds) {
-                        $sub2->select('id')->from('users')->whereIn('pharmacy_id', $targetPharmacyIds);
+        $pharmacyId = (int) $this->pharmacyId;
+        $query->where(function ($query) use ($pharmacyId) {
+            $query->whereHas('transfer', function ($transfer) use ($pharmacyId) {
+                $transfer->where('source_pharmacy_id', $pharmacyId)
+                    ->orWhere('destination_pharmacy_id', $pharmacyId)
+                    ->orWhere(function ($legacy) use ($pharmacyId) {
+                        $legacy->whereNull('source_pharmacy_id')->whereHas('users', fn($user) => $user->where('pharmacy_id', $pharmacyId));
                     });
-            })->orWhereIn('batches_id', function ($sub3) use ($targetPharmacyIds) {
-                $sub3->select('id')->from('batches')->whereIn('pharmacy_id', $targetPharmacyIds);
-            });
+            })->orWhereHas('sourceBatch', fn($batch) => $batch->where('pharmacy_id', $pharmacyId))
+                ->orWhereHas('batches', fn($batch) => $batch->where('pharmacy_id', $pharmacyId));
         });
 
         // Optimize memory and query speed by ordering by id
@@ -96,10 +99,15 @@ class TransfersExport implements FromQuery, WithHeadings, WithMapping, ShouldAut
             2 => 'Ditolak',
         ];
 
-        $senderId = $item->transfer?->users?->pharmacy_id ?? null;
-        $receiverId = $item->batches?->pharmacy_id ?? null;
+        $senderId = $item->transfer?->source_pharmacy_id ?? $item->sourceBatch?->pharmacy_id ?? $item->transfer?->users?->pharmacy_id ?? null;
+        $receiverId = $item->transfer?->destination_pharmacy_id ?? $item->batches?->pharmacy_id ?? null;
+        $senderName = $item->transfer?->sourcePharmacy?->name ?? $item->sourceBatch?->pharmacy?->name ?? $item->transfer?->users?->pharmacy?->name ?? '-';
+        $receiverName = $item->transfer?->destinationPharmacy?->name ?? $item->batches?->pharmacy?->name ?? '-';
+        $medicine = $item->batches?->medicines ?? $item->requestedMedicine;
 
-        if ($senderId == $this->pharmacyId && $receiverId == $this->pharmacyId) {
+        if ($item->transfer?->is_request && (int) $item->transfer?->request_status === 0) {
+            $tipe = 'Permintaan Mutasi';
+        } elseif ($senderId == $this->pharmacyId && $receiverId == $this->pharmacyId) {
             $tipe = 'Internal';
         } elseif ($senderId == $this->pharmacyId) {
             $tipe = 'Keluar';
@@ -113,10 +121,10 @@ class TransfersExport implements FromQuery, WithHeadings, WithMapping, ShouldAut
             $item->transfer?->code ?? '-',
             $tipe,
             $item->transfer?->created_at ? $item->transfer->created_at->format('Y-m-d H:i') : '-',
-            $item->transfer?->users?->pharmacy?->name ?? '-',
-            $item->batches?->pharmacy?->name ?? '-',
-            $item->batches?->medicines?->code ?? '-',
-            $item->batches?->medicines?->name ?? '-',
+            $senderName,
+            $receiverName,
+            $medicine?->code ?? '-',
+            $medicine?->name ?? '-',
             $item->batches?->name ?? '-',
             $item->etalases?->name ?? '-',
             $item->qty,

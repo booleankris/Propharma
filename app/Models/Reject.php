@@ -19,6 +19,13 @@ class Reject extends Model
         'unit',
         'total',
         'reason',
+        'source_type',
+        'doctor_name',
+        'stock_status',
+        'equivalent',
+        'follow_up',
+        'follow_up_note',
+        'follow_up_update',
     ];
     
     public function medicines()

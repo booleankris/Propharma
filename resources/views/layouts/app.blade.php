@@ -258,14 +258,6 @@
                 has_factory: false,
                 has_doctor: false
             },
-            "Lembar Omzet Harian": {
-                date_filter: false,
-                month_year_filter: true,
-                type_filter: false,
-                online_btn: false,
-                has_factory: false,
-                has_doctor: false
-            },
             "Monitoring Penjualan": {
                 date_filter: false,
                 month_year_filter: true,

@@ -80,6 +80,11 @@
                         <span>Lihat Mutasi</span>
                     </button>
                 </a>
+                <a href="{{ route('transfers.requests.create') }}" class="w-full sm:w-auto">
+                    <button type="button" class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg border border-indigo-100 transition">
+                        <span>Buat Permintaan Mutasi</span>
+                    </button>
+                </a>
 
             </div>
         </div>

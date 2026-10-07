@@ -710,12 +710,48 @@ class SalesController extends Controller
     }
     public function addDoctor(Request $request)
     {
+        $name = trim(preg_replace('/\s+/', ' ', (string) $request->name));
+
+        if ($name === '') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Nama dokter wajib diisi.',
+            ], 422);
+        }
+
+        $matches = \App\Support\DoctorNameMatcher::findMatches(
+            $name,
+            Doctors::select(['id', 'code', 'name', 'specialist', 'address', 'city', 'phone'])->get()
+        );
+
+        // Nama sama persis → minta konfirmasi kasir kecuali jika dipaksa (force)
+        if ($matches['exact'] && !$request->boolean('force')) {
+            return response()->json([
+                'success'            => false,
+                'needs_confirmation' => true,
+                'is_exact'           => true,
+                'message'            => 'Data dokter "' . $matches['exact']->name . '" (' . $matches['exact']->code . ') sudah ada di dalam database.',
+                'existing_doctor'    => $matches['exact'],
+                'suggestions'        => [$matches['exact']],
+            ]);
+        }
+
+        // Nama mirip (kemungkinan typo) → minta konfirmasi kasir, kecuali dipaksa
+        if (!empty($matches['similar']) && !$request->boolean('force')) {
+            return response()->json([
+                'success'            => false,
+                'needs_confirmation' => true,
+                'is_exact'           => false,
+                'suggestions'        => $matches['similar'],
+            ]);
+        }
+
         $code = $this->generateDoctorCode();
 
         $doctor = Doctors::create([
             'pharmacy_id' => "1",
             'code' => $code,
-            'name' => $request->name,
+            'name' => $name,
             'specialist' => $request->specialist,
             'address' => $request->address,
             'city' => $request->city,

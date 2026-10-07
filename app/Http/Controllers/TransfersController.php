@@ -158,8 +158,8 @@ class TransfersController extends Controller
         $pharmaciesQuery = Pharmacies::where('status', 1);
 
         if (isWarehousePharmacy($currentPharmacyId)) {
-            // Gudang PMI hanya bisa mutasi ke Apotek SAHABAT PMI (id = 1)
-            $pharmaciesQuery->where('id', 1);
+            // Stok gudang PMI dapat dimutasi ke cabang pelayanan.
+            $pharmaciesQuery->whereIn('id', [1, 2, 3, 4, 5]);
         } else {
             // Cabang / Pelayanan bisa transfer ke Gudang PMI (id = 9) dan ke cabang fisik lain
             $pharmaciesQuery->whereIn('id', [1, 2, 3, 4, 5, 9])
@@ -169,6 +169,306 @@ class TransfersController extends Controller
         $pharmacies = $pharmaciesQuery->get();
         return view('kasir.transfers.create_transfers', compact('now', 'pharmacies', 'code'));
     }
+
+    public function createTransferRequest()
+    {
+        $currentPharmacyId = getActivePharmacyId();
+        $pharmacies = Pharmacies::where('status', 1)
+            ->whereIn('id', [1, 2, 3, 4, 5, 9])
+            ->where('id', '!=', $currentPharmacyId)
+            ->orderBy('name')
+            ->get();
+
+        return view('kasir.transfers.create_request', [
+            'pharmacies' => $pharmacies,
+            'code' => $this->generateTransfersCode(),
+            'now' => Carbon::now(),
+        ]);
+    }
+
+    public function searchRequestMedicines(Request $request)
+    {
+        $search = trim((string) $request->query('search', ''));
+        $sourcePharmacyId = (int) $request->query('source_pharmacy_id');
+        if (mb_strlen($search) < 1 || !in_array($sourcePharmacyId, [1, 2, 3, 4, 5, 9], true)) {
+            return response()->json(['data' => []]);
+        }
+
+        $sourceType = isWarehousePharmacy($sourcePharmacyId) ? 'gudang' : 'pelayanan';
+        $batches = Batches::with('medicines')
+            ->where('pharmacy_id', $sourcePharmacyId)
+            ->where(function ($query) use ($search) {
+                $query->where('name', 'like', "%{$search}%")
+                    ->orWhereHas('medicines', function ($medicine) use ($search) {
+                        $medicine->where('name', 'like', "%{$search}%")
+                            ->orWhere('code', 'like', "%{$search}%");
+                    });
+            })
+            ->orderByRaw('expired_date IS NULL, expired_date ASC')
+            ->orderBy('id')
+            ->limit(60)
+            ->get();
+
+        $results = $batches->map(function ($batch) use ($sourceType) {
+            $available = $sourceType === 'gudang'
+                ? max(0, (int) $batch->stock)
+                : (int) MedicineTransferItems::where('batches_id', $batch->id)
+                    ->where('qty', '>', 0)->where('status', 1)
+                    ->where(function ($query) {
+                        $query->whereNull('source_type')->orWhere('source_type', '!=', 'retur_gudang');
+                    })->sum('qty');
+
+            if ($available < 1) return null;
+
+            return [
+                'id' => $batch->id,
+                'batches_name' => $batch->name,
+                'name' => $batch->medicines?->name ?? '—',
+                'medicine_id' => $batch->medicine_id,
+                'medicine_code' => $batch->medicines?->code ?? '—',
+                'stock' => $available,
+                'unit' => $batch->medicines?->unit ?? '—',
+                'expired_date' => safeDateFormat($batch->expired_date),
+                'source_type' => $sourceType,
+            ];
+        })->filter()->values();
+
+        return response()->json(['data' => $results]);
+    }
+
+    public function storeTransferRequest(Request $request)
+    {
+        $validated = $request->validate([
+            'source_pharmacy_id' => 'required|exists:pharmacies,id',
+            'items' => 'required|array|min:1',
+            'items.*.batches_id' => 'required|exists:batches,id',
+            'items.*.etalases_id' => 'required|exists:etalases,id',
+            'items.*.source_type' => 'required|in:gudang,pelayanan',
+            'items.*.qty' => 'required|integer|min:1',
+        ]);
+
+        $requesterPharmacyId = getActivePharmacyId();
+        if ((int) $validated['source_pharmacy_id'] === $requesterPharmacyId) {
+            return back()->withInput()->withErrors(['source_pharmacy_id' => 'Cabang pengirim harus berbeda dengan cabang Anda.']);
+        }
+        if (!in_array((int) $validated['source_pharmacy_id'], [1, 2, 3, 4, 5, 9], true)
+            || !Pharmacies::whereKey($validated['source_pharmacy_id'])->where('status', 1)->exists()) {
+            return back()->withInput()->withErrors(['source_pharmacy_id' => 'Cabang pengirim tidak aktif.']);
+        }
+
+        $transfer = DB::transaction(function () use ($validated, $requesterPharmacyId) {
+            $sourcePharmacyId = (int) $validated['source_pharmacy_id'];
+            if (!in_array($sourcePharmacyId, [1, 2, 3, 4, 5, 9], true)
+                || !Pharmacies::whereKey($sourcePharmacyId)->where('status', 1)->exists()) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['source_pharmacy_id' => 'Cabang pengirim tidak aktif.']);
+            }
+
+            foreach ($validated['items'] as $line) {
+                $sourceBatch = Batches::whereKey($line['batches_id'])
+                    ->where('pharmacy_id', $sourcePharmacyId)
+                    ->lockForUpdate()
+                    ->first();
+                if (!$sourceBatch) {
+                    throw \Illuminate\Validation\ValidationException::withMessages(['items' => 'Batch tidak tersedia di cabang pengirim yang dipilih.']);
+                }
+                $expectedSourceType = isWarehousePharmacy($sourcePharmacyId) ? 'gudang' : 'pelayanan';
+                if ($line['source_type'] !== $expectedSourceType) {
+                    throw \Illuminate\Validation\ValidationException::withMessages(['items' => 'Jenis stok pada permintaan tidak sesuai dengan cabang pengirim.']);
+                }
+                $available = $expectedSourceType === 'gudang'
+                    ? max(0, (int) $sourceBatch->stock)
+                    : (int) MedicineTransferItems::where('batches_id', $sourceBatch->id)
+                        ->where('qty', '>', 0)->where('status', 1)
+                        ->where(function ($query) {
+                            $query->whereNull('source_type')->orWhere('source_type', '!=', 'retur_gudang');
+                        })->sum('qty');
+                if ((int) $line['qty'] > $available) {
+                    throw \Illuminate\Validation\ValidationException::withMessages(['items' => "Stok {$sourceBatch->name} berubah. Stok tersedia sekarang {$available}."]);
+                }
+                $etalaseBelongsToReceiver = Items::whereKey($line['etalases_id'])
+                    ->where(function ($query) use ($requesterPharmacyId) {
+                        $query->where('pharmacy_id', $requesterPharmacyId)->orWhereNull('pharmacy_id');
+                    })->exists();
+                if (!$etalaseBelongsToReceiver) {
+                    throw \Illuminate\Validation\ValidationException::withMessages(['items' => 'Etalase harus berasal dari cabang penerima.']);
+                }
+            }
+
+            $transfer = MedicineTransfers::create([
+                'code' => $this->generateTransfersCode(),
+                'user_id' => auth()->id(),
+                'status' => 0,
+                'is_request' => true,
+                'source_pharmacy_id' => $validated['source_pharmacy_id'],
+                'destination_pharmacy_id' => $requesterPharmacyId,
+                'request_status' => 0,
+            ]);
+
+            foreach ($validated['items'] as $line) {
+                MedicineTransferItems::create([
+                    'medicine_transfer_id' => $transfer->id,
+                    'requested_medicine_id' => Batches::find($line['batches_id'])->medicine_id,
+                    'source_batches_id' => $line['batches_id'],
+                    'source_type' => $line['source_type'],
+                    'etalases_id' => $line['etalases_id'],
+                    'qty' => $line['qty'],
+                    'status' => 0,
+                ]);
+            }
+
+            return $transfer;
+        });
+
+        return redirect()->route('transfers.incoming', ['tab' => 'requests'])
+            ->with('success', "Permintaan mutasi {$transfer->code} berhasil dikirim.");
+    }
+
+    public function approveTransferRequest(MedicineTransfers $transfer)
+    {
+        $pharmacyId = getActivePharmacyId();
+        if (!$transfer->is_request || (int) $transfer->request_status !== 0 || (int) $transfer->source_pharmacy_id !== $pharmacyId) {
+            return back()->with('message', 'Permintaan ini tidak tersedia untuk disetujui oleh cabang Anda.');
+        }
+
+        try {
+            DB::transaction(function () use ($transfer, $pharmacyId) {
+                $transfer = MedicineTransfers::whereKey($transfer->id)->lockForUpdate()->firstOrFail();
+                if (!$transfer->is_request || (int) $transfer->request_status !== 0 || (int) $transfer->source_pharmacy_id !== $pharmacyId) {
+                    throw new \RuntimeException('Status permintaan sudah berubah. Muat ulang halaman.');
+                }
+
+                $now = Carbon::now();
+                $requestItems = $transfer->items()->whereNull('batches_id')->lockForUpdate()->get();
+                if ($requestItems->isEmpty()) {
+                    throw new \RuntimeException('Tidak ada item permintaan yang dapat diproses.');
+                }
+
+                $destinationEtalaseId = \App\Models\Etalases::where('pharmacy_id', $transfer->destination_pharmacy_id)->value('id');
+                if (!$destinationEtalaseId) {
+                    $destinationEtalaseId = \App\Models\Etalases::query()->value('id');
+                }
+
+                foreach ($requestItems as $requestedItem) {
+                    $remaining = (int) $requestedItem->qty;
+                    $medicineId = (int) $requestedItem->requested_medicine_id;
+                    $batches = Batches::where('pharmacy_id', $pharmacyId)
+                        ->where('medicine_id', $medicineId)
+                        ->when($requestedItem->source_batches_id, fn($query, $batchId) => $query->whereKey($batchId))
+                        ->orderByRaw('expired_date IS NULL, expired_date ASC')
+                        ->orderBy('id')
+                        ->lockForUpdate()
+                        ->get();
+
+                    foreach ($batches as $sourceBatch) {
+                        if ($remaining <= 0) break;
+                        $sourceType = isWarehousePharmacy($pharmacyId) ? 'gudang' : 'pelayanan';
+                        $available = $sourceType === 'gudang'
+                            ? max(0, (int) $sourceBatch->stock)
+                            : (int) MedicineTransferItems::where('batches_id', $sourceBatch->id)
+                                ->where('qty', '>', 0)->where('status', 1)
+                                ->where(function ($query) {
+                                    $query->whereNull('source_type')->orWhere('source_type', '!=', 'retur_gudang');
+                                })->sum('qty');
+
+                        if ($available <= 0) continue;
+                        $qty = min($remaining, $available);
+                        $destinationBatch = Batches::firstOrCreate(
+                            [
+                                'pharmacy_id' => $transfer->destination_pharmacy_id,
+                                'medicine_id' => $sourceBatch->medicine_id,
+                                'name' => $sourceBatch->name,
+                                'expired_date' => $sourceBatch->expired_date,
+                            ],
+                            ['status' => 0, 'stock' => 0]
+                        );
+
+                        if ($sourceType === 'gudang') {
+                            $qtyBefore = (int) $sourceBatch->stock;
+                            $sourceBatch->decrement('stock', $qty);
+                            $qtyAfter = (int) $sourceBatch->fresh()->stock;
+                        } else {
+                            $qtyBefore = $available;
+                            $toDeduct = $qty;
+                            $sourceRows = MedicineTransferItems::where('batches_id', $sourceBatch->id)
+                                ->where('qty', '>', 0)->where('status', 1)
+                                ->where(function ($query) {
+                                    $query->whereNull('source_type')->orWhere('source_type', '!=', 'retur_gudang');
+                                })->orderBy('id')->lockForUpdate()->get();
+                            foreach ($sourceRows as $sourceRow) {
+                                if ($toDeduct <= 0) break;
+                                $deduct = min((int) $sourceRow->qty, $toDeduct);
+                                $sourceRow->decrement('qty', $deduct);
+                                $toDeduct -= $deduct;
+                            }
+                            $qtyAfter = $qtyBefore - $qty;
+                        }
+
+                        $itemData = [
+                            'batches_id' => $destinationBatch->id,
+                            'source_batches_id' => $sourceBatch->id,
+                            'source_type' => $sourceType,
+                            'etalases_id' => $requestedItem->etalases_id ?: $destinationEtalaseId,
+                            'qty' => $qty,
+                            'status' => 0,
+                            'stock_deducted_at' => $now,
+                        ];
+                        if ($requestedItem->batches_id === null) {
+                            $requestedItem->update($itemData);
+                        } else {
+                            $itemData['medicine_transfer_id'] = $transfer->id;
+                            $itemData['requested_medicine_id'] = $medicineId;
+                            MedicineTransferItems::create($itemData);
+                        }
+
+                        Medicines::whereKey($medicineId)->decrement('stock', $qty);
+                        ItemsLog::create([
+                            'transaction_code' => $transfer->code,
+                            'code' => $this->generateItemsLogCode(),
+                            'type' => 'MU',
+                            'medicine_id' => $medicineId,
+                            'qty' => $qty,
+                            'qty_before' => $qtyBefore,
+                            'qty_after' => $qtyAfter,
+                            'total' => 0,
+                            'date' => $now,
+                            'status' => 7,
+                            'batches_id' => $sourceBatch->id,
+                            'user_id' => auth()->id(),
+                        ]);
+                        $remaining -= $qty;
+                    }
+
+                    if ($remaining > 0) {
+                        throw new \RuntimeException('Stok ' . (Medicines::find($medicineId)?->name ?? 'obat') . " tidak mencukupi. Kekurangan {$remaining}. Tidak ada stok yang dikurangi.");
+                    }
+                }
+
+                $transfer->update([
+                    'request_status' => 1,
+                    'user_id' => auth()->id(),
+                ]);
+            });
+
+            return back()->with('success', 'Permintaan disetujui. Mutasi keluar tercatat dan stok sumber telah dikurangi.');
+        } catch (\Throwable $e) {
+            return back()->with('message', 'Permintaan gagal diproses: ' . $e->getMessage());
+        }
+    }
+
+    public function denyTransferRequest(MedicineTransfers $transfer)
+    {
+        if (!$transfer->is_request || (int) $transfer->request_status !== 0 || (int) $transfer->source_pharmacy_id !== getActivePharmacyId()) {
+            return back()->with('message', 'Permintaan ini tidak tersedia untuk ditolak oleh cabang Anda.');
+        }
+
+        DB::transaction(function () use ($transfer) {
+            $transfer->items()->where('status', 0)->update(['status' => 2]);
+            $transfer->update(['request_status' => 2, 'status' => 2]);
+        });
+
+        return back()->with('success', 'Permintaan mutasi ditolak. Stok tidak berubah.');
+    }
+
     public function transfer(Request $request)
     {
         $request->validate([
@@ -188,22 +488,27 @@ class TransfersController extends Controller
                     'code' => $request->code,
                     'user_id' => auth()->id(),
                     'status' => 0,
+                    'source_pharmacy_id' => getActivePharmacyId(),
+                    'destination_pharmacy_id' => (int) $request->pharmacy,
                 ]);
 
                 $pharmacyId = getActivePharmacyId();
 
                 if (isWarehousePharmacy($pharmacyId)) {
-                    if ((int) $request->pharmacy !== 1) {
-                        throw new \Exception("Gudang PMI hanya dapat melakukan mutasi ke Apotek SAHABAT PMI.");
+                    if (!in_array((int) $request->pharmacy, [1, 2, 3, 4, 5], true)) {
+                        throw new \Exception("Gudang PMI hanya dapat melakukan mutasi ke cabang pelayanan.");
                     }
                 } else {
-                    if ((int) $request->pharmacy === (int) $pharmacyId) {
-                        throw new \Exception("Apotek tujuan tidak boleh sama dengan apotek asal.");
+                    if ((int) $request->pharmacy === (int) $pharmacyId || !in_array((int) $request->pharmacy, [1, 2, 3, 4, 5, 9], true)) {
+                        throw new \Exception("Apotek tujuan tidak valid.");
                     }
                 }
 
                 foreach ($request->items as $line) {
                     $sourceBatch = Batches::lockForUpdate()->findOrFail($line['batches_id']);
+                    if ((int) $sourceBatch->pharmacy_id !== $pharmacyId) {
+                        throw new \Exception("Batch sumber bukan milik cabang Anda.");
+                    }
                     $sourceType = $line['source_type'];
                     $qty = (int) $line['qty'];
                     $medicine = $sourceBatch->medicines;
@@ -314,6 +619,7 @@ class TransfersController extends Controller
             'items.batches.pharmacy',
             'users.pharmacy',
         ])->findOrFail($id);
+        $this->authorizeTransferParticipant($transfer);
 
         $pdf = Pdf::loadView('kasir.transfers.receipt', compact('transfer'))
             ->setPaper('a4', 'portrait');
@@ -409,9 +715,19 @@ class TransfersController extends Controller
         };
 
         // ── Mutasi Keluar: transfers WHERE source batch belongs to this pharmacy ──
-        $pendingQuery = MedicineTransfers::with(['users.pharmacy'])
+        $pendingRequests = MedicineTransfers::with(['users.pharmacy', 'sourcePharmacy', 'destinationPharmacy', 'items.requestedMedicine', 'items.sourceBatch'])
+            ->where('is_request', true)->where('request_status', 0)
+            ->where('source_pharmacy_id', $pharmacyId)->latest()->get();
+        $submittedRequests = MedicineTransfers::with(['users.pharmacy', 'sourcePharmacy', 'destinationPharmacy', 'items.requestedMedicine', 'items.sourceBatch'])
+            ->where('is_request', true)->where('destination_pharmacy_id', $pharmacyId)->latest()->get();
+
+        $pendingQuery = MedicineTransfers::with(['users.pharmacy', 'sourcePharmacy', 'destinationPharmacy'])
+            ->where(function ($query) {
+                $query->where('is_request', false)->orWhere('request_status', 1);
+            })
             ->where(function ($q) use ($pharmacyId) {
-                $q->whereHas('items.sourceBatch', fn($sb) => $sb->where('pharmacy_id', $pharmacyId))
+                $q->where('source_pharmacy_id', $pharmacyId)
+                    ->orWhereHas('items.sourceBatch', fn($sb) => $sb->where('pharmacy_id', $pharmacyId))
                     ->orWhere(function ($q2) use ($pharmacyId) {
                         $q2->whereDoesntHave('items.sourceBatch')
                             ->whereHas('users', fn($u) => $u->where('pharmacy_id', $pharmacyId));
@@ -425,8 +741,14 @@ class TransfersController extends Controller
             ->withQueryString();
 
         // ── Mutasi Masuk: transfers WHERE destination batch belongs to this pharmacy ──
-        $acceptedQuery = MedicineTransfers::with(['users.pharmacy'])
-            ->whereHas('items.batches', fn($q) => $q->where('pharmacy_id', $pharmacyId))
+        $acceptedQuery = MedicineTransfers::with(['users.pharmacy', 'sourcePharmacy', 'destinationPharmacy'])
+            ->where(function ($query) {
+                $query->where('is_request', false)->orWhere('request_status', 1);
+            })
+            ->where(function ($q) use ($pharmacyId) {
+                $q->where('destination_pharmacy_id', $pharmacyId)
+                    ->orWhereHas('items.batches', fn($b) => $b->where('pharmacy_id', $pharmacyId));
+            })
             ->whereIn('status', [0, 1])
             ->latest();
         $applyFilters($acceptedQuery);
@@ -442,7 +764,9 @@ class TransfersController extends Controller
                     ->orWhereHas('items', fn($i) => $i->where('status', 2));
             })
             ->where(function ($q) use ($pharmacyId) {
-                $q->whereHas('items.sourceBatch', fn($sb) => $sb->where('pharmacy_id', $pharmacyId))
+                $q->where('source_pharmacy_id', $pharmacyId)
+                    ->orWhere('destination_pharmacy_id', $pharmacyId)
+                    ->orWhereHas('items.sourceBatch', fn($sb) => $sb->where('pharmacy_id', $pharmacyId))
                     ->orWhereHas('items.batches', fn($b) => $b->where('pharmacy_id', $pharmacyId));
             })
             ->latest();
@@ -452,7 +776,7 @@ class TransfersController extends Controller
             ->fragment('denied')
             ->withQueryString();
 
-        return view('kasir.transfers.transfers', compact('pending', 'accepted', 'denied'));
+        return view('kasir.transfers.transfers', compact('pending', 'accepted', 'denied', 'pendingRequests', 'submittedRequests'));
     }
 
     public function exportTransfers(Request $request)
@@ -562,6 +886,12 @@ class TransfersController extends Controller
     public function acceptTransfer(MedicineTransfers $transfer)
     {
         $currentPharmacyId = getActivePharmacyId();
+        if ($transfer->is_request && (int) $transfer->request_status !== 1) {
+            return redirect(url()->previous())->with('message', 'Permintaan mutasi harus disetujui pengirim terlebih dahulu.');
+        }
+        if ($transfer->destination_pharmacy_id && (int) $transfer->destination_pharmacy_id !== $currentPharmacyId) {
+            return redirect(url()->previous())->with('message', 'Hanya cabang penerima yang berhak menerima mutasi ini.');
+        }
         $firstItem = $transfer->items()->first();
         $destinationPharmacyId = $firstItem?->batches?->pharmacy_id;
 
@@ -594,6 +924,12 @@ class TransfersController extends Controller
     public function getTransferItems($id)
     {
         $transfer = MedicineTransfers::with(['users.pharmacy'])->findOrFail($id);
+        $currentPharmacyId = getActivePharmacyId();
+        $isParticipant = (int) $transfer->source_pharmacy_id === $currentPharmacyId
+            || (int) $transfer->destination_pharmacy_id === $currentPharmacyId
+            || $transfer->items()->whereHas('sourceBatch', fn($query) => $query->where('pharmacy_id', $currentPharmacyId))->exists()
+            || $transfer->items()->whereHas('batches', fn($query) => $query->where('pharmacy_id', $currentPharmacyId))->exists();
+        if (!$isParticipant) abort(403);
 
         $statusMap = [
             0 => ['Menunggu', 'bg-amber-50 text-amber-700 border-amber-200'],
@@ -607,6 +943,13 @@ class TransfersController extends Controller
     public function acceptItem(MedicineTransferItems $item)
     {
         $currentPharmacyId = getActivePharmacyId();
+        $transfer = $item->transfer;
+        if ($transfer?->is_request && (int) $transfer->request_status !== 1) {
+            return redirect(url()->previous())->with('message', 'Permintaan mutasi harus disetujui pengirim terlebih dahulu.');
+        }
+        if ($transfer?->destination_pharmacy_id && (int) $transfer->destination_pharmacy_id !== $currentPharmacyId) {
+            return redirect(url()->previous())->with('message', 'Hanya cabang penerima yang berhak menerima mutasi ini.');
+        }
         $destinationPharmacyId = $item->batches?->pharmacy_id;
 
         if ($destinationPharmacyId && $destinationPharmacyId != $currentPharmacyId) {
@@ -634,6 +977,17 @@ class TransfersController extends Controller
     }
     public function denyItem(MedicineTransferItems $item)
     {
+        $transfer = $item->transfer;
+        if ($transfer?->is_request && (int) $transfer->request_status !== 1) {
+            return redirect(url()->previous())->with('message', 'Permintaan hanya dapat ditolak dari bagian Permintaan Masuk.');
+        }
+        $currentPharmacyId = getActivePharmacyId();
+        $isParticipant = (int) $transfer?->source_pharmacy_id === $currentPharmacyId
+            || (int) $transfer?->destination_pharmacy_id === $currentPharmacyId
+            || (int) $item->sourceBatch?->pharmacy_id === $currentPharmacyId
+            || (int) $item->batches?->pharmacy_id === $currentPharmacyId;
+        if (!$isParticipant) abort(403);
+
         try {
             DB::transaction(function () use ($item) {
                 $now = Carbon::now();
@@ -665,6 +1019,18 @@ class TransfersController extends Controller
 
     public function denyTransfer(MedicineTransfers $transfer)
     {
+        if ($transfer->is_request && (int) $transfer->request_status !== 1) {
+            return redirect(url()->previous())->with('message', 'Gunakan aksi pada bagian Permintaan Masuk untuk menolak permintaan.');
+        }
+        $currentPharmacyId = getActivePharmacyId();
+        if ((int) $transfer->source_pharmacy_id !== $currentPharmacyId && (int) $transfer->destination_pharmacy_id !== $currentPharmacyId) {
+            $isParticipant = $transfer->items()
+                ->where(function ($query) use ($currentPharmacyId) {
+                    $query->whereHas('sourceBatch', fn($batch) => $batch->where('pharmacy_id', $currentPharmacyId))
+                        ->orWhereHas('batches', fn($batch) => $batch->where('pharmacy_id', $currentPharmacyId));
+                })->exists();
+            if (!$isParticipant) abort(403);
+        }
         try {
             DB::transaction(function () use ($transfer) {
                 $now = Carbon::now();
@@ -763,5 +1129,15 @@ class TransfersController extends Controller
             'batches_id' => $srcBatch->id,
             'user_id' => auth()->id(),
         ]);
+    }
+
+    private function authorizeTransferParticipant(MedicineTransfers $transfer): void
+    {
+        $currentPharmacyId = getActivePharmacyId();
+        $isParticipant = (int) $transfer->source_pharmacy_id === $currentPharmacyId
+            || (int) $transfer->destination_pharmacy_id === $currentPharmacyId
+            || $transfer->items()->whereHas('sourceBatch', fn($query) => $query->where('pharmacy_id', $currentPharmacyId))->exists()
+            || $transfer->items()->whereHas('batches', fn($query) => $query->where('pharmacy_id', $currentPharmacyId))->exists();
+        abort_unless($isParticipant, 403);
     }
 }
