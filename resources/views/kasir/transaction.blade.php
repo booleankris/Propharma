@@ -4706,7 +4706,19 @@
         });
 
         // Submit Doctor Form
+        let isSubmittingDoctor = false;
+
         function submitDoctorForm(force = false) {
+            if (isSubmittingDoctor) return;
+            isSubmittingDoctor = true;
+
+            const submitBtn = newDoctorForm.querySelector('button[type="submit"]');
+            const originalBtnText = submitBtn ? submitBtn.innerText : 'Tambah Dokter';
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerText = 'Memproses...';
+            }
+
             let formData = new FormData(newDoctorForm);
             if (force) {
                 formData.append('force', '1');
@@ -4735,6 +4747,13 @@
                     console.error(error);
                     let msg = error.response?.data?.message || "Terjadi kesalahan, coba lagi.";
                     alert(msg);
+                })
+                .finally(() => {
+                    isSubmittingDoctor = false;
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.innerText = originalBtnText;
+                    }
                 });
         }
 
@@ -4766,13 +4785,15 @@
 
             const isExact = !!data.is_exact;
             const suggestions = data.suggestions || [];
+            const docName = data.existing_doctor?.name || suggestions[0]?.name || '';
+            const docCode = data.existing_doctor?.code || suggestions[0]?.code || '';
 
             if (confirmTitle) {
-                confirmTitle.innerText = isExact ? "Data Dokter Sudah Ada" : "Dokter Serupa Ditemukan";
+                confirmTitle.innerText = isExact ? "Dokter Sudah Terdaftar Sebelumnya" : "Dokter Serupa Ditemukan";
             }
             if (confirmDesc) {
                 confirmDesc.innerHTML = isExact ?
-                    (data.message || "Data dokter dengan nama yang sama sudah ada di dalam database.") :
+                    `Dokter bernama <b>"${escapeHtml(docName)}"</b> sudah pernah terdaftar di sistem dengan kode <b>${escapeHtml(docCode)}</b>.<br><span class="text-xs text-emerald-700 font-semibold mt-1 inline-block">ℹ <b>Catatan:</b> Tidak ada data baru yang dibuat di database saat ini.</span>` :
                     "Dokter dengan nama mirip sudah ada di sistem. Silakan pilih dokter yang sudah ada atau tetap buat dokter baru:";
             }
             if (confirmNote) {
@@ -4791,10 +4812,10 @@
                     'w-full text-left p-3 rounded-xl border border-blue-200 bg-blue-50/50 hover:bg-blue-100 hover:border-blue-400 transition-all flex items-center justify-between group shadow-sm';
                 btn.innerHTML = `
                     <div>
-                        <div class="font-bold text-sm text-gray-800 group-hover:text-blue-700">${doc.name}</div>
-                        <div class="text-xs text-gray-500">${doc.specialist ? doc.specialist + ' • ' : ''}${doc.city || doc.address || 'Tanpa alamat'}</div>
+                        <div class="font-bold text-sm text-gray-800 group-hover:text-blue-700">${escapeHtml(doc.name)}</div>
+                        <div class="text-xs text-gray-500">${doc.specialist ? escapeHtml(doc.specialist) + ' • ' : ''}${escapeHtml(doc.city || doc.address || 'Tanpa alamat')}</div>
                     </div>
-                    <span class="text-xs bg-blue-600 text-white px-2.5 py-1 rounded-lg font-semibold shadow-sm group-hover:bg-blue-700">Pilih Dokter Ini (${doc.code})</span>
+                    <span class="text-xs bg-blue-600 text-white px-2.5 py-1 rounded-lg font-semibold shadow-sm group-hover:bg-blue-700">Pilih Dokter Ini (${escapeHtml(doc.code)})</span>
                 `;
                 btn.addEventListener('click', () => {
                     selectDoctorAndClose(doc);
@@ -4814,6 +4835,8 @@
         if (cancelConfirmDoctorBtn) {
             cancelConfirmDoctorBtn.addEventListener('click', () => {
                 document.getElementById('confirmDoctorModal').classList.add('hidden');
+                document.getElementById('newDoctorModal').classList.add('hidden');
+                newDoctorForm.reset();
             });
         }
 
