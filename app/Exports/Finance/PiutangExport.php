@@ -2,9 +2,9 @@
 
 namespace App\Exports\Finance;
 
+use App\Models\Debtors;
 use App\Models\MedicineTransactions;
 use App\Models\Pharmacies;
-use App\Models\Debtors;
 use Carbon\Carbon;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\WithColumnWidths;
@@ -23,6 +23,10 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
     protected int $lastRow = 5;
     protected int $dataStartRow = 6;
     protected int $dataRowCount = 0;
+    protected int $detailTitleRow = 0;
+    protected int $detailHeaderRow = 0;
+    protected int $detailDataStartRow = 0;
+    protected int $detailDataEndRow = 0;
 
     public function __construct(array $targetPharmacyIds, array $filters = [], ?Pharmacies $activePharmacy = null)
     {
@@ -45,18 +49,21 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
         $filterDebtor = 'Semua Debitur';
         if (!empty($this->filters['debtor_id'])) {
             $debtor = Debtors::find($this->filters['debtor_id']);
-            if ($debtor) $filterDebtor = $debtor->name;
+            if ($debtor)
+                $filterDebtor = $debtor->name;
         }
         $dueMode = $this->filters['due_mode'] ?? 'all';
         $dueModeText = 'Semua Jatuh Tempo';
-        if ($dueMode === 'overdue') $dueModeText = 'Hanya Lewat Jatuh Tempo';
-        elseif ($dueMode === 'due_soon') $dueModeText = 'Hanya Mendekati Jatuh Tempo (≤ 7 Hari)';
+        if ($dueMode === 'overdue')
+            $dueModeText = 'Hanya Lewat Jatuh Tempo';
+        elseif ($dueMode === 'due_soon')
+            $dueModeText = 'Hanya Mendekati Jatuh Tempo (≤ 7 Hari)';
 
         $rows = [
             ["APOTEK PROPHARMA - {$branchName}"],
-            ["LAPORAN PIUTANG USAHA (PENJUALAN TEMPO / KREDIT)"],
-            ["Dicetak: " . date('d/m/Y H:i') . " | Status Tagihan: {$filterStatus} | Debitur: {$filterDebtor} | Filter Tempo: {$dueModeText}"],
-            [''], // Row 4 Blank
+            ['LAPORAN PIUTANG USAHA (PENJUALAN TEMPO / KREDIT)'],
+            ['Dicetak: ' . date('d/m/Y H:i') . " | Status Tagihan: {$filterStatus} | Debitur: {$filterDebtor} | Filter Tempo: {$dueModeText}"],
+            [''],  // Row 4 Blank
             // Row 5 Table Headers
             [
                 'No',
@@ -92,7 +99,8 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
         if (!empty($this->filters['search'])) {
             $s = trim($this->filters['search']);
             $query->where(function ($q) use ($s) {
-                $q->where('transaction_code', 'like', "%{$s}%")
+                $q
+                    ->where('transaction_code', 'like', "%{$s}%")
                     ->orWhereHas('debtors', fn($qd) => $qd->where('name', 'like', "%{$s}%"))
                     ->orWhereHas('patients', fn($qp) => $qp->where('name', 'like', "%{$s}%"))
                     ->orWhereHas('doctors', fn($qdc) => $qdc->where('name', 'like', "%{$s}%"));
@@ -110,6 +118,7 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
         $totalSemua = 0;
         $totalTerbayarSemua = 0;
         $totalSisaSemua = 0;
+        $detailRows = [];
 
         foreach ($query->get() as $tx) {
             $calcSubtotal = 0;
@@ -123,14 +132,19 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
             $totalTerbayarViaFinance = (float) $tx->payments->sum('amount');
             $legacyPaid = (float) ($tx->paid ?? 0);
             $totalTerbayar = round(max($totalTerbayarViaFinance, $legacyPaid), 2);
-            if ($totalTerbayar > $total) $totalTerbayar = $total;
+            if ($totalTerbayar > $total)
+                $totalTerbayar = $total;
             $sisa = round(max(0, $total - $totalTerbayar), 2);
             $isLunas = ($sisa < 0.005 && $total > 0);
             $statusLabel = $isLunas ? 'LUNAS' : ($totalTerbayar > 0 ? 'DIBAYAR SEBAGIAN' : 'BELUM BAYAR');
 
             if (!empty($this->filters['status'])) {
-                if ($this->filters['status'] === 'LUNAS' && !$isLunas) continue;
-                if ($this->filters['status'] === 'BELUM_LUNAS' && $isLunas) continue;
+                if ($this->filters['status'] === 'LUNAS' && !$isLunas)
+                    continue;
+                if ($this->filters['status'] === 'BELUM_LUNAS' && $isLunas)
+                    continue;
+                if ($this->filters['status'] === 'DIAJUKAN' && (empty($tx->is_submitted) || $isLunas))
+                    continue;
             }
 
             $createdDate = $tx->created_at ? $tx->created_at->format('d/m/Y') : '-';
@@ -161,10 +175,24 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
             $totalTerbayarSemua += $totalTerbayar;
             $totalSisaSemua += $sisa;
 
+            $transactionNumber = $tx->transaction_code ?: ('TRX-' . $tx->id);
+            $debtorName = $tx->debtors->name ?? ($tx->patient_id ? ('Pasien: ' . ($tx->patients->name ?? 'Umum')) : 'Pelanggan Umum');
+            foreach ($tx->transactions as $cart) {
+                $detailRows[] = [
+                    $transactionNumber,
+                    $debtorName,
+                    $cart->medicine->name ?? 'Obat',
+                    (float) ($cart->quantity ?? 0),
+                    (float) ($cart->item_price ?? 0),
+                    (float) ($cart->discount ?? 0),
+                    (float) ($cart->final_price ?? $cart->total_price ?? 0),
+                ];
+            }
+
             $rows[] = [
                 $no++,
-                $tx->transaction_code ?: ('TRX-' . $tx->id),
-                $tx->debtors->name ?? ($tx->patient_id ? ('Pasien: ' . ($tx->patients->name ?? 'Umum')) : 'Pelanggan Umum'),
+                $transactionNumber,
+                $debtorName,
                 $tx->debtors->code ?? '-',
                 $tx->doctors->name ?? '-',
                 $tx->patients->name ?? '-',
@@ -209,6 +237,15 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
             $this->lastRow = count($rows);
         }
 
+        $rows[] = [''];
+        $this->detailTitleRow = count($rows) + 1;
+        $rows[] = ['RINCIAN OBAT PER TRANSAKSI'];
+        $this->detailHeaderRow = count($rows) + 1;
+        $rows[] = ['No. Transaksi', 'Debitur / Instansi', 'Nama Obat', 'Qty', 'Harga Satuan (Rp)', 'Diskon (Rp)', 'Total Setelah Diskon (Rp)'];
+        $this->detailDataStartRow = count($rows) + 1;
+        foreach ($detailRows as $detailRow) $rows[] = $detailRow;
+        $this->detailDataEndRow = count($rows);
+
         return $rows;
     }
 
@@ -226,13 +263,13 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
         $sheet->getRowDimension(1)->setRowHeight(24);
 
         $sheet->getStyle('A2')->applyFromArray([
-            'font' => ['bold' => true, 'size' => 11, 'color' => ['rgb' => 'B45309']], // Amber-700
+            'font' => ['bold' => true, 'size' => 11, 'color' => ['rgb' => 'B45309']],  // Amber-700
             'alignment' => ['horizontal' => Alignment::HORIZONTAL_LEFT, 'vertical' => Alignment::VERTICAL_CENTER],
         ]);
         $sheet->getRowDimension(2)->setRowHeight(20);
 
         $sheet->getStyle('A3')->applyFromArray([
-            'font' => ['italic' => true, 'size' => 9, 'color' => ['rgb' => '64748B']], // Slate-500
+            'font' => ['italic' => true, 'size' => 9, 'color' => ['rgb' => '64748B']],  // Slate-500
             'alignment' => ['horizontal' => Alignment::HORIZONTAL_LEFT, 'vertical' => Alignment::VERTICAL_CENTER],
         ]);
         $sheet->getRowDimension(3)->setRowHeight(18);
@@ -242,7 +279,7 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
             'font' => ['bold' => true, 'size' => 10, 'color' => ['rgb' => 'FFFFFF']],
             'fill' => [
                 'fillType' => Fill::FILL_SOLID,
-                'startColor' => ['rgb' => '1E293B'], // Slate 800 Dark Aesthetic
+                'startColor' => ['rgb' => '1E293B'],  // Slate 800 Dark Aesthetic
             ],
             'alignment' => [
                 'horizontal' => Alignment::HORIZONTAL_CENTER,
@@ -262,24 +299,27 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
 
             for ($row = $start; $row <= $end; $row++) {
                 $sheet->getRowDimension($row)->setRowHeight(20);
-                
+
                 // Zebra striping for readability
                 if ($row % 2 == 1) {
-                    $sheet->getStyle("A{$row}:N{$row}")->getFill()
+                    $sheet
+                        ->getStyle("A{$row}:N{$row}")
+                        ->getFill()
                         ->setFillType(Fill::FILL_SOLID)
-                        ->getStartColor()->setRGB('F8FAFC');
+                        ->getStartColor()
+                        ->setRGB('F8FAFC');
                 }
 
                 // Status text coloring for quick visual glance
                 $statusTempo = $sheet->getCell("J{$row}")->getValue();
-                if (str_starts_with((string)$statusTempo, 'Lewat')) {
-                    $sheet->getStyle("J{$row}")->getFont()->getColor()->setRGB('DC2626'); // Red-600
+                if (str_starts_with((string) $statusTempo, 'Lewat')) {
+                    $sheet->getStyle("J{$row}")->getFont()->getColor()->setRGB('DC2626');  // Red-600
                     $sheet->getStyle("J{$row}")->getFont()->setBold(true);
-                } elseif (str_starts_with((string)$statusTempo, 'Sisa')) {
-                    $sheet->getStyle("J{$row}")->getFont()->getColor()->setRGB('D97706'); // Amber-600
+                } elseif (str_starts_with((string) $statusTempo, 'Sisa')) {
+                    $sheet->getStyle("J{$row}")->getFont()->getColor()->setRGB('D97706');  // Amber-600
                     $sheet->getStyle("J{$row}")->getFont()->setBold(true);
                 } elseif ($statusTempo === 'Lunas') {
-                    $sheet->getStyle("J{$row}")->getFont()->getColor()->setRGB('059669'); // Emerald-600
+                    $sheet->getStyle("J{$row}")->getFont()->getColor()->setRGB('059669');  // Emerald-600
                 }
 
                 $statusBayar = $sheet->getCell("K{$row}")->getValue();
@@ -329,7 +369,7 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
                 'font' => ['bold' => true, 'size' => 10],
                 'fill' => [
                     'fillType' => Fill::FILL_SOLID,
-                    'startColor' => ['rgb' => 'FEF3C7'], // Amber-100 highlight
+                    'startColor' => ['rgb' => 'FEF3C7'],  // Amber-100 highlight
                 ],
                 'borders' => [
                     'top' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'D97706']],
@@ -357,12 +397,45 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
             ]);
             $sheet->getRowDimension($emptyRow)->setRowHeight(30);
         }
+
+        $titleRow = $this->detailTitleRow;
+        $headerRow = $this->detailHeaderRow;
+        $sheet->mergeCells("A{$titleRow}:G{$titleRow}");
+        $sheet->getStyle("A{$titleRow}:G{$titleRow}")->applyFromArray([
+            'font' => ['bold' => true, 'size' => 11, 'color' => ['rgb' => 'B45309']],
+            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'FFFBEB']],
+            'alignment' => ['vertical' => Alignment::VERTICAL_CENTER],
+        ]);
+        $sheet->getRowDimension($titleRow)->setRowHeight(22);
+        $sheet->getStyle("A{$headerRow}:G{$headerRow}")->applyFromArray([
+            'font' => ['bold' => true, 'size' => 10, 'color' => ['rgb' => 'FFFFFF']],
+            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '1E293B']],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER, 'wrapText' => true],
+            'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => '0F172A']]],
+        ]);
+        $sheet->getRowDimension($headerRow)->setRowHeight(28);
+        if ($this->detailDataEndRow >= $this->detailDataStartRow) {
+            $start = $this->detailDataStartRow;
+            $end = $this->detailDataEndRow;
+            $sheet->getStyle("A{$start}:G{$end}")->applyFromArray([
+                'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'E2E8F0']]],
+                'alignment' => ['vertical' => Alignment::VERTICAL_CENTER],
+            ]);
+            $sheet->getStyle("D{$start}:D{$end}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+            $sheet->getStyle("E{$start}:G{$end}")->applyFromArray([
+                'alignment' => ['horizontal' => Alignment::HORIZONTAL_RIGHT],
+                'numberFormat' => ['formatCode' => '#,##0.00'],
+            ]);
+            for ($row = $start; $row <= $end; $row++) {
+                if ($row % 2 === 0) $sheet->getStyle("A{$row}:G{$row}")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('F8FAFC');
+            }
+        }
     }
 
     public function columnWidths(): array
     {
         return [
-            'A' => 6,   // No
+            'A' => 6,  // No
             'B' => 18,  // No. Transaksi
             'C' => 30,  // Debitur / Instansi
             'D' => 14,  // Kode Debitur

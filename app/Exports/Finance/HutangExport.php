@@ -2,9 +2,9 @@
 
 namespace App\Exports\Finance;
 
-use App\Models\Receiving;
-use App\Models\Pharmacies;
 use App\Models\Creditors;
+use App\Models\Pharmacies;
+use App\Models\Receiving;
 use Carbon\Carbon;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\WithColumnWidths;
@@ -45,14 +45,15 @@ class HutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         $filterPbf = 'Semua PBF';
         if (!empty($this->filters['pbf'])) {
             $pbf = Creditors::where('code', $this->filters['pbf'])->orWhere('id', $this->filters['pbf'])->first();
-            if ($pbf) $filterPbf = $pbf->name;
+            if ($pbf)
+                $filterPbf = $pbf->name;
         }
 
         $rows = [
             ["APOTEK PROPHARMA - {$branchName}"],
-            ["LAPORAN HUTANG DAGANG KE PBF (PEMBELIAN KREDIT)"],
-            ["Dicetak: " . date('d/m/Y H:i') . " | Status Tagihan: {$filterStatus} | Filter PBF: {$filterPbf}"],
-            [''], // Row 4 Blank
+            ['LAPORAN HUTANG DAGANG KE PBF (PEMBELIAN KREDIT)'],
+            ['Dicetak: ' . date('d/m/Y H:i') . " | Status Tagihan: {$filterStatus} | Filter PBF: {$filterPbf}"],
+            [''],  // Row 4 Blank
             // Row 5 Table Headers
             [
                 'No',
@@ -74,8 +75,9 @@ class HutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         // 2. Query Data
         $query = Receiving::with([
             'receiving_details' => function ($q) {
-                $q->where('invoice_payment', 'KREDIT')
-                  ->with(['creditor', 'payments', 'receiving_items.order_items.medicines']);
+                $q
+                    ->where('invoice_payment', 'KREDIT')
+                    ->with(['creditor', 'payments', 'receiving_items.order_items.medicines']);
             },
             'pharmacy',
         ])
@@ -87,7 +89,8 @@ class HutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         if (!empty($this->filters['search'])) {
             $s = trim($this->filters['search']);
             $query->where(function ($q) use ($s) {
-                $q->where('invoice_number', 'like', "%{$s}%")
+                $q
+                    ->where('invoice_number', 'like', "%{$s}%")
                     ->orWhere('ref_number', 'like', "%{$s}%")
                     ->orWhereHas('receiving_details.creditor', function ($qc) use ($s) {
                         $qc->where('name', 'like', "%{$s}%")->orWhere('code', 'like', "%{$s}%");
@@ -130,8 +133,12 @@ class HutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                 $statusLabel = $isLunas ? 'LUNAS' : ($totalPaid > 0 ? 'DIBAYAR SEBAGIAN' : 'BELUM LUNAS');
 
                 if (!empty($this->filters['status'])) {
-                    if ($this->filters['status'] === 'LUNAS' && !$isLunas) continue;
-                    if ($this->filters['status'] === 'BELUM_LUNAS' && $isLunas) continue;
+                    if ($this->filters['status'] === 'LUNAS' && !$isLunas)
+                        continue;
+                    if ($this->filters['status'] === 'BELUM_LUNAS' && $isLunas)
+                        continue;
+                    if ($this->filters['status'] === 'DIAJUKAN' && (empty($detail->is_submitted) || $isLunas))
+                        continue;
                 }
 
                 $tglFaktur = $this->safeFormatDate($rcv->date);
@@ -207,13 +214,13 @@ class HutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         $sheet->getRowDimension(1)->setRowHeight(24);
 
         $sheet->getStyle('A2')->applyFromArray([
-            'font' => ['bold' => true, 'size' => 11, 'color' => ['rgb' => '1E40AF']], // Blue-800
+            'font' => ['bold' => true, 'size' => 11, 'color' => ['rgb' => '1E40AF']],  // Blue-800
             'alignment' => ['horizontal' => Alignment::HORIZONTAL_LEFT, 'vertical' => Alignment::VERTICAL_CENTER],
         ]);
         $sheet->getRowDimension(2)->setRowHeight(20);
 
         $sheet->getStyle('A3')->applyFromArray([
-            'font' => ['italic' => true, 'size' => 9, 'color' => ['rgb' => '64748B']], // Slate-500
+            'font' => ['italic' => true, 'size' => 9, 'color' => ['rgb' => '64748B']],  // Slate-500
             'alignment' => ['horizontal' => Alignment::HORIZONTAL_LEFT, 'vertical' => Alignment::VERTICAL_CENTER],
         ]);
         $sheet->getRowDimension(3)->setRowHeight(18);
@@ -223,7 +230,7 @@ class HutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
             'font' => ['bold' => true, 'size' => 10, 'color' => ['rgb' => 'FFFFFF']],
             'fill' => [
                 'fillType' => Fill::FILL_SOLID,
-                'startColor' => ['rgb' => '1E293B'], // Dark Corporate Slate
+                'startColor' => ['rgb' => '1E293B'],  // Dark Corporate Slate
             ],
             'alignment' => [
                 'horizontal' => Alignment::HORIZONTAL_CENTER,
@@ -243,12 +250,15 @@ class HutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
 
             for ($row = $start; $row <= $end; $row++) {
                 $sheet->getRowDimension($row)->setRowHeight(20);
-                
+
                 // Zebra striping for readability
                 if ($row % 2 == 1) {
-                    $sheet->getStyle("A{$row}:M{$row}")->getFill()
+                    $sheet
+                        ->getStyle("A{$row}:M{$row}")
+                        ->getFill()
                         ->setFillType(Fill::FILL_SOLID)
-                        ->getStartColor()->setRGB('F8FAFC');
+                        ->getStartColor()
+                        ->setRGB('F8FAFC');
                 }
 
                 $statusBayar = $sheet->getCell("H{$row}")->getValue();
@@ -298,7 +308,7 @@ class HutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                 'font' => ['bold' => true, 'size' => 10],
                 'fill' => [
                     'fillType' => Fill::FILL_SOLID,
-                    'startColor' => ['rgb' => 'EFF6FF'], // Blue-50 highlight
+                    'startColor' => ['rgb' => 'EFF6FF'],  // Blue-50 highlight
                 ],
                 'borders' => [
                     'top' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => '3B82F6']],
@@ -331,7 +341,7 @@ class HutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
     public function columnWidths(): array
     {
         return [
-            'A' => 6,   // No
+            'A' => 6,  // No
             'B' => 20,  // No Faktur
             'C' => 32,  // Vendor PBF
             'D' => 16,  // Kode NT
@@ -349,7 +359,8 @@ class HutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
 
     protected function safeFormatDate($date): string
     {
-        if (empty($date)) return '-';
+        if (empty($date))
+            return '-';
         if ($date instanceof \DateTimeInterface) {
             return $date->format('d/m/Y');
         }

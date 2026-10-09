@@ -1,6 +1,6 @@
 import React from 'react';
 import { formatRupiah } from './Utils';
-import { CheckSquare, X, AlertTriangle, ArrowRight, CreditCard } from 'lucide-react';
+import { CheckSquare, X, AlertTriangle, ArrowRight, CreditCard, History } from 'lucide-react';
 
 export default function FloatingActionBar({
     selectedCount = 0,
@@ -11,6 +11,10 @@ export default function FloatingActionBar({
     titleAmount = 'Total Nilai Terpilih',
     actionLabel = 'Bayar Massal',
     actionIcon: ActionIcon = CreditCard,
+    secondaryActionLabel,
+    secondaryActionIcon: SecondaryActionIcon = History,
+    onSecondaryAction,
+    secondaryActionColor,
     onAction,
     onClear,
     isSubmitting = false,
@@ -57,7 +61,7 @@ export default function FloatingActionBar({
 
     return (
         <div className="fixed bottom-6 inset-x-0 mx-auto w-[92%] max-w-4xl z-40 animate-in slide-in-from-bottom-6 fade-in duration-200 pointer-events-auto">
-            <div className={`backdrop-blur-md shadow-2xl ${themeStyles.amount} rounded-2xl p-3.5 sm:p-4 text-white flex flex-col md:flex-row md:items-center justify-between gap-3.5 sm:gap-4`}>
+            <div className={`backdrop-blur-md shadow-2xl ${themeStyles.amount} w-full rounded-2xl p-5.5 sm:p-4 text-white flex flex-col md:flex-row md:items-center justify-between gap-3.5 sm:gap-4`}>
 
                 {/* 1. SEKSI KIRI: Item Count & Batas */}
                 <div className="flex items-center gap-3 shrink-0">
@@ -116,6 +120,21 @@ export default function FloatingActionBar({
                         <X className="w-4 h-4" />
                         <span className="hidden sm:inline">Batal</span>
                     </button>
+
+                    {secondaryActionLabel && onSecondaryAction && (
+                        <button
+                            type="button"
+                            onClick={onSecondaryAction}
+                            disabled={isSubmitting}
+                            className={`px-4 sm:px-5 py-2.5 rounded-xl text-xs font-bold transition shadow-lg flex items-center gap-2 cursor-pointer active:scale-98 disabled:opacity-50 ${
+                                secondaryActionColor === 'slate' ? 'bg-slate-600 hover:bg-slate-500 text-white' :
+                                themeColor === 'blue' ? 'bg-indigo-600 hover:bg-indigo-500 text-white' : 'bg-blue-600 hover:bg-blue-500 text-white'
+                            }`}
+                        >
+                            <SecondaryActionIcon className="w-4 h-4" />
+                            <span>{secondaryActionLabel}</span>
+                        </button>
+                    )}
 
                     <button
                         type="button"

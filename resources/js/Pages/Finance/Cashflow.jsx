@@ -195,7 +195,7 @@ export default function Cashflow({ days = [], monitoringDays = [], kinerjaDays =
 
                     <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs text-slate-600">
                         <CircleHelp className="h-4 w-4 shrink-0 text-blue-600" />
-                        <span>EDC tetap tercatat sebagai omzet tetapi dipisahkan dari total setoran sampai dana settlement masuk. Diskon transaksi dan diskon item ditampilkan bersama di kolom Disc.</span>
+                        <span>Omzet harian dihitung sebelum diskon. Diskon transaksi dan item ditampilkan sebagai informasi dan tidak mengurangi nilai omzet; EDC tetap dipisahkan dari setoran sampai settlement.</span>
                         <span className="font-semibold text-slate-800">Diskon periode: {money(totals.discount)}</span>
                         {totals.other > 0 && <span className="font-semibold text-violet-700">Metode lain / belum dibayar: {money(totals.other)} (tetap dipisahkan)</span>}
                     </div>

@@ -567,7 +567,10 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
 
         Route::post('/payments', [\App\Http\Controllers\FinanceController::class, 'storePayment'])->name('payments.store');
         Route::post('/consignment-payments', [\App\Http\Controllers\FinanceController::class, 'storeConsignmentPayment'])->name('consignmentPayments.store');
+        Route::post('/consignment-bulk-payments', [\App\Http\Controllers\FinanceController::class, 'storeBulkConsignmentPayments'])->name('consignmentPayments.bulkStore');
         Route::post('/bulk-payments', [\App\Http\Controllers\FinanceController::class, 'storeBulkPayments'])->name('payments.bulkStore');
+        Route::post('/hutang/import-payments', [\App\Http\Controllers\FinanceController::class, 'importHutangPayments'])->name('hutang.importPayments');
+        Route::get('/hutang/import-template', [\App\Http\Controllers\FinanceController::class, 'downloadHutangPaymentTemplate'])->name('hutang.importTemplate');
         Route::post('/accounts', [\App\Http\Controllers\FinanceController::class, 'storeAccount'])->name('accounts.store');
         Route::put('/accounts/{id}', [\App\Http\Controllers\FinanceController::class, 'updateAccount'])->name('accounts.update');
         Route::delete('/accounts/{id}', [\App\Http\Controllers\FinanceController::class, 'destroyAccount'])->name('accounts.destroy');
@@ -575,6 +578,8 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
         Route::post('/bulk-cash-payment', [\App\Http\Controllers\FinanceController::class, 'assignBulkCashAccount'])->name('cash.bulkAssign');
         Route::post('/piutang-payments', [\App\Http\Controllers\FinanceController::class, 'storePiutangPayment'])->name('piutang.store');
         Route::post('/bulk-piutang-payments', [\App\Http\Controllers\FinanceController::class, 'bulkPiutangPayment'])->name('piutang.bulkStore');
+        Route::post('/piutang/import-payments', [\App\Http\Controllers\FinanceController::class, 'importPiutangPayments'])->name('piutang.importPayments');
+        Route::get('/piutang/import-template', [\App\Http\Controllers\FinanceController::class, 'downloadPiutangPaymentTemplate'])->name('piutang.importTemplate');
 
         Route::post('/biaya', [\App\Http\Controllers\FinanceController::class, 'storeBiaya'])->name('biaya.store');
         Route::put('/biaya/{id}', [\App\Http\Controllers\FinanceController::class, 'updateBiaya'])->name('biaya.update');
@@ -583,6 +588,10 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
         Route::get('/export/piutang', [\App\Http\Controllers\FinanceController::class, 'exportPiutang'])->name('export.piutang');
         Route::get('/export/hutang', [\App\Http\Controllers\FinanceController::class, 'exportHutang'])->name('export.hutang');
         Route::get('/export/cash', [\App\Http\Controllers\FinanceController::class, 'exportCash'])->name('export.cash');
+        Route::post('/hutang/bulk-submit', [\App\Http\Controllers\FinanceController::class, 'bulkSubmitHutang'])->name('hutang.bulk-submit');
+        Route::post('/piutang/bulk-submit', [\App\Http\Controllers\FinanceController::class, 'bulkSubmitPiutang'])->name('piutang.bulk-submit');
+        Route::post('/hutang/{id}/submit', [\App\Http\Controllers\FinanceController::class, 'submitHutang'])->name('hutang.submit');
+        Route::post('/piutang/{id}/submit', [\App\Http\Controllers\FinanceController::class, 'submitPiutang'])->name('piutang.submit');
     });
 
     Route::get('/compositions/select', [CompositionsController::class, 'select'])->name('composition.select');

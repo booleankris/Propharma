@@ -614,7 +614,7 @@
 
                             {{-- Terima Semua & Tolak Semua Button --}}
                             @if ($hasPendingItems)
-                                <form method="POST" action="{{ route('transfers.accept', $transfer) }}" class="inline">
+                                <form method="POST" action="{{ route('transfers.accept', $transfer) }}" class="inline" onsubmit="const btn = this.querySelector('button[type=submit]'); if (btn.dataset.submitting) return false; btn.dataset.submitting = '1'; btn.disabled = true; btn.classList.add('opacity-50', 'cursor-not-allowed');">
                                     @csrf
                                     <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition shadow-sm" onclick="return confirm('Apakah Anda yakin ingin menerima semua obat yang masih pending pada mutasi ini?')">
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
@@ -623,7 +623,7 @@
                                         Terima Semua
                                     </button>
                                 </form>
-                                <form method="POST" action="{{ route('transfers.deny', $transfer) }}" class="inline">
+                                <form method="POST" action="{{ route('transfers.deny', $transfer) }}" class="inline" onsubmit="const btn = this.querySelector('button[type=submit]'); if (btn.dataset.submitting) return false; btn.dataset.submitting = '1'; btn.disabled = true; btn.classList.add('opacity-50', 'cursor-not-allowed');">
                                     @csrf
                                     <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-lg transition shadow-sm" onclick="return confirm('Apakah Anda yakin ingin menolak semua obat pada mutasi ini?')">
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">

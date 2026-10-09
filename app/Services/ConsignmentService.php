@@ -55,14 +55,17 @@ class ConsignmentService
             ->unique()
             ->values();
 
-        $allocations = $this->buildSoldAllocations($rootBatchIds);
+        $allocationData = $this->buildSoldAllocations($rootBatchIds);
+        $allocations = $allocationData['allocations'];
+        $transactionCodesByBatch = $allocationData['transaction_codes_by_batch'];
 
-        return $details->map(function ($detail) use ($receivings, $allocations): array {
+        return $details->map(function ($detail) use ($receivings, $allocations, $transactionCodesByBatch): array {
             $receiving = $receivings->firstWhere('id', $detail->receiving_id);
             $items = [];
             $receivedTotal = 0.0;
             $soldTotal = 0.0;
             $soldSubtotal = 0.0;
+            $transactionNumbers = [];
 
             foreach ($detail->receiving_items as $item) {
                 $medicine = $item->order_items?->medicines;
@@ -71,6 +74,10 @@ class ConsignmentService
                 $lineTotal = (float) ($item->total ?? 0);
                 $unitCost = $receivedQty > 0 ? $lineTotal / $receivedQty : 0;
                 $soldAmount = round($soldQty * $unitCost, 2);
+                $itemTransactionNumbers = $soldQty > 0
+                    ? ($transactionCodesByBatch[(int) $item->batches_id] ?? [])
+                    : [];
+                $transactionNumbers = array_merge($transactionNumbers, $itemTransactionNumbers);
 
                 $receivedTotal += $receivedQty;
                 $soldTotal += $soldQty;
@@ -88,6 +95,7 @@ class ConsignmentService
                     'qty_remaining' => round(max(0, $receivedQty - $soldQty), 4),
                     'unit_cost' => round($unitCost, 2),
                     'sold_amount' => $soldAmount,
+                    'transaction_numbers' => $itemTransactionNumbers,
                 ];
             }
 
@@ -128,6 +136,7 @@ class ConsignmentService
                 'due' => $due,
                 'overpaid' => $overpaid,
                 'status' => $status,
+                'transaction_numbers' => array_values(array_unique($transactionNumbers)),
                 'items' => $items,
                 'payments' => $consignmentPayments->map(fn ($payment): array => [
                     'id' => $payment->id,
@@ -151,7 +160,7 @@ class ConsignmentService
     private function buildSoldAllocations(Collection $rootBatchIds): array
     {
         if ($rootBatchIds->isEmpty()) {
-            return [];
+            return ['allocations' => [], 'transaction_codes_by_batch' => []];
         }
 
         $adjacency = [];
@@ -206,6 +215,24 @@ class ConsignmentService
         }
 
         $batchIds = array_keys($batchToComponent);
+        $transactionCodesByComponent = [];
+        $saleTransactions = DB::table('items_log')
+            ->whereIn('batches_id', $batchIds)
+            ->where('status', 1)
+            ->whereNotNull('transaction_code')
+            ->where('transaction_code', '<>', '')
+            ->distinct()
+            ->get(['batches_id', 'transaction_code']);
+        foreach ($saleTransactions as $saleTransaction) {
+            $componentKey = $batchToComponent[(int) $saleTransaction->batches_id] ?? null;
+            if ($componentKey !== null) {
+                $transactionCodesByComponent[$componentKey][$saleTransaction->transaction_code] = true;
+            }
+        }
+        $transactionCodesByBatch = [];
+        foreach ($batchToComponent as $batchId => $componentKey) {
+            $transactionCodesByBatch[$batchId] = array_keys($transactionCodesByComponent[$componentKey] ?? []);
+        }
         $salesByComponent = [];
         $salesRows = DB::table('items_log')
             ->whereIn('batches_id', $batchIds)
@@ -243,7 +270,10 @@ class ConsignmentService
             $allocations += $this->allocateFifo($receiptQuantities, (float) ($salesByComponent[$componentKey] ?? 0));
         }
 
-        return $allocations;
+        return [
+            'allocations' => $allocations,
+            'transaction_codes_by_batch' => $transactionCodesByBatch,
+        ];
     }
 
     private function connectedBatchIds(int $root, array $adjacency): array

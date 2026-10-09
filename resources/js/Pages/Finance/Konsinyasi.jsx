@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { router } from '@inertiajs/react';
 import {
     Banknote,
@@ -8,6 +9,8 @@ import {
     Clock3,
     Eye,
     HandCoins,
+    CheckCircle2,
+    CreditCard,
     PackageCheck,
     Search,
     ShoppingBag,
@@ -15,6 +18,8 @@ import {
 } from 'lucide-react';
 import FinanceLayout from './Layouts/FinanceLayout';
 import { formatNumberOnly, formatRupiah } from './Components/Utils';
+import PbfCombobox from './Components/PbfCombobox';
+import FloatingActionBar from './Components/FloatingActionBar';
 
 const statusStyle = {
     'Belum Ada Penjualan': 'bg-slate-100 text-slate-600',
@@ -54,6 +59,11 @@ export default function Konsinyasi({ consignments = [], kasBankAccounts = [], su
     const [detail, setDetail] = useState(null);
     const [paymentTarget, setPaymentTarget] = useState(null);
     const [submitting, setSubmitting] = useState(false);
+    const [selectedIds, setSelectedIds] = useState([]);
+    const [selectionWarning, setSelectionWarning] = useState('');
+    const [bulkPaymentOpen, setBulkPaymentOpen] = useState(false);
+    const [bulkSubmitting, setBulkSubmitting] = useState(false);
+    const [bulkForm, setBulkForm] = useState({ account_id: '', payment_date: new Date().toISOString().slice(0, 10), reference_number: '', notes: '' });
     const [form, setForm] = useState({
         account_id: '',
         payment_date: new Date().toISOString().slice(0, 10),
@@ -71,7 +81,7 @@ export default function Konsinyasi({ consignments = [], kasBankAccounts = [], su
     const filtered = useMemo(() => {
         const needle = search.trim().toLowerCase();
         return consignments.filter((item) => {
-            const matchesSearch = !needle || [item.nomor, item.referensi, item.vendor, item.gudang]
+            const matchesSearch = !needle || [item.nomor, item.referensi, item.vendor, item.gudang, ...(item.transaction_numbers || [])]
                 .some((value) => String(value || '').toLowerCase().includes(needle));
             const matchesStatus = status === 'ALL'
                 || (status === 'READY' && Number(item.due) > 0)
@@ -84,10 +94,38 @@ export default function Konsinyasi({ consignments = [], kasBankAccounts = [], su
 
     const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
     const rows = filtered.slice((page - 1) * perPage, page * perPage);
+    const selectedRows = consignments.filter((item) => selectedIds.includes(item.id));
+    const selectedDue = selectedRows.reduce((sum, item) => sum + Number(item.due || 0), 0);
+    const payableRows = rows.filter((item) => Number(item.due) > 0);
+    const allPageSelected = payableRows.length > 0 && payableRows.every((item) => selectedIds.includes(item.id));
 
     const changeFilter = (setter) => (event) => {
         setter(event.target.value);
         setPage(1);
+    };
+
+    const toggleSelection = (item) => {
+        if (selectedIds.includes(item.id)) {
+            setSelectedIds((current) => current.filter((id) => id !== item.id));
+            return;
+        }
+        if (selectedIds.length >= 10) {
+            setSelectionWarning('Maksimal 10 faktur yang dapat dipilih sekaligus untuk pelunasan massal.');
+            window.setTimeout(() => setSelectionWarning(''), 4000);
+            return;
+        }
+        setSelectedIds((current) => [...current, item.id]);
+    };
+
+    const openBulkPayment = () => {
+        if (!selectedIds.length) return;
+        setBulkForm({
+            account_id: kasBankAccounts[0]?.id || '',
+            payment_date: new Date().toISOString().slice(0, 10),
+            reference_number: '',
+            notes: `Pelunasan massal ${selectedIds.length} faktur konsinyasi`,
+        });
+        setBulkPaymentOpen(true);
     };
 
     const openPayment = (item) => {
@@ -113,6 +151,24 @@ export default function Konsinyasi({ consignments = [], kasBankAccounts = [], su
             preserveScroll: true,
             onSuccess: () => setPaymentTarget(null),
             onFinish: () => setSubmitting(false),
+        });
+    };
+
+    const submitBulkPayment = (event) => {
+        event.preventDefault();
+        if (!selectedIds.length || !bulkForm.account_id || bulkSubmitting) return;
+        setBulkSubmitting(true);
+        router.post('/finance/consignment-bulk-payments', {
+            receiving_detail_ids: selectedIds,
+            ...bulkForm,
+        }, {
+            preserveScroll: true,
+            onSuccess: () => {
+                setBulkPaymentOpen(false);
+                setSelectedIds([]);
+            },
+            onError: (errors) => alert(Object.values(errors).flat().join('\n') || 'Gagal memproses pelunasan konsinyasi.'),
+            onFinish: () => setBulkSubmitting(false),
         });
     };
 
@@ -142,10 +198,15 @@ export default function Konsinyasi({ consignments = [], kasBankAccounts = [], su
                                     <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                                     <input value={search} onChange={changeFilter(setSearch)} placeholder="Cari faktur, PBF, referensi..." className="w-full rounded-xl border border-slate-200 py-2 pl-9 pr-3 text-xs focus:border-violet-400 focus:ring-violet-400" />
                                 </label>
-                                <select value={vendor} onChange={changeFilter(setVendor)} className="rounded-xl border border-slate-200 px-3 py-2 text-xs">
-                                    <option value="ALL">Semua PBF</option>
-                                    {vendors.map((name) => <option key={name} value={name}>{name}</option>)}
-                                </select>
+                                <PbfCombobox
+                                    pbfs={vendors.map((name) => ({ name }))}
+                                    selectedPbf={vendor === 'ALL' ? '' : vendor}
+                                    onSelectPbf={(name) => {
+                                        setVendor(name || 'ALL');
+                                        setPage(1);
+                                    }}
+                                    placeholder="Filter PBF..."
+                                />
                                 <select value={status} onChange={changeFilter(setStatus)} className="rounded-xl border border-slate-200 px-3 py-2 text-xs">
                                     <option value="ALL">Semua status</option>
                                     <option value="READY">Siap dibayar</option>
@@ -155,10 +216,26 @@ export default function Konsinyasi({ consignments = [], kasBankAccounts = [], su
                             </div>
                         </div>
 
+                        {selectionWarning && <div className="border-b border-amber-100 bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-800">{selectionWarning}</div>}
+
                         <div className="overflow-x-auto">
-                            <table className="w-full min-w-[1050px] text-left text-xs">
+                            <table className="w-full min-w-[1180px] text-left text-xs">
                                 <thead className="bg-slate-50 text-[10px] font-bold uppercase tracking-wide text-slate-500">
                                     <tr>
+                                        <th className="px-3 py-3 text-center"><input aria-label="Pilih semua faktur siap dibayar pada halaman ini" type="checkbox" checked={allPageSelected} onChange={(event) => {
+                                            const pageIds = payableRows.map((item) => item.id);
+                                            if (!event.target.checked) {
+                                                setSelectedIds((current) => current.filter((id) => !pageIds.includes(id)));
+                                                return;
+                                            }
+                                            const remainingSlots = Math.max(0, 10 - selectedIds.length);
+                                            const toAdd = pageIds.filter((id) => !selectedIds.includes(id)).slice(0, remainingSlots);
+                                            setSelectedIds((current) => [...current, ...toAdd]);
+                                            if (toAdd.length < pageIds.filter((id) => !selectedIds.includes(id)).length) {
+                                                setSelectionWarning('Maksimal 10 faktur dapat dipilih. Sebagian faktur di halaman ini belum dipilih.');
+                                                window.setTimeout(() => setSelectionWarning(''), 4000);
+                                            }
+                                        }} /></th>
                                         <th className="px-4 py-3">Faktur / PBF</th>
                                         <th className="px-4 py-3">Tanggal</th>
                                         <th className="px-4 py-3">Progres barang</th>
@@ -176,9 +253,11 @@ export default function Konsinyasi({ consignments = [], kasBankAccounts = [], su
                                             : 0;
                                         return (
                                             <tr key={item.id} className="hover:bg-slate-50/70">
+                                                <td className="px-3 py-3 text-center"><input aria-label={`Pilih faktur ${item.nomor}`} type="checkbox" disabled={Number(item.due) <= 0} checked={selectedIds.includes(item.id)} onChange={() => toggleSelection(item)} /></td>
                                                 <td className="px-4 py-3">
                                                     <button onClick={() => setDetail(item)} className="font-bold text-violet-700 hover:underline">{item.nomor}</button>
                                                     <div className="mt-0.5 text-[11px] font-semibold text-slate-700">{item.vendor}</div>
+                                                    {item.transaction_numbers?.length > 0 && <div className="mt-0.5 max-w-[240px] truncate text-[10px] text-violet-600" title={item.transaction_numbers.join(', ')}>Transaksi terjual: {item.transaction_numbers.slice(0, 2).join(', ')}{item.transaction_numbers.length > 2 ? ` +${item.transaction_numbers.length - 2}` : ''}</div>}
                                                     <div className="text-[10px] text-slate-400">{item.referensi} · {item.gudang}</div>
                                                 </td>
                                                 <td className="px-4 py-3 text-slate-600">{item.tanggal}</td>
@@ -205,7 +284,7 @@ export default function Konsinyasi({ consignments = [], kasBankAccounts = [], su
                                         );
                                     })}
                                     {rows.length === 0 && (
-                                        <tr><td colSpan="8" className="px-4 py-16 text-center text-slate-400">Belum ada data konsinyasi yang sesuai filter.</td></tr>
+                                        <tr><td colSpan="9" className="px-4 py-16 text-center text-slate-400">Belum ada data konsinyasi yang sesuai filter.</td></tr>
                                     )}
                                 </tbody>
                             </table>
@@ -237,9 +316,9 @@ export default function Konsinyasi({ consignments = [], kasBankAccounts = [], su
                                 <div className="rounded-xl bg-amber-50 p-3"><p className="text-[10px] font-bold uppercase text-amber-600">Siap dibayar</p><p className="mt-1 font-black text-amber-800">{formatRupiah(detail.due)}</p></div>
                             </div>
                             <div className="overflow-hidden rounded-xl border border-slate-200">
-                                <table className="w-full text-xs">
-                                    <thead className="bg-slate-50 text-left text-[10px] uppercase text-slate-500"><tr><th className="p-3">Obat</th><th className="p-3 text-right">Diterima</th><th className="p-3 text-right">Terjual</th><th className="p-3 text-right">Nilai terjual</th></tr></thead>
-                                    <tbody className="divide-y divide-slate-100">{detail.items.map((item) => <tr key={item.id}><td className="p-3"><div className="font-bold text-slate-800">{item.nama}</div><div className="text-[10px] text-slate-400">{item.sku} · Batch {item.batch}</div></td><td className="p-3 text-right">{formatNumberOnly(item.qty_received)}</td><td className="p-3 text-right font-bold text-violet-700">{formatNumberOnly(item.qty_sold)}</td><td className="p-3 text-right font-semibold">{formatRupiah(item.sold_amount)}</td></tr>)}</tbody>
+                                <table className="w-full min-w-[760px] text-xs">
+                                    <thead className="bg-slate-50 text-left text-[10px] uppercase text-slate-500"><tr><th className="p-3">Obat</th><th className="p-3">No. Transaksi Terjual</th><th className="p-3 text-right">Diterima</th><th className="p-3 text-right">Terjual</th><th className="p-3 text-right">Nilai terjual</th></tr></thead>
+                                    <tbody className="divide-y divide-slate-100">{detail.items.map((item) => <tr key={item.id}><td className="p-3"><div className="font-bold text-slate-800">{item.nama}</div><div className="text-[10px] text-slate-400">{item.sku} · Batch {item.batch}</div></td><td className="p-3"><div className="max-w-[240px] whitespace-normal font-mono text-[10px] text-slate-600">{item.transaction_numbers?.length ? item.transaction_numbers.join(', ') : '—'}</div></td><td className="p-3 text-right">{formatNumberOnly(item.qty_received)}</td><td className="p-3 text-right font-bold text-violet-700">{formatNumberOnly(item.qty_sold)}</td><td className="p-3 text-right font-semibold">{formatRupiah(item.sold_amount)}</td></tr>)}</tbody>
                                 </table>
                             </div>
                             <div>
@@ -274,6 +353,40 @@ export default function Konsinyasi({ consignments = [], kasBankAccounts = [], su
                         <div className="mt-5 flex justify-end gap-2"><button type="button" onClick={() => setPaymentTarget(null)} className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-bold text-slate-600">Batal</button><button disabled={submitting} className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-xs font-bold text-white disabled:opacity-60"><Banknote className="h-4 w-4" />{submitting ? 'Menyimpan...' : 'Catat Pembayaran'}</button></div>
                     </form>
                 </div>
+            )}
+
+            <FloatingActionBar
+                selectedCount={selectedIds.length}
+                maxLimit={10}
+                totalAmount={selectedDue}
+                itemLabel="faktur"
+                titleAmount="Total Sisa Kewajiban Konsinyasi"
+                actionLabel={`Lunasi Faktur (${selectedIds.length})`}
+                actionIcon={CreditCard}
+                onAction={openBulkPayment}
+                onClear={() => setSelectedIds([])}
+                isSubmitting={bulkSubmitting}
+                themeColor="blue"
+            />
+
+            {bulkPaymentOpen && createPortal(
+                <div className="fixed inset-0 z-[65] flex items-center justify-center bg-slate-950/45 p-4" onClick={() => setBulkPaymentOpen(false)}>
+                    <form onSubmit={submitBulkPayment} onClick={(event) => event.stopPropagation()} className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl">
+                        <div className="flex items-start justify-between">
+                            <div><h3 className="font-black text-slate-900">Pelunasan Massal Konsinyasi</h3><p className="text-xs text-slate-500">{selectedIds.length} faktur terpilih</p></div>
+                            <button type="button" onClick={() => setBulkPaymentOpen(false)} className="rounded-lg p-2 hover:bg-slate-100"><X className="h-5 w-5" /></button>
+                        </div>
+                        <div className="my-4 rounded-xl border border-violet-100 bg-violet-50 p-4"><p className="text-[10px] font-bold uppercase text-violet-500">Total sisa kewajiban</p><p className="mt-1 text-2xl font-black text-violet-800">{formatRupiah(selectedDue)}</p><p className="mt-1 text-[11px] text-violet-600">Setiap faktur dibayar sebesar nilai barang yang sudah terjual dan belum dibayar.</p></div>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                            <label className="text-xs font-bold text-slate-600">Akun Kas &amp; Bank<select required value={bulkForm.account_id} onChange={(event) => setBulkForm({ ...bulkForm, account_id: event.target.value })} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs focus:border-violet-400 focus:ring-violet-400"><option value="">Pilih akun</option>{kasBankAccounts.map((account) => <option key={account.id} value={account.id}>{account.code} — {account.name}</option>)}</select></label>
+                            <label className="text-xs font-bold text-slate-600">Tanggal pembayaran<input required type="date" value={bulkForm.payment_date} onChange={(event) => setBulkForm({ ...bulkForm, payment_date: event.target.value })} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs focus:border-violet-400 focus:ring-violet-400" /></label>
+                            <label className="text-xs font-bold text-slate-600">Nomor referensi<input value={bulkForm.reference_number} onChange={(event) => setBulkForm({ ...bulkForm, reference_number: event.target.value })} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs focus:border-violet-400 focus:ring-violet-400" placeholder="Opsional" /></label>
+                            <label className="text-xs font-bold text-slate-600">Catatan<input value={bulkForm.notes} onChange={(event) => setBulkForm({ ...bulkForm, notes: event.target.value })} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-xs focus:border-violet-400 focus:ring-violet-400" /></label>
+                        </div>
+                        <div className="mt-5 flex justify-end gap-2"><button type="button" onClick={() => setBulkPaymentOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-bold text-slate-600">Batal</button><button disabled={bulkSubmitting} className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-xs font-bold text-white disabled:opacity-60"><CheckCircle2 className="h-4 w-4" />{bulkSubmitting ? 'Memproses...' : 'Lunasi Faktur Terpilih'}</button></div>
+                    </form>
+                </div>,
+                document.body,
             )}
         </FinanceLayout>
     );

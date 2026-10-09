@@ -55,7 +55,7 @@
 
                         @if ($item->status === 0 && $isDestinationPharmacy)
                             <div class="flex items-center justify-center gap-2">
-                                <form method="POST" action="{{ route('transfers.acceptItem', $item) }}">
+                                <form method="POST" action="{{ route('transfers.acceptItem', $item) }}" onsubmit="const btn = this.querySelector('button[type=submit]'); if (btn.dataset.submitting) return false; btn.dataset.submitting = '1'; btn.disabled = true; btn.classList.add('opacity-50', 'cursor-not-allowed');">
                                     @csrf
                                     <button type="submit"
                                         class="inline-flex items-center gap-1 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-semibold rounded-lg transition shadow-sm"
@@ -66,7 +66,7 @@
                                         Terima
                                     </button>
                                 </form>
-                                <form method="POST" action="{{ route('transfers.denyItem', $item) }}">
+                                <form method="POST" action="{{ route('transfers.denyItem', $item) }}" onsubmit="const btn = this.querySelector('button[type=submit]'); if (btn.dataset.submitting) return false; btn.dataset.submitting = '1'; btn.disabled = true; btn.classList.add('opacity-50', 'cursor-not-allowed');">
                                     @csrf
                                     <button type="submit"
                                         class="inline-flex items-center gap-1 px-3 py-1.5 bg-white border border-slate-200 hover:bg-rose-50 hover:border-rose-200 hover:text-rose-600 text-slate-600 text-[11px] font-semibold rounded-lg transition shadow-sm"

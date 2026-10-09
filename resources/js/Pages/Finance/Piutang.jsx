@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { router } from '@inertiajs/react';
 import FinanceLayout from './Layouts/FinanceLayout';
+import DateRangeFilter from './Components/DateRangeFilter';
 import Drawer from './Components/Drawer';
 import FloatingActionBar from './Components/FloatingActionBar';
 import DebtorCombobox from './Components/DebtorCombobox';
@@ -9,18 +10,50 @@ import { formatRupiah, formatNumberOnly } from './Components/Utils';
 import {
     ShoppingCart, Search, Check, X, Calendar, AlertCircle, ChevronLeft, ChevronRight, User,
     ArrowLeft, Printer, MoreVertical, ChevronDown, History, Landmark, Maximize2, CreditCard,
-    Download, ArrowUp, ArrowDown, Clock, AlertTriangle, FileText, CheckCircle2, FileSpreadsheet
+    Download, ArrowUp, ArrowDown, Clock, AlertTriangle, FileText, CheckCircle2, FileSpreadsheet, Upload
 } from 'lucide-react';
 
 export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAccounts = [], stats = {} }) {
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('ALL');
     const [debtorFilter, setDebtorFilter] = useState('');
+    const [startDate, setStartDate] = useState('');
+    const [endDate, setEndDate] = useState('');
+    const [datePreset, setDatePreset] = useState('all');
     const [sortCreatedAt, setSortCreatedAt] = useState('asc'); // Filter 1: Waktu Pembuatan ASC/DESC
     const [dueFilter, setDueFilter] = useState('all'); // Filter 2: Berdasarkan Jatuh Tempo
     const [isDueDropdownOpen, setIsDueDropdownOpen] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 10;
+
+    const handleDatePreset = (preset) => {
+        setDatePreset(preset);
+        setCurrentPage(1);
+        if (preset === 'all') {
+            setStartDate('');
+            setEndDate('');
+            return;
+        }
+        const today = new Date();
+        const formatDate = (date) => {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        };
+        const start = preset === 'today'
+            ? today
+            : preset === 'this_month'
+                ? new Date(today.getFullYear(), today.getMonth(), 1)
+                : new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        const end = preset === 'today'
+            ? today
+            : preset === 'this_month'
+                ? new Date(today.getFullYear(), today.getMonth() + 1, 0)
+                : new Date(today.getFullYear(), today.getMonth(), 0);
+        setStartDate(formatDate(start));
+        setEndDate(formatDate(end));
+    };
 
     // Selection untuk Pelunasan Massal (Maks 10)
     const [selectedPiutangIds, setSelectedPiutangIds] = useState([]);
@@ -57,6 +90,10 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
         notes: '',
     });
     const [isSubmittingBulk, setIsSubmittingBulk] = useState(false);
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+    const [importFile, setImportFile] = useState(null);
+    const [isImporting, setIsImporting] = useState(false);
+    const [importSuccessMessage, setImportSuccessMessage] = useState('');
 
     // Filter & Sorting Data Piutang
     const filteredPiutang = useMemo(() => {
@@ -72,6 +109,8 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                 matchStatus = item.status === 'Lunas' || item.sisa <= 0.005;
             } else if (statusFilter === 'BELUM_LUNAS') {
                 matchStatus = item.status !== 'Lunas' && item.sisa > 0.005;
+            } else if (statusFilter === 'DIAJUKAN') {
+                matchStatus = Boolean(item.is_submitted) && item.status !== 'Lunas';
             }
 
             const matchDebtor = debtorFilter
@@ -85,7 +124,11 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                 matchDue = !item.is_overdue && item.days_remaining <= 7 && item.status !== 'Lunas' && item.sisa > 0.005;
             }
 
-            return matchSearch && matchStatus && matchDebtor && matchDue;
+            const itemDate = item.raw_created_at?.slice(0, 10) || (item.tanggal?.includes('/') ? item.tanggal.split('/').reverse().join('-') : '');
+            const matchStartDate = !startDate || (itemDate && itemDate >= startDate);
+            const matchEndDate = !endDate || (itemDate && itemDate <= endDate);
+
+            return matchSearch && matchStatus && matchDebtor && matchDue && matchStartDate && matchEndDate;
         });
 
         // Sorting berdasarkan pilihan pengguna
@@ -106,7 +149,7 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
             const timeB = b.raw_created_at ? new Date(b.raw_created_at).getTime() : (Number(b.id) || 0);
             return sortCreatedAt === 'asc' ? timeA - timeB : timeB - timeA;
         });
-    }, [piutangPenjualan, searchTerm, statusFilter, debtorFilter, sortCreatedAt, dueFilter]);
+    }, [piutangPenjualan, searchTerm, statusFilter, debtorFilter, sortCreatedAt, dueFilter, startDate, endDate]);
 
     const totalPages = Math.ceil(filteredPiutang.length / itemsPerPage) || 1;
     const paginatedPiutang = useMemo(() => {
@@ -277,6 +320,53 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
         });
     };
 
+    const handleImportPayments = (e) => {
+        e.preventDefault();
+        if (!importFile) return alert('Pilih file Excel atau CSV terlebih dahulu.');
+        const formData = new FormData();
+        formData.append('file', importFile);
+        setIsImporting(true);
+        router.post('/finance/piutang/import-payments', formData, {
+            forceFormData: true,
+            preserveScroll: true,
+            onSuccess: (page) => {
+                setIsImportModalOpen(false);
+                setImportFile(null);
+                setIsImporting(false);
+                setSelectedPiutangIds([]);
+                setImportSuccessMessage(page?.props?.flash?.success || 'Impor pembayaran Piutang berhasil.');
+            },
+            onError: (errs) => {
+                setIsImporting(false);
+                alert(Object.values(errs).flat().join('\n') || 'Gagal mengimpor pembayaran piutang.');
+            },
+        });
+    };
+
+    // Handle Pengajuan Pelunasan (Submit / Batalkan)
+    const handleBulkSubmitPiutang = (isSubmit) => {
+        if (selectedPiutangIds.length === 0) return;
+        setIsSubmittingBulk(true);
+        router.post('/finance/piutang/bulk-submit', {
+            ids: selectedPiutangIds,
+            is_submitted: isSubmit
+        }, {
+            preserveScroll: true,
+            onSuccess: () => {
+                setIsSubmittingBulk(false);
+                setSelectedPiutangIds([]);
+            },
+            onError: () => {
+                setIsSubmittingBulk(false);
+            }
+        });
+    };
+
+    const allSelectedPiutangSubmitted = selectedPiutangIds.length > 0 && selectedPiutangIds.every(id => {
+        const item = filteredPiutang.find(p => p.id === id);
+        return item ? item.is_submitted : false;
+    });
+
     return (
         <FinanceLayout
             title="Piutang Penjualan"
@@ -346,16 +436,19 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                     <div className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-xs space-y-6">
                         {/* Status Badge */}
                         <div className="flex items-center justify-between">
-                            <span
+                            <div className="flex flex-col items-start gap-1">
+                                <span
                                 className={`inline-block px-3 py-1 text-xs font-semibold rounded-full ${detailViewPiutang.status === 'Lunas' || detailViewPiutang.sisa <= 0.005
-                                        ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'
-                                        : detailViewPiutang.status === 'Dibayar Sebagian'
-                                            ? 'bg-amber-50 text-amber-600 border border-amber-100'
-                                            : 'bg-red-50 text-red-600 border border-red-100'
+                                    ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'
+                                    : detailViewPiutang.status === 'Dibayar Sebagian'
+                                        ? 'bg-amber-50 text-amber-600 border border-amber-100'
+                                        : 'bg-red-50 text-red-600 border border-red-100'
                                     }`}
                             >
                                 {detailViewPiutang.status}
-                            </span>
+                                </span>
+                                {(detailViewPiutang.status === 'Lunas' || detailViewPiutang.sisa <= 0.005) && detailViewPiutang.tanggalLunas && <span className="text-[11px] font-medium text-emerald-600">Lunas pada {detailViewPiutang.tanggalLunas}</span>}
+                            </div>
 
                             <span className="text-xs text-slate-400">
                                 Jenis Transaksi: <strong className="text-slate-700 font-semibold">PENJUALAN KREDIT (Tempo)</strong>
@@ -637,6 +730,11 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                             <span className="px-3 py-1.5 rounded-xl bg-amber-50 text-amber-700 text-xs font-bold border border-amber-100">
                                 {stats.countPiutangBelumBayar || 0} Belum Lunas
                             </span>
+                            {Number(stats.countPiutangDiajukan || 0) > 0 && (
+                                <span className="px-3 py-1.5 rounded-xl bg-blue-50 text-blue-700 text-xs font-bold border border-blue-200">
+                                    {stats.countPiutangDiajukan} Diajukan
+                                </span>
+                            )}
                             <span className="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-100">
                                 {stats.countPiutangLunas || 0} Lunas
                             </span>
@@ -647,6 +745,7 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                     <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs space-y-3">
                         <div className="flex flex-wrap items-center justify-between gap-3">
                             <div className="flex flex-wrap items-center gap-2.5 flex-1">
+
                                 {/* Search Input */}
                                 <div className="relative w-full sm:w-64">
                                     <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -685,12 +784,21 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                                     </button>
                                     <button
                                         type="button"
+                                        onClick={() => { setStatusFilter('DIAJUKAN'); setCurrentPage(1); }}
+                                        className={`px-3 py-1.5 rounded-lg font-semibold transition cursor-pointer ${statusFilter === 'DIAJUKAN' ? 'bg-white text-blue-700 shadow-xs font-bold' : 'text-slate-500 hover:text-slate-800'}`}
+                                    >
+                                        Diajukan
+                                    </button>
+                                    <button
+                                        type="button"
                                         onClick={() => { setStatusFilter('LUNAS'); setCurrentPage(1); }}
                                         className={`px-3 py-1.5 rounded-lg font-semibold transition cursor-pointer ${statusFilter === 'LUNAS' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
                                     >
                                         Lunas
                                     </button>
                                 </div>
+
+
 
                                 {/* Filter 1: Waktu Pembuatan ASC / DESC */}
                                 <button
@@ -699,11 +807,10 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                                         setSortCreatedAt((prev) => (prev === 'asc' ? 'desc' : 'asc'));
                                         setCurrentPage(1);
                                     }}
-                                    className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
-                                        sortCreatedAt === 'asc'
+                                    className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${sortCreatedAt === 'asc'
                                             ? 'bg-amber-50 border-amber-300 text-amber-800 font-bold shadow-2xs'
                                             : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-                                    }`}
+                                        }`}
                                     title="Klik untuk mengubah urutan waktu pembuatan"
                                 >
                                     {sortCreatedAt === 'asc' ? (
@@ -719,11 +826,10 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                                     <button
                                         type="button"
                                         onClick={() => setIsDueDropdownOpen(!isDueDropdownOpen)}
-                                        className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
-                                            dueFilter !== 'all'
+                                        className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${dueFilter !== 'all'
                                                 ? 'bg-amber-50 border-amber-300 text-amber-800 font-bold shadow-2xs'
                                                 : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-                                        }`}
+                                            }`}
                                     >
                                         <Clock className={`w-3.5 h-3.5 ${dueFilter !== 'all' ? 'text-amber-600' : 'text-slate-500'}`} />
                                         <span>
@@ -788,6 +894,14 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                                 </div>
 
                                 {/* Tombol Export Excel */}
+                                <button
+                                    type="button"
+                                    onClick={() => setIsImportModalOpen(true)}
+                                    className="inline-flex items-center gap-1.5 px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl text-xs font-semibold transition shadow-2xs"
+                                >
+                                    <Upload className="w-3.5 h-3.5" />
+                                    <span>Import Pembayaran</span>
+                                </button>
                                 <a
                                     href={`/finance/export/piutang?search=${encodeURIComponent(searchTerm)}&status=${encodeURIComponent(statusFilter === 'ALL' ? '' : statusFilter)}&debtor_id=${encodeURIComponent(debtorFilter)}&sort_by=${dueFilter.startsWith('due_') ? 'due_date' : 'created_at'}&sort_order=${sortCreatedAt}&due_mode=${encodeURIComponent(dueFilter)}`}
                                     className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100/80 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-semibold transition shadow-2xs cursor-pointer"
@@ -807,6 +921,22 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                                     <span>Pelunasan Massal ({selectedPiutangIds.length} Transaksi)</span>
                                 </button>
                             )}
+                        </div>
+
+                        <div className="flex items-center border-t border-slate-100 pt-3">
+                            <DateRangeFilter
+                                startDate={startDate}
+                                endDate={endDate}
+                                preset={datePreset}
+                                accent="amber"
+                                onPreset={handleDatePreset}
+                                onChange={([start, end]) => {
+                                    setStartDate(start);
+                                    setEndDate(end);
+                                    setDatePreset(start || end ? 'custom' : 'all');
+                                    setCurrentPage(1);
+                                }}
+                            />
                         </div>
 
                         {selectionWarning && (
@@ -940,14 +1070,24 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                                                         {formatNumberOnly(item.sisa)}
                                                     </td>
                                                     <td className="px-4 py-3.5 text-center">
-                                                        <span className={`inline-block px-2.5 py-1 rounded-full text-[11px] font-bold ${isLunas
+                                                        <div className="flex flex-col items-center gap-1">
+                                                            <span className={`inline-block px-2.5 py-1 rounded-full text-[11px] font-bold ${isLunas
                                                                 ? 'bg-emerald-50 text-emerald-700'
                                                                 : item.status === 'Dibayar Sebagian'
                                                                     ? 'bg-amber-50 text-amber-700'
                                                                     : 'bg-red-50 text-red-700'
-                                                            }`}>
-                                                            {item.status}
-                                                        </span>
+                                                                }`}>
+                                                                {item.status}
+                                                            </span>
+                                                            {isLunas && item.tanggalLunas && (
+                                                                <span className="text-[10px] font-medium text-emerald-600">Lunas {item.tanggalLunas}</span>
+                                                            )}
+                                                            {item.is_submitted && !isLunas && (
+                                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700 border border-blue-200">
+                                                                    Diajukan
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                     </td>
                                                     <td className="px-4 py-3.5 text-center" onClick={(e) => e.stopPropagation()}>
                                                         <div className="flex items-center justify-center gap-1.5">
@@ -1138,6 +1278,50 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                                     className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-semibold transition disabled:opacity-50"
                                 >
                                     {isSubmittingPayment ? 'Memproses...' : 'Konfirmasi Penerimaan'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal Impor Pembayaran Piutang */}
+            {isImportModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden">
+                        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <Upload className="w-5 h-5 text-amber-600" />
+                                <h3 className="font-bold text-slate-900 text-sm">Impor Pembayaran Piutang</h3>
+                            </div>
+                            <button type="button" onClick={() => setIsImportModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg" aria-label="Tutup">
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+                        <form onSubmit={handleImportPayments} className="p-6 space-y-4 text-xs">
+                            <p className="text-slate-600 leading-relaxed">
+                                Satu transaksi per baris. Sistem mencatat seluruh sisa piutang sebagai penerimaan ke akun Kas &amp; Bank.
+                            </p>
+                            <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 text-slate-600">
+                                <div className="font-semibold text-slate-700 mb-1">Urutan kolom wajib</div>
+                                <div>A: No. Faktur/Transaksi · B: Tanggal Bayar · C: Kode Bank</div>
+                                <div className="mt-1 text-slate-500">Baris pertama dilewati. Tanggal: YYYY-MM-DD atau DD/MM/YYYY. Kode Bank harus cocok dengan kode akun Kas &amp; Bank.</div>
+                            </div>
+                            <a href="/finance/piutang/import-template" className="inline-flex items-center gap-1.5 text-amber-700 font-semibold hover:text-amber-800">
+                                <Download className="w-3.5 h-3.5" /> Unduh template CSV
+                            </a>
+                            <input
+                                type="file"
+                                accept=".xlsx,.xls,.csv"
+                                onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+                                className="block w-full rounded-xl border border-slate-200 p-2.5 text-xs file:mr-3 file:rounded-lg file:border-0 file:bg-amber-50 file:px-3 file:py-1.5 file:font-semibold file:text-amber-700"
+                                required
+                            />
+                            {importFile && <div className="text-slate-500 truncate">File dipilih: {importFile.name}</div>}
+                            <div className="pt-3 border-t border-slate-100 flex justify-end gap-2">
+                                <button type="button" onClick={() => setIsImportModalOpen(false)} className="px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-50">Batal</button>
+                                <button type="submit" disabled={isImporting || !importFile} className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-semibold disabled:opacity-50">
+                                    {isImporting ? 'Memproses...' : 'Impor & Catat Pembayaran'}
                                 </button>
                             </div>
                         </form>
@@ -1400,6 +1584,9 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                 actionLabel={`Terima Pembayaran (${selectedPiutangIds.length} Transaksi)`}
                 actionIcon={CreditCard}
                 onAction={openBulkModal}
+                secondaryActionLabel={allSelectedPiutangSubmitted ? "Batalkan Pengajuan" : "Ajukan Pelunasan"}
+                secondaryActionColor={allSelectedPiutangSubmitted ? "slate" : "amber"}
+                onSecondaryAction={() => handleBulkSubmitPiutang(!allSelectedPiutangSubmitted)}
                 onClear={() => setSelectedPiutangIds([])}
                 isSubmitting={isSubmittingBulk}
                 themeColor="amber"
@@ -1411,6 +1598,21 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                 onClose={() => setIsBuktiModalOpen(false)}
                 piutang={detailViewPiutang}
             />
+            {importSuccessMessage && (
+                <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/45 backdrop-blur-sm p-4" style={{ animation: 'finance-popup-fade 220ms ease-out both' }} role="dialog" aria-modal="true" aria-labelledby="import-success-title">
+                    <style>{`@keyframes finance-popup-fade { from { opacity: 0; } to { opacity: 1; } } @keyframes finance-popup-enter { from { opacity: 0; transform: translateY(18px) scale(.96); } to { opacity: 1; transform: translateY(0) scale(1); } } @keyframes finance-success-pop { 0% { transform: scale(.55); } 70% { transform: scale(1.12); } 100% { transform: scale(1); } }`}</style>
+                    <div className="w-full max-w-sm rounded-2xl bg-white p-7 text-center shadow-2xl ring-1 ring-slate-200" style={{ animation: 'finance-popup-enter 360ms cubic-bezier(.16,1,.3,1) both' }}>
+                        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 ring-8 ring-emerald-50/60" style={{ animation: 'finance-success-pop 420ms cubic-bezier(.16,1,.3,1) 100ms both' }}>
+                            <CheckCircle2 className="h-7 w-7 text-emerald-600" />
+                        </div>
+                        <h2 id="import-success-title" className="text-lg font-bold text-slate-900">Impor Berhasil</h2>
+                        <p className="mt-2 text-sm leading-relaxed text-slate-600">{importSuccessMessage}</p>
+                        <button type="button" onClick={() => setImportSuccessMessage('')} className="mt-6 w-full rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700">
+                            Selesai
+                        </button>
+                    </div>
+                </div>
+            )}
         </FinanceLayout>
     );
 }

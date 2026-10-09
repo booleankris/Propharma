@@ -338,6 +338,12 @@
         let activeIdx = -1;
         let stagedBatch = null; // batch just picked, not yet added to cart
         const CART_KEY = 'transfer_cart_{{ auth()->id() ?? 0 }}_{{ getActivePharmacyId() ?? 0 }}';
+        const SUBMISSION_KEY = `${CART_KEY}_submission_key`;
+        const createSubmissionKey = () => window.crypto?.randomUUID?.()
+            ?? `${Date.now()}-${Math.random().toString(16).slice(2)}-${Math.random().toString(16).slice(2)}`;
+        let submissionKey = localStorage.getItem(SUBMISSION_KEY) || createSubmissionKey();
+        localStorage.setItem(SUBMISSION_KEY, submissionKey);
+        let transferSubmitting = false;
         let cartItems = JSON.parse(localStorage.getItem(CART_KEY)) ||
         []; // {batches_id, batchName, medName, unit, stock, qty, etalases_id, etalasesName, source_type}
         let etalaseList = []; // {id, name}
@@ -496,6 +502,8 @@
         // ── Cart ──────────────────────────────────────────────────────────
         function saveCart() {
             localStorage.setItem(CART_KEY, JSON.stringify(cartItems));
+            submissionKey = createSubmissionKey();
+            localStorage.setItem(SUBMISSION_KEY, submissionKey);
         }
 
         function addItemToCart() {
@@ -511,17 +519,31 @@
                 return;
             }
 
-            cartItems.push({
-                batches_id: stagedBatch.batches_id,
-                batchName: stagedBatch.batchName,
-                medName: stagedBatch.medName,
-                unit: stagedBatch.unit,
-                stock: stagedBatch.stock,
-                qty: qty,
-                etalases_id: etId,
-                etalasesName: etName,
-                source_type: stagedBatch.source_type || 'gudang',
-            });
+            const existingIdx = cartItems.findIndex(c => String(c.batches_id) === String(stagedBatch.batches_id) && (c.source_type || 'gudang') === (stagedBatch.source_type || 'gudang'));
+            if (existingIdx !== -1) {
+                const combinedQty = cartItems[existingIdx].qty + qty;
+                if (combinedQty > stagedBatch.stock) {
+                    iziToast.warning({
+                        message: `Total kuantiti (${combinedQty}) melebihi stok tersedia (${stagedBatch.stock}).`
+                    });
+                    return;
+                }
+                cartItems[existingIdx].qty = combinedQty;
+                cartItems[existingIdx].etalases_id = etId;
+                cartItems[existingIdx].etalasesName = etName;
+            } else {
+                cartItems.push({
+                    batches_id: stagedBatch.batches_id,
+                    batchName: stagedBatch.batchName,
+                    medName: stagedBatch.medName,
+                    unit: stagedBatch.unit,
+                    stock: stagedBatch.stock,
+                    qty: qty,
+                    etalases_id: etId,
+                    etalasesName: etName,
+                    source_type: stagedBatch.source_type || 'gudang',
+                });
+            }
 
             saveCart();
             clearStaging();
@@ -835,6 +857,7 @@
         }
 
         function submitTransfer() {
+            if (transferSubmitting) return;
             const pharmacy = document.getElementById('pharmacySelect').value;
 
             if (!pharmacy || cartItems.length === 0) {
@@ -847,6 +870,7 @@
             const payload = {
                 _token: '{{ csrf_token() }}',
                 code: document.getElementById('code_hidden').value,
+                submission_key: submissionKey,
                 pharmacy: pharmacy,
                 items: cartItems.map(it => ({
                     batches_id: it.batches_id,
@@ -857,11 +881,13 @@
             };
 
             const btn = document.getElementById('submitBtn');
+            transferSubmitting = true;
             btn.disabled = true;
 
             axios.post('{{ route('transfer') }}', payload)
                 .then(res => {
                     localStorage.removeItem(CART_KEY); // Clear cart on success
+                    localStorage.removeItem(SUBMISSION_KEY);
                     iziToast.success({
                         title: 'Berhasil',
                         message: res.data.message ?? 'Transfer disimpan.'
@@ -869,6 +895,7 @@
                     setTimeout(() => window.location.reload(), 1200);
                 })
                 .catch(err => {
+                    transferSubmitting = false;
                     const msg = err.response?.data?.message ?? 'Gagal menyimpan transfer.';
                     iziToast.error({
                         title: 'Error',

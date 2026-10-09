@@ -473,6 +473,7 @@ class TransfersController extends Controller
     {
         $request->validate([
             'code' => 'required|string',
+            'submission_key' => 'required|uuid',
             'pharmacy' => 'required|exists:pharmacies,id',
             'items' => 'required|array|min:1',
             'items.*.batches_id' => 'required|exists:batches,id',
@@ -481,11 +482,24 @@ class TransfersController extends Controller
             'items.*.source_type' => 'required|in:gudang,pelayanan',
         ]);
 
+        $submissionKey = $request->input('submission_key');
+        $existingTransfer = MedicineTransfers::where('submission_key', $submissionKey)->first();
+        if ($existingTransfer) {
+            $sameSubmission = (int) $existingTransfer->user_id === (int) auth()->id()
+                && (int) $existingTransfer->source_pharmacy_id === (int) getActivePharmacyId()
+                && (int) $existingTransfer->destination_pharmacy_id === (int) $request->pharmacy;
+
+            return $sameSubmission
+                ? response()->json(['success' => true, 'message' => 'Transfer ini sudah tersimpan.'])
+                : response()->json(['success' => false, 'message' => 'Kunci pengiriman sudah digunakan. Muat ulang halaman dan periksa data transfer.'], 409);
+        }
+
         try {
             DB::transaction(function () use ($request) {
                 $now = Carbon::now();
                 $transfer = MedicineTransfers::create([
                     'code' => $request->code,
+                    'submission_key' => $request->submission_key,
                     'user_id' => auth()->id(),
                     'status' => 0,
                     'source_pharmacy_id' => getActivePharmacyId(),
@@ -504,7 +518,23 @@ class TransfersController extends Controller
                     }
                 }
 
+                // Aggregate items with identical batches_id and source_type to prevent duplicate entries
+                $aggregatedItems = [];
                 foreach ($request->items as $line) {
+                    $key = $line['batches_id'] . '_' . ($line['source_type'] ?? 'gudang');
+                    if (isset($aggregatedItems[$key])) {
+                        $aggregatedItems[$key]['qty'] += (int) $line['qty'];
+                    } else {
+                        $aggregatedItems[$key] = [
+                            'batches_id' => $line['batches_id'],
+                            'source_type' => $line['source_type'] ?? 'gudang',
+                            'etalases_id' => $line['etalases_id'],
+                            'qty' => (int) $line['qty'],
+                        ];
+                    }
+                }
+
+                foreach ($aggregatedItems as $line) {
                     $sourceBatch = Batches::lockForUpdate()->findOrFail($line['batches_id']);
                     if ((int) $sourceBatch->pharmacy_id !== $pharmacyId) {
                         throw new \Exception("Batch sumber bukan milik cabang Anda.");
@@ -608,6 +638,16 @@ class TransfersController extends Controller
 
             return response()->json(['success' => true, 'message' => 'Transfer disimpan. Stok telah dikurangi.']);
         } catch (\Throwable $e) {
+            // A concurrent retry can race the initial lookup. The unique index
+            // makes the second request roll back; return the first result.
+            $existingTransfer = MedicineTransfers::where('submission_key', $submissionKey)->first();
+            if ($existingTransfer
+                && (int) $existingTransfer->user_id === (int) auth()->id()
+                && (int) $existingTransfer->source_pharmacy_id === (int) getActivePharmacyId()
+                && (int) $existingTransfer->destination_pharmacy_id === (int) $request->pharmacy) {
+                return response()->json(['success' => true, 'message' => 'Transfer ini sudah tersimpan.']);
+            }
+
             return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
         }
     }
@@ -824,6 +864,11 @@ class TransfersController extends Controller
      */
     private function processItemTransferStock($item, $transfer, $now)
     {
+        // 1. Strict guard: If item is not in pending status (0), skip processing to prevent duplicate stock addition
+        if ((int) $item->status !== 0) {
+            return;
+        }
+
         $destBatch = $item->batches;
         $srcBatch = $item->sourceBatch;
         if (!$srcBatch) {
@@ -836,6 +881,21 @@ class TransfersController extends Controller
 
         $destPharmacyId = $destBatch->pharmacy_id;
         $srcPharmacyId = $srcBatch->pharmacy_id;
+
+        // 2. Strict idempotency guard: check if an incoming log for this transfer code and dest batch already exists
+        $hasIncomingLog = ItemsLog::where('transaction_code', $transfer->code)
+            ->where('batches_id', $destBatch->id)
+            ->where('status', 7)
+            ->where('type', 'MU')
+            ->where('medicine_id', $medicine->id)
+            ->where('qty', $item->qty)
+            ->whereRaw('qty_after > qty_before')
+            ->exists();
+
+        if ($hasIncomingLog) {
+            $item->update(['status' => 1]);
+            return;
+        }
 
         // Determine if this is a "return to gudang" (pelayanan → gudang destination)
         $isReturnToGudang = ($sourceType === 'pelayanan' && (isWarehousePharmacy($destPharmacyId) || ($srcPharmacyId == $destPharmacyId && $destPharmacyId == 1)));
@@ -892,6 +952,9 @@ class TransfersController extends Controller
         if ($transfer->destination_pharmacy_id && (int) $transfer->destination_pharmacy_id !== $currentPharmacyId) {
             return redirect(url()->previous())->with('message', 'Hanya cabang penerima yang berhak menerima mutasi ini.');
         }
+        if ((int) $transfer->status === 1) {
+            return redirect(url()->previous() . '#accepted')->with('message', 'Mutasi ini sudah pernah diterima sebelumnya.');
+        }
         $firstItem = $transfer->items()->first();
         $destinationPharmacyId = $firstItem?->batches?->pharmacy_id;
 
@@ -902,16 +965,21 @@ class TransfersController extends Controller
         try {
             DB::transaction(function () use ($transfer) {
                 $now = Carbon::now();
-                $pendingItems = $transfer->items()->where('status', 0)->get();
+                $lockedTransfer = MedicineTransfers::whereKey($transfer->getKey())->lockForUpdate()->firstOrFail();
+                if ((int) $lockedTransfer->status === 1) {
+                    return;
+                }
+
+                $pendingItems = $lockedTransfer->items()->where('status', 0)->lockForUpdate()->get();
 
                 foreach ($pendingItems as $item) {
-                    $this->processItemTransferStock($item, $transfer, $now);
+                    $this->processItemTransferStock($item, $lockedTransfer, $now);
                 }
 
                 // ── Update parent transfer status ─────────────────────────
-                if ($transfer->items()->where('status', 0)->doesntExist()) {
-                    $hasAccepted = $transfer->items()->where('status', 1)->exists();
-                    $transfer->update(['status' => $hasAccepted ? 1 : 2]);
+                if ($lockedTransfer->items()->where('status', 0)->doesntExist()) {
+                    $hasAccepted = $lockedTransfer->items()->where('status', 1)->exists();
+                    $lockedTransfer->update(['status' => $hasAccepted ? 1 : 2]);
                 }
             });
 
@@ -950,6 +1018,9 @@ class TransfersController extends Controller
         if ($transfer?->destination_pharmacy_id && (int) $transfer->destination_pharmacy_id !== $currentPharmacyId) {
             return redirect(url()->previous())->with('message', 'Hanya cabang penerima yang berhak menerima mutasi ini.');
         }
+        if ((int) $item->status !== 0) {
+            return redirect(url()->previous() . '#accepted')->with('message', 'Item ini sudah pernah diproses.');
+        }
         $destinationPharmacyId = $item->batches?->pharmacy_id;
 
         if ($destinationPharmacyId && $destinationPharmacyId != $currentPharmacyId) {
@@ -959,9 +1030,13 @@ class TransfersController extends Controller
         try {
             DB::transaction(function () use ($item) {
                 $now = Carbon::now();
-                $transfer = $item->transfer;
+                $transfer = MedicineTransfers::whereKey($item->medicine_transfer_id)->lockForUpdate()->firstOrFail();
+                $lockedItem = MedicineTransferItems::whereKey($item->getKey())->lockForUpdate()->firstOrFail();
+                if ((int) $lockedItem->status !== 0) {
+                    return;
+                }
 
-                $this->processItemTransferStock($item, $transfer, $now);
+                $this->processItemTransferStock($lockedItem, $transfer, $now);
 
                 // ── Update parent transfer status ─────────────────────────
                 if ($transfer->items()->where('status', 0)->doesntExist()) {
@@ -988,17 +1063,26 @@ class TransfersController extends Controller
             || (int) $item->batches?->pharmacy_id === $currentPharmacyId;
         if (!$isParticipant) abort(403);
 
+        if ((int) $item->status !== 0) {
+            return redirect(url()->previous() . '#denied')->with('message', 'Item ini sudah pernah diproses.');
+        }
+
         try {
             DB::transaction(function () use ($item) {
                 $now = Carbon::now();
-                $transfer = $item->transfer;
+                $transfer = MedicineTransfers::whereKey($item->medicine_transfer_id)->lockForUpdate()->firstOrFail();
+                $lockedItem = MedicineTransferItems::whereKey($item->getKey())->lockForUpdate()->firstOrFail();
 
-                // Rollback source stock if it was deducted on create
-                if ($item->stock_deducted_at && $item->status === 0) {
-                    $this->rollbackSourceStock($item, $transfer, $now);
+                if ((int) $lockedItem->status !== 0) {
+                    return;
                 }
 
-                $item->update(['status' => 2]);
+                // Rollback source stock if it was deducted on create
+                if ($lockedItem->stock_deducted_at) {
+                    $this->rollbackSourceStock($lockedItem, $transfer, $now);
+                }
+
+                $lockedItem->update(['status' => 2]);
 
                 if ($transfer->items()->where('status', 0)->doesntExist()) {
                     $hasAccepted = $transfer->items()->where('status', 1)->exists();
@@ -1031,21 +1115,29 @@ class TransfersController extends Controller
                 })->exists();
             if (!$isParticipant) abort(403);
         }
+        if ((int) $transfer->status === 2) {
+            return redirect(url()->previous() . '#denied')->with('message', 'Mutasi ini sudah pernah ditolak.');
+        }
         try {
             DB::transaction(function () use ($transfer) {
                 $now = Carbon::now();
-                $pendingItems = $transfer->items()->where('status', 0)->get();
+                $lockedTransfer = MedicineTransfers::whereKey($transfer->getKey())->lockForUpdate()->firstOrFail();
+                if ((int) $lockedTransfer->status === 2) {
+                    return;
+                }
+
+                $pendingItems = $lockedTransfer->items()->where('status', 0)->lockForUpdate()->get();
 
                 foreach ($pendingItems as $item) {
                     // Rollback source stock if it was deducted on create
-                    if ($item->stock_deducted_at) {
-                        $this->rollbackSourceStock($item, $transfer, $now);
+                    if ($item->stock_deducted_at && (int) $item->status === 0) {
+                        $this->rollbackSourceStock($item, $lockedTransfer, $now);
                     }
                     $item->update(['status' => 2]);
                 }
 
-                $hasAccepted = $transfer->items()->where('status', 1)->exists();
-                $transfer->update(['status' => $hasAccepted ? 1 : 2]);
+                $hasAccepted = $lockedTransfer->items()->where('status', 1)->exists();
+                $lockedTransfer->update(['status' => $hasAccepted ? 1 : 2]);
             });
 
             return redirect(url()->previous() . '#denied')->with('success', 'Mutasi ditolak. Stok telah dikembalikan.');

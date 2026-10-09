@@ -14,7 +14,7 @@ class CashflowReportService
     {
         $itemDiscounts = DB::table('medicine_cart')
             ->select('transaction_id')
-            ->selectRaw("SUM(CAST(COALESCE(NULLIF(discount, ''), '0') AS DECIMAL(15,2))) as item_discount")
+            ->selectRaw("SUM(GREATEST(CAST(COALESCE(NULLIF(total_price, ''), '0') AS DECIMAL(15,2)) - CAST(COALESCE(NULLIF(final_price, ''), NULLIF(total_price, ''), '0') AS DECIMAL(15,2)), 0)) as item_discount")
             ->where('status', 1)
             ->groupBy('transaction_id');
 
@@ -26,7 +26,7 @@ class CashflowReportService
             ->whereIn('mt.pharmacy_id', $pharmacyIds)
             ->whereDate('mt.created_at', '>=', $startDate)
             ->whereDate('mt.created_at', '<=', $endDate)
-            ->selectRaw("DATE(mt.created_at) as sale_date, s.name as shift_name, UPPER(TRIM(COALESCE(mt.payment_method, ''))) as payment_method, TRIM(COALESCE(mt.transfer_bank_name, '')) as bank_name, mt.transaction_type, COUNT(*) as transaction_count, SUM(CAST(COALESCE(NULLIF(mt.subtotal, ''), '0') AS DECIMAL(15,2))) as amount, SUM(CAST(COALESCE(NULLIF(mt.discount, ''), '0') AS DECIMAL(15,2))) as transaction_discount, SUM(COALESCE(cart_discounts.item_discount, 0)) as item_discount")
+            ->selectRaw("DATE(mt.created_at) as sale_date, s.name as shift_name, UPPER(TRIM(COALESCE(mt.payment_method, ''))) as payment_method, TRIM(COALESCE(mt.transfer_bank_name, '')) as bank_name, mt.transaction_type, COUNT(*) as transaction_count, SUM(CAST(COALESCE(NULLIF(mt.subtotal, ''), '0') AS DECIMAL(15,2)) - CAST(COALESCE(NULLIF(mt.discount, ''), '0') AS DECIMAL(15,2))) as amount, SUM(CAST(COALESCE(NULLIF(mt.subtotal, ''), '0') AS DECIMAL(15,2)) + COALESCE(cart_discounts.item_discount, 0)) as gross_amount, SUM(CAST(COALESCE(NULLIF(mt.discount, ''), '0') AS DECIMAL(15,2))) as transaction_discount, SUM(COALESCE(cart_discounts.item_discount, 0)) as item_discount")
             ->groupByRaw("DATE(mt.created_at), s.name, UPPER(TRIM(COALESCE(mt.payment_method, ''))), TRIM(COALESCE(mt.transfer_bank_name, '')), mt.transaction_type")
             ->orderBy('sale_date')
             ->get();
@@ -62,14 +62,19 @@ class CashflowReportService
                 }
             }
 
+            // Kolom omzet memakai nilai bruto; kolom metode bayar/setoran tetap memakai nilai bersih.
             $amount = (float) $record->amount;
-            if ($record->transaction_type === 'RETUR JUAL') $amount = -abs($amount);
+            $grossAmount = (float) $record->gross_amount;
+            if ($record->transaction_type === 'RETUR JUAL') {
+                $amount = -abs($amount);
+                $grossAmount = -abs($grossAmount);
+            }
             $count = (int) $record->transaction_count;
             $shift = &$day[$shiftKey];
             $shift['count'] += $count;
             $shift['discount'] += (float) $record->transaction_discount;
             $shift['itemDiscount'] += (float) $record->item_discount;
-            $shift['total'] += $amount;
+            $shift['total'] += $grossAmount;
 
             if (in_array($method, ['CASH', 'TUNAI'], true)) {
                 $shift['cash'] += $amount;

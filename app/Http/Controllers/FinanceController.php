@@ -5,9 +5,9 @@ namespace App\Http\Controllers;
 use App\Exports\Finance\BiayaExport;
 use App\Exports\Finance\CashExport;
 use App\Exports\Finance\CashflowExport;
-use App\Exports\Finance\MonitoringPenjualanExport;
-use App\Exports\Finance\KinerjaOmzetExport;
 use App\Exports\Finance\HutangExport;
+use App\Exports\Finance\KinerjaOmzetExport;
+use App\Exports\Finance\MonitoringPenjualanExport;
 use App\Exports\Finance\PiutangExport;
 use App\Models\Creditor;
 use App\Models\Debtors;
@@ -18,10 +18,10 @@ use App\Models\MedicineTransactions;
 use App\Models\Pharmacies;
 use App\Models\Receiving;
 use App\Models\ReceivingDetails;
-use App\Services\ConsignmentService;
 use App\Services\Finance\CashflowReportService;
-use App\Services\Finance\MonitoringPenjualanService;
 use App\Services\Finance\KinerjaOmzetService;
+use App\Services\Finance\MonitoringPenjualanService;
+use App\Services\ConsignmentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
@@ -29,6 +29,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class FinanceController extends Controller
@@ -181,7 +183,7 @@ class FinanceController extends Controller
 
         $reportDays = $cashflowReport->build($pharmacyIds, $startDate, $endDate);
         if ($request->boolean('download_xlsx')) {
-            $fileName = 'cashflow-omzet_'.$startDate.'_sd_'.$endDate.'.xlsx';
+            $fileName = 'cashflow-omzet_' . $startDate . '_sd_' . $endDate . '.xlsx';
             return Excel::download(new CashflowExport($reportDays), $fileName);
         }
         $kinerjaDays = $kinerjaOmzet->build($pharmacyIds, $startDate, $endDate);
@@ -260,10 +262,10 @@ class FinanceController extends Controller
                 'payable' => array_sum(array_column($consignments, 'payable')),
                 'paid' => array_sum(array_column($consignments, 'paid')),
                 'due' => array_sum(array_column($consignments, 'due')),
-                'ready_count' => count(array_filter($consignments, fn ($item) => $item['due'] > 0)),
+                'ready_count' => count(array_filter($consignments, fn($item) => $item['due'] > 0)),
             ],
             'stats' => [
-                'countKonsinyasiSiapBayar' => count(array_filter($consignments, fn ($item) => $item['due'] > 0)),
+                'countKonsinyasiSiapBayar' => count(array_filter($consignments, fn($item) => $item['due'] > 0)),
             ],
             'branchContext' => $this->getBranchContext(),
         ]);
@@ -530,7 +532,11 @@ class FinanceController extends Controller
                     'is_overdue' => $isOverdue,
                     'days_overdue' => $daysOverdue,
                     'days_remaining' => $daysRemaining,
-                    'tanggalBayar' => $isLunas ? \Carbon\Carbon::parse($rec->updated_at)->format('d/m/Y') : '',
+                    'tanggalBayar' => $isLunas
+                        ? ($detail->payments->sortByDesc('payment_date')->first()?->payment_date
+                            ? \Carbon\Carbon::parse($detail->payments->sortByDesc('payment_date')->first()->payment_date)->format('d/m/Y')
+                            : \Carbon\Carbon::parse($rec->updated_at)->format('d/m/Y'))
+                        : '',
                     'status' => $statusLabel,
                     'subtotal' => $subtotal,
                     'ppn' => $ppnNominal,
@@ -541,6 +547,7 @@ class FinanceController extends Controller
                     'tglKirim' => $rec->date ?: '-',
                     'items' => $itemsList,
                     'payments' => $paymentHistory,
+                    'is_submitted' => (bool) ($detail->is_submitted ?? false),
                     'lastModified' => \Carbon\Carbon::parse($rec->updated_at)->format('d M Y H:i'),
                 ];
             }
@@ -738,6 +745,13 @@ class FinanceController extends Controller
             $isOverdue = ($dueCarbon && !$isLunas) ? $dueCarbon->isPast() : false;
             $daysOverdue = ($isOverdue && $dueCarbon) ? (int) $dueCarbon->diffInDays(now()) : 0;
             $daysRemaining = (!$isOverdue && $dueCarbon && !$isLunas) ? (int) now()->diffInDays($dueCarbon) : 0;
+            $tanggalLunas = '';
+            if ($isLunas) {
+                $lastPayment = $tx->payments->sortByDesc('payment_date')->first();
+                $tanggalLunas = $lastPayment?->payment_date
+                    ? \Carbon\Carbon::parse($lastPayment->payment_date)->format('d/m/Y')
+                    : ($tx->updated_at ? \Carbon\Carbon::parse($tx->updated_at)->format('d/m/Y') : '');
+            }
 
             $piutangPenjualan[] = [
                 'id' => $tx->id,
@@ -756,12 +770,14 @@ class FinanceController extends Controller
                 'days_overdue' => $daysOverdue,
                 'days_remaining' => $daysRemaining,
                 'status' => $statusLabel,
+                'tanggalLunas' => $tanggalLunas,
                 'subtotal' => $total,
                 'total' => $total,
                 'terbayar' => $totalTerbayar,
                 'sisa' => $sisa,
                 'items' => $itemsList,
                 'payments' => $paymentHistory,
+                'is_submitted' => (bool) ($tx->is_submitted ?? false),
                 'lastModified' => $tx->updated_at ? \Carbon\Carbon::parse($tx->updated_at)->format('d M Y H:i') : '-',
             ];
         }
@@ -793,9 +809,11 @@ class FinanceController extends Controller
                 })->orWhereHas('transaction', function ($q) use ($targetPharmacyIds) {
                     $q->whereIn('pharmacy_id', $targetPharmacyIds);
                 })->orWhere(function ($q) use ($targetPharmacyIds) {
-                    $q->where('payment_type', 'BIAYA')
+                    $q
+                        ->where('payment_type', 'BIAYA')
                         ->where(function ($sub) use ($targetPharmacyIds) {
-                            $sub->whereIn('pharmacy_id', $targetPharmacyIds)
+                            $sub
+                                ->whereIn('pharmacy_id', $targetPharmacyIds)
                                 ->orWhereNull('pharmacy_id');
                         });
                 });
@@ -850,7 +868,7 @@ class FinanceController extends Controller
                     if ($doc)
                         $noDokumen = $doc;
                     if (!$deskripsi) {
-                        $deskripsi = "Pengeluaran biaya: " . ($p->expenseAccount->name ?? 'Operasional');
+                        $deskripsi = 'Pengeluaran biaya: ' . ($p->expenseAccount->name ?? 'Operasional');
                     }
                 }
 
@@ -884,7 +902,8 @@ class FinanceController extends Controller
         return FinancePayment::with(['account', 'expenseAccount', 'creator', 'pharmacy'])
             ->where('payment_type', 'BIAYA')
             ->where(function ($q) use ($targetPharmacyIds) {
-                $q->whereIn('pharmacy_id', $targetPharmacyIds)
+                $q
+                    ->whereIn('pharmacy_id', $targetPharmacyIds)
                     ->orWhereNull('pharmacy_id');
             })
             ->latest('payment_date')
@@ -921,7 +940,8 @@ class FinanceController extends Controller
     {
         $baseQuery = FinancePayment::where('payment_type', 'BIAYA')
             ->where(function ($q) use ($targetPharmacyIds) {
-                $q->whereIn('pharmacy_id', $targetPharmacyIds)
+                $q
+                    ->whereIn('pharmacy_id', $targetPharmacyIds)
                     ->orWhereNull('pharmacy_id');
             });
 
@@ -1030,7 +1050,8 @@ class FinanceController extends Controller
 
         $kasKeluarBiaya = (float) FinancePayment::where('payment_type', 'BIAYA')
             ->where(function ($sub) use ($targetPharmacyIds) {
-                $sub->whereIn('pharmacy_id', $targetPharmacyIds)
+                $sub
+                    ->whereIn('pharmacy_id', $targetPharmacyIds)
                     ->orWhereNull('pharmacy_id');
             })
             ->sum('amount');
@@ -1044,10 +1065,14 @@ class FinanceController extends Controller
         $countBelumBayar = 0;
         $countSebagian = 0;
         $countLunas = 0;
+        $countDiajukan = 0;
         $totalHutangSisa = 0;
 
         foreach ($hutang as $h) {
             $totalHutangSisa += $h['sisa'];
+            if (!empty($h['is_submitted']) && $h['status'] !== 'Lunas') {
+                $countDiajukan++;
+            }
             if ($h['status'] === 'Lunas') {
                 $countLunas++;
             } elseif ($h['status'] === 'Dibayar Sebagian') {
@@ -1077,9 +1102,13 @@ class FinanceController extends Controller
         // Piutang Stats
         $totalPiutangSisa = 0;
         $countPiutangBelumBayar = 0;
+        $countPiutangDiajukan = 0;
         $countPiutangLunas = 0;
         foreach ($piutang as $p) {
             $totalPiutangSisa += $p['sisa'];
+            if (!empty($p['is_submitted']) && $p['status'] !== 'Lunas') {
+                $countPiutangDiajukan++;
+            }
             if ($p['status'] === 'Lunas') {
                 $countPiutangLunas++;
             } else {
@@ -1089,14 +1118,16 @@ class FinanceController extends Controller
 
         $countBiayaTotal = (int) FinancePayment::where('payment_type', 'BIAYA')
             ->where(function ($sub) use ($targetPharmacyIds) {
-                $sub->whereIn('pharmacy_id', $targetPharmacyIds)
+                $sub
+                    ->whereIn('pharmacy_id', $targetPharmacyIds)
                     ->orWhereNull('pharmacy_id');
             })
             ->count();
 
         $countBiayaMonth = (int) FinancePayment::where('payment_type', 'BIAYA')
             ->where(function ($sub) use ($targetPharmacyIds) {
-                $sub->whereIn('pharmacy_id', $targetPharmacyIds)
+                $sub
+                    ->whereIn('pharmacy_id', $targetPharmacyIds)
                     ->orWhereNull('pharmacy_id');
             })
             ->whereBetween('payment_date', [
@@ -1116,6 +1147,7 @@ class FinanceController extends Controller
             'countHutangBelumLunas' => $countHutangBelumLunas,
             'countBelumBayar' => $countBelumBayar,
             'countSebagian' => $countSebagian,
+            'countDiajukan' => $countDiajukan,
             'countLunas' => $countLunas,
             'totalCashPurchases' => $totalCashPurchases,
             'totalCashSpent' => $totalCashPurchases,
@@ -1126,6 +1158,7 @@ class FinanceController extends Controller
             'totalPiutangSisa' => $totalPiutangSisa,
             'totalSisaPiutang' => $totalPiutangSisa,
             'countPiutangBelumBayar' => $countPiutangBelumBayar,
+            'countPiutangDiajukan' => $countPiutangDiajukan,
             'countPiutangLunas' => $countPiutangLunas,
             'totalBiaya' => $kasKeluarBiaya,
             'countBiayaTotal' => $countBiayaTotal,
@@ -1260,7 +1293,7 @@ class FinanceController extends Controller
 
             if ($amount > $due || $due <= 0) {
                 throw ValidationException::withMessages([
-                    'amount' => 'Nominal pembayaran tidak boleh melebihi nilai barang terjual yang belum dibayar (Rp '.number_format($due, 0, ',', '.').').',
+                    'amount' => 'Nominal pembayaran tidak boleh melebihi nilai barang terjual yang belum dibayar (Rp ' . number_format($due, 0, ',', '.') . ').',
                 ]);
             }
 
@@ -1283,6 +1316,68 @@ class FinanceController extends Controller
         $this->clearStatsCache();
 
         return back()->with('success', 'Pembayaran konsinyasi berhasil dicatat sesuai nilai barang yang telah terjual.');
+    }
+
+    /** Pelunasan massal seluruh sisa kewajiban konsinyasi pada faktur terpilih. */
+    public function storeBulkConsignmentPayments(Request $request, ConsignmentService $consignmentService)
+    {
+        $validated = $request->validate([
+            'receiving_detail_ids' => 'required|array|min:1',
+            'receiving_detail_ids.*' => 'required|integer|distinct|exists:receiving_details,id',
+            'account_id' => 'required|exists:finance_accounts,id',
+            'payment_date' => 'required|date',
+            'reference_number' => 'nullable|string|max:100',
+            'notes' => 'nullable|string|max:500',
+        ]);
+        $account = FinanceAccount::findOrFail($validated['account_id']);
+        if ($account->category !== 'Kas & Bank' || !$account->is_active) {
+            return back()->withErrors(['account_id' => 'Akun pembayaran harus akun Kas & Bank yang aktif.']);
+        }
+
+        $pharmacyIds = $this->getTargetPharmacyIds();
+        $totalPaid = 0.0;
+        DB::transaction(function () use ($validated, $account, $pharmacyIds, $consignmentService, &$totalPaid): void {
+            $lockedAccount = FinanceAccount::whereKey($account->id)->lockForUpdate()->firstOrFail();
+            $details = ReceivingDetails::with('receiving')
+                ->whereIn('id', $validated['receiving_detail_ids'])
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+            if ($details->count() !== count($validated['receiving_detail_ids'])) {
+                throw ValidationException::withMessages(['receiving_detail_ids' => 'Sebagian faktur tidak dapat ditemukan.']);
+            }
+            foreach ($details as $detail) {
+                if ($detail->invoice_payment !== 'KONSINYASI'
+                    || !in_array((int) $detail->receiving?->pharmacy_id, $pharmacyIds, true)) {
+                    throw ValidationException::withMessages(['receiving_detail_ids' => "Faktur {$detail->invoice_number} bukan faktur konsinyasi yang dapat diakses."]);
+                }
+            }
+
+            $consignments = collect($consignmentService->getData($pharmacyIds))->keyBy('id');
+            foreach ($details as $detail) {
+                $due = round((float) ($consignments->get($detail->id)['due'] ?? 0), 2);
+                if ($due <= 0) {
+                    throw ValidationException::withMessages(['receiving_detail_ids' => "Faktur {$detail->invoice_number} tidak memiliki sisa kewajiban konsinyasi."]);
+                }
+                FinancePayment::create([
+                    'pharmacy_id' => $detail->receiving?->pharmacy_id,
+                    'receiving_id' => $detail->receiving_id,
+                    'receiving_detail_id' => $detail->id,
+                    'account_id' => $lockedAccount->id,
+                    'payment_type' => 'KONSINYASI',
+                    'payment_date' => $validated['payment_date'],
+                    'amount' => $due,
+                    'reference_number' => $validated['reference_number'] ?? null,
+                    'notes' => $validated['notes'] ?: 'Pelunasan massal konsinyasi barang terjual',
+                    'created_by' => Auth::id(),
+                ]);
+                $totalPaid += $due;
+            }
+            $lockedAccount->decrement('balance', $totalPaid);
+        });
+
+        $this->clearStatsCache();
+        return back()->with('success', 'Berhasil melunasi ' . count($validated['receiving_detail_ids']) . ' faktur konsinyasi sebesar Rp ' . number_format($totalPaid, 0, ',', '.') . '.');
     }
 
     /**
@@ -1444,6 +1539,148 @@ class FinanceController extends Controller
         $this->clearStatsCache();
         $formattedTotal = number_format($totalPaidAll, 0, ',', '.');
         return back()->with('success', "Berhasil melunasi {$processedCount} faktur hutang dagang sebesar Rp {$formattedTotal} via {$account->name}.");
+    }
+
+    /** Import pelunasan hutang dari spreadsheet dengan kolom faktur, tanggal bayar, dan kode bank. */
+    public function importHutangPayments(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:xlsx,xls,csv,txt|max:10240',
+        ]);
+
+        try {
+            $file = $request->file('file');
+            $reader = IOFactory::createReaderForFile($file->getRealPath());
+            if ($reader instanceof \PhpOffice\PhpSpreadsheet\Reader\Csv) {
+                $firstLine = (string) strtok((string) file_get_contents($file->getRealPath()), "\n");
+                $delimiters = [',', ';', "\t"];
+                usort($delimiters, fn ($a, $b) => substr_count($firstLine, $b) <=> substr_count($firstLine, $a));
+                $reader->setDelimiter($delimiters[0]);
+            }
+            $sheet = $reader->load($file->getRealPath())->getActiveSheet();
+            $rows = $sheet->toArray(null, true, true, false);
+        } catch (\Throwable $e) {
+            throw ValidationException::withMessages(['file' => 'File tidak dapat dibaca. Gunakan template impor Hutang Dagang.']);
+        }
+
+        if (count($rows) < 2) {
+            throw ValidationException::withMessages(['file' => 'File belum berisi baris data.']);
+        }
+
+        // Format tetap: kolom A = No. Faktur, B = Tanggal Bayar, C = Kode Bank.
+        // Lewati baris pertama sebagai header tanpa memeriksa teksnya.
+        $headerRowIndex = 0;
+        $invoiceColumn = 0;
+        $dateColumn = 1;
+        $bankColumn = 2;
+        $rows = array_slice($rows, 1);
+
+        $accountsByCode = FinanceAccount::where('category', 'Kas & Bank')->where('is_active', true)
+            ->get()->keyBy(fn ($account) => mb_strtolower(trim((string) $account->code)));
+        $pharmacyIds = $this->getTargetPharmacyIds();
+        $prepared = [];
+        $errors = [];
+        $seenInvoices = [];
+
+        foreach ($rows as $index => $row) {
+            $line = $headerRowIndex + $index + 2;
+            $invoiceNumber = trim((string) ($row[$invoiceColumn] ?? ''));
+            $bankCode = trim((string) ($row[$bankColumn] ?? ''));
+            $rawDate = $row[$dateColumn] ?? null;
+            if ($invoiceNumber === '' && $bankCode === '' && ($rawDate === null || $rawDate === '')) continue;
+
+            if ($invoiceNumber === '') $errors[] = "Baris {$line}: No. Faktur kosong.";
+            if ($bankCode === '') $errors[] = "Baris {$line}: Kode Bank kosong.";
+            if ($invoiceNumber !== '' && isset($seenInvoices[mb_strtolower($invoiceNumber)])) {
+                $errors[] = "Baris {$line}: No. Faktur {$invoiceNumber} tercantum lebih dari sekali.";
+            }
+            if ($invoiceNumber !== '') $seenInvoices[mb_strtolower($invoiceNumber)] = true;
+
+            $account = $accountsByCode->get(mb_strtolower($bankCode));
+            if (!$account && $bankCode !== '') $errors[] = "Baris {$line}: Kode Bank '{$bankCode}' tidak ditemukan atau tidak aktif.";
+
+            try {
+                if (is_numeric($rawDate) && (float) $rawDate > 20000) {
+                    $paymentDate = ExcelDate::excelToDateTimeObject((float) $rawDate)->format('Y-m-d');
+                } else {
+                    $dateText = trim((string) $rawDate);
+                    $paymentDate = \Carbon\Carbon::createFromFormat('!Y-m-d', $dateText)->format('Y-m-d');
+                }
+            } catch (\Throwable $e) {
+                try {
+                    $paymentDate = \Carbon\Carbon::createFromFormat('!d/m/Y', trim((string) $rawDate))->format('Y-m-d');
+                } catch (\Throwable $ignored) {
+                    $paymentDate = null;
+                }
+            }
+            if (!$paymentDate) $errors[] = "Baris {$line}: Tanggal Bayar harus format YYYY-MM-DD atau DD/MM/YYYY.";
+
+            $matches = ReceivingDetails::with(['receiving_items.order_items', 'receiving_items.order_items.medicines', 'receiving', 'creditor'])
+                ->where('invoice_payment', 'KREDIT')->where('invoice_number', $invoiceNumber)
+                ->whereHas('receiving', fn ($query) => $query->whereIn('pharmacy_id', $pharmacyIds)->whereIn('status', [1, 2, 3]))
+                ->get();
+            if ($invoiceNumber !== '' && $matches->count() === 0) {
+                $errors[] = "Baris {$line}: Faktur '{$invoiceNumber}' tidak ditemukan pada cabang yang dapat diakses.";
+            } elseif ($matches->count() > 1) {
+                $errors[] = "Baris {$line}: Faktur '{$invoiceNumber}' cocok ke lebih dari satu data. Periksa nomor faktur.";
+            }
+
+            if ($matches->count() === 1 && $account && $paymentDate) {
+                $prepared[] = ['line' => $line, 'detail' => $matches->first(), 'account' => $account, 'payment_date' => $paymentDate];
+            }
+        }
+
+        if (!$prepared && !$errors) $errors[] = 'Tidak ada baris data untuk diimpor.';
+        if ($errors) throw ValidationException::withMessages(['file' => implode("\n", $errors)]);
+
+        $totalPaid = 0.0;
+        DB::transaction(function () use ($prepared, &$totalPaid) {
+            foreach ($prepared as $entry) {
+                $detail = ReceivingDetails::whereKey($entry['detail']->id)->lockForUpdate()->firstOrFail();
+                $account = FinanceAccount::whereKey($entry['account']->id)->lockForUpdate()->firstOrFail();
+                $detail->load(['receiving_items.order_items', 'creditor', 'receiving']);
+                $subtotal = 0.0;
+                foreach ($detail->receiving_items as $item) {
+                    $qty = (float) ($item->qty_received ?? 0);
+                    $price = (float) ($item->raw_price ?? ($item->order_items->price ?? 0));
+                    $subtotal += (float) ($item->total ?? ($qty * $price));
+                }
+                $ppnType = strtoupper(trim($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA'));
+                $invoiceTotal = round($subtotal + ($ppnType === 'EXCLUDE' ? round($subtotal * 0.11, 2) : 0), 2);
+                $alreadyPaid = (float) FinancePayment::where('receiving_detail_id', $detail->id)->sum('amount');
+                $remaining = round(max(0, $invoiceTotal - $alreadyPaid), 2);
+                if ($remaining < 0.005) {
+                    throw ValidationException::withMessages(['file' => "Baris {$entry['line']}: Faktur '{$detail->invoice_number}' sudah lunas."]);
+                }
+
+                FinancePayment::create([
+                    'pharmacy_id' => $detail->receiving?->pharmacy_id,
+                    'receiving_id' => $detail->receiving_id,
+                    'receiving_detail_id' => $detail->id,
+                    'account_id' => $account->id,
+                    'payment_type' => 'KREDIT',
+                    'payment_date' => $entry['payment_date'],
+                    'amount' => $remaining,
+                    'reference_number' => null,
+                    'notes' => 'Pelunasan Hutang Dagang melalui impor file',
+                    'created_by' => Auth::id(),
+                ]);
+                $account->decrement('balance', $remaining);
+                $totalPaid += $remaining;
+                if ($detail->receiving) $detail->receiving->update(['status' => 3]);
+            }
+        });
+
+        $this->clearStatsCache();
+        return back()->with('success', 'Impor berhasil: ' . count($prepared) . ' faktur dilunasi dengan total Rp ' . number_format($totalPaid, 0, ',', '.') . '.');
+    }
+
+    public function downloadHutangPaymentTemplate()
+    {
+        return response("No. Faktur,Tanggal Bayar,Kode Bank\n", 200, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename=template-impor-hutang-dagang.csv',
+        ]);
     }
 
     /**
@@ -1796,6 +2033,130 @@ class FinanceController extends Controller
         }
     }
 
+    /** Impor pelunasan piutang dari file dengan kolom A-C dan baris pertama sebagai header. */
+    public function importPiutangPayments(Request $request)
+    {
+        $request->validate(['file' => 'required|file|mimes:xlsx,xls,csv,txt|max:10240']);
+
+        try {
+            $file = $request->file('file');
+            $reader = IOFactory::createReaderForFile($file->getRealPath());
+            if ($reader instanceof \PhpOffice\PhpSpreadsheet\Reader\Csv) {
+                $firstLine = (string) strtok((string) file_get_contents($file->getRealPath()), "\n");
+                $delimiters = [',', ';', "\t"];
+                usort($delimiters, fn ($a, $b) => substr_count($firstLine, $b) <=> substr_count($firstLine, $a));
+                $reader->setDelimiter($delimiters[0]);
+            }
+            $rows = $reader->load($file->getRealPath())->getActiveSheet()->toArray(null, true, true, false);
+        } catch (\Throwable $e) {
+            throw ValidationException::withMessages(['file' => 'File tidak dapat dibaca. Gunakan format kolom impor Piutang.']);
+        }
+
+        // Baris pertama selalu dilewati. Kolom A = No. Faktur/Transaksi, B = Tanggal Bayar, C = Kode Bank.
+        $rows = array_slice($rows, 1);
+        $accountsByCode = FinanceAccount::where('category', 'Kas & Bank')->where('is_active', true)
+            ->get()->keyBy(fn ($account) => mb_strtolower(trim((string) $account->code)));
+        $pharmacyIds = $this->getTargetPharmacyIds();
+        $prepared = [];
+        $errors = [];
+        $seenInvoices = [];
+
+        foreach ($rows as $index => $row) {
+            $line = $index + 2;
+            $invoiceNumber = trim((string) ($row[0] ?? ''));
+            $rawDate = $row[1] ?? null;
+            $bankCode = trim((string) ($row[2] ?? ''));
+            if ($invoiceNumber === '' && ($rawDate === null || $rawDate === '') && $bankCode === '') continue;
+
+            if ($invoiceNumber === '') $errors[] = "Baris {$line}: No. Faktur/Transaksi kosong.";
+            if ($bankCode === '') $errors[] = "Baris {$line}: Kode Bank kosong.";
+            $invoiceKey = mb_strtolower($invoiceNumber);
+            if ($invoiceNumber !== '' && isset($seenInvoices[$invoiceKey])) $errors[] = "Baris {$line}: No. Faktur/Transaksi '{$invoiceNumber}' tercantum lebih dari sekali.";
+            if ($invoiceNumber !== '') $seenInvoices[$invoiceKey] = true;
+
+            $account = $accountsByCode->get(mb_strtolower($bankCode));
+            if (!$account && $bankCode !== '') $errors[] = "Baris {$line}: Kode Bank '{$bankCode}' tidak ditemukan atau tidak aktif.";
+
+            $paymentDate = null;
+            try {
+                if (is_numeric($rawDate) && (float) $rawDate > 20000) {
+                    $paymentDate = ExcelDate::excelToDateTimeObject((float) $rawDate)->format('Y-m-d');
+                } else {
+                    $paymentDate = \Carbon\Carbon::createFromFormat('!Y-m-d', trim((string) $rawDate))->format('Y-m-d');
+                }
+            } catch (\Throwable $e) {
+                try {
+                    $paymentDate = \Carbon\Carbon::createFromFormat('!d/m/Y', trim((string) $rawDate))->format('Y-m-d');
+                } catch (\Throwable $ignored) {
+                    $paymentDate = null;
+                }
+            }
+            if (!$paymentDate) $errors[] = "Baris {$line}: Tanggal Bayar harus format YYYY-MM-DD atau DD/MM/YYYY.";
+
+            $matches = MedicineTransactions::where('transaction_type', 'KREDIT')
+                ->where('status', 1)->where('transaction_code', $invoiceNumber)
+                ->whereIn('pharmacy_id', $pharmacyIds)->with('transactions')->get();
+            if ($invoiceNumber !== '' && $matches->isEmpty()) {
+                $errors[] = "Baris {$line}: Faktur/Transaksi '{$invoiceNumber}' tidak ditemukan pada cabang yang dapat diakses.";
+            } elseif ($matches->count() > 1) {
+                $errors[] = "Baris {$line}: Nomor '{$invoiceNumber}' cocok ke lebih dari satu transaksi.";
+            }
+
+            if ($matches->count() === 1 && $account && $paymentDate) {
+                $prepared[] = ['line' => $line, 'transaction' => $matches->first(), 'account' => $account, 'payment_date' => $paymentDate];
+            }
+        }
+
+        if (!$prepared && !$errors) $errors[] = 'Tidak ada baris data untuk diimpor.';
+        if ($errors) throw ValidationException::withMessages(['file' => implode("\n", $errors)]);
+
+        $totalReceived = 0.0;
+        DB::transaction(function () use ($prepared, &$totalReceived) {
+            foreach ($prepared as $entry) {
+                $tx = MedicineTransactions::whereKey($entry['transaction']->id)->lockForUpdate()->firstOrFail();
+                $tx->load('transactions');
+                $account = FinanceAccount::whereKey($entry['account']->id)->lockForUpdate()->firstOrFail();
+                $paymentsTotal = (float) FinancePayment::where('medicine_transaction_id', $tx->id)->sum('amount');
+                $alreadyPaid = max($paymentsTotal, (float) ($tx->paid ?? 0));
+                $calculatedTotal = $tx->transactions->sum(function ($item) {
+                    return (float) ($item->final_price ?: ($item->total_price ?: ((float) ($item->quantity ?? 0) * (float) ($item->item_price ?? 0))));
+                });
+                $total = round((float) ($tx->subtotal > 0 ? $tx->subtotal : $calculatedTotal), 2);
+                $remaining = round(max(0, $total - $alreadyPaid), 2);
+                if ($remaining < 0.005) {
+                    throw ValidationException::withMessages(['file' => "Baris {$entry['line']}: Transaksi '{$tx->transaction_code}' sudah lunas."]);
+                }
+
+                FinancePayment::create([
+                    'pharmacy_id' => $tx->pharmacy_id,
+                    'medicine_transaction_id' => $tx->id,
+                    'account_id' => $account->id,
+                    'payment_type' => 'PIUTANG',
+                    'payment_date' => $entry['payment_date'],
+                    'amount' => $remaining,
+                    'reference_number' => null,
+                    'notes' => 'Pelunasan Piutang melalui impor file',
+                    'created_by' => Auth::id(),
+                ]);
+                $tx->paid = (string) round($alreadyPaid + $remaining, 2);
+                $tx->save();
+                $account->increment('balance', $remaining);
+                $totalReceived += $remaining;
+            }
+        });
+
+        $this->clearStatsCache();
+        return back()->with('success', 'Impor berhasil: ' . count($prepared) . ' transaksi piutang dilunasi dengan total penerimaan Rp ' . number_format($totalReceived, 0, ',', '.') . '.');
+    }
+
+    public function downloadPiutangPaymentTemplate()
+    {
+        return response("No. Faktur,Tanggal Bayar,Kode Bank\n", 200, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename=template-impor-piutang.csv',
+        ]);
+    }
+
     /**
      * Export data Piutang Penjualan ke format Excel (.xlsx) dengan tampilan rapi & estetik.
      */
@@ -1995,5 +2356,70 @@ class FinanceController extends Controller
         ];
 
         return Excel::download(new BiayaExport($targetPharmacyIds, $filters, $activePharmacy), $filename);
+    }
+
+    // --- Submit Logic (Pengajuan) ---
+    public function submitHutang(Request $request, $id)
+    {
+        $validated = $request->validate(['is_submitted' => 'required|boolean']);
+        $item = ReceivingDetails::findOrFail($id);
+
+        $item->is_submitted = $validated['is_submitted'];
+        $item->save();
+
+        return redirect()->back()->with('success', 'Status pengajuan hutang berhasil diperbarui.');
+    }
+
+    public function submitPiutang(Request $request, $id)
+    {
+        $validated = $request->validate(['is_submitted' => 'required|boolean']);
+        $item = MedicineTransactions::findOrFail($id);
+
+        $item->is_submitted = $validated['is_submitted'];
+        $item->save();
+
+        return redirect()->back()->with('success', 'Status pengajuan piutang berhasil diperbarui.');
+    }
+
+    public function bulkSubmitHutang(Request $request)
+    {
+        $validated = $request->validate([
+            'ids' => 'required|array',
+            'ids.*' => 'exists:receiving_details,id',
+            'is_submitted' => 'required|boolean'
+        ]);
+
+        foreach ($validated['ids'] as $id) {
+            $item = ReceivingDetails::find($id);
+            if ($item) {
+                $item->is_submitted = $validated['is_submitted'];
+                $item->save();
+            }
+        }
+
+        $this->clearStatsCache();
+
+        return redirect()->back()->with('success', 'Status pengajuan hutang massal berhasil diperbarui.');
+    }
+
+    public function bulkSubmitPiutang(Request $request)
+    {
+        $validated = $request->validate([
+            'ids' => 'required|array',
+            'ids.*' => 'exists:medicine_transactions,id',
+            'is_submitted' => 'required|boolean'
+        ]);
+
+        foreach ($validated['ids'] as $id) {
+            $item = MedicineTransactions::find($id);
+            if ($item) {
+                $item->is_submitted = $validated['is_submitted'];
+                $item->save();
+            }
+        }
+
+        $this->clearStatsCache();
+
+        return redirect()->back()->with('success', 'Status pengajuan piutang massal berhasil diperbarui.');
     }
 }

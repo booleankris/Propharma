@@ -11,6 +11,7 @@ class MedicineTransfers extends Model
     protected $table = 'medicine_transfers';
     protected $fillable = [
         'code',
+        'submission_key',
         'user_id',
         'status',
         'is_request',
