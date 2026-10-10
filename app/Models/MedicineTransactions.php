@@ -25,7 +25,11 @@ class MedicineTransactions extends Model
         'payment_method',
         'shift_logs_id',
         'transfer_bank_name',
+        'is_submitted',
+    ];
 
+    protected $casts = [
+        'is_submitted' => 'boolean',
     ];
     public function transactions()
     {

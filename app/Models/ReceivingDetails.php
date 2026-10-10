@@ -20,6 +20,11 @@ class ReceivingDetails extends Model
         'invoice_due',
         'invoice_payment',
         'invoice_ppn',
+        'is_submitted',
+    ];
+
+    protected $casts = [
+        'is_submitted' => 'boolean',
     ];
     public function receiving()
     {
