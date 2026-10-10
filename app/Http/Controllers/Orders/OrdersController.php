@@ -577,14 +577,17 @@ class OrdersController extends Controller
         $orderid = $request->orderid;
         $filterExist = OrderItems::where('order_id', $orderid)->pluck('medicine_id');
         $data = Medicines::whereNotIn('id', $filterExist)
+            ->where('medicines.status', 1)
             ->with([
                 'composition',
                 'category',
                 'factory',
                 'creditor'
             ])
-            ->where('medicines.name', 'LIKE', "%{$search}%")
-            ->orWhere('medicines.code', 'LIKE', "%{$search}%")
+            ->where(function ($query) use ($search) {
+                $query->where('medicines.name', 'LIKE', "%{$search}%")
+                    ->orWhere('medicines.code', 'LIKE', "%{$search}%");
+            })
             ->paginate(10);
 
         // format response for frontend
