@@ -8,14 +8,18 @@ use Maatwebsite\Excel\Concerns\WithMapping;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithCustomStartCell;
+use Maatwebsite\Excel\Concerns\WithCustomValueBinder;
 use Maatwebsite\Excel\Events\AfterSheet;
+use PhpOffice\PhpSpreadsheet\Cell\Cell;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
+use PhpOffice\PhpSpreadsheet\Cell\DefaultValueBinder;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
-class StockExport implements FromQuery, WithHeadings, WithMapping, ShouldAutoSize, WithEvents, WithCustomStartCell
+class StockExport extends DefaultValueBinder implements FromQuery, WithHeadings, WithMapping, ShouldAutoSize, WithEvents, WithCustomStartCell, WithCustomValueBinder
 {
     private $dataCount = 0;
     private $periodLabel;
@@ -62,7 +66,7 @@ class StockExport implements FromQuery, WithHeadings, WithMapping, ShouldAutoSiz
                 AND (mt.source_type IS NULL OR mt.source_type != 'retur_gudang')
                 GROUP BY b.medicine_id
             ) as asa"), 'asa.medicine_id', '=', 'm.id')
-            ->select('m.name', 'g.gudang_qty', 'pmi.pmi_qty', 'asm.asm_qty', 'mim.mim_qty', 'asa.asa_qty')
+            ->select('m.code', 'm.name', 'g.gudang_qty', 'pmi.pmi_qty', 'asm.asm_qty', 'mim.mim_qty', 'asa.asa_qty')
             ->orderBy('m.name', 'asc');
     }
 
@@ -74,6 +78,7 @@ class StockExport implements FromQuery, WithHeadings, WithMapping, ShouldAutoSiz
     public function headings(): array
     {
         return [
+            'KODE OBAT',
             'NAMA OBAT',
             'STOK GUDANG',
             'STOK PMI',
@@ -86,6 +91,7 @@ class StockExport implements FromQuery, WithHeadings, WithMapping, ShouldAutoSiz
     public function map($row): array
     {
         return [
+            (string) $row->code,
             $row->name,
             (int) $row->gudang_qty,
             (int) $row->pmi_qty,
@@ -93,6 +99,17 @@ class StockExport implements FromQuery, WithHeadings, WithMapping, ShouldAutoSiz
             (int) $row->mim_qty,
             (int) $row->asa_qty,
         ];
+    }
+
+    public function bindValue(Cell $cell, $value): bool
+    {
+        // Keep medicine codes as literal text so Excel preserves leading zeroes.
+        if ($cell->getColumn() === 'A' && $cell->getRow() >= 5) {
+            $cell->setValueExplicit((string) $value, DataType::TYPE_STRING);
+            return true;
+        }
+
+        return parent::bindValue($cell, $value);
     }
 
     public function registerEvents(): array
@@ -105,7 +122,7 @@ class StockExport implements FromQuery, WithHeadings, WithMapping, ShouldAutoSiz
                 // ==============================
                 // 1. SET JUDUL (TITLE)
                 // ==============================
-                $sheet->mergeCells('A1:F1');
+                $sheet->mergeCells('A1:G1');
                 $sheet->setCellValue('A1', 'STOK OPNAME APOTEK SAHABAT');
                 $sheet->getStyle('A1')->applyFromArray([
                     'font' => [
@@ -122,7 +139,7 @@ class StockExport implements FromQuery, WithHeadings, WithMapping, ShouldAutoSiz
                 // ==============================
                 // 2. SET SUBJUDUL (TANGGAL)
                 // ==============================
-                $sheet->mergeCells('A2:F2');
+                $sheet->mergeCells('A2:G2');
                 $sheet->setCellValue('A2', $this->periodLabel);
                 $sheet->getStyle('A2')->applyFromArray([
                     'font' => [
@@ -159,7 +176,7 @@ class StockExport implements FromQuery, WithHeadings, WithMapping, ShouldAutoSiz
                         ]
                     ]
                 ];
-                $sheet->getStyle('A4:F4')->applyFromArray($headerStyle);
+                $sheet->getStyle('A4:G4')->applyFromArray($headerStyle);
                 $sheet->getRowDimension(4)->setRowHeight(25); // Tinggi baris header
 
                 // ==============================
@@ -178,16 +195,16 @@ class StockExport implements FromQuery, WithHeadings, WithMapping, ShouldAutoSiz
                         ]
                     ];
                     
-                    // Tengahkan angka stok (kolom B s.d F)
-                    $sheet->getStyle('B5:F' . $highestRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                    // Tengahkan angka stok (kolom C s.d G)
+                    $sheet->getStyle('C5:G' . $highestRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
                     
                     // Aplikasikan border untuk seluruh tabel
-                    $sheet->getStyle('A5:F' . $highestRow)->applyFromArray($contentStyle);
+                    $sheet->getStyle('A5:G' . $highestRow)->applyFromArray($contentStyle);
                     
                     // Efek Zebra Cross (belang-belang) untuk mempermudah mata membaca
                     for ($row = 5; $row <= $highestRow; $row++) {
                         if ($row % 2 == 0) {
-                            $sheet->getStyle('A'.$row.':F'.$row)
+                            $sheet->getStyle('A'.$row.':G'.$row)
                                 ->getFill()
                                 ->setFillType(Fill::FILL_SOLID)
                                 ->getStartColor()
@@ -195,8 +212,8 @@ class StockExport implements FromQuery, WithHeadings, WithMapping, ShouldAutoSiz
                         }
                     }
 
-                    // Tambahkan filter otomatis di baris header (A4 s.d F)
-                    $sheet->setAutoFilter('A4:F' . $highestRow);
+                    // Tambahkan filter otomatis di baris header (A4 s.d G)
+                    $sheet->setAutoFilter('A4:G' . $highestRow);
                 }
             }
         ];
