@@ -527,6 +527,10 @@ class StockOpnameImportService
         $totalValid = count($validRows);
         $processedCount = 0;
         $touchedMedicineIds = [];
+        $rowsByMedicine = [];
+        foreach ($validRows as $row) {
+            $rowsByMedicine[(int) $row['medicine_id']][] = $row;
+        }
 
         // Preload sequence numbers once before loop to avoid 15,000+ sequential LIKE queries
         $now = Carbon::now();
@@ -862,6 +866,7 @@ class StockOpnameImportService
                 $exportJob->update([
                     'status'   => ExportJob::STATUS_FAILED,
                     'progress' => 0,
+                    'error_message' => $e->getMessage(),
                 ]);
             }
 
@@ -884,7 +889,11 @@ class StockOpnameImportService
         $skippedRows = count($allRows) - count($rows);
         $exportJob = $jobId ? ExportJob::find($jobId) : null;
         if (empty($rows)) {
-            if ($exportJob) $exportJob->update(['status' => ExportJob::STATUS_FAILED, 'progress' => 0]);
+            if ($exportJob) $exportJob->update([
+                'status' => ExportJob::STATUS_FAILED,
+                'progress' => 0,
+                'error_message' => 'Impor saldo awal dibatalkan: tidak ada baris obat valid di file.',
+            ]);
             throw new \RuntimeException('Impor saldo awal dibatalkan: tidak ada baris obat valid di file.');
         }
         $exportJob?->markProcessing();
@@ -1195,7 +1204,11 @@ class StockOpnameImportService
         } catch (\Throwable $e) {
             DB::rollBack();
             Log::error('Stock opening balance rebase failed: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
-            if ($exportJob) $exportJob->update(['status' => ExportJob::STATUS_FAILED, 'progress' => 0]);
+            if ($exportJob) $exportJob->update([
+                'status' => ExportJob::STATUS_FAILED,
+                'progress' => 0,
+                'error_message' => $e->getMessage(),
+            ]);
             throw $e;
         }
     }

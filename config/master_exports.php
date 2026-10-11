@@ -4,6 +4,7 @@ return [
     'medicines' => [
         'filename' => 'master-obat',
         'table' => 'medicines',
+        'text_columns' => ['Kode', 'Barcode'],
         'joins' => [
             ['pharmacies', 'pharmacies.id', '=', 'medicines.pharmacy_id'],
             ['medicine_categories', 'medicine_categories.id', '=', 'medicines.medicine_category_id'],

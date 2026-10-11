@@ -33,6 +33,7 @@ class MasterDataExportController extends Controller
             fputcsv($output, array_keys($export['columns']));
 
             $query = $this->buildQuery($export);
+            $columnNames = array_keys($export['columns']);
             $aliases = array_map(
                 static fn (int $index): string => "export_column_{$index}",
                 array_keys(array_values($export['columns']))
@@ -41,8 +42,11 @@ class MasterDataExportController extends Controller
             foreach ($query->lazyById(self::CHUNK_SIZE, $export['table'].'.id', 'export_id') as $row) {
                 $values = [];
 
-                foreach ($aliases as $alias) {
-                    $values[] = $this->sanitizeCell($row->{$alias});
+                foreach ($aliases as $index => $alias) {
+                    $values[] = $this->sanitizeCell(
+                        $row->{$alias},
+                        in_array($columnNames[$index] ?? '', $export['text_columns'] ?? [], true)
+                    );
                 }
 
                 fputcsv($output, $values);
@@ -80,13 +84,18 @@ class MasterDataExportController extends Controller
         return $query->select($selects);
     }
 
-    private function sanitizeCell(mixed $value): string
+    private function sanitizeCell(mixed $value, bool $forceText = false): string
     {
         if ($value === null) {
             return '';
         }
 
         $value = (string) $value;
+
+        // Keep medicine codes and barcodes with leading zeroes intact in Excel CSV.
+        if ($forceText) {
+            return '="'.str_replace('"', '""', $value).'"';
+        }
 
         // Prevent spreadsheet programs from evaluating exported user input as a formula.
         if (! is_numeric($value) && preg_match('/^\s*[=+\-@]/u', $value) === 1) {

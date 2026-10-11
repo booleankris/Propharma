@@ -2200,7 +2200,7 @@
                                                 switchImportStep(2);
                                                 iziToast.error({
                                                     title: 'Gagal',
-                                                    message: 'Proses impor di latar belakang mengalami kegagalan.',
+                                                    message: job.error_message || 'Proses impor di latar belakang mengalami kegagalan.',
                                                     position: 'topRight'
                                                 });
                                             }

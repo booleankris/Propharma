@@ -70,7 +70,22 @@ export default function KasBank({
     });
     const [isSavingOpening, setIsSavingOpening] = useState(false);
     const [isOpeningModalOpen, setIsOpeningModalOpen] = useState(false);
+    const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
+    const [isSavingDeposit, setIsSavingDeposit] = useState(false);
+    const [depositForm, setDepositForm] = useState({ transfer_account_id: '', payment_date: localToday(), amount: '', reference_number: '', notes: 'Setoran tunai kasir ke rekening bank' });
     const selectedOpening = openingBalances[openingForm.account_id];
+
+    const submitDeposit = (event) => {
+        event.preventDefault();
+        if (!depositForm.transfer_account_id || !depositForm.amount) return alert('Pilih rekening tujuan dan masukkan nominal setoran.');
+        setIsSavingDeposit(true);
+        router.post('/finance/setoran', depositForm, {
+            preserveScroll: true,
+            onSuccess: () => setIsDepositModalOpen(false),
+            onFinish: () => setIsSavingDeposit(false),
+            onError: (errors) => alert(Object.values(errors)[0] || 'Gagal mencatat setoran.'),
+        });
+    };
 
     const submitOpening = (event) => {
         event.preventDefault();
@@ -311,6 +326,18 @@ export default function KasBank({
                     </div>
 
                     <div className="flex items-center gap-2.5">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                const destination = kasBankAccounts.find((account) => account.code !== '1-10001');
+                                setDepositForm({ transfer_account_id: destination?.id || '', payment_date: localToday(), amount: '', reference_number: '', notes: 'Setoran tunai kasir ke rekening bank' });
+                                setIsDepositModalOpen(true);
+                            }}
+                            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl hover:bg-emerald-100 transition shadow-xs"
+                        >
+                            <ArrowUpRight className="w-4 h-4" />
+                            <span>Setor Kas ke Bank</span>
+                        </button>
                         <Link
                             href="/finance/accounts"
                             className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 hover:text-blue-600 transition shadow-xs"
@@ -776,6 +803,25 @@ export default function KasBank({
                 </div>
 
             </div>
+
+            {isDepositModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
+                    <form onSubmit={submitDeposit} className="w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+                        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+                            <div><h3 className="text-base font-bold text-slate-900">Setor Kasir ke Rekening</h3><p className="mt-0.5 text-[11px] text-slate-500">Saldo Kas Apotek / Drawer berkurang dan saldo rekening tujuan bertambah.</p></div>
+                            <button type="button" onClick={() => setIsDepositModalOpen(false)} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100" aria-label="Tutup modal"><X className="h-5 w-5" /></button>
+                        </div>
+                        <div className="grid gap-3 p-5">
+                            <label className="text-xs font-semibold text-slate-600">Rekening tujuan<select required value={depositForm.transfer_account_id} onChange={(e) => setDepositForm({ ...depositForm, transfer_account_id: e.target.value })} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-normal"><option value="">Pilih rekening</option>{kasBankAccounts.filter((account) => account.code !== '1-10001').map((account) => <option key={account.id} value={account.id}>{account.code} · {account.name}</option>)}</select></label>
+                            <label className="text-xs font-semibold text-slate-600">Tanggal setoran<input required type="date" max={localToday()} value={depositForm.payment_date} onChange={(e) => setDepositForm({ ...depositForm, payment_date: e.target.value })} className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-normal" /></label>
+                            <label className="text-xs font-semibold text-slate-600">Nominal<input required type="number" min="0.01" step="0.01" value={depositForm.amount} onChange={(e) => setDepositForm({ ...depositForm, amount: e.target.value })} placeholder="Contoh: 500000" className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-normal" /></label>
+                            <label className="text-xs font-semibold text-slate-600">No. bukti<input value={depositForm.reference_number} onChange={(e) => setDepositForm({ ...depositForm, reference_number: e.target.value })} className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-normal" /></label>
+                            <label className="text-xs font-semibold text-slate-600">Catatan<input value={depositForm.notes} onChange={(e) => setDepositForm({ ...depositForm, notes: e.target.value })} className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-normal" /></label>
+                        </div>
+                        <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-4"><button type="button" onClick={() => setIsDepositModalOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600">Batal</button><button type="submit" disabled={isSavingDeposit || !kasBankAccounts.some((account) => account.code !== '1-10001')} className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50">{isSavingDeposit ? 'Menyimpan…' : 'Catat Setoran'}</button></div>
+                    </form>
+                </div>
+            )}
 
             {/* MODAL ATUR SALDO AWAL */}
             {isOpeningModalOpen && (

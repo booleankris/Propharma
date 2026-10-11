@@ -23,6 +23,7 @@ use App\Services\Finance\CashflowReportService;
 use App\Services\Finance\CashflowTradeReportService;
 use App\Services\Finance\KinerjaOmzetService;
 use App\Services\Finance\MonitoringPenjualanService;
+use App\Services\Finance\KeuanganReportService;
 use App\Services\ConsignmentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -168,7 +169,7 @@ class FinanceController extends Controller
      * Ringkasan omzet kasir per hari dan shift. Data bersumber dari transaksi
      * selesai; metode yang belum dikonfirmasi pemetaan akuntansinya tetap terpisah.
      */
-    public function cashflow(Request $request, CashflowReportService $cashflowReport, MonitoringPenjualanService $monitoringPenjualan, KinerjaOmzetService $kinerjaOmzet, CashflowTradeReportService $tradeReport)
+    public function cashflow(Request $request, CashflowReportService $cashflowReport, MonitoringPenjualanService $monitoringPenjualan, KinerjaOmzetService $kinerjaOmzet, CashflowTradeReportService $tradeReport, KeuanganReportService $keuanganReport)
     {
         $validated = $request->validate([
             'month' => 'nullable|integer|min:1|max:12',
@@ -189,6 +190,10 @@ class FinanceController extends Controller
             return Excel::download(new CashflowExport($reportDays), $fileName);
         }
         $kinerjaDays = $kinerjaOmzet->build($pharmacyIds, $startDate, $endDate);
+        $drawerAccount = FinanceAccount::where('code', '1-10001')->where('category', 'Kas & Bank')->first();
+        $openingBalance = $drawerAccount
+            ? FinancePayment::where('payment_type', 'SALDO AWAL')->where('account_id', $drawerAccount->id)->first()
+            : null;
 
         return Inertia::render('Finance/Cashflow', [
             'days' => $reportDays,
@@ -197,15 +202,57 @@ class FinanceController extends Controller
             'kinerjaDebtors' => $kinerjaDays['debtors'],
             'piutangDagang' => $tradeReport->receivables($pharmacyIds, $startDate, $endDate),
             'hutangDagang' => $tradeReport->payables($pharmacyIds, $startDate, $endDate),
+            'keuanganDays' => $keuanganReport->build($pharmacyIds, $startDate, $endDate, $drawerAccount?->id, $openingBalance),
+            'saldoAwalKas' => (float) ($openingBalance?->amount ?? 0),
+            'setorAccounts' => FinanceAccount::where('category', 'Kas & Bank')->where('is_active', true)->where('id', '!=', $drawerAccount?->id ?? 0)->orderBy('code')->get(['id', 'name', 'code']),
             'filters' => ['month' => $month, 'year' => $year],
             'branchContext' => $this->getBranchContext(),
         ]);
     }
 
-    public function exportCashflow(Request $request, CashflowReportService $cashflowReport, MonitoringPenjualanService $monitoringPenjualan, KinerjaOmzetService $kinerjaOmzet, CashflowTradeReportService $tradeReport)
+    /** Pindahkan uang tunai dari Kas Apotek / Drawer ke rekening bank. */
+    public function storeSetoran(Request $request)
+    {
+        $validated = $request->validate([
+            'transfer_account_id' => 'required|exists:finance_accounts,id',
+            'payment_date' => 'required|date',
+            'amount' => 'required|numeric|gt:0',
+            'reference_number' => 'nullable|string|max:100',
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        $drawer = FinanceAccount::where('code', '1-10001')->where('category', 'Kas & Bank')->where('is_active', true)->firstOrFail();
+        $destination = FinanceAccount::where('category', 'Kas & Bank')->where('is_active', true)->findOrFail($validated['transfer_account_id']);
+        if ($destination->id === $drawer->id) {
+            return back()->withErrors(['transfer_account_id' => 'Pilih rekening tujuan selain Kas Apotek / Drawer.']);
+        }
+
+        DB::transaction(function () use ($validated, $drawer, $destination) {
+            $source = FinanceAccount::whereKey($drawer->id)->lockForUpdate()->firstOrFail();
+            $target = FinanceAccount::whereKey($destination->id)->lockForUpdate()->firstOrFail();
+            FinancePayment::create([
+                'pharmacy_id' => getActivePharmacyId() ?: null,
+                'account_id' => $source->id,
+                'transfer_account_id' => $target->id,
+                'payment_type' => 'SETOR',
+                'payment_date' => $validated['payment_date'],
+                'amount' => $validated['amount'],
+                'reference_number' => $validated['reference_number'] ?? null,
+                'notes' => $validated['notes'] ?? 'Setoran tunai kasir ke rekening bank',
+                'created_by' => Auth::id(),
+            ]);
+            $source->decrement('balance', $validated['amount']);
+            $target->increment('balance', $validated['amount']);
+            $this->clearStatsCache();
+        });
+
+        return back()->with('success', 'Setoran kas ke rekening berhasil dicatat.');
+    }
+
+    public function exportCashflow(Request $request, CashflowReportService $cashflowReport, MonitoringPenjualanService $monitoringPenjualan, KinerjaOmzetService $kinerjaOmzet, CashflowTradeReportService $tradeReport, KeuanganReportService $keuanganReport)
     {
         $request->merge(['download_xlsx' => true]);
-        return $this->cashflow($request, $cashflowReport, $monitoringPenjualan, $kinerjaOmzet, $tradeReport);
+        return $this->cashflow($request, $cashflowReport, $monitoringPenjualan, $kinerjaOmzet, $tradeReport, $keuanganReport);
     }
 
     public function exportCashflowTrade(Request $request, CashflowTradeReportService $tradeReport)
@@ -505,13 +552,18 @@ class FinanceController extends Controller
             ->where('id', '!=', $opening->id)
             ->whereDate('payment_date', '>=', $openingDate)
             ->whereDate('payment_date', '<=', $asOfDate)
-            ->get(['payment_type', 'amount']);
+            ->get(['payment_type', 'amount', 'transfer_account_id']);
 
         $balance = (float) $opening->amount;
         foreach ($payments as $payment) {
             if (in_array($payment->payment_type, ['PIUTANG', 'PENDAPATAN'], true)) $balance += (float) $payment->amount;
-            elseif (in_array($payment->payment_type, ['KREDIT', 'CASH', 'KONSINYASI', 'BIAYA'], true)) $balance -= (float) $payment->amount;
+            elseif (in_array($payment->payment_type, ['KREDIT', 'CASH', 'KONSINYASI', 'BIAYA', 'SETOR'], true)) $balance -= (float) $payment->amount;
         }
+        $balance += (float) FinancePayment::where('payment_type', 'SETOR')
+            ->where('transfer_account_id', $accountId)
+            ->whereDate('payment_date', '>=', $openingDate)
+            ->whereDate('payment_date', '<=', $asOfDate)
+            ->sum('amount');
         return $balance;
     }
 
@@ -992,6 +1044,7 @@ class FinanceController extends Controller
             'account',
             'expenseAccount',
             'incomeAccount',
+            'transferAccount',
             'creator',
             'pharmacy',
             'receivingDetail.creditor',
@@ -1016,16 +1069,19 @@ class FinanceController extends Controller
                         });
                 })->orWhere(function ($q) use ($targetPharmacyIds) {
                     $q->where('payment_type', 'PENDAPATAN')->whereIn('pharmacy_id', $targetPharmacyIds);
+                })->orWhere(function ($q) use ($targetPharmacyIds) {
+                    $q->where('payment_type', 'SETOR')->whereIn('pharmacy_id', $targetPharmacyIds);
                 })->orWhere('payment_type', 'SALDO AWAL');
             })
             ->orderByDesc('payment_date')
             ->orderByDesc('id')
             ->take($limit)
             ->get()
-            ->map(function ($p) {
+            ->flatMap(function ($p) {
                 $isMasuk = in_array($p->payment_type, ['PIUTANG', 'PENDAPATAN'], true);
                 $isSaldoAwal = $p->payment_type === 'SALDO AWAL';
-                $tipeLabel = $isSaldoAwal ? 'Saldo Awal' : ($isMasuk ? 'Masuk (Debit)' : 'Keluar (Kredit)');
+                $isSetor = $p->payment_type === 'SETOR';
+                $tipeLabel = $isSaldoAwal ? 'Saldo Awal' : ($isSetor ? 'Setor Kas' : ($isMasuk ? 'Masuk (Debit)' : 'Keluar (Kredit)'));
 
                 $pihakTerkait = '-';
                 $noDokumen = $p->reference_number ?: ('MUT-' . str_pad($p->id, 5, '0', STR_PAD_LEFT));
@@ -1079,9 +1135,12 @@ class FinanceController extends Controller
                     $pihakTerkait = $p->account->name ?? 'Kas / Bank';
                     $noDokumen = 'SA-' . str_pad($p->id, 5, '0', STR_PAD_LEFT);
                     $deskripsi = $p->notes ?: 'Saldo awal akun Kas & Bank';
+                } elseif ($isSetor) {
+                    $pihakTerkait = $p->transferAccount->name ?? 'Rekening tujuan';
+                    $deskripsi = $p->notes ?: 'Setoran kas ke rekening';
                 }
 
-                return [
+                $row = [
                     'id' => $p->id,
                     'account_id' => $p->account_id,
                     'account_name' => $p->account->name ?? 'Akun Kas',
@@ -1098,6 +1157,18 @@ class FinanceController extends Controller
                     'description' => $deskripsi ?: 'Transaksi Keuangan',
                     'user' => $p->creator->name ?? 'Admin',
                 ];
+                if (!$isSetor) return [$row];
+
+                $destinationRow = $row;
+                $destinationRow['id'] = $p->id . '-in';
+                $destinationRow['account_id'] = $p->transfer_account_id;
+                $destinationRow['account_name'] = $p->transferAccount->name ?? 'Rekening tujuan';
+                $destinationRow['account_code'] = $p->transferAccount->code ?? '-';
+                $destinationRow['account_number'] = $p->transferAccount->account_number ?? '-';
+                $destinationRow['direction'] = 'IN';
+                $destinationRow['type_label'] = 'Setor Masuk';
+                $destinationRow['party'] = $p->account->name ?? 'Kas Apotek / Drawer';
+                return [$row, $destinationRow];
             });
     }
 

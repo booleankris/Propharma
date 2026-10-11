@@ -13,6 +13,7 @@ class ExportJob extends Model
         'status',
         'progress',
         'file_path',
+        'error_message',
     ];
 
     protected $casts = [
@@ -36,7 +37,8 @@ class ExportJob extends Model
     {
         return $this->update([
             'status' => self::STATUS_PROCESSING,
-            'progress' => 0
+            'progress' => 0,
+            'error_message' => null,
         ]);
     }
 

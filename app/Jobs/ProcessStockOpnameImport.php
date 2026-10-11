@@ -55,6 +55,7 @@ class ProcessStockOpnameImport implements ShouldQueue
             $job->update([
                 'status'   => ExportJob::STATUS_FAILED,
                 'progress' => 0,
+                'error_message' => $e->getMessage(),
             ]);
         }
     }

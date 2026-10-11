@@ -1481,6 +1481,7 @@ class SuppliesController extends Controller
             'progress'  => (int) $job->progress,
             'finished'  => $job->isFinished(),
             'failed'    => $job->status === ExportJob::STATUS_FAILED,
+            'error_message' => $job->error_message,
         ]);
     }
 
