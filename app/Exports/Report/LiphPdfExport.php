@@ -16,6 +16,8 @@ class LiphPdfExport
 
     const TYPE_MAP = [
         'KREDIT'      => ['kredit', 'Resep Kredit'],
+        'RESEP KREDIT' => ['kredit', 'Resep Kredit'],
+        'RETUR KREDIT' => ['kredit', 'Retur Kredit'],
         'HV/OTC'      => ['tunai',  'Obat Bebas'],
         'RETUR JUAL'  => ['tunai',  'Retur Tunai'],
         'RESEP TUNAI' => ['tunai',  'Resep Tunai'],
@@ -23,6 +25,7 @@ class LiphPdfExport
         'ONLINE'      => ['tunai',  'Obat Bebas'],
     ];
 
+    const KREDIT_ORDER = ['Resep Kredit', 'Retur Kredit'];
     const TUNAI_ORDER = ['Obat Bebas', 'Retur Tunai', 'Resep Tunai', 'UPDS'];
 
     public function __construct($pharmacyId, $startDate, $endDate, $pharmacyName = '', $pharmacyAddress = '')
@@ -77,14 +80,18 @@ class LiphPdfExport
             }
 
             $ref = &$grouped[$group][$label];
-            $ref['lembar']++;
-            $ref['r']        += $trx->transactions->count();
+            if (in_array($label, ['Retur Tunai', 'Retur Kredit'], true)) {
+                $ref['r'] -= max(1, $trx->transactions->count());
+            } else {
+                $ref['lembar']++;
+                $ref['r'] += $trx->transactions->count();
+            }
             $ref['jasa']     += $this->safeSum($trx->transactions, 'service_fee');
             $ref['embalase'] += $this->safeSum($trx->transactions, 'embalase');
             $ref['potongan'] += (int) ($trx->discount ?? 0) + $this->safeSum($trx->transactions, 'discount');
 
             $netto = (int) ($trx->subtotal ?? 0);
-            if ($label === 'Retur Tunai') $netto = -abs($netto);
+            if (in_array($label, ['Retur Tunai', 'Retur Kredit'], true)) $netto = -abs($netto);
             $ref['netto'] += $netto;
         }
 
@@ -93,7 +100,9 @@ class LiphPdfExport
         $kreditRows = [];
         $kreditSub  = ['lembar' => 0, 'r' => 0, 'jasa' => 0, 'embalase' => 0, 'potongan' => 0, 'netto' => 0];
 
-        foreach ($grouped['kredit'] ?? [] as $label => $d) {
+        foreach (self::KREDIT_ORDER as $label) {
+            if (!isset($grouped['kredit'][$label])) continue;
+            $d = $grouped['kredit'][$label] ?? ['lembar' => 0, 'r' => 0, 'jasa' => 0, 'embalase' => 0, 'potongan' => 0, 'netto' => 0];
             $kreditRows[] = array_merge(['no' => $no++, 'label' => $label], $d);
             foreach ($kreditSub as $k => $_) $kreditSub[$k] += $d[$k];
         }

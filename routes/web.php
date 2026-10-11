@@ -559,9 +559,11 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
         Route::get('/cashflow/export', [\App\Http\Controllers\FinanceController::class, 'exportCashflow'])->name('cashflow.export');
         Route::get('/cashflow/monitoring-export', [\App\Http\Controllers\FinanceController::class, 'exportMonitoringPenjualan'])->name('cashflow.monitoring-export');
         Route::get('/cashflow/kinerja-export', [\App\Http\Controllers\FinanceController::class, 'exportKinerjaOmzet'])->name('cashflow.kinerja-export');
+        Route::get('/cashflow/trade-export', [\App\Http\Controllers\FinanceController::class, 'exportCashflowTrade'])->name('cashflow.trade-export');
         Route::get('/konsinyasi', [\App\Http\Controllers\FinanceController::class, 'konsinyasi'])->name('konsinyasi');
         Route::get('/piutang', [\App\Http\Controllers\FinanceController::class, 'piutang'])->name('piutang');
         Route::get('/kas-bank', [\App\Http\Controllers\FinanceController::class, 'kasBank'])->name('kasBank');
+        Route::get('/pendapatan-lain-lain', [\App\Http\Controllers\FinanceController::class, 'pendapatanLainLain'])->name('pendapatanLainLain');
         Route::get('/biaya', [\App\Http\Controllers\FinanceController::class, 'biaya'])->name('biaya');
         Route::get('/accounts', [\App\Http\Controllers\FinanceController::class, 'accounts'])->name('accounts');
 
@@ -577,6 +579,8 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
         Route::post('/cash-payment', [\App\Http\Controllers\FinanceController::class, 'assignCashAccount'])->name('cash.assign');
         Route::post('/bulk-cash-payment', [\App\Http\Controllers\FinanceController::class, 'assignBulkCashAccount'])->name('cash.bulkAssign');
         Route::post('/piutang-payments', [\App\Http\Controllers\FinanceController::class, 'storePiutangPayment'])->name('piutang.store');
+        Route::post('/saldo-awal', [\App\Http\Controllers\FinanceController::class, 'storeSaldoAwal'])->name('saldoAwal.store');
+        Route::post('/pendapatan-lain-lain', [\App\Http\Controllers\FinanceController::class, 'storePendapatanLainLain'])->name('pendapatanLainLain.store');
         Route::post('/bulk-piutang-payments', [\App\Http\Controllers\FinanceController::class, 'bulkPiutangPayment'])->name('piutang.bulkStore');
         Route::post('/piutang/import-payments', [\App\Http\Controllers\FinanceController::class, 'importPiutangPayments'])->name('piutang.importPayments');
         Route::get('/piutang/import-template', [\App\Http\Controllers\FinanceController::class, 'downloadPiutangPaymentTemplate'])->name('piutang.importTemplate');

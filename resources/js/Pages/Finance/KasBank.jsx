@@ -20,14 +20,22 @@ import {
     Edit3,
     Trash2,
     Plus,
+    Save,
     HelpCircle,
 } from 'lucide-react';
+
+const localToday = () => {
+    const date = new Date();
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+};
 
 export default function KasBank({
     accounts = [],
     categories = [],
     mutasiKasBank = [],
     stats = {},
+    openingBalances = {},
+    monthlyOpeningBalances = {},
 }) {
     // State Filter & Search Mutasi
     const [selectedKasBankFilter, setSelectedKasBankFilter] = useState('all'); // 'all' | account_id
@@ -50,6 +58,40 @@ export default function KasBank({
         category: 'Kas & Bank',
         account_number: '',
     });
+    const [openingForm, setOpeningForm] = useState(() => {
+        const accountId = accounts[0]?.id || '';
+        const saved = openingBalances[accountId];
+        return {
+            account_id: accountId,
+            payment_date: saved?.payment_date || localToday(),
+            amount: saved?.amount ?? '',
+            notes: saved?.notes || '',
+        };
+    });
+    const [isSavingOpening, setIsSavingOpening] = useState(false);
+    const [isOpeningModalOpen, setIsOpeningModalOpen] = useState(false);
+    const selectedOpening = openingBalances[openingForm.account_id];
+
+    const submitOpening = (event) => {
+        event.preventDefault();
+        if (!openingForm.account_id || openingForm.amount === '') return alert('Pilih akun Kas & Bank dan masukkan saldo awal.');
+        setIsSavingOpening(true);
+        router.post('/finance/saldo-awal', openingForm, {
+            preserveScroll: true,
+            onFinish: () => setIsSavingOpening(false),
+            onError: (errors) => alert(Object.values(errors)[0] || 'Gagal menyimpan saldo awal.'),
+        });
+    };
+
+    const chooseOpeningAccount = (accountId) => {
+        const saved = openingBalances[accountId];
+        setOpeningForm({
+            account_id: accountId,
+            payment_date: saved?.payment_date || localToday(),
+            amount: saved?.amount ?? '',
+            notes: saved?.notes || '',
+        });
+    };
 
     const getNextCodeForKasBank = () => {
         const prefix = '1-100';
@@ -181,12 +223,14 @@ export default function KasBank({
                     accountStats[m.account_id].inflow += amt;
                     accountStats[m.account_id].txCount += 1;
                 }
-            } else {
+            } else if (m.direction === 'OUT') {
                 totalKeluar += amt;
                 if (accountStats[m.account_id]) {
                     accountStats[m.account_id].outflow += amt;
                     accountStats[m.account_id].txCount += 1;
                 }
+            } else if (m.direction === 'OPENING' && accountStats[m.account_id]) {
+                accountStats[m.account_id].txCount += 1;
             }
         });
 
@@ -317,7 +361,7 @@ export default function KasBank({
                                 + {formatRupiah(kasBankSummary.totalMasuk)}
                             </div>
                             <div className="text-[11px] text-slate-400 mt-1">
-                                Penerimaan piutang & penjualan
+                                Penerimaan piutang & pendapatan lain-lain
                             </div>
                         </div>
                     </div>
@@ -374,19 +418,28 @@ export default function KasBank({
                                 </p>
                             </div>
 
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setSelectedKasBankFilter('all');
-                                    setMutasiCurrentPage(1);
-                                }}
-                                className={`px-3 py-1.5 text-xs font-semibold rounded-xl border transition ${selectedKasBankFilter === 'all'
-                                    ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                                    : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                                    }`}
-                            >
-                                Tampilkan Semua ({kasBankAccounts.length})
-                            </button>
+                            <div className="flex flex-wrap items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsOpeningModalOpen(true)}
+                                    className="px-3 py-1.5 text-xs font-semibold rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-700 transition hover:bg-indigo-100"
+                                >
+                                    Atur Saldo Awal
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setSelectedKasBankFilter('all');
+                                        setMutasiCurrentPage(1);
+                                    }}
+                                    className={`px-3 py-1.5 text-xs font-semibold rounded-xl border transition ${selectedKasBankFilter === 'all'
+                                        ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                                        : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                                        }`}
+                                >
+                                    Tampilkan Semua ({kasBankAccounts.length})
+                                </button>
+                            </div>
                         </div>
 
                         {/* Grid Kartu Akun Interaktif dengan Visual Bar */}
@@ -650,6 +703,10 @@ export default function KasBank({
                                                         <ArrowDownLeft className="w-3 h-3" />
                                                         +{formatRupiah(item.amount)}
                                                     </span>
+                                                ) : item.direction === 'OPENING' ? (
+                                                    <span className="font-bold text-indigo-600 inline-flex items-center justify-end gap-1">
+                                                        {formatRupiah(item.amount)} <span className="text-[10px]">Saldo awal</span>
+                                                    </span>
                                                 ) : (
                                                     <span className="text-slate-300">-</span>
                                                 )}
@@ -719,6 +776,65 @@ export default function KasBank({
                 </div>
 
             </div>
+
+            {/* MODAL ATUR SALDO AWAL */}
+            {isOpeningModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
+                    <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-2xl animate-in fade-in duration-200">
+                        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-100 bg-white/95 px-6 py-4 backdrop-blur">
+                            <div>
+                                <h3 className="font-bold text-slate-900 text-base">Atur Saldo Awal Kas & Bank</h3>
+                                <p className="mt-0.5 text-[11px] text-slate-500">Saldo awal bulan berikutnya dihitung dari saldo akhir bulan sebelumnya.</p>
+                            </div>
+                            <button type="button" onClick={() => setIsOpeningModalOpen(false)} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Tutup modal"><X className="h-5 w-5" /></button>
+                        </div>
+
+                        <div className="space-y-5 p-5 sm:p-6">
+                            <div className="overflow-x-auto rounded-xl border border-slate-200">
+                                <table className="w-full min-w-[650px] text-left text-xs">
+                                    <thead className="bg-slate-50 text-slate-500"><tr><th className="px-4 py-3">Rekening</th><th className="px-4 py-3 text-right">Saldo Awal Tercatat</th><th className="px-4 py-3 text-right">Saldo Awal Bulan Ini</th><th className="px-4 py-3 text-right">Saldo Buku</th></tr></thead>
+                                    <tbody className="divide-y divide-slate-100">{kasBankAccounts.map((account) => {
+                                        const opening = openingBalances[account.id];
+                                        return <tr key={account.id} className={String(openingForm.account_id) === String(account.id) ? 'bg-indigo-50/50' : ''}>
+                                            <td className="px-4 py-3"><button type="button" onClick={() => chooseOpeningAccount(String(account.id))} className="text-left font-semibold text-slate-800 hover:text-indigo-700">{account.name}</button><div className="mt-0.5 text-[10px] text-slate-400">{account.code} · {opening?.payment_date ? `tanggal ${opening.payment_date}` : 'belum diatur'}</div></td>
+                                            <td className="px-4 py-3 text-right">{opening ? formatRupiah(opening.amount) : '—'}</td>
+                                            <td className="px-4 py-3 text-right">{formatRupiah(monthlyOpeningBalances[account.id] || 0)}</td>
+                                            <td className="px-4 py-3 text-right font-bold text-slate-900">{formatRupiah(account.balance || 0)}</td>
+                                        </tr>;
+                                    })}</tbody>
+                                </table>
+                            </div>
+
+                            <form onSubmit={submitOpening} className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-4 sm:p-5">
+                                <div className="mb-4">
+                                    <h4 className="text-sm font-bold text-slate-900">{selectedOpening ? 'Perbarui saldo awal rekening' : 'Isi saldo awal rekening'}</h4>
+                                    <p className="mt-1 text-[11px] text-slate-500">Nilai saldo aktual pada tanggal mulai pencatatan. Tidak dicatat sebagai pendapatan.</p>
+                                </div>
+                                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                                    <label className="block text-xs font-semibold text-slate-600">Rekening
+                                        <select required value={openingForm.account_id} onChange={(event) => chooseOpeningAccount(event.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-normal">
+                                            {kasBankAccounts.map((account) => <option key={account.id} value={account.id}>{account.code} · {account.name}</option>)}
+                                        </select>
+                                    </label>
+                                    <label className="block text-xs font-semibold text-slate-600">Tanggal saldo aktual
+                                        <input required type="date" max={localToday()} value={openingForm.payment_date} onChange={(event) => setOpeningForm({ ...openingForm, payment_date: event.target.value })} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-normal" />
+                                    </label>
+                                    <label className="block text-xs font-semibold text-slate-600">Saldo aktual
+                                        <input required type="number" min="0" step="0.01" value={openingForm.amount} onChange={(event) => setOpeningForm({ ...openingForm, amount: event.target.value })} placeholder="Contoh: 25000000" className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-normal" />
+                                    </label>
+                                    <label className="block text-xs font-semibold text-slate-600">Catatan
+                                        <input value={openingForm.notes} onChange={(event) => setOpeningForm({ ...openingForm, notes: event.target.value })} placeholder="Opsional" className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-normal" />
+                                    </label>
+                                </div>
+                                <div className="mt-4 flex flex-col gap-3 border-t border-indigo-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                                    <p className="text-[11px] text-slate-500">{selectedOpening ? `Saldo awal tersimpan ${formatRupiah(selectedOpening.amount)} per ${selectedOpening.payment_date}.` : 'Saldo awal belum dicatat untuk rekening ini.'}</p>
+                                    <button type="submit" disabled={isSavingOpening || kasBankAccounts.length === 0} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-50"><Save size={15} />{isSavingOpening ? 'Menyimpan…' : selectedOpening ? 'Simpan Perubahan' : 'Simpan Saldo Awal'}</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* MODAL TAMBAH / EDIT REKENING KAS & BANK */}
             {isAccountModalOpen && (

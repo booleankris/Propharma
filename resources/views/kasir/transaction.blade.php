@@ -620,9 +620,8 @@
                             <thead class="text-gray-600 uppercase text-xs border-b border-[#d6d6d6]">
                                 <tr>
                                     <th scope="col" class="px-4 py-3 text-center w-[40px]">No</th>
-                                    <th scope="col" colspan="7" class="px-4 py-3">Nama Obat</th>
+                                    <th scope="col" colspan="8" class="px-4 py-3">Nama Obat</th>
                                     <th scope="col" class="px-2 py-3 text-center">Satuan</th>
-                                    <th scope="col" class="px-4 py-3 text-center">Harga</th>
                                     <th scope="col" class="px-4 py-3 text-center">Qty</th>
                                     <th scope="col" class="px-4 py-3 text-center">Diskon</th>
                                     <th scope="col" class="px-4 py-3 text-center">Subtotal</th>
@@ -644,14 +643,12 @@
                                     <tr id="itemincart{{ $cart->id }}" data-id="{{ $cart->id }}"
                                         class="cart-row @if ($cart->recipe_status != null) bg-[#eefff8] @endif border-b hover:bg-blue-50 transition text-[10px] cursor-pointer">
                                         <td class="px-1 py-1 text-center text-gray-600">{{ $index + 1 }}</td>
-                                        <td colspan="7"
+                                        <td colspan="8"
                                             class="text-[10px] leading-normal px-1 py-1 font-semibold text-gray-800">
                                             {{ $cart->medicine->name }}
                                         </td>
                                         <td class="px-1 py-1 text-center">
                                             {{ $cart->medicine->unit ?? ($cart->medicine->packaging ?? '') }}</td>
-                                        <td class="px-1 py-1 text-center">Rp
-                                            {{ number_format($cart->item_price, 0, ',', '.') }}</td>
                                         <td class="px-1 py-1 text-center">{{ $cart->quantity }}</td>
                                         <td class="px-1 py-1 text-center">
                                             Rp.{{ number_format($cart->discount, 0, ',', ',') }}</td>
@@ -3365,9 +3362,9 @@
         if (currenttransaction == "KREDIT" && racikstatus === 0) {
             subtotal = rawAmount + parseInt(service || 0);
         } else if (transaction_type == "RESEP TUNAI" && racikstatus === 0) {
-            subtotal = Math.max(1000, Math.round(rawAmount / 1000) * 1000) + parseInt(service || 0);
+            subtotal = Math.max(1000, Math.ceil(rawAmount / 1000) * 1000) + parseInt(service || 0);
         } else {
-            subtotal = Math.max(1000, Math.round(rawAmount / 1000) * 1000);
+            subtotal = Math.max(1000, Math.ceil(rawAmount / 1000) * 1000);
         }
 
         pharmacy_price = rawAmount;
@@ -3510,11 +3507,10 @@
                             //   bakcup
                             existingRow.innerHTML = `
                             <td class="px-1 py-1 text-center text-gray-600">${existingRow.rowIndex}</td>
-                            <td colspan="7" class="leading-normal text-[10px] px-1 py-1 font-semibold text-gray-800">
+                            <td colspan="8" class="leading-normal text-[10px] px-1 py-1 font-semibold text-gray-800">
                                 ${item.medicine.name}
                             </td>
                             <td class="px-1 py-1 text-center">${item.medicine.unit || item.medicine.packaging || ''}</td>
-                            <td class="px-1 py-1 text-center">${formatRupiah(item_finalprice)}</td>
                             <td class="px-1 py-1 text-center">${item.quantity}</td>
                             <td class="px-1 py-1 text-center">${formatRupiah(item.discount)}</td>
                             <td class="px-1 py-1 text-center">${formatRupiah(item.total_price)}</td>
@@ -3533,9 +3529,8 @@
                             document.getElementById('carts').insertAdjacentHTML('beforeend', `
                             <tr id="itemincart${item.id}" data-id="${item.id}" class="cart-row border-b hover:bg-blue-50 transition text-[10px] cursor-pointer">
                                 <td class="px-1 py-1 text-center text-gray-600">${document.querySelectorAll('#carts tr').length + 1}</td>
-                                <td colspan="7" class="leading-normal text-[10px] px-1 py-1 font-semibold text-gray-800">${item.medicine.name}</td>
+                                <td colspan="8" class="leading-normal text-[10px] px-1 py-1 font-semibold text-gray-800">${item.medicine.name}</td>
                                 <td class="px-1 py-1 text-center">${item.medicine.unit || item.medicine.packaging || ''}</td>
-                                <td class="px-1 py-1 text-center">${formatRupiah(item_finalprice)}</td>
                                 <td class="px-1 py-1 text-center">${item.quantity}</td>
                                 <td class="px-1 py-1 text-center">${formatRupiah(item.discount)}</td>
                                 <td class="px-1 py-1 text-center">${formatRupiah(item.total_price)}</td>
@@ -3629,11 +3624,10 @@
                         <td class="px-1 py-1 text-center text-gray-600">
                             ${document.querySelectorAll('#carts tr').length + 1}
                         </td>
-                        <td colspan="7" class="leading-normal text-[10px] px-1 py-1 font-semibold text-gray-800">
+                        <td colspan="8" class="leading-normal text-[10px] px-1 py-1 font-semibold text-gray-800">
                             ${item.name}
                         </td>
                         <td class="px-1 py-1 text-center">${item.unit || item.packaging || ''}</td>
-                        <td class="px-1 py-1 text-center">${formatRupiah(item_finalprice)}</td>
                         <td class="px-1 py-1 text-center">${item.quantity}</td>
                         <td class="px-1 py-1 text-center">${formatRupiah(item.discount)}</td>
                         <td class="px-1 py-1 text-center">${formatRupiah(item.total_price)}</td>
@@ -3844,9 +3838,9 @@
                 if (currenttransaction == "KREDIT" && (!item.recipe_status || item.recipe_status == 0)) {
                     subtotal = rawAmount + parseInt(service || 0);
                 } else if (transaction_type == "RESEP TUNAI" && (!item.recipe_status || item.recipe_status == 0)) {
-                    subtotal = Math.max(1000, Math.round(rawAmount / 1000) * 1000) + parseInt(service || 0);
+                    subtotal = Math.max(1000, Math.ceil(rawAmount / 1000) * 1000) + parseInt(service || 0);
                 } else {
-                    subtotal = Math.max(1000, Math.round(rawAmount / 1000) * 1000);
+                    subtotal = Math.max(1000, Math.ceil(rawAmount / 1000) * 1000);
                 }
 
                 pharmacy_price = rawAmount;

@@ -92,9 +92,9 @@ class KinerjaOmzetService
             $items = $transaction->transactions;
             $amount = $items->sum(fn ($item) => $this->number($item->final_price ?? $item->total_price));
             if ($items->isEmpty()) $amount = max(0, $this->number($transaction->subtotal) - $this->number($transaction->discount));
-            elseif ($type !== 'RETUR JUAL') $amount = max(0, $amount - $this->number($transaction->discount));
+            elseif (!in_array($type, ['RETUR JUAL', 'RETUR KREDIT'], true)) $amount = max(0, $amount - $this->number($transaction->discount));
 
-            if ($type === 'RETUR JUAL') {
+            if (in_array($type, ['RETUR JUAL', 'RETUR KREDIT'], true)) {
                 $days[$date]['sales']['returns'][$shift] -= abs($amount);
             } elseif (in_array($type, ['KREDIT', 'RESEP KREDIT'], true)) {
                 $debtorId = (int) $transaction->debtor_id;

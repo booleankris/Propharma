@@ -169,7 +169,7 @@ class HODashboardController extends Controller
         // 1. METRICS: PENJUALAN (SALES)
         $salesQuery = MedicineTransactions::query()
             ->where('status', 1)
-            ->where('transaction_type', '!=', 'RETUR JUAL')
+            ->whereNotIn('transaction_type', ['RETUR JUAL', 'RETUR KREDIT'])
             ->whereBetween('updated_at', [$startDate, $endDate]);
         $salesQuery = $applyPharmacy($salesQuery);
 
@@ -196,7 +196,7 @@ class HODashboardController extends Controller
         // 3. METRICS: RETUR PENJUALAN (SALES RETURN)
         $salesReturQuery = MedicineTransactions::query()
             ->where('status', 1)
-            ->where('transaction_type', 'RETUR JUAL')
+            ->whereIn('transaction_type', ['RETUR JUAL', 'RETUR KREDIT'])
             ->whereBetween('updated_at', [$startDate, $endDate]);
         $salesReturQuery = $applyPharmacy($salesReturQuery);
 
@@ -215,7 +215,7 @@ class HODashboardController extends Controller
         // 5. BREAKDOWN JENIS TRANSAKSI (HV, UPDS, RESEP KREDIT, RESEP TUNAI)
         $txnTypesQuery = MedicineTransactions::query()
             ->where('status', 1)
-            ->where('transaction_type', '!=', 'RETUR JUAL')
+            ->whereNotIn('transaction_type', ['RETUR JUAL', 'RETUR KREDIT'])
             ->whereBetween('updated_at', [$startDate, $endDate]);
         $txnTypesQuery = $applyPharmacy($txnTypesQuery);
 
@@ -266,7 +266,7 @@ class HODashboardController extends Controller
         // Aggregate monthly sales in single query
         $salesByMonth = MedicineTransactions::query()
             ->where('status', 1)
-            ->where('transaction_type', '!=', 'RETUR JUAL')
+            ->whereNotIn('transaction_type', ['RETUR JUAL', 'RETUR KREDIT'])
             ->whereYear('updated_at', $targetYear)
             ->when($pharmacyId !== 'all' && !empty($pharmacyId), function ($q) use ($pharmacyId) {
                 $q->where('pharmacy_id', $pharmacyId);
@@ -290,7 +290,7 @@ class HODashboardController extends Controller
         // Aggregate monthly returns in single query
         $returnsByMonth = MedicineTransactions::query()
             ->where('status', 1)
-            ->where('transaction_type', 'RETUR JUAL')
+            ->whereIn('transaction_type', ['RETUR JUAL', 'RETUR KREDIT'])
             ->whereYear('updated_at', $targetYear)
             ->when($pharmacyId !== 'all' && !empty($pharmacyId), function ($q) use ($pharmacyId) {
                 $q->where('pharmacy_id', $pharmacyId);
@@ -313,7 +313,7 @@ class HODashboardController extends Controller
         if ($diffDays <= 31) {
             $salesByDate = MedicineTransactions::query()
                 ->where('status', 1)
-                ->where('transaction_type', '!=', 'RETUR JUAL')
+                ->whereNotIn('transaction_type', ['RETUR JUAL', 'RETUR KREDIT'])
                 ->whereBetween('updated_at', [$startDate, $endDate])
                 ->when($pharmacyId !== 'all' && !empty($pharmacyId), function ($q) use ($pharmacyId) {
                     $q->where('pharmacy_id', $pharmacyId);
@@ -334,7 +334,7 @@ class HODashboardController extends Controller
         // 8. BRANCHES PERFORMANCE LIST (FOR RIGHT SIDEBAR CARDS)
         $branchSales = MedicineTransactions::query()
             ->where('status', 1)
-            ->where('transaction_type', '!=', 'RETUR JUAL')
+            ->whereNotIn('transaction_type', ['RETUR JUAL', 'RETUR KREDIT'])
             ->whereBetween('updated_at', [$startDate, $endDate])
             ->groupBy('pharmacy_id')
             ->select('pharmacy_id', DB::raw('sum(subtotal) as total_sales'), DB::raw('count(id) as total_txns'))

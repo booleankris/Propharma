@@ -28,6 +28,8 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
 
     const TYPE_MAP = [
         'KREDIT'      => ['kredit', 'Resep Kredit'],
+        'RESEP KREDIT' => ['kredit', 'Resep Kredit'],
+        'RETUR KREDIT' => ['kredit', 'Retur Kredit'],
         'HV/OTC'      => ['tunai',  'Obat Bebas'],
         'RETUR JUAL'  => ['tunai',  'Retur Tunai'],
         'RESEP TUNAI' => ['tunai',  'Resep Tunai'],
@@ -237,7 +239,7 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                 $grouped[$group][$label]['potongan_transaksi'] += (int) ($trx->discount ?? 0);
 
                 $trxNetto = (int) ($trx->subtotal ?? 0);
-                if ($label === 'Retur Tunai') $trxNetto = -abs($trxNetto);
+                if (in_array($label, ['Retur Tunai', 'Retur Kredit'], true)) $trxNetto = -abs($trxNetto);
                 $grouped[$group][$label]['netto'] += $trxNetto;
 
                 continue;
@@ -288,7 +290,7 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                 $ref['potongan'] += $this->safeSum($groupItems, 'discount');
 
                 $itemNetto = $this->safeSum($groupItems, 'final_price');
-                if ($label === 'Retur Tunai') $itemNetto = -abs($itemNetto);
+                if (in_array($label, ['Retur Tunai', 'Retur Kredit'], true)) $itemNetto = -abs($itemNetto);
                 $ref['netto'] += $itemNetto;
 
                 if ($label === $potonganTransaksiTarget) {
@@ -336,11 +338,12 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         $sub = $this->emptyBucket();
 
         foreach ($kredit as $label => $d) {
+            $isReturn = $label === 'Retur Kredit';
             $rows[] = [
                 $no++,
                 $label,
-                $this->nz(round($d['lembar'], 2)),
-                $this->nz($d['r']),
+                $this->nz(round($isReturn ? $d['r'] : $d['lembar'], 2)),
+                $this->nz($isReturn ? -$d['lembar'] : $d['r']),
                 $this->nz($d['jasa']),
                 $this->nz($d['embalase']),
                 $this->nz($d['potongan']),
@@ -349,7 +352,15 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                 $this->nz($d['netto'] - $d['potongan_transaksi'])
             ];
 
-            foreach ($sub as $k => $v) $sub[$k] += $d[$k];
+            foreach ($sub as $k => $v) {
+                if ($isReturn && $k === 'lembar') {
+                    $sub[$k] += $d['r'];
+                } elseif ($isReturn && $k === 'r') {
+                    $sub[$k] -= $d['lembar'];
+                } else {
+                    $sub[$k] += $d[$k];
+                }
+            }
         }
 
         $rows[] = [

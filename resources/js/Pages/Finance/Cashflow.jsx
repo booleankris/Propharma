@@ -5,6 +5,7 @@ import FinanceLayout from './Layouts/FinanceLayout';
 import { formatRupiah } from './Components/Utils';
 import MonitoringPenjualan from './MonitoringPenjualan';
 import KinerjaOmzet from './KinerjaOmzet';
+import TradeDailyCashflow from './TradeDailyCashflow';
 
 const banks = [
     { key: 'BNI', label: 'BNI' },
@@ -93,7 +94,7 @@ function CustomSelect({ value, onChange, options, icon: Icon, className = "" }) 
     );
 }
 
-export default function Cashflow({ days = [], monitoringDays = [], kinerjaDays = [], kinerjaDebtors = [], filters = {} }) {
+export default function Cashflow({ days = [], monitoringDays = [], kinerjaDays = [], kinerjaDebtors = [], piutangDagang = {}, hutangDagang = {}, filters = {} }) {
     const [month, setMonth] = useState(String(filters.month || new Date().getMonth() + 1));
     const [year, setYear] = useState(String(filters.year || new Date().getFullYear()));
     const [activeTab, setActiveTab] = useState('sheet');
@@ -127,6 +128,10 @@ export default function Cashflow({ days = [], monitoringDays = [], kinerjaDays =
         router.get('/finance/cashflow', { month, year }, { preserveState: true, preserveScroll: true });
     };
 
+    const exportUrl = ['piutang', 'hutang'].includes(activeTab)
+        ? `/finance/cashflow/trade-export?type=${activeTab}&month=${encodeURIComponent(month)}&year=${encodeURIComponent(year)}`
+        : `${activeTab === 'sheet' ? '/finance/cashflow/export' : activeTab === 'monitoring' ? '/finance/cashflow/monitoring-export' : '/finance/cashflow/kinerja-export'}?month=${encodeURIComponent(month)}&year=${encodeURIComponent(year)}`;
+
     const sumShift = (shiftKey, getter) => days.reduce((sum, day) => sum + Number(getter(day[shiftKey] || {}) || 0), 0);
     const money = (value) => formatRupiah(value);
 
@@ -138,8 +143,8 @@ export default function Cashflow({ days = [], monitoringDays = [], kinerjaDays =
                         <span className="rounded-xl bg-blue-100 p-2.5 text-blue-700"><ArrowDownUp className="h-5 w-5" /></span>
                         <div>
                             <div className="text-xs font-bold uppercase tracking-wider text-blue-700">Cashflow</div>
-                            <h2 className="mt-1 text-xl font-bold text-slate-900">{activeTab === 'sheet' ? 'Omzet per tanggal dan shift' : activeTab === 'monitoring' ? 'Monitoring target penjualan' : 'Kinerja omzet'}</h2>
-                            <p className="mt-1 max-w-3xl text-sm text-slate-600">{activeTab === 'sheet' ? 'Rincian diambil dari transaksi kasir selesai, dikelompokkan menurut Cash, EDC, Transfer/QRIS, diskon, jumlah, dan total setoran. Tanggal tanpa transaksi tetap ditampilkan.' : activeTab === 'monitoring' ? 'Laporan harian mengikuti format Excel. Periode mengikuti bulan dan tahun yang dipilih.' : 'Penjualan per shift dan rincian pembelian mengikuti susunan workbook.'}</p>
+                            <h2 className="mt-1 text-xl font-bold text-slate-900">{activeTab === 'sheet' ? 'Omzet per tanggal dan shift' : activeTab === 'monitoring' ? 'Monitoring target penjualan' : activeTab === 'kinerja' ? 'Kinerja omzet' : activeTab === 'piutang' ? 'Piutang dagang per hari' : 'Hutang dagang per hari'}</h2>
+                            <p className="mt-1 max-w-3xl text-sm text-slate-600">{activeTab === 'sheet' ? 'Rincian diambil dari transaksi kasir selesai, dikelompokkan menurut Cash, EDC, Transfer/QRIS, diskon, jumlah, dan total setoran. Tanggal tanpa transaksi tetap ditampilkan.' : activeTab === 'monitoring' ? 'Laporan harian mengikuti format Excel. Periode mengikuti bulan dan tahun yang dipilih.' : activeTab === 'kinerja' ? 'Penjualan per shift dan rincian pembelian mengikuti susunan workbook.' : activeTab === 'piutang' ? 'Penjualan kredit yang selesai dicatat pada tanggal transaksi; retur kredit mengurangi piutang pada tanggal retur.' : 'Pembelian kredit dicatat pada tanggal barang diterima dan masuk stok.'}</p>
                         </div>
                     </div>
                     <form onSubmit={applyFilters} className="w-full rounded-3xl border border-blue-100/80 bg-white p-3 shadow-sm xl:w-auto xl:min-w-[450px]">
@@ -169,7 +174,7 @@ export default function Cashflow({ days = [], monitoringDays = [], kinerjaDays =
                                 <button type="submit" className="inline-flex h-[56px] sm:h-auto sm:px-6 flex-1 items-center justify-center gap-2 rounded-2xl bg-blue-600 text-sm font-bold tracking-wide text-white shadow-md shadow-blue-500/20 transition-all hover:bg-blue-700 hover:shadow-lg hover:shadow-blue-500/40 focus:outline-none focus:ring-4 focus:ring-blue-200 active:scale-95">
                                     Terapkan
                                 </button>
-                                <a href={`${activeTab === 'sheet' ? '/finance/cashflow/export' : activeTab === 'monitoring' ? '/finance/cashflow/monitoring-export' : '/finance/cashflow/kinerja-export'}?month=${encodeURIComponent(month)}&year=${encodeURIComponent(year)}`} className="inline-flex h-[56px] sm:h-auto px-4 items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50 text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100 hover:text-emerald-800" title="Export Excel"><Download className="h-5 w-5" /></a>
+                                <a href={exportUrl} className="inline-flex h-[56px] sm:h-auto px-4 items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50 text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100 hover:text-emerald-800" title="Export Excel"><Download className="h-5 w-5" /></a>
                             </div>
                         </div>
                     </form>
@@ -180,12 +185,14 @@ export default function Cashflow({ days = [], monitoringDays = [], kinerjaDays =
                         { key: 'sheet', label: 'Lembar Omzet Harian' },
                         { key: 'monitoring', label: 'Monitoring Penjualan' },
                         { key: 'kinerja', label: 'Kinerja Omzet' },
+                        { key: 'piutang', label: 'Piutang Dagang' },
+                        { key: 'hutang', label: 'Hutang Dagang' },
                     ].map((tab) => <button key={tab.key} role="tab" aria-selected={activeTab === tab.key} onClick={() => setActiveTab(tab.key)} className={`rounded-lg px-4 py-2.5 text-sm font-semibold transition ${activeTab === tab.key ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}>
                         {tab.label}
                     </button>)}
                 </div>
 
-                {activeTab === 'monitoring' ? <MonitoringPenjualan days={monitoringDays} /> : activeTab === 'kinerja' ? <KinerjaOmzet days={kinerjaDays} debtors={kinerjaDebtors} /> : <>
+                {activeTab === 'monitoring' ? <MonitoringPenjualan days={monitoringDays} /> : activeTab === 'kinerja' ? <KinerjaOmzet days={kinerjaDays} debtors={kinerjaDebtors} /> : activeTab === 'piutang' ? <TradeDailyCashflow title="Piutang Dagang" description="Total penjualan kredit per debitur, dikelompokkan berdasarkan tanggal transaksi selesai." report={piutangDagang} /> : activeTab === 'hutang' ? <TradeDailyCashflow title="Hutang Dagang" description="Total pembelian kredit per supplier, dikelompokkan berdasarkan tanggal barang diterima." report={hutangDagang} /> : <>
                     <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                         <Metric label="Total setoran" value={totals.deposit} note="Cash + Transfer/QRIS; EDC pending dikecualikan" icon={CalendarDays} tone="bg-blue-50 text-blue-700" />
                         <Metric label="Cash" value={totals.cash} note="Penerimaan tunai" icon={Wallet} tone="bg-emerald-50 text-emerald-700" />

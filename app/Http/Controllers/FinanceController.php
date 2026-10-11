@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Exports\Finance\BiayaExport;
 use App\Exports\Finance\CashExport;
 use App\Exports\Finance\CashflowExport;
+use App\Exports\Finance\CashflowTradeExport;
 use App\Exports\Finance\HutangExport;
 use App\Exports\Finance\KinerjaOmzetExport;
 use App\Exports\Finance\MonitoringPenjualanExport;
@@ -19,6 +20,7 @@ use App\Models\Pharmacies;
 use App\Models\Receiving;
 use App\Models\ReceivingDetails;
 use App\Services\Finance\CashflowReportService;
+use App\Services\Finance\CashflowTradeReportService;
 use App\Services\Finance\KinerjaOmzetService;
 use App\Services\Finance\MonitoringPenjualanService;
 use App\Services\ConsignmentService;
@@ -166,7 +168,7 @@ class FinanceController extends Controller
      * Ringkasan omzet kasir per hari dan shift. Data bersumber dari transaksi
      * selesai; metode yang belum dikonfirmasi pemetaan akuntansinya tetap terpisah.
      */
-    public function cashflow(Request $request, CashflowReportService $cashflowReport, MonitoringPenjualanService $monitoringPenjualan, KinerjaOmzetService $kinerjaOmzet)
+    public function cashflow(Request $request, CashflowReportService $cashflowReport, MonitoringPenjualanService $monitoringPenjualan, KinerjaOmzetService $kinerjaOmzet, CashflowTradeReportService $tradeReport)
     {
         $validated = $request->validate([
             'month' => 'nullable|integer|min:1|max:12',
@@ -193,15 +195,41 @@ class FinanceController extends Controller
             'monitoringDays' => $monitoringPenjualan->build($pharmacyIds, $startDate, $endDate),
             'kinerjaDays' => $kinerjaDays['days'],
             'kinerjaDebtors' => $kinerjaDays['debtors'],
+            'piutangDagang' => $tradeReport->receivables($pharmacyIds, $startDate, $endDate),
+            'hutangDagang' => $tradeReport->payables($pharmacyIds, $startDate, $endDate),
             'filters' => ['month' => $month, 'year' => $year],
             'branchContext' => $this->getBranchContext(),
         ]);
     }
 
-    public function exportCashflow(Request $request, CashflowReportService $cashflowReport, MonitoringPenjualanService $monitoringPenjualan, KinerjaOmzetService $kinerjaOmzet)
+    public function exportCashflow(Request $request, CashflowReportService $cashflowReport, MonitoringPenjualanService $monitoringPenjualan, KinerjaOmzetService $kinerjaOmzet, CashflowTradeReportService $tradeReport)
     {
         $request->merge(['download_xlsx' => true]);
-        return $this->cashflow($request, $cashflowReport, $monitoringPenjualan, $kinerjaOmzet);
+        return $this->cashflow($request, $cashflowReport, $monitoringPenjualan, $kinerjaOmzet, $tradeReport);
+    }
+
+    public function exportCashflowTrade(Request $request, CashflowTradeReportService $tradeReport)
+    {
+        $validated = $request->validate([
+            'month' => 'required|integer|min:1|max:12',
+            'year' => 'required|integer|min:2000|max:2100',
+            'type' => 'required|in:piutang,hutang',
+        ]);
+        $month = (int) $validated['month'];
+        $year = (int) $validated['year'];
+        $start = \Carbon\Carbon::createFromDate($year, $month, 1)->startOfMonth();
+        $end = $start->copy()->endOfMonth();
+        $isReceivable = $validated['type'] === 'piutang';
+        $report = $isReceivable
+            ? $tradeReport->receivables($this->getTargetPharmacyIds(), $start->toDateString(), $end->toDateString())
+            : $tradeReport->payables($this->getTargetPharmacyIds(), $start->toDateString(), $end->toDateString());
+        $label = $isReceivable ? 'Piutang Dagang' : 'Hutang Dagang';
+        $period = $start->locale('id')->translatedFormat('F Y');
+
+        return Excel::download(
+            new CashflowTradeExport($report, strtoupper($label), $label, "Periode: {$period}"),
+            sprintf('cashflow-%s_%04d-%02d.xlsx', $validated['type'], $year, $month)
+        );
     }
 
     public function exportMonitoringPenjualan(Request $request, MonitoringPenjualanService $monitoringPenjualan)
@@ -308,14 +336,183 @@ class FinanceController extends Controller
         $categories = ['Kas & Bank'];
         $mutasiKasBank = $this->getMutasiData(500);
         $stats = $this->getStats(null, null, null);
+        $openingBalances = FinancePayment::with('creator')
+            ->where('payment_type', 'SALDO AWAL')
+            ->whereIn('account_id', $accounts->pluck('id'))
+            ->get()
+            ->keyBy('account_id')
+            ->map(fn ($payment) => [
+                'id' => $payment->id,
+                'account_id' => $payment->account_id,
+                'amount' => (float) $payment->amount,
+                'payment_date' => $payment->payment_date?->format('Y-m-d'),
+                'notes' => $payment->notes,
+                'updated_by' => $payment->creator->name ?? 'Petugas',
+            ]);
+        $monthStart = now()->startOfMonth()->toDateString();
+        $monthEnd = now()->endOfMonth()->toDateString();
+        $previousMonthEnd = now()->startOfMonth()->subDay()->toDateString();
+        $monthlyOpeningBalances = [];
+        foreach ($accounts as $account) {
+            $opening = FinancePayment::where('payment_type', 'SALDO AWAL')->where('account_id', $account->id)->first();
+            if (!$opening) {
+                $monthlyOpeningBalances[$account->id] = 0;
+            } elseif ($opening->payment_date?->format('Y-m-d') >= $monthStart && $opening->payment_date?->format('Y-m-d') <= $monthEnd) {
+                $monthlyOpeningBalances[$account->id] = (float) $opening->amount;
+            } else {
+                $monthlyOpeningBalances[$account->id] = $this->calculateBalanceFromOpening($account->id, $opening, $previousMonthEnd);
+            }
+        }
 
         return Inertia::render('Finance/KasBank', [
             'accounts' => $accounts,
             'categories' => $categories,
             'mutasiKasBank' => $mutasiKasBank,
             'stats' => $stats,
+            'openingBalances' => $openingBalances,
+            'monthlyOpeningBalances' => $monthlyOpeningBalances,
             'branchContext' => $this->getBranchContext(),
         ]);
+    }
+
+    /** Catat penerimaan di luar pelunasan piutang. */
+    public function pendapatanLainLain(Request $request)
+    {
+        if ($request->filled('pharmacy_id') && auth()->check() && (auth()->user()->hasRole('HO') || auth()->user()->hasRole('administrator') || auth()->user()->hasRole('General Manager'))) {
+            session(['ho_pharmacy_id' => (int) $request->pharmacy_id]);
+        }
+
+        $validated = $request->validate([
+            'month' => 'nullable|integer|min:1|max:12',
+            'year' => 'nullable|integer|min:2000|max:2100',
+        ]);
+        $month = (int) ($validated['month'] ?? now()->month);
+        $year = (int) ($validated['year'] ?? now()->year);
+        $accounts = FinanceAccount::where('category', 'Kas & Bank')->where('is_active', true)->orderBy('code')->get();
+        $targetPharmacyIds = $this->getTargetPharmacyIds();
+        $periodStart = \Carbon\Carbon::createFromDate($year, $month, 1)->startOfMonth()->toDateString();
+        $periodEnd = \Carbon\Carbon::createFromDate($year, $month, 1)->endOfMonth()->toDateString();
+        $pendapatan = FinancePayment::with(['account', 'incomeAccount', 'creator', 'pharmacy'])
+            ->where('payment_type', 'PENDAPATAN')
+            ->whereIn('pharmacy_id', $targetPharmacyIds)
+            ->whereBetween('payment_date', [$periodStart, $periodEnd])
+            ->latest('payment_date')->latest('id')->take(500)->get()
+            ->map(fn ($payment) => [
+                'id' => $payment->id,
+                'payment_date' => $payment->payment_date?->format('Y-m-d'),
+                'formatted_date' => $payment->payment_date?->format('d/m/Y'),
+                'account_id' => $payment->account_id,
+                'account_name' => $payment->account->name ?? 'Kas / Bank',
+                'income_account_id' => $payment->income_account_id,
+                'income_account_name' => $payment->incomeAccount->name ?? 'Pendapatan',
+                'amount' => (float) $payment->amount,
+                'recipient' => $payment->recipient ?: '-',
+                'reference_number' => $payment->reference_number ?: ('PL-' . str_pad($payment->id, 5, '0', STR_PAD_LEFT)),
+                'notes' => $payment->notes ?: '',
+                'user_name' => $payment->creator->name ?? 'Petugas',
+            ]);
+
+        return Inertia::render('Finance/PendapatanLainLain', [
+            'accounts' => $accounts,
+            'incomeAccounts' => FinanceAccount::where('category', 'Pendapatan')->where('is_active', true)->orderBy('code')->get(['id', 'code', 'name']),
+            'pendapatan' => $pendapatan,
+            'filters' => ['month' => $month, 'year' => $year],
+            'stats' => $this->getStats(null, null, null),
+            'branchContext' => $this->getBranchContext(),
+        ]);
+    }
+
+    public function storeSaldoAwal(Request $request)
+    {
+        $validated = $request->validate([
+            'account_id' => 'required|exists:finance_accounts,id',
+            'payment_date' => 'required|date|before_or_equal:today',
+            'amount' => 'required|numeric|min:0',
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        $account = FinanceAccount::where('category', 'Kas & Bank')->where('is_active', true)->findOrFail($validated['account_id']);
+        DB::transaction(function () use ($validated, $account) {
+            $lockedAccount = FinanceAccount::whereKey($account->id)->lockForUpdate()->firstOrFail();
+            $opening = FinancePayment::where('payment_type', 'SALDO AWAL')->where('account_id', $lockedAccount->id)->lockForUpdate()->first();
+            $payload = [
+                'account_id' => $lockedAccount->id,
+                'payment_type' => 'SALDO AWAL',
+                'payment_date' => $validated['payment_date'],
+                'amount' => $validated['amount'],
+                'notes' => $validated['notes'] ?? null,
+                'created_by' => Auth::id(),
+                'pharmacy_id' => null,
+            ];
+            if ($opening) $opening->update($payload);
+            else $opening = FinancePayment::create($payload);
+
+            $lockedAccount->update([
+                'balance' => $this->calculateBalanceFromOpening($lockedAccount->id, $opening, now()->toDateString()),
+            ]);
+            $this->clearStatsCache();
+        });
+
+        return back()->with('success', 'Saldo awal akun berhasil disimpan. Nilai ini tidak dihitung sebagai pendapatan.');
+    }
+
+    public function storePendapatanLainLain(Request $request)
+    {
+        $validated = $request->validate([
+            'account_id' => 'required|exists:finance_accounts,id',
+            'income_account_id' => 'required|exists:finance_accounts,id',
+            'payment_date' => 'required|date',
+            'amount' => 'required|numeric|gt:0',
+            'recipient' => 'nullable|string|max:150',
+            'reference_number' => 'nullable|string|max:100',
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        $account = FinanceAccount::where('category', 'Kas & Bank')->where('is_active', true)->findOrFail($validated['account_id']);
+        $incomeAccount = FinanceAccount::where('category', 'Pendapatan')->where('is_active', true)->findOrFail($validated['income_account_id']);
+        $activePharmacyId = getActivePharmacyId();
+
+        DB::transaction(function () use ($validated, $account, $incomeAccount, $activePharmacyId) {
+            FinancePayment::create([
+                'pharmacy_id' => $activePharmacyId > 0 ? $activePharmacyId : null,
+                'account_id' => $account->id,
+                'income_account_id' => $incomeAccount->id,
+                'payment_type' => 'PENDAPATAN',
+                'payment_date' => $validated['payment_date'],
+                'amount' => $validated['amount'],
+                'recipient' => $validated['recipient'] ?? null,
+                'reference_number' => $validated['reference_number'] ?? null,
+                'notes' => $validated['notes'] ?? null,
+                'created_by' => Auth::id(),
+            ]);
+
+            $opening = FinancePayment::where('payment_type', 'SALDO AWAL')->where('account_id', $account->id)->first();
+            if (!$opening || $validated['payment_date'] >= $opening->payment_date->format('Y-m-d')) {
+                FinanceAccount::whereKey($account->id)->increment('balance', $validated['amount']);
+            }
+            $this->clearStatsCache();
+        });
+
+        return back()->with('success', 'Pendapatan lain-lain berhasil dicatat.');
+    }
+
+    private function calculateBalanceFromOpening(int $accountId, FinancePayment $opening, string $asOfDate): float
+    {
+        $openingDate = $opening->payment_date?->format('Y-m-d');
+        if (!$openingDate || $openingDate > $asOfDate) return 0;
+
+        $payments = FinancePayment::where('account_id', $accountId)
+            ->where('id', '!=', $opening->id)
+            ->whereDate('payment_date', '>=', $openingDate)
+            ->whereDate('payment_date', '<=', $asOfDate)
+            ->get(['payment_type', 'amount']);
+
+        $balance = (float) $opening->amount;
+        foreach ($payments as $payment) {
+            if (in_array($payment->payment_type, ['PIUTANG', 'PENDAPATAN'], true)) $balance += (float) $payment->amount;
+            elseif (in_array($payment->payment_type, ['KREDIT', 'CASH', 'KONSINYASI', 'BIAYA'], true)) $balance -= (float) $payment->amount;
+        }
+        return $balance;
     }
 
     /**
@@ -794,6 +991,7 @@ class FinanceController extends Controller
         return FinancePayment::with([
             'account',
             'expenseAccount',
+            'incomeAccount',
             'creator',
             'pharmacy',
             'receivingDetail.creditor',
@@ -816,15 +1014,18 @@ class FinanceController extends Controller
                                 ->whereIn('pharmacy_id', $targetPharmacyIds)
                                 ->orWhereNull('pharmacy_id');
                         });
-                });
+                })->orWhere(function ($q) use ($targetPharmacyIds) {
+                    $q->where('payment_type', 'PENDAPATAN')->whereIn('pharmacy_id', $targetPharmacyIds);
+                })->orWhere('payment_type', 'SALDO AWAL');
             })
             ->orderByDesc('payment_date')
             ->orderByDesc('id')
             ->take($limit)
             ->get()
             ->map(function ($p) {
-                $isMasuk = ($p->payment_type === 'PIUTANG');
-                $tipeLabel = $isMasuk ? 'Masuk (Debit)' : 'Keluar (Kredit)';
+                $isMasuk = in_array($p->payment_type, ['PIUTANG', 'PENDAPATAN'], true);
+                $isSaldoAwal = $p->payment_type === 'SALDO AWAL';
+                $tipeLabel = $isSaldoAwal ? 'Saldo Awal' : ($isMasuk ? 'Masuk (Debit)' : 'Keluar (Kredit)');
 
                 $pihakTerkait = '-';
                 $noDokumen = $p->reference_number ?: ('MUT-' . str_pad($p->id, 5, '0', STR_PAD_LEFT));
@@ -870,6 +1071,14 @@ class FinanceController extends Controller
                     if (!$deskripsi) {
                         $deskripsi = 'Pengeluaran biaya: ' . ($p->expenseAccount->name ?? 'Operasional');
                     }
+                } elseif ($p->payment_type === 'PENDAPATAN') {
+                    $pihakTerkait = $p->recipient ?: ($p->incomeAccount->name ?? 'Pendapatan Lain-lain');
+                    if (!$p->reference_number) $noDokumen = 'PL-' . str_pad($p->id, 5, '0', STR_PAD_LEFT);
+                    if (!$deskripsi) $deskripsi = 'Pendapatan lain-lain: ' . ($p->incomeAccount->name ?? 'Pendapatan');
+                } elseif ($isSaldoAwal) {
+                    $pihakTerkait = $p->account->name ?? 'Kas / Bank';
+                    $noDokumen = 'SA-' . str_pad($p->id, 5, '0', STR_PAD_LEFT);
+                    $deskripsi = $p->notes ?: 'Saldo awal akun Kas & Bank';
                 }
 
                 return [
@@ -881,7 +1090,7 @@ class FinanceController extends Controller
                     'date' => \Carbon\Carbon::parse($p->payment_date)->format('d/m/Y'),
                     'raw_date' => \Carbon\Carbon::parse($p->payment_date)->format('Y-m-d'),
                     'amount' => (float) $p->amount,
-                    'direction' => $isMasuk ? 'IN' : 'OUT',
+                    'direction' => $isSaldoAwal ? 'OPENING' : ($isMasuk ? 'IN' : 'OUT'),
                     'type_label' => $tipeLabel,
                     'category_type' => $p->payment_type,  // PIUTANG, KREDIT, CASH
                     'document_no' => $noDokumen,
@@ -1036,11 +1245,15 @@ class FinanceController extends Controller
         $totalSaldoKasBank = (float) FinanceAccount::where('category', 'Kas & Bank')->where('is_active', true)->sum('balance');
         $accountsCount = FinanceAccount::where('category', 'Kas & Bank')->where('is_active', true)->count();
 
-        $kasMasuk = (float) FinancePayment::where('payment_type', 'PIUTANG')
+        $kasMasukPiutang = (float) FinancePayment::where('payment_type', 'PIUTANG')
             ->whereHas('transaction', function ($q) use ($targetPharmacyIds) {
                 $q->whereIn('pharmacy_id', $targetPharmacyIds);
             })
             ->sum('amount');
+        $kasMasukPendapatan = (float) FinancePayment::where('payment_type', 'PENDAPATAN')
+            ->whereIn('pharmacy_id', $targetPharmacyIds)
+            ->sum('amount');
+        $kasMasuk = $kasMasukPiutang + $kasMasukPendapatan;
 
         $kasKeluarHutangCash = (float) FinancePayment::whereIn('payment_type', ['KREDIT', 'CASH', 'KONSINYASI'])
             ->whereHas('receiving', function ($q) use ($targetPharmacyIds) {

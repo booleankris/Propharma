@@ -454,7 +454,7 @@
         }
 
         function deleteRow(id) {
-            if (!confirm('Hapus item ini? Stok akan dikembalikan ke gudang/pesanan.')) return;
+            if (!confirm('Hapus item ini? Stok yang masih tersedia akan disesuaikan. Barang yang sudah terjual tidak akan ditarik ulang dari stok.')) return;
 
             axios.delete(`/receiving-items/${id}`, {
                 headers: {

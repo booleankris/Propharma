@@ -85,7 +85,7 @@ class HomeController extends Controller
         $today_qty_sales = (clone $baseQuery)->where(function ($q) use ($startToday, $endToday) {
             $q->whereBetween('updated_at', [$startToday, $endToday])
               ->orWhereBetween('created_at', [$startToday, $endToday]);
-        })->where('transaction_type', '!=' ,'RETUR JUAL')->count('id');
+        })->whereNotIn('transaction_type', ['RETUR JUAL', 'RETUR KREDIT'])->count('id');
 
         $month_sales = (clone $baseQuery)->where(function ($q) use ($startMonth, $endMonth) {
             $q->whereBetween('updated_at', [$startMonth, $endMonth])

@@ -18,6 +18,7 @@ class FinancePayment extends Model
         'medicine_transaction_id',
         'account_id',
         'expense_account_id',
+        'income_account_id',
         'payment_type',
         'payment_date',
         'amount',
@@ -40,6 +41,11 @@ class FinancePayment extends Model
     public function expenseAccount()
     {
         return $this->belongsTo(FinanceAccount::class, 'expense_account_id');
+    }
+
+    public function incomeAccount()
+    {
+        return $this->belongsTo(FinanceAccount::class, 'income_account_id');
     }
 
     public function pharmacy()

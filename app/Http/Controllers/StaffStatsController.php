@@ -69,7 +69,7 @@ class StaffStatsController extends Controller
                         FROM medicine_transactions
                         WHERE medicine_transactions.user_id = users.id
                         AND status = 1
-                        AND transaction_type != 'RETUR JUAL'
+                        AND transaction_type NOT IN ('RETUR JUAL', 'RETUR KREDIT')
                         AND updated_at BETWEEN '{$startDate}' AND '{$endDate}'
                     ), 0) as filtered_sales
                 "),
@@ -81,7 +81,7 @@ class StaffStatsController extends Controller
                         FROM medicine_transactions
                         WHERE medicine_transactions.user_id = users.id
                         AND status = 1
-                        AND transaction_type != 'RETUR JUAL'
+                        AND transaction_type NOT IN ('RETUR JUAL', 'RETUR KREDIT')
                         AND updated_at BETWEEN '{$startDate}' AND '{$endDate}'
                     ) as filtered_transactions
                 "),
@@ -105,7 +105,7 @@ class StaffStatsController extends Controller
         // Calculate total sales for share percentage
         $totalSalesPeriod = (float) DB::table('medicine_transactions')
             ->where('status', 1)
-            ->where('transaction_type', '!=', 'RETUR JUAL')
+            ->whereNotIn('transaction_type', ['RETUR JUAL', 'RETUR KREDIT'])
             ->whereBetween('updated_at', [$startDate, $endDate])
             ->when(!empty($pharmacyId) && $pharmacyId !== 'all', function ($q) use ($pharmacyId) {
                 $q->where('pharmacy_id', $pharmacyId);
@@ -171,7 +171,7 @@ class StaffStatsController extends Controller
                         FROM medicine_transactions
                         WHERE medicine_transactions.user_id = users.id
                         AND status = 1
-                        AND transaction_type != 'RETUR JUAL'
+                        AND transaction_type NOT IN ('RETUR JUAL', 'RETUR KREDIT')
                         AND updated_at BETWEEN '{$startDate}' AND '{$endDate}'
                     ), 0) as sales
                 "),
@@ -181,7 +181,7 @@ class StaffStatsController extends Controller
                         FROM medicine_transactions
                         WHERE medicine_transactions.user_id = users.id
                         AND status = 1
-                        AND transaction_type != 'RETUR JUAL'
+                        AND transaction_type NOT IN ('RETUR JUAL', 'RETUR KREDIT')
                         AND updated_at BETWEEN '{$startDate}' AND '{$endDate}'
                     ) as txns
                 "),

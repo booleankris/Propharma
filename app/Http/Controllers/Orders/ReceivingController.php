@@ -1867,25 +1867,39 @@ class ReceivingController extends Controller
         try {
             DB::beginTransaction();
 
-            $item = ReceivingItems::with('order_items')->findOrFail($id);
+            $item = ReceivingItems::with(['order_items', 'batches', 'receiving_details.receiving'])
+                ->whereKey($id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            if (!$item->order_items) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'message' => 'Item tidak terhubung ke obat yang valid.'], 422);
+            }
+
             $medicineId = $item->order_items->medicine_id;
-            $pharmacyId = getActivePharmacyId();
-            $medicine = Medicines::findOrFail($medicineId);
+            $pharmacyId = $item->batches?->pharmacy_id ?? $item->receiving_details?->receiving?->pharmacy_id ?? getActivePharmacyId();
+            $medicine = Medicines::whereKey($medicineId)->lockForUpdate()->firstOrFail();
 
             $isPack = ($item->order_items->pack == 1);
             $content = $isPack ? (int) ($medicine->content ?? 1) : 1;
-            $actualQty = $item->qty_received * $content;
+            $actualQty = max(0, (float) $item->qty_received * $content);
+            $stockBefore = max(0, (float) $medicine->stock);
+            $qtyToReverse = min($actualQty, $stockBefore);
+            $batch = null;
 
-            if ($medicine->stock < $actualQty) {
-                DB::rollBack();
-                return response()->json([
-                    'success' => false,
-                    'message' => "Gagal menghapus item: Stok saat ini tersisa {$medicine->stock}, kurang dari kuantiti yang akan ditarik ({$actualQty}). Sebagian barang kemungkinan telah terjual di kasir.",
-                ], 422);
+            // For warehouse stock, only reverse the remaining quantity from this exact batch.
+            // Already sold units are no longer available and must not block invoice revision.
+            if (isWarehousePharmacy($pharmacyId) && $item->batches_id) {
+                $batch = Batches::whereKey($item->batches_id)->lockForUpdate()->first();
+                if ($batch) {
+                    $qtyToReverse = min($qtyToReverse, max(0, (float) $batch->stock));
+                }
             }
 
-            $qtyBefore = $medicine->stock;
-            $medicine->decrement('stock', $actualQty);
+            $qtyBefore = (float) $medicine->stock;
+            if ($qtyToReverse > 0) {
+                $medicine->decrement('stock', $qtyToReverse);
+            }
 
             if (!isWarehousePharmacy($pharmacyId)) {
                 $transferItem = MedicineTransferItems::where('receiving_items_id', $item->id)->first();
@@ -1897,8 +1911,8 @@ class ReceivingController extends Controller
                         MedicineTransfers::where('id', $transferHeaderId)->delete();
                     }
                 }
-            } else {
-                Batches::where('id', $item->batches_id)->decrement('stock', $actualQty);
+            } elseif ($batch && $qtyToReverse > 0) {
+                $batch->decrement('stock', $qtyToReverse);
             }
 
             ItemsLog::create([
@@ -1906,7 +1920,7 @@ class ReceivingController extends Controller
                 'code' => $this->generateItemsLogCode(),
                 'type' => 'RV',
                 'medicine_id' => $medicineId,
-                'qty' => -$actualQty,
+                'qty' => -$qtyToReverse,
                 'qty_before' => $qtyBefore,
                 'qty_after' => $medicine->stock,
                 'total' => 0,
@@ -1932,7 +1946,9 @@ class ReceivingController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Item berhasil dihapus',
+                'message' => $actualQty > $qtyToReverse
+                    ? 'Item berhasil dihapus. ' . rtrim(rtrim(number_format($actualQty - $qtyToReverse, 2, ',', '.'), '0'), ',') . ' unit sudah terjual atau tidak tersedia, sehingga tidak dikurangi ulang dari stok.'
+                    : 'Item berhasil dihapus dan stok tersedia sudah disesuaikan.',
             ]);
         } catch (\Throwable $e) {
             DB::rollBack();

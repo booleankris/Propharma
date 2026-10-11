@@ -46,7 +46,7 @@ class ReturController extends Controller
         $data = MedicineCart::query()
             ->with(['transactions.patients'])
             ->whereHas('transactions', function ($q) use ($search) {
-                $q->where('medicine_transactions.transaction_type', '!=', 'RETUR')
+                $q->whereNotIn('medicine_transactions.transaction_type', ['RETUR', 'RETUR JUAL', 'RETUR KREDIT'])
                     // 1. Pastikan pharmacy_id selalu terfilter
                     ->where('medicine_transactions.pharmacy_id', getActivePharmacyId())
                     // 2. Grup terpisah khusus untuk logic pencarian (OR)
@@ -265,14 +265,15 @@ class ReturController extends Controller
 
             $activeshift = activeShift();
 
-            // Create New Retur Transaction
+            // Keep retur type aligned with the original sale so LIPH can
+            // report credit returns separately from cash returns.
             $getTransactiondata = $findcode;
             $transaction = MedicineTransactions::create([
                 'pharmacy_id' => $getTransactiondata->pharmacy_id,
                 "debtor_id" => $getTransactiondata->debtor_id,
                 "doctor_id" => $getTransactiondata->doctor_id,
                 "patient_id" => $getTransactiondata->patient_id,
-                "transaction_type" => "RETUR JUAL",
+                "transaction_type" => in_array($getTransactiondata->transaction_type, ['KREDIT', 'RESEP KREDIT'], true) ? 'RETUR KREDIT' : 'RETUR JUAL',
                 "transaction_code" => "RT",
                 "paid" => "-",
                 "changes" => "-",
@@ -280,8 +281,8 @@ class ReturController extends Controller
                 "discount" => "-",
                 "shift_logs_id" => $activeshift->id ?? null,
                 "status" => $getTransactiondata->status,
-                "created_at" => $getTransactiondata->created_at,
-                "updated_at" => $getTransactiondata->updated_at,
+                "created_at" => Carbon::now(),
+                "updated_at" => Carbon::now(),
             ]);
 
             // Get & Increase stock

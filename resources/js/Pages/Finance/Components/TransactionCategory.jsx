@@ -6,6 +6,8 @@ const categories = {
     KREDIT: { label: 'Hutang Dagang', color: 'bg-blue-50 text-blue-700 border-blue-200' },
     KONSINYASI: { label: 'Konsinyasi', color: 'bg-violet-50 text-violet-700 border-violet-200' },
     BIAYA: { label: 'Biaya Operasional', color: 'bg-rose-50 text-rose-700 border-rose-200' },
+    PENDAPATAN: { label: 'Pendapatan Lain-lain', color: 'bg-teal-50 text-teal-700 border-teal-200' },
+    'SALDO AWAL': { label: 'Saldo Awal', color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
 };
 
 export default function TransactionCategory({ type }) {

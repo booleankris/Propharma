@@ -86,14 +86,14 @@ class MonitoringPenjualanService
             'UP', 'UPDS' => 'upds',
             'HV', 'HV/OTC', 'OTC' => 'hv',
             'ONLINE' => 'nonPrescription',
-            'RETUR JUAL', 'RETUR TUNAI' => 'returns',
+            'RETUR JUAL', 'RETUR KREDIT', 'RETUR TUNAI' => 'returns',
             default => match (mb_strtoupper(trim($transactionType))) {
                 'KREDIT' => 'creditPrescription',
                 'RESEP TUNAI' => 'cashPrescription',
                 'UPDS' => 'upds',
                 'HV', 'HV/OTC', 'OTC' => 'hv',
                 'ONLINE' => 'nonPrescription',
-                'RETUR JUAL' => 'returns',
+                'RETUR JUAL', 'RETUR KREDIT' => 'returns',
                 default => null,
             },
         };
@@ -151,7 +151,7 @@ class MonitoringPenjualanService
                 if (!$type) continue;
                 $classified[] = ['item' => $item, 'type' => $type];
                 $amount = (float) ($item->final_price ?? $item->total_price ?? 0);
-                if ($type === 'returns' || $transactionType === 'RETUR JUAL') $amount = -abs($amount);
+                if ($type === 'returns' || in_array($transactionType, ['RETUR JUAL', 'RETUR KREDIT'], true)) $amount = -abs($amount);
 
                 if ($type === 'cashPrescription') $this->add($shift['sales'], 'cashPrescription', $amount);
                 elseif ($type === 'upds') $this->add($shift['sales'], 'upds', $amount);

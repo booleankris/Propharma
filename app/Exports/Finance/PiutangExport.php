@@ -27,6 +27,7 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
     protected int $detailHeaderRow = 0;
     protected int $detailDataStartRow = 0;
     protected int $detailDataEndRow = 0;
+    protected array $dataRowHeights = [];
 
     public function __construct(array $targetPharmacyIds, array $filters = [], ?Pharmacies $activePharmacy = null)
     {
@@ -72,6 +73,9 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
                 'Kode Debitur',
                 'Dokter',
                 'Pasien',
+                'Barang Dibeli',
+                'Qty',
+                'Harga Satuan (Rp)',
                 'Apotek Cabang',
                 'Tgl. Transaksi',
                 'Jatuh Tempo',
@@ -177,7 +181,13 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
 
             $transactionNumber = $tx->transaction_code ?: ('TRX-' . $tx->id);
             $debtorName = $tx->debtors->name ?? ($tx->patient_id ? ('Pasien: ' . ($tx->patients->name ?? 'Umum')) : 'Pelanggan Umum');
+            $medicineNames = [];
+            $quantities = [];
+            $unitPrices = [];
             foreach ($tx->transactions as $cart) {
+                $medicineNames[] = $cart->medicine->name ?? 'Obat';
+                $quantities[] = (string) (float) ($cart->quantity ?? 0);
+                $unitPrices[] = (string) (float) ($cart->item_price ?? 0);
                 $detailRows[] = [
                     $transactionNumber,
                     $debtorName,
@@ -196,6 +206,9 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
                 $tx->debtors->code ?? '-',
                 $tx->doctors->name ?? '-',
                 $tx->patients->name ?? '-',
+                implode("\n", $medicineNames) ?: '-',
+                implode("\n", $quantities) ?: '0',
+                implode("\n", $unitPrices) ?: '0',
                 $tx->pharmacy->name ?? '-',
                 $createdDate,
                 $dueDateStr,
@@ -205,6 +218,7 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
                 $totalTerbayar,
                 $sisa,
             ];
+            $this->dataRowHeights[] = max(24, count($medicineNames) * 18);
         }
 
         $this->dataRowCount = $no - 1;
@@ -224,6 +238,9 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
                 '',
                 '',
                 '',
+                '',
+                '',
+                '',
                 $totalSemua,
                 $totalTerbayarSemua,
                 $totalSisaSemua,
@@ -232,7 +249,7 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
         } else {
             $rows[] = [
                 'Tidak ada data piutang yang sesuai dengan filter yang dipilih.',
-                '', '', '', '', '', '', '', '', '', '', '', '', ''
+                ...array_fill(0, 16, ''),
             ];
             $this->lastRow = count($rows);
         }
@@ -252,9 +269,9 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
     public function styles(Worksheet $sheet)
     {
         // 1. Title Styling
-        $sheet->mergeCells('A1:N1');
-        $sheet->mergeCells('A2:N2');
-        $sheet->mergeCells('A3:N3');
+        $sheet->mergeCells('A1:Q1');
+        $sheet->mergeCells('A2:Q2');
+        $sheet->mergeCells('A3:Q3');
 
         $sheet->getStyle('A1')->applyFromArray([
             'font' => ['bold' => true, 'size' => 14, 'color' => ['rgb' => '0F172A']],
@@ -275,7 +292,7 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
         $sheet->getRowDimension(3)->setRowHeight(18);
 
         // 2. Table Headers (Row 5)
-        $sheet->getStyle('A5:N5')->applyFromArray([
+        $sheet->getStyle('A5:Q5')->applyFromArray([
             'font' => ['bold' => true, 'size' => 10, 'color' => ['rgb' => 'FFFFFF']],
             'fill' => [
                 'fillType' => Fill::FILL_SOLID,
@@ -298,12 +315,12 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
             $end = $start + $this->dataRowCount - 1;
 
             for ($row = $start; $row <= $end; $row++) {
-                $sheet->getRowDimension($row)->setRowHeight(20);
+                $sheet->getRowDimension($row)->setRowHeight($this->dataRowHeights[$row - $start] ?? 24);
 
                 // Zebra striping for readability
                 if ($row % 2 == 1) {
                     $sheet
-                        ->getStyle("A{$row}:N{$row}")
+                        ->getStyle("A{$row}:Q{$row}")
                         ->getFill()
                         ->setFillType(Fill::FILL_SOLID)
                         ->getStartColor()
@@ -311,32 +328,32 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
                 }
 
                 // Status text coloring for quick visual glance
-                $statusTempo = $sheet->getCell("J{$row}")->getValue();
+                $statusTempo = $sheet->getCell("M{$row}")->getValue();
                 if (str_starts_with((string) $statusTempo, 'Lewat')) {
-                    $sheet->getStyle("J{$row}")->getFont()->getColor()->setRGB('DC2626');  // Red-600
-                    $sheet->getStyle("J{$row}")->getFont()->setBold(true);
+                    $sheet->getStyle("M{$row}")->getFont()->getColor()->setRGB('DC2626');  // Red-600
+                    $sheet->getStyle("M{$row}")->getFont()->setBold(true);
                 } elseif (str_starts_with((string) $statusTempo, 'Sisa')) {
-                    $sheet->getStyle("J{$row}")->getFont()->getColor()->setRGB('D97706');  // Amber-600
-                    $sheet->getStyle("J{$row}")->getFont()->setBold(true);
+                    $sheet->getStyle("M{$row}")->getFont()->getColor()->setRGB('D97706');  // Amber-600
+                    $sheet->getStyle("M{$row}")->getFont()->setBold(true);
                 } elseif ($statusTempo === 'Lunas') {
-                    $sheet->getStyle("J{$row}")->getFont()->getColor()->setRGB('059669');  // Emerald-600
+                    $sheet->getStyle("M{$row}")->getFont()->getColor()->setRGB('059669');  // Emerald-600
                 }
 
-                $statusBayar = $sheet->getCell("K{$row}")->getValue();
+                $statusBayar = $sheet->getCell("N{$row}")->getValue();
                 if ($statusBayar === 'LUNAS') {
-                    $sheet->getStyle("K{$row}")->getFont()->getColor()->setRGB('059669');
-                    $sheet->getStyle("K{$row}")->getFont()->setBold(true);
+                    $sheet->getStyle("N{$row}")->getFont()->getColor()->setRGB('059669');
+                    $sheet->getStyle("N{$row}")->getFont()->setBold(true);
                 } elseif ($statusBayar === 'DIBAYAR SEBAGIAN') {
-                    $sheet->getStyle("K{$row}")->getFont()->getColor()->setRGB('D97706');
-                    $sheet->getStyle("K{$row}")->getFont()->setBold(true);
+                    $sheet->getStyle("N{$row}")->getFont()->getColor()->setRGB('D97706');
+                    $sheet->getStyle("N{$row}")->getFont()->setBold(true);
                 } elseif ($statusBayar === 'BELUM BAYAR') {
-                    $sheet->getStyle("K{$row}")->getFont()->getColor()->setRGB('DC2626');
-                    $sheet->getStyle("K{$row}")->getFont()->setBold(true);
+                    $sheet->getStyle("N{$row}")->getFont()->getColor()->setRGB('DC2626');
+                    $sheet->getStyle("N{$row}")->getFont()->setBold(true);
                 }
             }
 
             // General Data Grid Borders & Alignments
-            $sheet->getStyle("A{$start}:N{$end}")->applyFromArray([
+            $sheet->getStyle("A{$start}:Q{$end}")->applyFromArray([
                 'borders' => [
                     'allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'E2E8F0']],
                 ],
@@ -349,23 +366,25 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
             $sheet->getStyle("C{$start}:C{$end}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
             $sheet->getStyle("D{$start}:D{$end}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
             $sheet->getStyle("E{$start}:G{$end}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
-            $sheet->getStyle("H{$start}:K{$end}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle("H{$start}:I{$end}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+            $sheet->getStyle("G{$start}:I{$end}")->getAlignment()->setWrapText(true);
+            $sheet->getStyle("J{$start}:N{$end}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-            // Currency formatting on Numeric Columns L, M, N
-            $sheet->getStyle("L{$start}:N{$end}")->applyFromArray([
+            // Currency formatting on Total, Paid, and Remaining columns.
+            $sheet->getStyle("O{$start}:Q{$end}")->applyFromArray([
                 'alignment' => ['horizontal' => Alignment::HORIZONTAL_RIGHT],
                 'numberFormat' => ['formatCode' => '#,##0'],
             ]);
 
             // 4. Total / Summary Row
             $totalRow = $end + 1;
-            $sheet->mergeCells("A{$totalRow}:K{$totalRow}");
-            $sheet->getStyle("A{$totalRow}:K{$totalRow}")->applyFromArray([
+            $sheet->mergeCells("A{$totalRow}:N{$totalRow}");
+            $sheet->getStyle("A{$totalRow}:Q{$totalRow}")->applyFromArray([
                 'alignment' => ['horizontal' => Alignment::HORIZONTAL_RIGHT, 'vertical' => Alignment::VERTICAL_CENTER],
                 'font' => ['bold' => true, 'size' => 10, 'color' => ['rgb' => '78350F']],
             ]);
 
-            $sheet->getStyle("A{$totalRow}:N{$totalRow}")->applyFromArray([
+            $sheet->getStyle("A{$totalRow}:Q{$totalRow}")->applyFromArray([
                 'font' => ['bold' => true, 'size' => 10],
                 'fill' => [
                     'fillType' => Fill::FILL_SOLID,
@@ -378,7 +397,7 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
                 ],
             ]);
 
-            $sheet->getStyle("L{$totalRow}:N{$totalRow}")->applyFromArray([
+            $sheet->getStyle("O{$totalRow}:Q{$totalRow}")->applyFromArray([
                 'alignment' => ['horizontal' => Alignment::HORIZONTAL_RIGHT, 'vertical' => Alignment::VERTICAL_CENTER],
                 'numberFormat' => ['formatCode' => '#,##0'],
                 'font' => ['bold' => true, 'color' => ['rgb' => '92400E']],
@@ -387,8 +406,8 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
         } else {
             // Empty state row
             $emptyRow = 6;
-            $sheet->mergeCells("A{$emptyRow}:N{$emptyRow}");
-            $sheet->getStyle("A{$emptyRow}:N{$emptyRow}")->applyFromArray([
+            $sheet->mergeCells("A{$emptyRow}:Q{$emptyRow}");
+            $sheet->getStyle("A{$emptyRow}:Q{$emptyRow}")->applyFromArray([
                 'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
                 'font' => ['italic' => true, 'color' => ['rgb' => '94A3B8']],
                 'borders' => [
@@ -441,14 +460,17 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
             'D' => 14,  // Kode Debitur
             'E' => 22,  // Dokter
             'F' => 22,  // Pasien
-            'G' => 20,  // Apotek
-            'H' => 15,  // Tgl Transaksi
-            'I' => 15,  // Jatuh Tempo
-            'J' => 18,  // Status Tempo
-            'K' => 18,  // Status Bayar
-            'L' => 20,  // Total Penjualan
-            'M' => 20,  // Terbayar
-            'N' => 20,  // Sisa Piutang
+            'G' => 34,  // Barang Dibeli
+            'H' => 10,  // Qty
+            'I' => 18,  // Harga Satuan
+            'J' => 20,  // Apotek
+            'K' => 15,  // Tgl Transaksi
+            'L' => 15,  // Jatuh Tempo
+            'M' => 18,  // Status Tempo
+            'N' => 18,  // Status Bayar
+            'O' => 20,  // Total Penjualan
+            'P' => 20,  // Terbayar
+            'Q' => 20,  // Sisa Piutang
         ];
     }
 }

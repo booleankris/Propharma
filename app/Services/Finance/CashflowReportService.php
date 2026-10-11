@@ -65,7 +65,7 @@ class CashflowReportService
             // Kolom omzet memakai nilai bruto; kolom metode bayar/setoran tetap memakai nilai bersih.
             $amount = (float) $record->amount;
             $grossAmount = (float) $record->gross_amount;
-            if ($record->transaction_type === 'RETUR JUAL') {
+            if (in_array($record->transaction_type, ['RETUR JUAL', 'RETUR KREDIT'], true)) {
                 $amount = -abs($amount);
                 $grossAmount = -abs($grossAmount);
             }

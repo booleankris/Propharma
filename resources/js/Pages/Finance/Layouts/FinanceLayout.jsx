@@ -101,6 +101,13 @@ export default function FinanceLayout({ title, subtitle, children, stats = {} })
             } : null,
         },
         {
+            name: 'Pendapatan Lain-lain',
+            href: '/finance/pendapatan-lain-lain',
+            icon: CircleDollarSign,
+            active: currentUrl.startsWith('/finance/pendapatan-lain-lain'),
+            badge: null,
+        },
+        {
             name: 'Biaya',
             href: '/finance/biaya',
             icon: CircleDollarSign,
