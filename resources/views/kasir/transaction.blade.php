@@ -525,17 +525,14 @@
                     <div class="w-1/2 flex">
                         <div class="mr-2">
                             <div class="w-full my-1">
-                                <label class="text-[13px] font-poppins font-semibold">
-                                    @if ($transaction->transaction_type == 'KREDIT') Jenis Faktur Item @else Faktur @endif
-                                </label>
+                                <label class="text-[13px] font-poppins font-semibold">Faktur</label>
 
                             </div>
                             @if ($check_transaction != 0)
                                 @if ($transaction->transaction_type == 'KREDIT')
                                     <div id="faktur" class="py-2">
                                         <span
-                                            class="bg-yellow-100 text-yellow-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md dark:bg-yellow-900 dark:text-yellow-300">Resep
-                                            Jenis item: Resep Kredit</span>
+                                            class="bg-yellow-100 text-yellow-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md dark:bg-yellow-900 dark:text-yellow-300">Resep Kredit</span>
                                     </div>
                                 @elseif($transaction->transaction_type == 'RESEP TUNAI')
                                     <div id="faktur" class="py-2">
@@ -3900,16 +3897,16 @@
                     transaction_type = 'KREDIT';
                     parameters = creditItemParameters;
                     rounding = creditItemRounding;
-                    faktur.innerHTML = `<span class="bg-yellow-100 text-yellow-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md">Jenis item: Resep Kredit</span>`;
+                    faktur.innerHTML = `<span class="bg-yellow-100 text-yellow-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md">Resep Kredit</span>`;
                 } else if (item.cart_type == "UP") {
                     transaction_type = "UPDS";
                     parameters = {{ $parameterUP }};
-                    if (currenttransaction === 'KREDIT') faktur.innerHTML = `<span class="bg-green-100 text-green-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md">Jenis item: UPDS</span>`;
+                    if (currenttransaction === 'KREDIT') faktur.innerHTML = `<span class="bg-green-100 text-green-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md">UPDS</span>`;
 
                 } else if (item.cart_type == "HV") {
                     transaction_type = "HV/OTC";
                     parameters = {{ $parameterHV }};
-                    if (currenttransaction === 'KREDIT') faktur.innerHTML = `<span class="bg-blue-100 text-blue-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md">Jenis item: HV/OTC</span>`;
+                    if (currenttransaction === 'KREDIT') faktur.innerHTML = `<span class="bg-blue-100 text-blue-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md">HV/OTC</span>`;
 
                 }
                 totalprice.value = formatRupiah(item.total_price - item.discount);
@@ -4444,22 +4441,23 @@
         const isF3 = e.key === 'F3' || e.keyCode === 114;
         if (isF3) {
             e.preventDefault();
+            let raw;
             if (currenttransaction === 'KREDIT') {
                 if (transaction_type === 'KREDIT') {
                     parameters = {{ $parameterUP }};
                     rounding = {{ $ChangeFakturRounding }};
                     transaction_type = 'UPDS';
-                    faktur.innerHTML = `<span class="bg-green-100 text-green-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md">Jenis item: UPDS</span>`;
+                    faktur.innerHTML = `<span class="bg-green-100 text-green-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md">UPDS</span>`;
                 } else if (transaction_type === 'UPDS') {
                     parameters = {{ $parameterHV }};
                     rounding = {{ $ChangeFakturRounding }};
                     transaction_type = 'HV/OTC';
-                    faktur.innerHTML = `<span class="bg-blue-100 text-blue-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md">Jenis item: HV/OTC</span>`;
+                    faktur.innerHTML = `<span class="bg-blue-100 text-blue-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md">HV/OTC</span>`;
                 } else {
                     parameters = creditItemParameters;
                     rounding = creditItemRounding;
                     transaction_type = 'KREDIT';
-                    faktur.innerHTML = `<span class="bg-yellow-100 text-yellow-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md">Jenis item: Resep Kredit</span>`;
+                    faktur.innerHTML = `<span class="bg-yellow-100 text-yellow-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md">Resep Kredit</span>`;
                 }
             } else if (currenttransaction == "RESEP TUNAI") {
                 if (transaction_type == 'RESEP TUNAI') {
@@ -4558,6 +4556,10 @@
                 console.log("harga Total : " + raw);
                 price2 = raw;
                 item_finalprice = raw;
+                const selectedQuantity = Number(quantity.value) || 0;
+                if (selectedQuantity > 0) {
+                    count(selectedQuantity);
+                }
             }
 
         }
