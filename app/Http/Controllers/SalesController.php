@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Log;
 use App\Models\Debtors;
+use App\Models\FinanceAccount;
+use App\Models\FinancePayment;
 use App\Models\Batches;
 use App\Models\Doctors;
 use App\Models\Item;
@@ -25,6 +27,7 @@ use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\File;
@@ -920,6 +923,33 @@ class SalesController extends Controller
                 'user_id' => $validated['user_id'] ?? null,
                 'shift_logs_id' => $validated['shift_logs_id'] ?? null,
             ]);
+
+            // Penjualan tunai masuk otomatis ke akun Kas Apotek cabang transaksi.
+            if ($paymentMethod === 'CASH' && strtoupper((string) $transaction->transaction_type) !== 'KREDIT') {
+                $cashAccount = FinanceAccount::where('pharmacy_id', $transaction->pharmacy_id)
+                    ->where('category', 'Kas & Bank')
+                    ->where('account_type', 'kas_apotek')
+                    ->where('is_active', true)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($cashAccount) {
+                    $cashAmount = round((float) $validated['totaltransaction'], 2);
+                    FinancePayment::create([
+                        'pharmacy_id' => $transaction->pharmacy_id,
+                        'medicine_transaction_id' => $transaction->id,
+                        'account_id' => $cashAccount->id,
+                        'payment_type' => 'PENJUALAN TUNAI',
+                        'payment_date' => Carbon::now()->toDateString(),
+                        'amount' => $cashAmount,
+                        'reference_number' => $transaction->transaction_code,
+                        'notes' => 'Penerimaan penjualan tunai kasir',
+                        'created_by' => Auth::id(),
+                    ]);
+                    $cashAccount->increment('balance', $cashAmount);
+                    Cache::forget('finance_stats_summary_branch_' . $transaction->pharmacy_id . '_' . $transaction->pharmacy_id);
+                }
+            }
 
             MedicineCart::where('transaction_id', $validated['transaction_id'])
                 ->update(['status' => 1]);

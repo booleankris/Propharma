@@ -13,9 +13,11 @@ class FinanceAccount extends Model
 
     protected $fillable = [
         'code',
+        'pharmacy_id',
         'name',
         'name_en',
         'category',
+        'account_type',
         'account_number',
         'balance',
         'is_active',
@@ -29,5 +31,10 @@ class FinanceAccount extends Model
     public function payments()
     {
         return $this->hasMany(FinancePayment::class, 'account_id');
+    }
+
+    public function pharmacy()
+    {
+        return $this->belongsTo(Pharmacies::class, 'pharmacy_id');
     }
 }

@@ -79,7 +79,7 @@ class FinanceController extends Controller
         $piutang = $this->getPiutangData();
         $stats = $this->getStats($hutang, $cash, $piutang);
         $recentMutasi = $this->getMutasiData(10);
-        $accounts = FinanceAccount::where('category', 'Kas & Bank')->where('is_active', true)->orderBy('code')->get();
+        $accounts = $this->branchKasBankAccountsQuery()->orderBy('code')->get();
 
         // 5 Faktur Hutang yang mendekati atau melewati jatuh tempo
         $upcomingHutang = [];
@@ -130,7 +130,7 @@ class FinanceController extends Controller
 
         $hutangDagang = $this->getHutangData();
         $creditors = Creditor::orderBy('name')->get(['code', 'name']);
-        $kasBankAccounts = FinanceAccount::where('category', 'Kas & Bank')->where('is_active', true)->orderBy('code')->get();
+        $kasBankAccounts = $this->branchKasBankAccountsQuery()->orderBy('code')->get();
         $stats = $this->getStats($hutangDagang, null, null);
 
         return Inertia::render('Finance/Hutang', [
@@ -153,7 +153,7 @@ class FinanceController extends Controller
 
         $pembelianCash = $this->getCashData();
         $creditors = Creditor::orderBy('name')->get(['code', 'name']);
-        $kasBankAccounts = FinanceAccount::where('category', 'Kas & Bank')->where('is_active', true)->orderBy('code')->get();
+        $kasBankAccounts = $this->branchKasBankAccountsQuery()->orderBy('code')->get();
         $stats = $this->getStats(null, $pembelianCash, null);
 
         return Inertia::render('Finance/Cash', [
@@ -190,7 +190,7 @@ class FinanceController extends Controller
             return Excel::download(new CashflowExport($reportDays), $fileName);
         }
         $kinerjaDays = $kinerjaOmzet->build($pharmacyIds, $startDate, $endDate);
-        $drawerAccount = FinanceAccount::where('code', '1-10001')->where('category', 'Kas & Bank')->first();
+        $drawerAccount = $this->branchKasBankAccountsQuery()->where('account_type', 'kas_apotek')->first();
         $openingBalance = $drawerAccount
             ? FinancePayment::where('payment_type', 'SALDO AWAL')->where('account_id', $drawerAccount->id)->first()
             : null;
@@ -204,7 +204,7 @@ class FinanceController extends Controller
             'hutangDagang' => $tradeReport->payables($pharmacyIds, $startDate, $endDate),
             'keuanganDays' => $keuanganReport->build($pharmacyIds, $startDate, $endDate, $drawerAccount?->id, $openingBalance),
             'saldoAwalKas' => (float) ($openingBalance?->amount ?? 0),
-            'setorAccounts' => FinanceAccount::where('category', 'Kas & Bank')->where('is_active', true)->where('id', '!=', $drawerAccount?->id ?? 0)->orderBy('code')->get(['id', 'name', 'code']),
+            'setorAccounts' => $this->branchKasBankAccountsQuery()->where('account_type', 'bank')->where('id', '!=', $drawerAccount?->id ?? 0)->orderBy('code')->get(['id', 'name', 'code']),
             'filters' => ['month' => $month, 'year' => $year],
             'branchContext' => $this->getBranchContext(),
         ]);
@@ -221,8 +221,8 @@ class FinanceController extends Controller
             'notes' => 'nullable|string|max:500',
         ]);
 
-        $drawer = FinanceAccount::where('code', '1-10001')->where('category', 'Kas & Bank')->where('is_active', true)->firstOrFail();
-        $destination = FinanceAccount::where('category', 'Kas & Bank')->where('is_active', true)->findOrFail($validated['transfer_account_id']);
+        $drawer = $this->branchKasBankAccountsQuery()->where('account_type', 'kas_apotek')->firstOrFail();
+        $destination = $this->branchKasBankAccountsQuery()->where('account_type', 'bank')->findOrFail($validated['transfer_account_id']);
         if ($destination->id === $drawer->id) {
             return back()->withErrors(['transfer_account_id' => 'Pilih rekening tujuan selain Kas Apotek / Drawer.']);
         }
@@ -322,8 +322,7 @@ class FinanceController extends Controller
         }
 
         $consignments = $consignmentService->getData($this->getTargetPharmacyIds());
-        $kasBankAccounts = FinanceAccount::where('category', 'Kas & Bank')
-            ->where('is_active', true)
+        $kasBankAccounts = $this->branchKasBankAccountsQuery()
             ->orderBy('code')
             ->get();
 
@@ -357,7 +356,7 @@ class FinanceController extends Controller
 
         $piutangPenjualan = $this->getPiutangData();
         $debtors = Debtors::orderBy('name')->get(['id', 'code', 'name', 'phone', 'city']);
-        $kasBankAccounts = FinanceAccount::where('category', 'Kas & Bank')->where('is_active', true)->orderBy('code')->get();
+        $kasBankAccounts = $this->branchKasBankAccountsQuery()->orderBy('code')->get();
         $stats = $this->getStats(null, null, $piutangPenjualan);
 
         return Inertia::render('Finance/Piutang', [
@@ -379,7 +378,7 @@ class FinanceController extends Controller
         }
 
         // Hanya akun berkategori Kas & Bank untuk halaman Kas & Bank
-        $accounts = FinanceAccount::where('category', 'Kas & Bank')->where('is_active', true)->orderBy('code')->get();
+        $accounts = $this->branchKasBankAccountsQuery()->orderBy('code')->get();
         $categories = ['Kas & Bank'];
         $mutasiKasBank = $this->getMutasiData(500);
         $stats = $this->getStats(null, null, null);
@@ -435,7 +434,7 @@ class FinanceController extends Controller
         ]);
         $month = (int) ($validated['month'] ?? now()->month);
         $year = (int) ($validated['year'] ?? now()->year);
-        $accounts = FinanceAccount::where('category', 'Kas & Bank')->where('is_active', true)->orderBy('code')->get();
+        $accounts = $this->branchKasBankAccountsQuery()->orderBy('code')->get();
         $targetPharmacyIds = $this->getTargetPharmacyIds();
         $periodStart = \Carbon\Carbon::createFromDate($year, $month, 1)->startOfMonth()->toDateString();
         $periodEnd = \Carbon\Carbon::createFromDate($year, $month, 1)->endOfMonth()->toDateString();
@@ -478,7 +477,7 @@ class FinanceController extends Controller
             'notes' => 'nullable|string|max:500',
         ]);
 
-        $account = FinanceAccount::where('category', 'Kas & Bank')->where('is_active', true)->findOrFail($validated['account_id']);
+        $account = $this->branchKasBankAccountsQuery()->findOrFail($validated['account_id']);
         DB::transaction(function () use ($validated, $account) {
             $lockedAccount = FinanceAccount::whereKey($account->id)->lockForUpdate()->firstOrFail();
             $opening = FinancePayment::where('payment_type', 'SALDO AWAL')->where('account_id', $lockedAccount->id)->lockForUpdate()->first();
@@ -515,7 +514,7 @@ class FinanceController extends Controller
             'notes' => 'nullable|string|max:500',
         ]);
 
-        $account = FinanceAccount::where('category', 'Kas & Bank')->where('is_active', true)->findOrFail($validated['account_id']);
+        $account = $this->branchKasBankAccountsQuery()->findOrFail($validated['account_id']);
         $incomeAccount = FinanceAccount::where('category', 'Pendapatan')->where('is_active', true)->findOrFail($validated['income_account_id']);
         $activePharmacyId = getActivePharmacyId();
 
@@ -556,7 +555,7 @@ class FinanceController extends Controller
 
         $balance = (float) $opening->amount;
         foreach ($payments as $payment) {
-            if (in_array($payment->payment_type, ['PIUTANG', 'PENDAPATAN'], true)) $balance += (float) $payment->amount;
+            if (in_array($payment->payment_type, ['PIUTANG', 'PENDAPATAN', 'PENJUALAN TUNAI'], true)) $balance += (float) $payment->amount;
             elseif (in_array($payment->payment_type, ['KREDIT', 'CASH', 'KONSINYASI', 'BIAYA', 'SETOR'], true)) $balance -= (float) $payment->amount;
         }
         $balance += (float) FinancePayment::where('payment_type', 'SETOR')
@@ -576,7 +575,11 @@ class FinanceController extends Controller
             session(['ho_pharmacy_id' => (int) $request->pharmacy_id]);
         }
 
-        $accounts = FinanceAccount::orderBy('code')->get();
+        $accounts = FinanceAccount::where(function ($query) {
+            $query->whereNull('pharmacy_id')->orWhere('pharmacy_id', getActivePharmacyId());
+        })->where(function ($query) {
+            $query->where('category', '!=', 'Kas & Bank')->orWhereNotNull('pharmacy_id');
+        })->orderBy('code')->get();
         $categories = $this->getCategories();
         $stats = $this->getStats(null, null, null);
 
@@ -600,7 +603,7 @@ class FinanceController extends Controller
             ->where('is_active', true)
             ->orderBy('code')
             ->get(['id', 'code', 'name', 'category', 'balance']);
-        $kasBankAccounts = FinanceAccount::where('category', 'Kas & Bank')
+        $kasBankAccounts = $this->branchKasBankAccountsQuery()
             ->where('is_active', true)
             ->orderBy('code')
             ->get(['id', 'code', 'name', 'balance', 'account_number']);
@@ -623,17 +626,15 @@ class FinanceController extends Controller
     protected function getTargetPharmacyIds(): array
     {
         $activeId = getActivePharmacyId();
+        return [$activeId > 0 ? (int) $activeId : 1];
+    }
 
-        // Jika Gudang PMI (9) atau SAHABAT PMI (1) atau HO (6)
-        if (in_array((int) $activeId, [1, 9, 6])) {
-            return [1, 9];
-        }
-
-        if ($activeId > 0) {
-            return [(int) $activeId];
-        }
-
-        return [1, 9];
+    /** Akun Kas & Bank kini dimiliki cabang yang sedang dipilih. */
+    protected function branchKasBankAccountsQuery(bool $activeOnly = true)
+    {
+        return FinanceAccount::where('category', 'Kas & Bank')
+            ->where('pharmacy_id', getActivePharmacyId())
+            ->when($activeOnly, fn ($query) => $query->where('is_active', true));
     }
 
     /**
@@ -1053,6 +1054,7 @@ class FinanceController extends Controller
         ])
             ->whereHas('account', function ($q) {
                 $q->where('category', 'Kas & Bank');
+                $q->where('pharmacy_id', getActivePharmacyId());
             })
             ->where(function ($query) use ($targetPharmacyIds) {
                 $query->whereHas('receiving', function ($q) use ($targetPharmacyIds) {
@@ -1078,7 +1080,7 @@ class FinanceController extends Controller
             ->take($limit)
             ->get()
             ->flatMap(function ($p) {
-                $isMasuk = in_array($p->payment_type, ['PIUTANG', 'PENDAPATAN'], true);
+                $isMasuk = in_array($p->payment_type, ['PIUTANG', 'PENDAPATAN', 'PENJUALAN TUNAI'], true);
                 $isSaldoAwal = $p->payment_type === 'SALDO AWAL';
                 $isSetor = $p->payment_type === 'SETOR';
                 $tipeLabel = $isSaldoAwal ? 'Saldo Awal' : ($isSetor ? 'Setor Kas' : ($isMasuk ? 'Masuk (Debit)' : 'Keluar (Kredit)'));
@@ -1087,7 +1089,12 @@ class FinanceController extends Controller
                 $noDokumen = $p->reference_number ?: ('MUT-' . str_pad($p->id, 5, '0', STR_PAD_LEFT));
                 $deskripsi = $p->notes;
 
-                if ($p->payment_type === 'PIUTANG') {
+                if ($p->payment_type === 'PENJUALAN TUNAI') {
+                    $pihakTerkait = $p->transaction->debtors->name ?? ($p->transaction->patients->name ?? 'Pelanggan Umum');
+                    $doc = $p->transaction->transaction_code ?? $p->reference_number;
+                    if ($doc) $noDokumen = $doc;
+                    if (!$deskripsi) $deskripsi = 'Penerimaan penjualan tunai';
+                } elseif ($p->payment_type === 'PIUTANG') {
                     $pihakTerkait = $p->transaction->debtors->name ?? ($p->transaction->patients->name ?? 'Pelanggan Umum');
                     $doc = $p->transaction->invoice_number ?? $p->reference_number;
                     if ($doc)
@@ -1292,7 +1299,7 @@ class FinanceController extends Controller
     protected function getStats($hutang = null, $cash = null, $piutang = null)
     {
         $targetPharmacyIds = $this->getTargetPharmacyIds();
-        $cacheKey = 'finance_stats_summary_' . implode('_', $targetPharmacyIds);
+        $cacheKey = 'finance_stats_summary_branch_' . getActivePharmacyId() . '_' . implode('_', $targetPharmacyIds);
 
         // Jika data lengkap tidak disediakan, gunakan cache agar angka badge dan ringkasan selalu konsisten di semua halaman
         $isFullData = ($hutang !== null && $cash !== null && $piutang !== null);
@@ -1313,18 +1320,21 @@ class FinanceController extends Controller
             $piutang = $this->getPiutangData();
         }
 
-        $totalSaldoKasBank = (float) FinanceAccount::where('category', 'Kas & Bank')->where('is_active', true)->sum('balance');
-        $accountsCount = FinanceAccount::where('category', 'Kas & Bank')->where('is_active', true)->count();
+        $totalSaldoKasBank = (float) $this->branchKasBankAccountsQuery()->sum('balance');
+        $accountsCount = $this->branchKasBankAccountsQuery()->count();
 
         $kasMasukPiutang = (float) FinancePayment::where('payment_type', 'PIUTANG')
             ->whereHas('transaction', function ($q) use ($targetPharmacyIds) {
                 $q->whereIn('pharmacy_id', $targetPharmacyIds);
             })
             ->sum('amount');
+        $kasMasukPenjualanTunai = (float) FinancePayment::where('payment_type', 'PENJUALAN TUNAI')
+            ->where('pharmacy_id', getActivePharmacyId())
+            ->sum('amount');
         $kasMasukPendapatan = (float) FinancePayment::where('payment_type', 'PENDAPATAN')
             ->whereIn('pharmacy_id', $targetPharmacyIds)
             ->sum('amount');
-        $kasMasuk = $kasMasukPiutang + $kasMasukPendapatan;
+        $kasMasuk = $kasMasukPiutang + $kasMasukPendapatan + $kasMasukPenjualanTunai;
 
         $kasKeluarHutangCash = (float) FinancePayment::whereIn('payment_type', ['KREDIT', 'CASH', 'KONSINYASI'])
             ->whereHas('receiving', function ($q) use ($targetPharmacyIds) {
@@ -1460,6 +1470,8 @@ class FinanceController extends Controller
     protected function clearStatsCache()
     {
         Cache::forget('finance_stats_summary');
+        $targetPharmacyIds = $this->getTargetPharmacyIds();
+        Cache::forget('finance_stats_summary_branch_' . getActivePharmacyId() . '_' . implode('_', $targetPharmacyIds));
         $branches = [1, 2, 3, 4, 5, 6, 9];
         foreach ($branches as $b) {
             Cache::forget('finance_stats_summary_' . $b);
@@ -1482,7 +1494,7 @@ class FinanceController extends Controller
         ]);
 
         $detail = ReceivingDetails::with(['receiving_items', 'payments', 'receiving'])->findOrFail($validated['receiving_detail_id']);
-        $account = FinanceAccount::findOrFail($validated['account_id']);
+        $account = $this->branchKasBankAccountsQuery()->findOrFail($validated['account_id']);
 
         // Verifikasi akun harus ber-kategori 'Kas & Bank'
         if ($account->category !== 'Kas & Bank') {
@@ -1513,6 +1525,7 @@ class FinanceController extends Controller
         DB::transaction(function () use ($validated, $detail, $account, $totalInvoice) {
             // 1. Simpan Payment
             FinancePayment::create([
+                'pharmacy_id' => $detail->receiving?->pharmacy_id,
                 'receiving_id' => $detail->receiving_id,
                 'receiving_detail_id' => $detail->id,
                 'account_id' => $account->id,
@@ -1561,7 +1574,7 @@ class FinanceController extends Controller
             return back()->withErrors(['receiving_detail_id' => 'Faktur ini bukan pembelian konsinyasi.']);
         }
 
-        $account = FinanceAccount::findOrFail($validated['account_id']);
+        $account = $this->branchKasBankAccountsQuery()->findOrFail($validated['account_id']);
         if ($account->category !== 'Kas & Bank') {
             return back()->withErrors(['account_id' => 'Akun pembayaran harus berkategori Kas & Bank.']);
         }
@@ -1613,7 +1626,7 @@ class FinanceController extends Controller
             'reference_number' => 'nullable|string|max:100',
             'notes' => 'nullable|string|max:500',
         ]);
-        $account = FinanceAccount::findOrFail($validated['account_id']);
+        $account = $this->branchKasBankAccountsQuery()->findOrFail($validated['account_id']);
         if ($account->category !== 'Kas & Bank' || !$account->is_active) {
             return back()->withErrors(['account_id' => 'Akun pembayaran harus akun Kas & Bank yang aktif.']);
         }
@@ -1678,7 +1691,7 @@ class FinanceController extends Controller
         ]);
 
         $detail = ReceivingDetails::with(['receiving_items', 'receiving'])->findOrFail($validated['receiving_detail_id']);
-        $account = FinanceAccount::findOrFail($validated['account_id']);
+        $account = $this->branchKasBankAccountsQuery()->findOrFail($validated['account_id']);
 
         if ($account->category !== 'Kas & Bank') {
             return back()->withErrors(['account_id' => 'Akun pembayaran harus berkategori Kas & Bank.']);
@@ -1710,6 +1723,7 @@ class FinanceController extends Controller
                     $account->decrement('balance', $totalInvoice);
                 }
                 $existingPayment->update([
+                    'pharmacy_id' => $detail->receiving?->pharmacy_id,
                     'account_id' => $account->id,
                     'payment_date' => $validated['payment_date'] ?? now()->toDateString(),
                     'amount' => $totalInvoice,
@@ -1719,6 +1733,7 @@ class FinanceController extends Controller
                 ]);
             } else {
                 FinancePayment::create([
+                    'pharmacy_id' => $detail->receiving?->pharmacy_id,
                     'receiving_id' => $detail->receiving_id,
                     'receiving_detail_id' => $detail->id,
                     'account_id' => $account->id,
@@ -1756,7 +1771,7 @@ class FinanceController extends Controller
             'notes' => 'nullable|string|max:500',
         ]);
 
-        $account = FinanceAccount::findOrFail($validated['account_id']);
+        $account = $this->branchKasBankAccountsQuery()->findOrFail($validated['account_id']);
         if ($account->category !== 'Kas & Bank') {
             return back()->withErrors(['account_id' => 'Akun pembayaran harus berkategori Kas & Bank.']);
         }
@@ -1794,6 +1809,7 @@ class FinanceController extends Controller
                 }
 
                 FinancePayment::create([
+                    'pharmacy_id' => $detail->receiving?->pharmacy_id,
                     'receiving_id' => $detail->receiving_id,
                     'receiving_detail_id' => $detail->id,
                     'account_id' => $account->id,
@@ -1859,7 +1875,7 @@ class FinanceController extends Controller
         $bankColumn = 2;
         $rows = array_slice($rows, 1);
 
-        $accountsByCode = FinanceAccount::where('category', 'Kas & Bank')->where('is_active', true)
+        $accountsByCode = $this->branchKasBankAccountsQuery()
             ->get()->keyBy(fn ($account) => mb_strtolower(trim((string) $account->code)));
         $pharmacyIds = $this->getTargetPharmacyIds();
         $prepared = [];
@@ -1981,7 +1997,7 @@ class FinanceController extends Controller
             'notes' => 'nullable|string|max:500',
         ]);
 
-        $account = FinanceAccount::findOrFail($validated['account_id']);
+        $account = $this->branchKasBankAccountsQuery()->findOrFail($validated['account_id']);
         if ($account->category !== 'Kas & Bank') {
             return back()->withErrors(['account_id' => 'Akun pembayaran harus berkategori Kas & Bank.']);
         }
@@ -2016,6 +2032,7 @@ class FinanceController extends Controller
                         $account->decrement('balance', $totalInvoice);
                     }
                     $existingPayment->update([
+                        'pharmacy_id' => $detail->receiving?->pharmacy_id,
                         'account_id' => $account->id,
                         'payment_date' => $paymentDate,
                         'amount' => $totalInvoice,
@@ -2025,6 +2042,7 @@ class FinanceController extends Controller
                     ]);
                 } else {
                     FinancePayment::create([
+                        'pharmacy_id' => $detail->receiving?->pharmacy_id,
                         'receiving_id' => $detail->receiving_id,
                         'receiving_detail_id' => $detail->id,
                         'account_id' => $account->id,
@@ -2074,7 +2092,9 @@ class FinanceController extends Controller
         $prefix = $prefixMap[$category] ?? null;
 
         if (!$prefix) {
-            $lastInSameCat = FinanceAccount::where('category', $category)->orderBy('code', 'desc')->first();
+            $lastInSameCat = FinanceAccount::where('category', $category)
+                ->when($category === 'Kas & Bank', fn ($query) => $query->where('pharmacy_id', getActivePharmacyId()))
+                ->orderBy('code', 'desc')->first();
             if ($lastInSameCat && preg_match('/^(.+?)(\d+)$/', $lastInSameCat->code, $matches)) {
                 $base = $matches[1];
                 $num = (int) $matches[2] + 1;
@@ -2083,7 +2103,9 @@ class FinanceController extends Controller
             $prefix = '9-900';
         }
 
-        $existingCodes = FinanceAccount::where('code', 'LIKE', $prefix . '%')->pluck('code')->toArray();
+        $existingCodes = FinanceAccount::where('code', 'LIKE', $prefix . '%')
+            ->when($category === 'Kas & Bank', fn ($query) => $query->where('pharmacy_id', getActivePharmacyId()))
+            ->pluck('code')->toArray();
 
         if (empty($existingCodes)) {
             return $prefix . '01';
@@ -2111,22 +2133,39 @@ class FinanceController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'name_en' => 'nullable|string|max:255',
-            'code' => 'nullable|string|max:50|unique:finance_accounts,code',
+            'code' => 'nullable|string|max:50',
             'category' => 'required|string|max:100',
             'account_number' => 'nullable|string|max:100',
+            'account_type' => 'nullable|in:kas_apotek,bank',
         ]);
 
+        $isCashBank = $validated['category'] === 'Kas & Bank';
+        $pharmacyId = $isCashBank ? getActivePharmacyId() : null;
+        $accountType = $isCashBank ? ($validated['account_type'] ?? 'bank') : null;
+
         // Jika kode tidak diisi, otomatis buat kode melanjutkan nomor sebelumnya
-        $code = !empty($validated['code'])
+        $code = $accountType === 'kas_apotek' ? '1-10001' : (!empty($validated['code'])
             ? trim($validated['code'])
-            : $this->generateNextAccountCode($validated['category']);
+            : $this->generateNextAccountCode($validated['category']));
+
+        $duplicateCode = FinanceAccount::where('code', $code)
+            ->when($isCashBank, fn ($query) => $query->where('pharmacy_id', $pharmacyId), fn ($query) => $query->whereNull('pharmacy_id'))
+            ->exists();
+        if ($duplicateCode) {
+            return back()->withErrors(['code' => 'Kode akun sudah digunakan pada cabang ini.']);
+        }
+        if ($accountType === 'kas_apotek' && $this->branchKasBankAccountsQuery()->where('account_type', 'kas_apotek')->exists()) {
+            return back()->withErrors(['account_type' => 'Cabang ini sudah memiliki akun Kas Apotek.']);
+        }
 
         FinanceAccount::create([
+            'pharmacy_id' => $pharmacyId,
             'name' => $validated['name'],
             'name_en' => !empty($validated['name_en']) ? $validated['name_en'] : $validated['name'],
             'code' => $code,
             'category' => $validated['category'],
-            'account_number' => $validated['account_number'] ?? null,
+            'account_type' => $accountType,
+            'account_number' => $accountType === 'bank' ? ($validated['account_number'] ?? null) : null,
             'balance' => 0,
             'is_active' => true,
         ]);
@@ -2140,22 +2179,43 @@ class FinanceController extends Controller
      */
     public function updateAccount(Request $request, $id)
     {
-        $account = FinanceAccount::findOrFail($id);
+        $account = FinanceAccount::where(function ($query) {
+            $query->whereNull('pharmacy_id')->orWhere('pharmacy_id', getActivePharmacyId());
+        })->findOrFail($id);
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'name_en' => 'nullable|string|max:255',
-            'code' => 'required|string|max:50|unique:finance_accounts,code,' . $account->id,
+            'code' => 'required|string|max:50',
             'category' => 'required|string|max:100',
             'account_number' => 'nullable|string|max:100',
+            'account_type' => 'nullable|in:kas_apotek,bank',
         ]);
+
+        $isCashBank = $validated['category'] === 'Kas & Bank';
+        $pharmacyId = $isCashBank ? getActivePharmacyId() : null;
+        $accountType = $isCashBank ? ($validated['account_type'] ?? $account->account_type ?? 'bank') : null;
+        if ($account->account_type === 'kas_apotek' && $accountType !== 'kas_apotek') {
+            return back()->withErrors(['account_type' => 'Kategori akun Kas Apotek tidak dapat diubah karena dipakai untuk pencatatan otomatis penjualan tunai.']);
+        }
+        $code = $accountType === 'kas_apotek' ? '1-10001' : trim($validated['code']);
+        $duplicateCode = FinanceAccount::where('code', $code)
+            ->when($isCashBank, fn ($query) => $query->where('pharmacy_id', $pharmacyId), fn ($query) => $query->whereNull('pharmacy_id'))
+            ->where('id', '!=', $account->id)
+            ->exists();
+        if ($duplicateCode) return back()->withErrors(['code' => 'Kode akun sudah digunakan pada cabang ini.']);
+        if ($accountType === 'kas_apotek' && $this->branchKasBankAccountsQuery()->where('account_type', 'kas_apotek')->where('id', '!=', $account->id)->exists()) {
+            return back()->withErrors(['account_type' => 'Cabang ini sudah memiliki akun Kas Apotek.']);
+        }
 
         $account->update([
             'name' => $validated['name'],
             'name_en' => !empty($validated['name_en']) ? $validated['name_en'] : $validated['name'],
-            'code' => trim($validated['code']),
+            'code' => $code,
             'category' => $validated['category'],
-            'account_number' => $validated['account_number'] ?? null,
+            'pharmacy_id' => $pharmacyId,
+            'account_type' => $accountType,
+            'account_number' => $accountType === 'bank' ? ($validated['account_number'] ?? null) : null,
         ]);
 
         $this->clearStatsCache();
@@ -2167,11 +2227,22 @@ class FinanceController extends Controller
      */
     public function destroyAccount($id)
     {
-        $account = FinanceAccount::withCount('payments')->findOrFail($id);
+        $account = FinanceAccount::where(function ($query) {
+            $query->whereNull('pharmacy_id')->orWhere('pharmacy_id', getActivePharmacyId());
+        })->where(function ($query) {
+            $query->where('category', '!=', 'Kas & Bank')->orWhereNotNull('pharmacy_id');
+        })->findOrFail($id);
 
-        if ($account->payments_count > 0) {
+        if ($account->account_type === 'kas_apotek') {
+            return back()->withErrors(['account' => 'Akun Kas Apotek wajib tersedia agar penjualan tunai cabang tercatat otomatis.']);
+        }
+
+        $paymentsCount = FinancePayment::where('account_id', $account->id)
+            ->orWhere('transfer_account_id', $account->id)
+            ->count();
+        if ($paymentsCount > 0) {
             return back()->withErrors([
-                'account' => "Akun '{$account->name}' tidak dapat dihapus karena sudah memiliki riwayat {$account->payments_count} transaksi pembayaran."
+                'account' => "Akun '{$account->name}' tidak dapat dihapus karena sudah memiliki riwayat {$paymentsCount} transaksi pembayaran."
             ]);
         }
 
@@ -2197,7 +2268,7 @@ class FinanceController extends Controller
         ]);
 
         $tx = MedicineTransactions::with(['payments'])->findOrFail($validated['medicine_transaction_id']);
-        $account = FinanceAccount::findOrFail($validated['account_id']);
+        $account = $this->branchKasBankAccountsQuery()->findOrFail($validated['account_id']);
 
         if ($account->category !== 'Kas & Bank') {
             return back()->withErrors(['account_id' => 'Akun pembayaran harus berkategori Kas & Bank.']);
@@ -2215,6 +2286,7 @@ class FinanceController extends Controller
         DB::beginTransaction();
         try {
             FinancePayment::create([
+                'pharmacy_id' => $tx->pharmacy_id,
                 'medicine_transaction_id' => $tx->id,
                 'account_id' => $account->id,
                 'payment_type' => 'PIUTANG',
@@ -2267,7 +2339,7 @@ class FinanceController extends Controller
             'account_id.required' => 'Silakan pilih akun Kas & Bank penerima.',
         ]);
 
-        $account = FinanceAccount::findOrFail($validated['account_id']);
+        $account = $this->branchKasBankAccountsQuery()->findOrFail($validated['account_id']);
         if ($account->category !== 'Kas & Bank') {
             return back()->withErrors(['account_id' => 'Akun kas/bank yang dipilih harus berkategori Kas & Bank.']);
         }
@@ -2288,6 +2360,7 @@ class FinanceController extends Controller
                     continue;
 
                 FinancePayment::create([
+                    'pharmacy_id' => $tx->pharmacy_id,
                     'medicine_transaction_id' => $tx->id,
                     'account_id' => $account->id,
                     'payment_type' => 'PIUTANG',
@@ -2338,7 +2411,7 @@ class FinanceController extends Controller
 
         // Baris pertama selalu dilewati. Kolom A = No. Faktur/Transaksi, B = Tanggal Bayar, C = Kode Bank.
         $rows = array_slice($rows, 1);
-        $accountsByCode = FinanceAccount::where('category', 'Kas & Bank')->where('is_active', true)
+        $accountsByCode = $this->branchKasBankAccountsQuery()
             ->get()->keyBy(fn ($account) => mb_strtolower(trim((string) $account->code)));
         $pharmacyIds = $this->getTargetPharmacyIds();
         $prepared = [];
@@ -2516,7 +2589,7 @@ class FinanceController extends Controller
             'notes' => 'nullable|string|max:500',
         ]);
 
-        $account = FinanceAccount::findOrFail($validated['account_id']);
+        $account = $this->branchKasBankAccountsQuery()->findOrFail($validated['account_id']);
         if ($account->category !== 'Kas & Bank') {
             return back()->withErrors(['account_id' => 'Akun sumber dana harus berkategori Kas & Bank.']);
         }
@@ -2564,7 +2637,7 @@ class FinanceController extends Controller
             'notes' => 'nullable|string|max:500',
         ]);
 
-        $newAccount = FinanceAccount::findOrFail($validated['account_id']);
+        $newAccount = $this->branchKasBankAccountsQuery()->findOrFail($validated['account_id']);
         if ($newAccount->category !== 'Kas & Bank') {
             return back()->withErrors(['account_id' => 'Akun sumber dana harus berkategori Kas & Bank.']);
         }

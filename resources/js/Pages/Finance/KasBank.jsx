@@ -29,6 +29,16 @@ const localToday = () => {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 };
 
+const formatDepositAmount = (value) => {
+    const cleaned = String(value ?? '').replace(/[^\d,]/g, '');
+    const [whole = '', ...fractionParts] = cleaned.split(',');
+    const fraction = fractionParts.join('').slice(0, 2);
+    const formattedWhole = whole.replace(/^0+(?=\d)/, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    return fractionParts.length ? `${formattedWhole},${fraction}` : formattedWhole;
+};
+
+const parseDepositAmount = (value) => String(value ?? '').replace(/\./g, '').replace(',', '.');
+
 export default function KasBank({
     accounts = [],
     categories = [],
@@ -56,6 +66,7 @@ export default function KasBank({
         name_en: '',
         code: '',
         category: 'Kas & Bank',
+        account_type: 'bank',
         account_number: '',
     });
     const [openingForm, setOpeningForm] = useState(() => {
@@ -79,7 +90,7 @@ export default function KasBank({
         event.preventDefault();
         if (!depositForm.transfer_account_id || !depositForm.amount) return alert('Pilih rekening tujuan dan masukkan nominal setoran.');
         setIsSavingDeposit(true);
-        router.post('/finance/setoran', depositForm, {
+        router.post('/finance/setoran', { ...depositForm, amount: parseDepositAmount(depositForm.amount) }, {
             preserveScroll: true,
             onSuccess: () => setIsDepositModalOpen(false),
             onFinish: () => setIsSavingDeposit(false),
@@ -139,6 +150,7 @@ export default function KasBank({
             name_en: '',
             code: nextCode,
             category: 'Kas & Bank',
+            account_type: 'bank',
             account_number: '',
         });
         setIsAccountModalOpen(true);
@@ -151,6 +163,7 @@ export default function KasBank({
             name_en: acc.name_en || '',
             code: acc.code || '',
             category: 'Kas & Bank',
+            account_type: acc.account_type || (acc.code === '1-10001' ? 'kas_apotek' : 'bank'),
             account_number: acc.account_number || '',
         });
         setIsAccountModalOpen(true);
@@ -197,6 +210,7 @@ export default function KasBank({
                     name_en: '',
                     code: '',
                     category: 'Kas & Bank',
+                    account_type: 'bank',
                     account_number: '',
                 });
             },
@@ -329,7 +343,7 @@ export default function KasBank({
                         <button
                             type="button"
                             onClick={() => {
-                                const destination = kasBankAccounts.find((account) => account.code !== '1-10001');
+                                const destination = kasBankAccounts.find((account) => account.account_type === 'bank');
                                 setDepositForm({ transfer_account_id: destination?.id || '', payment_date: localToday(), amount: '', reference_number: '', notes: 'Setoran tunai kasir ke rekening bank' });
                                 setIsDepositModalOpen(true);
                             }}
@@ -510,6 +524,9 @@ export default function KasBank({
                                                     <div className="flex items-center gap-1.5 flex-wrap">
                                                         <span className="font-bold text-slate-900 text-xs truncate">
                                                             {acc.name}
+                                                        </span>
+                                                        <span className={`rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide ${acc.account_type === 'kas_apotek' ? 'bg-emerald-100 text-emerald-700' : 'bg-sky-100 text-sky-700'}`}>
+                                                            {acc.account_type === 'kas_apotek' ? 'Kas Apotek' : 'Bank'}
                                                         </span>
                                                         {isSelected && (
                                                             <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-600 text-white">
@@ -806,19 +823,33 @@ export default function KasBank({
 
             {isDepositModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
-                    <form onSubmit={submitDeposit} className="w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+                    <form
+                        onSubmit={submitDeposit}
+                        onKeyDown={(event) => {
+                            if (event.key !== 'Enter' || event.nativeEvent.isComposing) return;
+                            const fields = Array.from(event.currentTarget.querySelectorAll('select, input:not([type="hidden"])'))
+                                .filter((field) => !field.disabled);
+                            const currentIndex = fields.indexOf(event.target);
+                            if (currentIndex < 0) return;
+                            event.preventDefault();
+                            const nextField = fields[currentIndex + 1];
+                            if (nextField) nextField.focus();
+                            else event.currentTarget.requestSubmit();
+                        }}
+                        className="w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+                    >
                         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
                             <div><h3 className="text-base font-bold text-slate-900">Setor Kasir ke Rekening</h3><p className="mt-0.5 text-[11px] text-slate-500">Saldo Kas Apotek / Drawer berkurang dan saldo rekening tujuan bertambah.</p></div>
                             <button type="button" onClick={() => setIsDepositModalOpen(false)} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100" aria-label="Tutup modal"><X className="h-5 w-5" /></button>
                         </div>
                         <div className="grid gap-3 p-5">
-                            <label className="text-xs font-semibold text-slate-600">Rekening tujuan<select required value={depositForm.transfer_account_id} onChange={(e) => setDepositForm({ ...depositForm, transfer_account_id: e.target.value })} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-normal"><option value="">Pilih rekening</option>{kasBankAccounts.filter((account) => account.code !== '1-10001').map((account) => <option key={account.id} value={account.id}>{account.code} · {account.name}</option>)}</select></label>
+                            <label className="text-xs font-semibold text-slate-600">Rekening tujuan<select required value={depositForm.transfer_account_id} onChange={(e) => setDepositForm({ ...depositForm, transfer_account_id: e.target.value })} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-normal"><option value="">Pilih rekening</option>{kasBankAccounts.filter((account) => account.account_type === 'bank').map((account) => <option key={account.id} value={account.id}>{account.code} · {account.name}</option>)}</select></label>
                             <label className="text-xs font-semibold text-slate-600">Tanggal setoran<input required type="date" max={localToday()} value={depositForm.payment_date} onChange={(e) => setDepositForm({ ...depositForm, payment_date: e.target.value })} className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-normal" /></label>
-                            <label className="text-xs font-semibold text-slate-600">Nominal<input required type="number" min="0.01" step="0.01" value={depositForm.amount} onChange={(e) => setDepositForm({ ...depositForm, amount: e.target.value })} placeholder="Contoh: 500000" className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-normal" /></label>
-                            <label className="text-xs font-semibold text-slate-600">No. bukti<input value={depositForm.reference_number} onChange={(e) => setDepositForm({ ...depositForm, reference_number: e.target.value })} className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-normal" /></label>
+                            <label className="text-xs font-semibold text-slate-600">Nominal (Rupiah)<input required type="text" inputMode="decimal" value={depositForm.amount} onChange={(e) => setDepositForm({ ...depositForm, amount: formatDepositAmount(e.target.value) })} placeholder="Contoh: 500.000" className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-normal" /></label>
+                            <label className="text-xs font-semibold text-slate-600">No. bukti (opsional)<input value={depositForm.reference_number} onChange={(e) => setDepositForm({ ...depositForm, reference_number: e.target.value })} placeholder="Opsional, contoh: TRF-20261012-001" className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-normal placeholder:text-slate-400" /></label>
                             <label className="text-xs font-semibold text-slate-600">Catatan<input value={depositForm.notes} onChange={(e) => setDepositForm({ ...depositForm, notes: e.target.value })} className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-normal" /></label>
                         </div>
-                        <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-4"><button type="button" onClick={() => setIsDepositModalOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600">Batal</button><button type="submit" disabled={isSavingDeposit || !kasBankAccounts.some((account) => account.code !== '1-10001')} className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50">{isSavingDeposit ? 'Menyimpan…' : 'Catat Setoran'}</button></div>
+                        <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-4"><button type="button" onClick={() => setIsDepositModalOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600">Batal</button><button type="submit" disabled={isSavingDeposit || !kasBankAccounts.some((account) => account.account_type === 'bank')} className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50">{isSavingDeposit ? 'Menyimpan…' : 'Catat Setoran'}</button></div>
                     </form>
                 </div>
             )}
@@ -935,9 +966,17 @@ export default function KasBank({
                                 </div>
                             </div>
 
+                        <div className="grid grid-cols-2 gap-3">
+                            <label className="block text-slate-700 font-semibold">Jenis Akun
+                                <select value={accountForm.account_type} onChange={(e) => setAccountForm({ ...accountForm, account_type: e.target.value, account_number: e.target.value === 'kas_apotek' ? '' : accountForm.account_number })} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs">
+                                    <option value="kas_apotek">Kas Apotek</option>
+                                    <option value="bank">Rekening Bank</option>
+                                </select>
+                            </label>
                             <div className="p-3 bg-blue-50/70 border border-blue-100 rounded-xl flex items-center gap-2 text-blue-700 text-xs">
                                 <HelpCircle className="w-4 h-4 shrink-0 text-blue-600" />
-                                <span>Akun ini otomatis dikategorikan ke <strong>Kas & Bank (1-100)</strong></span>
+                                <span>Akun <strong>{accountForm.account_type === 'kas_apotek' ? 'Kas Apotek' : 'Bank'}</strong> ini khusus cabang aktif.</span>
+                            </div>
                             </div>
 
                             <div>
@@ -960,7 +999,7 @@ export default function KasBank({
                                 />
                             </div>
 
-                            <div>
+                            {accountForm.account_type === 'bank' && <div>
                                 <label className="block text-slate-700 font-semibold mb-1">
                                     Nomor Rekening Bank (Opsional)
                                 </label>
@@ -971,7 +1010,7 @@ export default function KasBank({
                                     onChange={(e) => setAccountForm({ ...accountForm, account_number: e.target.value })}
                                     className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-blue-500 focus:outline-none"
                                 />
-                            </div>
+                            </div>}
 
                             <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-100">
                                 <button
