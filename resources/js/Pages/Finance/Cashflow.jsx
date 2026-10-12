@@ -7,6 +7,7 @@ import MonitoringPenjualan from './MonitoringPenjualan';
 import KinerjaOmzet from './KinerjaOmzet';
 import TradeDailyCashflow from './TradeDailyCashflow';
 import KeuanganDaily from './KeuanganDaily';
+import RekapCashflow from './RekapCashflow';
 
 const banks = [
     { key: 'BNI', label: 'BNI' },
@@ -95,10 +96,10 @@ function CustomSelect({ value, onChange, options, icon: Icon, className = "" }) 
     );
 }
 
-export default function Cashflow({ days = [], monitoringDays = [], kinerjaDays = [], kinerjaDebtors = [], piutangDagang = {}, hutangDagang = {}, keuanganDays = [], saldoAwalKas = 0, setorAccounts = [], filters = {} }) {
+export default function Cashflow({ days = [], monitoringDays = [], kinerjaDays = [], kinerjaDebtors = [], piutangDagang = {}, hutangDagang = {}, keuanganDays = [], saldoAwalKas = 0, setorAccounts = [], recapCashflow = {}, filters = {} }) {
     const [month, setMonth] = useState(String(filters.month || new Date().getMonth() + 1));
     const [year, setYear] = useState(String(filters.year || new Date().getFullYear()));
-    const [activeTab, setActiveTab] = useState('sheet');
+    const [activeTab, setActiveTab] = useState('rekap');
     const totals = useMemo(() => days.reduce((acc, day) => {
         for (const shift of [...shifts.map((item) => item.key), 'otherShift']) {
             const row = day[shift] || {};
@@ -144,8 +145,8 @@ export default function Cashflow({ days = [], monitoringDays = [], kinerjaDays =
                         <span className="rounded-xl bg-blue-100 p-2.5 text-blue-700"><ArrowDownUp className="h-5 w-5" /></span>
                         <div>
                             <div className="text-xs font-bold uppercase tracking-wider text-blue-700">Cashflow</div>
-                            <h2 className="mt-1 text-xl font-bold text-slate-900">{activeTab === 'sheet' ? 'Omzet per tanggal dan shift' : activeTab === 'monitoring' ? 'Monitoring target penjualan' : activeTab === 'kinerja' ? 'Kinerja omzet' : activeTab === 'piutang' ? 'Piutang dagang per hari' : activeTab === 'hutang' ? 'Hutang dagang per hari' : 'Keuangan harian'}</h2>
-                            <p className="mt-1 max-w-3xl text-sm text-slate-600">{activeTab === 'sheet' ? 'Rincian diambil dari transaksi kasir selesai, dikelompokkan menurut Cash, EDC, Transfer/QRIS, diskon, jumlah, dan total setoran. Tanggal tanpa transaksi tetap ditampilkan.' : activeTab === 'monitoring' ? 'Laporan harian mengikuti format Excel. Periode mengikuti bulan dan tahun yang dipilih.' : activeTab === 'kinerja' ? 'Penjualan per shift dan rincian pembelian mengikuti susunan workbook.' : activeTab === 'piutang' ? 'Penjualan kredit yang selesai dicatat pada tanggal transaksi; retur kredit mengurangi piutang pada tanggal retur.' : activeTab === 'hutang' ? 'Pembelian kredit dicatat pada tanggal barang diterima dan masuk stok.' : 'Ringkasan pemasukan dan pengeluaran kas harian, termasuk setoran dari kasir ke rekening.'}</p>
+                            <h2 className="mt-1 text-xl font-bold text-slate-900">{activeTab === 'rekap' ? 'Rekap posisi keuangan cabang' : activeTab === 'sheet' ? 'Omzet per tanggal dan shift' : activeTab === 'monitoring' ? 'Monitoring target penjualan' : activeTab === 'kinerja' ? 'Kinerja omzet' : activeTab === 'piutang' ? 'Piutang dagang per hari' : activeTab === 'hutang' ? 'Hutang dagang per hari' : 'Keuangan harian'}</h2>
+                            <p className="mt-1 max-w-3xl text-sm text-slate-600">{activeTab === 'rekap' ? 'Lihat saldo kas dan bank aktual cabang, piutang yang belum tertagih, hutang supplier, dan pengeluaran periode.' : activeTab === 'sheet' ? 'Rincian diambil dari transaksi kasir selesai, dikelompokkan menurut Cash, EDC, Transfer/QRIS, diskon, jumlah, dan total setoran. Tanggal tanpa transaksi tetap ditampilkan.' : activeTab === 'monitoring' ? 'Laporan harian mengikuti format Excel. Periode mengikuti bulan dan tahun yang dipilih.' : activeTab === 'kinerja' ? 'Penjualan per shift dan rincian pembelian mengikuti susunan workbook.' : activeTab === 'piutang' ? 'Penjualan kredit yang selesai dicatat pada tanggal transaksi; retur kredit mengurangi piutang pada tanggal retur.' : activeTab === 'hutang' ? 'Pembelian kredit dicatat pada tanggal barang diterima dan masuk stok.' : 'Ringkasan pemasukan dan pengeluaran kas harian, termasuk setoran dari kasir ke rekening.'}</p>
                         </div>
                     </div>
                     <form onSubmit={applyFilters} className="w-full rounded-3xl border border-blue-100/80 bg-white p-3 shadow-sm xl:w-auto xl:min-w-[450px]">
@@ -175,7 +176,7 @@ export default function Cashflow({ days = [], monitoringDays = [], kinerjaDays =
                                 <button type="submit" className="inline-flex h-[56px] sm:h-auto sm:px-6 flex-1 items-center justify-center gap-2 rounded-2xl bg-blue-600 text-sm font-bold tracking-wide text-white shadow-md shadow-blue-500/20 transition-all hover:bg-blue-700 hover:shadow-lg hover:shadow-blue-500/40 focus:outline-none focus:ring-4 focus:ring-blue-200 active:scale-95">
                                     Terapkan
                                 </button>
-                                {activeTab !== 'keuangan' && <a href={exportUrl} className="inline-flex h-[56px] sm:h-auto px-4 items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50 text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100 hover:text-emerald-800" title="Export Excel"><Download className="h-5 w-5" /></a>}
+                                {!['keuangan', 'rekap'].includes(activeTab) && <a href={exportUrl} className="inline-flex h-[56px] sm:h-auto px-4 items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50 text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100 hover:text-emerald-800" title="Export Excel"><Download className="h-5 w-5" /></a>}
                             </div>
                         </div>
                     </form>
@@ -183,6 +184,7 @@ export default function Cashflow({ days = [], monitoringDays = [], kinerjaDays =
 
                 <div role="tablist" aria-label="Laporan cashflow" className="flex w-fit flex-wrap gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
                     {[
+                        { key: 'rekap', label: 'Rekap Cashflow' },
                         { key: 'sheet', label: 'Lembar Omzet Harian' },
                         { key: 'monitoring', label: 'Monitoring Penjualan' },
                         { key: 'kinerja', label: 'Kinerja Omzet' },
@@ -194,7 +196,7 @@ export default function Cashflow({ days = [], monitoringDays = [], kinerjaDays =
                     </button>)}
                 </div>
 
-                {activeTab === 'keuangan' ? <KeuanganDaily days={keuanganDays} saldoAwal={saldoAwalKas} setorAccounts={setorAccounts} /> : activeTab === 'monitoring' ? <MonitoringPenjualan days={monitoringDays} /> : activeTab === 'kinerja' ? <KinerjaOmzet days={kinerjaDays} debtors={kinerjaDebtors} /> : activeTab === 'piutang' ? <TradeDailyCashflow title="Piutang Dagang" description="Total penjualan kredit per debitur, dikelompokkan berdasarkan tanggal transaksi selesai." report={piutangDagang} /> : activeTab === 'hutang' ? <TradeDailyCashflow title="Hutang Dagang" description="Total pembelian kredit per supplier, dikelompokkan berdasarkan tanggal barang diterima." report={hutangDagang} /> : <>
+                {activeTab === 'rekap' ? <RekapCashflow recap={recapCashflow} monthLabel={`${monthOptions.find((option) => String(option.value) === String(month))?.label || ''} ${year}`} /> : activeTab === 'keuangan' ? <KeuanganDaily days={keuanganDays} saldoAwal={saldoAwalKas} setorAccounts={setorAccounts} /> : activeTab === 'monitoring' ? <MonitoringPenjualan days={monitoringDays} /> : activeTab === 'kinerja' ? <KinerjaOmzet days={kinerjaDays} debtors={kinerjaDebtors} /> : activeTab === 'piutang' ? <TradeDailyCashflow title="Piutang Dagang" description="Total penjualan kredit per debitur, dikelompokkan berdasarkan tanggal transaksi selesai." report={piutangDagang} /> : activeTab === 'hutang' ? <TradeDailyCashflow title="Hutang Dagang" description="Total pembelian kredit per supplier, dikelompokkan berdasarkan tanggal barang diterima." report={hutangDagang} /> : <>
                     <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                         <Metric label="Total setoran" value={totals.deposit} note="Cash + Transfer/QRIS; EDC pending dikecualikan" icon={CalendarDays} tone="bg-blue-50 text-blue-700" />
                         <Metric label="Cash" value={totals.cash} note="Penerimaan tunai" icon={Wallet} tone="bg-emerald-50 text-emerald-700" />

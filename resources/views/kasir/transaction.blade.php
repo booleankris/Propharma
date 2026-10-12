@@ -4109,7 +4109,7 @@
             return;
         }
 
-        if (['TRANSFER', 'DEBIT', 'QRIS'].includes(paymentType) && currenttransaction !== 'KREDIT') {
+        if (['TRANSFER', 'DEBIT', 'QRIS'].includes(paymentType)) {
             const bankVal = bank_name_input ? bank_name_input.value : '';
             if (!bankVal) {
                 iziToast.warning({

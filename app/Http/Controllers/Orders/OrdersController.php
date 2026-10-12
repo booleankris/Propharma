@@ -273,7 +273,6 @@ class OrdersController extends Controller
     public function orderList(Request $request)
     {
         $orderCode = $request->order_id;
-        \Illuminate\Support\Facades\Log::info('ORDER CODE', [$request->order_id]);
 
         if (!$orderCode) {
             return DataTables::of(collect())->make(true);

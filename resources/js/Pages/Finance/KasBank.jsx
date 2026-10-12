@@ -88,6 +88,9 @@ export default function KasBank({
     const [isBackfillModalOpen, setIsBackfillModalOpen] = useState(false);
     const [isBackfillingSales, setIsBackfillingSales] = useState(false);
     const [backfillForm, setBackfillForm] = useState({ from_date: '', to_date: localToday() });
+    const [isBackfillNonCashModalOpen, setIsBackfillNonCashModalOpen] = useState(false);
+    const [isBackfillingNonCash, setIsBackfillingNonCash] = useState(false);
+    const [backfillNonCashForm, setBackfillNonCashForm] = useState({ from_date: '', to_date: localToday() });
     const selectedOpening = openingBalances[openingForm.account_id];
 
     const submitDeposit = (event) => {
@@ -125,6 +128,21 @@ export default function KasBank({
             onSuccess: () => setIsBackfillModalOpen(false),
             onFinish: () => setIsBackfillingSales(false),
             onError: (errors) => alert(Object.values(errors)[0] || 'Gagal mencatat penjualan tunai lama.'),
+        });
+    };
+
+    const submitBackfillNonCash = (event) => {
+        event.preventDefault();
+        if (!backfillNonCashForm.from_date || !backfillNonCashForm.to_date) return alert('Pilih rentang tanggal transaksi non-tunai yang akan dicatat.');
+        const confirmed = window.confirm(`Catat transaksi QRIS, Debit, dan Transfer lama yang belum ada di rekening bank untuk ${backfillNonCashForm.from_date} sampai ${backfillNonCashForm.to_date}? Rekening tujuan dicocokkan dari nama bank pada transaksi.`);
+        if (!confirmed) return;
+
+        setIsBackfillingNonCash(true);
+        router.post('/finance/kas-bank/backfill-penjualan-non-tunai', backfillNonCashForm, {
+            preserveScroll: true,
+            onSuccess: () => setIsBackfillNonCashModalOpen(false),
+            onFinish: () => setIsBackfillingNonCash(false),
+            onError: (errors) => alert(Object.values(errors)[0] || 'Gagal mencatat transaksi non-tunai lama.'),
         });
     };
 
@@ -369,6 +387,17 @@ export default function KasBank({
                         >
                             <History className="w-4 h-4" />
                             <span>Catat Penjualan Lama</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setBackfillNonCashForm({ from_date: '', to_date: localToday() });
+                                setIsBackfillNonCashModalOpen(true);
+                            }}
+                            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-violet-700 bg-violet-50 border border-violet-200 rounded-xl hover:bg-violet-100 transition shadow-xs"
+                        >
+                            <History className="w-4 h-4" />
+                            <span>Catat Non-Tunai Lama</span>
                         </button>
                         <button
                             type="button"
@@ -871,6 +900,31 @@ export default function KasBank({
                         <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-4">
                             <button type="button" onClick={() => setIsBackfillModalOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600">Batal</button>
                             <button type="submit" disabled={isBackfillingSales || !backfillForm.from_date} className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-50"><History size={15} />{isBackfillingSales ? 'Memproses…' : 'Catat yang Belum Masuk'}</button>
+                        </div>
+                    </form>
+                </div>
+            )}
+
+            {isBackfillNonCashModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
+                    <form onSubmit={submitBackfillNonCash} className="w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+                        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+                            <div>
+                                <h3 className="text-base font-bold text-slate-900">Catat Transaksi Non-Tunai Lama</h3>
+                                <p className="mt-0.5 text-[11px] text-slate-500">Memasukkan QRIS, Debit, dan Transfer lama ke rekening bank cabang ini.</p>
+                            </div>
+                            <button type="button" onClick={() => setIsBackfillNonCashModalOpen(false)} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100" aria-label="Tutup modal"><X className="h-5 w-5" /></button>
+                        </div>
+                        <div className="grid gap-3 p-5">
+                            <label className="text-xs font-semibold text-slate-600">Dari tanggal<input required type="date" max={backfillNonCashForm.to_date || localToday()} value={backfillNonCashForm.from_date} onChange={(event) => setBackfillNonCashForm({ ...backfillNonCashForm, from_date: event.target.value })} className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-normal" /></label>
+                            <label className="text-xs font-semibold text-slate-600">Sampai tanggal<input required type="date" min={backfillNonCashForm.from_date || undefined} max={localToday()} value={backfillNonCashForm.to_date} onChange={(event) => setBackfillNonCashForm({ ...backfillNonCashForm, to_date: event.target.value })} className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-normal" /></label>
+                            <div className="rounded-xl border border-violet-200 bg-violet-50 px-3.5 py-3 text-[11px] leading-relaxed text-violet-800">
+                                Hanya transaksi selesai dengan metode QRIS, Debit, atau Transfer yang belum memiliki mutasi non-tunai yang dicatat. Rekening ditentukan dari nama bank tersimpan di transaksi; bank tersebut harus cocok dengan tepat satu rekening aktif cabang ini. Jika tanggal transaksi sebelum saldo awal, saldo aktual tidak berubah.
+                            </div>
+                        </div>
+                        <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-4">
+                            <button type="button" onClick={() => setIsBackfillNonCashModalOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600">Batal</button>
+                            <button type="submit" disabled={isBackfillingNonCash || !backfillNonCashForm.from_date || !kasBankAccounts.some((account) => account.account_type === 'bank')} className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-xs font-bold text-white hover:bg-violet-700 disabled:opacity-50"><History size={15} />{isBackfillingNonCash ? 'Memproses…' : 'Catat yang Belum Masuk'}</button>
                         </div>
                     </form>
                 </div>

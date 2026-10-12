@@ -906,6 +906,36 @@ class SalesController extends Controller
 
             $paymentMethod = strtoupper(trim($validated['paymentType'] ?? 'CASH'));
             $isUnpaid = $paymentMethod === 'BELUM BAYAR';
+            $nonCashPaymentMethods = ['QRIS', 'DEBIT', 'TRANSFER'];
+            $bankAccount = null;
+
+            if (in_array($paymentMethod, $nonCashPaymentMethods, true)) {
+                $bankName = trim((string) ($validated['bank_name'] ?? ''));
+                $normalizeBankName = static fn ($value) => preg_replace('/[^A-Z0-9]/', '', strtoupper((string) $value));
+                $bankKey = $normalizeBankName($bankName);
+                $matches = FinanceAccount::where('pharmacy_id', $transaction->pharmacy_id)
+                    ->where('category', 'Kas & Bank')
+                    ->where('account_type', 'bank')
+                    ->where('is_active', true)
+                    ->lockForUpdate()
+                    ->get()
+                    ->filter(function ($account) use ($normalizeBankName, $bankKey) {
+                        $accountName = $normalizeBankName($account->name);
+                        return $bankKey !== '' && str_contains($accountName, $bankKey);
+                    });
+
+                if ($matches->count() !== 1) {
+                    DB::rollBack();
+                    return response()->json([
+                        'success' => false,
+                        'message' => $matches->isEmpty()
+                            ? "Rekening {$bankName} belum tersedia atau belum aktif di cabang ini. Hubungi admin untuk mengatur rekening Kas & Bank."
+                            : "Ada lebih dari satu rekening {$bankName} aktif di cabang ini. Pastikan hanya satu rekening untuk setiap bank.",
+                    ], 422);
+                }
+
+                $bankAccount = $matches->first();
+            }
 
             $transaction->update([
                 'status' => 1,
@@ -951,6 +981,24 @@ class SalesController extends Controller
                 }
             }
 
+            // Pembayaran non-tunai masuk ke rekening bank sesuai nama bank yang dipilih kasir.
+            if ($bankAccount) {
+                $bankAmount = round((float) $validated['totaltransaction'], 2);
+                FinancePayment::create([
+                    'pharmacy_id' => $transaction->pharmacy_id,
+                    'medicine_transaction_id' => $transaction->id,
+                    'account_id' => $bankAccount->id,
+                    'payment_type' => 'PENJUALAN NON TUNAI',
+                    'payment_date' => Carbon::now()->toDateString(),
+                    'amount' => $bankAmount,
+                    'reference_number' => $transaction->transaction_code,
+                    'notes' => "Penerimaan penjualan {$paymentMethod} melalui {$validated['bank_name']}",
+                    'created_by' => Auth::id(),
+                ]);
+                $bankAccount->increment('balance', $bankAmount);
+                Cache::forget('finance_stats_summary_branch_' . $transaction->pharmacy_id . '_' . $transaction->pharmacy_id);
+            }
+
             MedicineCart::where('transaction_id', $validated['transaction_id'])
                 ->update(['status' => 1]);
 
@@ -975,11 +1023,7 @@ class SalesController extends Controller
                     })
                     ->sum('medicine_transfer_items.qty');
 
-                \Log::info('Sale debug', [
-                    'medicine_id' => $medicine_id,
-                    'medicine_name' => $medicine->name,
-                    'qty_bought' => $qty_bought,
-                ]);
+                // Debug log removed to prevent disk & log flooding
 
                 while ($qty_bought > 0) {
                     // 1. Cari batch counter dengan stok > 0 (FIFO berdasarkan expired date)

@@ -201,9 +201,7 @@ class StockOpnameImportService
                     $parsedEd = null;
                     foreach ($candidateBatches as $b) {
                         try {
-                            $normalizedExpiredDate = self::parseSmartExpiredDate($b->expired_date);
-                            if (!$normalizedExpiredDate) continue;
-                            $dt = Carbon::parse($normalizedExpiredDate);
+                            $dt = Carbon::parse($b->expired_date);
                             if ($dt->year >= 2020 && $dt->year <= 2050) {
                                 $parsedEd = $dt->toDateString();
                                 break;
@@ -624,9 +622,7 @@ class StockOpnameImportService
                     // a. Exact date match
                     $batch = $existingBatches->first(function ($b) use ($expiredDate) {
                         try {
-                            $existingDate = self::parseSmartExpiredDate($b->expired_date);
-                            $targetDate = self::parseSmartExpiredDate($expiredDate);
-                            return $existingDate && $targetDate && $existingDate === $targetDate;
+                            return $b->expired_date && Carbon::parse($b->expired_date)->toDateString() === Carbon::parse($expiredDate)->toDateString();
                         } catch (\Throwable $e) {
                             return false;
                         }
@@ -637,8 +633,7 @@ class StockOpnameImportService
                         try {
                             $targetYm = Carbon::parse($expiredDate)->format('Y-m');
                             $batch = $existingBatches->first(function ($b) use ($targetYm, $assignedBatchIds) {
-                                $existingDate = self::parseSmartExpiredDate($b->expired_date);
-                                return !in_array($b->id, $assignedBatchIds) && $existingDate && Carbon::parse($existingDate)->format('Y-m') === $targetYm;
+                                return !in_array($b->id, $assignedBatchIds) && $b->expired_date && Carbon::parse($b->expired_date)->format('Y-m') === $targetYm;
                             });
                             if ($batch) {
                                 $batch->expired_date = $expiredDate;
@@ -981,21 +976,14 @@ class StockOpnameImportService
                 foreach ($medicineRows as $row) {
                     $ed = $row['expired_date'] ?? now()->addYears(2)->toDateString();
                     $batch = $batches->first(function ($b) use ($ed) {
-                        try {
-                            $existingDate = self::parseSmartExpiredDate($b->expired_date);
-                            $targetDate = self::parseSmartExpiredDate($ed);
-                            return $existingDate && $targetDate && $existingDate === $targetDate;
-                        }
+                        try { return $b->expired_date && Carbon::parse($b->expired_date)->toDateString() === Carbon::parse($ed)->toDateString(); }
                         catch (\Throwable $e) { return false; }
                     });
                     if (!$batch && $ed) {
                         try {
                             $ym = Carbon::parse($ed)->format('Y-m');
                             $batch = $batches->first(function ($b) use ($ym) {
-                                try {
-                                    $existingDate = self::parseSmartExpiredDate($b->expired_date);
-                                    return $existingDate && Carbon::parse($existingDate)->format('Y-m') === $ym;
-                                }
+                                try { return $b->expired_date && Carbon::parse($b->expired_date)->format('Y-m') === $ym; }
                                 catch (\Throwable $e) { return false; }
                             });
                         } catch (\Throwable $e) {}
@@ -1474,8 +1462,7 @@ class StockOpnameImportService
             return '-';
         }
         try {
-            $normalized = self::parseSmartExpiredDate($dateStr);
-            return $normalized ? Carbon::parse($normalized)->format($format) : (string) $dateStr;
+            return Carbon::parse($dateStr)->format($format);
         } catch (\Throwable $e) {
             return (string) $dateStr;
         }
@@ -1487,7 +1474,7 @@ class StockOpnameImportService
             return $fallback ?? now()->addYear()->toDateString();
         }
         try {
-            return self::parseSmartExpiredDate($dateStr) ?? ($fallback ?? now()->addYear()->toDateString());
+            return Carbon::parse($dateStr)->toDateString();
         } catch (\Throwable $e) {
             return $fallback ?? now()->addYear()->toDateString();
         }
