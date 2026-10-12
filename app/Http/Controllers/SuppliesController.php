@@ -1303,7 +1303,7 @@ class SuppliesController extends Controller
         $prefix = "SO-{$year}{$month}";
 
         $lastCode = ItemsLog::where('code', 'like', "{$prefix}%")
-            ->where('status', 5)
+            ->whereIn('status', [5, 6])
             ->orderBy('code', 'desc')
             ->value('code');
 
@@ -1363,6 +1363,118 @@ class SuppliesController extends Controller
     public function stockOpname()
     {
         return view('supply.stockOpname');
+    }
+
+    public function resetMedicineBatches(Request $request)
+    {
+        $request->validate([
+            'medicine_id' => 'required|exists:medicines,id',
+            'target_mode' => 'required|in:pelayanan,gudang',
+        ]);
+
+        $pharmacyId = getActivePharmacyId();
+        $warehouseId = getWarehousePharmacyId();
+        $targetMode = $request->input('target_mode');
+        if ($targetMode === 'gudang' && !canAccessWarehouseStock($pharmacyId)) {
+            return response()->json(['message' => 'Anda tidak memiliki akses untuk mereset stok gudang.'], 403);
+        }
+
+        $medicineId = (int) $request->input('medicine_id');
+        $targetPharmacyId = $targetMode === 'gudang'
+            ? $warehouseId
+            : (isWarehousePharmacy($pharmacyId) ? 1 : $pharmacyId);
+        $now = now();
+        $resetCount = 0;
+
+        DB::beginTransaction();
+        try {
+            $batches = Batches::where('medicine_id', $medicineId)
+                ->where('pharmacy_id', $targetPharmacyId)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+
+            $transactionCode = $this->generateOpnameCode();
+
+            foreach ($batches as $batch) {
+                if ($targetMode === 'gudang') {
+                    $before = (int) $batch->stock;
+                    if ($before === 0) continue;
+                    $batch->stock = 0;
+                    $batch->save();
+                } else {
+                    $transfers = MedicineTransferItems::where('batches_id', $batch->id)
+                        ->where('status', 1)
+                        ->where(function ($query) {
+                            $query->whereNull('source_type')->orWhere('source_type', '!=', 'retur_gudang');
+                        })
+                        ->lockForUpdate()
+                        ->get();
+                    $before = (int) $transfers->sum('qty');
+                    foreach ($transfers as $transfer) {
+                        if ((int) $transfer->qty !== 0) {
+                            $transfer->qty = 0;
+                            $transfer->save();
+                        }
+                    }
+                    if ($before === 0) continue;
+                }
+
+                $delta = -$before;
+                $status = $delta >= 0 ? 5 : 6;
+                StockOpname::create([
+                    'users_id' => auth()->id(),
+                    'batches_id' => $batch->id,
+                    'stock_physical' => 0,
+                    'stock_discrepancy' => $delta,
+                    'stock_total' => 0,
+                    'date' => $now->toDateString(),
+                    'status' => $status,
+                ]);
+
+                ItemsLog::create([
+                    'batches_id' => $batch->id,
+                    'transaction_code' => $transactionCode,
+                    'code' => $this->generateItemsLogCode(),
+                    'type' => 'SO',
+                    'medicine_id' => $medicineId,
+                    'qty' => abs($delta),
+                    'qty_before' => $before,
+                    'qty_after' => 0,
+                    'total' => $delta,
+                    'date' => $now->toDateTimeString(),
+                    'status' => $status,
+                    'user_id' => auth()->id(),
+                ]);
+
+                $resetCount++;
+            }
+
+            $medicine = Medicines::find($medicineId);
+            if ($medicine) {
+                $medicine->update([
+                    'stock' => $this->calculateRealtimeStock($medicineId, $pharmacyId, 'total'),
+                ]);
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'reset_batches' => $resetCount,
+                'message' => $resetCount > 0
+                    ? "Stok batch obat berhasil dinolkan ({$resetCount} batch). Riwayat opname tetap tercatat."
+                    : 'Semua batch obat ini sudah bernilai 0.',
+            ]);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            report($e);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal menolkan stok batch: ' . $e->getMessage(),
+            ], 500);
+        }
     }
 
     public function downloadStockOpnameTemplate(Request $request)

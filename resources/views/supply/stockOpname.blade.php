@@ -500,6 +500,20 @@
                         </div>
                         <input type="hidden" id="target_mode" value="pelayanan">
 
+                        <div class="relative mb-5 flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                                <p class="text-xs font-bold text-amber-900">Reset semua batch obat ini</p>
+                                <p class="mt-1 text-[11px] leading-relaxed text-amber-800">
+                                    Menolkan stok seluruh batch obat terpilih pada mode lokasi ini. Riwayat opname tetap dicatat.
+                                    Setelah reset, pilih batch yang benar lalu masukkan stok fisiknya.
+                                </p>
+                            </div>
+                            <button type="button" id="btn_reset_medicine_batches"
+                                class="shrink-0 rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-bold text-amber-800 transition hover:bg-amber-100">
+                                Set Semua Batch ke 0
+                            </button>
+                        </div>
+
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5 relative">
                             <div class="bg-slate-50 p-3 rounded-xl border border-slate-100">
                                 <label id="label_desktop_stock_physic"
@@ -1380,6 +1394,64 @@
             });
         }
 
+        function resetAllMedicineBatches() {
+            const medicineId = $('#medicine_id').val();
+            const medicineName = $('#medicine_name').val() || 'obat terpilih';
+            const targetMode = $('#target_mode').val() || 'pelayanan';
+
+            if (!medicineId) {
+                iziToast.warning({
+                    title: 'Peringatan',
+                    message: 'Pilih obat terlebih dahulu.',
+                    position: 'topRight'
+                });
+                return;
+            }
+
+            const locationName = targetMode === 'gudang' ? 'Gudang PMI' : 'Pelayanan / Etalase';
+            if (!confirm(`Stok semua batch untuk ${medicineName} di ${locationName} akan menjadi 0. Riwayat opname akan tetap tercatat. Lanjutkan?`)) {
+                return;
+            }
+
+            const button = document.getElementById('btn_reset_medicine_batches');
+            button.disabled = true;
+            button.textContent = 'Memproses…';
+
+            $.ajax({
+                url: "{{ route('supplies.resetMedicineBatches') }}",
+                type: 'POST',
+                data: {
+                    _token: "{{ csrf_token() }}",
+                    medicine_id: medicineId,
+                    target_mode: targetMode
+                },
+                success: function(response) {
+                    iziToast.success({
+                        title: 'Berhasil',
+                        message: response.message || 'Semua stok batch berhasil dinolkan.',
+                        position: 'topRight'
+                    });
+
+                    $('#current_stock_physic, #stock_discrepancy, #custom_batch_name, #custom_expired_date, #selected_batch_id').val('');
+                    document.getElementById('discrepancy_badge').style.display = 'none';
+                    document.getElementById('stock_discrepancy').classList.remove('border-red-500', 'text-red-600');
+                    orderItemsTable.ajax.reload(null, false);
+                    loadBatches(medicineId);
+                },
+                error: function(xhr) {
+                    iziToast.error({
+                        title: 'Gagal',
+                        message: xhr.responseJSON?.message || 'Gagal menolkan semua batch.',
+                        position: 'topRight'
+                    });
+                },
+                complete: function() {
+                    button.disabled = false;
+                    button.textContent = 'Set Semua Batch ke 0';
+                }
+            });
+        }
+
         /* ── DOM ready ─────────────────────────────────────────────────── */
         document.addEventListener('DOMContentLoaded', function() {
             initEnterNavigation();
@@ -1550,6 +1622,7 @@
 
             // Load etalases on load
             loadEtalases();
+            document.getElementById('btn_reset_medicine_batches')?.addEventListener('click', resetAllMedicineBatches);
 
             // Desktop target mode switch
             document.getElementById('btn_desktop_mode_pelayanan')?.addEventListener('click', () =>

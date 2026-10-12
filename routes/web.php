@@ -344,6 +344,7 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
     Route::get('/getmedicines', [SuppliesController::class, 'getMedicines'])->name('supplies.medicines');
     Route::get('/medicineStockLog', [SuppliesController::class, 'medicineStockLog'])->name('supplies.medicineStockLog');
     Route::post('/saveopname', [SuppliesController::class, 'Opname'])->name('supplies.opname');
+    Route::post('/stockopname/reset-medicine-batches', [SuppliesController::class, 'resetMedicineBatches'])->name('supplies.resetMedicineBatches');
     Route::get('/export-stock', [SuppliesController::class, 'printStockData'])->name('supplies.printstockdata');
     Route::get('/export-stockopname', [SuppliesController::class, 'printStockOpname'])->name('supplies.printstockopname');
     Route::get('supplies/batches', [SuppliesController::class, 'getBatchesByMedicine'])->name('supplies.batches');
