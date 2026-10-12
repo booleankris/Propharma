@@ -22,6 +22,7 @@ import {
     Plus,
     Save,
     HelpCircle,
+    History,
 } from 'lucide-react';
 
 const localToday = () => {
@@ -84,6 +85,9 @@ export default function KasBank({
     const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
     const [isSavingDeposit, setIsSavingDeposit] = useState(false);
     const [depositForm, setDepositForm] = useState({ transfer_account_id: '', payment_date: localToday(), amount: '', reference_number: '', notes: 'Setoran tunai kasir ke rekening bank' });
+    const [isBackfillModalOpen, setIsBackfillModalOpen] = useState(false);
+    const [isBackfillingSales, setIsBackfillingSales] = useState(false);
+    const [backfillForm, setBackfillForm] = useState({ from_date: '', to_date: localToday() });
     const selectedOpening = openingBalances[openingForm.account_id];
 
     const submitDeposit = (event) => {
@@ -106,6 +110,21 @@ export default function KasBank({
             preserveScroll: true,
             onFinish: () => setIsSavingOpening(false),
             onError: (errors) => alert(Object.values(errors)[0] || 'Gagal menyimpan saldo awal.'),
+        });
+    };
+
+    const submitBackfill = (event) => {
+        event.preventDefault();
+        if (!backfillForm.from_date || !backfillForm.to_date) return alert('Pilih rentang tanggal penjualan yang akan dicatat.');
+        const confirmed = window.confirm(`Catat penjualan tunai selesai yang belum ada di Kas & Bank untuk ${backfillForm.from_date} sampai ${backfillForm.to_date}? Transaksi yang sudah tercatat akan dilewati.`);
+        if (!confirmed) return;
+
+        setIsBackfillingSales(true);
+        router.post('/finance/kas-bank/backfill-penjualan-tunai', backfillForm, {
+            preserveScroll: true,
+            onSuccess: () => setIsBackfillModalOpen(false),
+            onFinish: () => setIsBackfillingSales(false),
+            onError: (errors) => alert(Object.values(errors)[0] || 'Gagal mencatat penjualan tunai lama.'),
         });
     };
 
@@ -340,6 +359,17 @@ export default function KasBank({
                     </div>
 
                     <div className="flex items-center gap-2.5">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setBackfillForm({ from_date: '', to_date: localToday() });
+                                setIsBackfillModalOpen(true);
+                            }}
+                            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-xl hover:bg-indigo-100 transition shadow-xs"
+                        >
+                            <History className="w-4 h-4" />
+                            <span>Catat Penjualan Lama</span>
+                        </button>
                         <button
                             type="button"
                             onClick={() => {
@@ -820,6 +850,31 @@ export default function KasBank({
                 </div>
 
             </div>
+
+            {isBackfillModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
+                    <form onSubmit={submitBackfill} className="w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+                        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+                            <div>
+                                <h3 className="text-base font-bold text-slate-900">Catat Penjualan Tunai Lama</h3>
+                                <p className="mt-0.5 text-[11px] text-slate-500">Melengkapi mutasi yang belum tercatat untuk cabang ini.</p>
+                            </div>
+                            <button type="button" onClick={() => setIsBackfillModalOpen(false)} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100" aria-label="Tutup modal"><X className="h-5 w-5" /></button>
+                        </div>
+                        <div className="grid gap-3 p-5">
+                            <label className="text-xs font-semibold text-slate-600">Dari tanggal<input required type="date" max={backfillForm.to_date || localToday()} value={backfillForm.from_date} onChange={(event) => setBackfillForm({ ...backfillForm, from_date: event.target.value })} className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-normal" /></label>
+                            <label className="text-xs font-semibold text-slate-600">Sampai tanggal<input required type="date" min={backfillForm.from_date || undefined} max={localToday()} value={backfillForm.to_date} onChange={(event) => setBackfillForm({ ...backfillForm, to_date: event.target.value })} className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-normal" /></label>
+                            <div className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-[11px] leading-relaxed text-amber-800">
+                                Hanya transaksi penjualan berstatus selesai dengan metode Cash yang dicatat. Transaksi yang sudah memiliki mutasi akan dilewati. Jika tanggal transaksi sebelum tanggal saldo awal, saldo aktual tidak berubah.
+                            </div>
+                        </div>
+                        <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-4">
+                            <button type="button" onClick={() => setIsBackfillModalOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600">Batal</button>
+                            <button type="submit" disabled={isBackfillingSales || !backfillForm.from_date} className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-50"><History size={15} />{isBackfillingSales ? 'Memproses…' : 'Catat yang Belum Masuk'}</button>
+                        </div>
+                    </form>
+                </div>
+            )}
 
             {isDepositModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">

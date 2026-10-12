@@ -502,6 +502,89 @@ class FinanceController extends Controller
         return back()->with('success', 'Saldo awal akun berhasil disimpan. Nilai ini tidak dihitung sebagai pendapatan.');
     }
 
+    /** Catat ulang penjualan tunai lama yang belum memiliki mutasi Kas & Bank. */
+    public function backfillPenjualanTunai(Request $request)
+    {
+        $validated = $request->validate([
+            'from_date' => 'required|date|before_or_equal:to_date',
+            'to_date' => 'required|date|before_or_equal:today',
+        ], [
+            'from_date.before_or_equal' => 'Tanggal mulai harus sebelum atau sama dengan tanggal akhir.',
+            'to_date.before_or_equal' => 'Tanggal akhir tidak boleh melewati hari ini.',
+        ]);
+
+        $pharmacyId = (int) getActivePharmacyId();
+        $account = $this->branchKasBankAccountsQuery()->where('account_type', 'kas_apotek')->firstOrFail();
+        $createdCount = 0;
+        $createdTotal = 0.0;
+        $createdGrossTotal = 0.0;
+
+        DB::transaction(function () use ($validated, $pharmacyId, $account, &$createdCount, &$createdTotal, &$createdGrossTotal) {
+            $lockedAccount = FinanceAccount::whereKey($account->id)->lockForUpdate()->firstOrFail();
+            $opening = FinancePayment::where('payment_type', 'SALDO AWAL')
+                ->where('account_id', $lockedAccount->id)
+                ->first();
+
+            MedicineTransactions::query()
+                ->where('pharmacy_id', $pharmacyId)
+                ->where('status', 1)
+                ->where('payment_method', 'CASH')
+                ->whereNotIn('transaction_type', ['KREDIT'])
+                ->whereRaw("UPPER(COALESCE(transaction_type, '')) NOT LIKE 'RETUR%'")
+                ->whereBetween(DB::raw('DATE(created_at)'), [$validated['from_date'], $validated['to_date']])
+                ->whereDoesntHave('payments', fn ($query) => $query->where('payment_type', 'PENJUALAN TUNAI'))
+                ->orderBy('id')
+                ->chunkById(500, function ($transactions) use ($lockedAccount, $pharmacyId, $opening, &$createdCount, &$createdTotal, &$createdGrossTotal) {
+                    foreach ($transactions as $transaction) {
+                        $amount = round((float) $transaction->subtotal, 2);
+                        if ($amount <= 0) continue;
+
+                        // Recheck after locking the account so repeated imports stay idempotent.
+                        $alreadyRecorded = FinancePayment::where('medicine_transaction_id', $transaction->id)
+                            ->where('payment_type', 'PENJUALAN TUNAI')
+                            ->exists();
+                        if ($alreadyRecorded) continue;
+
+                        $paymentDate = $transaction->created_at?->toDateString() ?? now()->toDateString();
+                        FinancePayment::create([
+                            'pharmacy_id' => $pharmacyId,
+                            'medicine_transaction_id' => $transaction->id,
+                            'account_id' => $lockedAccount->id,
+                            'payment_type' => 'PENJUALAN TUNAI',
+                            'payment_date' => $paymentDate,
+                            'amount' => $amount,
+                            'reference_number' => $transaction->transaction_code,
+                            'notes' => 'Backfill penjualan tunai lama',
+                            'created_by' => Auth::id(),
+                        ]);
+
+                        $createdGrossTotal += $amount;
+                        // Saldo awal adalah saldo aktual pada tanggal mulai pencatatan.
+                        // Riwayat yang lebih lama hanya melengkapi mutasi dan tidak mengubah saldo aktual itu.
+                        if (!$opening || $paymentDate >= $opening->payment_date?->format('Y-m-d')) {
+                            $createdTotal += $amount;
+                        }
+                        $createdCount++;
+                    }
+                });
+
+            if ($createdTotal > 0) {
+                if ($opening) {
+                    $lockedAccount->update([
+                        'balance' => $this->calculateBalanceFromOpening($lockedAccount->id, $opening, now()->toDateString()),
+                    ]);
+                } else {
+                    $lockedAccount->increment('balance', $createdTotal);
+                }
+            }
+            $this->clearStatsCache();
+        });
+
+        return back()->with('success', $createdCount
+            ? "Berhasil mencatat {$createdCount} penjualan tunai lama senilai Rp " . number_format($createdGrossTotal, 0, ',', '.') . '.'
+            : 'Tidak ada penjualan tunai lama yang perlu ditambahkan pada rentang tanggal tersebut.');
+    }
+
     public function storePendapatanLainLain(Request $request)
     {
         $validated = $request->validate([

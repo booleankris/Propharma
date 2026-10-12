@@ -582,6 +582,7 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
         Route::post('/bulk-cash-payment', [\App\Http\Controllers\FinanceController::class, 'assignBulkCashAccount'])->name('cash.bulkAssign');
         Route::post('/piutang-payments', [\App\Http\Controllers\FinanceController::class, 'storePiutangPayment'])->name('piutang.store');
         Route::post('/saldo-awal', [\App\Http\Controllers\FinanceController::class, 'storeSaldoAwal'])->name('saldoAwal.store');
+        Route::post('/kas-bank/backfill-penjualan-tunai', [\App\Http\Controllers\FinanceController::class, 'backfillPenjualanTunai'])->name('kasBank.backfillPenjualanTunai');
         Route::post('/pendapatan-lain-lain', [\App\Http\Controllers\FinanceController::class, 'storePendapatanLainLain'])->name('pendapatanLainLain.store');
         Route::post('/bulk-piutang-payments', [\App\Http\Controllers\FinanceController::class, 'bulkPiutangPayment'])->name('piutang.bulkStore');
         Route::post('/piutang/import-payments', [\App\Http\Controllers\FinanceController::class, 'importPiutangPayments'])->name('piutang.importPayments');
