@@ -33,6 +33,7 @@ class StockExport extends DefaultValueBinder implements FromQuery, WithHeadings,
     public function query()
     {
         return DB::table('medicines as m')
+            ->where('m.status', 1)
             ->leftJoin(DB::raw("(SELECT medicine_id, SUM(stock) as gudang_qty FROM batches WHERE pharmacy_id = 9 GROUP BY medicine_id) as g"), 'g.medicine_id', '=', 'm.id')
             ->leftJoin(DB::raw("(
                 SELECT b.medicine_id, SUM(mt.qty) as pmi_qty
