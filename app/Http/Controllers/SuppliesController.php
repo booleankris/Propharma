@@ -1663,8 +1663,11 @@ class SuppliesController extends Controller
             if ($request->filled('custom_batch_name')) {
                 $customName = trim($request->custom_batch_name);
                 $customEd = $request->filled('custom_expired_date')
-                    ? Carbon::parse(str_replace('/', '-', $request->custom_expired_date))->toDateString()
+                    ? StockOpnameImportService::parseSmartExpiredDate((string) $request->custom_expired_date)
                     : now()->addYears(2)->toDateString();
+                if (!$customEd) {
+                    throw new \InvalidArgumentException('Format tanggal kedaluwarsa tidak valid.');
+                }
 
                 $batchTargetPharmacyId = ($targetMode === 'gudang') ? $warehouseId : $counterPharmacyId;
 

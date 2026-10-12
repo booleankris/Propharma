@@ -553,6 +553,25 @@ class SalesController extends Controller
     public function addToCart(Request $request)
     {
 
+        $parentTransaction = MedicineTransactions::where('id', $request->get('transaction_id'))
+            ->where('user_id', auth()->id())
+            ->where('status', 0)
+            ->firstOrFail();
+
+        $cartType = $request->get('cart_type');
+        $medicineType = $request->get('medicine_type');
+        $embalase = $request->get('embalase');
+        if ($parentTransaction->transaction_type === 'KREDIT') {
+            if (!in_array($cartType, ['UK', 'UP', 'HV'], true)) {
+                return response()->json(['message' => 'Jenis item resep kredit tidak valid.'], 422);
+            }
+            // Keep the invoice/receivable as credit while classifying each line separately.
+            $medicineType = 'KREDIT';
+            if ($cartType !== 'UK') {
+                $embalase = 0;
+            }
+        }
+
         if ($request->get('racikstatus') == 1) {
             $hasRacikan = MedicineCart::where('transaction_id', $request->get('transaction_id'))
                 ->where('user_id', auth()->id())
@@ -589,7 +608,7 @@ class SalesController extends Controller
         if ($request->get('racikstatus') == 1) {
             $service = 0;
         } else {
-            if ($request->get('cart_type') == "UM" || $request->get('cart_type') == "UK") {
+            if ($cartType == "UM" || $cartType == "UK") {
                 $service = $request->get('service');
             } else {
                 $service = 0;
@@ -611,8 +630,8 @@ class SalesController extends Controller
             'transaction_id' => $request->get('transaction_id'),
             'quantity' => $request->get('quantity'),
             'discount' => $request->get('discount'),
-            'embalase' => $request->get('embalase'),
-            'cart_type' => $request->get('cart_type'),
+            'embalase' => $embalase,
+            'cart_type' => $cartType,
             'package' => $request->get('package'),
             'dosage_r' => $request->get('dosage_r'),
             'item_price' => $request->get('price2'),
@@ -622,7 +641,7 @@ class SalesController extends Controller
             'status' => 0,
             'recipe_status' => $recipeStatus,
             'recipe_number' => $recipeNumber,
-            'medicine_type' => $request->get('medicine_type'),
+            'medicine_type' => $medicineType,
             'service_fee' => $service,
         ]);
         $transaction->load('medicine');
@@ -1234,6 +1253,32 @@ class SalesController extends Controller
             ->where('user_id', auth()->id())
             ->first();
 
+        if (!$cart) {
+            return response()->json(['message' => 'Item transaksi tidak ditemukan.'], 404);
+        }
+
+        $parentTransaction = MedicineTransactions::where('id', $cart->transaction_id)
+            ->where('user_id', auth()->id())
+            ->where('status', 0)
+            ->first();
+        if (!$parentTransaction) {
+            return response()->json(['message' => 'Transaksi tidak ditemukan atau sudah selesai.'], 422);
+        }
+
+        $cartType = $cart->cart_type;
+        $serviceFee = $cart->service_fee;
+        $embalase = $cart->embalase;
+        if ($parentTransaction->transaction_type === 'KREDIT') {
+            $cartType = $request->input('cart_type', $cart->cart_type);
+            if (!in_array($cartType, ['UK', 'UP', 'HV'], true)) {
+                return response()->json(['message' => 'Jenis item resep kredit tidak valid.'], 422);
+            }
+            $serviceFee = $cartType === 'UK' && (int) $request->input('racikstatus', 0) !== 1
+                ? (float) $request->input('service', 0)
+                : 0;
+            $embalase = $cartType === 'UK' ? (float) $request->input('embalase', 0) : 0;
+        }
+
         if ($request->has('debtor_id') && $request->filled('debtor_id')) {
             MedicineTransactions::where('id', $cart->transaction_id)
                 ->where('user_id', auth()->id())
@@ -1244,13 +1289,20 @@ class SalesController extends Controller
         }
 
         $cart->update([
+            'cart_type' => $cartType,
+            'medicine_type' => $parentTransaction->transaction_type === 'KREDIT'
+                ? 'KREDIT'
+                : $cart->medicine_type,
+            'service_fee' => $serviceFee,
+            'embalase' => $embalase,
             'quantity' => $request->quantity,
             'discount' => $request->discount,
             'package' => $request->package,
             'dosage_r' => $request->dosage_r,
+            'item_price' => $request->price2,
             'raw_total' => $request->raw_total,
             'total_price' => $request->final_price,
-            'final_price' => $request->total_price + $cart->embalase ?? 0,
+            'final_price' => $request->total_price + $embalase,
         ]);
 
         $cart->load('medicine');

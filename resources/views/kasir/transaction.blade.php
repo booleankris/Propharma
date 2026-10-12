@@ -438,7 +438,11 @@
                                 F3
                             </div>
                             <div class="font-semibold font-poppins text-[11px]">
-                                Ganti Faktor
+                                @if ($transaction->transaction_type == 'KREDIT')
+                                    Ganti Faktur Item
+                                @else
+                                    Ganti Faktor
+                                @endif
                             </div>
                         </div>
                         <svg class="w-6 h-6 text-gray-800 dark:text-white" aria-hidden="true"
@@ -521,7 +525,9 @@
                     <div class="w-1/2 flex">
                         <div class="mr-2">
                             <div class="w-full my-1">
-                                <label class="text-[13px] font-poppins font-semibold">Faktur</label>
+                                <label class="text-[13px] font-poppins font-semibold">
+                                    @if ($transaction->transaction_type == 'KREDIT') Jenis Faktur Item @else Faktur @endif
+                                </label>
 
                             </div>
                             @if ($check_transaction != 0)
@@ -529,7 +535,7 @@
                                     <div id="faktur" class="py-2">
                                         <span
                                             class="bg-yellow-100 text-yellow-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md dark:bg-yellow-900 dark:text-yellow-300">Resep
-                                            Kredit</span>
+                                            Jenis item: Resep Kredit</span>
                                     </div>
                                 @elseif($transaction->transaction_type == 'RESEP TUNAI')
                                     <div id="faktur" class="py-2">
@@ -1958,6 +1964,11 @@
     var cart_type = "";
     let existingpackage = {!! json_encode($existingpackage->package ?? '') !!};
     var currenttransaction = transaction_type;
+    var selectedMedicine = null;
+    // In a credit transaction this variable tracks the item category selected
+    // with F3; the transaction header itself remains KREDIT.
+    var creditItemParameters = parameters;
+    var creditItemRounding = rounding;
 
     var racikstatus = 0;
     var racikembalaseprice = 0;
@@ -2517,6 +2528,7 @@
 
         isScanning = true;
         clearTimeout(debounceTimer);
+        selectedMedicine = it;
 
         hidden.value = it.id;
         medicine_id = it.id;
@@ -3336,6 +3348,10 @@
 
             parameters = it.parameters[0].receipt;
             rounding = it.parameters[0].rounding;
+            if (currenttransaction === 'KREDIT') {
+                creditItemParameters = parameters;
+                creditItemRounding = rounding;
+            }
             if (document.getElementById('debtor_id')) document.getElementById('debtor_id').value = it.id;
             if (document.getElementById('selectedDebtorId')) document.getElementById('selectedDebtorId').value = it.id;
             console.log(rounding);
@@ -3359,7 +3375,7 @@
         total_item = val;
         let rawAmount = price2 * val;
 
-        if (currenttransaction == "KREDIT" && racikstatus === 0) {
+        if (transaction_type == "KREDIT" && racikstatus === 0) {
             subtotal = rawAmount + parseInt(service || 0);
         } else if (transaction_type == "RESEP TUNAI" && racikstatus === 0) {
             subtotal = Math.max(1000, Math.ceil(rawAmount / 1000) * 1000) + parseInt(service || 0);
@@ -3440,6 +3456,7 @@
         pharmacy_price = 0;
         true_price = 0;
         discount = 0;
+        selectedMedicine = null;
 
         const pkg = document.getElementById('package');
         if (pkg) pkg.focus();
@@ -3829,13 +3846,17 @@
                 let totalval;
 
                 medicine_id = item.medicine_id;
+                selectedMedicine = item.medicine || null;
+                cart_type = item.cart_type;
                 total_item = item.quantity;
                 price2 = Number(item.item_price) || 0;
                 item_finalprice = price2;
+                rawprice = Number(item.medicine?.net_price) || price2;
+                het = Number(item.medicine?.het_price) > 0 ? 1 : 0;
                 discount = Number(item.discount) || 0;
 
                 let rawAmount = price2 * item.quantity;
-                if (currenttransaction == "KREDIT" && (!item.recipe_status || item.recipe_status == 0)) {
+                if (item.cart_type == 'UK' && (!item.recipe_status || item.recipe_status == 0)) {
                     subtotal = rawAmount + parseInt(service || 0);
                 } else if (transaction_type == "RESEP TUNAI" && (!item.recipe_status || item.recipe_status == 0)) {
                     subtotal = Math.max(1000, Math.ceil(rawAmount / 1000) * 1000) + parseInt(service || 0);
@@ -3875,15 +3896,20 @@
                         }
                     }
                 }
-                if (item.cart_type == "UP") {
+                if (currenttransaction === 'KREDIT' && item.cart_type == 'UK') {
+                    transaction_type = 'KREDIT';
+                    parameters = creditItemParameters;
+                    rounding = creditItemRounding;
+                    faktur.innerHTML = `<span class="bg-yellow-100 text-yellow-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md">Jenis item: Resep Kredit</span>`;
+                } else if (item.cart_type == "UP") {
                     transaction_type = "UPDS";
-                    price2 = item.item_price;
-                    price.value = formatRupiah(item.item_price);
+                    parameters = {{ $parameterUP }};
+                    if (currenttransaction === 'KREDIT') faktur.innerHTML = `<span class="bg-green-100 text-green-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md">Jenis item: UPDS</span>`;
 
                 } else if (item.cart_type == "HV") {
                     transaction_type = "HV/OTC";
-                    price2 = item.item_price;
-                    price.value = formatRupiah(item.item_price);
+                    parameters = {{ $parameterHV }};
+                    if (currenttransaction === 'KREDIT') faktur.innerHTML = `<span class="bg-blue-100 text-blue-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md">Jenis item: HV/OTC</span>`;
 
                 }
                 totalprice.value = formatRupiah(item.total_price - item.discount);
@@ -4010,7 +4036,12 @@
         let debtor_id = null;
 
         // TRANSACTION TYPE
-        if (transaction_type === 'RESEP TUNAI') {
+        if (currenttransaction === 'KREDIT') {
+
+            doctor_id = document.getElementById('doctor_id').value || null;
+            debtor_id = document.getElementById('debtor_id').value || null;
+
+        } else if (currenttransaction === 'RESEP TUNAI') {
 
             doctor_id =
                 document.getElementById('doctor_id').value || null;
@@ -4039,7 +4070,7 @@
 
         // VALIDATION
         if (
-            transaction_type === 'RESEP TUNAI' &&
+            currenttransaction === 'RESEP TUNAI' &&
             !doctor_id
         ) {
 
@@ -4054,9 +4085,9 @@
 
         if (
             (
-                transaction_type === 'KREDIT' ||
-                transaction_type === 'RESEP KREDIT' ||
-                transaction_type === 'RESEP ASURANSI'
+                currenttransaction === 'KREDIT' ||
+                currenttransaction === 'RESEP KREDIT' ||
+                currenttransaction === 'RESEP ASURANSI'
             ) &&
             !debtor_id
         ) {
@@ -4081,7 +4112,7 @@
             return;
         }
 
-        if (['TRANSFER', 'DEBIT', 'QRIS'].includes(paymentType) && transaction_type !== 'KREDIT') {
+        if (['TRANSFER', 'DEBIT', 'QRIS'].includes(paymentType) && currenttransaction !== 'KREDIT') {
             const bankVal = bank_name_input ? bank_name_input.value : '';
             if (!bankVal) {
                 iziToast.warning({
@@ -4220,7 +4251,7 @@
 
             hideCheckoutLoading();
 
-            CheckoutModal.open(transaction_type);
+            CheckoutModal.open(currenttransaction);
 
         } catch (error) {
 
@@ -4413,7 +4444,24 @@
         const isF3 = e.key === 'F3' || e.keyCode === 114;
         if (isF3) {
             e.preventDefault();
-            if (currenttransaction == "RESEP TUNAI") {
+            if (currenttransaction === 'KREDIT') {
+                if (transaction_type === 'KREDIT') {
+                    parameters = {{ $parameterUP }};
+                    rounding = {{ $ChangeFakturRounding }};
+                    transaction_type = 'UPDS';
+                    faktur.innerHTML = `<span class="bg-green-100 text-green-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md">Jenis item: UPDS</span>`;
+                } else if (transaction_type === 'UPDS') {
+                    parameters = {{ $parameterHV }};
+                    rounding = {{ $ChangeFakturRounding }};
+                    transaction_type = 'HV/OTC';
+                    faktur.innerHTML = `<span class="bg-blue-100 text-blue-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md">Jenis item: HV/OTC</span>`;
+                } else {
+                    parameters = creditItemParameters;
+                    rounding = creditItemRounding;
+                    transaction_type = 'KREDIT';
+                    faktur.innerHTML = `<span class="bg-yellow-100 text-yellow-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md">Jenis item: Resep Kredit</span>`;
+                }
+            } else if (currenttransaction == "RESEP TUNAI") {
                 if (transaction_type == 'RESEP TUNAI') {
                     parameters = {{ $parameterUP }};
                     transaction_type = "UPDS";
@@ -4460,6 +4508,11 @@
                 // }
             }
 
+            if (currenttransaction === 'KREDIT') {
+                cart_type = transaction_type === 'UPDS' ? 'UP' :
+                    transaction_type === 'HV/OTC' ? 'HV' : 'UK';
+            }
+
             // if (checkbox.checked) {
             //     document.getElementById('receiptbox').checked = false;
 
@@ -4493,16 +4546,19 @@
             // //     rounded = Math.floor(raw / 1000) * 1000;
             // // }
 
-            if (het === 1) {
-                raw = Number(it.het_price);
-            } else {
-                raw = Number(rawprice) * Number(parameters || 1);
-            }
+            if (selectedMedicine) {
+                if (het === 1) {
+                    raw = Number(selectedMedicine.het_price || rawprice);
+                } else {
+                    raw = Number(rawprice) * Number(parameters || 1) +
+                        (transaction_type === 'KREDIT' ? Number(rounding || 0) : 0);
+                }
 
-            price.value = formatRupiah(raw);
-            console.log("harga Total : " + raw);
-            price2 = raw;
-            item_finalprice = raw;
+                price.value = formatRupiah(raw);
+                console.log("harga Total : " + raw);
+                price2 = raw;
+                item_finalprice = raw;
+            }
 
         }
     }

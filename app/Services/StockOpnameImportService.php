@@ -1374,6 +1374,22 @@ class StockOpnameImportService
         $candidates = array_unique(array_filter([$formatted, $raw]));
 
         foreach ($candidates as $candidate) {
+            // Some spreadsheet cells contain a literal Indonesian date-time string
+            // instead of an Excel date serial, e.g. "24/07/2026 08:25".
+            // Carbon::parse does not reliably recognize this day-first format.
+            if (preg_match('/^(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{4})(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?$/', trim($candidate), $dateMatch)) {
+                foreach (['d/m/Y', 'd-m-Y', 'd.m.Y'] as $dateFormat) {
+                    try {
+                        $date = Carbon::createFromFormat('!' . $dateFormat, $dateMatch[1]);
+                        if ($date !== false) {
+                            return $date->toDateString();
+                        }
+                    } catch (\Throwable $e) {
+                        // Try the next supported day-first separator.
+                    }
+                }
+            }
+
             $clean = trim(preg_replace('/[.\s\/]+/', '-', $candidate));
 
             // Pattern: MonthName-Year (e.g. Jun-26, Juni-2026, Agu-26, Agt-26, Des-26)
