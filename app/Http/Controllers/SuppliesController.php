@@ -28,6 +28,27 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class SuppliesController extends Controller
 {
+    private function parseStockOpnameDateTime($value): ?Carbon
+    {
+        if (!$value) return null;
+        if ($value instanceof Carbon) return $value;
+
+        try {
+            return Carbon::parse($value);
+        } catch (\Throwable $e) {
+            foreach (['d/m/Y H:i:s', 'd/m/Y H:i', 'd/m/Y', 'd-m-Y H:i:s', 'd-m-Y H:i', 'd-m-Y'] as $format) {
+                try {
+                    $date = Carbon::createFromFormat('!' . $format, trim((string) $value));
+                    if ($date !== false) return $date;
+                } catch (\Throwable $ignored) {
+                    // Continue through the accepted day-first date formats.
+                }
+            }
+        }
+
+        return null;
+    }
+
     private function stockLogDelta(ItemsLog $log): int
     {
         $status = (int) $log->status;
@@ -1132,7 +1153,7 @@ class SuppliesController extends Controller
                 })
                 ->addIndexColumn()
                 ->addColumn('date', function ($row) {
-                    $d = $row->date ? \Carbon\Carbon::parse($row->date) : null;
+                    $d = $this->parseStockOpnameDateTime($row->date);
                     if (!$d) return '<span class="text-slate-400 text-xs">—</span>';
                     $dateStr = $d->format('d/m/Y');
                     $timeStr = $d->format('H:i');
@@ -1178,7 +1199,8 @@ class SuppliesController extends Controller
                     $batch = $row->batches;
                     if (!$batch) return '<span class="text-slate-400 text-xs">—</span>';
                     $batchName = e($batch->batch_1 ?: '-');
-                    $ed = $batch->expired_date ? \Carbon\Carbon::parse($batch->expired_date)->format('d/m/Y') : '-';
+                    $parsedExpiredDate = StockOpnameImportService::parseSmartExpiredDate($batch->expired_date);
+                    $ed = $parsedExpiredDate ? Carbon::parse($parsedExpiredDate)->format('d/m/Y') : '-';
                     return '<div class="flex flex-col whitespace-nowrap leading-tight">
                         <span class="font-bold text-slate-700 text-xs">' . $batchName . '</span>
                         <span class="text-[10px] text-slate-400">ED: ' . $ed . '</span>
