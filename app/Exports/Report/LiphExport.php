@@ -3,6 +3,7 @@
 namespace App\Exports\Report;
 
 use App\Models\MedicineTransactions;
+use App\Support\LiphTransactionScope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Maatwebsite\Excel\Concerns\FromArray;
@@ -102,45 +103,18 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
      */
     private function applySalesStatusScope(Builder $query): Builder
     {
-        return $query->where(function (Builder $status) {
-            $status->where('status', 1)
-                ->orWhere(function (Builder $unpaid) {
-                    $unpaid->whereNotNull('transaction_code')
-                        ->whereHas('transactions', fn (Builder $cart) => $cart->where('status', 1))
-                        ->where(function (Builder $unpaidType) {
-                            $unpaidType->whereRaw("UPPER(TRIM(COALESCE(payment_method, ''))) = 'BELUM BAYAR'")
-                                ->orWhereIn('transaction_type', ['KREDIT', 'RESEP KREDIT']);
-                        });
-                });
-        });
+        return LiphTransactionScope::applySalesStatus($query);
     }
 
     private function applyReportPeriod(Builder $query): void
     {
-        $start = $this->startDate;
-        $until = $this->endDate->copy()->addDay()->startOfDay();
-
-        // All LIPH modes use the same working date. The two branches are exclusive,
-        // so a sale crossing midnight can belong to only one reporting day.
-        $query->where(function (Builder $period) use ($start, $until) {
-            $period->whereHas('shift_logs', function (Builder $shiftQuery) use ($start, $until) {
-                $shiftQuery->where('clock_in', '>=', $start)->where('clock_in', '<', $until);
-            })->orWhere(function (Builder $withoutShiftTime) use ($start, $until) {
-                $withoutShiftTime->whereDoesntHave('shift_logs', fn (Builder $q) => $q->whereNotNull('clock_in'))
-                    ->where(function (Builder $recorded) use ($start, $until) {
-                        // Checkout records created_at; later edits must not move the report date.
-                        $recorded->where('created_at', '>=', $start)->where('created_at', '<', $until)
-                            ->orWhere(function (Builder $legacy) use ($start, $until) {
-                                $legacy->whereNull('created_at')
-                                    ->where('updated_at', '>=', $start)->where('updated_at', '<', $until);
-                            });
-                    });
-            });
-        });
-
-        if ($this->hasShiftFilter()) {
-            $query->whereHas('shift_logs', fn (Builder $q) => $q->where('shift_id', $this->shift));
-        }
+        LiphTransactionScope::applyPeriod(
+            $query,
+            $this->startDate,
+            $this->endDate,
+            $this->shiftType,
+            $this->shift
+        );
     }
 
     private function buildReportData(): array

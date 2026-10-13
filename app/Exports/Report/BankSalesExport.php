@@ -3,6 +3,7 @@
 namespace App\Exports\Report;
 
 use App\Models\MedicineTransactions;
+use App\Support\LiphTransactionScope;
 use Illuminate\Support\Carbon;
 use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 
@@ -69,7 +70,8 @@ class BankSalesExport implements WithMultipleSheets
         )
             ->with([
                 'transactions' => function ($q) {
-                    $q->select('id', 'transaction_id', 'medicine_id', 'quantity', 'item_price', 'discount', 'total_price', 'final_price');
+                    $q->select('id', 'transaction_id', 'medicine_id', 'quantity', 'item_price', 'discount', 'total_price', 'final_price', 'status', 'cart_type')
+                        ->where('status', 1);
                 },
                 'transactions.medicine' => function ($q) {
                     $q->select('id', 'code', 'name');
@@ -88,14 +90,16 @@ class BankSalesExport implements WithMultipleSheets
                 },
             ])
             ->where('pharmacy_id', $this->pharmacyId)
-            ->where('status', 1)
-            ->whereBetween('updated_at', [$this->startDate, $this->endDate]);
+            ->whereIn('transaction_type', array_keys(LiphExport::TYPE_MAP));
 
-        if ($this->shiftType === 'shift' && !empty($this->shift)) {
-            $query->whereHas('shift_logs', function ($q) {
-                $q->where('shift_id', $this->shift);
-            });
-        }
+        LiphTransactionScope::applySalesStatus($query);
+        LiphTransactionScope::applyPeriod(
+            $query,
+            $this->startDate,
+            $this->endDate,
+            $this->shiftType,
+            $this->shift
+        );
 
         $allTransactions = $query->orderBy('updated_at', 'asc')->get();
 
@@ -127,10 +131,14 @@ class BankSalesExport implements WithMultipleSheets
                 $discSum += $trxDiscount;
 
                 $items = $trx->transactions;
+                $originalMap = LiphExport::TYPE_MAP[$trx->transaction_type] ?? null;
+                $originalLabel = $originalMap[1] ?? '';
                 if ($items->isEmpty()) {
                     $subtotal = (float) ($trx->subtotal ?? 0);
-                    $grossSum += $subtotal;
-                    $netSum += ($subtotal - $trxDiscount);
+                    $isReturn = in_array($originalLabel, ['Retur Tunai', 'Retur Kredit'], true);
+                    $signedSubtotal = $isReturn ? -abs($subtotal) : $subtotal;
+                    $grossSum += $signedSubtotal;
+                    $netSum += ($signedSubtotal - $trxDiscount);
                     $qtySum += 1;
                 } else {
                     foreach ($items as $item) {
@@ -139,10 +147,20 @@ class BankSalesExport implements WithMultipleSheets
                         $itemDisc = (float) ($item->discount ?? 0);
                         $final = (float) ($item->final_price ?? ($item->total_price ?? ($qty * $price - $itemDisc)));
 
+                        $effectiveType = $item->cart_type
+                            ? (LiphExport::CART_TYPE_ABBR[$item->cart_type] ?? $item->cart_type)
+                            : $trx->transaction_type;
+                        $effectiveMap = LiphExport::TYPE_MAP[$effectiveType] ?? $originalMap;
+                        $isReturn = in_array($effectiveMap[1] ?? $originalLabel, ['Retur Tunai', 'Retur Kredit'], true);
+
                         $qtySum += $qty;
-                        $grossSum += ($qty * $price);
-                        $netSum += $final;
+                        $grossSum += $isReturn ? -abs($qty * $price) : ($qty * $price);
+                        $netSum += $isReturn ? -abs($final) : $final;
                     }
+
+                    // LIPH's Netto Akhir subtracts each transaction-level
+                    // discount once, after summing all eligible cart items.
+                    $netSum -= $trxDiscount;
                 }
             }
 
