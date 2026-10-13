@@ -95,6 +95,26 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         return in_array($this->shiftType, ['shift', 'online'], true) && !empty($this->shift);
     }
 
+    /**
+     * LIPH reports sales by the value of goods sold, not cash collected.
+     * Keep completed sales and include finalized unpaid transactions even if
+     * legacy rows have a non-standard transaction status.
+     */
+    private function applySalesStatusScope(Builder $query): Builder
+    {
+        return $query->where(function (Builder $status) {
+            $status->where('status', 1)
+                ->orWhere(function (Builder $unpaid) {
+                    $unpaid->whereNotNull('transaction_code')
+                        ->whereHas('transactions', fn (Builder $cart) => $cart->where('status', 1))
+                        ->where(function (Builder $unpaidType) {
+                            $unpaidType->whereRaw("UPPER(TRIM(COALESCE(payment_method, ''))) = 'BELUM BAYAR'")
+                                ->orWhereIn('transaction_type', ['KREDIT', 'RESEP KREDIT']);
+                        });
+                });
+        });
+    }
+
     private function applyReportPeriod(Builder $query): void
     {
         $start = $this->startDate;
@@ -133,7 +153,7 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                 'shift_logs'
             ])
                 ->where('pharmacy_id', $this->pharmacyId)
-                ->where('status', 1)
+                ->tap(fn (Builder $query) => $this->applySalesStatusScope($query))
                 ->tap(fn (Builder $query) => $this->applyReportPeriod($query))
                 ->whereIn('transaction_type', array_keys(self::TYPE_MAP))
                 ->get();
@@ -144,7 +164,7 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                 'transactions' => fn($q) => $q->where('status', 1)
             ])
                 ->where('pharmacy_id', $this->pharmacyId)
-                ->where('status', 1)
+                ->tap(fn (Builder $query) => $this->applySalesStatusScope($query))
                 ->tap(fn (Builder $query) => $this->applyReportPeriod($query))
                 ->whereIn('transaction_type', array_keys(self::TYPE_MAP))
                 ->get();
@@ -159,7 +179,7 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                 'shift_logs'
             ])
                 ->where('pharmacy_id', $this->pharmacyId)
-                ->where('status', 1)
+                ->tap(fn (Builder $query) => $this->applySalesStatusScope($query))
                 ->tap(fn (Builder $query) => $this->applyReportPeriod($query))
                 ->whereIn('transaction_type', array_keys(self::TYPE_MAP))
                 ->where(function ($query) use ($roleName) {
@@ -189,7 +209,7 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                 'transactions' => fn($q) => $q->where('status', 1)
             ])
                 ->where('pharmacy_id', $this->pharmacyId)
-                ->where('status', 1)
+                ->tap(fn (Builder $query) => $this->applySalesStatusScope($query))
                 ->tap(fn (Builder $query) => $this->applyReportPeriod($query))
                 ->whereIn('transaction_type', array_keys(self::TYPE_MAP))
                 ->get();
