@@ -24,6 +24,12 @@
             background-color: #e4efff;
         }
 
+        .bg-searchhover.is-keyboard-active,
+        .bg-searchhover.is-keyboard-active:hover {
+            background-color: #e4efff;
+            border-left-color: #60a5fa;
+        }
+
         .payment-option:focus-within .payment-card {
             outline: 2.5px solid #3b82f6 !important;
             outline-offset: 2px !important;
@@ -2319,8 +2325,9 @@
     function highlight() {
 
         [...list.children].forEach((li, i) => {
-            li.classList.toggle('bg-slate-50', i === activeIndex);
-            li.classList.toggle('border-blue-400', i === activeIndex);
+            const isActive = i === activeIndex;
+            li.classList.toggle('is-keyboard-active', isActive);
+            li.setAttribute('aria-selected', String(isActive));
         });
     }
 
@@ -2363,6 +2370,11 @@
             const stock = canSeeWarehouse ?
                 ((Number(it.storage_stock) || 0) + (Number(it.counter_stock) || 0)) :
                 (Number(it.counter_stock) || 0);
+            const packaging = String(it.packaging || '').trim();
+            const unit = String(it.unit || '').trim();
+            const content = String(it.content ?? '').trim();
+            const stripValue = String(it.strip ?? '').trim();
+            const showStrip = stripValue !== '' && Number(stripValue) !== 0;
 
             // Definisi badge stok untuk cabang-cabang lain
             const branchPillsDef = {
@@ -2449,26 +2461,33 @@
             </div>
  
             <div class="grid grid-cols-2 gap-x-5 gap-y-1.5 mt-1">
-                <div class="flex items-center gap-1.5">
-                    <svg class="w-3 h-3 text-gray-300 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9.75h16.5M3.75 9.75V6.108c0-.621.504-1.125 1.125-1.125h14.25c.621 0 1.125.504 1.125 1.125V9.75m-16.5 0v9.017c0 .621.504 1.125 1.125 1.125h14.25c.621 0 1.125-.504 1.125-1.125V9.75"/></svg>
+                <div class="flex items-start gap-1.5">
+                    <svg class="w-3 h-3 mt-0.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 7.5 12 12m0 0L3 7.5M12 12v9m8.25-13.5-7.5-4.167a1.5 1.5 0 0 0-1.5 0L3.75 7.5m16.5 0v9a1.5 1.5 0 0 1-.75 1.3l-6.75 3.9a1.5 1.5 0 0 1-1.5 0l-6.75-3.9a1.5 1.5 0 0 1-.75-1.3v-9"/></svg>
                     <div class="min-w-0">
-                        <div class="text-[9px] uppercase tracking-wider text-gray-400 leading-none">Etalase</div>
-                        <div class="text-xs text-gray-700 truncate">${escapeHtml(it.etalases?.name || '—')}</div>
+                        <div class="text-[9px] font-semibold uppercase tracking-wider text-slate-500 leading-none">Kemasan</div>
+                        <div class="text-xs font-medium text-slate-700 truncate">${escapeHtml(packaging)}${escapeHtml(unit)}${escapeHtml(content)}${showStrip ? `STRIP${escapeHtml(stripValue)}` : ''}</div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-1.5">
+                    <svg class="w-3 h-3 text-slate-400 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9.75h16.5M3.75 9.75V6.108c0-.621.504-1.125 1.125-1.125h14.25c.621 0 1.125.504 1.125 1.125V9.75m-16.5 0v9.017c0 .621.504 1.125 1.125 1.125h14.25c.621 0 1.125-.504 1.125-1.125V9.75"/></svg>
+                    <div class="min-w-0">
+                        <div class="text-[9px] font-semibold uppercase tracking-wider text-slate-500 leading-none">Etalase</div>
+                        <div class="text-xs font-medium text-slate-700 truncate">${escapeHtml(it.etalases?.name || '—')}</div>
                     </div>
                 </div>
                
                 <div class="flex items-center gap-1.5">
-                    <svg class="w-3 h-3 text-gray-300 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.5v15m3-15v15m4.5-15v15m3-15v15m4.5-15v15"/></svg>
+                    <svg class="w-3 h-3 text-slate-400 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 4.5v15m3-15v15m4.5-15v15m3-15v15m4.5-15v15"/></svg>
                     <div class="min-w-0">
-                        <div class="text-[9px] uppercase tracking-wider text-gray-400 leading-none">Barcode</div>
-                        <div class="text-xs text-gray-700 font-mono truncate">${escapeHtml(it.barcode || '—')}</div>
+                        <div class="text-[9px] font-semibold uppercase tracking-wider text-slate-500 leading-none">Barcode</div>
+                        <div class="text-xs font-medium text-slate-700 font-mono truncate">${escapeHtml(it.barcode || '—')}</div>
                     </div>
                 </div>
                 <div class="flex items-center gap-1.5">
-                    <svg class="w-3 h-3 text-gray-300 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5"/></svg>
+                    <svg class="w-3 h-3 text-slate-400 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5"/></svg>
                     <div class="min-w-0">
-                        <div class="text-[9px] uppercase tracking-wider text-gray-400 leading-none">Strip</div>
-                        <div class="text-xs text-gray-700 font-mono truncate">${escapeHtml(it.strip || '—')}</div>
+                        <div class="text-[9px] font-semibold uppercase tracking-wider text-slate-500 leading-none">Strip</div>
+                        <div class="text-xs font-medium text-slate-700 font-mono truncate">${escapeHtml(it.strip || '—')}</div>
                     </div>
                 </div>
             </div>
@@ -2678,7 +2697,7 @@
         } else if (e.key === 'ArrowUp') {
             e.preventDefault();
             if (max < 0) return;
-            activeIndex = Math.max(0, activeIndex - 1);
+            activeIndex = activeIndex < 0 ? max : Math.max(0, activeIndex - 1);
             highlight();
             ensureVisible();
         } else if (e.key === 'Escape') {
