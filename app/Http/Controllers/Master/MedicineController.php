@@ -9,6 +9,8 @@ use App\Models\MedicinePriceHistory;
 use App\Models\Medicines;
 use App\Services\MedicineImportService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Yajra\DataTables\Facades\DataTables;
 
 class MedicineController extends Controller
@@ -353,9 +355,66 @@ class MedicineController extends Controller
         ]);
 
         $file = $request->file('file');
-        $filePath = $file->getRealPath();
+        foreach ($request->session()->get('medicine_import_previews', []) as $oldPreviewPath) {
+            Storage::disk('local')->delete($oldPreviewPath);
+        }
+        $request->session()->forget('medicine_import_previews');
 
-        $result = $service->import($filePath);
+        $token = Str::random(48);
+        $extension = strtolower($file->getClientOriginalExtension() ?: 'xlsx');
+        $storedPath = $file->storeAs('medicine-import-previews', "{$token}.{$extension}", 'local');
+
+        try {
+            $summary = $service->preview(Storage::disk('local')->path($storedPath));
+        } catch (\Throwable $e) {
+            Storage::disk('local')->delete($storedPath);
+            report($e);
+            return response()->json([
+                'success' => false,
+                'message' => 'File tidak dapat dianalisis. Pastikan format dan susunan kolom Excel sesuai panduan.',
+            ], 422);
+        }
+
+        if ($summary['total_rows'] === 0) {
+            Storage::disk('local')->delete($storedPath);
+            return response()->json([
+                'success' => false,
+                'message' => 'Tidak ditemukan baris data obat pada file (kolom Nama Obat mulai baris 2).',
+            ], 422);
+        }
+
+        $request->session()->put("medicine_import_previews.{$token}", $storedPath);
+
+        return response()->json([
+            'success' => true,
+            'preview_token' => $token,
+            'summary' => $summary,
+            'message' => 'Ringkasan file siap ditinjau sebelum import.',
+        ]);
+    }
+
+    public function executeImport(Request $request, MedicineImportService $service)
+    {
+        $request->validate([
+            'preview_token' => 'required|string|size:48',
+        ]);
+
+        $token = $request->input('preview_token');
+        $sessionKey = "medicine_import_previews.{$token}";
+        $storedPath = $request->session()->pull($sessionKey);
+
+        if (!$storedPath || !Storage::disk('local')->exists($storedPath)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Preview import sudah kedaluwarsa. Silakan pilih file dan tampilkan ringkasan lagi.',
+            ], 422);
+        }
+
+        try {
+            $result = $service->import(Storage::disk('local')->path($storedPath));
+        } finally {
+            Storage::disk('local')->delete($storedPath);
+        }
 
         if (!$result['success']) {
             return response()->json($result, 422);

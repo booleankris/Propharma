@@ -567,7 +567,7 @@
                                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
                                 </svg>
-                                Sedang memproses import & relasi PBF...
+                                <span id="importProgressLabel">Sedang menganalisis file...</span>
                             </span>
                             <span class="text-emerald-600 font-bold">Harap tunggu</span>
                         </div>
@@ -576,13 +576,26 @@
                         </div>
                     </div>
 
+                    <div id="importSummary" class="hidden rounded-xl border border-blue-200 bg-blue-50 p-4 space-y-2">
+                        <div class="font-semibold text-sm text-slate-800">Ringkasan sebelum import</div>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                            <div class="rounded-lg bg-white p-2"><div class="text-slate-500">Baris data</div><strong id="summaryTotal" class="text-slate-800">0</strong></div>
+                            <div class="rounded-lg bg-white p-2"><div class="text-slate-500">Obat baru</div><strong id="summaryCreate" class="text-emerald-700">0</strong></div>
+                            <div class="rounded-lg bg-white p-2"><div class="text-slate-500">Akan diperbarui</div><strong id="summaryUpdate" class="text-blue-700">0</strong></div>
+                            <div class="rounded-lg bg-white p-2"><div class="text-slate-500">Dilewati</div><strong id="summarySkipped" class="text-amber-700">0</strong></div>
+                        </div>
+                        <div class="text-[11px] text-slate-600">Pastikan ringkasan sudah sesuai. Perubahan database baru dijalankan setelah tombol konfirmasi ditekan.</div>
+                        <div class="text-[11px] text-slate-600"><strong>Kolom yang disinkronkan:</strong> nama, satuan, HNA dan net price + PPN 11%, barcode, HET, kemasan, sediaan, dan golongan.</div>
+                        <ul id="summarySkippedSamples" class="hidden list-disc pl-5 text-[11px] text-amber-800"></ul>
+                    </div>
+
                     <div class="flex items-center justify-end gap-2 pt-3 border-t border-gray-100">
                         <button type="button" id="btnCancelImport" class="px-4 py-2 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition cursor-pointer">Batal</button>
                         <button type="submit" id="btnSubmitImport" class="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow transition flex items-center gap-1.5 cursor-pointer">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                             </svg>
-                            <span>Proses Import</span>
+                            <span>Tampilkan Ringkasan</span>
                         </button>
                     </div>
                 </form>
@@ -1443,15 +1456,29 @@
             const $dropzone = $('#dropzoneImport');
             const $namePreview = $('#fileNamePreview');
             const $progress = $('#importProgress');
+            const $summary = $('#importSummary');
             const $btnSubmit = $('#btnSubmitImport');
+            const importPreviewUrl = "{{ route('medicines.import') }}";
+            const executeImportUrl = "{{ route('medicines.import.execute') }}";
+            let previewToken = null;
+
+            function resetImportPreview() {
+                previewToken = null;
+                $summary.addClass('hidden');
+                $('#summarySkippedSamples').empty().addClass('hidden');
+                $btnSubmit.find('span').text('Tampilkan Ringkasan');
+                $btnSubmit.prop('disabled', false).removeClass('opacity-50');
+                $('#importProgressLabel').text('Sedang menganalisis file...');
+            }
 
             $('#btnOpenImport').on('click', function() {
                 try {
                     $('.select2').select2('close');
                 } catch (e) {}
                 $fileInput.val('');
-                $namePreview.text('Klik untuk memilih file atau drag & drop ke sini');
+                $namePreview.text('Klik untuk memilih file atau drag & drop ke sini').removeClass('text-emerald-600 font-semibold');
                 $progress.addClass('hidden');
+                resetImportPreview();
                 $btnSubmit.prop('disabled', false).removeClass('opacity-50');
                 $modalImport.removeClass('hidden');
             });
@@ -1471,8 +1498,9 @@
             });
 
             $fileInput.on('change', function() {
+                resetImportPreview();
                 if (this.files && this.files[0]) {
-                    $namePreview.html('<span class="text-emerald-600 font-semibold">' + this.files[0].name + '</span> (' + (this.files[0].size / 1024 / 1024).toFixed(2) + ' MB)');
+                    $namePreview.text(`${this.files[0].name} (${(this.files[0].size / 1024 / 1024).toFixed(2)} MB)`).addClass('text-emerald-600 font-semibold');
                 }
             });
 
@@ -1494,42 +1522,78 @@
                 e.stopPropagation();
                 if (e.originalEvent.dataTransfer && e.originalEvent.dataTransfer.files.length) {
                     $fileInput[0].files = e.originalEvent.dataTransfer.files;
-                    $namePreview.html('<span class="text-emerald-600 font-semibold">' + $fileInput[0].files[0].name + '</span> (' + ($fileInput[0].files[0].size / 1024 / 1024).toFixed(2) + ' MB)');
+                    resetImportPreview();
+                    $namePreview.text(`${$fileInput[0].files[0].name} (${($fileInput[0].files[0].size / 1024 / 1024).toFixed(2)} MB)`).addClass('text-emerald-600 font-semibold');
                 }
             });
 
             $('#formImportMedicine').on('submit', function(e) {
                 e.preventDefault();
-                if (!$fileInput[0].files || !$fileInput[0].files[0]) {
+                if (!previewToken && (!$fileInput[0].files || !$fileInput[0].files[0])) {
                     swal('Peringatan', 'Silakan pilih file Excel terlebih dahulu.', 'warning');
                     return;
                 }
 
-                const formData = new FormData(this);
+                const isExecuting = Boolean(previewToken);
+                const formData = isExecuting ? new FormData() : new FormData(this);
+                if (isExecuting) {
+                    formData.append('preview_token', previewToken);
+                    formData.append('_token', $('input[name="_token"]').val());
+                    $('#importProgressLabel').text('Sedang memproses import & relasi PBF...');
+                } else {
+                    $('#importProgressLabel').text('Sedang menganalisis file...');
+                }
                 $progress.removeClass('hidden');
                 $btnSubmit.prop('disabled', true).addClass('opacity-50');
 
-                axios.post("{{ route('medicines.import') }}", formData, {
+                axios.post(isExecuting ? executeImportUrl : importPreviewUrl, formData, {
                     headers: { 'Content-Type': 'multipart/form-data' }
                 })
                 .then(function(res) {
+                    $progress.addClass('hidden');
+                    $btnSubmit.prop('disabled', false).removeClass('opacity-50');
+
+                    if (!isExecuting) {
+                        const summary = res.data.summary || {};
+                        previewToken = res.data.preview_token;
+                        $('#summaryTotal').text(Number(summary.total_rows || 0).toLocaleString('id-ID'));
+                        $('#summaryCreate').text(Number(summary.created_count || 0).toLocaleString('id-ID'));
+                        $('#summaryUpdate').text(Number(summary.updated_count || 0).toLocaleString('id-ID'));
+                        $('#summarySkipped').text(Number(summary.skipped_count || 0).toLocaleString('id-ID'));
+
+                        const skippedSamples = summary.skipped_samples || [];
+                        if (skippedSamples.length) {
+                            const $samples = $('#summarySkippedSamples').empty();
+                            skippedSamples.forEach(item => {
+                                $('<li>').text(`Baris ${Number(item.row)}: ${String(item.reason || '')}`).appendTo($samples);
+                            });
+                            $samples.removeClass('hidden');
+                        }
+
+                        $summary.removeClass('hidden');
+                        $btnSubmit.find('span').text('Konfirmasi & Import');
+                        if (Number(summary.created_count || 0) + Number(summary.updated_count || 0) === 0) {
+                            $btnSubmit.prop('disabled', true).addClass('opacity-50');
+                        }
+                        return;
+                    }
+
                     $modalImport.addClass('hidden');
                     swal({
                         title: 'Import Berhasil!',
                         text: res.data.message || 'Data master obat berhasil diimpor.',
                         icon: 'success',
                         button: 'OK',
-                    }).then(() => {
-                        tableData.ajax.reload();
-                    });
+                    }).then(() => tableData.ajax.reload());
                 })
                 .catch(function(err) {
                     $progress.addClass('hidden');
                     $btnSubmit.prop('disabled', false).removeClass('opacity-50');
+                    if (isExecuting) resetImportPreview();
                     const msg = err.response && err.response.data && err.response.data.message 
                         ? err.response.data.message 
                         : (err.message || 'Gagal memproses file import.');
-                    swal('Gagal Import', msg, 'error');
+                    swal(isExecuting ? 'Gagal Import' : 'Gagal Menganalisis', msg, 'error');
                 });
             });
 

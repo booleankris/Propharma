@@ -591,103 +591,6 @@ class FinanceController extends Controller
             : 'Tidak ada penjualan tunai lama yang perlu ditambahkan pada rentang tanggal tersebut.');
     }
 
-    /** Catat ulang transaksi non-tunai lama ke rekening bank sesuai bank pada transaksi. */
-    public function backfillPenjualanNonTunai(Request $request)
-    {
-        $validated = $request->validate([
-            'from_date' => 'required|date|before_or_equal:to_date',
-            'to_date' => 'required|date|before_or_equal:today',
-        ], [
-            'from_date.before_or_equal' => 'Tanggal mulai harus sebelum atau sama dengan tanggal akhir.',
-            'to_date.before_or_equal' => 'Tanggal akhir tidak boleh melewati hari ini.',
-        ]);
-
-        $pharmacyId = (int) getActivePharmacyId();
-        $bankAccounts = $this->branchKasBankAccountsQuery()
-            ->where('account_type', 'bank')->orderBy('id')->get();
-        if ($bankAccounts->isEmpty()) {
-            return back()->withErrors(['backfill' => 'Cabang ini belum memiliki rekening bank aktif di Kas & Bank.']);
-        }
-
-        $createdCount = 0;
-        $skippedCount = 0;
-        $createdGrossTotal = 0.0;
-        $balanceAdditions = [];
-
-        DB::transaction(function () use ($validated, $pharmacyId, $bankAccounts, &$createdCount, &$skippedCount, &$createdGrossTotal, &$balanceAdditions) {
-            $lockedAccounts = FinanceAccount::whereIn('id', $bankAccounts->pluck('id'))
-                ->orderBy('id')->lockForUpdate()->get();
-            $openings = FinancePayment::where('payment_type', 'SALDO AWAL')
-                ->whereIn('account_id', $lockedAccounts->pluck('id'))->get()->keyBy('account_id');
-            $normalizeBankName = static fn ($value) => preg_replace('/[^A-Z0-9]/', '', strtoupper((string) $value));
-
-            MedicineTransactions::query()
-                ->where('pharmacy_id', $pharmacyId)
-                ->where('status', 1)
-                ->whereRaw('UPPER(TRIM(COALESCE(payment_method, ""))) IN (?, ?, ?)', ['QRIS', 'DEBIT', 'TRANSFER'])
-                ->whereRaw("UPPER(COALESCE(transaction_type, '')) NOT LIKE 'RETUR%'")
-                ->whereBetween(DB::raw('DATE(created_at)'), [$validated['from_date'], $validated['to_date']])
-                ->whereDoesntHave('payments', fn ($query) => $query->where('payment_type', 'PENJUALAN NON TUNAI'))
-                ->orderBy('id')
-                ->chunkById(500, function ($transactions) use ($lockedAccounts, $openings, $normalizeBankName, $pharmacyId, &$createdCount, &$skippedCount, &$createdGrossTotal, &$balanceAdditions) {
-                    foreach ($transactions as $transaction) {
-                        $amount = round((float) $transaction->subtotal, 2);
-                        if ($amount <= 0) continue;
-
-                        $alreadyRecorded = FinancePayment::where('medicine_transaction_id', $transaction->id)
-                            ->where('payment_type', 'PENJUALAN NON TUNAI')->exists();
-                        if ($alreadyRecorded) continue;
-
-                        $bankKey = $normalizeBankName($transaction->transfer_bank_name);
-                        $matches = $lockedAccounts->filter(function ($account) use ($normalizeBankName, $bankKey) {
-                            return $bankKey !== '' && str_contains($normalizeBankName($account->name), $bankKey);
-                        });
-                        if ($matches->count() !== 1) {
-                            $skippedCount++;
-                            continue;
-                        }
-
-                        $account = $matches->first();
-                        $paymentDate = $transaction->created_at?->toDateString() ?? now()->toDateString();
-                        FinancePayment::create([
-                            'pharmacy_id' => $pharmacyId,
-                            'medicine_transaction_id' => $transaction->id,
-                            'account_id' => $account->id,
-                            'payment_type' => 'PENJUALAN NON TUNAI',
-                            'payment_date' => $paymentDate,
-                            'amount' => $amount,
-                            'reference_number' => $transaction->transaction_code,
-                            'notes' => 'Backfill penjualan non-tunai lama (' . ($transaction->payment_method ?? '-') . ' · ' . ($transaction->transfer_bank_name ?? '-') . ')',
-                            'created_by' => Auth::id(),
-                        ]);
-
-                        $createdGrossTotal += $amount;
-                        $opening = $openings->get($account->id);
-                        if (!$opening || $paymentDate >= $opening->payment_date?->format('Y-m-d')) {
-                            $balanceAdditions[$account->id] = ($balanceAdditions[$account->id] ?? 0) + $amount;
-                        }
-                        $createdCount++;
-                    }
-                });
-
-            foreach ($lockedAccounts as $account) {
-                if ($openings->has($account->id)) {
-                    $opening = $openings->get($account->id);
-                    $account->update(['balance' => $this->calculateBalanceFromOpening($account->id, $opening, now()->toDateString())]);
-                } elseif (($balanceAdditions[$account->id] ?? 0) > 0) {
-                    $account->increment('balance', $balanceAdditions[$account->id]);
-                }
-            }
-            $this->clearStatsCache();
-        });
-
-        $message = $createdCount
-            ? "Berhasil mencatat {$createdCount} transaksi non-tunai lama senilai Rp " . number_format($createdGrossTotal, 0, ',', '.') . '.'
-            : 'Tidak ada transaksi non-tunai lama yang cocok untuk ditambahkan pada rentang tanggal tersebut.';
-        if ($skippedCount > 0) $message .= " {$skippedCount} transaksi dilewati karena nama bank tidak cocok dengan tepat satu rekening aktif.";
-        return back()->with('success', $message);
-    }
-
     public function storePendapatanLainLain(Request $request)
     {
         $validated = $request->validate([
@@ -741,7 +644,7 @@ class FinanceController extends Controller
 
         $balance = (float) $opening->amount;
         foreach ($payments as $payment) {
-            if (in_array($payment->payment_type, ['PIUTANG', 'PENDAPATAN', 'PENJUALAN TUNAI', 'PENJUALAN NON TUNAI'], true)) $balance += (float) $payment->amount;
+            if (in_array($payment->payment_type, ['PIUTANG', 'PENDAPATAN', 'PENJUALAN TUNAI'], true)) $balance += (float) $payment->amount;
             elseif (in_array($payment->payment_type, ['KREDIT', 'CASH', 'KONSINYASI', 'BIAYA', 'SETOR'], true)) $balance -= (float) $payment->amount;
         }
         $balance += (float) FinancePayment::where('payment_type', 'SETOR')
@@ -932,7 +835,7 @@ class FinanceController extends Controller
         usort($payablesByCreditor, fn ($a, $b) => $b['amount'] <=> $a['amount']);
         $totalPayables = array_sum(array_column($payablesByCreditor, 'amount'));
 
-        $periodPayments = FinancePayment::with(['expenseAccount:id,name,category', 'account:id,pharmacy_id,account_type', 'receiving:id,pharmacy_id'])
+        $periodPayments = FinancePayment::with(['expenseAccount:id,name,category', 'account:id,pharmacy_id', 'receiving:id,pharmacy_id'])
             ->whereBetween('payment_date', [$startDate, $endDate])
             ->where(function ($query) use ($pharmacyId) {
                 $query->where('pharmacy_id', $pharmacyId)->orWhere(function ($legacy) use ($pharmacyId) {
@@ -1007,8 +910,6 @@ class FinanceController extends Controller
             ->join('receiving_details as rd', 'rd.id', '=', 'ri.receiving_details_id')
             ->join('receiving as r', 'r.id', '=', 'rd.receiving_id')
             ->where('r.pharmacy_id', $pharmacyId)
-            ->whereIn('r.status', [1, 2, 3])
-            ->whereNotNull('ri.batches_id')
             ->whereRaw('UPPER(TRIM(COALESCE(rd.invoice_payment, ""))) = ?', ['KREDIT'])
             ->whereBetween(DB::raw('DATE(ri.created_at)'), [$startDate, $endDate])
             ->sum(DB::raw('CASE WHEN CAST(COALESCE(NULLIF(ri.total, ""), "0") AS DECIMAL(15,2)) > 0 THEN CAST(ri.total AS DECIMAL(15,2)) ELSE CAST(COALESCE(NULLIF(ri.raw_price, ""), "0") AS DECIMAL(15,2)) * CAST(COALESCE(NULLIF(ri.qty_received, ""), "0") AS DECIMAL(15,2)) END'));
@@ -1075,69 +976,6 @@ class FinanceController extends Controller
             'netCashAfterPayables' => $totalCashBank - $totalPayables,
             'netPositionIncludingReceivables' => $totalCashBank + $totalReceivables - $totalPayables,
         ];
-    }
-
-    protected function receivableBalanceAtDate(int $pharmacyId, string $asOfDate): float
-    {
-        $transactions = MedicineTransactions::query()
-            ->with('transactions:id,transaction_id,final_price,total_price')
-            ->withSum(['payments as finance_paid' => fn ($query) => $query->where('payment_type', 'PIUTANG')->whereDate('payment_date', '<=', $asOfDate)], 'amount')
-            ->withCount(['payments as finance_payment_count' => fn ($query) => $query->where('payment_type', 'PIUTANG')])
-            ->where('pharmacy_id', $pharmacyId)->where('status', 1)
-            ->whereDate('created_at', '<=', $asOfDate)
-            ->whereIn('transaction_type', ['KREDIT', 'RESEP KREDIT', 'RETUR KREDIT'])
-            ->get(['id', 'transaction_type', 'subtotal', 'paid']);
-
-        $receivables = 0.0;
-        $returns = 0.0;
-        foreach ($transactions as $transaction) {
-            if ($transaction->transaction_type === 'RETUR KREDIT') {
-                $returns += abs((float) $transaction->subtotal);
-                continue;
-            }
-            $total = (float) $transaction->subtotal;
-            if ($total <= 0) $total = (float) $transaction->transactions->sum(fn ($item) => $item->final_price ?: $item->total_price);
-            $paid = (int) $transaction->finance_payment_count > 0
-                ? (float) ($transaction->finance_paid ?? 0)
-                : (float) ($transaction->paid ?? 0);
-            $receivables += max(0, max(0, $total) - min(max(0, $total), max(0, $paid)));
-        }
-        return max(0, $receivables - $returns);
-    }
-
-    protected function payableBalanceAtDate(int $pharmacyId, string $asOfDate): float
-    {
-        $details = ReceivingDetails::with([
-            'receiving:id,pharmacy_id,status',
-            'receiving_items:id,receiving_details_id,total,raw_price,qty_received,batches_id,created_at',
-            'payments:id,receiving_detail_id,amount,payment_date',
-        ])
-            ->whereRaw('UPPER(TRIM(COALESCE(invoice_payment, ""))) = ?', ['KREDIT'])
-            ->whereHas('receiving', fn ($query) => $query->where('pharmacy_id', $pharmacyId)->whereIn('status', [1, 2, 3]))
-            ->get();
-
-        $balance = 0.0;
-        foreach ($details as $detail) {
-            $subtotal = 0.0;
-            foreach ($detail->receiving_items as $item) {
-                if (!$item->batches_id) continue;
-                if ($item->created_at && $item->created_at->toDateString() > $asOfDate) continue;
-                $lineTotal = (float) ($item->total ?? 0);
-                if ($lineTotal <= 0) $lineTotal = (float) $item->raw_price * (float) $item->qty_received;
-                $subtotal += $lineTotal;
-            }
-            if ($subtotal <= 0) continue;
-
-            $paid = (float) $detail->payments
-                ->filter(fn ($payment) => $payment->payment_date && $payment->payment_date->toDateString() <= $asOfDate)
-                ->sum('amount');
-            if ((int) ($detail->receiving?->status ?? 0) === 3 && $detail->payments->isEmpty()) continue;
-
-            $ppnType = strtoupper(trim((string) ($detail->invoice_ppn ?? 'TANPA')));
-            $total = $subtotal + ($ppnType === 'EXCLUDE' ? round($subtotal * 0.11, 2) : 0);
-            $balance += max(0, $total - $paid);
-        }
-        return $balance;
     }
 
     /** Akun Kas & Bank kini dimiliki cabang yang sedang dipilih. */
@@ -1591,7 +1429,7 @@ class FinanceController extends Controller
             ->take($limit)
             ->get()
             ->flatMap(function ($p) {
-                $isMasuk = in_array($p->payment_type, ['PIUTANG', 'PENDAPATAN', 'PENJUALAN TUNAI', 'PENJUALAN NON TUNAI'], true);
+                $isMasuk = in_array($p->payment_type, ['PIUTANG', 'PENDAPATAN', 'PENJUALAN TUNAI'], true);
                 $isSaldoAwal = $p->payment_type === 'SALDO AWAL';
                 $isSetor = $p->payment_type === 'SETOR';
                 $tipeLabel = $isSaldoAwal ? 'Saldo Awal' : ($isSetor ? 'Setor Kas' : ($isMasuk ? 'Masuk (Debit)' : 'Keluar (Kredit)'));
@@ -1605,11 +1443,6 @@ class FinanceController extends Controller
                     $doc = $p->transaction->transaction_code ?? $p->reference_number;
                     if ($doc) $noDokumen = $doc;
                     if (!$deskripsi) $deskripsi = 'Penerimaan penjualan tunai';
-                } elseif ($p->payment_type === 'PENJUALAN NON TUNAI') {
-                    $pihakTerkait = $p->transaction->debtors->name ?? ($p->transaction->patients->name ?? 'Pelanggan Umum');
-                    $doc = $p->transaction->transaction_code ?? $p->reference_number;
-                    if ($doc) $noDokumen = $doc;
-                    if (!$deskripsi) $deskripsi = 'Penerimaan penjualan non-tunai';
                 } elseif ($p->payment_type === 'PIUTANG') {
                     $pihakTerkait = $p->transaction->debtors->name ?? ($p->transaction->patients->name ?? 'Pelanggan Umum');
                     $doc = $p->transaction->invoice_number ?? $p->reference_number;
@@ -1847,13 +1680,10 @@ class FinanceController extends Controller
         $kasMasukPenjualanTunai = (float) FinancePayment::where('payment_type', 'PENJUALAN TUNAI')
             ->where('pharmacy_id', getActivePharmacyId())
             ->sum('amount');
-        $kasMasukPenjualanNonTunai = (float) FinancePayment::where('payment_type', 'PENJUALAN NON TUNAI')
-            ->where('pharmacy_id', getActivePharmacyId())
-            ->sum('amount');
         $kasMasukPendapatan = (float) FinancePayment::where('payment_type', 'PENDAPATAN')
             ->whereIn('pharmacy_id', $targetPharmacyIds)
             ->sum('amount');
-        $kasMasuk = $kasMasukPiutang + $kasMasukPendapatan + $kasMasukPenjualanTunai + $kasMasukPenjualanNonTunai;
+        $kasMasuk = $kasMasukPiutang + $kasMasukPendapatan + $kasMasukPenjualanTunai;
 
         $kasKeluarHutangCash = (float) FinancePayment::whereIn('payment_type', ['KREDIT', 'CASH', 'KONSINYASI'])
             ->whereHas('receiving', function ($q) use ($targetPharmacyIds) {

@@ -195,6 +195,7 @@ class ReturController extends Controller
         $request->validate([
             'transaction_id' => 'required|integer',
             'medicine_id' => 'required|integer',
+            'cart_id' => 'required|integer',
             'qty_retur' => 'required|numeric|min:1',
             'total_retur' => 'required',
             'old_qty' => 'required',
@@ -202,6 +203,18 @@ class ReturController extends Controller
         ]);
 
         $findcode = MedicineTransactions::findOrFail($request->transaction_id);
+
+        $cartItem = MedicineCart::where('id', $request->cart_id)
+            ->where('transaction_id', $findcode->id)
+            ->where('medicine_id', $request->medicine_id)
+            ->firstOrFail();
+
+        if ((float) $request->qty_retur > (float) $cartItem->quantity) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Qty retur tidak boleh melebihi qty yang dibeli (' . $cartItem->quantity . ').',
+            ], 422);
+        }
 
         // Validasi lock: Cek apakah obat ini pada transaksi ini sudah pernah di-retur
         $alreadyReturnedInLog = ItemsLog::where('transaction_code', $findcode->transaction_code)
@@ -225,14 +238,28 @@ class ReturController extends Controller
         DB::beginTransaction();
 
         try {
-            $now = Carbon::now()->format('Y-m-d');
+            $now = Carbon::now()->format('Y-m-d H:i:s');
 
             $medicine = Medicines::where('id', $request->medicine_id)
                 ->lockForUpdate()
                 ->firstOrFail();
             $qty_before = $medicine->stock;
 
-            $transfer = MedicineTransferItems::findOrFail($request->transfer_id);
+            // Retur stok harus kembali ke cabang transaksi asal, bukan cabang
+            // yang mungkin sedang aktif saat user membuka form retur.
+            $pharmacyId = (int) $findcode->pharmacy_id;
+            $counterPharmacyId = isWarehousePharmacy($pharmacyId) ? 1 : $pharmacyId;
+            $transfer = MedicineTransferItems::whereKey($request->transfer_id)
+                ->where('status', 1)
+                ->where(function ($q) {
+                    $q->whereNull('source_type')->orWhere('source_type', '!=', 'retur_gudang');
+                })
+                ->whereHas('batches', function ($q) use ($request, $counterPharmacyId) {
+                    $q->where('medicine_id', $request->medicine_id)
+                        ->where('pharmacy_id', $counterPharmacyId);
+                })
+                ->lockForUpdate()
+                ->firstOrFail();
             $transfer->qty += $request->qty_retur; // add back to counter stock
             $transfer->save();
 
@@ -308,15 +335,24 @@ class ReturController extends Controller
     }
     public function getBatchesByMedicine(Request $request)
     {
+        $request->validate([
+            'medicine_id' => 'required|integer',
+            'transaction_id' => 'required|integer',
+        ]);
+
         $medicine_id = $request->medicine_id;
-        $pharmacyId = getActivePharmacyId();
+        $sale = MedicineTransactions::findOrFail($request->transaction_id);
+        $pharmacyId = (int) $sale->pharmacy_id;
+        $counterPharmacyId = isWarehousePharmacy((int) $pharmacyId) ? 1 : (int) $pharmacyId;
 
         $transfers = MedicineTransferItems::join('batches', 'medicine_transfer_items.batches_id', '=', 'batches.id')
-            ->join('etalases', 'medicine_transfer_items.etalases_id', '=', 'etalases.id')
+            ->leftJoin('etalases', 'medicine_transfer_items.etalases_id', '=', 'etalases.id')
             ->where('batches.medicine_id', $medicine_id)
-            ->where(function ($q) use ($pharmacyId) {
-                $q->where('etalases.pharmacy_id', $pharmacyId)
-                  ->orWhere('batches.pharmacy_id', $pharmacyId);
+            ->where('batches.pharmacy_id', $counterPharmacyId)
+            ->where('medicine_transfer_items.status', 1)
+            ->where(function ($q) {
+                $q->whereNull('medicine_transfer_items.source_type')
+                    ->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang');
             })
             ->orderBy('batches.expired_date', 'asc') // FEFO
             ->select(
@@ -328,22 +364,6 @@ class ReturController extends Controller
                 'etalases.name as etalase_name'
             )
             ->get();
-
-        if ($transfers->isEmpty()) {
-            $transfers = MedicineTransferItems::join('batches', 'medicine_transfer_items.batches_id', '=', 'batches.id')
-                ->join('etalases', 'medicine_transfer_items.etalases_id', '=', 'etalases.id')
-                ->where('batches.medicine_id', $medicine_id)
-                ->orderBy('batches.expired_date', 'asc')
-                ->select(
-                    'medicine_transfer_items.id as transfer_id',
-                    'medicine_transfer_items.qty as counter_stock',
-                    'batches.id as batch_id',
-                    'batches.name as batch_name',
-                    'batches.expired_date',
-                    'etalases.name as etalase_name'
-                )
-                ->get();
-        }
 
         return response()->json($transfers);
     }

@@ -1023,19 +1023,27 @@ class SuppliesController extends Controller
             $baseMedicineLogQuery = function () use ($activePharmacyId, $request) {
                 $warehouseId = getWarehousePharmacyId();
                 $canSeeWarehouse = canAccessWarehouseStock($activePharmacyId);
+                $allowedPharmacyIds = isWarehousePharmacy($activePharmacyId)
+                    ? [$warehouseId, 1]
+                    : array_values(array_unique(array_filter([
+                        $activePharmacyId,
+                        $canSeeWarehouse ? $warehouseId : null,
+                        $canSeeWarehouse ? 1 : null,
+                    ])));
 
-                $q = ItemsLog::whereHas('batches', function ($batch) use ($activePharmacyId, $warehouseId, $canSeeWarehouse) {
-                    if (isWarehousePharmacy($activePharmacyId)) {
-                        $batch->whereIn('pharmacy_id', [$warehouseId, 1]);
-                    } else {
-                        $batch->where(function ($sub) use ($activePharmacyId, $warehouseId, $canSeeWarehouse) {
-                            $sub->where('pharmacy_id', $activePharmacyId);
-                            if ($canSeeWarehouse) {
-                                $sub->orWhere('pharmacy_id', $warehouseId)
-                                    ->orWhere('pharmacy_id', 1);
-                            }
-                        });
-                    }
+                $q = ItemsLog::where(function ($branchScope) use ($allowedPharmacyIds) {
+                    $branchScope->whereHas('batches', function ($batch) use ($allowedPharmacyIds) {
+                        $batch->whereIn('pharmacy_id', $allowedPharmacyIds);
+                    })->orWhere(function ($returnScope) use ($allowedPharmacyIds) {
+                        // Return logs belong to the branch of the original sale.
+                        // Historically some returns were attached to a batch from
+                        // the currently selected branch, so batch-only filtering
+                        // made those valid return movements disappear here.
+                        $returnScope->where('status', 3)
+                            ->whereHas('transaction', function ($transaction) use ($allowedPharmacyIds) {
+                                $transaction->whereIn('pharmacy_id', $allowedPharmacyIds);
+                            });
+                    });
                 });
 
                 if ($request->filled('searchMedicine')) {
@@ -1053,11 +1061,15 @@ class SuppliesController extends Controller
             // snapshots of the global medicines.stock value, not branch stock.
             // Replaying the movements keeps historical rows internally consistent
             // while ensuring the last balance equals the real stock source.
+            // Older sale-return rows stored only the calendar date, which casts to
+            // midnight and incorrectly places the return before same-day sales.
+            // Use created_at as the effective timestamp for those legacy rows.
+            $effectiveDateSql = "CASE WHEN status = 3 AND TIME(date) = '00:00:00' AND created_at IS NOT NULL THEN created_at ELSE date END";
             $ledgerRows = $request->filled('searchMedicine')
                 ? $baseMedicineLogQuery()
-                    ->orderBy('date', 'asc')
+                    ->orderByRaw($effectiveDateSql . ' ASC')
                     ->orderBy('id', 'asc')
-                    ->get(['id', 'medicine_id', 'qty', 'qty_before', 'qty_after', 'total', 'status', 'date'])
+                    ->get(['id', 'medicine_id', 'qty', 'qty_before', 'qty_after', 'total', 'status', 'date', 'created_at'])
                 : collect();
 
             $runningMap = [];
@@ -1137,23 +1149,27 @@ class SuppliesController extends Controller
                 }
             }
 
-            $items->orderBy('date', 'asc')->orderBy('id', 'asc');
+            $items->orderByRaw($effectiveDateSql . ' ASC')->orderBy('id', 'asc');
 
             return DataTables::eloquent($items)
-                ->order(function ($q) use ($request) {
+                ->order(function ($q) use ($request, $effectiveDateSql) {
                     if ($request->has('order')) {
                         $orderColIdx = (int) $request->input('order.0.column');
                         $orderDir = strtolower($request->input('order.0.dir', 'asc')) === 'desc' ? 'desc' : 'asc';
                         if ($orderColIdx === 1) {
-                            $q->orderBy('date', $orderDir)->orderBy('id', $orderDir);
+                            $q->orderByRaw($effectiveDateSql . ' ' . strtoupper($orderDir))->orderBy('id', $orderDir);
                             return;
                         }
                     }
-                    $q->orderBy('date', 'asc')->orderBy('id', 'asc');
+                    $q->orderByRaw($effectiveDateSql . ' ASC')->orderBy('id', 'asc');
                 })
                 ->addIndexColumn()
                 ->addColumn('date', function ($row) {
-                    $d = $this->parseStockOpnameDateTime($row->date);
+                    $dateValue = $row->date;
+                    if ((int) $row->status === 3 && $row->date && $row->date->format('H:i:s') === '00:00:00' && $row->created_at) {
+                        $dateValue = $row->created_at;
+                    }
+                    $d = $this->parseStockOpnameDateTime($dateValue);
                     if (!$d) return '<span class="text-slate-400 text-xs">—</span>';
                     $dateStr = $d->format('d/m/Y');
                     $timeStr = $d->format('H:i');

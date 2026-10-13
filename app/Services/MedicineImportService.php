@@ -16,6 +16,89 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
 class MedicineImportService
 {
     /**
+     * Analyze the file without writing to the database, for the import confirmation step.
+     */
+    public function preview(string $filePath): array
+    {
+        @ini_set('memory_limit', '512M');
+        @set_time_limit(300);
+
+        $reader = IOFactory::createReaderForFile($filePath);
+        $reader->setReadEmptyCells(false);
+        $spreadsheet = $reader->load($filePath);
+        $sheet = $spreadsheet->getActiveSheet();
+        $highestRow = (int) $sheet->getHighestRow();
+        $highestCol = Coordinate::columnIndexFromString($sheet->getHighestColumn()) < 40
+            ? 'AN'
+            : $sheet->getHighestColumn();
+
+        $summary = [
+            'total_rows' => 0,
+            'created_count' => 0,
+            'updated_count' => 0,
+            'skipped_count' => 0,
+            'skipped_samples' => [],
+        ];
+
+        if ($highestRow < 2) {
+            return $summary;
+        }
+
+        $existingCodes = Medicines::query()->pluck('code')
+            ->map(fn ($code) => strtoupper(trim((string) $code)))
+            ->flip();
+        $categoryMap = $this->buildCategoryMap();
+        $seenCodes = [];
+        $rows = $sheet->rangeToArray("A2:{$highestCol}{$highestRow}", null, false, false, true);
+
+        foreach ($rows as $rowIndex => $row) {
+            $name = trim((string) ($row['C'] ?? ''));
+            if ($name === '') {
+                continue;
+            }
+
+            $summary['total_rows']++;
+            $code = trim((string) ($row['B'] ?? ''));
+            $categoryName = trim((string) ($row['AL'] ?? ''));
+            $categoryId = $this->resolveCategoryId($categoryName, $categoryMap);
+            $codeKey = strtoupper($code);
+            $exists = $code !== '' && ($existingCodes->has($codeKey) || isset($seenCodes[$codeKey]));
+            if ($code !== '') {
+                $seenCodes[$codeKey] = true;
+            }
+
+            if ($categoryName !== '' && $categoryId === null) {
+                $summary['skipped_count']++;
+                if (count($summary['skipped_samples']) < 10) {
+                    $summary['skipped_samples'][] = [
+                        'row' => $rowIndex,
+                        'reason' => "Golongan '{$categoryName}' tidak ditemukan di medicine_categories.",
+                    ];
+                }
+                continue;
+            }
+
+            if ($categoryId === null && !$exists && empty($categoryMap)) {
+                $summary['skipped_count']++;
+                if (count($summary['skipped_samples']) < 10) {
+                    $summary['skipped_samples'][] = [
+                        'row' => $rowIndex,
+                        'reason' => 'Tidak ada golongan obat di medicine_categories untuk digunakan.',
+                    ];
+                }
+                continue;
+            }
+
+            $summary[$exists ? 'updated_count' : 'created_count']++;
+        }
+
+        $spreadsheet->disconnectWorksheets();
+        unset($spreadsheet);
+
+        return $summary;
+    }
+
+    /**
      * Import medicines master from Excel file.
      *
      * Expected columns (Row 2 onwards):
@@ -23,7 +106,7 @@ class MedicineImportService
      * C: Name (Nama obat)
      * O: HNA (raw_price)
      * P: HET (het_price)
-     * Q: Barcode
+     * Q: Barcode (read as formatted text to preserve leading zeroes)
      * R: PBF (Distributor/Creditor -> medicine_creditors)
      * AC: Surat Pesanan (type)
      * AE: Isi (content)
@@ -103,7 +186,7 @@ class MedicineImportService
                 $totalRows++;
 
                 $rawCode = trim((string) ($row['B'] ?? ''));
-                $barcode = trim((string) ($row['Q'] ?? ''));
+                $barcode = trim((string) $sheet->getCell("Q{$rowIndex}")->getFormattedValue());
                 $hna = $this->parsePrice($row['O'] ?? null);
                 $het = $this->parsePrice($row['P'] ?? null);
                 $pbfName = trim((string) ($row['R'] ?? ''));
@@ -134,7 +217,35 @@ class MedicineImportService
                 $codeKey = strtoupper($code);
                 $isExisting = $existingMedicines->has($codeKey);
 
-                $netPrice = $hna > 0 ? (string) floor($hna * 1.11) : '0';
+                // Never silently assign a medicine to an unrelated/default category.
+                if ($categoryName !== '' && $categoryId === null) {
+                    $skippedCount++;
+                    $skippedRows[] = [
+                        'row' => $rowIndex,
+                        'reason' => "Golongan '{$categoryName}' tidak ditemukan di medicine_categories.",
+                    ];
+                    continue;
+                }
+
+                if ($categoryId === null && $isExisting) {
+                    $categoryId = $existingMedicines->get($codeKey)->medicine_category_id;
+                }
+
+                if ($categoryId === null) {
+                    $firstCategory = reset($categoryMap);
+                    $categoryId = $firstCategory ? $firstCategory->id : null;
+                }
+
+                if ($categoryId === null) {
+                    $skippedCount++;
+                    $skippedRows[] = [
+                        'row' => $rowIndex,
+                        'reason' => 'Tidak ada golongan obat di medicine_categories untuk digunakan.',
+                    ];
+                    continue;
+                }
+
+                $netPrice = (string) floor($hna * 1.11);
 
                 $payload = [
                     'code'                 => $code,
@@ -291,48 +402,34 @@ class MedicineImportService
     {
         $map = [];
         foreach (MedicineCategory::all() as $c) {
-            $key = mb_strtoupper(trim((string) $c->name));
-            if ($key !== '') {
-                $map[$key] = $c;
+            foreach ([$c->name, $c->code] as $label) {
+                $key = $this->normalizeLookupKey((string) $label);
+                if ($key !== '') {
+                    $map[$key] = $c;
+                }
             }
         }
         return $map;
     }
 
     /**
-     * Resolve category ID.
+     * Resolve category ID only from the existing medicine_categories table.
      */
-    private function resolveCategoryId(string $name, array &$map): int
+    private function resolveCategoryId(string $name, array &$map): ?int
     {
         $trimmed = trim($name);
         if ($trimmed === '') {
-            $first = reset($map);
-            return $first ? $first->id : 1;
+            return null;
         }
 
-        $key = mb_strtoupper($trimmed);
-        if (isset($map[$key])) {
-            return $map[$key]->id;
-        }
+        $category = $map[$this->normalizeLookupKey($trimmed)] ?? null;
+        return $category?->id;
+    }
 
-        // Check partial match (e.g. "OBAT KERAS" matches "OBAT KERAS (G)")
-        foreach ($map as $catName => $catModel) {
-            if (str_contains($catName, $key) || str_contains($key, $catName)) {
-                return $catModel->id;
-            }
-        }
-
-        // Auto-create category
-        $maxId = MedicineCategory::max('id') ?? 0;
-        $newCode = str_pad($maxId + 1, 2, '0', STR_PAD_LEFT);
-        $newCat = MedicineCategory::create([
-            'code'   => $newCode,
-            'name'   => $trimmed,
-            'status' => 1,
-        ]);
-        $map[$key] = $newCat;
-
-        return $newCat->id;
+    private function normalizeLookupKey(string $value): string
+    {
+        $value = preg_replace('/\s+/u', ' ', trim($value)) ?? trim($value);
+        return mb_strtoupper($value);
     }
 
     /**

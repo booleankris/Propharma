@@ -805,7 +805,7 @@
                 $('#cart_id').val(data.id);
 
                 // Load batches
-                loadBatches(data.medicine.id);
+                loadBatches(data.medicine.id, data.transaction_id);
                 $('#qty').trigger('focus');
             }
 
@@ -830,11 +830,11 @@
 
 
 
-        function loadBatches(medicine_id) {
+        function loadBatches(medicine_id, transaction_id) {
             const select = document.getElementById('batch_select');
             select.innerHTML = '<option value="">Memuat batch...</option>';
 
-            fetch(`{{ route('returdata.batches') }}?medicine_id=${medicine_id}`)
+            fetch(`{{ route('returdata.batches') }}?medicine_id=${medicine_id}&transaction_id=${transaction_id}`)
                 .then(res => res.json())
                 .then(data => {
                     select.innerHTML = '<option value="">— Pilih batch/etalase —</option>';

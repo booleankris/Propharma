@@ -257,6 +257,7 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
             Route::get('/', [MedicineController::class, 'index'])->name('index');
             Route::post('/', [MedicineController::class, 'store'])->name('store');
             Route::post('/import', [MedicineController::class, 'import'])->name('import');
+            Route::post('/import/execute', [MedicineController::class, 'executeImport'])->name('import.execute');
             Route::put('/{id}', [MedicineController::class, 'update'])->name('update');
             Route::delete('/{id}', [MedicineController::class, 'destroy'])->name('destroy');
             Route::post('/{id}/restore', [MedicineController::class, 'restore'])->name('restore');

@@ -20,9 +20,11 @@ class BiayaExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
     protected array $targetPharmacyIds;
     protected array $filters;
     protected ?Pharmacies $activePharmacy;
-    protected int $lastRow = 5;
-    protected int $dataStartRow = 6;
-    protected int $dataRowCount = 0;
+    protected array $detailRows = [];
+    protected array $groupHeaderRows = [];
+    protected array $subtotalRows = [];
+    protected ?int $grandTotalRow = null;
+    protected ?int $emptyRow = null;
 
     public function __construct(array $targetPharmacyIds, array $filters = [], ?Pharmacies $activePharmacy = null)
     {
@@ -80,7 +82,7 @@ class BiayaExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
             ["APOTEK PROPHARMA - {$branchName}"],
             ['LAPORAN BIAYA OPERASIONAL & PENGELUARAN'],
             ["Periode: {$filterDateStr} | Kategori Beban: {$filterExpenseName} | Sumber Dana: {$filterKasName} | Dicetak: " . Carbon::now()->format('d/m/Y H:i')],
-            [], // Row 4 Blank
+            array_fill(0, 12, ''), // Row 4 Blank; keep a real row in Laravel Excel's flatMap.
             [   // Row 5 Table Headers
                 'No',
                 'No. Bukti / Ref',
@@ -165,46 +167,64 @@ class BiayaExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         $sortOrder = strtolower($this->filters['sort_order'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
         $query->orderBy('payment_date', $sortOrder)->orderBy('id', $sortOrder);
 
-        $no = 1;
-        $totalNominal = 0;
         $items = $query->get();
-        $this->dataRowCount = $items->count();
-
-        foreach ($items as $item) {
-            $amount = (float) $item->amount;
-            $totalNominal += $amount;
-
-            $rows[] = [
-                $no++,
-                $item->reference_number ?: ('BY-' . str_pad($item->id, 5, '0', STR_PAD_LEFT)),
-                $this->safeFormatDate($item->payment_date),
-                $item->pharmacy->name ?? ($branchName ?: 'Pusat'),
-                $item->expenseAccount->code ?? '-',
-                $item->expenseAccount->name ?? 'Biaya Operasional',
-                $item->expenseAccount->category ?? 'Beban Operasional',
-                $item->account->name ?? 'Kas / Bank',
-                $item->recipient ?: '-',
-                $item->notes ?: '-',
-                $item->creator->name ?? 'Petugas',
-                $amount,
-            ];
-        }
-
-        // Summary or Empty State Row
-        if ($this->dataRowCount > 0) {
-            $rows[] = [
-                'TOTAL PENGELUARAN BIAYA',
-                '', '', '', '', '', '', '', '', '', '',
-                $totalNominal,
-            ];
-            $this->lastRow = count($rows);
-        } else {
+        if ($items->isEmpty()) {
+            $this->emptyRow = count($rows) + 1;
             $rows[] = [
                 'Tidak ada data pengeluaran biaya operasional yang sesuai dengan filter yang dipilih.',
                 '', '', '', '', '', '', '', '', '', '', ''
             ];
-            $this->lastRow = count($rows);
+            return $rows;
         }
+
+        $groups = $items->groupBy(function ($item) {
+            $accountName = trim((string) ($item->expenseAccount->name ?? ''));
+            return $accountName !== '' ? $accountName : 'Biaya tanpa akun beban';
+        })->sortKeys(SORT_NATURAL | SORT_FLAG_CASE);
+
+        $no = 1;
+        $totalNominal = 0;
+
+        foreach ($groups as $accountName => $categoryItems) {
+            $this->groupHeaderRows[] = count($rows) + 1;
+            $rows[] = ["Sub. Jenis Pengeluaran: {$accountName}"];
+            $categoryTotal = 0;
+
+            foreach ($categoryItems as $item) {
+                $amount = (float) $item->amount;
+                $categoryTotal += $amount;
+                $totalNominal += $amount;
+
+                $this->detailRows[] = count($rows) + 1;
+                $rows[] = [
+                    $no++,
+                    $item->reference_number ?: ('BY-' . str_pad($item->id, 5, '0', STR_PAD_LEFT)),
+                    $this->safeFormatDate($item->payment_date),
+                    $item->pharmacy->name ?? ($branchName ?: 'Pusat'),
+                    $item->expenseAccount->code ?? '-',
+                    $item->expenseAccount->name ?? 'Biaya Operasional',
+                    $item->expenseAccount->category ?? 'Beban Operasional',
+                    $item->account->name ?? 'Kas / Bank',
+                    $item->recipient ?: '-',
+                    $item->notes ?: '-',
+                    $item->creator->name ?? 'Petugas',
+                    $amount,
+                ];
+            }
+
+            $this->subtotalRows[] = count($rows) + 1;
+            $rows[] = [
+                'Jml. Data: ' . $categoryItems->count(), '', '', 'Sub. Total',
+                '', '', '', '', '', '', '', $categoryTotal,
+            ];
+        }
+
+        $this->grandTotalRow = count($rows) + 1;
+        $rows[] = [
+            'TOTAL PENGELUARAN BIAYA',
+            '', '', '', '', '', '', '', '', '', '',
+            $totalNominal,
+        ];
 
         return $rows;
     }
@@ -229,7 +249,6 @@ class BiayaExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
 
     public function styles(Worksheet $sheet)
     {
-        // 1. Title Styling
         $sheet->mergeCells('A1:L1');
         $sheet->mergeCells('A2:L2');
         $sheet->mergeCells('A3:L3');
@@ -252,7 +271,6 @@ class BiayaExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         ]);
         $sheet->getRowDimension(3)->setRowHeight(18);
 
-        // 2. Table Headers (Row 5)
         $sheet->getStyle('A5:L5')->applyFromArray([
             'font' => ['bold' => true, 'size' => 10, 'color' => ['rgb' => 'FFFFFF']],
             'fill' => [
@@ -270,54 +288,70 @@ class BiayaExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         ]);
         $sheet->getRowDimension(5)->setRowHeight(28);
 
-        // 3. Data Rows Styling
-        if ($this->dataRowCount > 0) {
-            $start = $this->dataStartRow;
-            $end = $start + $this->dataRowCount - 1;
-
-            for ($row = $start; $row <= $end; $row++) {
-                $sheet->getRowDimension($row)->setRowHeight(20);
-
-                // Zebra striping for readability
-                if ($row % 2 == 1) {
-                    $sheet->getStyle("A{$row}:L{$row}")->getFill()
-                        ->setFillType(Fill::FILL_SOLID)
-                        ->getStartColor()->setRGB('F8FAFC');
-                }
-            }
-
-            // General Grid Borders & Alignments
-            $sheet->getStyle("A{$start}:L{$end}")->applyFromArray([
+        foreach ($this->detailRows as $index => $row) {
+            $sheet->getRowDimension($row)->setRowHeight(20);
+            $sheet->getStyle("A{$row}:L{$row}")->applyFromArray([
                 'borders' => [
                     'allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'E2E8F0']],
                 ],
                 'alignment' => ['vertical' => Alignment::VERTICAL_CENTER],
             ]);
+            if ($index % 2 === 1) {
+                $sheet->getStyle("A{$row}:L{$row}")->getFill()
+                    ->setFillType(Fill::FILL_SOLID)
+                    ->getStartColor()->setRGB('F8FAFC');
+            }
 
-            $sheet->getStyle("A{$start}:A{$end}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle("B{$start}:B{$end}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle("B{$start}:B{$end}")->getFont()->setBold(true);
-            $sheet->getStyle("C{$start}:C{$end}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle("D{$start}:D{$end}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
-            $sheet->getStyle("E{$start}:E{$end}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle("F{$start}:F{$end}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
-            $sheet->getStyle("G{$start}:G{$end}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
-            $sheet->getStyle("H{$start}:H{$end}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
-            $sheet->getStyle("I{$start}:I{$end}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
-            $sheet->getStyle("J{$start}:J{$end}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
-            $sheet->getStyle("K{$start}:K{$end}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle("L{$start}:L{$end}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
-            $sheet->getStyle("L{$start}:L{$end}")->getNumberFormat()->setFormatCode('#,##0');
-            $sheet->getStyle("L{$start}:L{$end}")->getFont()->setBold(true);
+            foreach (['A', 'B', 'C', 'E', 'K'] as $column) {
+                $sheet->getStyle("{$column}{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            }
+            foreach (['D', 'F', 'G', 'H', 'I', 'J'] as $column) {
+                $sheet->getStyle("{$column}{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
+            }
+            $sheet->getStyle("B{$row}")->getFont()->setBold(true);
+            $sheet->getStyle("L{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+            $sheet->getStyle("L{$row}")->getNumberFormat()->setFormatCode('#,##0');
+            $sheet->getStyle("L{$row}")->getFont()->setBold(true);
+        }
 
-            // Summary Row Style
-            $totalRow = $this->lastRow;
-            $sheet->mergeCells("A{$totalRow}:K{$totalRow}");
-            $sheet->getStyle("A{$totalRow}:L{$totalRow}")->applyFromArray([
-                'fill' => [
-                    'fillType' => Fill::FILL_SOLID,
-                    'startColor' => ['rgb' => 'ECFDF5'], // Emerald-50 highlight
+        foreach ($this->groupHeaderRows as $row) {
+            $sheet->mergeCells("A{$row}:L{$row}");
+            $sheet->getStyle("A{$row}:L{$row}")->applyFromArray([
+                'font' => ['bold' => true, 'italic' => true, 'color' => ['rgb' => '334155']],
+                'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'E2E8F0']],
+                'borders' => [
+                    'top' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => '94A3B8']],
+                    'bottom' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => '94A3B8']],
                 ],
+                'alignment' => ['vertical' => Alignment::VERTICAL_CENTER],
+            ]);
+            $sheet->getRowDimension($row)->setRowHeight(22);
+        }
+
+        foreach ($this->subtotalRows as $row) {
+            $sheet->mergeCells("A{$row}:C{$row}");
+            $sheet->mergeCells("D{$row}:K{$row}");
+            $sheet->getStyle("A{$row}:L{$row}")->applyFromArray([
+                'font' => ['bold' => true, 'color' => ['rgb' => '334155']],
+                'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'F1F5F9']],
+                'borders' => [
+                    'top' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'CBD5E1']],
+                    'bottom' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'CBD5E1']],
+                ],
+                'alignment' => ['vertical' => Alignment::VERTICAL_CENTER],
+            ]);
+            $sheet->getStyle("A{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
+            $sheet->getStyle("D{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+            $sheet->getStyle("L{$row}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+            $sheet->getStyle("L{$row}")->getNumberFormat()->setFormatCode('#,##0');
+            $sheet->getRowDimension($row)->setRowHeight(22);
+        }
+
+        if ($this->grandTotalRow !== null) {
+            $row = $this->grandTotalRow;
+            $sheet->mergeCells("A{$row}:K{$row}");
+            $sheet->getStyle("A{$row}:L{$row}")->applyFromArray([
+                'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'ECFDF5']],
                 'borders' => [
                     'top' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => '10B981']],
                     'bottom' => ['borderStyle' => Border::BORDER_DOUBLE, 'color' => ['rgb' => '047857']],
@@ -325,30 +359,29 @@ class BiayaExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                 ],
                 'alignment' => ['vertical' => Alignment::VERTICAL_CENTER],
             ]);
-
-            $sheet->getStyle("A{$totalRow}")->applyFromArray([
+            $sheet->getStyle("A{$row}")->applyFromArray([
                 'font' => ['bold' => true, 'size' => 10, 'color' => ['rgb' => '047857']],
                 'alignment' => ['horizontal' => Alignment::HORIZONTAL_RIGHT],
             ]);
-
-            $sheet->getStyle("L{$totalRow}")->applyFromArray([
+            $sheet->getStyle("L{$row}")->applyFromArray([
                 'font' => ['bold' => true, 'size' => 11, 'color' => ['rgb' => '047857']],
                 'alignment' => ['horizontal' => Alignment::HORIZONTAL_RIGHT],
                 'numberFormat' => ['formatCode' => '#,##0'],
             ]);
-            $sheet->getRowDimension($totalRow)->setRowHeight(24);
-        } else {
-            // Empty State Row
-            $emptyRow = $this->dataStartRow;
-            $sheet->mergeCells("A{$emptyRow}:L{$emptyRow}");
-            $sheet->getStyle("A{$emptyRow}:L{$emptyRow}")->applyFromArray([
+            $sheet->getRowDimension($row)->setRowHeight(24);
+        }
+
+        if ($this->emptyRow !== null) {
+            $row = $this->emptyRow;
+            $sheet->mergeCells("A{$row}:L{$row}");
+            $sheet->getStyle("A{$row}:L{$row}")->applyFromArray([
                 'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
                 'font' => ['italic' => true, 'color' => ['rgb' => '94A3B8']],
                 'borders' => [
                     'allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'E2E8F0']],
                 ],
             ]);
-            $sheet->getRowDimension($emptyRow)->setRowHeight(30);
+            $sheet->getRowDimension($row)->setRowHeight(30);
         }
     }
 

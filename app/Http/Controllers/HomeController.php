@@ -106,7 +106,7 @@ class HomeController extends Controller
         $total_reject_rp = formatRupiah($total_reject);
 
         // 5 barang dengan ED terdekat
-        $nearExpiry = $this->queryNearExpiry()->take(5);
+        $nearExpiry = $this->queryNearExpiry(null, 5);
 
         return view('kasir.home', compact(
             'today_sales_rp',
@@ -147,7 +147,7 @@ class HomeController extends Controller
         ]);
     }
 
-    private function queryNearExpiry($medicineId = null)
+    private function queryNearExpiry($medicineId = null, ?int $limit = null)
     {
         $query = Batches::query()
             ->with('medicines:id,name,code,unit')
@@ -157,6 +157,30 @@ class HomeController extends Controller
 
         if ($medicineId) {
             $query->where('medicine_id', $medicineId);
+        }
+
+        // expired_date is a string and historical rows can use several date formats.
+        // Parse/order/limit in MariaDB for the dashboard so we do not hydrate every
+        // positive-stock batch into PHP just to display five rows.
+        if ($limit !== null && $limit > 0 && \Illuminate\Support\Facades\DB::connection()->getDriverName() === 'mysql') {
+            $parsedExpiry = "COALESCE("
+                . "STR_TO_DATE(batches.expired_date, '%Y-%m-%d %H:%i:%s'),"
+                . "STR_TO_DATE(batches.expired_date, '%Y-%m-%d %H:%i'),"
+                . "STR_TO_DATE(batches.expired_date, '%Y-%m-%d'),"
+                . "STR_TO_DATE(batches.expired_date, '%d/%m/%Y %H:%i:%s'),"
+                . "STR_TO_DATE(batches.expired_date, '%d/%m/%Y %H:%i'),"
+                . "STR_TO_DATE(batches.expired_date, '%d/%m/%Y'),"
+                . "STR_TO_DATE(batches.expired_date, '%d-%m-%Y %H:%i:%s'),"
+                . "STR_TO_DATE(batches.expired_date, '%d-%m-%Y %H:%i'),"
+                . "STR_TO_DATE(batches.expired_date, '%d-%m-%Y')"
+                . ")";
+
+            $query->select('batches.*')
+                ->selectRaw("{$parsedExpiry} AS parsed_expiry_date")
+                ->orderByRaw('parsed_expiry_date IS NULL ASC')
+                ->orderBy('parsed_expiry_date')
+                ->orderBy('batches.id')
+                ->limit($limit);
         }
 
         $items = $query
@@ -191,6 +215,10 @@ class HomeController extends Controller
             ->filter(fn($batch) => $batch->expiry_carbon !== null)
             ->sortBy(fn($batch) => $batch->expiry_carbon)
             ->values();
+
+        if ($limit !== null && $limit > 0) {
+            $items = $items->take($limit)->values();
+        }
 
         return $items;
     }
