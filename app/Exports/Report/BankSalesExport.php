@@ -127,14 +127,15 @@ class BankSalesExport implements WithMultipleSheets
             $netSum = 0;
 
             foreach ($bankTransactions as $trx) {
-                $trxDiscount = (float) ($trx->discount ?? 0);
+                // LIPH casts each monetary value to whole rupiah before summing.
+                $trxDiscount = (int) ($trx->discount ?? 0);
                 $discSum += $trxDiscount;
 
                 $items = $trx->transactions;
                 $originalMap = LiphExport::TYPE_MAP[$trx->transaction_type] ?? null;
                 $originalLabel = $originalMap[1] ?? '';
                 if ($items->isEmpty()) {
-                    $subtotal = (float) ($trx->subtotal ?? 0);
+                    $subtotal = (int) ($trx->subtotal ?? 0);
                     $isReturn = in_array($originalLabel, ['Retur Tunai', 'Retur Kredit'], true);
                     $signedSubtotal = $isReturn ? -abs($subtotal) : $subtotal;
                     $grossSum += $signedSubtotal;
@@ -145,7 +146,7 @@ class BankSalesExport implements WithMultipleSheets
                         $qty = (int) ($item->quantity ?? 0);
                         $price = (float) ($item->item_price ?? 0);
                         $itemDisc = (float) ($item->discount ?? 0);
-                        $final = (float) ($item->final_price ?? ($item->total_price ?? ($qty * $price - $itemDisc)));
+                        $final = (int) ($item->final_price ?? ($item->total_price ?? ($qty * $price - $itemDisc)));
 
                         $effectiveType = $item->cart_type
                             ? (LiphExport::CART_TYPE_ABBR[$item->cart_type] ?? $item->cart_type)
