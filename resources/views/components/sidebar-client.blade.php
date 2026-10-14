@@ -1606,7 +1606,7 @@
                                 <path d="M16 14l0 3" />
                             </svg>
                         </div>
-                        <span class="text-sm font-semibold text-slate-600">Bank</span>
+                        <span class="text-sm font-semibold text-slate-600">Pembayaran</span>
                     </button>
 
                     <button onclick="selectReport(this)"
