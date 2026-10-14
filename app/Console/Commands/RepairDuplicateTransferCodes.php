@@ -59,8 +59,41 @@ class RepairDuplicateTransferCodes extends Command
                             ?: Batches::whereKey($item->source_batches_id ?: $item->batches_id)->value('medicine_id'));
 
                         if ($medicineId === (int) $log->medicine_id && in_array((int) $log->batches_id, $batchIds, true)) {
-                            $owners[$transfer->id] = true;
+                            $owners[$transfer->id] = $transfer;
                         }
+                    }
+                }
+
+                if (count($owners) === 1) {
+                    $logOwner[$log->id] = (int) array_key_first($owners);
+                    continue;
+                }
+
+                // Duplicate headers can reference the same batches. Prefer a
+                // uniquely closest header timestamp only when the log is within
+                // one minute of that header's creation/update time.
+                $timeMatches = [];
+                foreach ($owners as $ownerId => $transfer) {
+                    $distances = [];
+                    foreach ([$transfer->created_at, $transfer->updated_at] as $transferTime) {
+                        if ($transferTime) {
+                            $distances[] = abs(
+                                Carbon::parse($log->created_at)->getTimestamp()
+                                - Carbon::parse($transferTime)->getTimestamp()
+                            );
+                        }
+                    }
+                    if ($distances) {
+                        $timeMatches[$ownerId] = min($distances);
+                    }
+                }
+
+                if ($timeMatches) {
+                    asort($timeMatches);
+                    $ranked = array_values($timeMatches);
+                    if ($ranked[0] <= 60 && (!isset($ranked[1]) || $ranked[0] < $ranked[1])) {
+                        $logOwner[$log->id] = (int) array_key_first($timeMatches);
+                        continue;
                     }
                 }
 
@@ -68,7 +101,6 @@ class RepairDuplicateTransferCodes extends Command
                     $ambiguous[] = $log->id;
                     continue;
                 }
-                $logOwner[$log->id] = (int) array_key_first($owners);
             }
 
             if ($ambiguous) {
@@ -99,7 +131,8 @@ class RepairDuplicateTransferCodes extends Command
                     });
                 }
 
-                $this->line("  Mutasi #{$transfer->id} -> {$newCode}; log terkait: " . count($ownedLogIds));
+                $logLabel = $ownedLogIds ? '#' . implode(', #', $ownedLogIds) : '-';
+                $this->line("  Mutasi #{$transfer->id} -> {$newCode}; log terkait: {$logLabel}");
             }
         }
 
