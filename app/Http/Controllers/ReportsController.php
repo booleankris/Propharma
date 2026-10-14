@@ -112,21 +112,38 @@ class ReportsController extends Controller
                         $headerRows = array_slice($rawRows, 0, $headerEndIndex + 1);
                         $dataRows = array_slice($rawRows, $headerEndIndex + 1, 90);
 
-                        $lastRow = end($rawRows);
-                        $hasSummaryRow = false;
-                        if (is_array($lastRow)) {
-                            foreach ($lastRow as $cell) {
-                                if (is_string($cell) && (stripos($cell, 'total') !== false || stripos($cell, 'jumlah') !== false)) {
-                                    $hasSummaryRow = true;
-                                    break;
+                        $summaryRows = [];
+                        $rIdx = count($rawRows) - 1;
+                        while ($rIdx > $headerEndIndex) {
+                            $candidate = $rawRows[$rIdx];
+                            $isSummary = false;
+                            if (is_array($candidate) && count($candidate) > 1) {
+                                $c0 = trim((string)($candidate[0] ?? ''));
+                                if ($c0 === '' || !is_numeric($c0)) {
+                                    foreach ($candidate as $cell) {
+                                        if (is_string($cell) && (
+                                            stripos($cell, 'total') !== false ||
+                                            stripos($cell, 'jumlah') !== false ||
+                                            stripos($cell, 'potongan') !== false
+                                        )) {
+                                            $isSummary = true;
+                                            break;
+                                        }
+                                    }
                                 }
+                            }
+                            if ($isSummary) {
+                                array_unshift($summaryRows, $candidate);
+                                $rIdx--;
+                            } else {
+                                break;
                             }
                         }
 
-                        $totalDataRows = count($rawRows) - count($headerRows) - ($hasSummaryRow ? 1 : 0);
+                        $totalDataRows = count($rawRows) - count($headerRows) - count($summaryRows);
                         $noticeRow = ['Menampilkan ' . count($dataRows) . ' baris pertama dari total ' . number_format(max(0, $totalDataRows), 0, ',', '.') . ' data. Unduh file Excel untuk melihat seluruh transaksi lengkap.'];
 
-                        $sheets[$title] = array_merge($headerRows, $dataRows, [$noticeRow], $hasSummaryRow ? [$lastRow] : []);
+                        $sheets[$title] = array_merge($headerRows, $dataRows, [$noticeRow], $summaryRows);
                     } else {
                         $sheets[$title] = $rawRows;
                     }
@@ -158,21 +175,38 @@ class ReportsController extends Controller
                 $headerRows = array_slice($rawRows, 0, $headerEndIndex + 1);
                 $dataRows = array_slice($rawRows, $headerEndIndex + 1, 140);
 
-                $lastRow = end($rawRows);
-                $hasSummaryRow = false;
-                if (is_array($lastRow)) {
-                    foreach ($lastRow as $cell) {
-                        if (is_string($cell) && (stripos($cell, 'total') !== false || stripos($cell, 'jumlah') !== false)) {
-                            $hasSummaryRow = true;
-                            break;
+                $summaryRows = [];
+                $rIdx = count($rawRows) - 1;
+                while ($rIdx > $headerEndIndex) {
+                    $candidate = $rawRows[$rIdx];
+                    $isSummary = false;
+                    if (is_array($candidate) && count($candidate) > 1) {
+                        $c0 = trim((string)($candidate[0] ?? ''));
+                        if ($c0 === '' || !is_numeric($c0)) {
+                            foreach ($candidate as $cell) {
+                                if (is_string($cell) && (
+                                    stripos($cell, 'total') !== false ||
+                                    stripos($cell, 'jumlah') !== false ||
+                                    stripos($cell, 'potongan') !== false
+                                )) {
+                                    $isSummary = true;
+                                    break;
+                                }
+                            }
                         }
+                    }
+                    if ($isSummary) {
+                        array_unshift($summaryRows, $candidate);
+                        $rIdx--;
+                    } else {
+                        break;
                     }
                 }
 
-                $totalDataRows = count($rawRows) - count($headerRows) - ($hasSummaryRow ? 1 : 0);
+                $totalDataRows = count($rawRows) - count($headerRows) - count($summaryRows);
                 $noticeRow = ['Menampilkan ' . count($dataRows) . ' baris pertama dari total ' . number_format(max(0, $totalDataRows), 0, ',', '.') . ' data. Unduh file Excel untuk data lengkap.'];
 
-                $previewRows = array_merge($headerRows, $dataRows, [$noticeRow], $hasSummaryRow ? [$lastRow] : []);
+                $previewRows = array_merge($headerRows, $dataRows, [$noticeRow], $summaryRows);
             } else {
                 $previewRows = $rawRows;
             }

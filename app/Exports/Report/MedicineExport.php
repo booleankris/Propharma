@@ -255,6 +255,26 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
             $grand['total'] - $grand['total_retur'],
         ];
 
+        $potonganTransaksi = (float) $transactions->reject(function ($trx) {
+            return in_array(strtoupper(trim((string) $trx->transaction_type)), ['RETUR JUAL', 'RETUR KREDIT'], true)
+                || strtoupper(trim((string) $trx->transaction_code)) === 'RT';
+        })->sum(fn ($t) => is_numeric($t->discount) ? (float) $t->discount : 0);
+
+        if ($potonganTransaksi > 0) {
+            $rows[] = [
+                '', 'POTONGAN TRANSAKSI (DISKON NOTA)', '',
+                '', '', '', '', '',
+                -$potonganTransaksi,
+            ];
+
+            $rows[] = [
+                '', 'TOTAL NETTO AKHIR', '',
+                '', '', '', '',
+                $grand['qty'] - $grand['qty_retur'],
+                ($grand['total'] - $grand['total_retur']) - $potonganTransaksi,
+            ];
+        }
+
         return $rows;
     }
 
@@ -334,6 +354,26 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
         }
 
         $rows[] = ['', 'TOTAL', '', $grandQty, $grandBruto, $grandDisc, $grandNetto];
+
+        $potonganTransaksi = (float) $transactions->reject(function ($trx) {
+            return in_array(strtoupper(trim((string) $trx->transaction_type)), ['RETUR JUAL', 'RETUR KREDIT'], true)
+                || strtoupper(trim((string) $trx->transaction_code)) === 'RT';
+        })->sum(fn ($t) => is_numeric($t->discount) ? (float) $t->discount : 0);
+
+        if ($potonganTransaksi > 0) {
+            $rows[] = [
+                '', 'POTONGAN TRANSAKSI (DISKON NOTA)', '',
+                '', '', '',
+                -$potonganTransaksi,
+            ];
+
+            $rows[] = [
+                '', 'TOTAL NETTO AKHIR', '',
+                $grandQty,
+                '', '',
+                $grandNetto - $potonganTransaksi,
+            ];
+        }
 
         return $rows;
     }
@@ -545,9 +585,18 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
         $sheet->getStyle("A{$dataStartRow}:{$lastCol}{$dataStartRow}")
             ->getFont()->setBold(true);
 
-        // Bold the TOTAL summary row at the bottom
-        $sheet->getStyle("A{$lastRow}:{$lastCol}{$lastRow}")
-            ->getFont()->setBold(true);
+        // Bold the summary rows at the bottom (TOTAL, POTONGAN TRANSAKSI, TOTAL NETTO AKHIR)
+        for ($r = $lastRow; $r >= $dataStartRow; $r--) {
+            $cellB = trim((string) $sheet->getCell("B{$r}")->getValue());
+            if ($cellB === 'TOTAL' || str_starts_with($cellB, 'TOTAL') || str_starts_with($cellB, 'POTONGAN')) {
+                $sheet->getStyle("A{$r}:{$lastCol}{$r}")->getFont()->setBold(true);
+                if (str_starts_with($cellB, 'POTONGAN')) {
+                    $sheet->getStyle("A{$r}:{$lastCol}{$r}")->getFont()->getColor()->setRGB('B91C1C');
+                }
+            } else {
+                break;
+            }
+        }
 
         // Borders only on the data table (row 7 onward)
         $sheet->getStyle("A{$dataStartRow}:{$lastCol}{$lastRow}")
@@ -607,8 +656,8 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
                 ->getAlignment()
                 ->setHorizontal(Alignment::HORIZONTAL_RIGHT);
 
-            // Format Bruto, Disc, Netto as number
-            $sheet->getStyle("E" . ($dataStartRow + 1) . ":G{$lastRow}")
+            // Format Qty, Bruto, Disc, Netto as number
+            $sheet->getStyle("D" . ($dataStartRow + 1) . ":G{$lastRow}")
                 ->getNumberFormat()
                 ->setFormatCode('#,##0');
         }

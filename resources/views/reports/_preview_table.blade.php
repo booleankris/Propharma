@@ -44,7 +44,7 @@
                                 if (str_starts_with($cLower, 'sub total') || str_starts_with($cLower, 'subtotal')) {
                                     $isSubTotal = true;
                                 }
-                                if ($cLower === 'total' || str_starts_with($cLower, 'grand total') || $cLower === 'jumlah total') {
+                                if ($cLower === 'total' || str_starts_with($cLower, 'grand total') || $cLower === 'jumlah total' || str_starts_with($cLower, 'total ') || str_starts_with($cLower, 'potongan')) {
                                     $isGrandTotal = true;
                                 }
                             }
@@ -121,7 +121,7 @@
                                     $isNoCol = ($colIndex === 0 && !$isHeader && $colStr !== '');
                                     $isCenterCol = $isHeader || $isNoCol || stripos($colHeader, 'kode') !== false || stripos($colHeader, 'struk') !== false || stripos($colHeader, 'tanggal') !== false || stripos($colHeader, 'shift') !== false;
                                 @endphp
-                                <td class="px-3 py-1.5 border border-slate-200 {{ $isCenterCol ? 'text-center' : ($isNumeric ? 'text-right' : 'text-left') }}">
+                                <td class="px-3 py-1.5 border border-slate-200 {{ $isCenterCol ? 'text-center' : ($isNumeric ? 'text-right' : 'text-left') }} {{ $isNumeric && (float)$col < 0 ? 'text-red-600' : '' }}">
                                     @if($shouldNotFormat)
                                         {{ $col }}
                                     @elseif($isNumeric)
