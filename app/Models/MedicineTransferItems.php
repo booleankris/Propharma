@@ -16,6 +16,7 @@ class MedicineTransferItems extends Model
         'source_type',
         'etalases_id',
         'qty',
+        'original_qty',
         'status',
         'stock_deducted_at',
     ];
@@ -23,6 +24,17 @@ class MedicineTransferItems extends Model
     protected $casts = [
         'stock_deducted_at' => 'datetime',
     ];
+
+    protected static function booted(): void
+    {
+        // qty is the live balance and is decremented by sales. Keep the
+        // quantity printed on the transfer receipt immutable from creation.
+        static::creating(function (self $item) {
+            if ($item->original_qty === null && $item->qty !== null) {
+                $item->original_qty = $item->qty;
+            }
+        });
+    }
 
     public function sourceBatch()
     {

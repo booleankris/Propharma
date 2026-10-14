@@ -120,7 +120,7 @@
             <tr>
                 <td>{{ $item->batches?->medicines?->name ?? '—' }}</td>
                 <td>{{ $item->batches?->name ?? '—' }}</td>
-                <td class="qty-col">{{ $item->qty }}</td>
+                <td class="qty-col">{{ $item->original_qty ?? $item->qty }}</td>
             </tr>
             @endforeach
         </tbody>

@@ -18,6 +18,7 @@ use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\TransfersExport;
 use App\Models\ExportJob;
 use App\Jobs\ProcessTransfersExport;
+use App\Services\MedicineTransferCodeGenerator;
 
 class TransfersController extends Controller
 {
@@ -44,24 +45,7 @@ class TransfersController extends Controller
     }
     function generateTransfersCode()
     {
-        $now = Carbon::now();
-
-        $year = $now->format('y');
-        $month = $now->format('m');
-        $prefix = "{$year}{$month}MUT";
-
-        $lastCode = Transfers::where('code', 'like', "{$prefix}%")
-            ->orderBy('code', 'desc')
-            ->value('code');
-
-        if ($lastCode) {
-            $lastNumber = (int) substr($lastCode, -4);
-            $nextNumber = $lastNumber + 1;
-        } else {
-            $nextNumber = 1;
-        }
-
-        return $prefix . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+        return MedicineTransferCodeGenerator::generate();
     }
     public function searchBatches(Request $request)
     {
@@ -409,6 +393,7 @@ class TransfersController extends Controller
                             'source_type' => $sourceType,
                             'etalases_id' => $requestedItem->etalases_id ?: $destinationEtalaseId,
                             'qty' => $qty,
+                            'original_qty' => $qty,
                             'status' => 0,
                             'stock_deducted_at' => $now,
                         ];
@@ -608,6 +593,7 @@ class TransfersController extends Controller
                         'source_type' => $sourceType,
                         'etalases_id' => $line['etalases_id'],
                         'qty' => $qty,
+                        'original_qty' => $qty,
                         'status' => 0,
                         'stock_deducted_at' => $now,
                     ]);

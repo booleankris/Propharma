@@ -3249,22 +3249,7 @@ class ReceivingController extends Controller
 
     public function generateTransfersCode()
     {
-        $now = Carbon::now();
-        $prefix = $now->format('ym') . 'MUT';
-
-        $codes = MedicineTransfers::where('code', 'like', "{$prefix}%")->pluck('code');
-
-        $maxNumber = 0;
-        foreach ($codes as $c) {
-            $parts = explode('MUT', (string)$c);
-            $val = (int) ($parts[1] ?? substr($c, -4));
-            if ($val > $maxNumber) {
-                $maxNumber = $val;
-            }
-        }
-
-        $nextNumber = $maxNumber + 1;
-        return $prefix . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+        return \App\Services\MedicineTransferCodeGenerator::generate();
     }
 
     public function saveOrder(Request $request)
@@ -3402,6 +3387,7 @@ class ReceivingController extends Controller
                         'receiving_items_id' => $item->id,
                         'etalases_id' => 99,
                         'qty' => $actualStockQty,
+                        'original_qty' => $actualStockQty,
                         'status' => 1,
                         'created_at' => now(),
                         'updated_at' => now(),

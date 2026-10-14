@@ -550,12 +550,6 @@ class StockOpnameImportService
             ->value('code');
         $logSeq = $lastLogCode ? ((int) substr($lastLogCode, -4)) : 0;
 
-        $transfersPrefix = "{$year}{$month}MUT";
-        $lastMutCode = MedicineTransfers::where('code', 'like', "{$transfersPrefix}%")
-            ->orderBy('code', 'desc')
-            ->value('code');
-        $mutSeq = $lastMutCode ? ((int) substr($lastMutCode, -4)) : 0;
-
         DB::beginTransaction();
 
         try {
@@ -684,11 +678,8 @@ class StockOpnameImportService
                                 }
                             }
                         } else {
-                            $mutSeq++;
-                            $mutCode = $transfersPrefix . str_pad($mutSeq, 4, '0', STR_PAD_LEFT);
-
                             $transferHeader = MedicineTransfers::create([
-                                'code'    => $mutCode,
+                                'code'    => $this->generateTransfersCode(),
                                 'status'  => 1,
                                 'user_id' => $userId,
                             ]);
@@ -1085,11 +1076,8 @@ class StockOpnameImportService
                                 if ($fallbackEtalase) $etalaseByBatch[$batchId] = (int) $fallbackEtalase;
                             }
                             if (!$transferHeaderId) {
-                                $mutPrefix = now()->format('ym') . 'MUT';
-                                $lastMut = MedicineTransfers::where('code', 'like', "{$mutPrefix}%")->orderBy('code', 'desc')->value('code');
-                                $mutSeq = $lastMut ? (int) substr($lastMut, -4) : 0;
                                 $transferHeaderId = MedicineTransfers::create([
-                                    'code' => $mutPrefix . str_pad($mutSeq + 1, 4, '0', STR_PAD_LEFT),
+                                    'code' => $this->generateTransfersCode(),
                                     'status' => 1,
                                     'user_id' => $userId,
                                 ])->id;
@@ -1300,26 +1288,7 @@ class StockOpnameImportService
 
     private function generateTransfersCode(): string
     {
-        $now = Carbon::now();
-        $prefix = $now->format('ym') . 'MUT';
-
-        $lastCode = MedicineTransfers::where('code', 'like', "{$prefix}%")
-            ->orderBy('id', 'desc')
-            ->value('code');
-
-        if (!$lastCode) {
-            $lastCode = MedicineTransfers::where('code', 'like', "{$prefix}%")
-                ->orderByRaw('LENGTH(code) DESC, code DESC')
-                ->value('code');
-        }
-
-        $nextNumber = 1;
-        if ($lastCode) {
-            $parts = explode('MUT', $lastCode);
-            $nextNumber = ((int) ($parts[1] ?? substr($lastCode, -4))) + 1;
-        }
-
-        return $prefix . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+        return MedicineTransferCodeGenerator::generate();
     }
 
     /**

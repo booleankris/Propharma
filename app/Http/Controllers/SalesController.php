@@ -23,6 +23,7 @@ use App\Models\TicketPayment;
 use App\Models\TicketTransaction;
 use App\Models\MedicineTransfers;
 use App\Models\MedicineTransferItems;
+use App\Services\MedicineTransactionCodeGenerator;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -65,8 +66,6 @@ class SalesController extends Controller
         $ChangeFakturRounding = $paymentParams->rounding;
         $rounding = $dbType === 'KREDIT' ? '0' : $paymentParams->rounding;
         $parameters = $dbType === 'KREDIT' ? '0' : $paymentParams->{$paramKey};
-        $transaction_code = $this->generateTransactionCode($meta['code']);
-
         // 3. Resolve which transaction to use
         if ($id !== null) {
             // Tab already has a specific transaction, load it, guard status
@@ -118,8 +117,6 @@ class SalesController extends Controller
         // update the type and clear the cart (prices differ per type).
 
         if ($transaction->transaction_type !== $dbType) {
-            $new_type = $meta['code'];
-            $new_code = $this->regenerateTransactionCode($new_type, $transaction->transaction_code);
             $transaction->update(['transaction_type' => $dbType, 'transaction_code' => null]);
             MedicineCart::where('transaction_id', $transaction->id)->delete();
         }
@@ -423,35 +420,9 @@ class SalesController extends Controller
     // 2 = UPDS
     // 3 = HV/OTC
     // 4 = Resep Kredit
-    public function generateTransactionCode($code)
+    public function generateTransactionCode($code, ?int $pharmacyId = null)
     {
-        $pharmacyId = getActivePharmacyId();
-        $pharmacyIdPadded = str_pad($pharmacyId, 2, '0', STR_PAD_LEFT);
-
-        $year = now()->format('y');
-        $month = now()->format('m');
-        $prefix = $year . $month . strtoupper($code);
-
-        $expectedLength = strlen($prefix) + 4 + 2;
-
-        $last = MedicineTransactions::where('transaction_code', 'like', $prefix . '%' . $pharmacyIdPadded)
-            ->whereRaw('LENGTH(transaction_code) = ?', [$expectedLength])
-            ->where('status', 1)
-            ->orderBy('transaction_code', 'desc')
-            ->first();
-
-        if ($last) {
-            $withoutPharmacyId = substr($last->transaction_code, 0, -2);
-            $lastNumber = intval(substr($withoutPharmacyId, -4));
-            $nextNumber = $lastNumber + 1;
-        } else {
-            $nextNumber = 0;
-        }
-
-        $serial = str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
-
-        $transactionCode = $prefix . $serial . $pharmacyIdPadded;
-        return $transactionCode;
+        return MedicineTransactionCodeGenerator::generate((string) $code, $pharmacyId);
     }
     public function regenerateTransactionCode($newTypeCode, $oldCode)
     {
@@ -941,7 +912,7 @@ class SalesController extends Controller
                 'status' => 1,
                 'created_at' => Carbon::now(),
                 'paid' => $validated['paid'],
-                'transaction_code' => $this->generateTransactionCode($meta['code']),
+                'transaction_code' => $this->generateTransactionCode($meta['code'], (int) $transaction->pharmacy_id),
                 'discount' => $validated['discounsubtotalvalue'],
                 'subtotal' => $validated['totaltransaction'],
                 'changes' => $validated['changes'],

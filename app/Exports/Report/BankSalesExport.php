@@ -122,9 +122,9 @@ class BankSalesExport implements WithMultipleSheets
         // 3. Prepare master bank list
         $activeCategories = array_keys($grouped);
         $banksList = array_values(array_unique(array_merge(self::STANDARD_BANKS, $activeCategories)));
-        // Add one aggregate Kredit row directly after Cash while preserving
-        // the existing order of every payment method.
-        array_splice($banksList, 1, 0, ['KREDIT']);
+        // Put the aggregate Kredit row first, preserving the existing order
+        // of Cash and every payment method that follows it.
+        array_unshift($banksList, 'KREDIT');
 
         // 4. Build one flat recap: Cash, Kredit, then each payment method once.
         $allBanksData = [];

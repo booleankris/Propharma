@@ -1356,24 +1356,7 @@ class SuppliesController extends Controller
 
     public function generateTransfersCode()
     {
-        $now = Carbon::now();
-
-        $year = $now->format('y');
-        $month = $now->format('m');
-        $prefix = "{$year}{$month}MUT";
-
-        $lastCode = MedicineTransfers::where('code', 'like', "{$prefix}%")
-            ->orderBy('code', 'desc')
-            ->value('code');
-
-        if ($lastCode) {
-            $lastNumber = (int) substr($lastCode, -4);
-            $nextNumber = $lastNumber + 1;
-        } else {
-            $nextNumber = 1;
-        }
-
-        return $prefix . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+        return \App\Services\MedicineTransferCodeGenerator::generate();
     }
 
     public function stockOpname()
@@ -1993,6 +1976,7 @@ class SuppliesController extends Controller
                         'batches_id'           => $counterBatch->id,
                         'source_batches_id'    => $counterBatch->id,
                         'qty'                  => $counterPhysic,
+                        'original_qty'         => $counterPhysic,
                         'status'               => 1,
                         'source_type'          => 'pelayanan',
                         'etalases_id'          => $etalasesId,
