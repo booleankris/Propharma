@@ -2,7 +2,11 @@
 
 namespace App\Exports\Report;
 
-use App\Models\ItemsLog;
+use App\Models\MedicineTransactions;
+use App\Models\Medicines;
+use App\Models\Pharmacies;
+use App\Models\Retur;
+use App\Support\LiphTransactionScope;
 use Illuminate\Support\Carbon;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\WithStyles;
@@ -17,24 +21,28 @@ class ReturExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
     protected $pharmacyId;
     protected $startDate;
     protected $endDate;
+    protected $shift;
+    protected $shiftType;
 
-    public function __construct($pharmacyId, $startDate, $endDate)
+    public function __construct($pharmacyId, $startDate, $endDate, $shift = null, $shiftType = 'semua')
     {
         $this->pharmacyId = $pharmacyId;
         $this->startDate  = Carbon::parse($startDate)->startOfDay();
         $this->endDate    = Carbon::parse($endDate)->endOfDay();
+        $this->shift      = $shift;
+        $this->shiftType  = $shiftType;
     }
 
     public function array(): array
     {
-        $pharmacy = \App\Models\Pharmacies::find($this->pharmacyId);
+        $pharmacy = Pharmacies::find($this->pharmacyId);
 
         $header = [
             [$pharmacy->name ?? 'APOTEK'],
             [$pharmacy->address ?? ''],
             [''],
             ['Laporan Retur Penjualan'],
-            ['Tanggal : ' . $this->startDate->format('d/m/Y') . ' s/d ' . $this->endDate->format('d/m/Y')],
+            ['Periode : ' . $this->startDate->format('d/m/Y') . ' s/d ' . $this->endDate->format('d/m/Y')],
             [''],
         ];
 
@@ -43,38 +51,102 @@ class ReturExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
 
     private function buildBody(): array
     {
-        $items = ItemsLog::with('medicines')
-            ->where('status', 3)
-            ->whereBetween('created_at', [$this->startDate, $this->endDate])
-            ->orderBy('created_at', 'asc')
-            ->get();
+        $query = MedicineTransactions::with(['shift_logs'])
+            ->where('pharmacy_id', $this->pharmacyId);
+
+        LiphTransactionScope::applySalesStatus($query);
+        LiphTransactionScope::applyPeriod(
+            $query,
+            $this->startDate,
+            $this->endDate,
+            $this->shiftType,
+            $this->shift
+        );
+
+        $transactions = $query->get();
+
+        $headers = $transactions->filter(function ($trx) {
+            return in_array(strtoupper(trim((string) $trx->transaction_type)), ['RETUR JUAL', 'RETUR KREDIT'], true)
+                || strtoupper(trim((string) $trx->transaction_code)) === 'RT';
+        })->values();
 
         $rows   = [];
-        $rows[] = ['NO', 'TANGGAL', 'NO RETUR', 'NO RESEP', 'NAMA OBAT', 'QTY RETUR', 'JUMLAH'];
+        $rows[] = ['No.', 'Tanggal', 'No. Retur', 'No. Transaksi Asal', 'Nama Obat', 'Qty Retur', 'Nilai Retur'];
 
+        if ($headers->isEmpty()) {
+            $rows[] = ['', 'TOTAL RETUR', '', '', '', 0, 0];
+            return $rows;
+        }
+
+        $times = $headers->map(fn ($h) => Carbon::parse($h->created_at ?? $h->updated_at));
+        $candidates = Retur::whereBetween('created_at', [
+            $times->min()->copy()->subSeconds(10),
+            $times->max()->copy()->addSeconds(10),
+        ])->get();
+
+        $medicines = Medicines::whereIn('id', $candidates->pluck('medicine_id')->filter()->unique())
+            ->get()->keyBy('id');
+        $originCodes = MedicineTransactions::whereIn('id', $candidates->pluck('transaction_id')->filter()->unique())
+            ->where('pharmacy_id', $this->pharmacyId)
+            ->pluck('transaction_code', 'id');
+
+        $used       = [];
         $no         = 1;
         $grandQty   = 0;
         $grandTotal = 0;
 
-        foreach ($items as $item) {
-            $qty   = (int) ($item->qty ?? 0);
-            $total = (int) ($item->total ?? 0);
+        foreach ($headers as $rt) {
+            $rtTime   = Carbon::parse($rt->created_at ?? $rt->updated_at);
+            $rtAmount = (int) round((float) $rt->subtotal);
+
+            $match = $candidates->first(function ($r) use ($rtTime, $rtAmount, $used, $originCodes) {
+                return !isset($used[$r->id])
+                    && isset($originCodes[$r->transaction_id])
+                    && (int) round((float) $r->total_retur) === $rtAmount
+                    && abs(Carbon::parse($r->created_at)->diffInSeconds($rtTime, false)) <= 10;
+            });
+
+            $tgl = Carbon::parse($rt->shift_logs?->clock_in ?? $rt->created_at ?? $rt->updated_at)->format('d/m/Y');
+
+            if ($match) {
+                $used[$match->id] = true;
+                $medicine = $medicines[$match->medicine_id] ?? null;
+                $qty      = (float) $match->qty_retur;
+                $total    = (float) $match->total_retur;
+                $origin   = $originCodes[$match->transaction_id] ?? '-';
+                $nomor    = 'RT/' . $origin;
+                $medName  = $medicine?->name ?? 'Obat Retur (Tanpa Master)';
+            } else {
+                $qty     = 0;
+                $total   = (float) $rt->subtotal;
+                $origin  = '-';
+                $nomor   = 'RT#' . $rt->id;
+                $medName = '[RETUR TANPA RINCIAN OBAT]';
+            }
 
             $rows[] = [
                 $no++,
-                Carbon::parse($item->created_at)->format('d/m/Y'),
-                $item->code ?? '-',
-                $item->transaction_code ?? '-',
-                $item->medicines?->name ?? '-',
-                '-' . $qty,
-                '-' . number_format($total, 0, ',', '.'),
+                $tgl,
+                $nomor,
+                $origin,
+                $medName,
+                $qty ? -$qty : 0,
+                $total ? -$total : 0,
             ];
 
             $grandQty   += $qty;
             $grandTotal += $total;
         }
 
-        $rows[] = ['', '', '', '', 'TOTAL RETUR', '', '-' . number_format($grandTotal, 0, ',', '.')];
+        $rows[] = [
+            '',
+            'TOTAL RETUR',
+            '',
+            '',
+            '',
+            $grandQty ? -$grandQty : 0,
+            $grandTotal ? -$grandTotal : 0,
+        ];
 
         return $rows;
     }
@@ -91,7 +163,6 @@ class ReturExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         $sheet->mergeCells("A4:{$lastCol}4");
         $sheet->mergeCells("A5:{$lastCol}5");
 
-        // Header styles
         $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(13);
         $sheet->getStyle('A4')->getFont()->setBold(true);
 
@@ -99,42 +170,65 @@ class ReturExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         $sheet->getStyle("A{$dataStartRow}:{$lastCol}{$dataStartRow}")
             ->getFont()->setBold(true);
 
+        // Bold summary rows at bottom
+        for ($r = $lastRow; $r >= $dataStartRow; $r--) {
+            $cellB = trim((string) $sheet->getCell("B{$r}")->getValue());
+            if ($cellB === 'TOTAL RETUR' || str_starts_with($cellB, 'TOTAL')) {
+                $sheet->getStyle("A{$r}:{$lastCol}{$r}")->getFont()->setBold(true);
+            } else {
+                break;
+            }
+        }
+
         // Borders on data area
         $sheet->getStyle("A{$dataStartRow}:{$lastCol}{$lastRow}")
             ->getBorders()->getAllBorders()
             ->setBorderStyle(Border::BORDER_THIN);
 
-        // Row height
         for ($i = $dataStartRow; $i <= $lastRow; $i++) {
-            $sheet->getRowDimension($i)->setRowHeight(25);
+            $sheet->getRowDimension($i)->setRowHeight(22);
         }
 
-        // Left-align all data
+        // Default alignment
         $sheet->getStyle("A{$dataStartRow}:{$lastCol}{$lastRow}")
             ->getAlignment()
+            ->setVertical(Alignment::VERTICAL_CENTER)
             ->setHorizontal(Alignment::HORIZONTAL_LEFT);
 
-        // Right-align Qty Retur (col F) and Jumlah (col G)
+        // Center No and Dates
+        $sheet->getStyle("A{$dataStartRow}:B{$lastRow}")
+            ->getAlignment()
+            ->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+        // Right-align and format numbers (Qty in col F, Nilai in col G)
         $sheet->getStyle("F{$dataStartRow}:G{$lastRow}")
             ->getAlignment()
             ->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+
+        $sheet->getStyle("F" . ($dataStartRow + 1) . ":G{$lastRow}")
+            ->getNumberFormat()
+            ->setFormatCode('#,##0');
+
+        // Retur values in red
+        $sheet->getStyle("F" . ($dataStartRow + 1) . ":G{$lastRow}")
+            ->getFont()->getColor()->setRGB('B91C1C');
     }
 
     public function columnWidths(): array
     {
         return [
-            'A' => 5,
-            'B' => 15,
-            'C' => 15,
-            'D' => 15,
-            'E' => 40,
-            'F' => 12,
-            'G' => 20,
+            'A' => 6,   // No.
+            'B' => 14,  // Tanggal
+            'C' => 18,  // No. Retur
+            'D' => 20,  // No. Transaksi Asal
+            'E' => 38,  // Nama Obat
+            'F' => 14,  // Qty Retur
+            'G' => 18,  // Nilai Retur
         ];
     }
 
     public function title(): string
     {
-        return 'ReturPenjualanExport';
+        return 'Retur Penjualan';
     }
 }

@@ -5,6 +5,7 @@ namespace App\Exports\Report;
 use App\Models\MedicineTransactions;
 use App\Models\Pharmacies;
 use App\Models\Shifts;
+use App\Support\LiphTransactionScope;
 use Illuminate\Support\Carbon;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\WithColumnWidths;
@@ -113,27 +114,40 @@ class RecipeDetailSheet implements FromArray, WithStyles, WithColumnWidths, With
 
     private function buildBody(): array
     {
-        $query = MedicineTransactions::with(['doctors', 'patients', 'shift_logs.shift'])
+        $query = MedicineTransactions::with([
+            'transactions' => fn ($q) => $q->where('status', 1),
+            'doctors',
+            'patients',
+            'shift_logs.shift',
+        ])
             ->where('pharmacy_id', $this->pharmacyId)
-            ->whereIn('transaction_type', ['RESEP TUNAI', 'KREDIT'])
-            ->where('status', 1)
-            ->whereBetween('updated_at', [$this->startDate, $this->endDate]);
+            ->whereIn('transaction_type', ['RESEP TUNAI', 'KREDIT']);
 
-        if ($this->shiftType === 'shift' && !empty($this->shift)) {
-            $query->whereHas('shift_logs', function ($q) {
-                $q->where('shift_id', $this->shift);
-            });
-        }
+        LiphTransactionScope::applySalesStatus($query);
+        LiphTransactionScope::applyPeriod(
+            $query,
+            $this->startDate,
+            $this->endDate,
+            $this->shiftType,
+            $this->shift
+        );
 
         $transactions = $query->get();
 
         $rows   = [];
         $rows[] = ['No.', 'Tanggal', 'No. Resep', 'Layanan', 'Dokter', 'Pasien', 'Netto', 'Shift'];
 
-        $no         = 1;
-        $grandTotal = 0;
+        $no          = 1;
+        $grandTotal  = 0;
+        $potonganTrx = 0;
 
         foreach ($transactions as $trx) {
+            $resepItems = $trx->transactions->filter(function ($item) use ($trx) {
+                $ct = $item->cart_type ?: $trx->transaction_type;
+                return in_array($ct, ['UM', 'UK', 'RESEP TUNAI', 'KREDIT'], true);
+            });
+            if ($resepItems->isEmpty()) continue;
+
             $layanan = '-';
             if ($trx->transaction_type === 'KREDIT') {
                 $layanan = 'UK';
@@ -141,12 +155,13 @@ class RecipeDetailSheet implements FromArray, WithStyles, WithColumnWidths, With
                 $layanan = 'UM';
             }
 
-            $netto     = (int) ($trx->subtotal ?? 0);
+            $netto     = (float) $resepItems->sum('final_price');
             $shiftName = $trx->shift_logs?->shift?->name ?? '-';
+            $tgl       = Carbon::parse($trx->shift_logs?->clock_in ?? $trx->created_at)->format('d/m/Y');
 
             $rows[] = [
                 $no++,
-                Carbon::parse($trx->created_at)->format('d/m/Y'),
+                $tgl,
                 $trx->transaction_code ?? '-',
                 $layanan,
                 $trx->doctors?->name  ?? '-',
@@ -156,9 +171,28 @@ class RecipeDetailSheet implements FromArray, WithStyles, WithColumnWidths, With
             ];
 
             $grandTotal += $netto;
+            if (is_numeric($trx->discount) && (float) $trx->discount > 0) {
+                $potonganTrx += (float) $trx->discount;
+            }
         }
 
         $rows[] = ['', '', '', '', '', 'TOTAL', $grandTotal, ''];
+
+        if ($potonganTrx > 0) {
+            $rows[] = [
+                '', '', '', '', '',
+                'POTONGAN TRANSAKSI (DISKON NOTA)',
+                -$potonganTrx,
+                '',
+            ];
+
+            $rows[] = [
+                '', '', '', '', '',
+                'TOTAL NETTO AKHIR',
+                $grandTotal - $potonganTrx,
+                '',
+            ];
+        }
 
         return $rows;
     }
@@ -182,6 +216,19 @@ class RecipeDetailSheet implements FromArray, WithStyles, WithColumnWidths, With
         $sheet->getStyle("A{$dataStartRow}:{$lastCol}{$dataStartRow}")
             ->getFont()->setBold(true);
 
+        // Bold summary rows at bottom
+        for ($r = $lastRow; $r >= $dataStartRow; $r--) {
+            $cellF = trim((string) $sheet->getCell("F{$r}")->getValue());
+            if ($cellF === 'TOTAL' || str_starts_with($cellF, 'TOTAL') || str_starts_with($cellF, 'POTONGAN')) {
+                $sheet->getStyle("A{$r}:{$lastCol}{$r}")->getFont()->setBold(true);
+                if (str_starts_with($cellF, 'POTONGAN')) {
+                    $sheet->getStyle("A{$r}:{$lastCol}{$r}")->getFont()->getColor()->setRGB('B91C1C');
+                }
+            } else {
+                break;
+            }
+        }
+
         // Borders on entire data area
         $sheet->getStyle("A{$dataStartRow}:{$lastCol}{$lastRow}")
             ->getBorders()->getAllBorders()
@@ -189,16 +236,21 @@ class RecipeDetailSheet implements FromArray, WithStyles, WithColumnWidths, With
 
         // Row height
         for ($i = $dataStartRow; $i <= $lastRow; $i++) {
-            $sheet->getRowDimension($i)->setRowHeight(25);
+            $sheet->getRowDimension($i)->setRowHeight(22);
         }
 
         // Left-align all data rows
         $sheet->getStyle("A{$dataStartRow}:{$lastCol}{$lastRow}")
             ->getAlignment()
+            ->setVertical(Alignment::VERTICAL_CENTER)
             ->setHorizontal(Alignment::HORIZONTAL_LEFT);
 
         // Number format on Netto (col G)
         $sheet->getStyle("G{$dataStartRow}:G{$lastRow}")
+            ->getAlignment()
+            ->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+
+        $sheet->getStyle("G" . ($dataStartRow + 1) . ":G{$lastRow}")
             ->getNumberFormat()
             ->setFormatCode('#,##0');
     }
@@ -347,12 +399,13 @@ class RecipeMonthlySummarySheet implements FromArray, WithStyles, WithColumnWidt
         $yearStart = Carbon::create($this->year, 1, 1, 0, 0, 0)->startOfDay();
         $yearEnd   = Carbon::create($this->year, 12, 31, 23, 59, 59)->endOfDay();
 
-        $transactions = MedicineTransactions::with(['transactions.medicine.category'])
+        $query = MedicineTransactions::with(['transactions.medicine.category'])
             ->where('pharmacy_id', $this->pharmacyId)
             ->whereIn('transaction_type', ['RESEP TUNAI', 'KREDIT'])
-            ->where('status', 1)
-            ->whereBetween('updated_at', [$yearStart, $yearEnd])
-            ->get();
+            ->whereBetween('updated_at', [$yearStart, $yearEnd]);
+
+        LiphTransactionScope::applySalesStatus($query);
+        $transactions = $query->get();
 
         $categories = ['NARKOTIK', 'PSIKOTROPIKA', 'PREKURSOR', 'OOT', 'UMUM'];
         $matrix     = [];

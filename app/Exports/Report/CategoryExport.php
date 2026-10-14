@@ -3,6 +3,10 @@
 namespace App\Exports\Report;
 
 use App\Models\MedicineTransactions;
+use App\Models\Medicines;
+use App\Models\Pharmacies;
+use App\Models\Retur;
+use App\Support\LiphTransactionScope;
 use Illuminate\Support\Carbon;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\WithStyles;
@@ -19,71 +23,167 @@ class CategoryExport implements FromArray, WithStyles, WithColumnWidths, WithTit
     protected $endDate;
     protected $shift;
     protected $shiftType;
+    protected $selectedType;
 
-    public function __construct($pharmacyId, $startDate, $endDate, $shift, $shiftType)
+    public function __construct($pharmacyId, $startDate, $endDate, $shift = null, $shiftType = 'semua', $selectedType = 'rekap')
     {
-        $this->pharmacyId = $pharmacyId;
-        $this->startDate  = Carbon::parse($startDate)->startOfDay();
-        $this->endDate    = Carbon::parse($endDate)->endOfDay();
-        $this->shift      = $shift;
-        $this->shiftType  = $shiftType;
+        $this->pharmacyId   = $pharmacyId;
+        $this->startDate    = Carbon::parse($startDate)->startOfDay();
+        $this->endDate      = Carbon::parse($endDate)->endOfDay();
+        $this->shift        = $shift;
+        $this->shiftType    = $shiftType;
+        $this->selectedType = $selectedType ?: 'rekap';
     }
 
     public function array(): array
     {
-        $transactions = MedicineTransactions::with(['transactions.medicine.category'])
-            ->where('pharmacy_id', $this->pharmacyId)
-            ->where('status', 1)
-            ->whereBetween('updated_at', [$this->startDate, $this->endDate])
-            ->get();
+        $query = MedicineTransactions::with([
+            'transactions' => fn ($q) => $q->where('status', 1),
+            'transactions.medicine.category',
+            'shift_logs',
+        ])
+            ->where('pharmacy_id', $this->pharmacyId);
 
-        $pharmacy = \App\Models\Pharmacies::find($this->pharmacyId);
+        LiphTransactionScope::applySalesStatus($query);
+        LiphTransactionScope::applyPeriod(
+            $query,
+            $this->startDate,
+            $this->endDate,
+            $this->shiftType,
+            $this->shift
+        );
+
+        $transactions = $query->get();
+        $returns      = $this->resolveReturns($transactions);
+
+        $pharmacy = Pharmacies::find($this->pharmacyId);
+
+        $typeTitle = $this->selectedType === 'detail'
+            ? 'Detail Penjualan Per Golongan'
+            : 'Rekap Penjualan Golongan Obat';
 
         $header = [
             [$pharmacy->name ?? 'APOTEK'],
             [$pharmacy->address ?? ''],
             [''],
-            ['Laporan Penjualan (Golongan Obat)'],
-            ['Tanggal : ' . $this->startDate->format('d/m/Y') . ' s/d ' . $this->endDate->format('d/m/Y')],
+            ['Laporan Penjualan (' . $typeTitle . ')'],
+            ['Periode : ' . $this->startDate->format('d/m/Y') . ' s/d ' . $this->endDate->format('d/m/Y')],
             [''],
         ];
 
-        return array_merge($header, $this->buildGolongan($transactions));
+        $body = $this->selectedType === 'detail'
+            ? $this->buildDetail($transactions, $returns)
+            : $this->buildRecap($transactions, $returns);
+
+        return array_merge($header, $body);
     }
 
-    private function buildGolongan($transactions): array
+    private function resolveReturns($transactions): array
+    {
+        $headers = $transactions->filter(function ($trx) {
+            return in_array(strtoupper(trim((string) $trx->transaction_type)), ['RETUR JUAL', 'RETUR KREDIT'], true)
+                || strtoupper(trim((string) $trx->transaction_code)) === 'RT';
+        })->values();
+
+        if ($headers->isEmpty()) {
+            return [];
+        }
+
+        $times = $headers->map(fn ($h) => Carbon::parse($h->created_at ?? $h->updated_at));
+        $candidates = Retur::whereBetween('created_at', [
+            $times->min()->copy()->subSeconds(10),
+            $times->max()->copy()->addSeconds(10),
+        ])->get();
+
+        $medicines = Medicines::with('category')
+            ->whereIn('id', $candidates->pluck('medicine_id')->filter()->unique())
+            ->get()->keyBy('id');
+        $originCodes = MedicineTransactions::whereIn('id', $candidates->pluck('transaction_id')->filter()->unique())
+            ->where('pharmacy_id', $this->pharmacyId)
+            ->pluck('transaction_code', 'id');
+
+        $used    = [];
+        $returns = [];
+
+        foreach ($headers as $rt) {
+            $rtTime   = Carbon::parse($rt->created_at ?? $rt->updated_at);
+            $rtAmount = (int) round((float) $rt->subtotal);
+
+            $match = $candidates->first(function ($r) use ($rtTime, $rtAmount, $used, $originCodes) {
+                return !isset($used[$r->id])
+                    && isset($originCodes[$r->transaction_id])
+                    && (int) round((float) $r->total_retur) === $rtAmount
+                    && abs(Carbon::parse($r->created_at)->diffInSeconds($rtTime, false)) <= 10;
+            });
+
+            if ($match) {
+                $used[$match->id] = true;
+                $medicine = $medicines[$match->medicine_id] ?? null;
+                $returns[] = [
+                    'category' => $medicine?->category?->name ?? 'LAINNYA',
+                    'name'     => $medicine?->name ?? 'Obat Retur (Tanpa Master)',
+                    'qty'      => (float) $match->qty_retur,
+                    'total'    => (float) $match->total_retur,
+                ];
+            } else {
+                $returns[] = [
+                    'category' => '[RETUR TANPA RINCIAN OBAT]',
+                    'name'     => '[RETUR TANPA RINCIAN OBAT]',
+                    'qty'      => 0,
+                    'total'    => (float) $rt->subtotal,
+                ];
+            }
+        }
+
+        return $returns;
+    }
+
+    private function buildRecap($transactions, array $returns = []): array
     {
         $grouped = [];
 
         foreach ($transactions as $trx) {
             foreach ($trx->transactions ?? [] as $item) {
-
                 $medicine = $item->medicine;
-                if (!$medicine) continue;
-
-                $category = $medicine->category->name ?? 'LAINNYA';
+                $category = $medicine?->category?->name ?? 'LAINNYA';
 
                 if (!isset($grouped[$category])) {
                     $grouped[$category] = [
-                        'name'  => $category,
-                        'qty'   => 0,
-                        'total' => 0,
+                        'name'        => $category,
+                        'qty'         => 0,
+                        'total'       => 0,
+                        'qty_retur'   => 0,
+                        'total_retur' => 0,
                     ];
                 }
 
-                $grouped[$category]['qty'] += (int) ($item->quantity ?? 0);
-                $grouped[$category]['total'] += (int) ($item->final_price ?? 0);
+                $grouped[$category]['qty']   += (float) ($item->quantity ?? 0);
+                $grouped[$category]['total'] += (float) ($item->final_price ?? 0);
             }
+        }
+
+        foreach ($returns as $ret) {
+            $cat = $ret['category'];
+            if (!isset($grouped[$cat])) {
+                $grouped[$cat] = [
+                    'name'        => $cat,
+                    'qty'         => 0,
+                    'total'       => 0,
+                    'qty_retur'   => 0,
+                    'total_retur' => 0,
+                ];
+            }
+            $grouped[$cat]['qty_retur']   += $ret['qty'];
+            $grouped[$cat]['total_retur'] += $ret['total'];
         }
 
         ksort($grouped);
 
         $rows   = [];
-        $rows[] = ['No', 'Golongan', 'Qty', 'Nilai'];
+        $rows[] = ['No', 'Golongan', 'Qty Jual', 'Nilai Jual', 'Qty Retur', 'Nilai Retur', 'Qty Netto', 'Nilai Netto'];
 
         $no = 1;
-        $grandQty = 0;
-        $grandTotal = 0;
+        $grand = array_fill_keys(['qty', 'total', 'qty_retur', 'total_retur'], 0);
 
         foreach ($grouped as $data) {
             $rows[] = [
@@ -91,71 +191,259 @@ class CategoryExport implements FromArray, WithStyles, WithColumnWidths, WithTit
                 $data['name'],
                 $data['qty'],
                 $data['total'],
+                $data['qty_retur'] ? -$data['qty_retur'] : 0,
+                $data['total_retur'] ? -$data['total_retur'] : 0,
+                $data['qty'] - $data['qty_retur'],
+                $data['total'] - $data['total_retur'],
             ];
 
-            $grandQty += $data['qty'];
-            $grandTotal += $data['total'];
+            foreach ($grand as $k => $v) {
+                $grand[$k] += $data[$k];
+            }
         }
 
-        // TOTAL row
-        $rows[] = ['', 'TOTAL', $grandQty, $grandTotal];
+        $rows[] = [
+            '', 'TOTAL',
+            $grand['qty'],
+            $grand['total'],
+            $grand['qty_retur'] ? -$grand['qty_retur'] : 0,
+            $grand['total_retur'] ? -$grand['total_retur'] : 0,
+            $grand['qty'] - $grand['qty_retur'],
+            $grand['total'] - $grand['total_retur'],
+        ];
+
+        $potonganTransaksi = (float) $transactions->reject(function ($trx) {
+            return in_array(strtoupper(trim((string) $trx->transaction_type)), ['RETUR JUAL', 'RETUR KREDIT'], true)
+                || strtoupper(trim((string) $trx->transaction_code)) === 'RT';
+        })->sum(fn ($t) => is_numeric($t->discount) ? (float) $t->discount : 0);
+
+        if ($potonganTransaksi > 0) {
+            $rows[] = [
+                '', 'POTONGAN TRANSAKSI (DISKON NOTA)', '',
+                '', '', '', '',
+                -$potonganTransaksi,
+            ];
+
+            $rows[] = [
+                '', 'TOTAL NETTO AKHIR', '',
+                '', '', '',
+                $grand['qty'] - $grand['qty_retur'],
+                ($grand['total'] - $grand['total_retur']) - $potonganTransaksi,
+            ];
+        }
+
+        return $rows;
+    }
+
+    private function buildDetail($transactions, array $returns = []): array
+    {
+        $grouped = [];
+
+        foreach ($transactions as $trx) {
+            foreach ($trx->transactions ?? [] as $item) {
+                $medicine = $item->medicine;
+                $category = $medicine?->category?->name ?? 'LAINNYA';
+                $medName  = $medicine?->name ?? ($item->medicine_name ?? '-');
+                $key      = $category . '###' . ($medicine?->id ?? ('item_' . $item->id));
+
+                if (!isset($grouped[$key])) {
+                    $grouped[$key] = [
+                        'category'    => $category,
+                        'name'        => $medName,
+                        'qty'         => 0,
+                        'total'       => 0,
+                        'qty_retur'   => 0,
+                        'total_retur' => 0,
+                    ];
+                }
+
+                $grouped[$key]['qty']   += (float) ($item->quantity ?? 0);
+                $grouped[$key]['total'] += (float) ($item->final_price ?? 0);
+            }
+        }
+
+        foreach ($returns as $ret) {
+            $cat = $ret['category'];
+            $key = $cat . '###' . $ret['name'];
+            if (!isset($grouped[$key])) {
+                $grouped[$key] = [
+                    'category'    => $cat,
+                    'name'        => $ret['name'],
+                    'qty'         => 0,
+                    'total'       => 0,
+                    'qty_retur'   => 0,
+                    'total_retur' => 0,
+                ];
+            }
+            $grouped[$key]['qty_retur']   += $ret['qty'];
+            $grouped[$key]['total_retur'] += $ret['total'];
+        }
+
+        uasort($grouped, function ($a, $b) {
+            $catCmp = strcasecmp($a['category'], $b['category']);
+            if ($catCmp !== 0) return $catCmp;
+            return strcasecmp($a['name'], $b['name']);
+        });
+
+        $rows   = [];
+        $rows[] = ['No', 'Golongan', 'Nama Obat', 'Qty Jual', 'Nilai Jual', 'Qty Retur', 'Nilai Retur', 'Qty Netto', 'Nilai Netto'];
+
+        $no = 1;
+        $grand = array_fill_keys(['qty', 'total', 'qty_retur', 'total_retur'], 0);
+
+        foreach ($grouped as $data) {
+            $rows[] = [
+                $no++,
+                $data['category'],
+                $data['name'],
+                $data['qty'],
+                $data['total'],
+                $data['qty_retur'] ? -$data['qty_retur'] : 0,
+                $data['total_retur'] ? -$data['total_retur'] : 0,
+                $data['qty'] - $data['qty_retur'],
+                $data['total'] - $data['total_retur'],
+            ];
+
+            foreach ($grand as $k => $v) {
+                $grand[$k] += $data[$k];
+            }
+        }
+
+        $rows[] = [
+            '', 'TOTAL', '',
+            $grand['qty'],
+            $grand['total'],
+            $grand['qty_retur'] ? -$grand['qty_retur'] : 0,
+            $grand['total_retur'] ? -$grand['total_retur'] : 0,
+            $grand['qty'] - $grand['qty_retur'],
+            $grand['total'] - $grand['total_retur'],
+        ];
+
+        $potonganTransaksi = (float) $transactions->reject(function ($trx) {
+            return in_array(strtoupper(trim((string) $trx->transaction_type)), ['RETUR JUAL', 'RETUR KREDIT'], true)
+                || strtoupper(trim((string) $trx->transaction_code)) === 'RT';
+        })->sum(fn ($t) => is_numeric($t->discount) ? (float) $t->discount : 0);
+
+        if ($potonganTransaksi > 0) {
+            $rows[] = [
+                '', 'POTONGAN TRANSAKSI (DISKON NOTA)', '',
+                '', '', '', '', '',
+                -$potonganTransaksi,
+            ];
+
+            $rows[] = [
+                '', 'TOTAL NETTO AKHIR', '',
+                '', '', '', '',
+                $grand['qty'] - $grand['qty_retur'],
+                ($grand['total'] - $grand['total_retur']) - $potonganTransaksi,
+            ];
+        }
 
         return $rows;
     }
 
     public function styles(Worksheet $sheet)
     {
-        $lastCol = $sheet->getHighestColumn();
-        $lastRow = $sheet->getHighestRow();
+        $lastCol      = $sheet->getHighestColumn();
+        $lastRow      = $sheet->getHighestRow();
         $dataStartRow = 7;
 
-        // Merge header
+        // Merge header rows
         $sheet->mergeCells("A1:{$lastCol}1");
         $sheet->mergeCells("A2:{$lastCol}2");
         $sheet->mergeCells("A4:{$lastCol}4");
         $sheet->mergeCells("A5:{$lastCol}5");
 
-        // Header style
         $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(13);
+        $sheet->getStyle('A2')->getFont()->setSize(11);
         $sheet->getStyle('A4')->getFont()->setBold(true);
 
-        // Table header bold
+        // Bold column headers
         $sheet->getStyle("A{$dataStartRow}:{$lastCol}{$dataStartRow}")
             ->getFont()->setBold(true);
+
+        // Bold summary rows at bottom
+        for ($r = $lastRow; $r >= $dataStartRow; $r--) {
+            $cellB = trim((string) $sheet->getCell("B{$r}")->getValue());
+            if ($cellB === 'TOTAL' || str_starts_with($cellB, 'TOTAL') || str_starts_with($cellB, 'POTONGAN')) {
+                $sheet->getStyle("A{$r}:{$lastCol}{$r}")->getFont()->setBold(true);
+                if (str_starts_with($cellB, 'POTONGAN')) {
+                    $sheet->getStyle("A{$r}:{$lastCol}{$r}")->getFont()->getColor()->setRGB('B91C1C');
+                }
+            } else {
+                break;
+            }
+        }
 
         // Borders
         $sheet->getStyle("A{$dataStartRow}:{$lastCol}{$lastRow}")
             ->getBorders()->getAllBorders()
             ->setBorderStyle(Border::BORDER_THIN);
 
-        // Row height
         for ($i = $dataStartRow; $i <= $lastRow; $i++) {
-            $sheet->getRowDimension($i)->setRowHeight(25);
+            $sheet->getRowDimension($i)->setRowHeight(22);
         }
 
-        // Align numbers right (Qty & Nilai)
-        $sheet->getStyle("C{$dataStartRow}:D{$lastRow}")
+        // Default alignment
+        $sheet->getStyle("A{$dataStartRow}:{$lastCol}{$lastRow}")
+            ->getAlignment()
+            ->setVertical(Alignment::VERTICAL_CENTER)
+            ->setHorizontal(Alignment::HORIZONTAL_LEFT);
+
+        // Center No
+        $sheet->getStyle("A{$dataStartRow}:A{$lastRow}")
+            ->getAlignment()
+            ->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+        $numStartCol = $this->selectedType === 'detail' ? 'D' : 'C';
+
+        // Align numbers right
+        $sheet->getStyle("{$numStartCol}{$dataStartRow}:{$lastCol}{$lastRow}")
             ->getAlignment()
             ->setHorizontal(Alignment::HORIZONTAL_RIGHT);
 
-        // Format number
-        $sheet->getStyle("C{$dataStartRow}:D{$lastRow}")
+        // Format numbers
+        $sheet->getStyle("{$numStartCol}" . ($dataStartRow + 1) . ":{$lastCol}{$lastRow}")
             ->getNumberFormat()
             ->setFormatCode('#,##0');
+
+        // Retur columns in red
+        $returCols = $this->selectedType === 'detail' ? 'F:G' : 'E:F';
+        [$c1, $c2] = explode(':', $returCols);
+        $sheet->getStyle("{$c1}" . ($dataStartRow + 1) . ":{$c2}{$lastRow}")
+            ->getFont()->getColor()->setRGB('B91C1C');
     }
 
     public function columnWidths(): array
     {
-        return [
-            'A' => 5,
-            'B' => 40,
-            'C' => 15,
-            'D' => 20,
-        ];
+        return $this->selectedType === 'detail'
+            ? [
+                'A' => 6,   // No
+                'B' => 25,  // Golongan
+                'C' => 38,  // Nama Obat
+                'D' => 12,  // Qty Jual
+                'E' => 16,  // Nilai Jual
+                'F' => 12,  // Qty Retur
+                'G' => 16,  // Nilai Retur
+                'H' => 12,  // Qty Netto
+                'I' => 18,  // Nilai Netto
+            ]
+            : [
+                'A' => 6,   // No
+                'B' => 30,  // Golongan
+                'C' => 12,  // Qty Jual
+                'D' => 18,  // Nilai Jual
+                'E' => 12,  // Qty Retur
+                'F' => 16,  // Nilai Retur
+                'G' => 12,  // Qty Netto
+                'H' => 18,  // Nilai Netto
+            ];
     }
 
     public function title(): string
     {
-        return 'CategoryExport';
+        return $this->selectedType === 'detail'
+            ? 'Detail Golongan Obat'
+            : 'Rekap Golongan Obat';
     }
 }

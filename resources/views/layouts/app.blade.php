@@ -210,21 +210,21 @@
                 has_doctor: false
             },
             "Golongan": {
-                date_filter: false,
-                type_filter: false,
+                date_filter: true,
+                type_filter: true,
                 online_btn: false,
                 has_factory: false,
                 has_doctor: false
             },
             "Pabrik": {
-                date_filter: false,
+                date_filter: true,
                 type_filter: true,
                 online_btn: false,
                 has_factory: true,
                 has_doctor: false
             },
             "Dokter": {
-                date_filter: false,
+                date_filter: true,
                 type_filter: true,
                 online_btn: false,
                 has_factory: false,
@@ -238,7 +238,7 @@
                 has_doctor: false
             },
             "Retur Jual": {
-                date_filter: false,
+                date_filter: true,
                 type_filter: false,
                 online_btn: false,
                 has_factory: false,

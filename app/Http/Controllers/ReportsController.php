@@ -342,7 +342,13 @@ class ReportsController extends Controller
                 'RESEP_' . $pharmacy->name . '_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx',
             ],
             'Retur Jual' => [
-                new ReturExport($pharmacy->id, $request->start_date, $request->end_date),
+                new ReturExport(
+                    $pharmacy->id,
+                    $request->start_date,
+                    $request->end_date,
+                    $request->shift,
+                    $request->shiftType ?? 'semua'
+                ),
                 'RETUR_JUAL_' . $pharmacy->name . '_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx',
             ],
             'Pembelian', 'Laporan Pembelian' => [
