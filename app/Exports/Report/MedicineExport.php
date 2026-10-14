@@ -5,6 +5,8 @@ namespace App\Exports\Report;
 use App\Models\Batches;
 use App\Models\MedicineTransferItems;
 use App\Models\MedicineTransactions;
+use App\Models\Medicines;
+use App\Models\Retur;
 use App\Support\LiphTransactionScope;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -58,6 +60,7 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
         );
 
         $transactions = $query->get();
+        $returns      = $this->resolveReturns($transactions);
 
         $pharmacy = \App\Models\Pharmacies::find($this->pharmacyId);
 
@@ -77,15 +80,96 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
         ];
 
         $body = match ($this->selectedType) {
-            'rekap_bulanan', 'bulanan' => $this->buildMonthlyRecap($transactions),
-            'detail'                   => $this->buildDetail($transactions),
-            default                    => $this->buildRecap($transactions),
+            'rekap_bulanan', 'bulanan' => $this->buildMonthlyRecap($transactions, $returns),
+            'detail'                   => $this->buildDetail($transactions, $returns),
+            default                    => $this->buildRecap($transactions, $returns),
         };
 
         return array_merge($header, $body);
     }
 
-    private function buildRecap($transactions): array
+    /**
+     * Retur penjualan disimpan sebagai header RT tanpa item keranjang, dan
+     * rincian obatnya ada di tabel `retur`. Keduanya dibuat dalam request
+     * yang sama (ReturController), jadi dicocokkan via waktu simpan + nominal.
+     * Header RT yang tidak punya rincian (data lama) tetap dihitung sebagai
+     * baris "tanpa rincian obat" agar total tetap sama dengan LIPH.
+     */
+    private function resolveReturns($transactions): array
+    {
+        $headers = $transactions->filter(function ($trx) {
+            return in_array(strtoupper(trim((string) $trx->transaction_type)), ['RETUR JUAL', 'RETUR KREDIT'], true)
+                || strtoupper(trim((string) $trx->transaction_code)) === 'RT';
+        })->values();
+
+        if ($headers->isEmpty()) {
+            return [];
+        }
+
+        $times = $headers->map(fn ($h) => Carbon::parse($h->created_at ?? $h->updated_at));
+        $candidates = Retur::whereBetween('created_at', [
+            $times->min()->copy()->subSeconds(10),
+            $times->max()->copy()->addSeconds(10),
+        ])->get();
+
+        $medicines = Medicines::with('factory')
+            ->whereIn('id', $candidates->pluck('medicine_id')->filter()->unique())
+            ->get()->keyBy('id');
+        $originCodes = MedicineTransactions::whereIn('id', $candidates->pluck('transaction_id')->filter()->unique())
+            ->where('pharmacy_id', $this->pharmacyId)
+            ->pluck('transaction_code', 'id');
+
+        $used    = [];
+        $returns = [];
+
+        foreach ($headers as $rt) {
+            $rtTime   = Carbon::parse($rt->created_at ?? $rt->updated_at);
+            $rtAmount = (int) round((float) $rt->subtotal);
+
+            $match = $candidates->first(function ($r) use ($rtTime, $rtAmount, $used, $originCodes) {
+                return !isset($used[$r->id])
+                    && isset($originCodes[$r->transaction_id])
+                    && (int) round((float) $r->total_retur) === $rtAmount
+                    && abs(Carbon::parse($r->created_at)->diffInSeconds($rtTime, false)) <= 10;
+            });
+
+            $date = Carbon::parse($rt->shift_logs?->clock_in ?? $rt->created_at ?? $rt->updated_at);
+
+            if ($match) {
+                $used[$match->id] = true;
+                $medicine = $medicines[$match->medicine_id] ?? null;
+                $returns[] = [
+                    'key'         => $medicine ? $medicine->id : 'retur_' . $rt->id,
+                    'medicine_id' => $medicine?->id,
+                    'code'        => $medicine?->code ?? '-',
+                    'name'        => $medicine?->name ?? 'Obat Retur (Tanpa Master)',
+                    'unit'        => $medicine?->unit ?? '-',
+                    'factory'     => $medicine?->factory?->name ?? '-',
+                    'qty'         => (float) $match->qty_retur,
+                    'total'       => (float) $match->total_retur,
+                    'nomor'       => 'RT/' . ($originCodes[$match->transaction_id] ?? '-'),
+                    'date'        => $date,
+                ];
+            } else {
+                $returns[] = [
+                    'key'         => 'retur_' . $rt->id,
+                    'medicine_id' => null,
+                    'code'        => '-',
+                    'name'        => '[RETUR TANPA RINCIAN OBAT]',
+                    'unit'        => '-',
+                    'factory'     => '-',
+                    'qty'         => 0,
+                    'total'       => (float) $rt->subtotal,
+                    'nomor'       => 'RT#' . $rt->id,
+                    'date'        => $date,
+                ];
+            }
+        }
+
+        return $returns;
+    }
+
+    private function buildRecap($transactions, array $returns = []): array
     {
         $grouped = [];
 
@@ -104,10 +188,12 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
 
                 if (!isset($grouped[$key])) {
                     $grouped[$key] = [
-                        'name'    => $name,
-                        'factory' => $factory,
-                        'qty'     => 0,
-                        'total'   => 0,
+                        'name'        => $name,
+                        'factory'     => $factory,
+                        'qty'         => 0,
+                        'total'       => 0,
+                        'qty_retur'   => 0,
+                        'total_retur' => 0,
                     ];
                 }
 
@@ -116,15 +202,30 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
             }
         }
 
+        foreach ($returns as $ret) {
+            $key = $ret['key'];
+            if (!isset($grouped[$key])) {
+                $grouped[$key] = [
+                    'name'        => $ret['name'],
+                    'factory'     => $ret['factory'],
+                    'qty'         => 0,
+                    'total'       => 0,
+                    'qty_retur'   => 0,
+                    'total_retur' => 0,
+                ];
+            }
+            $grouped[$key]['qty_retur']   += $ret['qty'];
+            $grouped[$key]['total_retur'] += $ret['total'];
+        }
+
         // Sort alphabetically by medicine name
         uasort($grouped, fn($a, $b) => strcasecmp($a['name'], $b['name']));
 
         $rows   = [];
-        $rows[] = ['No', 'Nama Obat', 'Pabrik', 'Qty Jual', 'Nilai Jual'];
+        $rows[] = ['No', 'Nama Obat', 'Pabrik', 'Qty Jual', 'Nilai Jual', 'Qty Retur', 'Nilai Retur', 'Qty Netto', 'Nilai Netto'];
 
         $no = 1;
-        $grandQty = 0;
-        $grandTotal = 0;
+        $grand = array_fill_keys(['qty', 'total', 'qty_retur', 'total_retur'], 0);
 
         foreach ($grouped as $data) {
             $rows[] = [
@@ -133,18 +234,31 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
                 $data['factory'],
                 $data['qty'],
                 $data['total'],
+                $data['qty_retur'] ? -$data['qty_retur'] : 0,
+                $data['total_retur'] ? -$data['total_retur'] : 0,
+                $data['qty'] - $data['qty_retur'],
+                $data['total'] - $data['total_retur'],
             ];
 
-            $grandQty += $data['qty'];
-            $grandTotal += $data['total'];
+            foreach ($grand as $k => $v) {
+                $grand[$k] += $data[$k];
+            }
         }
 
-        $rows[] = ['', 'TOTAL', '', $grandQty, $grandTotal];
+        $rows[] = [
+            '', 'TOTAL', '',
+            $grand['qty'],
+            $grand['total'],
+            $grand['qty_retur'] ? -$grand['qty_retur'] : 0,
+            $grand['total_retur'] ? -$grand['total_retur'] : 0,
+            $grand['qty'] - $grand['qty_retur'],
+            $grand['total'] - $grand['total_retur'],
+        ];
 
         return $rows;
     }
 
-    private function buildDetail($transactions): array
+    private function buildDetail($transactions, array $returns = []): array
     {
         $itemsList = [];
 
@@ -171,6 +285,17 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
                     'netto'    => $netto,
                 ];
             }
+        }
+
+        foreach ($returns as $ret) {
+            $itemsList[] = [
+                'nomor' => $ret['nomor'],
+                'name'  => $ret['name'],
+                'qty'   => -$ret['qty'],
+                'bruto' => -$ret['total'],
+                'disc'  => 0,
+                'netto' => -$ret['total'],
+            ];
         }
 
         // Sort by Nama Obat (A-Z), then by Nomor Transaksi
@@ -234,7 +359,7 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
         return $months;
     }
 
-    private function buildMonthlyRecap($transactions): array
+    private function buildMonthlyRecap($transactions, array $returns = []): array
     {
         $months = $this->getMonthsList();
         $grouped = [];
@@ -285,6 +410,29 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
             }
         }
 
+        // Kurangi qty obat yang diretur pada bulan shift retur tersebut
+        foreach ($returns as $ret) {
+            if (!$ret['medicine_id']) {
+                continue; // retur tanpa rincian obat tidak punya qty per obat
+            }
+            $key = $ret['key'];
+            if (!isset($grouped[$key])) {
+                $grouped[$key] = [
+                    'id'        => $ret['medicine_id'],
+                    'code'      => $ret['code'],
+                    'name'      => $ret['name'],
+                    'unit'      => $ret['unit'],
+                    'factory'   => $ret['factory'],
+                    'monthly'   => array_fill_keys(array_keys($months), 0),
+                    'total_qty' => 0,
+                ];
+                $medicineIds[$ret['medicine_id']] = $ret['medicine_id'];
+            }
+            $mKey = $ret['date']->format('Y-m');
+            $grouped[$key]['monthly'][$mKey] = ($grouped[$key]['monthly'][$mKey] ?? 0) - $ret['qty'];
+            $grouped[$key]['total_qty'] -= $ret['qty'];
+        }
+
         // Realtime stock calculation for involved medicines
         $storageStockMap = [];
         $counterStockMap = [];
@@ -326,7 +474,7 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
         foreach ($months as $label) {
             $headerCols[] = $label;
         }
-        $headerCols[] = 'Total Terjual';
+        $headerCols[] = 'Total Terjual (- Retur)';
         $headerCols[] = 'Sisa Stok';
 
         $rows = [$headerCols];
@@ -441,15 +589,18 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
                 ->getNumberFormat()
                 ->setFormatCode('#,##0');
         } elseif ($this->selectedType === 'rekap') {
-            // Align Qty & Nilai right
-            $sheet->getStyle("D{$dataStartRow}:E{$lastRow}")
+            // Align Qty & Nilai (jual, retur, netto) right
+            $sheet->getStyle("D{$dataStartRow}:I{$lastRow}")
                 ->getAlignment()
                 ->setHorizontal(Alignment::HORIZONTAL_RIGHT);
 
-            // Format Nilai as number
-            $sheet->getStyle("E" . ($dataStartRow + 1) . ":E{$lastRow}")
+            $sheet->getStyle("D" . ($dataStartRow + 1) . ":I{$lastRow}")
                 ->getNumberFormat()
                 ->setFormatCode('#,##0');
+
+            // Retur columns in red
+            $sheet->getStyle("F" . ($dataStartRow + 1) . ":G{$lastRow}")
+                ->getFont()->getColor()->setRGB('B91C1C');
         } else {
             // Align Qty, Bruto, Disc, Netto right
             $sheet->getStyle("D{$dataStartRow}:G{$lastRow}")
@@ -496,8 +647,12 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
                 'A' => 6,
                 'B' => 42,
                 'C' => 28,
-                'D' => 14,
-                'E' => 20,
+                'D' => 12,
+                'E' => 16,
+                'F' => 12,
+                'G' => 16,
+                'H' => 12,
+                'I' => 18,
             ]
             : [
                 'A' => 6,
