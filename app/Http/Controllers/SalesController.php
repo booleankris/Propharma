@@ -530,98 +530,94 @@ class SalesController extends Controller
 
     public function addToCart(Request $request)
     {
-
-        $parentTransaction = MedicineTransactions::where('id', $request->get('transaction_id'))
-            ->where('user_id', auth()->id())
-            ->where('status', 0)
-            ->firstOrFail();
-
-        $cartType = $request->get('cart_type');
-        $medicineType = $request->get('medicine_type');
-        $embalase = $request->get('embalase');
-        if ($parentTransaction->transaction_type === 'KREDIT') {
-            if (!in_array($cartType, ['UK', 'UP', 'HV'], true)) {
-                return response()->json(['message' => 'Jenis item resep kredit tidak valid.'], 422);
-            }
-            // Keep the invoice/receivable as credit while classifying each line separately.
-            $medicineType = 'KREDIT';
-            if ($cartType !== 'UK') {
-                $embalase = 0;
-            }
-        }
-
-        if ($request->get('racikstatus') == 1) {
-            $hasRacikan = MedicineCart::where('transaction_id', $request->get('transaction_id'))
+        $transaction = DB::transaction(function () use ($request) {
+            // Serialize cart writes on the parent transaction. This prevents two
+            // tabs/devices from both selecting the same "next recipe" state.
+            $parentTransaction = MedicineTransactions::where('id', $request->get('transaction_id'))
                 ->where('user_id', auth()->id())
-                ->whereNotNull('recipe_number')
-                ->exists();
+                ->where('status', 0)
+                ->lockForUpdate()
+                ->firstOrFail();
 
-            if ($hasRacikan) {
-                $latestRecord = MedicineCart::where('transaction_id', $request->get('transaction_id'))
+            $cartType = $request->get('cart_type');
+            $medicineType = $request->get('medicine_type');
+            $embalase = $request->get('embalase');
+            if ($parentTransaction->transaction_type === 'KREDIT') {
+                if (!in_array($cartType, ['UK', 'UP', 'HV'], true)) {
+                    abort(422, 'Jenis item resep kredit tidak valid.');
+                }
+                // Keep the invoice/receivable as credit while classifying each line separately.
+                $medicineType = 'KREDIT';
+                if ($cartType !== 'UK') {
+                    $embalase = 0;
+                }
+            }
+
+            $isRecipe = (int) $request->get('racikstatus') === 1;
+            if ($isRecipe && !in_array($parentTransaction->transaction_type, ['RESEP TUNAI', 'KREDIT'], true)) {
+                abort(422, 'Racikan hanya dapat ditambahkan pada resep tunai atau kredit.');
+            }
+
+            $recipeNumber = null;
+            $recipeStatus = null;
+            if ($isRecipe) {
+                $startNewRecipe = $request->boolean('start_new_recipe');
+                $latestRecipeItem = MedicineCart::where('transaction_id', $parentTransaction->id)
                     ->where('user_id', auth()->id())
+                    ->where('status', 0)
                     ->whereNotNull('recipe_number')
                     ->latest('id')
                     ->first();
 
-                if ($latestRecord->recipe_status == 0) {
-                    $recipeNumber = $latestRecord->recipe_number;
-                    $recipeStatus = 0;
+                if ($latestRecipeItem && (int) $latestRecipeItem->recipe_status === 0) {
+                    $recipeNumber = (int) $latestRecipeItem->recipe_number;
+                } elseif (!$latestRecipeItem && $startNewRecipe) {
+                    $recipeNumber = 1;
+                } elseif ($latestRecipeItem && (int) $latestRecipeItem->recipe_status === 1 && $startNewRecipe) {
+                    $highestRecipeNumber = MedicineCart::where('transaction_id', $parentTransaction->id)
+                        ->where('user_id', auth()->id())
+                        ->where('status', 0)
+                        ->whereNotNull('recipe_number')
+                        ->pluck('recipe_number')
+                        ->map(fn ($number) => (int) $number)
+                        ->max();
+                    $recipeNumber = ((int) $highestRecipeNumber) + 1;
                 } else {
-                    $recipeNumber = $latestRecord->recipe_number + 1;
-                    $recipeStatus = 0;
+                    abort(409, 'Racikan sebelumnya sudah selesai. Matikan lalu aktifkan kembali mode racikan untuk memulai racikan baru.');
                 }
-            } else {
-                $recipeNumber = 1;
                 $recipeStatus = 0;
             }
-        } else {
-            $recipeNumber = null;
-            $recipeStatus = null;
-        }
-        $service = 0;
 
-        // Service Filter / Validation, Only UM that can have jasa, 22 JULI 2026
-        // Service Filter 2, Only racikan can have jasa, 29 JULI 2026
+            // Service Filter: only non-recipe UM/UK items may receive service fee.
+            $service = $isRecipe
+                ? 0
+                : (in_array($cartType, ['UM', 'UK'], true) ? $request->get('service', 0) : 0);
 
-        if ($request->get('racikstatus') == 1) {
-            $service = 0;
-        } else {
-            if ($cartType == "UM" || $cartType == "UK") {
-                $service = $request->get('service');
-            } else {
-                $service = 0;
+            if ($request->has('debtor_id') && $request->filled('debtor_id') && $parentTransaction->transaction_type === 'KREDIT') {
+                $parentTransaction->update(['debtor_id' => $request->get('debtor_id')]);
             }
-        }
 
-        if ($request->has('debtor_id') && $request->filled('debtor_id')) {
-            MedicineTransactions::where('id', $request->get('transaction_id'))
-                ->where('user_id', auth()->id())
-                ->where('transaction_type', 'KREDIT')
-                ->update([
-                    'debtor_id' => $request->get('debtor_id'),
-                ]);
-        }
-
-        $transaction = MedicineCart::create([
-            'user_id' => Auth()->user()->id,
-            'medicine_id' => $request->get('medicine_id'),
-            'transaction_id' => $request->get('transaction_id'),
-            'quantity' => $request->get('quantity'),
-            'discount' => $request->get('discount'),
-            'embalase' => $embalase,
-            'cart_type' => $cartType,
-            'package' => $request->get('package'),
-            'dosage_r' => $request->get('dosage_r'),
-            'item_price' => $request->get('price2'),
-            'raw_total' => $request->get('raw_total'),
-            'total_price' => $request->get('final_price'),
-            'final_price' => $request->get('total_price'),
-            'status' => 0,
-            'recipe_status' => $recipeStatus,
-            'recipe_number' => $recipeNumber,
-            'medicine_type' => $medicineType,
-            'service_fee' => $service,
-        ]);
+            return MedicineCart::create([
+                'user_id' => auth()->id(),
+                'medicine_id' => $request->get('medicine_id'),
+                'transaction_id' => $parentTransaction->id,
+                'quantity' => $request->get('quantity'),
+                'discount' => $request->get('discount'),
+                'embalase' => $embalase,
+                'cart_type' => $cartType,
+                'package' => $request->get('package'),
+                'dosage_r' => $request->get('dosage_r'),
+                'item_price' => $request->get('price2'),
+                'raw_total' => $request->get('raw_total'),
+                'total_price' => $request->get('final_price'),
+                'final_price' => $request->get('total_price'),
+                'status' => 0,
+                'recipe_status' => $recipeStatus,
+                'recipe_number' => $recipeNumber,
+                'medicine_type' => $medicineType,
+                'service_fee' => $service,
+            ]);
+        });
         $transaction->load('medicine');
 
         return response()->json([
@@ -1233,70 +1229,70 @@ class SalesController extends Controller
 
     public function sendEmbalase(Request $request)
     {
-        DB::beginTransaction();
+        $validated = $request->validate([
+            'transaction_id' => 'required|integer',
+            'jasaValue' => 'required|numeric|min:0',
+        ]);
+        $transactionId = (int) $validated['transaction_id'];
+        $jasaValue = (int) $validated['jasaValue'];
 
-        try {
-            $transactionId = $request->get('transaction_id');
-            $jasaValue = (int) $request->get('jasaValue');
-
-            $transaction = MedicineCart::where('transaction_id', $transactionId)
-                ->latest()
-                ->first();
-
-            if (!$transaction) {
-                throw new \Exception('Data transaksi tidak ditemukan.');
-            }
-
-            $hasRacikan = MedicineCart::where('transaction_id', $transactionId)
+        $cartItem = DB::transaction(function () use ($transactionId, $jasaValue) {
+            $parentTransaction = MedicineTransactions::where('id', $transactionId)
                 ->where('user_id', auth()->id())
+                ->where('status', 0)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $latestRecipeItem = MedicineCart::where('transaction_id', $parentTransaction->id)
+                ->where('user_id', auth()->id())
+                ->where('status', 0)
                 ->whereNotNull('recipe_number')
                 ->latest('id')
                 ->first();
 
-            if ($hasRacikan) {
-                $recipeNumber = $hasRacikan->recipe_number;
-
-                MedicineCart::where('recipe_number', $recipeNumber)->update([
-                    'recipe_status' => 1,
-                ]);
+            if (!$latestRecipeItem || (int) $latestRecipeItem->recipe_status !== 0) {
+                abort(422, 'Tidak ada racikan aktif yang dapat diselesaikan.');
             }
 
-            $finalprice = $transaction->total_price - $transaction->discount + $jasaValue;
+            $recipeNumber = $latestRecipeItem->recipe_number;
+            $recipeItems = MedicineCart::where('transaction_id', $parentTransaction->id)
+                ->where('user_id', auth()->id())
+                ->where('status', 0)
+                ->where('recipe_number', $recipeNumber);
+            $targetItem = (clone $recipeItems)->latest('id')->firstOrFail();
 
-            $transaction->update([
+            $targetItem->update([
                 'embalase' => $jasaValue,
-                'final_price' => $finalprice,
+                'final_price' => (float) $targetItem->total_price - (float) $targetItem->discount + $jasaValue,
             ]);
 
-            DB::commit();
+            // Scope completion to this one recipe in this one pending transaction.
+            $recipeItems->update(['recipe_status' => 1]);
 
-            $total_transaction = MedicineCart::where('transaction_id', $transactionId)
-                ->where('user_id', auth()->id())
-                ->where('status', '0')
-                ->sum('final_price');
+            return $targetItem->fresh();
+        });
 
-            $totalbought = MedicineCart::where('transaction_id', $transactionId)
-                ->where('user_id', auth()->id())
-                ->where('status', '0')
-                ->selectRaw('SUM(total_price) as total_price, SUM(embalase) as embalase')->first();
+        $total_transaction = MedicineCart::where('transaction_id', $transactionId)
+            ->where('user_id', auth()->id())
+            ->where('status', '0')
+            ->sum('final_price');
 
-            $total_raw = $totalbought->total_price + $totalbought->embalase;
+        $totalbought = MedicineCart::where('transaction_id', $transactionId)
+            ->where('user_id', auth()->id())
+            ->where('status', '0')
+            ->selectRaw('SUM(total_price) as total_price, SUM(embalase) as embalase')->first();
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Data embalase berhasil disimpan.',
-                'racikStatus' => 1,
-                'finalprice' => $transaction->final_price,
-                'totaltransaction' => $total_transaction,
-                'totalbought' => $total_raw,
-            ]);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json([
-                'success' => false,
-                'message' => 'Gagal menyimpan! ' . $e->getMessage(),
-            ], 500);
-        }
+        $total_raw = $totalbought->total_price + $totalbought->embalase;
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Data embalase berhasil disimpan.',
+            'racikStatus' => 1,
+            'item_id' => $cartItem->id,
+            'finalprice' => $cartItem->final_price,
+            'totaltransaction' => $total_transaction,
+            'totalbought' => $total_raw,
+        ]);
     }
 
     public function updateCart(Request $request)

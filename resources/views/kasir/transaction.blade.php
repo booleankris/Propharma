@@ -1974,6 +1974,7 @@
     var creditItemRounding = rounding;
 
     var racikstatus = 0;
+    let startNewRecipe = false;
     var racikembalaseprice = 0;
     var previewdiscounttotal = document.getElementById('discount_total');
     var previewtransactiontotal = document.getElementById('price2');
@@ -3488,7 +3489,7 @@
 
         if (document.getElementById('quantity').value != "") {
             if (edit_status != 0) {
-                axios.post("{{ route('transaction.updateCart') }}", {
+                return axios.post("{{ route('transaction.updateCart') }}", {
                         id: selectedRowId,
                         medicine_id,
                         transaction_id,
@@ -3505,6 +3506,7 @@
                         final_price,
                         grossprice,
                         racikstatus,
+                        start_new_recipe: startNewRecipe,
                         medicine_type,
                         service,
 
@@ -3584,9 +3586,10 @@
                     })
                     .catch(error => {
                         console.error("Error updating cart:", error.response ? error.response.data : error.message);
-                    });
+                    })
+                    .finally(releaseSubmitLock);
             } else {
-                axios.post("{{ route('transaction.addToCart') }}", {
+                return axios.post("{{ route('transaction.addToCart') }}", {
                     medicine_id,
                     transaction_id,
                     debtor_id,
@@ -3602,6 +3605,7 @@
                     final_price,
                     grossprice,
                     racikstatus,
+                    start_new_recipe: startNewRecipe,
                     medicine_type,
                     service
 
@@ -3680,12 +3684,16 @@
                     attachRowEvents(newRow);
                     discount = 0;
                     console.log('Reseting the discount variable', discount);
+                    if (racikstatus == 1) startNewRecipe = false;
 
 
                 }).catch(error => {
                     console.error("Error adding to cart:", error.response ? error.response.data : error
                         .message);
-                });
+                    if (error.response?.status === 409) {
+                        alert(error.response.data?.message || 'Racikan sudah selesai di sesi lain. Aktifkan ulang mode racikan untuk memulai yang baru.');
+                    }
+                }).finally(releaseSubmitLock);
             }
         } else {
             alert('isi transaksi dengan benar!');
@@ -3702,6 +3710,7 @@
 
         const btn = document.querySelector('button[onclick="submit()"]');
         if (btn) btn.disabled = true;
+        let requestPending = false;
 
         try {
             // ALWAYS re-calculate fresh to avoid stale values from previous items
@@ -3729,11 +3738,11 @@
                     grossprice,
                     racikstatus
                 });
-                addToCart(
+                requestPending = Boolean(addToCart(
                     medicine_id, transaction_id, total_item, discount, jasa,
                     cart_type, pkg, dose, price2, pharmacy_price, true_price,
                     grossprice, racikstatus
-                );
+                ));
             } else {
                 console.log('grossprice =', grossprice);
 
@@ -3760,22 +3769,25 @@
                 const dose = document.getElementById('dosage_r')?.value || '';
                 console.log("count() => subtotal:", subtotal, "grossprice:", grossprice);
 
-                addToCart(
+                requestPending = Boolean(addToCart(
                     medicine_id, transaction_id, total_item, discount, jasa,
                     cart_type, pkg, dose, price2, pharmacy_price, true_price,
                     grossprice, racikstatus
-                );
+                ));
             }
 
             edit_status = 0;
             discount = 0;
 
         } finally {
-            setTimeout(() => {
-                isSubmitting = false;
-                if (btn) btn.disabled = false;
-            }, 1000);
+            if (!requestPending) releaseSubmitLock();
         }
+    }
+
+    function releaseSubmitLock() {
+        isSubmitting = false;
+        const btn = document.querySelector('button[onclick="submit()"]');
+        if (btn) btn.disabled = false;
     }
 
     // edit cart
@@ -5469,6 +5481,7 @@
                 packageInput?.classList.remove('readonly');
                 dosageRInput?.classList.remove('readonly');
                 if (dosageR2) dosageR2.value = "Ya";
+                startNewRecipe = true;
                 racikstatus = 1;
 
                 packageInput?.focus();
@@ -5515,20 +5528,13 @@
             // document.getElementById('quantity').value = "";
             // document.getElementById('dosage').value = "";
             racikembalaseprice = item.finalprice;
+            startNewRecipe = false;
 
 
-            let embalaseEls = document.querySelectorAll('.clEmbalase');
-            let finalPriceEls = document.querySelectorAll('.clFinalprice');
-
-
-            // Get The Last Record
-            let lastEmbalase = embalaseEls[embalaseEls.length - 1];
-            let lastFinalPrice = finalPriceEls[finalPriceEls.length - 1];
-
-            // Update The Last Record
-            if (lastEmbalase && lastFinalPrice) {
-                lastEmbalase.innerHTML = formatRupiah(jasaValue);
-                lastFinalPrice.innerHTML = formatRupiah(racikembalaseprice);
+            const recipeRow = document.getElementById(`itemincart${item.item_id}`);
+            if (recipeRow) {
+                recipeRow.querySelector('.clEmbalase')?.replaceChildren(formatRupiah(jasaValue));
+                recipeRow.querySelector('.clFinalprice')?.replaceChildren(formatRupiah(racikembalaseprice));
             }
 
             document.getElementById('jasa').value = "";
@@ -5551,6 +5557,7 @@
 
         }).catch(error => {
             console.error("Error Updating Embalase:", error.response ? error.response.data : error.message);
+            alert(error.response?.data?.message || 'Racikan gagal diselesaikan. Periksa kembali item racikan yang aktif.');
         });
 
     }

@@ -17,4 +17,14 @@ class Retur extends Model
         'total_retur',
         'status', 
     ];
+
+    public function transaction()
+    {
+        return $this->belongsTo(MedicineTransactions::class, 'transaction_id');
+    }
+
+    public function medicine()
+    {
+        return $this->belongsTo(Medicines::class, 'medicine_id');
+    }
 }

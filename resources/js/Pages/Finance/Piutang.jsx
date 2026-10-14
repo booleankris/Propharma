@@ -10,10 +10,12 @@ import { formatRupiah, formatNumberOnly } from './Components/Utils';
 import {
     ShoppingCart, Search, Check, X, Calendar, AlertCircle, ChevronLeft, ChevronRight, User,
     ArrowLeft, Printer, MoreVertical, ChevronDown, History, Landmark, Maximize2, CreditCard,
-    Download, ArrowUp, ArrowDown, Clock, AlertTriangle, FileText, CheckCircle2, FileSpreadsheet, Upload
+    Download, ArrowUp, ArrowDown, Clock, AlertTriangle, FileText, CheckCircle2, FileSpreadsheet, Upload,
+    RotateCcw
 } from 'lucide-react';
 
-export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAccounts = [], stats = {} }) {
+export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAccounts = [], stats = {}, creditReturns = [] }) {
+    const [mainTab, setMainTab] = useState('faktur'); // 'faktur' | 'retur'
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('ALL');
     const [debtorFilter, setDebtorFilter] = useState('');
@@ -25,6 +27,16 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
     const [isDueDropdownOpen, setIsDueDropdownOpen] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 10;
+
+    // State Khusus Tab Riwayat Retur Kredit
+    const [returSearchTerm, setReturSearchTerm] = useState('');
+    const [returDebtorFilter, setReturDebtorFilter] = useState('');
+    const [returCurrentPage, setReturCurrentPage] = useState(1);
+    const returItemsPerPage = 10;
+
+    const isItemSettled = (item) => {
+        return !item || item.status === 'Lunas' || item.status === 'Diretur Penuh' || item.status === 'Lunas (Ada Retur)' || (Number(item.sisa) || 0) <= 0.005;
+    };
 
     const handleDatePreset = (preset) => {
         setDatePreset(preset);
@@ -106,11 +118,13 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
 
             let matchStatus = true;
             if (statusFilter === 'LUNAS') {
-                matchStatus = item.status === 'Lunas' || item.sisa <= 0.005;
+                matchStatus = isItemSettled(item);
             } else if (statusFilter === 'BELUM_LUNAS') {
-                matchStatus = item.status !== 'Lunas' && item.sisa > 0.005;
+                matchStatus = !isItemSettled(item);
             } else if (statusFilter === 'DIAJUKAN') {
-                matchStatus = Boolean(item.is_submitted) && item.status !== 'Lunas';
+                matchStatus = Boolean(item.is_submitted) && !isItemSettled(item);
+            } else if (statusFilter === 'RETUR') {
+                matchStatus = (Number(item.total_retur) > 0) || item.status === 'Diretur Penuh' || item.status === 'Diretur Sebagian' || item.status === 'Lunas (Ada Retur)';
             }
 
             const matchDebtor = debtorFilter
@@ -119,9 +133,9 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
 
             let matchDue = true;
             if (dueFilter === 'overdue') {
-                matchDue = item.is_overdue && item.status !== 'Lunas' && item.sisa > 0.005;
+                matchDue = item.is_overdue && !isItemSettled(item);
             } else if (dueFilter === 'due_soon') {
-                matchDue = !item.is_overdue && item.days_remaining <= 7 && item.status !== 'Lunas' && item.sisa > 0.005;
+                matchDue = !item.is_overdue && item.days_remaining <= 7 && !isItemSettled(item);
             }
 
             const itemDate = item.raw_created_at?.slice(0, 10) || (item.tanggal?.includes('/') ? item.tanggal.split('/').reverse().join('-') : '');
@@ -157,6 +171,34 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
         return filteredPiutang.slice(start, start + itemsPerPage);
     }, [filteredPiutang, currentPage, itemsPerPage]);
 
+    // Filter & Paginasi Tab Riwayat Retur Kredit
+    const filteredCreditReturns = useMemo(() => {
+        return creditReturns.filter((ret) => {
+            const matchSearch =
+                (ret.code && ret.code.toLowerCase().includes(returSearchTerm.toLowerCase())) ||
+                (ret.transaction_code && ret.transaction_code.toLowerCase().includes(returSearchTerm.toLowerCase())) ||
+                (ret.debtor && ret.debtor.toLowerCase().includes(returSearchTerm.toLowerCase())) ||
+                (ret.medicine_name && ret.medicine_name.toLowerCase().includes(returSearchTerm.toLowerCase())) ||
+                (ret.pasien && ret.pasien.toLowerCase().includes(returSearchTerm.toLowerCase()));
+
+            const matchDebtor = returDebtorFilter
+                ? String(ret.debtor_id) === String(returDebtorFilter)
+                : true;
+
+            const retDate = ret.raw_created_at?.slice(0, 10) || (ret.tanggal?.includes('/') ? ret.tanggal.split('/').reverse().join('-') : '');
+            const matchStartDate = !startDate || (retDate && retDate >= startDate);
+            const matchEndDate = !endDate || (retDate && retDate <= endDate);
+
+            return matchSearch && matchDebtor && matchStartDate && matchEndDate;
+        });
+    }, [creditReturns, returSearchTerm, returDebtorFilter, startDate, endDate]);
+
+    const returTotalPages = Math.ceil(filteredCreditReturns.length / returItemsPerPage) || 1;
+    const paginatedCreditReturns = useMemo(() => {
+        const start = (returCurrentPage - 1) * returItemsPerPage;
+        return filteredCreditReturns.slice(start, start + returItemsPerPage);
+    }, [filteredCreditReturns, returCurrentPage, returItemsPerPage]);
+
     const selectedPiutangItems = useMemo(() => {
         return piutangPenjualan.filter((item) => selectedPiutangIds.includes(item.id));
     }, [piutangPenjualan, selectedPiutangIds]);
@@ -179,7 +221,7 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
 
     // Checkbox Handlers
     const handleTogglePiutang = (item) => {
-        if (item.status === 'Lunas' || item.sisa <= 0.005) return;
+        if (isItemSettled(item)) return;
         if (selectedPiutangIds.includes(item.id)) {
             setSelectedPiutangIds((prev) => prev.filter((id) => id !== item.id));
         } else {
@@ -194,7 +236,7 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
 
     const handleSelectAllPiutang = (e) => {
         if (e.target.checked) {
-            const eligible = paginatedPiutang.filter((item) => item.status !== 'Lunas' && item.sisa > 0.005);
+            const eligible = paginatedPiutang.filter((item) => !isItemSettled(item));
             const remainingSlots = 10 - selectedPiutangIds.length;
             if (remainingSlots <= 0) {
                 setSelectionWarning('Maksimal 10 transaksi yang dapat dipilih.');
@@ -215,6 +257,52 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
             const currentPageIds = paginatedPiutang.map((item) => item.id);
             setSelectedPiutangIds((prev) => prev.filter((id) => !currentPageIds.includes(id)));
         }
+    };
+
+    const renderStatusBadge = (item) => {
+        if (item.status === 'Diretur Penuh') {
+            return (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-purple-100 text-purple-800 border border-purple-200" title="Tagihan diretur penuh (Sisa Rp 0)">
+                    <RotateCcw className="w-3 h-3 text-purple-600" />
+                    <span>Diretur Penuh</span>
+                </span>
+            );
+        }
+        if (item.status === 'Diretur Sebagian') {
+            return (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-200" title="Sebagian item diretur dan memotong tagihan">
+                    <RotateCcw className="w-3 h-3 text-rose-600" />
+                    <span>Diretur Sebagian</span>
+                </span>
+            );
+        }
+        if (item.status === 'Lunas (Ada Retur)') {
+            return (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200" title="Lunas setelah pemotongan retur">
+                    <Check className="w-3 h-3 text-emerald-600" />
+                    <span>Lunas (Ada Retur)</span>
+                </span>
+            );
+        }
+        if (item.status === 'Lunas' || (Number(item.sisa) || 0) <= 0.005) {
+            return (
+                <span className="inline-block px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700">
+                    Lunas
+                </span>
+            );
+        }
+        if (item.status === 'Dibayar Sebagian') {
+            return (
+                <span className="inline-block px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700">
+                    Dibayar Sebagian
+                </span>
+            );
+        }
+        return (
+            <span className="inline-block px-2.5 py-1 rounded-full text-[11px] font-bold bg-red-50 text-red-700">
+                Belum Bayar
+            </span>
+        );
     };
 
     // Buka Modal Terima Pembayaran Satuan
@@ -437,17 +525,10 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                         {/* Status Badge */}
                         <div className="flex items-center justify-between">
                             <div className="flex flex-col items-start gap-1">
-                                <span
-                                className={`inline-block px-3 py-1 text-xs font-semibold rounded-full ${detailViewPiutang.status === 'Lunas' || detailViewPiutang.sisa <= 0.005
-                                    ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'
-                                    : detailViewPiutang.status === 'Dibayar Sebagian'
-                                        ? 'bg-amber-50 text-amber-600 border border-amber-100'
-                                        : 'bg-red-50 text-red-600 border border-red-100'
-                                    }`}
-                            >
-                                {detailViewPiutang.status}
-                                </span>
-                                {(detailViewPiutang.status === 'Lunas' || detailViewPiutang.sisa <= 0.005) && detailViewPiutang.tanggalLunas && <span className="text-[11px] font-medium text-emerald-600">Lunas pada {detailViewPiutang.tanggalLunas}</span>}
+                                {renderStatusBadge(detailViewPiutang)}
+                                {isItemSettled(detailViewPiutang) && detailViewPiutang.tanggalLunas && detailViewPiutang.status !== 'Diretur Penuh' && (
+                                    <span className="text-[11px] font-medium text-emerald-600">Lunas pada {detailViewPiutang.tanggalLunas}</span>
+                                )}
                             </div>
 
                             <span className="text-xs text-slate-400">
@@ -611,9 +692,25 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                                     <span className="font-medium text-slate-800">{formatNumberOnly(detailViewPiutang.subtotal)}</span>
                                 </div>
                                 <div className="flex justify-between text-slate-800 font-bold pt-1">
-                                    <span>Total Tagihan</span>
+                                    <span>Total Tagihan (Bruto)</span>
                                     <span>{formatNumberOnly(detailViewPiutang.total)}</span>
                                 </div>
+
+                                {detailViewPiutang.total_retur > 0 && (
+                                    <>
+                                        <div className="flex justify-between text-rose-600 font-semibold pt-1">
+                                            <span className="flex items-center gap-1">
+                                                <RotateCcw className="w-3 h-3" />
+                                                <span>Retur Penjualan</span>
+                                            </span>
+                                            <span>- {formatNumberOnly(detailViewPiutang.total_retur)}</span>
+                                        </div>
+                                        <div className="flex justify-between text-slate-700 font-semibold pt-1 border-t border-dashed border-slate-200">
+                                            <span>Tagihan Bersih (Net)</span>
+                                            <span className="font-bold">{formatNumberOnly(detailViewPiutang.net_total)}</span>
+                                        </div>
+                                    </>
+                                )}
 
                                 {detailViewPiutang.terbayar > 0 && (
                                     <div className="flex justify-between text-emerald-600 font-semibold pt-1">
@@ -640,6 +737,69 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                             </div>
                         </div>
                     </div>
+
+                    {/* KARTU RIWAYAT RETUR PENJUALAN (KREDIT) JIKA ADA */}
+                    {detailViewPiutang.returs && detailViewPiutang.returs.length > 0 && (
+                        <div className="bg-white rounded-2xl border border-rose-200 p-6 shadow-xs space-y-4">
+                            <div className="flex items-center justify-between border-b border-rose-100 pb-4">
+                                <div className="flex items-center gap-2.5">
+                                    <div className="p-2 rounded-xl bg-rose-50 text-rose-600">
+                                        <RotateCcw className="w-5 h-5" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-slate-900 text-sm">
+                                            Riwayat Retur Penjualan Kredit
+                                        </h3>
+                                        <p className="text-[11px] text-slate-400">
+                                            Item obat yang dikembalikan dan langsung memotong sisa tagihan piutang faktur ini.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <span className="text-xs font-semibold text-slate-600">
+                                    Total Potongan Retur: <strong className="text-rose-600">- {formatRupiah(detailViewPiutang.total_retur)}</strong>
+                                </span>
+                            </div>
+
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left text-xs">
+                                    <thead className="text-slate-400 bg-rose-50/40 border-b border-rose-100">
+                                        <tr>
+                                            <th className="py-2.5 px-3 font-medium">Tanggal</th>
+                                            <th className="py-2.5 px-3 font-medium">No. Retur</th>
+                                            <th className="py-2.5 px-3 font-medium">Item Obat</th>
+                                            <th className="py-2.5 px-3 font-medium text-center">Qty Diretur</th>
+                                            <th className="py-2.5 px-3 font-medium text-right">Potongan Piutang</th>
+                                            <th className="py-2.5 px-3 font-medium text-center">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-rose-50 text-slate-700">
+                                        {detailViewPiutang.returs.map((ret, idx) => (
+                                            <tr key={ret.id || idx} className="hover:bg-rose-50/30">
+                                                <td className="py-3 px-3 font-medium text-slate-900">{ret.tanggal}</td>
+                                                <td className="py-3 px-3 font-mono text-[11px] font-semibold text-rose-700">{ret.code}</td>
+                                                <td className="py-3 px-3">
+                                                    <div className="font-semibold text-slate-800">{ret.nama}</div>
+                                                    <div className="text-[10px] text-slate-400 font-mono">{ret.sku}</div>
+                                                </td>
+                                                <td className="py-3 px-3 text-center font-bold text-slate-700">
+                                                    {ret.qty} {ret.satuan}
+                                                </td>
+                                                <td className="py-3 px-3 text-right font-extrabold text-rose-600">
+                                                    - {formatRupiah(ret.nominal)}
+                                                </td>
+                                                <td className="py-3 px-3 text-center">
+                                                    <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-700 border border-purple-200">
+                                                        Memotong Tagihan
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
 
                     {/* KARTU AUDIT TRAIL & RIWAYAT PENERIMAAN PEMBAYARAN */}
                     <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
@@ -710,441 +870,731 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                     </div>
                 </div>
             ) : (
-                /* SUB-VIEW B: TABEL DAFTAR PIUTANG PENJUALAN */
+                /* SUB-VIEW B: TABEL DAFTAR PIUTANG PENJUALAN & RETUR KREDIT */
                 <div className="space-y-6">
-                    {/* Banner Summary */}
-                    <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs flex flex-wrap items-center justify-between gap-4">
-                        <div>
-                            <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                                Total Sisa Piutang Usaha
+                    {/* Ringkasan Eksekutif KPI: Piutang & Retur Kredit */}
+                    <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+                            <div>
+                                <h2 className="text-base font-bold text-slate-900">Ringkasan Eksekutif Piutang &amp; Retur Kredit</h2>
+                                <p className="text-xs text-slate-400 mt-0.5">
+                                    Monitoring total omset kredit, potongan retur, penerimaan kas/bank, dan sisa piutang bersih apotek.
+                                </p>
                             </div>
-                            <div className="text-2xl font-black text-amber-700 mt-1">
-                                {formatRupiah(stats.totalPiutangSisa || 0)}
+                            <div className="flex flex-wrap items-center gap-2">
+                                <span className="px-3 py-1 rounded-xl bg-amber-50 text-amber-700 text-xs font-bold border border-amber-100">
+                                    {stats.countPiutangBelumBayar || 0} Belum Lunas
+                                </span>
+                                {Number(stats.countPiutangDiajukan || 0) > 0 && (
+                                    <span className="px-3 py-1 rounded-xl bg-blue-50 text-blue-700 text-xs font-bold border border-blue-200">
+                                        {stats.countPiutangDiajukan} Diajukan
+                                    </span>
+                                )}
+                                {Number(stats.countPiutangDiretur || 0) > 0 && (
+                                    <span className="px-3 py-1 rounded-xl bg-purple-50 text-purple-700 text-xs font-bold border border-purple-200">
+                                        {stats.countPiutangDiretur} Diretur Penuh
+                                    </span>
+                                )}
+                                <span className="px-3 py-1 rounded-xl bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-100">
+                                    {stats.countPiutangLunas || 0} Lunas
+                                </span>
                             </div>
-                            <p className="text-xs text-slate-400 mt-0.5">
-                                Dari total {piutangPenjualan.length} transaksi piutang penjualan
-                            </p>
                         </div>
 
-                        <div className="flex items-center gap-3">
-                            <span className="px-3 py-1.5 rounded-xl bg-amber-50 text-amber-700 text-xs font-bold border border-amber-100">
-                                {stats.countPiutangBelumBayar || 0} Belum Lunas
-                            </span>
-                            {Number(stats.countPiutangDiajukan || 0) > 0 && (
-                                <span className="px-3 py-1.5 rounded-xl bg-blue-50 text-blue-700 text-xs font-bold border border-blue-200">
-                                    {stats.countPiutangDiajukan} Diajukan
-                                </span>
-                            )}
-                            <span className="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-100">
-                                {stats.countPiutangLunas || 0} Lunas
-                            </span>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-1">
+                            {/* Total Piutang Bruto */}
+                            <div className="p-4 rounded-xl bg-slate-50 border border-slate-100">
+                                <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                                    Total Piutang Bruto
+                                </div>
+                                <div className="text-xl font-extrabold text-slate-800 mt-1">
+                                    {formatRupiah(stats.totalPiutangBruto || stats.totalPiutang || 0)}
+                                </div>
+                                <p className="text-[11px] text-slate-400 mt-0.5">
+                                    Dari {piutangPenjualan.length} transaksi penjualan
+                                </p>
+                            </div>
+
+                            {/* Total Retur Kredit */}
+                            <div className="p-4 rounded-xl bg-rose-50/60 border border-rose-100">
+                                <div className="text-[11px] font-semibold text-rose-700 uppercase tracking-wider flex items-center gap-1.5">
+                                    <RotateCcw className="w-3.5 h-3.5 text-rose-600" />
+                                    <span>Total Retur Kredit</span>
+                                </div>
+                                <div className="text-xl font-extrabold text-rose-700 mt-1">
+                                    - {formatRupiah(stats.totalPiutangRetur || 0)}
+                                </div>
+                                <p className="text-[11px] text-rose-600/70 mt-0.5">
+                                    {creditReturns.length} item retur memotong piutang
+                                </p>
+                            </div>
+
+                            {/* Sudah Diterima */}
+                            <div className="p-4 rounded-xl bg-emerald-50/60 border border-emerald-100">
+                                <div className="text-[11px] font-semibold text-emerald-700 uppercase tracking-wider">
+                                    Sudah Diterima (Kas/Bank)
+                                </div>
+                                <div className="text-xl font-extrabold text-emerald-700 mt-1">
+                                    {formatRupiah(stats.totalPiutangTerbayar || 0)}
+                                </div>
+                                <p className="text-[11px] text-emerald-600/70 mt-0.5">
+                                    Total pelunasan yang telah masuk
+                                </p>
+                            </div>
+
+                            {/* Sisa Piutang Bersih */}
+                            <div className="p-4 rounded-xl bg-amber-50/80 border border-amber-200">
+                                <div className="text-[11px] font-semibold text-amber-800 uppercase tracking-wider">
+                                    Sisa Piutang Bersih (Net)
+                                </div>
+                                <div className="text-2xl font-black text-amber-700 mt-1">
+                                    {formatRupiah(stats.totalPiutangSisa || 0)}
+                                </div>
+                                <p className="text-[11px] text-amber-700/80 mt-0.5 font-medium">
+                                    Kewajiban aktif yang wajib ditagih
+                                </p>
+                            </div>
                         </div>
                     </div>
 
-                    {/* Filter & Toolbar */}
-                    <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs space-y-3">
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                            <div className="flex flex-wrap items-center gap-2.5 flex-1">
+                    {/* Tab Switcher: Faktur Piutang Penjualan vs Riwayat Retur Kredit */}
+                    <div className="flex items-center gap-2 border-b border-slate-200">
+                        <button
+                            type="button"
+                            onClick={() => setMainTab('faktur')}
+                            className={`inline-flex items-center gap-2 px-4 py-3 text-xs font-bold border-b-2 transition cursor-pointer ${
+                                mainTab === 'faktur'
+                                    ? 'border-amber-600 text-amber-700'
+                                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                            }`}
+                        >
+                            <FileText className="w-4 h-4" />
+                            <span>Faktur Piutang Penjualan</span>
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+                                mainTab === 'faktur' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600'
+                            }`}>
+                                {piutangPenjualan.length}
+                            </span>
+                        </button>
 
-                                {/* Search Input */}
-                                <div className="relative w-full sm:w-64">
-                                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                    <input
-                                        type="text"
-                                        placeholder="Cari transaksi, debitur, pasien..."
-                                        value={searchTerm}
-                                        onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-                                        className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-amber-500 focus:bg-white focus:outline-none"
+                        <button
+                            type="button"
+                            onClick={() => setMainTab('retur')}
+                            className={`inline-flex items-center gap-2 px-4 py-3 text-xs font-bold border-b-2 transition cursor-pointer ${
+                                mainTab === 'retur'
+                                    ? 'border-rose-600 text-rose-700'
+                                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                            }`}
+                        >
+                            <RotateCcw className="w-4 h-4 text-rose-600" />
+                            <span>Riwayat Retur Kredit</span>
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+                                mainTab === 'retur' ? 'bg-rose-100 text-rose-800' : 'bg-slate-100 text-slate-600'
+                            }`}>
+                                {creditReturns.length}
+                            </span>
+                        </button>
+                    </div>
+
+                    {mainTab === 'faktur' ? (
+                        /* KONTEN TAB 1: FAKTUR PIUTANG PENJUALAN */
+                        <div className="space-y-4">
+                            {/* Filter & Toolbar */}
+                            <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs space-y-3">
+                                <div className="flex flex-wrap items-center justify-between gap-3">
+                                    <div className="flex flex-wrap items-center gap-2.5 flex-1">
+
+                                        {/* Search Input */}
+                                        <div className="relative w-full sm:w-64">
+                                            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                            <input
+                                                type="text"
+                                                placeholder="Cari transaksi, debitur, pasien..."
+                                                value={searchTerm}
+                                                onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                                                className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-amber-500 focus:bg-white focus:outline-none"
+                                            />
+                                        </div>
+
+                                        {/* Debtor Filter Combobox */}
+                                        <DebtorCombobox
+                                            debtors={debtors}
+                                            selectedDebtorId={debtorFilter}
+                                            onSelectDebtor={(val) => { setDebtorFilter(val); setCurrentPage(1); }}
+                                            placeholder="Filter Debitur (Instansi)..."
+                                        />
+
+                                        {/* Status Filter Segmented */}
+                                        <div className="flex items-center bg-slate-100 p-1 rounded-xl text-xs flex-wrap gap-0.5">
+                                            <button
+                                                type="button"
+                                                onClick={() => { setStatusFilter('ALL'); setCurrentPage(1); }}
+                                                className={`px-3 py-1.5 rounded-lg font-semibold transition cursor-pointer ${statusFilter === 'ALL' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
+                                            >
+                                                Semua
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => { setStatusFilter('BELUM_LUNAS'); setCurrentPage(1); }}
+                                                className={`px-3 py-1.5 rounded-lg font-semibold transition cursor-pointer ${statusFilter === 'BELUM_LUNAS' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
+                                            >
+                                                Belum Lunas
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => { setStatusFilter('DIAJUKAN'); setCurrentPage(1); }}
+                                                className={`px-3 py-1.5 rounded-lg font-semibold transition cursor-pointer ${statusFilter === 'DIAJUKAN' ? 'bg-white text-blue-700 shadow-xs font-bold' : 'text-slate-500 hover:text-slate-800'}`}
+                                            >
+                                                Diajukan
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => { setStatusFilter('RETUR'); setCurrentPage(1); }}
+                                                className={`px-3 py-1.5 rounded-lg font-semibold transition cursor-pointer ${statusFilter === 'RETUR' ? 'bg-white text-rose-700 shadow-xs font-bold' : 'text-slate-500 hover:text-slate-800'}`}
+                                            >
+                                                Ada Retur
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => { setStatusFilter('LUNAS'); setCurrentPage(1); }}
+                                                className={`px-3 py-1.5 rounded-lg font-semibold transition cursor-pointer ${statusFilter === 'LUNAS' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
+                                            >
+                                                Lunas
+                                            </button>
+                                        </div>
+
+                                        {/* Filter 1: Waktu Pembuatan ASC / DESC */}
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setSortCreatedAt((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+                                                setCurrentPage(1);
+                                            }}
+                                            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${sortCreatedAt === 'asc'
+                                                    ? 'bg-amber-50 border-amber-300 text-amber-800 font-bold shadow-2xs'
+                                                    : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                                                }`}
+                                            title="Klik untuk mengubah urutan waktu pembuatan"
+                                        >
+                                            {sortCreatedAt === 'asc' ? (
+                                                <ArrowUp className="w-3.5 h-3.5 text-amber-600" />
+                                            ) : (
+                                                <ArrowDown className="w-3.5 h-3.5 text-slate-500" />
+                                            )}
+                                            <span>Waktu: {sortCreatedAt === 'asc' ? 'Terlama (ASC)' : 'Terbaru (DESC)'}</span>
+                                        </button>
+
+                                        {/* Filter 2: Berdasarkan Jatuh Tempo */}
+                                        <div className="relative">
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsDueDropdownOpen(!isDueDropdownOpen)}
+                                                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${dueFilter !== 'all'
+                                                        ? 'bg-amber-50 border-amber-300 text-amber-800 font-bold shadow-2xs'
+                                                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                                                    }`}
+                                            >
+                                                <Clock className={`w-3.5 h-3.5 ${dueFilter !== 'all' ? 'text-amber-600' : 'text-slate-500'}`} />
+                                                <span>
+                                                    {dueFilter === 'overdue' && 'Tempo: Lewat Tempo'}
+                                                    {dueFilter === 'due_soon' && 'Tempo: Mendekati (≤ 7 Hari)'}
+                                                    {dueFilter === 'due_nearest' && 'Tempo: Terdekat'}
+                                                    {dueFilter === 'due_furthest' && 'Tempo: Terjauh'}
+                                                    {dueFilter === 'all' && 'Filter Jatuh Tempo'}
+                                                </span>
+                                                <ChevronDown className="w-3 h-3 text-slate-400" />
+                                            </button>
+                                            {isDueDropdownOpen && (
+                                                <div className="absolute left-0 mt-1.5 w-60 bg-white border border-slate-200 rounded-xl shadow-xl z-50 py-1 divide-y divide-slate-100 text-xs animate-in fade-in zoom-in-95 duration-150">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => { setDueFilter('all'); setIsDueDropdownOpen(false); setCurrentPage(1); }}
+                                                        className={`w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center justify-between cursor-pointer ${dueFilter === 'all' ? 'font-bold text-amber-700 bg-amber-50/50' : 'text-slate-700'}`}
+                                                    >
+                                                        <span>Semua Jatuh Tempo</span>
+                                                        {dueFilter === 'all' && <Check className="w-3.5 h-3.5 text-amber-600" />}
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => { setDueFilter('overdue'); setIsDueDropdownOpen(false); setCurrentPage(1); }}
+                                                        className={`w-full text-left px-3.5 py-2 hover:bg-red-50 flex items-center justify-between text-red-700 cursor-pointer ${dueFilter === 'overdue' ? 'font-bold bg-red-50' : ''}`}
+                                                    >
+                                                        <div className="flex items-center gap-1.5">
+                                                            <AlertTriangle className="w-3.5 h-3.5 text-red-600" />
+                                                            <span>Lewat Jatuh Tempo (Overdue)</span>
+                                                        </div>
+                                                        {dueFilter === 'overdue' && <Check className="w-3.5 h-3.5 text-red-600" />}
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => { setDueFilter('due_soon'); setIsDueDropdownOpen(false); setCurrentPage(1); }}
+                                                        className={`w-full text-left px-3.5 py-2 hover:bg-amber-50 flex items-center justify-between text-amber-800 cursor-pointer ${dueFilter === 'due_soon' ? 'font-bold bg-amber-50' : ''}`}
+                                                    >
+                                                        <div className="flex items-center gap-1.5">
+                                                            <Clock className="w-3.5 h-3.5 text-amber-600" />
+                                                            <span>Mendekati Tempo (≤ 7 Hari)</span>
+                                                        </div>
+                                                        {dueFilter === 'due_soon' && <Check className="w-3.5 h-3.5 text-amber-600" />}
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => { setDueFilter('due_nearest'); setIsDueDropdownOpen(false); setCurrentPage(1); }}
+                                                        className={`w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center justify-between cursor-pointer ${dueFilter === 'due_nearest' ? 'font-bold text-amber-700 bg-amber-50/50' : 'text-slate-700'}`}
+                                                    >
+                                                        <span>Urutkan Tempo Terdekat</span>
+                                                        {dueFilter === 'due_nearest' && <Check className="w-3.5 h-3.5 text-amber-600" />}
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => { setDueFilter('due_furthest'); setIsDueDropdownOpen(false); setCurrentPage(1); }}
+                                                        className={`w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center justify-between cursor-pointer ${dueFilter === 'due_furthest' ? 'font-bold text-amber-700 bg-amber-50/50' : 'text-slate-700'}`}
+                                                    >
+                                                        <span>Urutkan Tempo Terjauh</span>
+                                                        {dueFilter === 'due_furthest' && <Check className="w-3.5 h-3.5 text-amber-600" />}
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Tombol Import & Export Excel */}
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsImportModalOpen(true)}
+                                            className="inline-flex items-center gap-1.5 px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl text-xs font-semibold transition shadow-2xs"
+                                        >
+                                            <Upload className="w-3.5 h-3.5" />
+                                            <span>Import Pembayaran</span>
+                                        </button>
+                                        <a
+                                            href={`/finance/export/piutang?search=${encodeURIComponent(searchTerm)}&status=${encodeURIComponent(statusFilter === 'ALL' ? '' : statusFilter)}&debtor_id=${encodeURIComponent(debtorFilter)}&sort_by=${dueFilter.startsWith('due_') ? 'due_date' : 'created_at'}&sort_order=${sortCreatedAt}&due_mode=${encodeURIComponent(dueFilter)}`}
+                                            className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100/80 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-semibold transition shadow-2xs cursor-pointer"
+                                            title="Export data piutang ke Excel (.xlsx) dengan kolom retur penjualan dan sisa piutang bersih"
+                                        >
+                                            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                                            <span>Export Excel</span>
+                                        </a>
+                                    </div>
+
+                                    {selectedPiutangIds.length > 0 && (
+                                        <button
+                                            onClick={openBulkModal}
+                                            className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center gap-2 animate-in zoom-in-95 duration-150"
+                                        >
+                                            <ShoppingCart className="w-4 h-4" />
+                                            <span>Pelunasan Massal ({selectedPiutangIds.length} Transaksi)</span>
+                                        </button>
+                                    )}
+                                </div>
+
+                                <div className="flex items-center border-t border-slate-100 pt-3">
+                                    <DateRangeFilter
+                                        startDate={startDate}
+                                        endDate={endDate}
+                                        preset={datePreset}
+                                        accent="amber"
+                                        onPreset={handleDatePreset}
+                                        onChange={([start, end]) => {
+                                            setStartDate(start);
+                                            setEndDate(end);
+                                            setDatePreset(start || end ? 'custom' : 'all');
+                                            setCurrentPage(1);
+                                        }}
                                     />
                                 </div>
 
-                                {/* Debtor Filter Combobox */}
-                                <DebtorCombobox
-                                    debtors={debtors}
-                                    selectedDebtorId={debtorFilter}
-                                    onSelectDebtor={(val) => { setDebtorFilter(val); setCurrentPage(1); }}
-                                    placeholder="Filter Debitur (Instansi)..."
-                                />
-
-                                {/* Status Filter Segmented */}
-                                <div className="flex items-center bg-slate-100 p-1 rounded-xl text-xs">
-                                    <button
-                                        type="button"
-                                        onClick={() => { setStatusFilter('ALL'); setCurrentPage(1); }}
-                                        className={`px-3 py-1.5 rounded-lg font-semibold transition cursor-pointer ${statusFilter === 'ALL' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
-                                    >
-                                        Semua
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => { setStatusFilter('BELUM_LUNAS'); setCurrentPage(1); }}
-                                        className={`px-3 py-1.5 rounded-lg font-semibold transition cursor-pointer ${statusFilter === 'BELUM_LUNAS' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
-                                    >
-                                        Belum Lunas
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => { setStatusFilter('DIAJUKAN'); setCurrentPage(1); }}
-                                        className={`px-3 py-1.5 rounded-lg font-semibold transition cursor-pointer ${statusFilter === 'DIAJUKAN' ? 'bg-white text-blue-700 shadow-xs font-bold' : 'text-slate-500 hover:text-slate-800'}`}
-                                    >
-                                        Diajukan
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => { setStatusFilter('LUNAS'); setCurrentPage(1); }}
-                                        className={`px-3 py-1.5 rounded-lg font-semibold transition cursor-pointer ${statusFilter === 'LUNAS' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
-                                    >
-                                        Lunas
-                                    </button>
-                                </div>
-
-
-
-                                {/* Filter 1: Waktu Pembuatan ASC / DESC */}
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setSortCreatedAt((prev) => (prev === 'asc' ? 'desc' : 'asc'));
-                                        setCurrentPage(1);
-                                    }}
-                                    className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${sortCreatedAt === 'asc'
-                                            ? 'bg-amber-50 border-amber-300 text-amber-800 font-bold shadow-2xs'
-                                            : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-                                        }`}
-                                    title="Klik untuk mengubah urutan waktu pembuatan"
-                                >
-                                    {sortCreatedAt === 'asc' ? (
-                                        <ArrowUp className="w-3.5 h-3.5 text-amber-600" />
-                                    ) : (
-                                        <ArrowDown className="w-3.5 h-3.5 text-slate-500" />
-                                    )}
-                                    <span>Waktu: {sortCreatedAt === 'asc' ? 'Terlama (ASC)' : 'Terbaru (DESC)'}</span>
-                                </button>
-
-                                {/* Filter 2: Berdasarkan Jatuh Tempo */}
-                                <div className="relative">
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsDueDropdownOpen(!isDueDropdownOpen)}
-                                        className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${dueFilter !== 'all'
-                                                ? 'bg-amber-50 border-amber-300 text-amber-800 font-bold shadow-2xs'
-                                                : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-                                            }`}
-                                    >
-                                        <Clock className={`w-3.5 h-3.5 ${dueFilter !== 'all' ? 'text-amber-600' : 'text-slate-500'}`} />
-                                        <span>
-                                            {dueFilter === 'overdue' && 'Tempo: Lewat Tempo'}
-                                            {dueFilter === 'due_soon' && 'Tempo: Mendekati (≤ 7 Hari)'}
-                                            {dueFilter === 'due_nearest' && 'Tempo: Terdekat'}
-                                            {dueFilter === 'due_furthest' && 'Tempo: Terjauh'}
-                                            {dueFilter === 'all' && 'Filter Jatuh Tempo'}
-                                        </span>
-                                        <ChevronDown className="w-3 h-3 text-slate-400" />
-                                    </button>
-                                    {isDueDropdownOpen && (
-                                        <div className="absolute left-0 mt-1.5 w-60 bg-white border border-slate-200 rounded-xl shadow-xl z-50 py-1 divide-y divide-slate-100 text-xs animate-in fade-in zoom-in-95 duration-150">
-                                            <button
-                                                type="button"
-                                                onClick={() => { setDueFilter('all'); setIsDueDropdownOpen(false); setCurrentPage(1); }}
-                                                className={`w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center justify-between cursor-pointer ${dueFilter === 'all' ? 'font-bold text-amber-700 bg-amber-50/50' : 'text-slate-700'}`}
-                                            >
-                                                <span>Semua Jatuh Tempo</span>
-                                                {dueFilter === 'all' && <Check className="w-3.5 h-3.5 text-amber-600" />}
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => { setDueFilter('overdue'); setIsDueDropdownOpen(false); setCurrentPage(1); }}
-                                                className={`w-full text-left px-3.5 py-2 hover:bg-red-50 flex items-center justify-between text-red-700 cursor-pointer ${dueFilter === 'overdue' ? 'font-bold bg-red-50' : ''}`}
-                                            >
-                                                <div className="flex items-center gap-1.5">
-                                                    <AlertTriangle className="w-3.5 h-3.5 text-red-600" />
-                                                    <span>Lewat Jatuh Tempo (Overdue)</span>
-                                                </div>
-                                                {dueFilter === 'overdue' && <Check className="w-3.5 h-3.5 text-red-600" />}
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => { setDueFilter('due_soon'); setIsDueDropdownOpen(false); setCurrentPage(1); }}
-                                                className={`w-full text-left px-3.5 py-2 hover:bg-amber-50 flex items-center justify-between text-amber-800 cursor-pointer ${dueFilter === 'due_soon' ? 'font-bold bg-amber-50' : ''}`}
-                                            >
-                                                <div className="flex items-center gap-1.5">
-                                                    <Clock className="w-3.5 h-3.5 text-amber-600" />
-                                                    <span>Mendekati Tempo (≤ 7 Hari)</span>
-                                                </div>
-                                                {dueFilter === 'due_soon' && <Check className="w-3.5 h-3.5 text-amber-600" />}
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => { setDueFilter('due_nearest'); setIsDueDropdownOpen(false); setCurrentPage(1); }}
-                                                className={`w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center justify-between cursor-pointer ${dueFilter === 'due_nearest' ? 'font-bold text-amber-700 bg-amber-50/50' : 'text-slate-700'}`}
-                                            >
-                                                <span>Urutkan Tempo Terdekat</span>
-                                                {dueFilter === 'due_nearest' && <Check className="w-3.5 h-3.5 text-amber-600" />}
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => { setDueFilter('due_furthest'); setIsDueDropdownOpen(false); setCurrentPage(1); }}
-                                                className={`w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center justify-between cursor-pointer ${dueFilter === 'due_furthest' ? 'font-bold text-amber-700 bg-amber-50/50' : 'text-slate-700'}`}
-                                            >
-                                                <span>Urutkan Tempo Terjauh</span>
-                                                {dueFilter === 'due_furthest' && <Check className="w-3.5 h-3.5 text-amber-600" />}
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Tombol Export Excel */}
-                                <button
-                                    type="button"
-                                    onClick={() => setIsImportModalOpen(true)}
-                                    className="inline-flex items-center gap-1.5 px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl text-xs font-semibold transition shadow-2xs"
-                                >
-                                    <Upload className="w-3.5 h-3.5" />
-                                    <span>Import Pembayaran</span>
-                                </button>
-                                <a
-                                    href={`/finance/export/piutang?search=${encodeURIComponent(searchTerm)}&status=${encodeURIComponent(statusFilter === 'ALL' ? '' : statusFilter)}&debtor_id=${encodeURIComponent(debtorFilter)}&sort_by=${dueFilter.startsWith('due_') ? 'due_date' : 'created_at'}&sort_order=${sortCreatedAt}&due_mode=${encodeURIComponent(dueFilter)}`}
-                                    className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100/80 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-semibold transition shadow-2xs cursor-pointer"
-                                    title="Export data piutang ke Excel (.xlsx) dengan format rapi dan estetik"
-                                >
-                                    <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-                                    <span>Export Excel</span>
-                                </a>
+                                {selectionWarning && (
+                                    <div className="text-xs text-amber-700 bg-amber-50 px-3 py-2 rounded-xl flex items-center gap-2 border border-amber-200">
+                                        <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                                        <span>{selectionWarning}</span>
+                                    </div>
+                                )}
                             </div>
 
-                            {selectedPiutangIds.length > 0 && (
-                                <button
-                                    onClick={openBulkModal}
-                                    className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition shadow-xs flex items-center gap-2 animate-in zoom-in-95 duration-150"
-                                >
-                                    <ShoppingCart className="w-4 h-4" />
-                                    <span>Pelunasan Massal ({selectedPiutangIds.length} Transaksi)</span>
-                                </button>
-                            )}
-                        </div>
-
-                        <div className="flex items-center border-t border-slate-100 pt-3">
-                            <DateRangeFilter
-                                startDate={startDate}
-                                endDate={endDate}
-                                preset={datePreset}
-                                accent="amber"
-                                onPreset={handleDatePreset}
-                                onChange={([start, end]) => {
-                                    setStartDate(start);
-                                    setEndDate(end);
-                                    setDatePreset(start || end ? 'custom' : 'all');
-                                    setCurrentPage(1);
-                                }}
-                            />
-                        </div>
-
-                        {selectionWarning && (
-                            <div className="text-xs text-amber-700 bg-amber-50 px-3 py-2 rounded-xl flex items-center gap-2 border border-amber-200">
-                                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-                                <span>{selectionWarning}</span>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Tabel Piutang Penjualan */}
-                    <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left border-collapse text-xs">
-                                <thead>
-                                    <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-600 font-semibold uppercase tracking-wider text-[11px]">
-                                        <th className="px-4 py-3.5 w-10">
-                                            <input
-                                                type="checkbox"
-                                                checked={
-                                                    paginatedPiutang.filter(i => i.status !== 'Lunas' && i.sisa > 0.005).length > 0 &&
-                                                    paginatedPiutang
-                                                        .filter(i => i.status !== 'Lunas' && i.sisa > 0.005)
-                                                        .every(i => selectedPiutangIds.includes(i.id))
-                                                }
-                                                onChange={handleSelectAllPiutang}
-                                                className="rounded border-slate-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
-                                                title="Pilih semua di halaman ini"
-                                            />
-                                        </th>
-                                        <th className="px-4 py-3.5">No. Transaksi & Tgl</th>
-                                        <th className="px-4 py-3.5">Jatuh Tempo</th>
-                                        <th className="px-4 py-3.5">Debitur / Pasien</th>
-                                        <th className="px-4 py-3.5">Apotek</th>
-                                        <th className="px-4 py-3.5 text-right">Total Tagihan</th>
-                                        <th className="px-4 py-3.5 text-right">Terbayar</th>
-                                        <th className="px-4 py-3.5 text-right">Sisa Piutang</th>
-                                        <th className="px-4 py-3.5 text-center">Status</th>
-                                        <th className="px-4 py-3.5 text-center w-28">Aksi</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100">
-                                    {paginatedPiutang.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={10} className="text-center py-12 text-slate-400">
-                                                Tidak ada data piutang yang sesuai dengan filter.
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        paginatedPiutang.map((item) => {
-                                            const isLunas = item.status === 'Lunas' || item.sisa <= 0.005;
-                                            return (
-                                                <tr
-                                                    key={item.id}
-                                                    onClick={() => setDrawerPiutang(item)}
-                                                    className="hover:bg-amber-50/40 cursor-pointer transition group"
-                                                >
-                                                    <td className="px-4 py-3.5" onClick={(e) => e.stopPropagation()}>
-                                                        {isLunas ? (
-                                                            <span title="Piutang sudah lunas" className="inline-block p-0.5 text-emerald-500">
-                                                                <Check className="w-3.5 h-3.5" />
-                                                            </span>
-                                                        ) : (
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={selectedPiutangIds.includes(item.id)}
-                                                                onChange={() => handleTogglePiutang(item)}
-                                                                className="rounded border-slate-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
-                                                            />
-                                                        )}
-                                                    </td>
-                                                    <td className="px-4 py-3.5">
-                                                        <button
-                                                            type="button"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                setDetailViewPiutang(item);
-                                                            }}
-                                                            className="font-bold text-amber-700 hover:text-amber-800 hover:underline transition text-left cursor-pointer"
-                                                        >
-                                                            {item.nomor}
-                                                        </button>
-                                                        <div className="text-[11px] text-slate-400 mt-0.5">{item.tanggal}</div>
-                                                    </td>
-                                                    {/* Kolom Jatuh Tempo Visual Jelas */}
-                                                    <td className="px-4 py-3.5 whitespace-nowrap">
-                                                        {isLunas ? (
-                                                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-semibold border border-emerald-200">
-                                                                <Check className="w-3.5 h-3.5 text-emerald-600" />
-                                                                <span>{item.jatuhTempo}</span>
-                                                                <span className="text-[10px] text-emerald-600 font-bold ml-0.5">• Lunas</span>
-                                                            </span>
-                                                        ) : item.is_overdue || item.days_overdue > 0 ? (
-                                                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-red-100 text-red-800 text-xs font-bold border border-red-300 shadow-2xs">
-                                                                <AlertTriangle className="w-3.5 h-3.5 text-red-600 shrink-0" />
-                                                                <span>{item.jatuhTempo}</span>
-                                                                <span className="text-[10px] bg-red-600 text-white px-1.5 py-0.5 rounded-md font-black">
-                                                                    Lewat {item.days_overdue} hr
-                                                                </span>
-                                                            </div>
-                                                        ) : item.days_remaining <= 7 ? (
-                                                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-100 text-amber-900 text-xs font-bold border border-amber-300 shadow-2xs">
-                                                                <Clock className="w-3.5 h-3.5 text-amber-700 shrink-0" />
-                                                                <span>{item.jatuhTempo}</span>
-                                                                <span className="text-[10px] bg-amber-600 text-white px-1.5 py-0.5 rounded-md font-bold">
-                                                                    Sisa {item.days_remaining} hr
-                                                                </span>
-                                                            </div>
-                                                        ) : (
-                                                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-xs font-medium border border-slate-200">
-                                                                <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                                                                <span>{item.jatuhTempo}</span>
-                                                                <span className="text-[10px] text-slate-500 font-normal">({item.days_remaining} hr)</span>
-                                                            </div>
-                                                        )}
-                                                    </td>
-                                                    <td className="px-4 py-3.5">
-                                                        <div className="font-semibold text-slate-800">{item.debtor}</div>
-                                                        <div className="text-[10px] text-slate-400">
-                                                            {item.pasien && item.pasien !== '-' ? `Pasien: ${item.pasien}` : ''}
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-4 py-3.5 text-slate-600">{item.apotek}</td>
-                                                    <td className="px-4 py-3.5 text-right font-medium text-slate-800">
-                                                        {formatNumberOnly(item.total)}
-                                                    </td>
-                                                    <td className="px-4 py-3.5 text-right text-emerald-600 font-medium">
-                                                        {formatNumberOnly(item.terbayar)}
-                                                    </td>
-                                                    <td className="px-4 py-3.5 text-right font-bold text-amber-700">
-                                                        {formatNumberOnly(item.sisa)}
-                                                    </td>
-                                                    <td className="px-4 py-3.5 text-center">
-                                                        <div className="flex flex-col items-center gap-1">
-                                                            <span className={`inline-block px-2.5 py-1 rounded-full text-[11px] font-bold ${isLunas
-                                                                ? 'bg-emerald-50 text-emerald-700'
-                                                                : item.status === 'Dibayar Sebagian'
-                                                                    ? 'bg-amber-50 text-amber-700'
-                                                                    : 'bg-red-50 text-red-700'
-                                                                }`}>
-                                                                {item.status}
-                                                            </span>
-                                                            {isLunas && item.tanggalLunas && (
-                                                                <span className="text-[10px] font-medium text-emerald-600">Lunas {item.tanggalLunas}</span>
-                                                            )}
-                                                            {item.is_submitted && !isLunas && (
-                                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700 border border-blue-200">
-                                                                    Diajukan
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-4 py-3.5 text-center" onClick={(e) => e.stopPropagation()}>
-                                                        <div className="flex items-center justify-center gap-1.5">
-                                                            {item.sisa > 0.005 && (
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => openPaymentModal(item)}
-                                                                    className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-semibold transition cursor-pointer"
-                                                                >
-                                                                    Terima
-                                                                </button>
-                                                            )}
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => setDetailViewPiutang(item)}
-                                                                className="px-2.5 py-1 border border-slate-200 text-slate-600 hover:bg-slate-100 rounded-lg text-xs font-semibold transition cursor-pointer"
-                                                            >
-                                                                Detil
-                                                            </button>
-                                                        </div>
+                            {/* Tabel Piutang Penjualan */}
+                            <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left border-collapse text-xs">
+                                        <thead>
+                                            <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-600 font-semibold uppercase tracking-wider text-[11px]">
+                                                <th className="px-4 py-3.5 w-10">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={
+                                                            paginatedPiutang.filter(i => !isItemSettled(i)).length > 0 &&
+                                                            paginatedPiutang
+                                                                .filter(i => !isItemSettled(i))
+                                                                .every(i => selectedPiutangIds.includes(i.id))
+                                                        }
+                                                        onChange={handleSelectAllPiutang}
+                                                        className="rounded border-slate-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                                                        title="Pilih semua di halaman ini"
+                                                    />
+                                                </th>
+                                                <th className="px-4 py-3.5">No. Transaksi &amp; Tgl</th>
+                                                <th className="px-4 py-3.5">Jatuh Tempo</th>
+                                                <th className="px-4 py-3.5">Debitur / Pasien</th>
+                                                <th className="px-4 py-3.5">Apotek</th>
+                                                <th className="px-4 py-3.5 text-right">Total Bruto</th>
+                                                <th className="px-4 py-3.5 text-right">Retur</th>
+                                                <th className="px-4 py-3.5 text-right">Terbayar</th>
+                                                <th className="px-4 py-3.5 text-right">Sisa Piutang</th>
+                                                <th className="px-4 py-3.5 text-center">Status</th>
+                                                <th className="px-4 py-3.5 text-center w-28">Aksi</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {paginatedPiutang.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={11} className="text-center py-12 text-slate-400">
+                                                        Tidak ada data piutang yang sesuai dengan filter.
                                                     </td>
                                                 </tr>
-                                            );
-                                        })
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        {/* Pagination */}
-                        {totalPages > 1 && (
-                            <div className="p-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-                                <div>
-                                    Menampilkan {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, filteredPiutang.length)} dari {filteredPiutang.length} transaksi
+                                            ) : (
+                                                paginatedPiutang.map((item) => {
+                                                    const isLunas = isItemSettled(item);
+                                                    return (
+                                                        <tr
+                                                            key={item.id}
+                                                            onClick={() => setDrawerPiutang(item)}
+                                                            className="hover:bg-amber-50/40 cursor-pointer transition group"
+                                                        >
+                                                            <td className="px-4 py-3.5" onClick={(e) => e.stopPropagation()}>
+                                                                {item.status === 'Diretur Penuh' ? (
+                                                                    <span title="Tagihan diretur penuh (Sisa Rp 0)" className="inline-flex items-center justify-center w-5 h-5 rounded text-purple-600 bg-purple-50">
+                                                                        <RotateCcw className="w-3.5 h-3.5" />
+                                                                    </span>
+                                                                ) : isLunas ? (
+                                                                    <span title="Piutang sudah lunas" className="inline-block p-0.5 text-emerald-500">
+                                                                        <Check className="w-3.5 h-3.5" />
+                                                                    </span>
+                                                                ) : (
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={selectedPiutangIds.includes(item.id)}
+                                                                        onChange={() => handleTogglePiutang(item)}
+                                                                        className="rounded border-slate-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                                                                    />
+                                                                )}
+                                                            </td>
+                                                            <td className="px-4 py-3.5">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setDetailViewPiutang(item);
+                                                                    }}
+                                                                    className="font-bold text-amber-700 hover:text-amber-800 hover:underline transition text-left cursor-pointer"
+                                                                >
+                                                                    {item.nomor}
+                                                                </button>
+                                                                <div className="text-[11px] text-slate-400 mt-0.5">{item.tanggal}</div>
+                                                            </td>
+                                                            {/* Kolom Jatuh Tempo Visual Jelas */}
+                                                            <td className="px-4 py-3.5 whitespace-nowrap">
+                                                                {isLunas ? (
+                                                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-semibold border border-emerald-200">
+                                                                        <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                                                        <span>{item.jatuhTempo}</span>
+                                                                        <span className="text-[10px] text-emerald-600 font-bold ml-0.5">• Lunas</span>
+                                                                    </span>
+                                                                ) : item.is_overdue || item.days_overdue > 0 ? (
+                                                                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-red-100 text-red-800 text-xs font-bold border border-red-300 shadow-2xs">
+                                                                        <AlertTriangle className="w-3.5 h-3.5 text-red-600 shrink-0" />
+                                                                        <span>{item.jatuhTempo}</span>
+                                                                        <span className="text-[10px] bg-red-600 text-white px-1.5 py-0.5 rounded-md font-black">
+                                                                            Lewat {item.days_overdue} hr
+                                                                        </span>
+                                                                    </div>
+                                                                ) : item.days_remaining <= 7 ? (
+                                                                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-100 text-amber-900 text-xs font-bold border border-amber-300 shadow-2xs">
+                                                                        <Clock className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                                                                        <span>{item.jatuhTempo}</span>
+                                                                        <span className="text-[10px] bg-amber-600 text-white px-1.5 py-0.5 rounded-md font-bold">
+                                                                            Sisa {item.days_remaining} hr
+                                                                        </span>
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-xs font-medium border border-slate-200">
+                                                                        <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                                                        <span>{item.jatuhTempo}</span>
+                                                                        <span className="text-[10px] text-slate-500 font-normal">({item.days_remaining} hr)</span>
+                                                                    </div>
+                                                                )}
+                                                            </td>
+                                                            <td className="px-4 py-3.5">
+                                                                <div className="font-semibold text-slate-800">{item.debtor}</div>
+                                                                <div className="text-[10px] text-slate-400">
+                                                                    {item.pasien && item.pasien !== '-' ? `Pasien: ${item.pasien}` : ''}
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-4 py-3.5 text-slate-600">{item.apotek}</td>
+                                                            <td className="px-4 py-3.5 text-right font-medium text-slate-800">
+                                                                {formatNumberOnly(item.total)}
+                                                            </td>
+                                                            <td className="px-4 py-3.5 text-right font-medium">
+                                                                {item.total_retur > 0 ? (
+                                                                    <span className="font-semibold text-rose-600" title={`Total Retur Kredit: ${formatRupiah(item.total_retur)}`}>
+                                                                        - {formatNumberOnly(item.total_retur)}
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="text-slate-300">-</span>
+                                                                )}
+                                                            </td>
+                                                            <td className="px-4 py-3.5 text-right text-emerald-600 font-medium">
+                                                                {formatNumberOnly(item.terbayar)}
+                                                            </td>
+                                                            <td className="px-4 py-3.5 text-right font-bold text-amber-700">
+                                                                {formatNumberOnly(item.sisa)}
+                                                            </td>
+                                                            <td className="px-4 py-3.5 text-center">
+                                                                <div className="flex flex-col items-center gap-1">
+                                                                    {renderStatusBadge(item)}
+                                                                    {item.is_submitted && !isLunas && (
+                                                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700 border border-blue-200">
+                                                                            Diajukan
+                                                                        </span>
+                                                                    )}
+                                                                    {isLunas && item.tanggalLunas && item.status !== 'Diretur Penuh' && (
+                                                                        <span className="text-[10px] font-medium text-emerald-600">Lunas {item.tanggalLunas}</span>
+                                                                    )}
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-4 py-3.5 text-center" onClick={(e) => e.stopPropagation()}>
+                                                                <div className="flex items-center justify-center gap-1.5">
+                                                                    {item.sisa > 0.005 && (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => openPaymentModal(item)}
+                                                                            className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-semibold transition cursor-pointer"
+                                                                        >
+                                                                            Terima
+                                                                        </button>
+                                                                    )}
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setDetailViewPiutang(item)}
+                                                                        className="px-2.5 py-1 border border-slate-200 text-slate-600 hover:bg-slate-100 rounded-lg text-xs font-semibold transition cursor-pointer"
+                                                                    >
+                                                                        Detil
+                                                                    </button>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })
+                                            )}
+                                        </tbody>
+                                    </table>
                                 </div>
-                                <div className="flex items-center gap-1">
-                                    <button
-                                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                                        disabled={currentPage === 1}
-                                        className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50"
-                                    >
-                                        <ChevronLeft className="w-4 h-4" />
-                                    </button>
-                                    <span className="px-3 py-1 font-semibold text-slate-800">
-                                        {currentPage} / {totalPages}
-                                    </span>
-                                    <button
-                                        onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                                        disabled={currentPage === totalPages}
-                                        className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50"
-                                    >
-                                        <ChevronRight className="w-4 h-4" />
-                                    </button>
+
+                                {/* Pagination */}
+                                {totalPages > 1 && (
+                                    <div className="p-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                                        <div>
+                                            Menampilkan {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, filteredPiutang.length)} dari {filteredPiutang.length} transaksi
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                            <button
+                                                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                                                disabled={currentPage === 1}
+                                                className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50 cursor-pointer"
+                                            >
+                                                <ChevronLeft className="w-4 h-4" />
+                                            </button>
+                                            <span className="px-3 py-1 font-semibold text-slate-800">
+                                                {currentPage} / {totalPages}
+                                            </span>
+                                            <button
+                                                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                                                disabled={currentPage === totalPages}
+                                                className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50 cursor-pointer"
+                                            >
+                                                <ChevronRight className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    ) : (
+                        /* KONTEN TAB 2: RIWAYAT RETUR KREDIT */
+                        <div className="space-y-4">
+                            {/* Filter Toolbar Retur */}
+                            <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs space-y-3">
+                                <div className="flex flex-wrap items-center justify-between gap-3">
+                                    <div className="flex flex-wrap items-center gap-2.5 flex-1">
+                                        {/* Search Retur */}
+                                        <div className="relative w-full sm:w-72">
+                                            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                            <input
+                                                type="text"
+                                                placeholder="Cari no. retur, faktur, debitur, obat..."
+                                                value={returSearchTerm}
+                                                onChange={(e) => { setReturSearchTerm(e.target.value); setReturCurrentPage(1); }}
+                                                className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-rose-500 focus:bg-white focus:outline-none"
+                                            />
+                                        </div>
+
+                                        {/* Debtor Combobox */}
+                                        <DebtorCombobox
+                                            debtors={debtors}
+                                            selectedDebtorId={returDebtorFilter}
+                                            onSelectDebtor={(val) => { setReturDebtorFilter(val); setReturCurrentPage(1); }}
+                                            placeholder="Filter Debitur (Instansi)..."
+                                        />
+                                    </div>
+
+                                    <div className="flex items-center gap-2 text-xs">
+                                        <span className="text-slate-500">Total Potongan Retur:</span>
+                                        <span className="font-extrabold text-rose-700 bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-200">
+                                            - {formatRupiah(stats.totalPiutangRetur || 0)}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center border-t border-slate-100 pt-3">
+                                    <DateRangeFilter
+                                        startDate={startDate}
+                                        endDate={endDate}
+                                        preset={datePreset}
+                                        accent="rose"
+                                        onPreset={handleDatePreset}
+                                        onChange={([start, end]) => {
+                                            setStartDate(start);
+                                            setEndDate(end);
+                                            setDatePreset(start || end ? 'custom' : 'all');
+                                            setReturCurrentPage(1);
+                                        }}
+                                    />
                                 </div>
                             </div>
-                        )}
-                    </div>
+
+                            {/* Tabel Riwayat Retur Penjualan Kredit */}
+                            <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left border-collapse text-xs">
+                                        <thead>
+                                            <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-600 font-semibold uppercase tracking-wider text-[11px]">
+                                                <th className="px-4 py-3.5">No. Retur &amp; Tgl</th>
+                                                <th className="px-4 py-3.5">Faktur Asal</th>
+                                                <th className="px-4 py-3.5">Debitur / Pasien</th>
+                                                <th className="px-4 py-3.5">Apotek</th>
+                                                <th className="px-4 py-3.5">Item Obat Diretur</th>
+                                                <th className="px-4 py-3.5 text-center">Qty Retur</th>
+                                                <th className="px-4 py-3.5 text-right">Potongan Piutang</th>
+                                                <th className="px-4 py-3.5 text-center">Status</th>
+                                                <th className="px-4 py-3.5 text-center w-28">Aksi</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {paginatedCreditReturns.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={9} className="text-center py-12 text-slate-400">
+                                                        <RotateCcw className="w-8 h-8 mx-auto text-slate-300 mb-2" />
+                                                        <p className="font-semibold text-slate-600">Tidak ada data retur kredit yang sesuai filter.</p>
+                                                        <p className="text-[11px] text-slate-400 mt-0.5">
+                                                            Retur dari transaksi kredit otomatis memotong piutang dan dicatat di sini.
+                                                        </p>
+                                                    </td>
+                                                </tr>
+                                            ) : (
+                                                paginatedCreditReturns.map((ret) => {
+                                                    const matchingTx = piutangPenjualan.find((p) => p.id === ret.transaction_id);
+                                                    return (
+                                                        <tr key={ret.id} className="hover:bg-rose-50/30 transition">
+                                                            <td className="px-4 py-3.5">
+                                                                <div className="font-bold text-rose-700 font-mono">{ret.code}</div>
+                                                                <div className="text-[11px] text-slate-400 mt-0.5">{ret.tanggal}</div>
+                                                            </td>
+                                                            <td className="px-4 py-3.5">
+                                                                {matchingTx ? (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setDetailViewPiutang(matchingTx)}
+                                                                        className="font-bold text-amber-700 hover:text-amber-800 hover:underline transition text-left cursor-pointer"
+                                                                        title="Klik untuk melihat rincian faktur piutang asal"
+                                                                    >
+                                                                        {ret.transaction_code}
+                                                                    </button>
+                                                                ) : (
+                                                                    <span className="font-semibold text-slate-700">{ret.transaction_code}</span>
+                                                                )}
+                                                                <div className="text-[10px] text-slate-400">Faktur Kredit</div>
+                                                            </td>
+                                                            <td className="px-4 py-3.5">
+                                                                <div className="font-semibold text-slate-800">{ret.debtor}</div>
+                                                                <div className="text-[10px] text-slate-400">
+                                                                    {ret.pasien && ret.pasien !== '-' ? `Pasien: ${ret.pasien}` : ''}
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-4 py-3.5 text-slate-600">{ret.apotek}</td>
+                                                            <td className="px-4 py-3.5">
+                                                                <div className="font-semibold text-slate-800">{ret.medicine_name}</div>
+                                                                <div className="text-[10px] text-slate-400 font-mono">{ret.medicine_sku}</div>
+                                                            </td>
+                                                            <td className="px-4 py-3.5 text-center font-bold text-slate-700">
+                                                                {ret.qty_retur} {ret.satuan}
+                                                            </td>
+                                                            <td className="px-4 py-3.5 text-right font-extrabold text-rose-600">
+                                                                - {formatNumberOnly(ret.total_retur)}
+                                                            </td>
+                                                            <td className="px-4 py-3.5 text-center">
+                                                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200">
+                                                                    <Check className="w-3 h-3 text-purple-600" />
+                                                                    <span>Memotong Piutang</span>
+                                                                </span>
+                                                            </td>
+                                                            <td className="px-4 py-3.5 text-center">
+                                                                {matchingTx ? (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setDetailViewPiutang(matchingTx)}
+                                                                        className="px-2.5 py-1 border border-slate-200 hover:border-amber-300 text-slate-600 hover:text-amber-800 hover:bg-amber-50 rounded-lg text-xs font-semibold transition cursor-pointer"
+                                                                    >
+                                                                        Buka Faktur
+                                                                    </button>
+                                                                ) : (
+                                                                    <span className="text-slate-300 text-xs">-</span>
+                                                                )}
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                {/* Pagination Retur */}
+                                {returTotalPages > 1 && (
+                                    <div className="p-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                                        <div>
+                                            Menampilkan {(returCurrentPage - 1) * returItemsPerPage + 1} - {Math.min(returCurrentPage * returItemsPerPage, filteredCreditReturns.length)} dari {filteredCreditReturns.length} data retur kredit
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                            <button
+                                                onClick={() => setReturCurrentPage((p) => Math.max(1, p - 1))}
+                                                disabled={returCurrentPage === 1}
+                                                className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50 cursor-pointer"
+                                            >
+                                                <ChevronLeft className="w-4 h-4" />
+                                            </button>
+                                            <span className="px-3 py-1 font-semibold text-slate-800">
+                                                {returCurrentPage} / {returTotalPages}
+                                            </span>
+                                            <button
+                                                onClick={() => setReturCurrentPage((p) => Math.min(returTotalPages, p + 1))}
+                                                disabled={returCurrentPage === returTotalPages}
+                                                className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50 cursor-pointer"
+                                            >
+                                                <ChevronRight className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -1489,7 +1939,11 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                                 <span className="text-slate-500">Jatuh Tempo:</span>
                                 <div className="flex items-center gap-1.5">
                                     <span className="font-bold text-slate-800">{item.jatuhTempo}</span>
-                                    {item.status === 'Lunas' || item.sisa <= 0.005 ? (
+                                    {item.status === 'Diretur Penuh' ? (
+                                        <span className="text-[10px] bg-purple-100 text-purple-700 font-bold px-1.5 py-0.5 rounded">Diretur Penuh</span>
+                                    ) : item.status === 'Diretur Sebagian' ? (
+                                        <span className="text-[10px] bg-rose-100 text-rose-700 font-bold px-1.5 py-0.5 rounded">Diretur Sebagian</span>
+                                    ) : item.status === 'Lunas' || item.status === 'Lunas (Ada Retur)' || item.sisa <= 0.005 ? (
                                         <span className="text-[10px] bg-emerald-50 text-emerald-700 font-bold px-1.5 py-0.5 rounded">Lunas</span>
                                     ) : item.is_overdue || item.days_overdue > 0 ? (
                                         <span className="text-[10px] bg-red-100 text-red-700 font-black px-1.5 py-0.5 rounded">Lewat {item.days_overdue} hr</span>
@@ -1535,9 +1989,24 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                         {/* Ringkasan Biaya */}
                         <div className="p-4 bg-slate-50 rounded-xl space-y-1.5 font-medium">
                             <div className="flex justify-between text-base font-bold text-slate-900">
-                                <span>Total Tagihan:</span>
+                                <span>Total Tagihan (Bruto):</span>
                                 <span>{formatRupiah(item.total)}</span>
                             </div>
+                            {item.total_retur > 0 && (
+                                <>
+                                    <div className="flex justify-between text-rose-600 font-semibold text-xs">
+                                        <span className="flex items-center gap-1">
+                                            <RotateCcw className="w-3.5 h-3.5" />
+                                            <span>Retur Penjualan:</span>
+                                        </span>
+                                        <span>- {formatRupiah(item.total_retur)}</span>
+                                    </div>
+                                    <div className="flex justify-between text-slate-700 font-semibold text-xs pt-1 border-t border-dashed border-slate-200">
+                                        <span>Tagihan Bersih (Net):</span>
+                                        <span className="font-bold">{formatRupiah(item.net_total)}</span>
+                                    </div>
+                                </>
+                            )}
                             <div className="flex justify-between text-emerald-600 font-semibold">
                                 <span>Sudah Terbayar:</span>
                                 <span>{formatRupiah(item.terbayar)}</span>
@@ -1547,6 +2016,35 @@ export default function Piutang({ piutangPenjualan = [], debtors = [], kasBankAc
                                 <span>{formatRupiah(item.sisa)}</span>
                             </div>
                         </div>
+
+                        {/* Riwayat Retur Penjualan Jika Ada */}
+                        {item.returs && item.returs.length > 0 && (
+                            <div>
+                                <div className="flex items-center justify-between mb-2">
+                                    <h4 className="font-bold text-rose-700 text-xs flex items-center gap-1.5">
+                                        <RotateCcw className="w-3.5 h-3.5" />
+                                        <span>Riwayat Retur Kredit ({item.returs.length})</span>
+                                    </h4>
+                                    <span className="text-[11px] font-bold text-rose-600">
+                                        - {formatRupiah(item.total_retur)}
+                                    </span>
+                                </div>
+                                <div className="space-y-2">
+                                    {item.returs.map((r, idx) => (
+                                        <div key={r.id || idx} className="p-2.5 bg-rose-50/60 border border-rose-100 rounded-xl text-xs space-y-0.5">
+                                            <div className="flex justify-between items-center">
+                                                <span className="font-bold text-slate-800">{r.nama}</span>
+                                                <span className="font-bold text-rose-700">- {formatRupiah(r.nominal)}</span>
+                                            </div>
+                                            <div className="flex justify-between text-[11px] text-slate-500">
+                                                <span>{r.code} • {r.qty} {r.satuan}</span>
+                                                <span>{r.tanggal}</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
                         {/* Riwayat Pembayaran */}
                         <div>

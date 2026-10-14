@@ -82,6 +82,7 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
                 'Status Tempo',
                 'Status Pembayaran',
                 'Total Penjualan (Rp)',
+                'Retur Penjualan (Rp)',
                 'Sudah Terbayar (Rp)',
                 'Sisa Piutang (Rp)',
             ],
@@ -95,8 +96,9 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
             'pharmacy',
             'payments',
             'transactions.medicine',
+            'returs',
         ])
-            ->where('transaction_type', 'KREDIT')
+            ->whereIn('transaction_type', ['KREDIT', 'RESEP KREDIT'])
             ->where('status', 1)
             ->whereIn('pharmacy_id', $this->targetPharmacyIds);
 
@@ -120,6 +122,7 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
 
         $no = 1;
         $totalSemua = 0;
+        $totalReturSemua = 0;
         $totalTerbayarSemua = 0;
         $totalSisaSemua = 0;
         $detailRows = [];
@@ -132,15 +135,38 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
                 $calcSubtotal += (float) ($cart->final_price ?: ($cart->total_price ?: ($qty * $harga)));
             }
 
+            $totalRetur = (float) $tx->returs->sum('total_retur');
             $total = (float) ($tx->subtotal > 0 ? $tx->subtotal : $calcSubtotal);
+            $total = round($total, 2);
+            $totalRetur = round($totalRetur, 2);
+            $netTotal = round(max(0, $total - $totalRetur), 2);
+
             $totalTerbayarViaFinance = (float) $tx->payments->sum('amount');
             $legacyPaid = (float) ($tx->paid ?? 0);
             $totalTerbayar = round(max($totalTerbayarViaFinance, $legacyPaid), 2);
-            if ($totalTerbayar > $total)
-                $totalTerbayar = $total;
-            $sisa = round(max(0, $total - $totalTerbayar), 2);
-            $isLunas = ($sisa < 0.005 && $total > 0);
-            $statusLabel = $isLunas ? 'LUNAS' : ($totalTerbayar > 0 ? 'DIBAYAR SEBAGIAN' : 'BELUM BAYAR');
+            if ($totalTerbayar > $netTotal)
+                $totalTerbayar = $netTotal;
+            $sisa = round(max(0, $netTotal - $totalTerbayar), 2);
+            $isLunas = ($sisa < 0.005);
+            $sisa = $isLunas ? 0 : $sisa;
+
+            if ($isLunas) {
+                if ($totalRetur >= $total && $total > 0) {
+                    $statusLabel = 'DIRETUR PENUH';
+                } elseif ($totalRetur > 0) {
+                    $statusLabel = 'LUNAS (ADA RETUR)';
+                } else {
+                    $statusLabel = 'LUNAS';
+                }
+            } else {
+                if ($totalTerbayar > 0) {
+                    $statusLabel = 'DIBAYAR SEBAGIAN';
+                } elseif ($totalRetur > 0) {
+                    $statusLabel = 'DIRETUR SEBAGIAN';
+                } else {
+                    $statusLabel = 'BELUM BAYAR';
+                }
+            }
 
             if (!empty($this->filters['status'])) {
                 if ($this->filters['status'] === 'LUNAS' && !$isLunas)
@@ -176,6 +202,7 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
             }
 
             $totalSemua += $total;
+            $totalReturSemua += $totalRetur;
             $totalTerbayarSemua += $totalTerbayar;
             $totalSisaSemua += $sisa;
 
@@ -215,6 +242,7 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
                 $dueStatus,
                 $statusLabel,
                 $total,
+                $totalRetur,
                 $totalTerbayar,
                 $sisa,
             ];
@@ -242,6 +270,7 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
                 '',
                 '',
                 $totalSemua,
+                $totalReturSemua,
                 $totalTerbayarSemua,
                 $totalSisaSemua,
             ];
@@ -249,7 +278,7 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
         } else {
             $rows[] = [
                 'Tidak ada data piutang yang sesuai dengan filter yang dipilih.',
-                ...array_fill(0, 16, ''),
+                ...array_fill(0, 17, ''),
             ];
             $this->lastRow = count($rows);
         }
@@ -269,9 +298,9 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
     public function styles(Worksheet $sheet)
     {
         // 1. Title Styling
-        $sheet->mergeCells('A1:Q1');
-        $sheet->mergeCells('A2:Q2');
-        $sheet->mergeCells('A3:Q3');
+        $sheet->mergeCells('A1:R1');
+        $sheet->mergeCells('A2:R2');
+        $sheet->mergeCells('A3:R3');
 
         $sheet->getStyle('A1')->applyFromArray([
             'font' => ['bold' => true, 'size' => 14, 'color' => ['rgb' => '0F172A']],
@@ -292,7 +321,7 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
         $sheet->getRowDimension(3)->setRowHeight(18);
 
         // 2. Table Headers (Row 5)
-        $sheet->getStyle('A5:Q5')->applyFromArray([
+        $sheet->getStyle('A5:R5')->applyFromArray([
             'font' => ['bold' => true, 'size' => 10, 'color' => ['rgb' => 'FFFFFF']],
             'fill' => [
                 'fillType' => Fill::FILL_SOLID,
@@ -320,7 +349,7 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
                 // Zebra striping for readability
                 if ($row % 2 == 1) {
                     $sheet
-                        ->getStyle("A{$row}:Q{$row}")
+                        ->getStyle("A{$row}:R{$row}")
                         ->getFill()
                         ->setFillType(Fill::FILL_SOLID)
                         ->getStartColor()
@@ -340,10 +369,13 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
                 }
 
                 $statusBayar = $sheet->getCell("N{$row}")->getValue();
-                if ($statusBayar === 'LUNAS') {
+                if ($statusBayar === 'LUNAS' || $statusBayar === 'LUNAS (ADA RETUR)') {
                     $sheet->getStyle("N{$row}")->getFont()->getColor()->setRGB('059669');
                     $sheet->getStyle("N{$row}")->getFont()->setBold(true);
-                } elseif ($statusBayar === 'DIBAYAR SEBAGIAN') {
+                } elseif ($statusBayar === 'DIRETUR PENUH') {
+                    $sheet->getStyle("N{$row}")->getFont()->getColor()->setRGB('7C3AED');
+                    $sheet->getStyle("N{$row}")->getFont()->setBold(true);
+                } elseif ($statusBayar === 'DIBAYAR SEBAGIAN' || $statusBayar === 'DIRETUR SEBAGIAN') {
                     $sheet->getStyle("N{$row}")->getFont()->getColor()->setRGB('D97706');
                     $sheet->getStyle("N{$row}")->getFont()->setBold(true);
                 } elseif ($statusBayar === 'BELUM BAYAR') {
@@ -353,7 +385,7 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
             }
 
             // General Data Grid Borders & Alignments
-            $sheet->getStyle("A{$start}:Q{$end}")->applyFromArray([
+            $sheet->getStyle("A{$start}:R{$end}")->applyFromArray([
                 'borders' => [
                     'allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'E2E8F0']],
                 ],
@@ -370,8 +402,8 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
             $sheet->getStyle("G{$start}:I{$end}")->getAlignment()->setWrapText(true);
             $sheet->getStyle("J{$start}:N{$end}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-            // Currency formatting on Total, Paid, and Remaining columns.
-            $sheet->getStyle("O{$start}:Q{$end}")->applyFromArray([
+            // Currency formatting on Total, Retur, Paid, and Remaining columns.
+            $sheet->getStyle("O{$start}:R{$end}")->applyFromArray([
                 'alignment' => ['horizontal' => Alignment::HORIZONTAL_RIGHT],
                 'numberFormat' => ['formatCode' => '#,##0'],
             ]);
@@ -379,12 +411,12 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
             // 4. Total / Summary Row
             $totalRow = $end + 1;
             $sheet->mergeCells("A{$totalRow}:N{$totalRow}");
-            $sheet->getStyle("A{$totalRow}:Q{$totalRow}")->applyFromArray([
+            $sheet->getStyle("A{$totalRow}:R{$totalRow}")->applyFromArray([
                 'alignment' => ['horizontal' => Alignment::HORIZONTAL_RIGHT, 'vertical' => Alignment::VERTICAL_CENTER],
                 'font' => ['bold' => true, 'size' => 10, 'color' => ['rgb' => '78350F']],
             ]);
 
-            $sheet->getStyle("A{$totalRow}:Q{$totalRow}")->applyFromArray([
+            $sheet->getStyle("A{$totalRow}:R{$totalRow}")->applyFromArray([
                 'font' => ['bold' => true, 'size' => 10],
                 'fill' => [
                     'fillType' => Fill::FILL_SOLID,
@@ -397,7 +429,7 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
                 ],
             ]);
 
-            $sheet->getStyle("O{$totalRow}:Q{$totalRow}")->applyFromArray([
+            $sheet->getStyle("O{$totalRow}:R{$totalRow}")->applyFromArray([
                 'alignment' => ['horizontal' => Alignment::HORIZONTAL_RIGHT, 'vertical' => Alignment::VERTICAL_CENTER],
                 'numberFormat' => ['formatCode' => '#,##0'],
                 'font' => ['bold' => true, 'color' => ['rgb' => '92400E']],
@@ -406,8 +438,8 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
         } else {
             // Empty state row
             $emptyRow = 6;
-            $sheet->mergeCells("A{$emptyRow}:Q{$emptyRow}");
-            $sheet->getStyle("A{$emptyRow}:Q{$emptyRow}")->applyFromArray([
+            $sheet->mergeCells("A{$emptyRow}:R{$emptyRow}");
+            $sheet->getStyle("A{$emptyRow}:R{$emptyRow}")->applyFromArray([
                 'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
                 'font' => ['italic' => true, 'color' => ['rgb' => '94A3B8']],
                 'borders' => [
@@ -469,8 +501,9 @@ class PiutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
             'M' => 18,  // Status Tempo
             'N' => 18,  // Status Bayar
             'O' => 20,  // Total Penjualan
-            'P' => 20,  // Terbayar
-            'Q' => 20,  // Sisa Piutang
+            'P' => 18,  // Retur Penjualan
+            'Q' => 20,  // Terbayar
+            'R' => 20,  // Sisa Piutang
         ];
     }
 }

@@ -67,6 +67,10 @@ class MedicineTransactions extends Model
     {
         return $this->hasMany(FinancePayment::class, 'medicine_transaction_id');
     }
+    public function returs()
+    {
+        return $this->hasMany(Retur::class, 'transaction_id');
+    }
 
     public function getChannelInfoAttribute()
     {

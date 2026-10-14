@@ -19,6 +19,7 @@ use App\Models\MedicineTransactions;
 use App\Models\Pharmacies;
 use App\Models\Receiving;
 use App\Models\ReceivingDetails;
+use App\Models\Retur;
 use App\Services\Finance\CashflowReportService;
 use App\Services\Finance\CashflowTradeReportService;
 use App\Services\Finance\KinerjaOmzetService;
@@ -361,12 +362,14 @@ class FinanceController extends Controller
         }
 
         $piutangPenjualan = $this->getPiutangData();
+        $creditReturns = $this->getCreditReturnsData();
         $debtors = Debtors::orderBy('name')->get(['id', 'code', 'name', 'phone', 'city']);
         $kasBankAccounts = $this->branchKasBankAccountsQuery()->orderBy('code')->get();
         $stats = $this->getStats(null, null, $piutangPenjualan);
 
         return Inertia::render('Finance/Piutang', [
             'piutangPenjualan' => $piutangPenjualan,
+            'creditReturns' => $creditReturns,
             'debtors' => $debtors,
             'kasBankAccounts' => $kasBankAccounts,
             'stats' => $stats,
@@ -1367,8 +1370,9 @@ class FinanceController extends Controller
             'payments.account',
             'payments.creator',
             'transactions.medicine',
+            'returs.medicine',
         ])
-            ->where('transaction_type', 'KREDIT')
+            ->whereIn('transaction_type', ['KREDIT', 'RESEP KREDIT'])
             ->where('status', 1)
             ->whereIn('pharmacy_id', $targetPharmacyIds)
             ->latest('id')
@@ -1404,7 +1408,31 @@ class FinanceController extends Controller
                 ];
             }
 
+            // Riwayat Retur Kredit untuk faktur ini
+            $retursList = [];
+            $totalRetur = 0;
+            foreach ($tx->returs as $ret) {
+                $retNominal = (float) ($ret->total_retur ?? 0);
+                $totalRetur += $retNominal;
+                $retCreated = $ret->created_at ? \Carbon\Carbon::parse($ret->created_at) : null;
+                $retursList[] = [
+                    'id' => $ret->id,
+                    'code' => $ret->code ?: ('RT-' . $ret->id),
+                    'tanggal' => $retCreated ? $retCreated->format('d/m/Y') : '-',
+                    'raw_created_at' => $retCreated ? $retCreated->format('Y-m-d H:i:s') : null,
+                    'medicine_id' => $ret->medicine_id,
+                    'nama' => $ret->medicine->name ?? 'Obat',
+                    'sku' => $ret->medicine->code ?? ('SKU-' . $ret->medicine_id),
+                    'satuan' => $ret->medicine->unit ?? 'Pcs',
+                    'qty' => (float) ($ret->qty_retur ?? 0),
+                    'nominal' => $retNominal,
+                ];
+            }
+            $totalRetur = round($totalRetur, 2);
+
             $total = (float) ($tx->subtotal > 0 ? $tx->subtotal : $calcSubtotal);
+            $total = round($total, 2);
+            $netTotal = round(max(0, $total - $totalRetur), 2);
 
             $paymentHistory = [];
             $totalTerbayarViaFinance = 0;
@@ -1427,15 +1455,31 @@ class FinanceController extends Controller
 
             $legacyPaid = (float) ($tx->paid ?? 0);
             $totalTerbayar = round(max($totalTerbayarViaFinance, $legacyPaid), 2);
-            $total = round($total, 2);
-            if ($totalTerbayar > $total) {
-                $totalTerbayar = $total;
+            if ($totalTerbayar > $netTotal) {
+                $totalTerbayar = $netTotal;
             }
-            $sisa = round(max(0, $total - $totalTerbayar), 2);
+            $sisa = round(max(0, $netTotal - $totalTerbayar), 2);
 
-            $isLunas = ($sisa < 0.005 && $total > 0);
+            $isLunas = ($sisa < 0.005);
             $sisa = $isLunas ? 0 : $sisa;
-            $statusLabel = $isLunas ? 'Lunas' : ($totalTerbayar > 0 ? 'Dibayar Sebagian' : 'Belum Bayar');
+
+            if ($isLunas) {
+                if ($totalRetur >= $total && $total > 0) {
+                    $statusLabel = 'Diretur Penuh';
+                } elseif ($totalRetur > 0) {
+                    $statusLabel = 'Lunas (Ada Retur)';
+                } else {
+                    $statusLabel = 'Lunas';
+                }
+            } else {
+                if ($totalTerbayar > 0) {
+                    $statusLabel = 'Dibayar Sebagian';
+                } elseif ($totalRetur > 0) {
+                    $statusLabel = 'Diretur Sebagian';
+                } else {
+                    $statusLabel = 'Belum Bayar';
+                }
+            }
 
             $createdCarbon = $tx->created_at ? \Carbon\Carbon::parse($tx->created_at) : null;
             $dueCarbon = $createdCarbon ? $createdCarbon->copy()->addDays(30) : null;
@@ -1470,15 +1514,73 @@ class FinanceController extends Controller
                 'tanggalLunas' => $tanggalLunas,
                 'subtotal' => $total,
                 'total' => $total,
+                'total_retur' => $totalRetur,
+                'net_total' => $netTotal,
                 'terbayar' => $totalTerbayar,
                 'sisa' => $sisa,
                 'items' => $itemsList,
                 'payments' => $paymentHistory,
+                'returs' => $retursList,
                 'is_submitted' => (bool) ($tx->is_submitted ?? false),
                 'lastModified' => $tx->updated_at ? \Carbon\Carbon::parse($tx->updated_at)->format('d M Y H:i') : '-',
             ];
         }
         return $piutangPenjualan;
+    }
+
+    /**
+     * Helper: Ambil daftar seluruh Transaksi Retur Penjualan Kredit.
+     */
+    protected function getCreditReturnsData()
+    {
+        $targetPharmacyIds = $this->getTargetPharmacyIds();
+
+        $returs = Retur::with([
+            'medicine',
+            'transaction.debtors',
+            'transaction.patients',
+            'transaction.doctors',
+            'transaction.pharmacy',
+        ])
+            ->whereHas('transaction', function ($q) use ($targetPharmacyIds) {
+                $q->whereIn('transaction_type', ['KREDIT', 'RESEP KREDIT'])
+                    ->whereIn('pharmacy_id', $targetPharmacyIds);
+            })
+            ->where('status', 1)
+            ->latest('id')
+            ->take(300)
+            ->get();
+
+        $creditReturns = [];
+        foreach ($returs as $ret) {
+            $tx = $ret->transaction;
+            $debtorName = $tx?->debtors?->name ?? ($tx?->patient_id ? ('Pasien: ' . ($tx->patients->name ?? 'Umum')) : 'Pelanggan Umum');
+            $createdCarbon = $ret->created_at ? \Carbon\Carbon::parse($ret->created_at) : null;
+
+            $creditReturns[] = [
+                'id' => $ret->id,
+                'code' => $ret->code ?: ('RT-' . $ret->id),
+                'transaction_id' => $ret->transaction_id,
+                'transaction_code' => $tx?->transaction_code ?: ('TRX-' . $ret->transaction_id),
+                'debtor' => $debtorName,
+                'debtor_id' => $tx?->debtor_id,
+                'debtor_code' => $tx?->debtors?->code ?? '-',
+                'dokter' => $tx?->doctors?->name ?? '-',
+                'pasien' => $tx?->patients?->name ?? '-',
+                'apotek' => $tx?->pharmacy?->name ?? 'Apotek Utama',
+                'tanggal' => $createdCarbon ? $createdCarbon->format('d/m/Y') : '-',
+                'raw_created_at' => $createdCarbon ? $createdCarbon->format('Y-m-d H:i:s') : null,
+                'medicine_id' => $ret->medicine_id,
+                'medicine_name' => $ret->medicine?->name ?? 'Obat',
+                'medicine_sku' => $ret->medicine?->code ?? ('SKU-' . $ret->medicine_id),
+                'satuan' => $ret->medicine?->unit ?? 'Pcs',
+                'qty_retur' => (float) ($ret->qty_retur ?? 0),
+                'total_retur' => (float) ($ret->total_retur ?? 0),
+                'status' => 'Selesai',
+            ];
+        }
+
+        return $creditReturns;
     }
 
     /**
@@ -1841,16 +1943,27 @@ class FinanceController extends Controller
         }
 
         // Piutang Stats
+        $totalPiutangBruto = 0;
+        $totalPiutangRetur = 0;
+        $totalPiutangTerbayar = 0;
         $totalPiutangSisa = 0;
         $countPiutangBelumBayar = 0;
         $countPiutangDiajukan = 0;
         $countPiutangLunas = 0;
+        $countPiutangDiretur = 0;
+
         foreach ($piutang as $p) {
-            $totalPiutangSisa += $p['sisa'];
-            if (!empty($p['is_submitted']) && $p['status'] !== 'Lunas') {
+            $totalPiutangBruto += (float) ($p['total'] ?? 0);
+            $totalPiutangRetur += (float) ($p['total_retur'] ?? 0);
+            $totalPiutangTerbayar += (float) ($p['terbayar'] ?? 0);
+            $totalPiutangSisa += (float) ($p['sisa'] ?? 0);
+
+            if (!empty($p['is_submitted']) && !in_array($p['status'], ['Lunas', 'Diretur Penuh'], true) && $p['sisa'] > 0.005) {
                 $countPiutangDiajukan++;
             }
-            if ($p['status'] === 'Lunas') {
+            if ($p['status'] === 'Diretur Penuh') {
+                $countPiutangDiretur++;
+            } elseif ($p['status'] === 'Lunas' || $p['status'] === 'Lunas (Ada Retur)' || $p['sisa'] <= 0.005) {
                 $countPiutangLunas++;
             } else {
                 $countPiutangBelumBayar++;
@@ -1896,11 +2009,15 @@ class FinanceController extends Controller
             'countSudahPilihAkun' => $countSudahPilihAkun,
             'countBelumPilihAkun' => $countBelumPilihAkun,
             'totalNominalBelumPilihAkun' => $totalNominalBelumPilihAkun,
+            'totalPiutangBruto' => $totalPiutangBruto,
+            'totalPiutangRetur' => $totalPiutangRetur,
+            'totalPiutangTerbayar' => $totalPiutangTerbayar,
             'totalPiutangSisa' => $totalPiutangSisa,
             'totalSisaPiutang' => $totalPiutangSisa,
             'countPiutangBelumBayar' => $countPiutangBelumBayar,
             'countPiutangDiajukan' => $countPiutangDiajukan,
             'countPiutangLunas' => $countPiutangLunas,
+            'countPiutangDiretur' => $countPiutangDiretur,
             'totalBiaya' => $kasKeluarBiaya,
             'countBiayaTotal' => $countBiayaTotal,
             'countBiayaMonth' => $countBiayaMonth,
@@ -2714,16 +2831,18 @@ class FinanceController extends Controller
             'notes' => 'nullable|string|max:500',
         ]);
 
-        $tx = MedicineTransactions::with(['payments'])->findOrFail($validated['medicine_transaction_id']);
+        $tx = MedicineTransactions::with(['payments', 'returs'])->findOrFail($validated['medicine_transaction_id']);
         $account = $this->branchKasBankAccountsQuery()->findOrFail($validated['account_id']);
 
         if ($account->category !== 'Kas & Bank') {
             return back()->withErrors(['account_id' => 'Akun pembayaran harus berkategori Kas & Bank.']);
         }
 
+        $totalRetur = (float) $tx->returs->sum('total_retur');
         $totalTerbayarExisting = (float) $tx->payments->sum('amount');
         $totalNominal = (float) $tx->subtotal;
-        $sisa = round(max(0, $totalNominal - $totalTerbayarExisting), 2);
+        $netNominal = max(0, $totalNominal - $totalRetur);
+        $sisa = round(max(0, $netNominal - $totalTerbayarExisting), 2);
 
         if (round($validated['amount'], 2) > $sisa) {
             $formattedSisa = fmod($sisa, 1) !== 0.0 ? number_format($sisa, 2, ',', '.') : number_format($sisa, 0, ',', '.');
@@ -2791,7 +2910,7 @@ class FinanceController extends Controller
             return back()->withErrors(['account_id' => 'Akun kas/bank yang dipilih harus berkategori Kas & Bank.']);
         }
 
-        $transactions = MedicineTransactions::with(['payments'])
+        $transactions = MedicineTransactions::with(['payments', 'returs'])
             ->whereIn('id', $validated['transaction_ids'])
             ->get();
 
@@ -2799,9 +2918,11 @@ class FinanceController extends Controller
         try {
             $processedCount = 0;
             foreach ($transactions as $tx) {
+                $totalRetur = (float) $tx->returs->sum('total_retur');
                 $totalPaid = (float) $tx->payments->sum('amount');
                 $totalNominal = (float) $tx->subtotal;
-                $sisa = round(max(0, $totalNominal - $totalPaid), 2);
+                $netNominal = max(0, $totalNominal - $totalRetur);
+                $sisa = round(max(0, $netNominal - $totalPaid), 2);
 
                 if ($sisa < 0.005)
                     continue;
@@ -2818,7 +2939,7 @@ class FinanceController extends Controller
                     'created_by' => Auth::id(),
                 ]);
 
-                $tx->paid = (string) $totalNominal;
+                $tx->paid = (string) round($totalPaid + $sisa, 2);
                 $tx->save();
 
                 // Tambah saldo akun Kas & Bank
@@ -2918,17 +3039,19 @@ class FinanceController extends Controller
         DB::transaction(function () use ($prepared, &$totalReceived) {
             foreach ($prepared as $entry) {
                 $tx = MedicineTransactions::whereKey($entry['transaction']->id)->lockForUpdate()->firstOrFail();
-                $tx->load('transactions');
+                $tx->load(['transactions', 'returs']);
                 $account = FinanceAccount::whereKey($entry['account']->id)->lockForUpdate()->firstOrFail();
+                $totalRetur = (float) $tx->returs->sum('total_retur');
                 $paymentsTotal = (float) FinancePayment::where('medicine_transaction_id', $tx->id)->sum('amount');
                 $alreadyPaid = max($paymentsTotal, (float) ($tx->paid ?? 0));
                 $calculatedTotal = $tx->transactions->sum(function ($item) {
                     return (float) ($item->final_price ?: ($item->total_price ?: ((float) ($item->quantity ?? 0) * (float) ($item->item_price ?? 0))));
                 });
                 $total = round((float) ($tx->subtotal > 0 ? $tx->subtotal : $calculatedTotal), 2);
-                $remaining = round(max(0, $total - $alreadyPaid), 2);
+                $netTotal = round(max(0, $total - $totalRetur), 2);
+                $remaining = round(max(0, $netTotal - $alreadyPaid), 2);
                 if ($remaining < 0.005) {
-                    throw ValidationException::withMessages(['file' => "Baris {$entry['line']}: Transaksi '{$tx->transaction_code}' sudah lunas."]);
+                    throw ValidationException::withMessages(['file' => "Baris {$entry['line']}: Transaksi '{$tx->transaction_code}' sudah lunas atau sudah diretur penuh."]);
                 }
 
                 FinancePayment::create([
