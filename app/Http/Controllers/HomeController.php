@@ -73,24 +73,43 @@ class HomeController extends Controller
                 ->where('pharmacy_id', $pharmacyId);
         }
 
-        $total_sales = (clone $baseQuery)->sum('subtotal');
-        $qty_sales = (clone $baseQuery)->count('id');
+        $isReturnSql = "UPPER(TRIM(COALESCE(transaction_type, ''))) IN ('RETUR JUAL', 'RETUR KREDIT', 'RETUR TUNAI', 'RETUR') OR UPPER(TRIM(COALESCE(transaction_code, ''))) = 'RT'";
+
+        $calcNetSales = function ($query) use ($isReturnSql) {
+            return (float) (clone $query)->selectRaw("
+                COALESCE(SUM(
+                    CASE 
+                        WHEN {$isReturnSql} THEN -ABS(COALESCE(subtotal, 0)) 
+                        ELSE COALESCE(subtotal, 0) 
+                    END
+                ), 0) as net_sales
+            ")->value('net_sales');
+        };
+
+        $total_sales = $calcNetSales($baseQuery);
+        $qty_sales   = (clone $baseQuery)
+            ->whereNotIn('transaction_type', ['RETUR JUAL', 'RETUR KREDIT', 'RETUR TUNAI', 'RETUR'])
+            ->where('transaction_code', '!=', 'RT')
+            ->count('id');
 
         // Tangkap transaksi selesai baik berdasarkan updated_at (waktu checkout) maupun created_at
-        $today_sales = (clone $baseQuery)->where(function ($q) use ($startToday, $endToday) {
+        $todayQuery = (clone $baseQuery)->where(function ($q) use ($startToday, $endToday) {
             $q->whereBetween('updated_at', [$startToday, $endToday])
               ->orWhereBetween('created_at', [$startToday, $endToday]);
-        })->sum('subtotal');
+        });
 
-        $today_qty_sales = (clone $baseQuery)->where(function ($q) use ($startToday, $endToday) {
-            $q->whereBetween('updated_at', [$startToday, $endToday])
-              ->orWhereBetween('created_at', [$startToday, $endToday]);
-        })->whereNotIn('transaction_type', ['RETUR JUAL', 'RETUR KREDIT'])->count('id');
+        $today_sales     = $calcNetSales($todayQuery);
+        $today_qty_sales = (clone $todayQuery)
+            ->whereNotIn('transaction_type', ['RETUR JUAL', 'RETUR KREDIT', 'RETUR TUNAI', 'RETUR'])
+            ->where('transaction_code', '!=', 'RT')
+            ->count('id');
 
-        $month_sales = (clone $baseQuery)->where(function ($q) use ($startMonth, $endMonth) {
+        $monthQuery = (clone $baseQuery)->where(function ($q) use ($startMonth, $endMonth) {
             $q->whereBetween('updated_at', [$startMonth, $endMonth])
               ->orWhereBetween('created_at', [$startMonth, $endMonth]);
-        })->sum('subtotal');
+        });
+
+        $month_sales = $calcNetSales($monthQuery);
 
         $total_orders = OrderItems::whereHas('orders', function ($query) use ($pharmacyId) {
             $targetPharmacyIds = in_array((int) $pharmacyId, [1, 6, 9]) ? [9, 1] : [(int) $pharmacyId];

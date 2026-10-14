@@ -703,10 +703,12 @@
             rows.forEach(function(r) {
                 const typeClass = getTypeBadgeClass(r.type);
                 const payClass = getPayBadgeClass(r.payment);
+                const totalColor = r.total < 0 ? 'text-rose-600 font-bold' : 'text-gray-900';
+                const qtyColor = r.qty < 0 ? 'text-rose-600 font-bold' : 'text-blue-700';
 
                 if (mode === 'rekap') {
                     html += `
-                        <tr class="hover:bg-gray-50/80 transition">
+                        <tr class="hover:bg-gray-50/80 transition ${r.total < 0 ? 'bg-rose-50/30' : ''}">
                             <td class="text-center font-medium text-gray-500">${r.no}</td>
                             <td class="font-bold text-gray-800">${escapeHtml(r.patient_name)}</td>
                             <td class="text-gray-600 font-mono text-xs">${escapeHtml(r.patient_phone)}</td>
@@ -714,7 +716,7 @@
                             <td class="text-center whitespace-nowrap text-gray-600">${escapeHtml(r.date)}</td>
                             <td class="text-center font-mono text-xs text-gray-500">${escapeHtml(r.time)}</td>
                             <td class="text-gray-700 text-xs font-medium">${escapeHtml(r.pharmacy)}</td>
-                            <td class="text-right font-extrabold text-gray-900">${r.total_formatted}</td>
+                            <td class="text-right font-extrabold ${totalColor}">${r.total_formatted}</td>
                             <td class="text-center">
                                 <span class="badge-type ${payClass}">${escapeHtml(r.payment)}</span>
                             </td>
@@ -724,8 +726,15 @@
                         </tr>
                     `;
                 } else {
+                    let medDisplay = `<span class="font-semibold text-gray-800 max-w-[220px] truncate block" title="${escapeHtml(r.medicine_name)}">${escapeHtml(r.medicine_name)}</span>`;
+                    if (r.medicine_name === '[POTONGAN TRANSAKSI]') {
+                        medDisplay = `<span class="font-bold text-rose-600 italic tracking-wide">[POTONGAN TRANSAKSI]</span>`;
+                    } else if (r.medicine_name === 'RETUR PENJUALAN') {
+                        medDisplay = `<span class="font-bold text-rose-600 tracking-wide">[RETUR PENJUALAN]</span>`;
+                    }
+
                     html += `
-                        <tr class="hover:bg-gray-50/80 transition">
+                        <tr class="hover:bg-gray-50/80 transition ${r.total < 0 ? 'bg-rose-50/30' : ''}">
                             <td class="text-center font-medium text-gray-500">${r.no}</td>
                             <td class="font-bold text-gray-800">${escapeHtml(r.patient_name)}</td>
                             <td class="text-gray-600 font-mono text-xs">${escapeHtml(r.patient_phone)}</td>
@@ -733,10 +742,10 @@
                             <td class="text-center whitespace-nowrap text-gray-600">${escapeHtml(r.date)}</td>
                             <td class="text-center font-mono text-xs text-gray-500">${escapeHtml(r.time)}</td>
                             <td class="text-gray-700 text-xs font-medium">${escapeHtml(r.pharmacy)}</td>
-                            <td class="font-semibold text-gray-800 max-w-[220px] truncate" title="${escapeHtml(r.medicine_name)}">${escapeHtml(r.medicine_name)}</td>
-                            <td class="text-right text-gray-600 font-mono text-xs">${r.price_formatted}</td>
-                            <td class="text-center font-bold text-blue-700">${r.qty}</td>
-                            <td class="text-right font-extrabold text-gray-900">${r.total_formatted}</td>
+                            <td>${medDisplay}</td>
+                            <td class="text-right text-gray-600 font-mono text-xs ${r.price < 0 ? 'text-rose-600 font-bold' : ''}">${r.price_formatted}</td>
+                            <td class="text-center font-bold ${qtyColor}">${r.qty}</td>
+                            <td class="text-right font-extrabold ${totalColor}">${r.total_formatted}</td>
                             <td class="text-center">
                                 <span class="badge-type ${payClass}">${escapeHtml(r.payment)}</span>
                             </td>

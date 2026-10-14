@@ -401,23 +401,68 @@
                             Kembali
                         </a>
                     </div>
-                    <div class="flex flex-wrap items-center gap-3 mb-2">
-                        <div class="date-filter-wrap !mb-0">
-                            <label>Periode</label>
-                            <input type="text" id="date-range" placeholder="dd/mm/yyyy — dd/mm/yyyy" readonly
-                                style="width: 210px;">
-                            <button class="btn-clear-date" id="btn-clear-date">Reset</button>
+                    <div class="flex flex-wrap items-center justify-between gap-3 mb-2">
+                        <div class="flex flex-wrap items-center gap-3">
+                            <div class="date-filter-wrap !mb-0">
+                                <label>Periode</label>
+                                <input type="text" id="date-range" placeholder="dd/mm/yyyy — dd/mm/yyyy" readonly
+                                    style="width: 210px;">
+                                <button class="btn-clear-date" id="btn-clear-date">Reset</button>
+                            </div>
+                            <div class="channel-filter-wrap !mb-0">
+                                <label>Jenis Transaksi</label>
+                                <select id="channel-filter">
+                                    <option value="">Semua Jenis Transaksi</option>
+                                    <option value="kasir">Kasir (Offline)</option>
+                                    <option value="online">Online (Chat WA)</option>
+                                    <option value="shopee">Online Shopee</option>
+                                    <option value="grab">Online Grab</option>
+                                    <option value="digital">Digital (Aplikasi Mobile)</option>
+                                </select>
+                            </div>
                         </div>
-                        <div class="channel-filter-wrap !mb-0">
-                            <label>Jenis Transaksi</label>
-                            <select id="channel-filter">
-                                <option value="">Semua Jenis Transaksi</option>
-                                <option value="kasir">Kasir (Offline)</option>
-                                <option value="online">Online (Chat WA)</option>
-                                <option value="shopee">Online Shopee</option>
-                                <option value="grab">Online Grab</option>
-                                <option value="digital">Digital (Aplikasi Mobile)</option>
-                            </select>
+
+                        {{-- Export Dropdown --}}
+                        <div class="relative inline-block text-left ml-auto">
+                            <button type="button" id="btnExportDropdown" onclick="toggleExportMenu(event)"
+                                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:border-emerald-400 font-medium text-[12px] shadow-xs transition-colors">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                    <polyline points="7 10 12 15 17 10"/>
+                                    <line x1="12" y1="15" x2="12" y2="3"/>
+                                </svg>
+                                <span>Export Excel</span>
+                                <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor" class="text-emerald-600">
+                                    <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                                </svg>
+                            </button>
+
+                            <div id="exportMenu" class="hidden absolute right-0 mt-1.5 w-56 bg-white rounded-xl shadow-lg border border-gray-100 py-1.5 z-50 text-[12px]">
+                                <div class="px-3 py-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider border-b border-gray-100 mb-1">
+                                    Pilihan Format Ekspor
+                                </div>
+                                <button type="button" onclick="exportSalesData('all')" class="w-full text-left px-3 py-2 text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 flex items-center justify-between transition-colors">
+                                    <div>
+                                        <div class="font-medium">Semua (Rekap & Detail)</div>
+                                        <div class="text-[10px] text-gray-400">2 Sheet lengkap</div>
+                                    </div>
+                                    <span class="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-mono font-medium">Lengkap</span>
+                                </button>
+                                <button type="button" onclick="exportSalesData('rekap')" class="w-full text-left px-3 py-2 text-gray-700 hover:bg-gray-50 flex items-center justify-between transition-colors">
+                                    <div>
+                                        <div class="font-medium">Rekap Nota Penjualan</div>
+                                        <div class="text-[10px] text-gray-400">1 baris per struk</div>
+                                    </div>
+                                    <span class="text-[10px] text-gray-400 font-mono">Rekap</span>
+                                </button>
+                                <button type="button" onclick="exportSalesData('detail')" class="w-full text-left px-3 py-2 text-gray-700 hover:bg-gray-50 flex items-center justify-between transition-colors">
+                                    <div>
+                                        <div class="font-medium">Detail Obat / Produk</div>
+                                        <div class="text-[10px] text-gray-400">Rincian item per transaksi</div>
+                                    </div>
+                                    <span class="text-[10px] text-gray-400 font-mono">Detail</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
                     <div class="overflow-x-auto">
@@ -826,6 +871,50 @@
                     },
                 ],
             });
+        }
+
+        // ── Export functionality ─────────────────────────────────────────────
+        function toggleExportMenu(e) {
+            if (e) e.stopPropagation();
+            const menu = document.getElementById('exportMenu');
+            if (menu) {
+                menu.classList.toggle('hidden');
+            }
+        }
+
+        $(document).on('click', function(e) {
+            if (!$(e.target).closest('#btnExportDropdown, #exportMenu').length) {
+                $('#exportMenu').addClass('hidden');
+            }
+        });
+
+        function exportSalesData(mode) {
+            $('#exportMenu').addClass('hidden');
+
+            const val = $('#date-range').val() || '';
+            const parts = val.split(' to ');
+            const dateFrom = parts[0] ? parts[0].trim() : '';
+            const dateTo = parts[1] ? parts[1].trim() : dateFrom;
+            const channel = $('#channel-filter').val() || '';
+            const search = (tableData && typeof tableData.search === 'function') ? (tableData.search() || '') : '';
+
+            const url = new URL("{{ route('salesdata.export') }}", window.location.origin);
+            if (dateFrom) url.searchParams.set('date_from', dateFrom);
+            if (dateTo) url.searchParams.set('date_to', dateTo);
+            if (channel) url.searchParams.set('channel', channel);
+            if (search) url.searchParams.set('search', search);
+            if (mode) url.searchParams.set('mode', mode);
+
+            if (typeof iziToast !== 'undefined') {
+                iziToast.info({
+                    title: 'Mempersiapkan',
+                    message: 'Mengunduh file Excel...',
+                    position: 'topRight',
+                    timeout: 2000
+                });
+            }
+
+            window.location.href = url.toString();
         }
     </script>
 @endsection

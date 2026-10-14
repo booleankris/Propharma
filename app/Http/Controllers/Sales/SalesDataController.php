@@ -2,15 +2,18 @@
 
 namespace App\Http\Controllers\Sales;
 
+use App\Exports\Report\SalesDataExport;
 use App\Http\Controllers\Controller;
 use App\Models\MedicineCart;
 use App\Models\MedicineTransactions;
+use App\Models\Pharmacies;
 use App\Models\Retur;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use DataTables;
 use Form;
 use Illuminate\Support\Facades\DB;
+use Maatwebsite\Excel\Facades\Excel;
 
 class SalesDataController extends Controller
 {
@@ -180,6 +183,37 @@ class SalesDataController extends Controller
 
         return view('sales.salesdata');
     }
+
+    public function export(Request $request)
+    {
+        $pharmacyId = getActivePharmacyId();
+        $dateFrom   = $request->input('date_from');
+        $dateTo     = $request->input('date_to');
+        $channel    = $request->input('channel');
+        $search     = $request->input('search');
+        $mode       = $request->input('mode', 'all');
+
+        $pharmacy = Pharmacies::find($pharmacyId);
+        $pharmacyName = $pharmacy?->name ?? 'APOTEK';
+
+        $safePharmacy = $pharmacy ? preg_replace('/[^A-Za-z0-9_]/', '_', $pharmacy->name) . '_' : '';
+        $modeSuffix = $mode === 'all' ? 'Lengkap' : ucfirst($mode);
+        $fileName = 'Data_Penjualan_' . $safePharmacy . $modeSuffix . '_' . date('Ymd_His') . '.xlsx';
+
+        return Excel::download(
+            new SalesDataExport(
+                $pharmacyId,
+                $dateFrom,
+                $dateTo,
+                $channel,
+                $search,
+                $mode,
+                $pharmacyName
+            ),
+            $fileName
+        );
+    }
+
     public function pending(Request $request)
     {
         if ($request->ajax()) {

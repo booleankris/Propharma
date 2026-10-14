@@ -5,6 +5,7 @@ namespace App\Exports\Report;
 use App\Models\MedicineTransactions;
 use App\Models\Patients;
 use App\Models\Pharmacies;
+use App\Support\LiphTransactionScope;
 use Illuminate\Support\Carbon;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\WithColumnWidths;
@@ -103,9 +104,14 @@ class PatientTransactionsExport implements FromArray, WithStyles, WithColumnWidt
 
     private function getBaseQuery()
     {
-        $query = MedicineTransactions::query()
-            ->whereBetween('created_at', [$this->startDate, $this->endDate])
-            ->where('status', 1);
+        $query = MedicineTransactions::query();
+
+        LiphTransactionScope::applySalesStatus($query);
+        LiphTransactionScope::applyPeriod(
+            $query,
+            $this->startDate,
+            $this->endDate
+        );
 
         if ($this->patientId) {
             $query->where('patient_id', $this->patientId);
@@ -146,7 +152,12 @@ class PatientTransactionsExport implements FromArray, WithStyles, WithColumnWidt
             $patientName = $trx->patients?->name ?? 'Umum / Tanpa Pasien';
             $patientPhone = $trx->patients?->phone ?? '-';
             $pharmacyName = $trx->pharmacy?->name ?? '-';
-            $total = (float) ($trx->subtotal ?? 0);
+            $subtotal = is_numeric($trx->subtotal) ? (float) $trx->subtotal : 0;
+            $rawDiscount = is_numeric($trx->discount) ? (float) $trx->discount : 0;
+            $isReturn = in_array(strtoupper(trim((string) $trx->transaction_type)), ['RETUR JUAL', 'RETUR KREDIT'], true) || strtoupper(trim((string) ($trx->transaction_code ?? ''))) === 'RT';
+
+            $trxDiscount = $isReturn ? 0 : max(0, $rawDiscount);
+            $total = $isReturn ? -abs($subtotal) : ($subtotal - $trxDiscount);
 
             $rows[] = [
                 $no++,
@@ -205,11 +216,20 @@ class PatientTransactionsExport implements FromArray, WithStyles, WithColumnWidt
             $timeStr = $trx->created_at ? $trx->created_at->format('H:i:s') : '-';
             $payMethod = $trx->payment_method ?? '-';
             $trxType = $trx->transaction_type ?? '-';
+            $isReturn = in_array(strtoupper(trim((string) $trxType)), ['RETUR JUAL', 'RETUR KREDIT'], true) || strtoupper(trim((string) ($trx->transaction_code ?? ''))) === 'RT';
+
+            $rawDiscount = is_numeric($trx->discount) ? (float) $trx->discount : 0;
+            $trxDiscount = $isReturn ? 0 : max(0, $rawDiscount);
 
             $items = $trx->transactions ?? collect();
 
             if ($items->isEmpty()) {
-                $total = (float) ($trx->subtotal ?? 0);
+                $subtotal = is_numeric($trx->subtotal) ? (float) $trx->subtotal : 0;
+                $total = $isReturn ? -abs($subtotal) : ($subtotal - $trxDiscount);
+                $qty = $isReturn ? -1 : 0;
+                $medName = $isReturn ? 'RETUR PENJUALAN' : '-';
+                $price = $isReturn ? -$subtotal : $subtotal;
+
                 $rows[] = [
                     $no++,
                     $patientName,
@@ -218,13 +238,14 @@ class PatientTransactionsExport implements FromArray, WithStyles, WithColumnWidt
                     $dateStr,
                     $timeStr,
                     $pharmacyName,
-                    '-',
-                    0,
-                    0,
+                    $medName,
+                    $price,
+                    $qty,
                     $total,
                     $payMethod,
                     $trxType,
                 ];
+                $grandQty += $qty;
                 $grandTotal += $total;
             } else {
                 foreach ($items as $item) {
@@ -232,6 +253,12 @@ class PatientTransactionsExport implements FromArray, WithStyles, WithColumnWidt
                     $price = (float) ($item->item_price ?? 0);
                     $qty = (float) ($item->quantity ?? 0);
                     $itemTot = (float) ($item->final_price ?? $item->total_price ?? ($price * $qty));
+
+                    if ($isReturn) {
+                        $price = -abs($price);
+                        $qty = -abs($qty);
+                        $itemTot = -abs($itemTot);
+                    }
 
                     $rows[] = [
                         $no++,
@@ -251,6 +278,25 @@ class PatientTransactionsExport implements FromArray, WithStyles, WithColumnWidt
 
                     $grandQty += $qty;
                     $grandTotal += $itemTot;
+                }
+
+                if ($trxDiscount > 0) {
+                    $rows[] = [
+                        $no++,
+                        $patientName,
+                        $patientPhone,
+                        $trx->transaction_code ?? '-',
+                        $dateStr,
+                        $timeStr,
+                        $pharmacyName,
+                        '[POTONGAN TRANSAKSI]',
+                        0,
+                        0,
+                        -$trxDiscount,
+                        $payMethod,
+                        $trxType,
+                    ];
+                    $grandTotal -= $trxDiscount;
                 }
             }
         }

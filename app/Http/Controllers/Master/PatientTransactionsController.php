@@ -9,6 +9,7 @@ use App\Models\ExportJob;
 use App\Models\MedicineTransactions;
 use App\Models\Patients;
 use App\Models\Pharmacies;
+use App\Support\LiphTransactionScope;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Carbon;
@@ -89,10 +90,10 @@ class PatientTransactionsController extends Controller
         $page = max(1, (int) $request->get('page', 1));
         $perPage = min(100, max(10, (int) $request->get('per_page', 50)));
 
-        // Base query for transactions
-        $baseQuery = MedicineTransactions::query()
-            ->whereBetween('created_at', [$startDate, $endDate])
-            ->where('status', 1);
+        // Base query for transactions aligned with LIPH
+        $baseQuery = MedicineTransactions::query();
+        LiphTransactionScope::applySalesStatus($baseQuery);
+        LiphTransactionScope::applyPeriod($baseQuery, $startDate, $endDate);
 
         if ($patientId) {
             $baseQuery->where('patient_id', $patientId);
@@ -102,9 +103,20 @@ class PatientTransactionsController extends Controller
             $baseQuery->where('pharmacy_id', $pharmacyId);
         }
 
-        // Summary KPI statistics (computed efficiently over entire range)
-        $totalTransactions = (clone $baseQuery)->count();
-        $totalNominal = (float) (clone $baseQuery)->sum('subtotal');
+        // Summary KPI statistics (computed efficiently over entire range matching LIPH net sales)
+        $allTx = (clone $baseQuery)->select(['id', 'subtotal', 'discount', 'transaction_type', 'transaction_code'])->get();
+        $totalTransactions = $allTx->count();
+        $totalNominal = 0;
+        foreach ($allTx as $tx) {
+            $sub = is_numeric($tx->subtotal) ? (float) $tx->subtotal : 0;
+            $disc = is_numeric($tx->discount) ? (float) $tx->discount : 0;
+            $isRet = in_array(strtoupper(trim((string) $tx->transaction_type)), ['RETUR JUAL', 'RETUR KREDIT'], true) || strtoupper(trim((string) ($tx->transaction_code ?? ''))) === 'RT';
+            if ($isRet) {
+                $totalNominal -= abs($sub);
+            } else {
+                $totalNominal += max(0, $sub - max(0, $disc));
+            }
+        }
         $uniquePatients = (clone $baseQuery)->whereNotNull('patient_id')->distinct('patient_id')->count('patient_id');
 
         $rows = [];
@@ -132,7 +144,13 @@ class PatientTransactionsController extends Controller
 
             $no = $pagination['from'];
             foreach ($transactions as $trx) {
-                $subtotal = (float) ($trx->subtotal ?? 0);
+                $subtotal = is_numeric($trx->subtotal) ? (float) $trx->subtotal : 0;
+                $rawDiscount = is_numeric($trx->discount) ? (float) $trx->discount : 0;
+                $isReturn = in_array(strtoupper(trim((string) $trx->transaction_type)), ['RETUR JUAL', 'RETUR KREDIT'], true) || strtoupper(trim((string) ($trx->transaction_code ?? ''))) === 'RT';
+
+                $trxDiscount = $isReturn ? 0 : max(0, $rawDiscount);
+                $total = $isReturn ? -abs($subtotal) : ($subtotal - $trxDiscount);
+
                 $rows[] = [
                     'no' => $no++,
                     'patient_name' => $trx->patients?->name ?? 'Umum / Tanpa Pasien',
@@ -141,8 +159,8 @@ class PatientTransactionsController extends Controller
                     'date' => $trx->created_at ? $trx->created_at->format('d/m/Y') : '-',
                     'time' => $trx->created_at ? $trx->created_at->format('H:i:s') : '-',
                     'pharmacy' => $trx->pharmacy?->name ?? '-',
-                    'total' => $subtotal,
-                    'total_formatted' => 'Rp ' . number_format($subtotal, 0, ',', '.'),
+                    'total' => $total,
+                    'total_formatted' => ($total < 0 ? '-Rp ' . number_format(abs($total), 0, ',', '.') : 'Rp ' . number_format($total, 0, ',', '.')),
                     'payment' => $trx->payment_method ?? '-',
                     'type' => $trx->transaction_type ?? '-',
                 ];
@@ -172,11 +190,20 @@ class PatientTransactionsController extends Controller
                 $timeStr = $trx->created_at ? $trx->created_at->format('H:i:s') : '-';
                 $payMethod = $trx->payment_method ?? '-';
                 $trxType = $trx->transaction_type ?? '-';
+                $isReturn = in_array(strtoupper(trim((string) $trxType)), ['RETUR JUAL', 'RETUR KREDIT'], true) || strtoupper(trim((string) ($trx->transaction_code ?? ''))) === 'RT';
+
+                $rawDiscount = is_numeric($trx->discount) ? (float) $trx->discount : 0;
+                $trxDiscount = $isReturn ? 0 : max(0, $rawDiscount);
 
                 $items = $trx->transactions ?? collect();
 
                 if ($items->isEmpty()) {
-                    $subtotal = (float) ($trx->subtotal ?? 0);
+                    $subtotal = is_numeric($trx->subtotal) ? (float) $trx->subtotal : 0;
+                    $total = $isReturn ? -abs($subtotal) : ($subtotal - $trxDiscount);
+                    $qty = $isReturn ? -1 : 0;
+                    $medName = $isReturn ? 'RETUR PENJUALAN' : '-';
+                    $price = $isReturn ? -$subtotal : $subtotal;
+
                     $rows[] = [
                         'no' => $no++,
                         'patient_name' => $patientName,
@@ -185,12 +212,12 @@ class PatientTransactionsController extends Controller
                         'date' => $dateStr,
                         'time' => $timeStr,
                         'pharmacy' => $pharmacyName,
-                        'medicine_name' => '-',
-                        'price' => 0,
-                        'price_formatted' => 'Rp 0',
-                        'qty' => 0,
-                        'total' => $subtotal,
-                        'total_formatted' => 'Rp ' . number_format($subtotal, 0, ',', '.'),
+                        'medicine_name' => $medName,
+                        'price' => $price,
+                        'price_formatted' => ($price < 0 ? '-Rp ' . number_format(abs($price), 0, ',', '.') : 'Rp ' . number_format($price, 0, ',', '.')),
+                        'qty' => $qty,
+                        'total' => $total,
+                        'total_formatted' => ($total < 0 ? '-Rp ' . number_format(abs($total), 0, ',', '.') : 'Rp ' . number_format($total, 0, ',', '.')),
                         'payment' => $payMethod,
                         'type' => $trxType,
                     ];
@@ -200,6 +227,12 @@ class PatientTransactionsController extends Controller
                         $price = (float) ($item->item_price ?? 0);
                         $qty = (float) ($item->quantity ?? 0);
                         $itemTot = (float) ($item->final_price ?? $item->total_price ?? ($price * $qty));
+
+                        if ($isReturn) {
+                            $price = -abs($price);
+                            $qty = -abs($qty);
+                            $itemTot = -abs($itemTot);
+                        }
 
                         $rows[] = [
                             'no' => $no++,
@@ -211,10 +244,30 @@ class PatientTransactionsController extends Controller
                             'pharmacy' => $pharmacyName,
                             'medicine_name' => $medName,
                             'price' => $price,
-                            'price_formatted' => 'Rp ' . number_format($price, 0, ',', '.'),
+                            'price_formatted' => ($price < 0 ? '-Rp ' . number_format(abs($price), 0, ',', '.') : 'Rp ' . number_format($price, 0, ',', '.')),
                             'qty' => $qty,
                             'total' => $itemTot,
-                            'total_formatted' => 'Rp ' . number_format($itemTot, 0, ',', '.'),
+                            'total_formatted' => ($itemTot < 0 ? '-Rp ' . number_format(abs($itemTot), 0, ',', '.') : 'Rp ' . number_format($itemTot, 0, ',', '.')),
+                            'payment' => $payMethod,
+                            'type' => $trxType,
+                        ];
+                    }
+
+                    if ($trxDiscount > 0) {
+                        $rows[] = [
+                            'no' => $no++,
+                            'patient_name' => $patientName,
+                            'patient_phone' => $patientPhone,
+                            'transaction_code' => $trx->transaction_code ?? '-',
+                            'date' => $dateStr,
+                            'time' => $timeStr,
+                            'pharmacy' => $pharmacyName,
+                            'medicine_name' => '[POTONGAN TRANSAKSI]',
+                            'price' => 0,
+                            'price_formatted' => 'Rp 0',
+                            'qty' => 0,
+                            'total' => -$trxDiscount,
+                            'total_formatted' => '-Rp ' . number_format($trxDiscount, 0, ',', '.'),
                             'payment' => $payMethod,
                             'type' => $trxType,
                         ];
@@ -230,7 +283,7 @@ class PatientTransactionsController extends Controller
                 'total_transactions' => $totalTransactions,
                 'total_transactions_formatted' => number_format($totalTransactions, 0, ',', '.'),
                 'total_nominal' => $totalNominal,
-                'total_nominal_formatted' => 'Rp ' . number_format($totalNominal, 0, ',', '.'),
+                'total_nominal_formatted' => ($totalNominal < 0 ? '-Rp ' . number_format(abs($totalNominal), 0, ',', '.') : 'Rp ' . number_format($totalNominal, 0, ',', '.')),
                 'unique_patients' => $uniquePatients,
                 'unique_patients_formatted' => number_format($uniquePatients, 0, ',', '.'),
             ],
