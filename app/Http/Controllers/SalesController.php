@@ -133,6 +133,10 @@ class SalesController extends Controller
             }
         }
 
+        // Pending transactions do not reserve a receipt number; the final code
+        // is allocated atomically during checkout.
+        $transaction_code = $transaction->transaction_code;
+
         // 5. Collect view data───────────────
         $itemInCart = MedicineCart::with('medicine')
             ->where('transaction_id', $trx_id)
