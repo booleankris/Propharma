@@ -21,6 +21,14 @@ class LiphTransactionScope
                             $unpaidType->whereRaw("UPPER(TRIM(COALESCE(payment_method, ''))) = 'BELUM BAYAR'")
                                 ->orWhereIn('transaction_type', ['KREDIT', 'RESEP KREDIT']);
                         });
+                })
+                // ReturController stores a separate RT header and copies the
+                // original sale status. Returns from an unpaid credit sale
+                // therefore have status 0 and no cart row, but are finalized
+                // financial movements and must still reduce LIPH.
+                ->orWhere(function (Builder $return) {
+                    $return->whereIn('transaction_type', ['RETUR JUAL', 'RETUR KREDIT'])
+                        ->where('transaction_code', 'RT');
                 });
         });
     }

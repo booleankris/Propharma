@@ -912,9 +912,12 @@ class SalesController extends Controller
                 $bankAccount = $matches->first();
             }
 
+            // created_at is intentionally not mass assignable on the model.
+            // Set it explicitly at checkout so reports that fall back to the
+            // transaction timestamp use the sale time, not when the cart began.
+            $transaction->forceFill(['created_at' => Carbon::now()]);
             $transaction->update([
                 'status' => 1,
-                'created_at' => Carbon::now(),
                 'paid' => $validated['paid'],
                 'transaction_code' => $this->generateTransactionCode($meta['code'], (int) $transaction->pharmacy_id),
                 'discount' => $validated['discounsubtotalvalue'],
