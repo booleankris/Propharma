@@ -110,46 +110,28 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
         $grandTotalDiscount = 0;
         $grandTotalNet = 0;
 
-        foreach ($this->allBanksData as $paymentClass => $paymentMethods) {
-            $rows[] = [$paymentClass, '', '', '', '', '', ''];
+        foreach ($this->allBanksData as $paymentMethod => $data) {
+            $strukCount = $data['struk_count'] ?? 0;
+            $qtySum     = $data['qty_sum'] ?? 0;
+            $grossSum   = $data['gross_sum'] ?? 0;
+            $discSum    = $data['discount_sum'] ?? 0;
+            $netSum     = $data['net_sum'] ?? 0;
 
-            $classStruk = 0;
-            $classQty = 0;
-            $classGross = 0;
-            $classDiscount = 0;
-            $classNet = 0;
+            $rows[] = [
+                $no++,
+                $paymentMethod,
+                $strukCount,
+                $qtySum,
+                $grossSum,
+                $discSum,
+                $netSum,
+            ];
 
-            foreach ($paymentMethods as $paymentMethod => $data) {
-                $strukCount = $data['struk_count'] ?? 0;
-                $qtySum     = $data['qty_sum'] ?? 0;
-                $grossSum   = $data['gross_sum'] ?? 0;
-                $discSum    = $data['discount_sum'] ?? 0;
-                $netSum     = $data['net_sum'] ?? 0;
-
-                $classStruk += $strukCount;
-                $classQty += $qtySum;
-                $classGross += $grossSum;
-                $classDiscount += $discSum;
-                $classNet += $netSum;
-
-                $rows[] = [
-                    $no++,
-                    $paymentMethod,
-                    $strukCount,
-                    $qtySum,
-                    $grossSum,
-                    $discSum,
-                    $netSum,
-                ];
-            }
-
-            $rows[] = ['', 'TOTAL ' . $paymentClass, $classStruk, $classQty, $classGross, $classDiscount, $classNet];
-
-            $grandTotalStruk    += $classStruk;
-            $grandTotalQty      += $classQty;
-            $grandTotalGross    += $classGross;
-            $grandTotalDiscount += $classDiscount;
-            $grandTotalNet      += $classNet;
+            $grandTotalStruk    += $strukCount;
+            $grandTotalQty      += $qtySum;
+            $grandTotalGross    += $grossSum;
+            $grandTotalDiscount += $discSum;
+            $grandTotalNet      += $netSum;
         }
 
         if (count($this->allBanksData) === 0) {
@@ -385,20 +367,10 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
                 $sheet->getStyle("E8:E{$highestRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
                 for ($row = 8; $row <= $highestRow; $row++) {
-                    $section = strtoupper((string) $sheet->getCell("A{$row}")->getValue());
                     $label = strtoupper((string) $sheet->getCell("B{$row}")->getValue());
 
-                    if (in_array($section, ['KREDIT', 'CASH'], true)) {
-                        $sheet->getStyle("A{$row}:G{$row}")->applyFromArray([
-                            'font' => ['bold' => true, 'color' => ['rgb' => '1D4ED8']],
-                            'fill' => [
-                                'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
-                                'startColor' => ['rgb' => 'EFF6FF'],
-                            ],
-                        ]);
-                    } elseif (str_starts_with($label, 'TOTAL KREDIT') || str_starts_with($label, 'TOTAL CASH')) {
+                    if ($label === 'KREDIT' || $label === 'CASH') {
                         $sheet->getStyle("A{$row}:G{$row}")->getFont()->setBold(true);
-                        $sheet->getStyle("A{$row}:G{$row}")->getBorders()->getTop()->setBorderStyle(Border::BORDER_THIN);
                     }
                 }
             }

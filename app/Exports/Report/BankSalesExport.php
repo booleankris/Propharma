@@ -17,7 +17,7 @@ class BankSalesExport implements WithMultipleSheets
     protected $shift;
     protected $shiftType;
 
-    public const STANDARD_BANKS = ['CASH', 'BELUM BAYAR',
+    public const STANDARD_BANKS = ['CASH',
         'TRANSFER MANDIRI', 'TRANSFER BNI', 'TRANSFER BCA', 'TRANSFER BRI', 'TRANSFER BTN',
         'DEBIT MANDIRI', 'DEBIT BNI', 'DEBIT BCA', 'DEBIT BRI', 'DEBIT BTN',
         'QRIS MANDIRI', 'QRIS BNI', 'QRIS BCA', 'QRIS BRI', 'QRIS BTN'];
@@ -108,81 +108,36 @@ class BankSalesExport implements WithMultipleSheets
         $groupedByPaymentClass = ['KREDIT' => [], 'CASH' => []];
         foreach ($allTransactions as $trx) {
             $cat = self::resolveCategory($trx) ?: 'Transfer Lainnya';
-            $grouped[$cat][] = $trx;
-
             $typeGroup = LiphExport::TYPE_MAP[$trx->transaction_type][0] ?? 'tunai';
             $paymentClass = $typeGroup === 'kredit' ? 'KREDIT' : 'CASH';
             $groupedByPaymentClass[$paymentClass][$cat][] = $trx;
+
+            // Kredit is a transaction type, not a selected payment method.
+            // Keep those transactions out of the bank/method detail sheets.
+            if ($paymentClass !== 'KREDIT') {
+                $grouped[$cat][] = $trx;
+            }
         }
 
         // 3. Prepare master bank list
         $activeCategories = array_keys($grouped);
-        $banksList = array_unique(array_merge(self::STANDARD_BANKS, $activeCategories));
+        $banksList = array_values(array_unique(array_merge(self::STANDARD_BANKS, $activeCategories)));
+        // Add one aggregate Kredit row directly after Cash while preserving
+        // the existing order of every payment method.
+        array_splice($banksList, 1, 0, ['KREDIT']);
 
-        // 4. Compute summary per transaction class, then payment method/bank.
-        $allBanksData = ['KREDIT' => [], 'CASH' => []];
+        // 4. Build one flat recap: Cash, Kredit, then each payment method once.
+        $allBanksData = [];
         $activeBanksWithData = [];
 
-        foreach ($groupedByPaymentClass as $paymentClass => $categories) {
-            foreach ($banksList as $bank) {
-                $bankTransactions = collect($categories[$bank] ?? []);
-                $strukCount = $bankTransactions->count();
-                $qtySum = 0;
-                $grossSum = 0;
-                $discSum = 0;
-                $netSum = 0;
+        foreach ($banksList as $bank) {
+            $bankTransactions = $bank === 'KREDIT'
+                ? collect($groupedByPaymentClass['KREDIT'])->flatten(1)
+                : collect($grouped[$bank] ?? []);
+            $allBanksData[$bank] = self::summarizeTransactions($bankTransactions);
 
-                foreach ($bankTransactions as $trx) {
-                    // LIPH casts each monetary value to whole rupiah before summing.
-                    $trxDiscount = (int) ($trx->discount ?? 0);
-                    $discSum += $trxDiscount;
-
-                    $items = $trx->transactions;
-                    $originalMap = LiphExport::TYPE_MAP[$trx->transaction_type] ?? null;
-                    $originalLabel = $originalMap[1] ?? '';
-                    if ($items->isEmpty()) {
-                        $subtotal = (int) ($trx->subtotal ?? 0);
-                        $isReturn = in_array($originalLabel, ['Retur Tunai', 'Retur Kredit'], true);
-                        $signedSubtotal = $isReturn ? -abs($subtotal) : $subtotal;
-                        $grossSum += $signedSubtotal;
-                        $netSum += ($signedSubtotal - $trxDiscount);
-                        $qtySum += 1;
-                    } else {
-                        foreach ($items as $item) {
-                            $qty = (int) ($item->quantity ?? 0);
-                            $price = (float) ($item->item_price ?? 0);
-                            $itemDisc = (float) ($item->discount ?? 0);
-                            $final = (int) ($item->final_price ?? ($item->total_price ?? ($qty * $price - $itemDisc)));
-
-                            $effectiveType = $item->cart_type
-                                ? (LiphExport::CART_TYPE_ABBR[$item->cart_type] ?? $item->cart_type)
-                                : $trx->transaction_type;
-                            $effectiveMap = LiphExport::TYPE_MAP[$effectiveType] ?? $originalMap;
-                            $isReturn = in_array($effectiveMap[1] ?? $originalLabel, ['Retur Tunai', 'Retur Kredit'], true);
-
-                            $qtySum += $qty;
-                            $grossSum += $isReturn ? -abs($qty * $price) : ($qty * $price);
-                            $netSum += $isReturn ? -abs($final) : $final;
-                        }
-
-                        // LIPH's Netto Akhir subtracts each transaction-level
-                        // discount once, after summing all eligible cart items.
-                        $netSum -= $trxDiscount;
-                    }
-                }
-
-                $allBanksData[$paymentClass][$bank] = [
-                    'struk_count'  => $strukCount,
-                    'qty_sum'      => $qtySum,
-                    'gross_sum'    => $grossSum,
-                    'discount_sum' => $discSum,
-                    'net_sum'      => $netSum,
-                ];
-
-                // Keep one detail sheet per payment method/category.
-                if ($strukCount > 0 || in_array($bank, self::STANDARD_BANKS)) {
-                    $activeBanksWithData[] = $bank;
-                }
+            if ($bank !== 'KREDIT' && ($bankTransactions->isNotEmpty() || in_array($bank, self::STANDARD_BANKS, true))) {
+                $activeBanksWithData[] = $bank;
             }
         }
         $activeBanksWithData = array_values(array_unique($activeBanksWithData));
@@ -223,5 +178,48 @@ class BankSalesExport implements WithMultipleSheets
         }
 
         return $sheets;
+    }
+
+    private static function summarizeTransactions($transactions): array
+    {
+        $summary = ['struk_count' => $transactions->count(), 'qty_sum' => 0, 'gross_sum' => 0, 'discount_sum' => 0, 'net_sum' => 0];
+
+        foreach ($transactions as $trx) {
+            $trxDiscount = (int) ($trx->discount ?? 0);
+            $summary['discount_sum'] += $trxDiscount;
+            $items = $trx->transactions;
+            $originalMap = LiphExport::TYPE_MAP[$trx->transaction_type] ?? null;
+            $originalLabel = $originalMap[1] ?? '';
+
+            if ($items->isEmpty()) {
+                $subtotal = (int) ($trx->subtotal ?? 0);
+                $isReturn = in_array($originalLabel, ['Retur Tunai', 'Retur Kredit'], true);
+                $signedSubtotal = $isReturn ? -abs($subtotal) : $subtotal;
+                $summary['gross_sum'] += $signedSubtotal;
+                $summary['net_sum'] += $signedSubtotal - $trxDiscount;
+                $summary['qty_sum'] += 1;
+                continue;
+            }
+
+            foreach ($items as $item) {
+                $qty = (int) ($item->quantity ?? 0);
+                $price = (float) ($item->item_price ?? 0);
+                $itemDisc = (float) ($item->discount ?? 0);
+                $final = (int) ($item->final_price ?? ($item->total_price ?? ($qty * $price - $itemDisc)));
+                $effectiveType = $item->cart_type
+                    ? (LiphExport::CART_TYPE_ABBR[$item->cart_type] ?? $item->cart_type)
+                    : $trx->transaction_type;
+                $effectiveMap = LiphExport::TYPE_MAP[$effectiveType] ?? $originalMap;
+                $isReturn = in_array($effectiveMap[1] ?? $originalLabel, ['Retur Tunai', 'Retur Kredit'], true);
+
+                $summary['qty_sum'] += $qty;
+                $summary['gross_sum'] += $isReturn ? -abs($qty * $price) : ($qty * $price);
+                $summary['net_sum'] += $isReturn ? -abs($final) : $final;
+            }
+
+            $summary['net_sum'] -= $trxDiscount;
+        }
+
+        return $summary;
     }
 }
