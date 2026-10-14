@@ -13,7 +13,7 @@ class MonitoringPenjualanService
         return [
             'sales' => [
                 'cashPrescription' => 0, 'upds' => 0, 'hv' => 0,
-                'creditPrescription' => 0, 'returns' => 0,
+                'creditPrescription' => 0, 'creditReturns' => 0, 'returns' => 0,
                 'onlineWhatsappPrescription' => 0, 'onlineWhatsappNonPrescription' => 0,
                 'onlineShopee' => 0, 'onlineTiktok' => 0, 'onlineGrabmart' => 0,
                 'onlineDigital' => 0, 'onlineOther' => 0,
@@ -23,7 +23,7 @@ class MonitoringPenjualanService
             ],
             'receipts' => [
                 'cashPrescription' => 0, 'upds' => 0, 'hv' => 0,
-                'creditPrescription' => 0, 'returns' => 0,
+                'creditPrescription' => 0, 'creditReturns' => 0, 'returns' => 0,
                 'onlineWhatsappPrescription' => 0, 'onlineWhatsappNonPrescription' => 0,
                 'onlineShopee' => 0, 'onlineTiktok' => 0, 'onlineGrabmart' => 0,
                 'onlineDigital' => 0, 'onlineOther' => 0,
@@ -38,7 +38,7 @@ class MonitoringPenjualanService
             ],
             'items' => [
                 'cashPrescription' => 0, 'upds' => 0, 'hv' => 0,
-                'creditPrescription' => 0, 'returns' => 0,
+                'creditPrescription' => 0, 'creditReturns' => 0, 'returns' => 0,
                 'onlineWhatsappPrescription' => 0, 'onlineWhatsappNonPrescription' => 0,
                 'onlineShopee' => 0, 'onlineTiktok' => 0, 'onlineGrabmart' => 0,
                 'onlineDigital' => 0, 'onlineOther' => 0,
@@ -86,14 +86,16 @@ class MonitoringPenjualanService
             'UP', 'UPDS' => 'upds',
             'HV', 'HV/OTC', 'OTC' => 'hv',
             'ONLINE' => 'nonPrescription',
-            'RETUR JUAL', 'RETUR KREDIT', 'RETUR TUNAI' => 'returns',
+            'RETUR KREDIT' => 'creditReturns',
+            'RETUR JUAL', 'RETUR TUNAI' => 'returns',
             default => match (mb_strtoupper(trim($transactionType))) {
                 'KREDIT' => 'creditPrescription',
                 'RESEP TUNAI' => 'cashPrescription',
                 'UPDS' => 'upds',
                 'HV', 'HV/OTC', 'OTC' => 'hv',
                 'ONLINE' => 'nonPrescription',
-                'RETUR JUAL', 'RETUR KREDIT' => 'returns',
+                'RETUR KREDIT' => 'creditReturns',
+                'RETUR JUAL', 'RETUR TUNAI' => 'returns',
                 default => null,
             },
         };
@@ -151,15 +153,16 @@ class MonitoringPenjualanService
                 if (!$type) continue;
                 $classified[] = ['item' => $item, 'type' => $type];
                 $amount = (float) ($item->final_price ?? $item->total_price ?? 0);
-                if ($type === 'returns' || in_array($transactionType, ['RETUR JUAL', 'RETUR KREDIT'], true)) $amount = -abs($amount);
+                if (in_array($type, ['returns', 'creditReturns'], true) || in_array($transactionType, ['RETUR JUAL', 'RETUR KREDIT'], true)) $amount = -abs($amount);
 
                 if ($type === 'cashPrescription') $this->add($shift['sales'], 'cashPrescription', $amount);
                 elseif ($type === 'upds') $this->add($shift['sales'], 'upds', $amount);
                 elseif ($type === 'hv' || $type === 'nonPrescription') $this->add($shift['sales'], 'hv', $amount);
                 elseif ($type === 'creditPrescription') $this->add($shift['sales'], 'creditPrescription', $amount);
+                elseif ($type === 'creditReturns') $this->add($shift['sales'], 'creditReturns', $amount);
                 elseif ($type === 'returns') $this->add($shift['sales'], 'returns', $amount);
 
-                $isPrescription = in_array($type, ['cashPrescription', 'creditPrescription'], true);
+                $isPrescription = in_array($type, ['cashPrescription', 'creditPrescription', 'creditReturns'], true);
                 if ($isOnline) {
                     if ($channel === 'onlineWhatsapp') {
                         $channelTypeKey = 'onlineWhatsapp' . ($isPrescription ? 'Prescription' : 'NonPrescription');
@@ -178,6 +181,7 @@ class MonitoringPenjualanService
                     if ($type === 'returns') $this->add($shift['sales'], 'offlineReturns', $amount);
                 }
                 if ($type === 'returns') $this->add($shift['items'], 'returns', 1);
+                elseif ($type === 'creditReturns') $this->add($shift['items'], 'creditReturns', 1);
                 elseif ($type === 'cashPrescription') $this->add($shift['items'], 'cashPrescription', 1);
                 elseif ($type === 'upds') $this->add($shift['items'], 'upds', 1);
                 elseif ($type === 'hv' || $type === 'nonPrescription') $this->add($shift['items'], 'hv', 1);
@@ -203,12 +207,13 @@ class MonitoringPenjualanService
                     'upds' => 'upds',
                     'hv', 'nonPrescription' => 'hv',
                     'creditPrescription' => 'creditPrescription',
+                    'creditReturns' => 'creditReturns',
                     'returns' => 'returns',
                     default => null,
                 };
                 if ($salesKey) $this->add($shift['sales'], $salesKey, -$transactionDiscount);
 
-                $isPrescription = in_array($discountType, ['cashPrescription', 'creditPrescription'], true);
+                $isPrescription = in_array($discountType, ['cashPrescription', 'creditPrescription', 'creditReturns'], true);
                 if ($isOnline) {
                     if ($channel === 'onlineWhatsapp') {
                         $channelTypeKey = 'onlineWhatsapp' . ($isPrescription ? 'Prescription' : 'NonPrescription');
@@ -232,11 +237,12 @@ class MonitoringPenjualanService
                 $typeKeys = array_column($classified, 'type');
                 if (in_array($originalType, $typeKeys, true)) $receiptType = $originalType;
                 else $receiptType = $typeKeys[0];
-                $isPrescription = in_array($receiptType, ['cashPrescription', 'creditPrescription'], true);
+                $isPrescription = in_array($receiptType, ['cashPrescription', 'creditPrescription', 'creditReturns'], true);
                 if ($receiptType === 'cashPrescription') $this->add($shift['receipts'], 'cashPrescription', 1);
                 elseif ($receiptType === 'upds') $this->add($shift['receipts'], 'upds', 1);
                 elseif ($receiptType === 'hv' || $receiptType === 'nonPrescription') $this->add($shift['receipts'], 'hv', 1);
                 elseif ($receiptType === 'creditPrescription') $this->add($shift['receipts'], 'creditPrescription', 1);
+                elseif ($receiptType === 'creditReturns') $this->add($shift['receipts'], 'creditReturns', 1);
                 elseif ($receiptType === 'returns') $this->add($shift['receipts'], 'returns', 1);
                 if ($isOnline) {
                     if ($channel === 'onlineWhatsapp') {
@@ -257,7 +263,8 @@ class MonitoringPenjualanService
                 elseif ($originalType === 'hv' || $originalType === 'nonPrescription') $this->add($shift['receipts'], 'hv', 1);
                 elseif ($originalType === 'creditPrescription') $this->add($shift['receipts'], 'creditPrescription', 1);
                 elseif ($originalType === 'returns') $this->add($shift['receipts'], 'returns', 1);
-                $isPrescription = in_array($originalType, ['cashPrescription', 'creditPrescription'], true);
+                if ($originalType === 'creditReturns') $this->add($shift['receipts'], 'creditReturns', 1);
+                $isPrescription = in_array($originalType, ['cashPrescription', 'creditPrescription', 'creditReturns'], true);
                 if ($isOnline && $channel === 'onlineWhatsapp') {
                     $this->add($shift['receipts'], 'onlineWhatsapp' . ($isPrescription ? 'Prescription' : 'NonPrescription'), 1);
                 } else {
@@ -275,17 +282,17 @@ class MonitoringPenjualanService
             foreach (['morning', 'evening', 'otherShift'] as $shiftKey) {
                 $shift = &$day[$shiftKey];
                 $shift['sales']['cashTotal'] = $shift['sales']['cashPrescription'] + $shift['sales']['upds'] + $shift['sales']['hv'] + $shift['sales']['returns'];
-                $shift['sales']['creditTotal'] = $shift['sales']['creditPrescription'];
+                $shift['sales']['creditTotal'] = $shift['sales']['creditPrescription'] + $shift['sales']['creditReturns'];
                 $shift['sales']['total'] = $shift['sales']['cashTotal'] + $shift['sales']['creditTotal'];
                 $shift['sales']['onlineWhatsappTotal'] = $shift['sales']['onlineWhatsappPrescription'] + $shift['sales']['onlineWhatsappNonPrescription'];
                 $shift['receipts']['cashTotal'] = $shift['receipts']['cashPrescription'] + $shift['receipts']['upds'] + $shift['receipts']['hv'] + $shift['receipts']['returns'];
-                $shift['receipts']['creditTotal'] = $shift['receipts']['creditPrescription'];
+                $shift['receipts']['creditTotal'] = $shift['receipts']['creditPrescription'] + $shift['receipts']['creditReturns'];
                 $shift['receipts']['total'] = $shift['receipts']['cashTotal'] + $shift['receipts']['creditTotal'];
                 $shift['receipts']['onlineWhatsappTotal'] = $shift['receipts']['onlineWhatsappPrescription'] + $shift['receipts']['onlineWhatsappNonPrescription'];
                 $shift['receipts']['onlineTotal'] = $shift['receipts']['onlineWhatsappTotal'] + $shift['receipts']['onlineShopee'] + $shift['receipts']['onlineTiktok'] + $shift['receipts']['onlineGrabmart'] + $shift['receipts']['onlineDigital'] + $shift['receipts']['onlineOther'];
                 $shift['receipts']['offlineTotal'] = $shift['receipts']['offlinePrescription'] + $shift['receipts']['offlineNonPrescription'];
                 $shift['items']['cashTotal'] = $shift['items']['cashPrescription'] + $shift['items']['upds'] + $shift['items']['hv'] + $shift['items']['returns'];
-                $shift['items']['creditTotal'] = $shift['items']['creditPrescription'];
+                $shift['items']['creditTotal'] = $shift['items']['creditPrescription'] + $shift['items']['creditReturns'];
                 $shift['items']['total'] = $shift['items']['cashTotal'] + $shift['items']['creditTotal'];
                 $shift['items']['onlineWhatsappTotal'] = $shift['items']['onlineWhatsappPrescription'] + $shift['items']['onlineWhatsappNonPrescription'];
                 $shift['items']['onlineTotal'] = $shift['items']['onlineWhatsappTotal'] + $shift['items']['onlineShopee'] + $shift['items']['onlineTiktok'] + $shift['items']['onlineGrabmart'] + $shift['items']['onlineDigital'] + $shift['items']['onlineOther'];
