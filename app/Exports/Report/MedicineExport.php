@@ -37,7 +37,10 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
 
     public function array(): array
     {
-        $query = MedicineTransactions::with(['transactions.medicine.factory'])
+        $query = MedicineTransactions::with([
+            'transactions' => fn ($q) => $q->where('status', 1),
+            'transactions.medicine.factory',
+        ])
             ->where('pharmacy_id', $this->pharmacyId)
             ->where('status', 1)
             ->whereBetween('updated_at', [$this->startDate, $this->endDate]);
