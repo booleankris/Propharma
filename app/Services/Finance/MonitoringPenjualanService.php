@@ -152,8 +152,9 @@ class MonitoringPenjualanService
                 $type = $this->effectiveItemType($item, $transactionType);
                 if (!$type) continue;
                 $classified[] = ['item' => $item, 'type' => $type];
-                $amount = (float) ($item->final_price ?? $item->total_price ?? 0);
-                if (in_array($type, ['returns', 'creditReturns'], true) || in_array($transactionType, ['RETUR JUAL', 'RETUR KREDIT'], true)) $amount = -abs($amount);
+                // LIPH sums final_price only and truncates each line to whole rupiah.
+                $amount = (float) (int) ($item->final_price ?? 0);
+                if (in_array($type, ['returns', 'creditReturns'], true)) $amount = -abs($amount);
 
                 if ($type === 'cashPrescription') $this->add($shift['sales'], 'cashPrescription', $amount);
                 elseif ($type === 'upds') $this->add($shift['sales'], 'upds', $amount);
@@ -188,6 +189,34 @@ class MonitoringPenjualanService
                 elseif ($type === 'creditPrescription') $this->add($shift['items'], 'creditPrescription', 1);
             }
 
+            // LIPH uses subtotal for a finalized transaction with no cart rows.
+            if (!$classified) {
+                $fallbackType = $this->effectiveItemType((object) ['cart_type' => null], $transactionType);
+                $fallbackAmount = (float) (int) ($transaction->subtotal ?? 0);
+                if (in_array($fallbackType, ['returns', 'creditReturns'], true)) $fallbackAmount = -abs($fallbackAmount);
+
+                $fallbackKey = match ($fallbackType) {
+                    'cashPrescription' => 'cashPrescription',
+                    'upds' => 'upds',
+                    'hv', 'nonPrescription' => 'hv',
+                    'creditPrescription' => 'creditPrescription',
+                    'creditReturns' => 'creditReturns',
+                    'returns' => 'returns',
+                    default => null,
+                };
+                if ($fallbackKey) $this->add($shift['sales'], $fallbackKey, $fallbackAmount);
+
+                $fallbackPrescription = in_array($fallbackType, ['cashPrescription', 'creditPrescription', 'creditReturns'], true);
+                $fallbackChannelKey = $isOnline
+                    ? ($channel === 'onlineWhatsapp'
+                        ? 'onlineWhatsapp' . ($fallbackPrescription ? 'Prescription' : 'NonPrescription')
+                        : $channel)
+                    : 'offline' . ($fallbackPrescription ? 'Prescription' : 'NonPrescription');
+                $this->add($shift['sales'], $fallbackChannelKey, $fallbackAmount);
+                $this->add($shift['sales'], $isOnline ? 'onlineTotal' : 'offlineTotal', $fallbackAmount);
+                if (!$isOnline && $fallbackType === 'returns') $this->add($shift['sales'], 'offlineReturns', $fallbackAmount);
+            }
+
             // LIPH subtracts the transaction-level discount once from the
             // receipt's effective class. Keep Monitoring Penjualan on the same
             // basis so its sales totals reconcile with LIPH's Netto Akhir.
@@ -197,7 +226,9 @@ class MonitoringPenjualanService
                 $discountType = in_array($originalType, $typeKeys, true)
                     ? $originalType
                     : $typeKeys[0];
-            } else $discountType = null;
+            } else {
+                $discountType = $this->effectiveItemType((object) ['cart_type' => null], $transactionType);
+            }
 
             // LIPH treats transaction discounts as whole rupiah.
             $transactionDiscount = (float) (int) ($transaction->discount ?? 0);
