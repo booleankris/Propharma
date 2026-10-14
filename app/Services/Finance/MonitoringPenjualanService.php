@@ -5,6 +5,8 @@ namespace App\Services\Finance;
 use App\Models\MedicineTransactions;
 use Carbon\CarbonPeriod;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Carbon;
+use App\Support\LiphTransactionScope;
 
 class MonitoringPenjualanService
 {
@@ -113,22 +115,26 @@ class MonitoringPenjualanService
             $days[$key] = $this->emptyDay($key);
         }
 
-        $transactions = MedicineTransactions::query()
+        $transactionQuery = MedicineTransactions::query()
             ->with([
                 'transactions' => fn ($query) => $query->where('status', 1),
                 'transactions.user.roles',
                 'user.roles',
                 'shift_logs.shift',
             ])
-            ->where('status', 1)
             ->whereIn('pharmacy_id', $pharmacyIds)
-            ->whereDate('created_at', '>=', $startDate)
-            ->whereDate('created_at', '<=', $endDate)
-            ->orderBy('created_at')
-            ->get();
+            ->orderBy('created_at');
+        LiphTransactionScope::applySalesStatus($transactionQuery);
+        LiphTransactionScope::applyPeriod(
+            $transactionQuery,
+            Carbon::parse($startDate),
+            Carbon::parse($endDate),
+            'semua'
+        );
+        $transactions = $transactionQuery->get();
 
         foreach ($transactions as $transaction) {
-            $date = optional($transaction->created_at)->toDateString();
+            $date = optional($transaction->shift_logs?->clock_in ?? $transaction->created_at ?? $transaction->updated_at)->toDateString();
             if (!$date || !isset($days[$date])) continue;
 
             $shiftName = mb_strtolower(trim((string) ($transaction->shift_logs?->shift?->name ?? '')));
@@ -182,6 +188,75 @@ class MonitoringPenjualanService
                 elseif ($type === 'upds') $this->add($shift['items'], 'upds', 1);
                 elseif ($type === 'hv' || $type === 'nonPrescription') $this->add($shift['items'], 'hv', 1);
                 elseif ($type === 'creditPrescription') $this->add($shift['items'], 'creditPrescription', 1);
+            }
+
+            // Match LIPH for finalized transactions that have no cart rows.
+            if (!$classified) {
+                $fallbackType = $this->effectiveItemType((object) ['cart_type' => null], $transactionType);
+                $fallbackAmount = (float) ($transaction->subtotal ?? 0);
+                if ($fallbackType === 'returns') $fallbackAmount = -abs($fallbackAmount);
+                $fallbackKey = match ($fallbackType) {
+                    'cashPrescription' => 'cashPrescription',
+                    'upds' => 'upds',
+                    'hv', 'nonPrescription' => 'hv',
+                    'creditPrescription' => 'creditPrescription',
+                    'returns' => 'returns',
+                    default => null,
+                };
+                if ($fallbackKey) $this->add($shift['sales'], $fallbackKey, $fallbackAmount);
+
+                $fallbackPrescription = in_array($fallbackType, ['cashPrescription', 'creditPrescription'], true);
+                $fallbackChannelKey = $isOnline
+                    ? ($channel === 'onlineWhatsapp'
+                        ? 'onlineWhatsapp' . ($fallbackPrescription ? 'Prescription' : 'NonPrescription')
+                        : $channel)
+                    : 'offline' . ($fallbackPrescription ? 'Prescription' : 'NonPrescription');
+                $this->add($shift['sales'], $fallbackChannelKey, $fallbackAmount);
+                $this->add($shift['sales'], $isOnline ? 'onlineTotal' : 'offlineTotal', $fallbackAmount);
+                if (!$isOnline && $fallbackType === 'returns') $this->add($shift['sales'], 'offlineReturns', $fallbackAmount);
+            }
+
+            // LIPH subtracts the transaction-level discount once from the
+            // receipt's effective class. Keep Monitoring Penjualan on the same
+            // basis so its sales totals reconcile with LIPH's Netto Akhir.
+            if ($classified) {
+                $originalType = $this->effectiveItemType((object) ['cart_type' => null], $transactionType);
+                $typeKeys = array_column($classified, 'type');
+                $discountType = in_array($originalType, $typeKeys, true)
+                    ? $originalType
+                    : $typeKeys[0];
+            } else {
+                $discountType = $this->effectiveItemType((object) ['cart_type' => null], $transactionType);
+            }
+
+            // LIPH treats transaction discounts as whole rupiah.
+            $transactionDiscount = (float) (int) ($transaction->discount ?? 0);
+            if ($transactionDiscount !== 0.0 && $discountType) {
+                $salesKey = match ($discountType) {
+                    'cashPrescription' => 'cashPrescription',
+                    'upds' => 'upds',
+                    'hv', 'nonPrescription' => 'hv',
+                    'creditPrescription' => 'creditPrescription',
+                    'returns' => 'returns',
+                    default => null,
+                };
+                if ($salesKey) $this->add($shift['sales'], $salesKey, -$transactionDiscount);
+
+                $isPrescription = in_array($discountType, ['cashPrescription', 'creditPrescription'], true);
+                if ($isOnline) {
+                    if ($channel === 'onlineWhatsapp') {
+                        $channelTypeKey = 'onlineWhatsapp' . ($isPrescription ? 'Prescription' : 'NonPrescription');
+                        $this->add($shift['sales'], $channelTypeKey, -$transactionDiscount);
+                    } else {
+                        $this->add($shift['sales'], $channel, -$transactionDiscount);
+                    }
+                    $this->add($shift['sales'], 'onlineTotal', -$transactionDiscount);
+                } else {
+                    $channelTypeKey = 'offline' . ($isPrescription ? 'Prescription' : 'NonPrescription');
+                    $this->add($shift['sales'], $channelTypeKey, -$transactionDiscount);
+                    $this->add($shift['sales'], 'offlineTotal', -$transactionDiscount);
+                    if ($discountType === 'returns') $this->add($shift['sales'], 'offlineReturns', -$transactionDiscount);
+                }
             }
 
             // Count one receipt once, following LIPH's rule: keep its original class if present;

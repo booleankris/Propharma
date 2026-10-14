@@ -655,6 +655,104 @@ class FinanceController extends Controller
         return $balance;
     }
 
+    /** Hitung sisa piutang penjualan cabang sampai tanggal tertentu. */
+    private function receivableBalanceAtDate(int $pharmacyId, string $asOfDate): float
+    {
+        $transactions = MedicineTransactions::query()
+            ->with([
+                'transactions' => fn ($query) => $query->where('status', 1),
+            ])
+            ->withSum(['payments as finance_paid' => fn ($query) => $query
+                ->where('payment_type', 'PIUTANG')
+                ->whereDate('payment_date', '<=', $asOfDate)], 'amount')
+            ->where('pharmacy_id', $pharmacyId)
+            ->where('status', 1)
+            ->whereIn('transaction_type', ['KREDIT', 'RESEP KREDIT', 'RETUR KREDIT'])
+            ->whereDate('created_at', '<=', $asOfDate)
+            ->get(['id', 'debtor_id', 'transaction_type', 'subtotal', 'paid']);
+
+        $balancesByDebtor = [];
+        $returnsByDebtor = [];
+
+        foreach ($transactions as $transaction) {
+            $debtorKey = (string) ((int) ($transaction->debtor_id ?? 0));
+
+            if ($transaction->transaction_type === 'RETUR KREDIT') {
+                $returnsByDebtor[$debtorKey] = ($returnsByDebtor[$debtorKey] ?? 0)
+                    + abs((float) ($transaction->subtotal ?? 0));
+                continue;
+            }
+
+            $total = (float) ($transaction->subtotal ?? 0);
+            if ($total <= 0) {
+                $total = (float) $transaction->transactions->sum(
+                    fn ($item) => $item->final_price ?: $item->total_price
+                );
+            }
+
+            $total = max(0, $total);
+            $paid = min($total, max(
+                (float) ($transaction->finance_paid ?? 0),
+                (float) ($transaction->paid ?? 0)
+            ));
+            $balancesByDebtor[$debtorKey] = ($balancesByDebtor[$debtorKey] ?? 0) + max(0, $total - $paid);
+        }
+
+        foreach ($returnsByDebtor as $debtorKey => $returnAmount) {
+            if (isset($balancesByDebtor[$debtorKey])) {
+                $balancesByDebtor[$debtorKey] = max(0, $balancesByDebtor[$debtorKey] - $returnAmount);
+            }
+        }
+
+        return (float) array_sum($balancesByDebtor);
+    }
+
+    /** Hitung sisa hutang dagang pembelian kredit cabang sampai tanggal tertentu. */
+    private function payableBalanceAtDate(int $pharmacyId, string $asOfDate): float
+    {
+        $details = ReceivingDetails::query()
+            ->with([
+                'receiving:id,pharmacy_id,status,date,created_at',
+                'receiving_items:id,receiving_details_id,total,raw_price,qty_received',
+                'payments' => fn ($query) => $query->whereDate('payment_date', '<=', $asOfDate),
+            ])
+            ->whereRaw('UPPER(TRIM(COALESCE(invoice_payment, ""))) = ?', ['KREDIT'])
+            ->whereHas('receiving', function ($query) use ($pharmacyId, $asOfDate) {
+                $query->where('pharmacy_id', $pharmacyId)
+                    ->whereIn('status', [1, 2, 3])
+                    ->where(function ($date) use ($asOfDate) {
+                        $date->whereDate('date', '<=', $asOfDate)
+                            ->orWhere(function ($legacy) use ($asOfDate) {
+                                $legacy->whereNull('date')->whereDate('created_at', '<=', $asOfDate);
+                            });
+                    });
+            })
+            ->get();
+
+        $balance = 0.0;
+        foreach ($details as $detail) {
+            if ((int) ($detail->receiving?->status ?? 0) === 3) {
+                continue;
+            }
+
+            $subtotal = 0.0;
+            foreach ($detail->receiving_items as $item) {
+                $lineTotal = (float) ($item->total ?? 0);
+                if ($lineTotal <= 0) {
+                    $lineTotal = (float) ($item->raw_price ?? 0) * (float) ($item->qty_received ?? 0);
+                }
+                $subtotal += $lineTotal;
+            }
+
+            $ppnType = strtoupper(trim((string) ($detail->invoice_ppn ?? 'TANPA')));
+            $invoiceTotal = $subtotal + ($ppnType === 'EXCLUDE' ? round($subtotal * 0.11, 2) : 0);
+            $paid = (float) $detail->payments->sum('amount');
+            $balance += max(0, $invoiceTotal - $paid);
+        }
+
+        return $balance;
+    }
+
     /**
      * Halaman Pengelolaan Master Bagan Akun (Chart of Accounts / COA).
      */

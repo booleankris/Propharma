@@ -56,7 +56,7 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
     public function title(): string
     {
         if ($this->isRecap) {
-            return 'Rekap Semua Bank';
+            return 'Rekap Pembayaran';
         }
 
         $title = $this->bankName ?: 'Lainnya';
@@ -75,7 +75,7 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
             [$pharmacyName],
             [$pharmacyAddress],
             [''],
-            [$this->isRecap ? 'REKAPITULASI PENJUALAN PER METODE / BANK' : 'LAPORAN PENJUALAN : ' . strtoupper($this->bankName ?: 'METODE BAYAR')],
+            [$this->isRecap ? 'REKAPITULASI PENJUALAN PER PEMBAYARAN' : 'LAPORAN PENJUALAN : ' . strtoupper($this->bankName ?: 'METODE BAYAR')],
             ['Periode : ' . $this->startDate->format('d/m/Y') . ' s/d ' . $this->endDate->format('d/m/Y') . ($this->shiftType === 'shift' && $this->shift ? ' (Shift ' . $this->shift . ')' : '')],
             [''],
         ];
@@ -92,7 +92,7 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
     {
         $tableHeaders = [
             'No',
-            'Nama Bank / Metode',
+            'Pembayaran',
             'Jumlah Struk',
             'Total Qty Obat',
             'Subtotal Kotor',
@@ -110,32 +110,50 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
         $grandTotalDiscount = 0;
         $grandTotalNet = 0;
 
-        foreach ($this->allBanksData as $bank => $data) {
-            $strukCount = $data['struk_count'] ?? 0;
-            $qtySum     = $data['qty_sum'] ?? 0;
-            $grossSum   = $data['gross_sum'] ?? 0;
-            $discSum    = $data['discount_sum'] ?? 0;
-            $netSum     = $data['net_sum'] ?? 0;
+        foreach ($this->allBanksData as $paymentClass => $paymentMethods) {
+            $rows[] = [$paymentClass, '', '', '', '', '', ''];
 
-            $grandTotalStruk    += $strukCount;
-            $grandTotalQty      += $qtySum;
-            $grandTotalGross    += $grossSum;
-            $grandTotalDiscount += $discSum;
-            $grandTotalNet      += $netSum;
+            $classStruk = 0;
+            $classQty = 0;
+            $classGross = 0;
+            $classDiscount = 0;
+            $classNet = 0;
 
-            $rows[] = [
-                $no++,
-                $bank,
-                $strukCount,
-                $qtySum,
-                $grossSum,
-                $discSum,
-                $netSum,
-            ];
+            foreach ($paymentMethods as $paymentMethod => $data) {
+                $strukCount = $data['struk_count'] ?? 0;
+                $qtySum     = $data['qty_sum'] ?? 0;
+                $grossSum   = $data['gross_sum'] ?? 0;
+                $discSum    = $data['discount_sum'] ?? 0;
+                $netSum     = $data['net_sum'] ?? 0;
+
+                $classStruk += $strukCount;
+                $classQty += $qtySum;
+                $classGross += $grossSum;
+                $classDiscount += $discSum;
+                $classNet += $netSum;
+
+                $rows[] = [
+                    $no++,
+                    $paymentMethod,
+                    $strukCount,
+                    $qtySum,
+                    $grossSum,
+                    $discSum,
+                    $netSum,
+                ];
+            }
+
+            $rows[] = ['', 'TOTAL ' . $paymentClass, $classStruk, $classQty, $classGross, $classDiscount, $classNet];
+
+            $grandTotalStruk    += $classStruk;
+            $grandTotalQty      += $classQty;
+            $grandTotalGross    += $classGross;
+            $grandTotalDiscount += $classDiscount;
+            $grandTotalNet      += $classNet;
         }
 
         if (count($this->allBanksData) === 0) {
-            $rows[] = ['-', 'Tidak ada transaksi bank pada periode ini', 0, 0, 0, 0, 0];
+            $rows[] = ['-', 'Tidak ada transaksi pembayaran pada periode ini', 0, 0, 0, 0, 0];
         }
 
         // Grand Total Row
@@ -280,13 +298,13 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
         }
 
         if ($transactions->isEmpty()) {
-            $rows[] = ['-', '-', '-', '-', '-', 'Tidak ada transaksi untuk bank ini', 0, 0, 0, 0, '-', '-', '-', '-'];
+            $rows[] = ['-', '-', '-', '-', '-', 'Tidak ada transaksi untuk pembayaran ini', 0, 0, 0, 0, '-', '-', '-', '-'];
         }
 
         // Summary Total Row
         $rows[] = [
             '',
-            'TOTAL ' . strtoupper($this->bankName ?: 'BANK'),
+            'TOTAL ' . strtoupper($this->bankName ?: 'PEMBAYARAN'),
             '',
             '',
             '',
@@ -365,6 +383,24 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
                 $sheet->getStyle("B8:B{$highestRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
                 $sheet->getStyle("C8:C{$highestRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
                 $sheet->getStyle("E8:E{$highestRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+                for ($row = 8; $row <= $highestRow; $row++) {
+                    $section = strtoupper((string) $sheet->getCell("A{$row}")->getValue());
+                    $label = strtoupper((string) $sheet->getCell("B{$row}")->getValue());
+
+                    if (in_array($section, ['KREDIT', 'CASH'], true)) {
+                        $sheet->getStyle("A{$row}:G{$row}")->applyFromArray([
+                            'font' => ['bold' => true, 'color' => ['rgb' => '1D4ED8']],
+                            'fill' => [
+                                'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
+                                'startColor' => ['rgb' => 'EFF6FF'],
+                            ],
+                        ]);
+                    } elseif (str_starts_with($label, 'TOTAL KREDIT') || str_starts_with($label, 'TOTAL CASH')) {
+                        $sheet->getStyle("A{$row}:G{$row}")->getFont()->setBold(true);
+                        $sheet->getStyle("A{$row}:G{$row}")->getBorders()->getTop()->setBorderStyle(Border::BORDER_THIN);
+                    }
+                }
             }
 
             // Total Bottom Row Highlight

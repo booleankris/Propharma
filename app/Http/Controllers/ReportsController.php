@@ -239,7 +239,7 @@ class ReportsController extends Controller
                     ),
                     'LIPH_' . $pharmacy->name . '_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx',
                 ],
-            'Bank', 'Penjualan Bank' => [
+            'Bank', 'Penjualan Bank', 'Pembayaran' => [
                 new BankSalesExport(
                     $pharmacy->id,
                     $request->start_date,
@@ -249,7 +249,7 @@ class ReportsController extends Controller
                     $request->shift,
                     $request->shiftType ?? 'semua'
                 ),
-                'LAPORAN_PENJUALAN_BANK_' . $pharmacy->name . '_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx',
+                'LAPORAN_PENJUALAN_PEMBAYARAN_' . $pharmacy->name . '_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx',
             ],
             'Obat' => [
                 new MedicineExport(

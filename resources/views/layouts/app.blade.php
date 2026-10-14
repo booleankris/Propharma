@@ -251,6 +251,13 @@
                 has_factory: false,
                 has_doctor: false
             },
+            "Pembayaran": {
+                date_filter: true,
+                type_filter: false,
+                online_btn: false,
+                has_factory: false,
+                has_doctor: false
+            },
             "Penjualan Bank": {
                 date_filter: true,
                 type_filter: false,
