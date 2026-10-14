@@ -5,6 +5,7 @@ namespace App\Exports\Report;
 use App\Models\Batches;
 use App\Models\MedicineTransferItems;
 use App\Models\MedicineTransactions;
+use App\Support\LiphTransactionScope;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Concerns\FromArray;
@@ -37,19 +38,24 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
 
     public function array(): array
     {
+        // Samakan dasar periode & status dengan LIPH: tanggal = mulai shift
+        // (clock_in), bukan updated_at transaksi. Shift yang melewati tengah
+        // malam sebelumnya terpecah ke dua tanggal sehingga total tidak klop.
         $query = MedicineTransactions::with([
             'transactions' => fn ($q) => $q->where('status', 1),
             'transactions.medicine.factory',
+            'shift_logs',
         ])
-            ->where('pharmacy_id', $this->pharmacyId)
-            ->where('status', 1)
-            ->whereBetween('updated_at', [$this->startDate, $this->endDate]);
+            ->where('pharmacy_id', $this->pharmacyId);
 
-        if ($this->shiftType === 'shift' && !empty($this->shift)) {
-            $query->whereHas('shift_logs', function ($s) {
-                $s->where('shift_id', $this->shift);
-            });
-        }
+        LiphTransactionScope::applySalesStatus($query);
+        LiphTransactionScope::applyPeriod(
+            $query,
+            $this->startDate,
+            $this->endDate,
+            $this->shiftType,
+            $this->shift
+        );
 
         $transactions = $query->get();
 
@@ -235,7 +241,7 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
         $medicineIds = [];
 
         foreach ($transactions as $trx) {
-            $trxDate = Carbon::parse($trx->updated_at ?? $trx->created_at);
+            $trxDate = Carbon::parse($trx->shift_logs?->clock_in ?? $trx->created_at ?? $trx->updated_at);
             $monthKey = $trxDate->format('Y-m');
 
             foreach ($trx->transactions ?? [] as $item) {
