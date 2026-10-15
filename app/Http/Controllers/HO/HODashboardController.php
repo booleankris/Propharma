@@ -101,7 +101,7 @@ class HODashboardController extends Controller
                 AND (mt.source_type IS NULL OR mt.source_type != 'retur_gudang')
                 GROUP BY b.medicine_id
             ) as asa"), 'asa.medicine_id', '=', 'm.id')
-            ->select('m.id', 'm.code', 'm.name', 'g.gudang_qty', 'pmi.pmi_qty', 'asm.asm_qty', 'mim.mim_qty', 'asa.asa_qty');
+            ->select('m.id', 'm.code', 'm.name', 'm.status', 'g.gudang_qty', 'pmi.pmi_qty', 'asm.asm_qty', 'mim.mim_qty', 'asa.asa_qty');
 
         if (!empty($search)) {
             $query->where(function ($q) use ($search) {
@@ -110,11 +110,15 @@ class HODashboardController extends Controller
             });
         }
 
-        // Apply Stock Filter using HAVING so we can reference the aliases
+        // Apply Stock & Status Filter
         if ($filter === 'available') {
             $query->havingRaw('(COALESCE(gudang_qty, 0) > 0 OR COALESCE(pmi_qty, 0) > 0 OR COALESCE(asm_qty, 0) > 0 OR COALESCE(mim_qty, 0) > 0 OR COALESCE(asa_qty, 0) > 0)');
         } elseif ($filter === 'empty') {
             $query->havingRaw('(COALESCE(gudang_qty, 0) = 0 AND COALESCE(pmi_qty, 0) = 0 AND COALESCE(asm_qty, 0) = 0 AND COALESCE(mim_qty, 0) = 0 AND COALESCE(asa_qty, 0) = 0)');
+        } elseif ($filter === 'active') {
+            $query->where('m.status', 1);
+        } elseif ($filter === 'inactive') {
+            $query->where('m.status', '!=', 1);
         }
 
         $query->orderBy('m.name', 'asc');

@@ -846,10 +846,12 @@
                             <h3 class="text-base sm:text-lg font-black text-slate-900 mt-1">Stok Per Cabang (Real-time)</h3>
                         </div>
                         <div class="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
-                            <select id="filter_stock_table" class="w-full sm:w-40 pl-3 pr-8 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all appearance-none bg-white">
+                            <select id="filter_stock_table" class="w-full sm:w-44 pl-3 pr-8 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all appearance-none bg-white">
                                 <option value="all">Semua Status</option>
                                 <option value="available">Stok Tersedia</option>
                                 <option value="empty">Stok Kosong</option>
+                                <option value="active">Obat Aktif Saja</option>
+                                <option value="inactive">Obat Non-Aktif Saja</option>
                             </select>
                             <div class="relative w-full sm:w-64">
                                 <input type="text" id="search_stock_table" placeholder="Cari nama atau kode obat..." class="w-full pl-10 pr-4 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all">
@@ -1531,9 +1533,11 @@
 
             // Render Rows
             tbody.innerHTML = data.data.map(item => {
+                const isInactive = parseInt(item.status) !== 1;
+
                 const codeHtml = item.code 
                     ? `<button type="button" onclick="copyMedicineCode('${escapeHtml(item.code)}', this)" 
-                              class="group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-indigo-50 border border-slate-200/80 hover:border-indigo-200 text-slate-700 hover:text-indigo-700 font-mono text-xs font-semibold transition-all cursor-pointer shadow-2xs active:scale-95" 
+                              class="group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg ${isInactive ? 'bg-slate-100/70 text-slate-500 border-slate-200' : 'bg-slate-100 hover:bg-indigo-50 border-slate-200/80 hover:border-indigo-200 text-slate-700 hover:text-indigo-700'} font-mono text-xs font-semibold transition-all cursor-pointer shadow-2xs active:scale-95" 
                               title="Klik untuk salin kode obat">
                            <span class="code-text">${escapeHtml(item.code)}</span>
                            <span class="copy-icon text-slate-400 group-hover:text-indigo-600 transition-colors">
@@ -1545,32 +1549,44 @@
                        </button>`
                     : `<span class="text-slate-400 font-mono text-xs">-</span>`;
 
+                const inactiveBadge = isInactive
+                    ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-rose-50 text-rose-600 border border-rose-200/90 shadow-2xs">
+                           <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                           Non-Aktif
+                       </span>`
+                    : '';
+
                 return `
-                    <tr class="hover:bg-slate-50 transition-colors">
+                    <tr class="${isInactive ? 'bg-rose-50/25 hover:bg-rose-50/40' : 'hover:bg-slate-50'} transition-colors">
                         <td class="p-4 whitespace-nowrap">${codeHtml}</td>
-                        <td class="p-4 font-medium text-slate-800">${escapeHtml(item.name)}</td>
+                        <td class="p-4">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="font-medium ${isInactive ? 'text-slate-600' : 'text-slate-800'}">${escapeHtml(item.name)}</span>
+                                ${inactiveBadge}
+                            </div>
+                        </td>
                         <td class="p-4 text-center">
-                            <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-bold ${item.gudang_qty > 0 ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-500'}">
+                            <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-bold ${item.gudang_qty > 0 ? (isInactive ? 'bg-indigo-50/80 text-indigo-600' : 'bg-indigo-50 text-indigo-700') : 'bg-slate-100 text-slate-500'}">
                                 ${parseInt(item.gudang_qty || 0).toLocaleString('id-ID')}
                             </span>
                         </td>
                         <td class="p-4 text-center">
-                            <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-bold ${item.pmi_qty > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}">
+                            <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-bold ${item.pmi_qty > 0 ? (isInactive ? 'bg-emerald-50/80 text-emerald-600' : 'bg-emerald-50 text-emerald-700') : 'bg-slate-100 text-slate-500'}">
                                 ${parseInt(item.pmi_qty || 0).toLocaleString('id-ID')}
                             </span>
                         </td>
                         <td class="p-4 text-center">
-                            <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-bold ${item.asm_qty > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}">
+                            <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-bold ${item.asm_qty > 0 ? (isInactive ? 'bg-emerald-50/80 text-emerald-600' : 'bg-emerald-50 text-emerald-700') : 'bg-slate-100 text-slate-500'}">
                                 ${parseInt(item.asm_qty || 0).toLocaleString('id-ID')}
                             </span>
                         </td>
                         <td class="p-4 text-center">
-                            <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-bold ${item.mim_qty > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}">
+                            <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-bold ${item.mim_qty > 0 ? (isInactive ? 'bg-emerald-50/80 text-emerald-600' : 'bg-emerald-50 text-emerald-700') : 'bg-slate-100 text-slate-500'}">
                                 ${parseInt(item.mim_qty || 0).toLocaleString('id-ID')}
                             </span>
                         </td>
                         <td class="p-4 text-center">
-                            <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-bold ${item.asa_qty > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}">
+                            <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-bold ${item.asa_qty > 0 ? (isInactive ? 'bg-emerald-50/80 text-emerald-600' : 'bg-emerald-50 text-emerald-700') : 'bg-slate-100 text-slate-500'}">
                                 ${parseInt(item.asa_qty || 0).toLocaleString('id-ID')}
                             </span>
                         </td>
