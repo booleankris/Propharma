@@ -115,12 +115,12 @@ class DoctorExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                 ];
             }
 
-            $grouped[$groupKey]['nilai_resep'] += (float) $resepItems->sum('final_price');
+            $grouped[$groupKey]['nilai_resep'] += $resepItems->sum(fn ($i) => (int) ($i->final_price ?? 0));
             $grouped[$groupKey]['lembar']      += 1;
             $grouped[$groupKey]['jumlah_r']    += $resepItems->count();
 
-            if (is_numeric($trx->discount) && (float) $trx->discount > 0) {
-                $potonganTrx += (float) $trx->discount;
+            if (is_numeric($trx->discount) && (int) $trx->discount > 0) {
+                $potonganTrx += (int) $trx->discount;
             }
         }
 
@@ -139,23 +139,23 @@ class DoctorExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
             $rows[] = [
                 $no++,
                 $doc['doctor_name'],
-                $doc['nilai_resep'],
+                (int) $doc['nilai_resep'],
                 $doc['lembar'],
                 $doc['jumlah_r'],
             ];
 
-            $grandNilai   += $doc['nilai_resep'];
+            $grandNilai   += (int) $doc['nilai_resep'];
             $grandLembar  += $doc['lembar'];
             $grandJumlahR += $doc['jumlah_r'];
         }
 
-        $rows[] = ['', 'TOTAL', $grandNilai, $grandLembar, $grandJumlahR];
+        $rows[] = ['', 'TOTAL', (int) $grandNilai, $grandLembar, $grandJumlahR];
 
         if (empty($this->doctorId) && $potonganTrx > 0) {
             $rows[] = [
                 '',
                 'POTONGAN TRANSAKSI (DISKON NOTA)',
-                -$potonganTrx,
+                -(int) $potonganTrx,
                 '',
                 '',
             ];
@@ -163,7 +163,7 @@ class DoctorExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
             $rows[] = [
                 '',
                 'TOTAL NETTO AKHIR',
-                $grandNilai - $potonganTrx,
+                (int) ($grandNilai - $potonganTrx),
                 $grandLembar,
                 $grandJumlahR,
             ];
@@ -205,11 +205,11 @@ class DoctorExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                 }
 
                 $grouped[$key]['qty']   += (float) ($item->quantity ?? 0);
-                $grouped[$key]['total'] += (float) ($item->final_price ?? 0);
+                $grouped[$key]['total'] += (int) ($item->final_price ?? 0);
             }
 
-            if (is_numeric($trx->discount) && (float) $trx->discount > 0) {
-                $potonganTrx += (float) $trx->discount;
+            if (is_numeric($trx->discount) && (int) $trx->discount > 0) {
+                $potonganTrx += (int) $trx->discount;
             }
         }
 
@@ -232,14 +232,14 @@ class DoctorExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                 $item['doctor'],
                 $item['medicine'],
                 $item['qty'],
-                $item['total'],
+                (int) $item['total'],
             ];
 
             $grandQty   += $item['qty'];
-            $grandTotal += $item['total'];
+            $grandTotal += (int) $item['total'];
         }
 
-        $rows[] = ['', 'TOTAL', '', $grandQty, $grandTotal];
+        $rows[] = ['', 'TOTAL', '', $grandQty, (int) $grandTotal];
 
         if (empty($this->doctorId) && $potonganTrx > 0) {
             $rows[] = [
@@ -247,7 +247,7 @@ class DoctorExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                 'POTONGAN TRANSAKSI (DISKON NOTA)',
                 '',
                 '',
-                -$potonganTrx,
+                -(int) $potonganTrx,
             ];
 
             $rows[] = [
@@ -255,7 +255,7 @@ class DoctorExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                 'TOTAL NETTO AKHIR',
                 '',
                 $grandQty,
-                $grandTotal - $potonganTrx,
+                (int) ($grandTotal - $potonganTrx),
             ];
         }
 

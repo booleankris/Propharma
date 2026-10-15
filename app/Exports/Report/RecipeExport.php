@@ -155,7 +155,7 @@ class RecipeDetailSheet implements FromArray, WithStyles, WithColumnWidths, With
                 $layanan = 'UM';
             }
 
-            $netto     = (float) $resepItems->sum('final_price');
+            $netto     = $resepItems->sum(fn ($i) => (int) ($i->final_price ?? 0));
             $shiftName = $trx->shift_logs?->shift?->name ?? '-';
             $tgl       = Carbon::parse($trx->shift_logs?->clock_in ?? $trx->created_at)->format('d/m/Y');
 
@@ -166,30 +166,30 @@ class RecipeDetailSheet implements FromArray, WithStyles, WithColumnWidths, With
                 $layanan,
                 $trx->doctors?->name  ?? '-',
                 $trx->patients?->name ?? '-',
-                $netto,
+                (int) $netto,
                 $shiftName,
             ];
 
-            $grandTotal += $netto;
-            if (is_numeric($trx->discount) && (float) $trx->discount > 0) {
-                $potonganTrx += (float) $trx->discount;
+            $grandTotal += (int) $netto;
+            if (is_numeric($trx->discount) && (int) $trx->discount > 0) {
+                $potonganTrx += (int) $trx->discount;
             }
         }
 
-        $rows[] = ['', '', '', '', '', 'TOTAL', $grandTotal, ''];
+        $rows[] = ['', '', '', '', '', 'TOTAL', (int) $grandTotal, ''];
 
         if ($potonganTrx > 0) {
             $rows[] = [
                 '', '', '', '', '',
                 'POTONGAN TRANSAKSI (DISKON NOTA)',
-                -$potonganTrx,
+                -(int) $potonganTrx,
                 '',
             ];
 
             $rows[] = [
                 '', '', '', '', '',
                 'TOTAL NETTO AKHIR',
-                $grandTotal - $potonganTrx,
+                (int) ($grandTotal - $potonganTrx),
                 '',
             ];
         }

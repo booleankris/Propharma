@@ -97,12 +97,12 @@ class ReturExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
 
         foreach ($headers as $rt) {
             $rtTime   = Carbon::parse($rt->created_at ?? $rt->updated_at);
-            $rtAmount = (int) round((float) $rt->subtotal);
+            $rtAmount = (int) ($rt->subtotal ?? 0);
 
             $match = $candidates->first(function ($r) use ($rtTime, $rtAmount, $used, $originCodes) {
                 return !isset($used[$r->id])
                     && isset($originCodes[$r->transaction_id])
-                    && (int) round((float) $r->total_retur) === $rtAmount
+                    && abs((float) $r->total_retur - (float) $rtAmount) < 1.0
                     && abs(Carbon::parse($r->created_at)->diffInSeconds($rtTime, false)) <= 10;
             });
 
@@ -112,13 +112,13 @@ class ReturExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                 $used[$match->id] = true;
                 $medicine = $medicines[$match->medicine_id] ?? null;
                 $qty      = (float) $match->qty_retur;
-                $total    = (float) $match->total_retur;
+                $total    = (int) ($rt->subtotal ?? ($match->total_retur ?? 0));
                 $origin   = $originCodes[$match->transaction_id] ?? '-';
                 $nomor    = 'RT/' . $origin;
                 $medName  = $medicine?->name ?? 'Obat Retur (Tanpa Master)';
             } else {
                 $qty     = 0;
-                $total   = (float) $rt->subtotal;
+                $total   = (int) ($rt->subtotal ?? 0);
                 $origin  = '-';
                 $nomor   = 'RT#' . $rt->id;
                 $medName = '[RETUR TANPA RINCIAN OBAT]';
@@ -131,11 +131,11 @@ class ReturExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                 $origin,
                 $medName,
                 $qty ? -$qty : 0,
-                $total ? -$total : 0,
+                $total ? -(int) $total : 0,
             ];
 
             $grandQty   += $qty;
-            $grandTotal += $total;
+            $grandTotal += (int) $total;
         }
 
         $rows[] = [
@@ -145,7 +145,7 @@ class ReturExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
             '',
             '',
             $grandQty ? -$grandQty : 0,
-            $grandTotal ? -$grandTotal : 0,
+            $grandTotal ? -(int) $grandTotal : 0,
         ];
 
         return $rows;

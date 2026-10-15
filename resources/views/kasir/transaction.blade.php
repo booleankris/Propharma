@@ -5758,4 +5758,345 @@
 </script>
 
 {{-- ------------------- Fixed Cart Card --------------------- --}}
+@php
+    $onlineWarningRoleNames = ['Online Shopee', 'Online Grab', 'Digital', 'Online'];
+    $userRoleNames = auth()->user()?->getRoleNames() ?? collect();
+    $onlineWarningRole = collect($onlineWarningRoleNames)->first(function ($expectedRole) use ($userRoleNames) {
+        return $userRoleNames->contains(fn ($roleName) => strcasecmp(trim($roleName), $expectedRole) === 0);
+    });
+    if ($onlineWarningRole) {
+        $onlineWarningRole = $userRoleNames->first(fn ($roleName) => strcasecmp(trim($roleName), $onlineWarningRole) === 0);
+    }
+@endphp
+@if ($onlineWarningRole)
+    <style>
+        .online-role-warning {
+            position: fixed;
+            inset: 0;
+            z-index: 1000000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            background: rgba(15, 23, 42, .45);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            animation: orw-fade-in .2s ease-out;
+        }
+
+        .online-role-warning.is-closing {
+            animation: orw-fade-out .18s ease-in forwards;
+        }
+
+        .online-role-warning.is-closing .online-role-warning__dialog {
+            animation: orw-pop-out .18s ease-in forwards;
+        }
+
+        .online-role-warning__dialog {
+            position: relative;
+            width: min(100%, 400px);
+            padding: 1.5rem;
+            border: .5px solid rgba(0, 0, 0, .08);
+            border-radius: 1rem;
+            background: #fff;
+            box-shadow: 0 20px 50px -12px rgba(15, 23, 42, .28);
+            overflow: hidden;
+            outline: none;
+            animation: orw-pop-in .26s cubic-bezier(.2, .9, .3, 1.2);
+        }
+
+        .online-role-warning__dialog::before {
+            content: '';
+            position: absolute;
+            inset: 0 0 auto 0;
+            height: 4px;
+            background: linear-gradient(90deg, #f59e0b, #f97316);
+        }
+
+        .online-role-warning__head {
+            display: flex;
+            align-items: flex-start;
+            gap: .85rem;
+        }
+
+        .online-role-warning__icon {
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 2.5rem;
+            height: 2.5rem;
+            border-radius: .75rem;
+            background: #fffbeb;
+            color: #d97706;
+            box-shadow: inset 0 0 0 1px #fde68a;
+        }
+
+        .online-role-warning__title {
+            margin: .1rem 0 .2rem;
+            color: #1f2937;
+            font-size: 15px;
+            font-weight: 600;
+        }
+
+        .online-role-warning__subtitle {
+            margin: 0;
+            color: #9ca3af;
+            font-size: 12px;
+        }
+
+        .online-role-warning__account {
+            display: flex;
+            align-items: center;
+            gap: .7rem;
+            margin-top: 1.1rem;
+            padding: .7rem .85rem;
+            border: 1px solid #f3f4f6;
+            border-radius: .75rem;
+            background: #f9fafb;
+        }
+
+        .online-role-warning__avatar {
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 2rem;
+            height: 2rem;
+            border-radius: .6rem;
+            background: #eff6ff;
+            color: #2196f3;
+        }
+
+        .online-role-warning__label {
+            display: block;
+            color: #9ca3af;
+            font-size: 11px;
+        }
+
+        .online-role-warning__role {
+            display: block;
+            color: #1f2937;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .online-role-warning__badge {
+            margin-left: auto;
+            padding: .2rem .55rem;
+            border-radius: 999px;
+            background: #fff7ed;
+            color: #c2410c;
+            font-size: 10.5px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .online-role-warning__message {
+            margin: .9rem 0 0;
+            color: #6b7280;
+            font-size: 12.5px;
+            line-height: 1.6;
+        }
+
+        .online-role-warning__message strong {
+            color: #374151;
+            font-weight: 600;
+        }
+
+        .online-role-warning__actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: .6rem;
+            margin-top: 1.25rem;
+        }
+
+        .online-role-warning__actions form {
+            margin: 0;
+        }
+
+        .online-role-warning__button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: .45rem;
+            width: 100%;
+            padding: .65rem 1rem;
+            border: 1px solid transparent;
+            border-radius: .75rem;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: background-color .15s ease, border-color .15s ease, transform .1s ease, box-shadow .15s ease;
+        }
+
+        .online-role-warning__button:active {
+            transform: scale(.97);
+        }
+
+        .online-role-warning__button--logout {
+            border-color: #fecaca;
+            background: #fff;
+            color: #dc2626;
+        }
+
+        .online-role-warning__button--logout:hover {
+            border-color: #fca5a5;
+            background: #fef2f2;
+        }
+
+        .online-role-warning__button--continue {
+            background: #2196f3;
+            color: #fff;
+            box-shadow: 0 4px 12px -4px rgba(33, 150, 243, .6);
+        }
+
+        .online-role-warning__button--continue:hover {
+            background: #1e88e5;
+        }
+
+        .online-role-warning__button:focus-visible {
+            outline: 2px solid #93c5fd;
+            outline-offset: 2px;
+        }
+
+        .online-role-warning__hint {
+            margin: .9rem 0 0;
+            color: #9ca3af;
+            font-size: 11px;
+            text-align: center;
+        }
+
+        .online-role-warning__hint kbd {
+            display: inline-flex;
+            align-items: center;
+            padding: 0 .3rem;
+            border: 1px solid #e5e7eb;
+            border-radius: .25rem;
+            background: #f9fafb;
+            color: #6b7280;
+            font-family: ui-monospace, monospace;
+            font-size: 10.5px;
+        }
+
+        @keyframes orw-fade-in { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes orw-fade-out { from { opacity: 1; } to { opacity: 0; } }
+        @keyframes orw-pop-in {
+            from { opacity: 0; transform: translateY(8px) scale(.96); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes orw-pop-out {
+            from { opacity: 1; transform: scale(1); }
+            to { opacity: 0; transform: scale(.96); }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .online-role-warning,
+            .online-role-warning__dialog {
+                animation: none !important;
+            }
+        }
+    </style>
+
+    <div class="online-role-warning" id="online-role-warning" role="alertdialog" aria-modal="true"
+        aria-labelledby="online-role-warning-title" aria-describedby="online-role-warning-message">
+        <section class="online-role-warning__dialog" tabindex="-1">
+            <div class="online-role-warning__head">
+                <div class="online-role-warning__icon" aria-hidden="true">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                        <line x1="12" y1="9" x2="12" y2="13" />
+                        <line x1="12" y1="17" x2="12.01" y2="17" />
+                    </svg>
+                </div>
+                <div>
+                    <h2 class="online-role-warning__title" id="online-role-warning-title">Peringatan akun</h2>
+                    <p class="online-role-warning__subtitle">Periksa akun sebelum memulai transaksi</p>
+                </div>
+            </div>
+
+            <div class="online-role-warning__account">
+                <div class="online-role-warning__avatar" aria-hidden="true">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                        <circle cx="12" cy="7" r="4" />
+                    </svg>
+                </div>
+                <div>
+                    <span class="online-role-warning__label">Login sebagai</span>
+                    <span class="online-role-warning__role">{{ $onlineWarningRole }}</span>
+                </div>
+                <span class="online-role-warning__badge">Bukan kasir</span>
+            </div>
+
+            <p class="online-role-warning__message" id="online-role-warning-message">
+                Anda sedang login dengan akun <strong>{{ $onlineWarningRole }}</strong>.
+                Jika ingin input sebagai <strong>kasir</strong>, silakan logout terlebih dahulu.
+            </p>
+
+            <div class="online-role-warning__actions">
+                <form action="{{ route('logout') }}" method="POST">
+                    @csrf
+                    <button class="online-role-warning__button online-role-warning__button--logout" id="online-role-warning-logout" type="submit">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                            <polyline points="16 17 21 12 16 7" />
+                            <line x1="21" y1="12" x2="9" y2="12" />
+                        </svg>
+                        Logout
+                    </button>
+                </form>
+                <button class="online-role-warning__button online-role-warning__button--continue" id="online-role-warning-continue" type="button">
+                    Lanjutkan
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <line x1="5" y1="12" x2="19" y2="12" />
+                        <polyline points="12 5 19 12 12 19" />
+                    </svg>
+                </button>
+            </div>
+
+            <p class="online-role-warning__hint">
+                Tekan <kbd>↵</kbd> untuk lanjutkan
+            </p>
+        </section>
+    </div>
+
+    <script>
+        (function () {
+            const warning = document.getElementById('online-role-warning');
+            const continueButton = document.getElementById('online-role-warning-continue');
+            if (!warning || !continueButton) return;
+
+            const close = function () {
+                if (warning.classList.contains('is-closing')) return;
+                warning.classList.add('is-closing');
+                document.removeEventListener('keydown', onKeydown, true);
+                setTimeout(function () {
+                    warning.remove();
+                    const productSearch = document.getElementById('productSearch');
+                    if (productSearch) {
+                        productSearch.focus();
+                        productSearch.select();
+                    }
+                }, 180);
+            };
+
+            const onKeydown = function (e) {
+                if (e.key === 'Enter' && document.activeElement?.id !== 'online-role-warning-logout') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    close();
+                }
+            };
+
+            continueButton.focus();
+            continueButton.addEventListener('click', close);
+            document.addEventListener('keydown', onKeydown, true);
+        })();
+    </script>
+@endif
 @endsection

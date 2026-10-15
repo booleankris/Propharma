@@ -251,10 +251,10 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
                 $medicine = $item->medicine;
                 $medCode  = $medicine->code ?? '-';
                 $medName  = $medicine->name ?? 'Obat Tidak Ditemukan';
-                $qty      = (int) ($item->quantity ?? 0);
-                $price    = (float) ($item->item_price ?? 0);
-                $discount = (float) ($item->discount ?? 0);
-                $final    = (float) ($item->final_price ?? ($item->total_price ?? ($qty * $price - $discount)));
+                $qty      = (float) ($item->quantity ?? 0);
+                $price    = (int) ($item->item_price ?? 0);
+                $discount = (int) ($item->discount ?? 0);
+                $final    = (int) ($item->final_price ?? ($item->total_price ?? ($qty * $price - $discount)));
 
                 $totalQty      += $qty;
                 $totalDiscount += $discount;
@@ -293,8 +293,8 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
             '',
             $totalQty,
             '',
-            $totalDiscount,
-            $totalAmount,
+            (int) $totalDiscount,
+            (int) $totalAmount,
             '',
             '',
             '',

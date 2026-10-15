@@ -107,12 +107,12 @@ class CategoryExport implements FromArray, WithStyles, WithColumnWidths, WithTit
 
         foreach ($headers as $rt) {
             $rtTime   = Carbon::parse($rt->created_at ?? $rt->updated_at);
-            $rtAmount = (int) round((float) $rt->subtotal);
+            $rtAmount = (int) ($rt->subtotal ?? 0);
 
             $match = $candidates->first(function ($r) use ($rtTime, $rtAmount, $used, $originCodes) {
                 return !isset($used[$r->id])
                     && isset($originCodes[$r->transaction_id])
-                    && (int) round((float) $r->total_retur) === $rtAmount
+                    && abs((float) $r->total_retur - (float) $rtAmount) < 1.0
                     && abs(Carbon::parse($r->created_at)->diffInSeconds($rtTime, false)) <= 10;
             });
 
@@ -123,14 +123,14 @@ class CategoryExport implements FromArray, WithStyles, WithColumnWidths, WithTit
                     'category' => $medicine?->category?->name ?? 'LAINNYA',
                     'name'     => $medicine?->name ?? 'Obat Retur (Tanpa Master)',
                     'qty'      => (float) $match->qty_retur,
-                    'total'    => (float) $match->total_retur,
+                    'total'    => (int) ($rt->subtotal ?? ($match->total_retur ?? 0)),
                 ];
             } else {
                 $returns[] = [
                     'category' => '[RETUR TANPA RINCIAN OBAT]',
                     'name'     => '[RETUR TANPA RINCIAN OBAT]',
                     'qty'      => 0,
-                    'total'    => (float) $rt->subtotal,
+                    'total'    => (int) ($rt->subtotal ?? 0),
                 ];
             }
         }
@@ -158,7 +158,7 @@ class CategoryExport implements FromArray, WithStyles, WithColumnWidths, WithTit
                 }
 
                 $grouped[$category]['qty']   += (float) ($item->quantity ?? 0);
-                $grouped[$category]['total'] += (float) ($item->final_price ?? 0);
+                $grouped[$category]['total'] += (int) ($item->final_price ?? 0);
             }
         }
 
@@ -173,8 +173,8 @@ class CategoryExport implements FromArray, WithStyles, WithColumnWidths, WithTit
                     'total_retur' => 0,
                 ];
             }
-            $grouped[$cat]['qty_retur']   += $ret['qty'];
-            $grouped[$cat]['total_retur'] += $ret['total'];
+            $grouped[$cat]['qty_retur']   += (float) $ret['qty'];
+            $grouped[$cat]['total_retur'] += (int) ($ret['total'] ?? 0);
         }
 
         ksort($grouped);
@@ -190,11 +190,11 @@ class CategoryExport implements FromArray, WithStyles, WithColumnWidths, WithTit
                 $no++,
                 $data['name'],
                 $data['qty'],
-                $data['total'],
+                (int) $data['total'],
                 $data['qty_retur'] ? -$data['qty_retur'] : 0,
-                $data['total_retur'] ? -$data['total_retur'] : 0,
+                $data['total_retur'] ? -(int) $data['total_retur'] : 0,
                 $data['qty'] - $data['qty_retur'],
-                $data['total'] - $data['total_retur'],
+                (int) ($data['total'] - $data['total_retur']),
             ];
 
             foreach ($grand as $k => $v) {
@@ -205,17 +205,17 @@ class CategoryExport implements FromArray, WithStyles, WithColumnWidths, WithTit
         $rows[] = [
             '', 'TOTAL',
             $grand['qty'],
-            $grand['total'],
+            (int) $grand['total'],
             $grand['qty_retur'] ? -$grand['qty_retur'] : 0,
-            $grand['total_retur'] ? -$grand['total_retur'] : 0,
+            $grand['total_retur'] ? -(int) $grand['total_retur'] : 0,
             $grand['qty'] - $grand['qty_retur'],
-            $grand['total'] - $grand['total_retur'],
+            (int) ($grand['total'] - $grand['total_retur']),
         ];
 
-        $potonganTransaksi = (float) $transactions->reject(function ($trx) {
+        $potonganTransaksi = (int) $transactions->reject(function ($trx) {
             return in_array(strtoupper(trim((string) $trx->transaction_type)), ['RETUR JUAL', 'RETUR KREDIT'], true)
                 || strtoupper(trim((string) $trx->transaction_code)) === 'RT';
-        })->sum(fn ($t) => is_numeric($t->discount) ? (float) $t->discount : 0);
+        })->sum(fn ($t) => (int) ($t->discount ?? 0));
 
         if ($potonganTransaksi > 0) {
             $rows[] = [
@@ -228,7 +228,7 @@ class CategoryExport implements FromArray, WithStyles, WithColumnWidths, WithTit
                 '', 'TOTAL NETTO AKHIR', '',
                 '', '', '',
                 $grand['qty'] - $grand['qty_retur'],
-                ($grand['total'] - $grand['total_retur']) - $potonganTransaksi,
+                (int) (($grand['total'] - $grand['total_retur']) - $potonganTransaksi),
             ];
         }
 
@@ -258,7 +258,7 @@ class CategoryExport implements FromArray, WithStyles, WithColumnWidths, WithTit
                 }
 
                 $grouped[$key]['qty']   += (float) ($item->quantity ?? 0);
-                $grouped[$key]['total'] += (float) ($item->final_price ?? 0);
+                $grouped[$key]['total'] += (int) ($item->final_price ?? 0);
             }
         }
 
@@ -275,8 +275,8 @@ class CategoryExport implements FromArray, WithStyles, WithColumnWidths, WithTit
                     'total_retur' => 0,
                 ];
             }
-            $grouped[$key]['qty_retur']   += $ret['qty'];
-            $grouped[$key]['total_retur'] += $ret['total'];
+            $grouped[$key]['qty_retur']   += (float) $ret['qty'];
+            $grouped[$key]['total_retur'] += (int) ($ret['total'] ?? 0);
         }
 
         uasort($grouped, function ($a, $b) {
@@ -297,11 +297,11 @@ class CategoryExport implements FromArray, WithStyles, WithColumnWidths, WithTit
                 $data['category'],
                 $data['name'],
                 $data['qty'],
-                $data['total'],
+                (int) $data['total'],
                 $data['qty_retur'] ? -$data['qty_retur'] : 0,
-                $data['total_retur'] ? -$data['total_retur'] : 0,
+                $data['total_retur'] ? -(int) $data['total_retur'] : 0,
                 $data['qty'] - $data['qty_retur'],
-                $data['total'] - $data['total_retur'],
+                (int) ($data['total'] - $data['total_retur']),
             ];
 
             foreach ($grand as $k => $v) {
@@ -312,17 +312,17 @@ class CategoryExport implements FromArray, WithStyles, WithColumnWidths, WithTit
         $rows[] = [
             '', 'TOTAL', '',
             $grand['qty'],
-            $grand['total'],
+            (int) $grand['total'],
             $grand['qty_retur'] ? -$grand['qty_retur'] : 0,
-            $grand['total_retur'] ? -$grand['total_retur'] : 0,
+            $grand['total_retur'] ? -(int) $grand['total_retur'] : 0,
             $grand['qty'] - $grand['qty_retur'],
-            $grand['total'] - $grand['total_retur'],
+            (int) ($grand['total'] - $grand['total_retur']),
         ];
 
-        $potonganTransaksi = (float) $transactions->reject(function ($trx) {
+        $potonganTransaksi = (int) $transactions->reject(function ($trx) {
             return in_array(strtoupper(trim((string) $trx->transaction_type)), ['RETUR JUAL', 'RETUR KREDIT'], true)
                 || strtoupper(trim((string) $trx->transaction_code)) === 'RT';
-        })->sum(fn ($t) => is_numeric($t->discount) ? (float) $t->discount : 0);
+        })->sum(fn ($t) => (int) ($t->discount ?? 0));
 
         if ($potonganTransaksi > 0) {
             $rows[] = [
@@ -335,7 +335,7 @@ class CategoryExport implements FromArray, WithStyles, WithColumnWidths, WithTit
                 '', 'TOTAL NETTO AKHIR', '',
                 '', '', '', '',
                 $grand['qty'] - $grand['qty_retur'],
-                ($grand['total'] - $grand['total_retur']) - $potonganTransaksi,
+                (int) (($grand['total'] - $grand['total_retur']) - $potonganTransaksi),
             ];
         }
 

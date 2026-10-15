@@ -2,7 +2,7 @@
 
 namespace App\Exports\Report;
 
-use App\Models\Factories;
+use App\Models\Factory;
 use App\Models\MedicineTransactions;
 use App\Models\Medicines;
 use App\Models\Pharmacies;
@@ -63,7 +63,7 @@ class FactoryExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
 
         $factoryName = null;
         if (!empty($this->factoryId)) {
-            $factoryObj  = Factories::find($this->factoryId);
+            $factoryObj  = Factory::find($this->factoryId);
             $factoryName = $factoryObj?->name;
         }
 
@@ -117,12 +117,12 @@ class FactoryExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
 
         foreach ($headers as $rt) {
             $rtTime   = Carbon::parse($rt->created_at ?? $rt->updated_at);
-            $rtAmount = (int) round((float) $rt->subtotal);
+            $rtAmount = (int) ($rt->subtotal ?? 0);
 
             $match = $candidates->first(function ($r) use ($rtTime, $rtAmount, $used, $originCodes) {
                 return !isset($used[$r->id])
                     && isset($originCodes[$r->transaction_id])
-                    && (int) round((float) $r->total_retur) === $rtAmount
+                    && abs((float) $r->total_retur - (float) $rtAmount) < 1.0
                     && abs(Carbon::parse($r->created_at)->diffInSeconds($rtTime, false)) <= 10;
             });
 
@@ -134,7 +134,7 @@ class FactoryExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
                     'factory'    => $medicine?->factory?->name ?? 'LAINNYA',
                     'name'       => $medicine?->name ?? 'Obat Retur (Tanpa Master)',
                     'qty'        => (float) $match->qty_retur,
-                    'total'      => (float) $match->total_retur,
+                    'total'      => (int) ($rt->subtotal ?? ($match->total_retur ?? 0)),
                 ];
             } else {
                 $returns[] = [
@@ -142,7 +142,7 @@ class FactoryExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
                     'factory'    => '[RETUR TANPA RINCIAN OBAT]',
                     'name'       => '[RETUR TANPA RINCIAN OBAT]',
                     'qty'        => 0,
-                    'total'      => (float) $rt->subtotal,
+                    'total'      => (int) ($rt->subtotal ?? 0),
                 ];
             }
         }
@@ -174,7 +174,7 @@ class FactoryExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
                 }
 
                 $grouped[$factory]['qty']   += (float) ($item->quantity ?? 0);
-                $grouped[$factory]['total'] += (float) ($item->final_price ?? 0);
+                $grouped[$factory]['total'] += (int) ($item->final_price ?? 0);
             }
         }
 
@@ -193,8 +193,8 @@ class FactoryExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
                     'total_retur' => 0,
                 ];
             }
-            $grouped[$fac]['qty_retur']   += $ret['qty'];
-            $grouped[$fac]['total_retur'] += $ret['total'];
+            $grouped[$fac]['qty_retur']   += (float) $ret['qty'];
+            $grouped[$fac]['total_retur'] += (int) ($ret['total'] ?? 0);
         }
 
         // Sort by highest sales
@@ -211,11 +211,11 @@ class FactoryExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
                 $no++,
                 $data['name'],
                 $data['qty'],
-                $data['total'],
+                (int) $data['total'],
                 $data['qty_retur'] ? -$data['qty_retur'] : 0,
-                $data['total_retur'] ? -$data['total_retur'] : 0,
+                $data['total_retur'] ? -(int) $data['total_retur'] : 0,
                 $data['qty'] - $data['qty_retur'],
-                $data['total'] - $data['total_retur'],
+                (int) ($data['total'] - $data['total_retur']),
             ];
 
             foreach ($grand as $k => $v) {
@@ -226,19 +226,19 @@ class FactoryExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
         $rows[] = [
             '', 'TOTAL',
             $grand['qty'],
-            $grand['total'],
+            (int) $grand['total'],
             $grand['qty_retur'] ? -$grand['qty_retur'] : 0,
-            $grand['total_retur'] ? -$grand['total_retur'] : 0,
+            $grand['total_retur'] ? -(int) $grand['total_retur'] : 0,
             $grand['qty'] - $grand['qty_retur'],
-            $grand['total'] - $grand['total_retur'],
+            (int) ($grand['total'] - $grand['total_retur']),
         ];
 
         // Jika menampilkan seluruh pabrik (tidak difilter 1 pabrik tertentu), tampilkan rekonsiliasi diskon transaksi
         if (empty($this->factoryId)) {
-            $potonganTransaksi = (float) $transactions->reject(function ($trx) {
+            $potonganTransaksi = (int) $transactions->reject(function ($trx) {
                 return in_array(strtoupper(trim((string) $trx->transaction_type)), ['RETUR JUAL', 'RETUR KREDIT'], true)
                     || strtoupper(trim((string) $trx->transaction_code)) === 'RT';
-            })->sum(fn ($t) => is_numeric($t->discount) ? (float) $t->discount : 0);
+            })->sum(fn ($t) => (int) ($t->discount ?? 0));
 
             if ($potonganTransaksi > 0) {
                 $rows[] = [
@@ -251,7 +251,7 @@ class FactoryExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
                     '', 'TOTAL NETTO AKHIR', '',
                     '', '', '',
                     $grand['qty'] - $grand['qty_retur'],
-                    ($grand['total'] - $grand['total_retur']) - $potonganTransaksi,
+                    (int) (($grand['total'] - $grand['total_retur']) - $potonganTransaksi),
                 ];
             }
         }
@@ -286,7 +286,7 @@ class FactoryExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
                 }
 
                 $grouped[$key]['qty']   += (float) ($item->quantity ?? 0);
-                $grouped[$key]['total'] += (float) ($item->final_price ?? 0);
+                $grouped[$key]['total'] += (int) ($item->final_price ?? 0);
             }
         }
 
@@ -307,8 +307,8 @@ class FactoryExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
                     'total_retur' => 0,
                 ];
             }
-            $grouped[$key]['qty_retur']   += $ret['qty'];
-            $grouped[$key]['total_retur'] += $ret['total'];
+            $grouped[$key]['qty_retur']   += (float) $ret['qty'];
+            $grouped[$key]['total_retur'] += (int) ($ret['total'] ?? 0);
         }
 
         uasort($grouped, function ($a, $b) {
@@ -329,11 +329,11 @@ class FactoryExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
                 $data['factory'],
                 $data['name'],
                 $data['qty'],
-                $data['total'],
+                (int) $data['total'],
                 $data['qty_retur'] ? -$data['qty_retur'] : 0,
-                $data['total_retur'] ? -$data['total_retur'] : 0,
+                $data['total_retur'] ? -(int) $data['total_retur'] : 0,
                 $data['qty'] - $data['qty_retur'],
-                $data['total'] - $data['total_retur'],
+                (int) ($data['total'] - $data['total_retur']),
             ];
 
             foreach ($grand as $k => $v) {
@@ -344,18 +344,18 @@ class FactoryExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
         $rows[] = [
             '', 'TOTAL', '',
             $grand['qty'],
-            $grand['total'],
+            (int) $grand['total'],
             $grand['qty_retur'] ? -$grand['qty_retur'] : 0,
-            $grand['total_retur'] ? -$grand['total_retur'] : 0,
+            $grand['total_retur'] ? -(int) $grand['total_retur'] : 0,
             $grand['qty'] - $grand['qty_retur'],
-            $grand['total'] - $grand['total_retur'],
+            (int) ($grand['total'] - $grand['total_retur']),
         ];
 
         if (empty($this->factoryId)) {
-            $potonganTransaksi = (float) $transactions->reject(function ($trx) {
+            $potonganTransaksi = (int) $transactions->reject(function ($trx) {
                 return in_array(strtoupper(trim((string) $trx->transaction_type)), ['RETUR JUAL', 'RETUR KREDIT'], true)
                     || strtoupper(trim((string) $trx->transaction_code)) === 'RT';
-            })->sum(fn ($t) => is_numeric($t->discount) ? (float) $t->discount : 0);
+            })->sum(fn ($t) => (int) ($t->discount ?? 0));
 
             if ($potonganTransaksi > 0) {
                 $rows[] = [
@@ -368,7 +368,7 @@ class FactoryExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
                     '', 'TOTAL NETTO AKHIR', '',
                     '', '', '', '',
                     $grand['qty'] - $grand['qty_retur'],
-                    ($grand['total'] - $grand['total_retur']) - $potonganTransaksi,
+                    (int) (($grand['total'] - $grand['total_retur']) - $potonganTransaksi),
                 ];
             }
         }
