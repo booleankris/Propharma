@@ -41,20 +41,14 @@ class LiphTransactionScope
         $shift = null
     ): Builder {
         $start = $start->copy()->startOfDay();
-        $until = $end->copy()->endOfDay()->addDay()->startOfDay();
+        $until = $end->copy()->addDay()->startOfDay();
 
         $query->where(function (Builder $period) use ($start, $until) {
-            $period->whereHas('shift_logs', function (Builder $shiftQuery) use ($start, $until) {
-                $shiftQuery->where('clock_in', '>=', $start)->where('clock_in', '<', $until);
-            })->orWhere(function (Builder $withoutShiftTime) use ($start, $until) {
-                $withoutShiftTime->whereDoesntHave('shift_logs', fn (Builder $q) => $q->whereNotNull('clock_in'))
-                    ->where(function (Builder $recorded) use ($start, $until) {
-                        $recorded->where('created_at', '>=', $start)->where('created_at', '<', $until)
-                            ->orWhere(function (Builder $legacy) use ($start, $until) {
-                                $legacy->whereNull('created_at')
-                                    ->where('updated_at', '>=', $start)->where('updated_at', '<', $until);
-                            });
-                    });
+            $period->where(function (Builder $main) use ($start, $until) {
+                $main->where('created_at', '>=', $start)->where('created_at', '<', $until);
+            })->orWhere(function (Builder $legacy) use ($start, $until) {
+                $legacy->whereNull('created_at')
+                    ->where('updated_at', '>=', $start)->where('updated_at', '<', $until);
             });
         });
 

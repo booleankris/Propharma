@@ -157,7 +157,7 @@ class RecipeDetailSheet implements FromArray, WithStyles, WithColumnWidths, With
 
             $netto     = $resepItems->sum(fn ($i) => (int) ($i->final_price ?? 0));
             $shiftName = $trx->shift_logs?->shift?->name ?? '-';
-            $tgl       = Carbon::parse($trx->shift_logs?->clock_in ?? $trx->created_at)->format('d/m/Y');
+            $tgl       = Carbon::parse($trx->created_at ?? $trx->updated_at ?? $trx->shift_logs?->clock_in)->format('d/m/Y');
 
             $rows[] = [
                 $no++,

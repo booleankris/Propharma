@@ -3,6 +3,7 @@
 namespace App\Exports\Report;
 
 use App\Models\MedicineTransactions;
+use App\Support\LiphTransactionScope;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Carbon;
 
@@ -52,13 +53,14 @@ class LiphPdfExport
 
     private function buildData(): array
     {
-        $transactions = MedicineTransactions::with('transactions')
+        $query = MedicineTransactions::with('transactions')
             ->where('pharmacy_id', $this->pharmacyId)
-            ->where('status', 1)
-            ->whereDate('created_at', '>=', $this->startDate->toDateString())
-            ->whereDate('created_at', '<=', $this->endDate->toDateString())
-            ->whereIn('transaction_type', array_keys(self::TYPE_MAP))
-            ->get();
+            ->whereIn('transaction_type', array_keys(self::TYPE_MAP));
+
+        LiphTransactionScope::applySalesStatus($query);
+        LiphTransactionScope::applyPeriod($query, $this->startDate, $this->endDate);
+
+        $transactions = $query->get();
 
         $grouped = [];
 

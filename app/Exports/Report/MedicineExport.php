@@ -40,9 +40,7 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
 
     public function array(): array
     {
-        // Samakan dasar periode & status dengan LIPH: tanggal = mulai shift
-        // (clock_in), bukan updated_at transaksi. Shift yang melewati tengah
-        // malam sebelumnya terpecah ke dua tanggal sehingga total tidak klop.
+        // Samakan dasar periode & status dengan LIPH: tanggal = waktu transaksi selesai (created_at).
         $query = MedicineTransactions::with([
             'transactions' => fn ($q) => $q->where('status', 1),
             'transactions.medicine.factory',
@@ -133,7 +131,7 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
                     && abs(Carbon::parse($r->created_at)->diffInSeconds($rtTime, false)) <= 10;
             });
 
-            $date = Carbon::parse($rt->shift_logs?->clock_in ?? $rt->created_at ?? $rt->updated_at);
+            $date = Carbon::parse($rt->created_at ?? $rt->updated_at ?? $rt->shift_logs?->clock_in);
 
             if ($match) {
                 $used[$match->id] = true;
@@ -406,7 +404,7 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
         $medicineIds = [];
 
         foreach ($transactions as $trx) {
-            $trxDate = Carbon::parse($trx->shift_logs?->clock_in ?? $trx->created_at ?? $trx->updated_at);
+            $trxDate = Carbon::parse($trx->created_at ?? $trx->updated_at ?? $trx->shift_logs?->clock_in);
             $monthKey = $trxDate->format('Y-m');
 
             foreach ($trx->transactions ?? [] as $item) {

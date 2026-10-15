@@ -4,7 +4,9 @@ namespace App\Exports\Report;
 
 use App\Models\MedicineTransactions;
 use App\Models\Pharmacies;
+use App\Support\LiphTransactionScope;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\WithColumnWidths;
 use Maatwebsite\Excel\Concerns\WithStyles;
@@ -128,18 +130,27 @@ class SalesDataDetailSheet implements FromArray, WithStyles, WithColumnWidths, W
                 'transactions.user.roles',
                 'patients',
                 'user.roles',
-            ])
-            ->where('status', 1);
+            ]);
+
+        LiphTransactionScope::applySalesStatus($query);
 
         if ($this->pharmacyId) {
             $query->where('pharmacy_id', $this->pharmacyId);
         }
 
-        if ($startDateObj) {
-            $query->whereDate('updated_at', '>=', $startDateObj->format('Y-m-d'));
-        }
-        if ($endDateObj) {
-            $query->whereDate('updated_at', '<=', $endDateObj->format('Y-m-d'));
+        if ($startDateObj || $endDateObj) {
+            $start = $startDateObj ? $startDateObj->copy()->startOfDay() : null;
+            $end   = $endDateObj ? $endDateObj->copy()->addDay()->startOfDay() : null;
+            $query->where(function ($period) use ($start, $end) {
+                $period->where(function ($main) use ($start, $end) {
+                    if ($start) $main->where('created_at', '>=', $start);
+                    if ($end)   $main->where('created_at', '<', $end);
+                })->orWhere(function ($legacy) use ($start, $end) {
+                    $legacy->whereNull('created_at');
+                    if ($start) $legacy->where('updated_at', '>=', $start);
+                    if ($end)   $legacy->where('updated_at', '<', $end);
+                });
+            });
         }
 
         if ($this->channel) {
@@ -194,7 +205,7 @@ class SalesDataDetailSheet implements FromArray, WithStyles, WithColumnWidths, W
             });
         }
 
-        $transactions = $query->orderBy('updated_at', 'ASC')->get();
+        $transactions = $query->orderBy(DB::raw('COALESCE(created_at, updated_at)'), 'ASC')->get();
 
         $no = 1;
         $grandQty = 0;

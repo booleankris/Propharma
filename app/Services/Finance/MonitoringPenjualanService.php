@@ -3,6 +3,7 @@
 namespace App\Services\Finance;
 
 use App\Models\MedicineTransactions;
+use App\Support\LiphTransactionScope;
 use Carbon\CarbonPeriod;
 use Illuminate\Support\Collection;
 
@@ -122,10 +123,10 @@ class MonitoringPenjualanService
                 'user.roles',
                 'shift_logs.shift',
             ])
-            ->where('status', 1)
             ->whereIn('pharmacy_id', $pharmacyIds)
             ->whereDate('created_at', '>=', $startDate)
             ->whereDate('created_at', '<=', $endDate)
+            ->tap(fn ($q) => LiphTransactionScope::applySalesStatus($q))
             ->orderBy('created_at')
             ->get();
 
@@ -134,7 +135,14 @@ class MonitoringPenjualanService
             if (!$date || !isset($days[$date])) continue;
 
             $shiftName = mb_strtolower(trim((string) ($transaction->shift_logs?->shift?->name ?? '')));
-            $shiftKey = str_contains($shiftName, 'malam') ? 'evening' : (str_contains($shiftName, 'pagi') || str_contains($shiftName, 'siang') ? 'morning' : 'otherShift');
+            if (str_contains($shiftName, 'malam') || str_contains($shiftName, 'siang') || str_contains($shiftName, 'sore')) {
+                $shiftKey = 'evening';
+            } elseif (str_contains($shiftName, 'pagi')) {
+                $shiftKey = 'morning';
+            } else {
+                $time = optional($transaction->created_at)->format('H:i:s') ?? '12:00:00';
+                $shiftKey = ($time >= '15:31:00') ? 'evening' : 'morning';
+            }
             $shift = &$days[$date][$shiftKey];
             $items = $transaction->transactions;
             $users = collect([$transaction->user])->concat($items->pluck('user'))->filter()->unique('id');

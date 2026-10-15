@@ -106,7 +106,7 @@ class ReturExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                     && abs(Carbon::parse($r->created_at)->diffInSeconds($rtTime, false)) <= 10;
             });
 
-            $tgl = Carbon::parse($rt->shift_logs?->clock_in ?? $rt->created_at ?? $rt->updated_at)->format('d/m/Y');
+            $tgl = Carbon::parse($rt->created_at ?? $rt->updated_at ?? $rt->shift_logs?->clock_in)->format('d/m/Y');
 
             if ($match) {
                 $used[$match->id] = true;
