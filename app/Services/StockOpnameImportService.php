@@ -519,6 +519,14 @@ class StockOpnameImportService
             $exportJob->markProcessing();
         }
 
+        // Honor target_mode and pharmacy_id from analyzed session to prevent UI desync
+        if (!empty($payload['target_mode'])) {
+            $targetMode = $payload['target_mode'];
+        }
+        if (!empty($payload['pharmacy_id'])) {
+            $pharmacyId = (int) $payload['pharmacy_id'];
+        }
+
         $warehouseId = getWarehousePharmacyId();
         $counterPharmacyId = isWarehousePharmacy($pharmacyId) ? 1 : $pharmacyId;
         $batchTargetPharmacyId = ($targetMode === 'gudang') ? $warehouseId : $counterPharmacyId;
@@ -532,23 +540,22 @@ class StockOpnameImportService
             $rowsByMedicine[(int) $row['medicine_id']][] = $row;
         }
 
-        // Preload sequence numbers once before loop to avoid 15,000+ sequential LIKE queries
+        // Preload sequence numbers once before loop using reliable numeric MAX query
         $now = Carbon::now();
         $year = $now->format('y');
         $month = $now->format('m');
 
         $opnamePrefix = "SO-{$year}{$month}";
-        $lastOpnameCode = ItemsLog::where('code', 'like', "{$opnamePrefix}%")
-            ->where('status', 5)
-            ->orderBy('code', 'desc')
-            ->value('code');
-        $opnameSeq = $lastOpnameCode ? ((int) substr($lastOpnameCode, -4)) : 0;
+        $opnameSeq = (int) DB::table('items_log')
+            ->where('transaction_code', 'like', "{$opnamePrefix}%")
+            ->selectRaw("MAX(CAST(SUBSTRING(transaction_code, " . (strlen($opnamePrefix) + 1) . ") AS UNSIGNED)) as max_seq")
+            ->value('max_seq');
 
         $itemsLogPrefix = "{$year}{$month}LOG-";
-        $lastLogCode = ItemsLog::where('code', 'like', "{$itemsLogPrefix}%")
-            ->orderBy('code', 'desc')
-            ->value('code');
-        $logSeq = $lastLogCode ? ((int) substr($lastLogCode, -4)) : 0;
+        $logSeq = (int) DB::table('items_log')
+            ->where('code', 'like', "{$itemsLogPrefix}%")
+            ->selectRaw('MAX(CAST(SUBSTRING_INDEX(code, "-", -1) AS UNSIGNED)) as max_seq')
+            ->value('max_seq');
 
         DB::beginTransaction();
 
@@ -605,14 +612,15 @@ class StockOpnameImportService
 
                 $assignedBatchIds = [];
                 $lastResolvedBatch = null;
+                $physicalByBatch = [];
+                $etalaseByBatch = [];
 
-                // Process each row/batch for this medicine
+                // 1. Resolve target batch and accumulate physical stock per batch
                 foreach ($medRows as $row) {
                     $stockPhysic = (int) $row['stock'];
                     $expiredDate = $row['expired_date'];
                     $etalasesId  = $row['etalases_id'];
 
-                    // 1. Resolve target batch
                     // a. Exact date match
                     $batch = $existingBatches->first(function ($b) use ($expiredDate) {
                         try {
@@ -627,7 +635,14 @@ class StockOpnameImportService
                         try {
                             $targetYm = Carbon::parse($expiredDate)->format('Y-m');
                             $batch = $existingBatches->first(function ($b) use ($targetYm, $assignedBatchIds) {
-                                return !in_array($b->id, $assignedBatchIds) && $b->expired_date && Carbon::parse($b->expired_date)->format('Y-m') === $targetYm;
+                                if (in_array($b->id, $assignedBatchIds) || empty($b->expired_date)) {
+                                    return false;
+                                }
+                                try {
+                                    return Carbon::parse($b->expired_date)->format('Y-m') === $targetYm;
+                                } catch (\Throwable $e) {
+                                    return false;
+                                }
                             });
                             if ($batch) {
                                 $batch->expired_date = $expiredDate;
@@ -656,18 +671,28 @@ class StockOpnameImportService
                     $assignedBatchIds[] = $batch->id;
                     $lastResolvedBatch  = $batch;
 
-                    // 2. Set physical stock for the resolved batch
+                    $physicalByBatch[$batch->id] = ($physicalByBatch[$batch->id] ?? 0) + $stockPhysic;
+                    if (!empty($etalasesId)) {
+                        $etalaseByBatch[$batch->id] = $etalasesId;
+                    }
+                }
+
+                // 2. Set physical stock for all resolved batches
+                foreach ($physicalByBatch as $batchId => $targetStock) {
                     if ($targetMode === 'gudang') {
-                        $batch->stock = $stockPhysic;
-                        $batch->save();
+                        $batch = $existingBatches->firstWhere('id', $batchId);
+                        if ($batch) {
+                            $batch->stock = $targetStock;
+                            $batch->save();
+                        }
                     } else {
-                        $transfers = clone $allExistingTransfers->get($batch->id, collect());
+                        $transfers = clone $allExistingTransfers->get($batchId, collect());
 
                         if ($transfers->isNotEmpty()) {
                             $primary = $transfers->first();
-                            $primary->qty = $stockPhysic;
-                            if ($etalasesId) {
-                                $primary->etalases_id = $etalasesId;
+                            $primary->qty = $targetStock;
+                            if (!empty($etalaseByBatch[$batchId])) {
+                                $primary->etalases_id = $etalaseByBatch[$batchId];
                             }
                             $primary->save();
 
@@ -686,19 +711,19 @@ class StockOpnameImportService
 
                             $newItem = MedicineTransferItems::create([
                                 'medicine_transfer_id' => $transferHeader->id,
-                                'batches_id'           => $batch->id,
-                                'source_batches_id'    => $batch->id,
-                                'qty'                  => $stockPhysic,
+                                'batches_id'           => $batchId,
+                                'source_batches_id'    => $batchId,
+                                'qty'                  => $targetStock,
                                 'status'               => 1,
                                 'source_type'          => 'pelayanan',
-                                'etalases_id'          => $etalasesId,
+                                'etalases_id'          => $etalaseByBatch[$batchId] ?? null,
                             ]);
-                            $allExistingTransfers->put($batch->id, collect([$newItem]));
+                            $allExistingTransfers->put($batchId, collect([$newItem]));
                         }
                     }
                 }
 
-                $allAssignedBatchIds = array_merge($allAssignedBatchIds, $assignedBatchIds);
+                $allAssignedBatchIds = array_merge($allAssignedBatchIds, array_unique($assignedBatchIds));
 
                 // 4. Record Opname header & ItemsLog adjustment
                 $opnameSeq++;
@@ -788,7 +813,7 @@ class StockOpnameImportService
                     $exportJob->setProgress(92);
                 }
 
-                $canSeeWarehouse = canAccessWarehouseStock($pharmacyId);
+                $canSeeWarehouse = ($targetMode === 'gudang') || canAccessWarehouseStock($pharmacyId);
                 $storageStocks = $canSeeWarehouse
                     ? Batches::whereIn('medicine_id', $medIds)
                         ->where('pharmacy_id', $warehouseId)
@@ -873,6 +898,13 @@ class StockOpnameImportService
      */
     private function executeOpeningBalanceImport(array $payload, int $pharmacyId, string $targetMode, int $userId, string $filePath, ?int $jobId): array
     {
+        if (!empty($payload['target_mode'])) {
+            $targetMode = $payload['target_mode'];
+        }
+        if (!empty($payload['pharmacy_id'])) {
+            $pharmacyId = (int) $payload['pharmacy_id'];
+        }
+
         $effectiveDate = Carbon::parse($payload['effective_date'] ?? '')->endOfDay();
         $reconcileThrough = Carbon::parse($payload['reconcile_opname_through'] ?? $effectiveDate->toDateString())->endOfDay();
         $allRows = $payload['rows'] ?? [];
@@ -903,11 +935,17 @@ class StockOpnameImportService
             $year = now()->format('y');
             $month = now()->format('m');
             $opnamePrefix = "SO-{$year}{$month}";
-            $lastOpnameCode = ItemsLog::where('code', 'like', "{$opnamePrefix}%")->where('status', 5)->orderBy('code', 'desc')->value('code');
-            $opnameSeq = $lastOpnameCode ? (int) substr($lastOpnameCode, -4) : 0;
+            $opnameSeq = (int) DB::table('items_log')
+                ->where('transaction_code', 'like', "{$opnamePrefix}%")
+                ->selectRaw("MAX(CAST(SUBSTRING(transaction_code, " . (strlen($opnamePrefix) + 1) . ") AS UNSIGNED)) as max_seq")
+                ->value('max_seq');
+
             $logPrefix = "{$year}{$month}LOG-";
-            $lastLogCode = ItemsLog::where('code', 'like', "{$logPrefix}%")->orderBy('code', 'desc')->value('code');
-            $logSeq = $lastLogCode ? (int) substr($lastLogCode, -4) : 0;
+            $logSeq = (int) DB::table('items_log')
+                ->where('code', 'like', "{$logPrefix}%")
+                ->selectRaw('MAX(CAST(SUBSTRING_INDEX(code, "-", -1) AS UNSIGNED)) as max_seq')
+                ->value('max_seq');
+
             $processed = 0;
             $touched = [];
             $transferHeaderId = null;
@@ -1161,7 +1199,7 @@ class StockOpnameImportService
                     ->whereIn('batches.medicine_id', $medIds)->where('batches.pharmacy_id', $counterPharmacyId)
                     ->groupBy('batches.medicine_id')->selectRaw('batches.medicine_id, SUM(medicine_transfer_items.qty) as total')
                     ->pluck('total', 'batches.medicine_id')->all();
-                $storageStocks = canAccessWarehouseStock($pharmacyId)
+                $storageStocks = (($targetMode === 'gudang') || canAccessWarehouseStock($pharmacyId))
                     ? Batches::whereIn('medicine_id', $medIds)->where('pharmacy_id', $warehouseId)->groupBy('medicine_id')->selectRaw('medicine_id, SUM(stock) as total')->pluck('total', 'medicine_id')->all()
                     : [];
 
@@ -1253,13 +1291,12 @@ class StockOpnameImportService
         $month = $now->format('m');
         $prefix = "SO-{$year}{$month}";
 
-        $lastCode = ItemsLog::where('code', 'like', "{$prefix}%")
-            ->where('status', 5)
-            ->orderBy('code', 'desc')
-            ->value('code');
+        $maxSeq = (int) DB::table('items_log')
+            ->where('transaction_code', 'like', "{$prefix}%")
+            ->selectRaw("MAX(CAST(SUBSTRING(transaction_code, " . (strlen($prefix) + 1) . ") AS UNSIGNED)) as max_seq")
+            ->value('max_seq');
 
-        $nextNumber = $lastCode ? ((int) substr($lastCode, -4)) + 1 : 1;
-        return $prefix . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+        return $prefix . str_pad($maxSeq + 1, 4, '0', STR_PAD_LEFT);
     }
 
     private function generateItemsLogCode(): string
@@ -1267,23 +1304,12 @@ class StockOpnameImportService
         $now = Carbon::now();
         $prefix = $now->format('ym') . 'LOG-';
 
-        $lastCode = ItemsLog::where('code', 'like', "{$prefix}%")
-            ->orderBy('id', 'desc')
-            ->value('code');
+        $maxSeq = (int) DB::table('items_log')
+            ->where('code', 'like', "{$prefix}%")
+            ->selectRaw('MAX(CAST(SUBSTRING_INDEX(code, "-", -1) AS UNSIGNED)) as max_seq')
+            ->value('max_seq');
 
-        if (!$lastCode) {
-            $lastCode = ItemsLog::where('code', 'like', "{$prefix}%")
-                ->orderByRaw('LENGTH(code) DESC, code DESC')
-                ->value('code');
-        }
-
-        $nextNumber = 1;
-        if ($lastCode) {
-            $parts = explode('LOG-', $lastCode);
-            $nextNumber = ((int) ($parts[1] ?? substr($lastCode, -4))) + 1;
-        }
-
-        return $prefix . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+        return $prefix . str_pad($maxSeq + 1, 4, '0', STR_PAD_LEFT);
     }
 
     private function generateTransfersCode(): string

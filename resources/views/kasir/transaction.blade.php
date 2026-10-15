@@ -134,7 +134,7 @@
                     <div id="live-date" class="trx-date">Memuat tanggal...</div>
                     <div id="live-time" class="trx-time">Memuat waktu...</div>
                     <div class="trx-badge mt-2">
-                        {{ 'Shift : ' . $shift->name }}
+                        {{ 'Shift : ' . ($shift?->name ?? ($activeshift ? 'Shift tidak ditemukan' : 'Belum mulai shift')) }}
                     </div>
                 </div>
 
@@ -1902,7 +1902,7 @@
 
     // Patient
     const user_id = {{ auth()->user()->id }};
-    const shift_logs_id = {{ $activeshift->id }}
+    const shift_logs_id = @json($activeshift?->id);
     const inputpatient = document.getElementById('patientSearch');
     const patientname = document.getElementById('patientname');
     const patientbox = document.getElementById('patientResults');

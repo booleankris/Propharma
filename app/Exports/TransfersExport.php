@@ -127,7 +127,7 @@ class TransfersExport implements FromQuery, WithHeadings, WithMapping, ShouldAut
             $medicine?->name ?? '-',
             $item->batches?->name ?? '-',
             $item->etalases?->name ?? '-',
-            $item->qty,
+            $item->original_qty ?? $item->qty,
             $statusMap[$item->status] ?? '-',
         ];
     }

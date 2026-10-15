@@ -1313,45 +1313,30 @@ class SuppliesController extends Controller
     public function generateOpnameCode()
     {
         $now = Carbon::now();
-
         $year = $now->format('y');
         $month = $now->format('m');
         $prefix = "SO-{$year}{$month}";
 
-        $lastCode = ItemsLog::where('code', 'like', "{$prefix}%")
-            ->whereIn('status', [5, 6])
-            ->orderBy('code', 'desc')
-            ->value('code');
+        $maxSeq = (int) DB::table('items_log')
+            ->where('transaction_code', 'like', "{$prefix}%")
+            ->selectRaw("MAX(CAST(SUBSTRING(transaction_code, " . (strlen($prefix) + 1) . ") AS UNSIGNED)) as max_seq")
+            ->value('max_seq');
 
-        if ($lastCode) {
-            $lastNumber = (int) substr($lastCode, -4);
-            $nextNumber = $lastNumber + 1;
-        } else {
-            $nextNumber = 1;
-        }
-
-        return $prefix . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+        return $prefix . str_pad($maxSeq + 1, 4, '0', STR_PAD_LEFT);
     }
     function generateItemsLogCode()
     {
         $now = Carbon::now();
-
         $year = $now->format('y');
         $month = $now->format('m');
         $prefix = "{$year}{$month}LOG-";
 
-        $lastCode = ItemsLog::where('code', 'like', "{$prefix}%")
-            ->orderBy('code', 'desc')
-            ->value('code');
+        $maxSeq = (int) DB::table('items_log')
+            ->where('code', 'like', "{$prefix}%")
+            ->selectRaw('MAX(CAST(SUBSTRING_INDEX(code, "-", -1) AS UNSIGNED)) as max_seq')
+            ->value('max_seq');
 
-        if ($lastCode) {
-            $lastNumber = (int) substr($lastCode, -4);
-            $nextNumber = $lastNumber + 1;
-        } else {
-            $nextNumber = 1;
-        }
-
-        return $prefix . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+        return $prefix . str_pad($maxSeq + 1, 4, '0', STR_PAD_LEFT);
     }
 
     public function generateTransfersCode()

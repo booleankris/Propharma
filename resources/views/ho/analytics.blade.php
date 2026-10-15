@@ -852,7 +852,7 @@
                                 <option value="empty">Stok Kosong</option>
                             </select>
                             <div class="relative w-full sm:w-64">
-                                <input type="text" id="search_stock_table" placeholder="Cari obat..." class="w-full pl-10 pr-4 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all">
+                                <input type="text" id="search_stock_table" placeholder="Cari nama atau kode obat..." class="w-full pl-10 pr-4 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search absolute left-3 top-2.5 text-slate-400" width="18" height="18" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                                     <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
                                     <path d="M10 10m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0"></path>
@@ -866,7 +866,8 @@
                         <table class="w-full text-left border-collapse min-w-max">
                             <thead>
                                 <tr class="bg-slate-50 border-b border-slate-100 text-[10px] font-black uppercase tracking-widest text-slate-500">
-                                    <th class="p-4 rounded-tl-xl">Nama Obat</th>
+                                    <th class="p-4 rounded-tl-xl">Kode Obat</th>
+                                    <th class="p-4">Nama Obat</th>
                                     <th class="p-4 text-center">Stok Gudang</th>
                                     <th class="p-4 text-center">Stok PMI</th>
                                     <th class="p-4 text-center">Stok ASM</th>
@@ -876,7 +877,7 @@
                             </thead>
                             <tbody id="stock_table_body" class="text-xs sm:text-sm text-slate-700 divide-y divide-slate-50">
                                 <tr>
-                                    <td colspan="6" class="p-8 text-center text-slate-400">
+                                    <td colspan="7" class="p-8 text-center text-slate-400">
                                         <svg class="animate-spin h-6 w-6 text-indigo-500 mx-auto mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                                         Memuat data...
                                     </td>
@@ -1402,12 +1403,82 @@
         let stockFilterValue = 'all';
         let stockSearchTimer = null;
 
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function copyMedicineCode(code, element) {
+            if (!code) return;
+
+            const fallbackCopy = (text) => {
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                ta.style.position = 'fixed';
+                ta.style.left = '-9999px';
+                ta.style.top = '-9999px';
+                document.body.appendChild(ta);
+                ta.focus();
+                ta.select();
+                try {
+                    document.execCommand('copy');
+                } catch (e) {
+                    console.error('Fallback copy failed', e);
+                } finally {
+                    document.body.removeChild(ta);
+                }
+            };
+
+            const triggerFeedback = () => {
+                if (element) {
+                    const iconContainer = element.querySelector('.copy-icon');
+                    if (iconContainer) {
+                        const originalHtml = iconContainer.innerHTML;
+                        iconContainer.innerHTML = `
+                            <svg class="w-3.5 h-3.5 text-emerald-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                        `;
+                        element.classList.add('bg-emerald-50', 'border-emerald-200');
+                        setTimeout(() => {
+                            iconContainer.innerHTML = originalHtml;
+                            element.classList.remove('bg-emerald-50', 'border-emerald-200');
+                        }, 1500);
+                    }
+                }
+
+                if (window.iziToast) {
+                    iziToast.success({
+                        title: 'Disalin',
+                        message: `Kode ${code} berhasil disalin`,
+                        position: 'topRight',
+                        timeout: 1500
+                    });
+                }
+            };
+
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(code).then(triggerFeedback).catch(() => {
+                    fallbackCopy(code);
+                    triggerFeedback();
+                });
+            } else {
+                fallbackCopy(code);
+                triggerFeedback();
+            }
+        }
+
         async function fetchStockTable(page = 1) {
             currentStockPage = page;
             const tbody = document.getElementById('stock_table_body');
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="6" class="p-8 text-center text-slate-400">
+                    <td colspan="7" class="p-8 text-center text-slate-400">
                         <svg class="animate-spin h-6 w-6 text-indigo-500 mx-auto mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                         Memuat data...
                     </td>
@@ -1432,7 +1503,7 @@
                 console.error(err);
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="6" class="p-8 text-center text-red-500">
+                        <td colspan="7" class="p-8 text-center text-red-500">
                             Gagal memuat data stok. Silakan coba lagi.
                         </td>
                     </tr>
@@ -1448,7 +1519,7 @@
             if (!data.data || data.data.length === 0) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="6" class="p-8 text-center text-slate-400">
+                        <td colspan="7" class="p-8 text-center text-slate-400">
                             Tidak ada data obat ditemukan.
                         </td>
                     </tr>
@@ -1459,36 +1530,53 @@
             }
 
             // Render Rows
-            tbody.innerHTML = data.data.map(item => `
-                <tr class="hover:bg-slate-50 transition-colors">
-                    <td class="p-4 font-medium">${item.name}</td>
-                    <td class="p-4 text-center">
-                        <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-bold ${item.gudang_qty > 0 ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-500'}">
-                            ${parseInt(item.gudang_qty || 0).toLocaleString('id-ID')}
-                        </span>
-                    </td>
-                    <td class="p-4 text-center">
-                        <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-bold ${item.pmi_qty > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}">
-                            ${parseInt(item.pmi_qty || 0).toLocaleString('id-ID')}
-                        </span>
-                    </td>
-                    <td class="p-4 text-center">
-                        <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-bold ${item.asm_qty > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}">
-                            ${parseInt(item.asm_qty || 0).toLocaleString('id-ID')}
-                        </span>
-                    </td>
-                    <td class="p-4 text-center">
-                        <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-bold ${item.mim_qty > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}">
-                            ${parseInt(item.mim_qty || 0).toLocaleString('id-ID')}
-                        </span>
-                    </td>
-                    <td class="p-4 text-center">
-                        <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-bold ${item.asa_qty > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}">
-                            ${parseInt(item.asa_qty || 0).toLocaleString('id-ID')}
-                        </span>
-                    </td>
-                </tr>
-            `).join('');
+            tbody.innerHTML = data.data.map(item => {
+                const codeHtml = item.code 
+                    ? `<button type="button" onclick="copyMedicineCode('${escapeHtml(item.code)}', this)" 
+                              class="group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-indigo-50 border border-slate-200/80 hover:border-indigo-200 text-slate-700 hover:text-indigo-700 font-mono text-xs font-semibold transition-all cursor-pointer shadow-2xs active:scale-95" 
+                              title="Klik untuk salin kode obat">
+                           <span class="code-text">${escapeHtml(item.code)}</span>
+                           <span class="copy-icon text-slate-400 group-hover:text-indigo-600 transition-colors">
+                               <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                   <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                   <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                               </svg>
+                           </span>
+                       </button>`
+                    : `<span class="text-slate-400 font-mono text-xs">-</span>`;
+
+                return `
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td class="p-4 whitespace-nowrap">${codeHtml}</td>
+                        <td class="p-4 font-medium text-slate-800">${escapeHtml(item.name)}</td>
+                        <td class="p-4 text-center">
+                            <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-bold ${item.gudang_qty > 0 ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-500'}">
+                                ${parseInt(item.gudang_qty || 0).toLocaleString('id-ID')}
+                            </span>
+                        </td>
+                        <td class="p-4 text-center">
+                            <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-bold ${item.pmi_qty > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}">
+                                ${parseInt(item.pmi_qty || 0).toLocaleString('id-ID')}
+                            </span>
+                        </td>
+                        <td class="p-4 text-center">
+                            <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-bold ${item.asm_qty > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}">
+                                ${parseInt(item.asm_qty || 0).toLocaleString('id-ID')}
+                            </span>
+                        </td>
+                        <td class="p-4 text-center">
+                            <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-bold ${item.mim_qty > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}">
+                                ${parseInt(item.mim_qty || 0).toLocaleString('id-ID')}
+                            </span>
+                        </td>
+                        <td class="p-4 text-center">
+                            <span class="inline-flex px-2.5 py-1 rounded-full text-xs font-bold ${item.asa_qty > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}">
+                                ${parseInt(item.asa_qty || 0).toLocaleString('id-ID')}
+                            </span>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
 
             // Render Info
             info.innerText = `Menampilkan ${data.from} - ${data.to} dari ${data.total} obat`;

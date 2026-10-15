@@ -101,10 +101,13 @@ class HODashboardController extends Controller
                 AND (mt.source_type IS NULL OR mt.source_type != 'retur_gudang')
                 GROUP BY b.medicine_id
             ) as asa"), 'asa.medicine_id', '=', 'm.id')
-            ->select('m.name', 'g.gudang_qty', 'pmi.pmi_qty', 'asm.asm_qty', 'mim.mim_qty', 'asa.asa_qty');
+            ->select('m.id', 'm.code', 'm.name', 'g.gudang_qty', 'pmi.pmi_qty', 'asm.asm_qty', 'mim.mim_qty', 'asa.asa_qty');
 
         if (!empty($search)) {
-            $query->where('m.name', 'LIKE', '%' . $search . '%');
+            $query->where(function ($q) use ($search) {
+                $q->where('m.name', 'LIKE', '%' . $search . '%')
+                  ->orWhere('m.code', 'LIKE', '%' . $search . '%');
+            });
         }
 
         // Apply Stock Filter using HAVING so we can reference the aliases

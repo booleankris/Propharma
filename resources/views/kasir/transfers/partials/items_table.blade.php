@@ -38,7 +38,7 @@
                     </td>
                     <td class="py-4 px-6 text-center whitespace-nowrap">
                         <span class="inline-flex items-center px-3 py-1 rounded-lg bg-emerald-50 text-emerald-700 font-mono text-xs font-bold border border-emerald-200 shadow-sm">
-                            {{ $item->qty }} {{ $item->batches?->medicines?->unit ?? '' }}
+                            {{ $item->original_qty ?? $item->qty }} {{ $item->batches?->medicines?->unit ?? '' }}
                         </span>
                     </td>
                     <td class="py-4 px-6 text-center whitespace-nowrap">
@@ -59,7 +59,7 @@
                                     @csrf
                                     <button type="submit"
                                         class="inline-flex items-center gap-1 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-semibold rounded-lg transition shadow-sm"
-                                        onclick="return confirm('Terima obat {{ $item->batches?->medicines?->name }} (Qty: {{ $item->qty }})?')">
+                                        onclick="return confirm('Terima obat {{ $item->batches?->medicines?->name }} (Qty: {{ $item->original_qty ?? $item->qty }})?')">
                                         <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
                                             <polyline points="20 6 9 17 4 12" />
                                         </svg>
@@ -70,7 +70,7 @@
                                     @csrf
                                     <button type="submit"
                                         class="inline-flex items-center gap-1 px-3 py-1.5 bg-white border border-slate-200 hover:bg-rose-50 hover:border-rose-200 hover:text-rose-600 text-slate-600 text-[11px] font-semibold rounded-lg transition shadow-sm"
-                                        onclick="return confirm('Tolak mutasi {{ $item->batches?->medicines?->name }} (Qty: {{ $item->qty }})?')">
+                                        onclick="return confirm('Tolak mutasi {{ $item->batches?->medicines?->name }} (Qty: {{ $item->original_qty ?? $item->qty }})?')">
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                                         </svg>
