@@ -189,9 +189,23 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
                 ->whereBetween('updated_at', [$this->startDate, $this->endDate]);
 
             if ($this->shiftType === 'shift' && !empty($this->shift)) {
-                $query->whereHas('shift_logs', function ($q) {
-                    $q->where('shift_id', $this->shift);
-                });
+                $shiftObj = is_numeric($this->shift) ? \App\Models\Shifts::find($this->shift) : null;
+                $shiftName = $shiftObj ? strtoupper(trim($shiftObj->name)) : strtoupper(trim((string) $this->shift));
+
+                if ($shiftName === 'PAGI' || $this->shift == 2) {
+                    $query->whereTime('updated_at', '<=', '15:30:59');
+                } elseif ($shiftName === 'SIANG' || $this->shift == 3) {
+                    $query->whereTime('updated_at', '>=', '15:31:00');
+                } elseif ($shiftName === 'MALAM' || $this->shift == 1) {
+                    $query->where(function ($q) {
+                        $q->whereTime('updated_at', '>=', '23:01:00')
+                          ->orWhereTime('updated_at', '<', '08:00:00');
+                    });
+                } else {
+                    $query->whereHas('shift_logs', function ($q) {
+                        $q->where('shift_id', $this->shift);
+                    });
+                }
             }
 
             $transactions = $query->orderBy('updated_at', 'asc')->get()

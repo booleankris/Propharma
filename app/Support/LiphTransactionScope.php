@@ -53,7 +53,41 @@ class LiphTransactionScope
         });
 
         if (in_array($shiftType, ['shift', 'online'], true) && !empty($shift)) {
-            $query->whereHas('shift_logs', fn (Builder $q) => $q->where('shift_id', $shift));
+            $shiftObj = is_numeric($shift) ? \App\Models\Shifts::find($shift) : null;
+            $shiftName = $shiftObj ? strtoupper(trim($shiftObj->name)) : strtoupper(trim((string) $shift));
+
+            if ($shiftName === 'PAGI' || $shift == 2) {
+                $query->where(function (Builder $q) {
+                    $q->whereTime('created_at', '<=', '15:30:59')
+                      ->orWhere(function (Builder $sub) {
+                          $sub->whereNull('created_at')
+                              ->whereTime('updated_at', '<=', '15:30:59');
+                      });
+                });
+            } elseif ($shiftName === 'SIANG' || $shift == 3) {
+                $query->where(function (Builder $q) {
+                    $q->whereTime('created_at', '>=', '15:31:00')
+                      ->orWhere(function (Builder $sub) {
+                          $sub->whereNull('created_at')
+                              ->whereTime('updated_at', '>=', '15:31:00');
+                      });
+                });
+            } elseif ($shiftName === 'MALAM' || $shift == 1) {
+                $query->where(function (Builder $q) {
+                    $q->where(function (Builder $time) {
+                        $time->whereTime('created_at', '>=', '23:01:00')
+                             ->orWhereTime('created_at', '<', '08:00:00');
+                    })->orWhere(function (Builder $sub) {
+                        $sub->whereNull('created_at')
+                            ->where(function (Builder $time) {
+                                $time->whereTime('updated_at', '>=', '23:01:00')
+                                     ->orWhereTime('updated_at', '<', '08:00:00');
+                            });
+                    });
+                });
+            } else {
+                $query->whereHas('shift_logs', fn (Builder $q) => $q->where('shift_id', $shift));
+            }
         }
 
         return $query;

@@ -134,15 +134,8 @@ class MonitoringPenjualanService
             $date = optional($transaction->created_at)->toDateString();
             if (!$date || !isset($days[$date])) continue;
 
-            $shiftName = mb_strtolower(trim((string) ($transaction->shift_logs?->shift?->name ?? '')));
-            if (str_contains($shiftName, 'malam') || str_contains($shiftName, 'siang') || str_contains($shiftName, 'sore')) {
-                $shiftKey = 'evening';
-            } elseif (str_contains($shiftName, 'pagi')) {
-                $shiftKey = 'morning';
-            } else {
-                $time = optional($transaction->created_at)->format('H:i:s') ?? '12:00:00';
-                $shiftKey = ($time >= '15:31:00') ? 'evening' : 'morning';
-            }
+            $time = optional($transaction->created_at)->format('H:i:s') ?? '12:00:00';
+            $shiftKey = ($time <= '15:30:59') ? 'morning' : 'evening';
             $shift = &$days[$date][$shiftKey];
             $items = $transaction->transactions;
             $users = collect([$transaction->user])->concat($items->pluck('user'))->filter()->unique('id');

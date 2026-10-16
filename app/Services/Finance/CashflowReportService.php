@@ -19,15 +19,13 @@ class CashflowReportService
             ->groupBy('transaction_id');
 
         $records = DB::table('medicine_transactions as mt')
-            ->leftJoin('shift_logs as sl', 'sl.id', '=', 'mt.shift_logs_id')
-            ->leftJoin('shift as s', 's.id', '=', 'sl.shift_id')
             ->leftJoinSub($itemDiscounts, 'cart_discounts', fn ($join) => $join->on('cart_discounts.transaction_id', '=', 'mt.id'))
             ->where('mt.status', 1)
             ->whereIn('mt.pharmacy_id', $pharmacyIds)
             ->whereDate('mt.created_at', '>=', $startDate)
             ->whereDate('mt.created_at', '<=', $endDate)
-            ->selectRaw("DATE(mt.created_at) as sale_date, s.name as shift_name, UPPER(TRIM(COALESCE(mt.payment_method, ''))) as payment_method, TRIM(COALESCE(mt.transfer_bank_name, '')) as bank_name, mt.transaction_type, COUNT(*) as transaction_count, SUM(CAST(COALESCE(NULLIF(mt.subtotal, ''), '0') AS DECIMAL(15,2)) - CAST(COALESCE(NULLIF(mt.discount, ''), '0') AS DECIMAL(15,2))) as amount, SUM(CAST(COALESCE(NULLIF(mt.subtotal, ''), '0') AS DECIMAL(15,2)) + COALESCE(cart_discounts.item_discount, 0)) as gross_amount, SUM(CAST(COALESCE(NULLIF(mt.discount, ''), '0') AS DECIMAL(15,2))) as transaction_discount, SUM(COALESCE(cart_discounts.item_discount, 0)) as item_discount")
-            ->groupByRaw("DATE(mt.created_at), s.name, UPPER(TRIM(COALESCE(mt.payment_method, ''))), TRIM(COALESCE(mt.transfer_bank_name, '')), mt.transaction_type")
+            ->selectRaw("DATE(mt.created_at) as sale_date, CASE WHEN TIME(mt.created_at) <= '15:30:59' THEN 'PAGI' ELSE 'SIANG' END as shift_name, UPPER(TRIM(COALESCE(mt.payment_method, ''))) as payment_method, TRIM(COALESCE(mt.transfer_bank_name, '')) as bank_name, mt.transaction_type, COUNT(*) as transaction_count, SUM(CAST(COALESCE(NULLIF(mt.subtotal, ''), '0') AS DECIMAL(15,2)) - CAST(COALESCE(NULLIF(mt.discount, ''), '0') AS DECIMAL(15,2))) as amount, SUM(CAST(COALESCE(NULLIF(mt.subtotal, ''), '0') AS DECIMAL(15,2)) + COALESCE(cart_discounts.item_discount, 0)) as gross_amount, SUM(CAST(COALESCE(NULLIF(mt.discount, ''), '0') AS DECIMAL(15,2))) as transaction_discount, SUM(COALESCE(cart_discounts.item_discount, 0)) as item_discount")
+            ->groupByRaw("DATE(mt.created_at), CASE WHEN TIME(mt.created_at) <= '15:30:59' THEN 'PAGI' ELSE 'SIANG' END, UPPER(TRIM(COALESCE(mt.payment_method, ''))), TRIM(COALESCE(mt.transfer_bank_name, '')), mt.transaction_type")
             ->orderBy('sale_date')
             ->get();
 
@@ -51,7 +49,7 @@ class CashflowReportService
             ];
 
             $shiftName = mb_strtolower(trim((string) $record->shift_name));
-            $shiftKey = str_contains($shiftName, 'pagi') ? 'morning' : (str_contains($shiftName, 'malam') ? 'evening' : 'otherShift');
+            $shiftKey = str_contains($shiftName, 'pagi') ? 'morning' : 'evening';
             $method = $record->payment_method;
             $bank = mb_strtoupper(trim((string) $record->bank_name));
             $bankKey = 'OTHER';

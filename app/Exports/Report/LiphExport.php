@@ -309,7 +309,6 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         // HEADER
         $rows[] = [$this->pharmacyName];
         $rows[] = [$this->pharmacyAddress];
-        $rows[] = ['Dasar tanggal: mulai shift; tanpa waktu shift memakai tanggal pencatatan transaksi.'];
         $titleSuffix = $this->customTitle ? ' - ' . $this->customTitle : '';
         $shiftLabel = 'Seluruh';
         if ($this->hasShiftFilter()) {
@@ -471,20 +470,19 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         $sheet->mergeCells("A2:{$lastCol}2");
         $sheet->mergeCells("A3:{$lastCol}3");
         $sheet->mergeCells("A4:{$lastCol}4");
-        $sheet->mergeCells("A5:{$lastCol}5");
 
         $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
 
-        $sheet->getStyle("A1:{$lastCol}5")
+        $sheet->getStyle("A1:{$lastCol}4")
             ->getAlignment()
             ->setVertical(Alignment::VERTICAL_CENTER);
-        $sheet->getStyle("A1:{$lastCol}5")
+        $sheet->getStyle("A1:{$lastCol}4")
             ->getAlignment()
             ->setHorizontal(Alignment::HORIZONTAL_LEFT);
         /*
-    | TABLE HEADER (ROW 7)
+    | TABLE HEADER (ROW 6)
     */
-        $sheet->getStyle("A7:{$lastCol}7")->applyFromArray([
+        $sheet->getStyle("A6:{$lastCol}6")->applyFromArray([
             'font' => ['bold' => true],
             'alignment' => [
                 'horizontal' => Alignment::HORIZONTAL_CENTER,
@@ -498,7 +496,7 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         /*
     | CONTENT
     */
-        for ($row = 8; $row <= $lastRow; $row++) {
+        for ($row = 7; $row <= $lastRow; $row++) {
 
             $A = trim((string)$sheet->getCell("A{$row}")->getValue());
             $B = trim((string)$sheet->getCell("B{$row}")->getValue());
