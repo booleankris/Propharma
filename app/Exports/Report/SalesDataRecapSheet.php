@@ -233,10 +233,10 @@ class SalesDataRecapSheet implements FromArray, WithStyles, WithColumnWidths, Wi
             $items = $trx->transactions;
 
             $rawSubtotal = $items->isNotEmpty()
-                ? $items->sum(fn ($i) => (float) ($i->total_price ?? ($i->item_price * $i->quantity)))
-                : (is_numeric($trx->subtotal) ? (float) $trx->subtotal : 0);
-            $itemDiscount = $items->sum(fn ($i) => (float) ($i->discount ?? 0));
-            $cartDiscount = is_numeric($trx->discount) ? (float) $trx->discount : 0;
+                ? $items->sum(fn ($i) => (int) ($i->total_price ?? ($i->item_price * $i->quantity)))
+                : (is_numeric($trx->subtotal) ? (int) $trx->subtotal : 0);
+            $itemDiscount = $items->sum(fn ($i) => (int) ($i->discount ?? 0));
+            $cartDiscount = is_numeric($trx->discount) ? (int) $trx->discount : 0;
 
             if ($isReturn) {
                 $subtotal = -abs($rawSubtotal);
@@ -246,7 +246,7 @@ class SalesDataRecapSheet implements FromArray, WithStyles, WithColumnWidths, Wi
             } else {
                 $subtotal = $rawSubtotal;
                 $netto = $items->isNotEmpty()
-                    ? ($items->sum(fn ($i) => (float) ($i->final_price ?? ($i->total_price - $i->discount))) - $cartDiscount)
+                    ? ($items->sum(fn ($i) => (int) ($i->final_price ?? ($i->total_price - $i->discount))) - $cartDiscount)
                     : ($subtotal - $cartDiscount);
             }
 

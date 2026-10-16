@@ -234,7 +234,7 @@ class SalesDataDetailSheet implements FromArray, WithStyles, WithColumnWidths, W
             $patientName = $trx->patients?->name ?? 'Umum / Tanpa Pasien';
 
             $isReturn = in_array(strtoupper(trim((string) $trx->transaction_type)), ['RETUR JUAL', 'RETUR KREDIT'], true) || strtoupper(trim((string) ($trx->transaction_code ?? ''))) === 'RT';
-            $cartDiscount = is_numeric($trx->discount) ? (float) $trx->discount : 0;
+            $cartDiscount = is_numeric($trx->discount) ? (int) $trx->discount : 0;
             $items = $trx->transactions;
 
             $payMethod = \App\Support\PaymentMethod::label(
@@ -243,7 +243,7 @@ class SalesDataDetailSheet implements FromArray, WithStyles, WithColumnWidths, W
             );
 
             if ($items->isEmpty()) {
-                $subtotal = is_numeric($trx->subtotal) ? (float) $trx->subtotal : 0;
+                $subtotal = is_numeric($trx->subtotal) ? (int) $trx->subtotal : 0;
                 $netto = $isReturn ? -abs($subtotal) : ($subtotal - $cartDiscount);
                 $qty = $isReturn ? -1 : 0;
                 $medName = $isReturn ? '[RETUR PENJUALAN]' : '-';
@@ -273,10 +273,10 @@ class SalesDataDetailSheet implements FromArray, WithStyles, WithColumnWidths, W
                 foreach ($items as $item) {
                     $medCode = $item->medicine?->code ?? '-';
                     $medName = $item->medicine?->name ?? ($item->medicine_name ?? '-');
-                    $price = (float) ($item->item_price ?? 0);
+                    $price = (int) ($item->item_price ?? 0);
                     $qty = (float) ($item->quantity ?? 0);
-                    $itemDiscount = (float) ($item->discount ?? 0);
-                    $itemTot = (float) ($item->final_price ?? $item->total_price ?? ($price * $qty - $itemDiscount));
+                    $itemDiscount = (int) ($item->discount ?? 0);
+                    $itemTot = (int) ($item->final_price ?? $item->total_price ?? ($price * $qty - $itemDiscount));
 
                     if ($isReturn) {
                         $price = -abs($price);
