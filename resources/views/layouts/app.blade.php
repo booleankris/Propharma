@@ -163,8 +163,11 @@
                 window.axios.interceptors.response.use(
                     response => response,
                     error => {
+                        const url = error.config?.url || '';
                         if (error.response && (error.response.status === 419 || error.response.status === 401)) {
-                            handleExpiredSession();
+                            if (!url.includes('/verifypin')) {
+                                handleExpiredSession();
+                            }
                         }
                         return Promise.reject(error);
                     }
@@ -172,7 +175,11 @@
             }
 
             if (window.jQuery) {
-                $(document).ajaxError(function(event, jqXHR) {
+                $(document).ajaxError(function(event, jqXHR, ajaxSettings) {
+                    const url = ajaxSettings?.url || '';
+                    if (url.indexOf('verifypin') !== -1) {
+                        return;
+                    }
                     if (jqXHR.status === 419 || jqXHR.status === 401) {
                         handleExpiredSession();
                     }

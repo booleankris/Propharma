@@ -1521,7 +1521,7 @@ class SalesController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'PIN salah, silahkan coba lagi'
-            ], 401);
+            ], 200);
         }
 
         return response()->json([

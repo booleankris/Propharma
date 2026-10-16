@@ -17,6 +17,48 @@
                     }
                 }
                 $headerMap = [];
+                $supplierNameColumn = null;
+                $supplierCodeColumn = null;
+                foreach ($rows as $candidateRow) {
+                    if (!is_array($candidateRow)) continue;
+                    $candidateHeaders = array_map(fn($c) => strtolower(trim((string)$c)), $candidateRow);
+                    $supplierNameColumn = array_search('nm_kreditur', $candidateHeaders, true);
+                    if ($supplierNameColumn !== false) {
+                        $supplierCodeColumn = array_search('kd_kreditur', $candidateHeaders, true);
+                        break;
+                    }
+                    $supplierNameColumn = null;
+                }
+                $mergedCellSpans = [];
+                $mergedCellSkips = [];
+                if ($supplierNameColumn !== null && $supplierNameColumn !== false) {
+                    for ($i = 0; $i < count($rows); $i++) {
+                        if (!is_array($rows[$i] ?? null)) continue;
+                        $supplierName = trim((string)($rows[$i][$supplierNameColumn] ?? ''));
+                        if ($supplierName === '' || stripos($supplierName, 'subtotal') === 0 || strtoupper($supplierName) === 'TOTAL') continue;
+                        $span = 1;
+                        for ($j = $i + 1; $j < count($rows); $j++) {
+                            if (!is_array($rows[$j] ?? null)) break;
+                            $nextName = trim((string)($rows[$j][$supplierNameColumn] ?? ''));
+                            $nextCode = $supplierCodeColumn !== false && $supplierCodeColumn !== null
+                                ? trim((string)($rows[$j][$supplierCodeColumn] ?? ''))
+                                : '';
+                            if ($nextName !== '' || $nextCode !== '') break;
+                            $span++;
+                            $mergedCellSkips[$j][$supplierNameColumn] = true;
+                            if ($supplierCodeColumn !== false && $supplierCodeColumn !== null) {
+                                $mergedCellSkips[$j][$supplierCodeColumn] = true;
+                            }
+                        }
+                        if ($span > 1) {
+                            $mergedCellSpans[$i][$supplierNameColumn] = $span;
+                            if ($supplierCodeColumn !== false && $supplierCodeColumn !== null) {
+                                $mergedCellSpans[$i][$supplierCodeColumn] = $span;
+                            }
+                        }
+                        $i += $span - 1;
+                    }
+                }
             @endphp
             @foreach($rows as $rowIndex => $row)
                 @php
@@ -78,6 +120,9 @@
                             </td>
                         @else
                             @foreach($row as $colIndex => $col)
+                                @if(isset($mergedCellSkips[$rowIndex][$colIndex]))
+                                    @continue
+                                @endif
                                 @php
                                     $colStr = trim((string)$col);
                                     $colHeader = $headerMap[$colIndex] ?? '';
@@ -121,7 +166,7 @@
                                     $isNoCol = ($colIndex === 0 && !$isHeader && $colStr !== '');
                                     $isCenterCol = $isHeader || $isNoCol || stripos($colHeader, 'kode') !== false || stripos($colHeader, 'struk') !== false || stripos($colHeader, 'tanggal') !== false || stripos($colHeader, 'shift') !== false;
                                 @endphp
-                                <td class="px-3 py-1.5 border border-slate-200 {{ $isCenterCol ? 'text-center' : ($isNumeric ? 'text-right' : 'text-left') }} {{ $isNumeric && (float)$col < 0 ? 'text-red-600' : '' }}">
+                                <td @if(isset($mergedCellSpans[$rowIndex][$colIndex])) rowspan="{{ $mergedCellSpans[$rowIndex][$colIndex] }}" @endif class="px-3 py-1.5 border border-slate-200 align-middle {{ $isCenterCol ? 'text-center' : ($isNumeric ? 'text-right' : 'text-left') }} {{ $isNumeric && (float)$col < 0 ? 'text-red-600' : '' }}">
                                     @if($shouldNotFormat)
                                         {{ $col }}
                                     @elseif($isNumeric)

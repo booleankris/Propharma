@@ -190,14 +190,46 @@ class PurchasePaymentExport implements FromArray, WithStyles, WithColumnWidths, 
             $invoices[$key]['jumlah'] += $jumlah;
         }
 
+        if ($this->reportType === 'Kredit') {
+            uasort($invoices, fn ($a, $b) => [
+                mb_strtolower((string) ($a['creditor_name'] ?? '')),
+                mb_strtolower((string) ($a['creditor_code'] ?? '')),
+                mb_strtolower((string) ($a['invoice_number'] ?? '')),
+            ] <=> [
+                mb_strtolower((string) ($b['creditor_name'] ?? '')),
+                mb_strtolower((string) ($b['creditor_code'] ?? '')),
+                mb_strtolower((string) ($b['invoice_number'] ?? '')),
+            ]);
+        }
+
         $rows = [];
         $rows[] = $tableHeaders;
 
         $grandDpp = 0.0;
         $grandPpn = 0.0;
         $grandTotal = 0.0;
+        $activeSupplierKey = null;
+        $activeSupplierName = '';
+        $supplierDpp = 0.0;
+        $supplierPpn = 0.0;
+        $supplierTotal = 0.0;
 
         foreach ($invoices as $inv) {
+            $supplierKey = (string) ($inv['creditor_code'] ?? '') . '|' . (string) ($inv['creditor_name'] ?? '');
+            $isCreditReport = $this->reportType === 'Kredit';
+            if ($isCreditReport && $activeSupplierKey !== null && $supplierKey !== $activeSupplierKey) {
+                $rows[] = ['', 'SUBTOTAL - ' . $activeSupplierName, '', '', '', '', $supplierDpp, $supplierPpn, $supplierTotal, '', '', ''];
+                $supplierDpp = $supplierPpn = $supplierTotal = 0.0;
+            }
+            $isFirstSupplierInvoice = !$isCreditReport || $supplierKey !== $activeSupplierKey;
+            if ($isCreditReport) {
+                $activeSupplierKey = $supplierKey;
+                $activeSupplierName = $inv['creditor_name'] ?? 'PBF / Vendor';
+                $supplierDpp += $inv['dpp'];
+                $supplierPpn += $inv['ppn'];
+                $supplierTotal += $inv['jumlah'];
+            }
+
             $tglFaktur = $inv['invoice_date']
                 ? Carbon::parse($inv['invoice_date'])->format('d/m/Y') : '-';
             $tglTerima = ReceivingDateFilter::format($inv['receiving_date'], $inv['receiving_details_created_at']);
@@ -221,8 +253,8 @@ class PurchasePaymentExport implements FromArray, WithStyles, WithColumnWidths, 
             } else {
                 // Konsinyasi / Tunai: NM_KREDITUR | KD_KREDITUR | NO_FAKTUR | TGL_FAKTUR | NO_TERIMA | TGL_TERIMA | DPP | PPN | JUMLAH | JTH_TEMPO | WKT_KREDIT | JNS_BAYAR
                 $rows[] = [
-                    $inv['creditor_name'] ?? '-',
-                    $inv['creditor_code'] ?? '-',
+                    $isFirstSupplierInvoice ? ($inv['creditor_name'] ?? '-') : '',
+                    $isFirstSupplierInvoice ? ($inv['creditor_code'] ?? '-') : '',
                     $inv['invoice_number'] ?? '-',
                     $tglFaktur,
                     $inv['receiving_details_code'] ?? '-',
@@ -239,6 +271,10 @@ class PurchasePaymentExport implements FromArray, WithStyles, WithColumnWidths, 
             $grandDpp += $inv['dpp'];
             $grandPpn += $inv['ppn'];
             $grandTotal += $inv['jumlah'];
+        }
+
+        if ($this->reportType === 'Kredit' && $activeSupplierKey !== null) {
+            $rows[] = ['', 'SUBTOTAL - ' . $activeSupplierName, '', '', '', '', $supplierDpp, $supplierPpn, $supplierTotal, '', '', ''];
         }
 
         // Total Row
@@ -296,6 +332,43 @@ class PurchasePaymentExport implements FromArray, WithStyles, WithColumnWidths, 
         $sheet->getStyle("A{$dataStartRow}:{$lastCol}{$lastRow}")
             ->getAlignment()
             ->setHorizontal(Alignment::HORIZONTAL_LEFT);
+
+        if ($this->reportType === 'Kredit') {
+            $row = $dataStartRow + 1;
+            while ($row < $lastRow) {
+                $supplierName = trim((string) $sheet->getCell("A{$row}")->getValue());
+                $supplierCode = trim((string) $sheet->getCell("B{$row}")->getValue());
+                if (stripos($supplierCode, 'SUBTOTAL') === 0) {
+                    $sheet->getStyle("A{$row}:{$lastCol}{$row}")->getFont()->setBold(true);
+                    $row++;
+                    continue;
+                }
+                if ($supplierName === '' || stripos($supplierName, 'subtotal') === 0 || strtoupper($supplierName) === 'TOTAL') {
+                    $row++;
+                    continue;
+                }
+
+                $startRow = $row;
+                $endRow = $row;
+                for ($next = $row + 1; $next < $lastRow; $next++) {
+                    $nextName = trim((string) $sheet->getCell("A{$next}")->getValue());
+                    $nextCode = trim((string) $sheet->getCell("B{$next}")->getValue());
+                    if ($nextName !== '' || $nextCode !== '') {
+                        break;
+                    }
+                    $endRow = $next;
+                }
+
+                if ($endRow > $startRow) {
+                    $sheet->mergeCells("A{$startRow}:A{$endRow}");
+                    $sheet->mergeCells("B{$startRow}:B{$endRow}");
+                    $sheet->getStyle("A{$startRow}:B{$endRow}")
+                        ->getAlignment()
+                        ->setVertical(Alignment::VERTICAL_CENTER);
+                }
+                $row = $endRow + 1;
+            }
+        }
 
         foreach ($numericCols as $col) {
             $sheet->getStyle("{$col}{$dataStartRow}:{$col}{$lastRow}")
