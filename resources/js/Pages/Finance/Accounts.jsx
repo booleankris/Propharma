@@ -10,6 +10,7 @@ import {
     Check,
     Edit3,
     Trash2,
+    Copy,
     HelpCircle,
     Building2,
     Landmark,
@@ -35,6 +36,7 @@ export default function Accounts({
     const [isSubmittingAccount, setIsSubmittingAccount] = useState(false);
     const [deletingAccount, setDeletingAccount] = useState(null);
     const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+    const [copiedAccountCode, setCopiedAccountCode] = useState(null);
 
     // Custom Category Support
     const [isCustomCategory, setIsCustomCategory] = useState(false);
@@ -85,6 +87,33 @@ export default function Accounts({
 
         const next = maxNum + 1;
         return `${prefix}${String(next).padStart(2, '0')}`;
+    };
+
+    const copyAccountCode = async (account) => {
+        const code = String(account?.code || '').trim();
+        if (!code) return;
+
+        try {
+            if (navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(code);
+            } else {
+                const input = document.createElement('textarea');
+                input.value = code;
+                input.setAttribute('readonly', '');
+                input.style.position = 'fixed';
+                input.style.opacity = '0';
+                document.body.appendChild(input);
+                input.select();
+                const copied = document.execCommand('copy');
+                document.body.removeChild(input);
+                if (!copied) throw new Error('Clipboard tidak tersedia');
+            }
+
+            setCopiedAccountCode(account.id);
+            window.setTimeout(() => setCopiedAccountCode((current) => current === account.id ? null : current), 1600);
+        } catch (error) {
+            alert('Kode akun gagal disalin. Silakan pilih dan salin kodenya secara manual.');
+        }
     };
 
     const categoryList = useMemo(() => {
@@ -431,7 +460,20 @@ export default function Accounts({
                                     filteredAccounts.map((acc) => (
                                         <tr key={acc.id} className="hover:bg-slate-50/80 transition group">
                                             <td className="py-3 px-4 font-mono font-bold text-blue-700 whitespace-nowrap">
-                                                {acc.code}
+                                                <span className="inline-flex items-center gap-1.5">
+                                                    <span>{acc.code}</span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => copyAccountCode(acc)}
+                                                        className="rounded-md p-1 text-slate-400 transition hover:bg-blue-50 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                                                        title={copiedAccountCode === acc.id ? 'Kode akun tersalin' : 'Salin kode akun'}
+                                                        aria-label={`Salin kode akun ${acc.code}`}
+                                                    >
+                                                        {copiedAccountCode === acc.id
+                                                            ? <Check className="h-3.5 w-3.5 text-emerald-600" />
+                                                            : <Copy className="h-3.5 w-3.5" />}
+                                                    </button>
+                                                </span>
                                             </td>
                                             <td className="py-3 px-4 font-bold text-slate-900">
                                                 {acc.name}
