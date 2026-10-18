@@ -77,7 +77,7 @@ class CashflowExport implements FromArray, WithColumnWidths, WithEvents, WithSty
 
     private function headerRowOne(): array
     {
-        return array_merge(['TANGGAL', 'PAGI'], array_fill(0, 16, ''), ['MALAM'], array_fill(0, 16, ''), ['TOTAL SETORAN', '', '']);
+        return array_merge(['TANGGAL', 'PAGI'], array_fill(0, 16, ''), ['SORE'], array_fill(0, 16, ''), ['TOTAL SETORAN', '', '']);
     }
 
     private function headerRowTwo(): array
@@ -92,7 +92,7 @@ class CashflowExport implements FromArray, WithColumnWidths, WithEvents, WithSty
             $headers[] = 'DISC';
             $headers[] = 'JUMLAH';
         }
-        return array_merge($headers, ['PAGI', 'MALAM', 'JUMLAH']);
+        return array_merge($headers, ['PAGI', 'SORE', 'NETTO (LIPH)']);
     }
 
     private function headerRowThree(): array

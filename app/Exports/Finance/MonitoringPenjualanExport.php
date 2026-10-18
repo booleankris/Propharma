@@ -178,11 +178,11 @@ class MonitoringPenjualanExport implements FromArray, WithColumnWidths, WithEven
         foreach ($this->days as $index => $_day) {
             $column = 4 + $index * 3;
             $headerTwo[$column] = 'RP (PAGI)';
-            $headerTwo[$column + 1] = 'RP (MALAM)';
+            $headerTwo[$column + 1] = 'RP (SORE)';
             $headerTwo[$column + 2] = '%';
         }
         $headerTwo[$summaryStart] = 'PAGI';
-        $headerTwo[$summaryStart + 1] = 'MALAM';
+        $headerTwo[$summaryStart + 1] = 'SORE';
         $headerTwo[$summaryStart + 2] = 'TOTAL';
         $headerTwo[$summaryStart + 3] = '% ASE';
 

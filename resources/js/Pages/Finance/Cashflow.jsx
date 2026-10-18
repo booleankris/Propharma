@@ -20,7 +20,7 @@ const banks = [
 ];
 const shifts = [
     { key: 'morning', label: 'PAGI' },
-    { key: 'evening', label: 'MALAM' },
+    { key: 'evening', label: 'SORE' },
 ];
 const otherShiftLabel = 'Shift belum terpetakan';
 
@@ -146,7 +146,8 @@ export default function Cashflow({ days = [], monitoringDays = [], kinerjaDays =
                         <div>
                             <div className="text-xs font-bold uppercase tracking-wider text-blue-700">Cashflow</div>
                             <h2 className="mt-1 text-xl font-bold text-slate-900">{activeTab === 'rekap' ? 'Rekap posisi keuangan cabang' : activeTab === 'sheet' ? 'Omzet per tanggal dan shift' : activeTab === 'monitoring' ? 'Monitoring target penjualan' : activeTab === 'kinerja' ? 'Kinerja omzet' : activeTab === 'piutang' ? 'Piutang dagang per hari' : activeTab === 'hutang' ? 'Hutang dagang per hari' : 'Keuangan harian'}</h2>
-                            <p className="mt-1 max-w-3xl text-sm text-slate-600">{activeTab === 'rekap' ? 'Lihat saldo kas dan bank aktual cabang, piutang yang belum tertagih, hutang supplier, dan pengeluaran periode.' : activeTab === 'sheet' ? 'Rincian diambil dari transaksi kasir selesai, dikelompokkan menurut Cash, EDC, Transfer/QRIS, diskon, jumlah, dan total setoran. Tanggal tanpa transaksi tetap ditampilkan.' : activeTab === 'monitoring' ? 'Laporan harian mengikuti format Excel. Periode mengikuti bulan dan tahun yang dipilih.' : activeTab === 'kinerja' ? 'Penjualan per shift dan rincian pembelian mengikuti susunan workbook.' : activeTab === 'piutang' ? 'Penjualan kredit yang selesai dicatat pada tanggal transaksi; retur kredit mengurangi piutang pada tanggal retur.' : activeTab === 'hutang' ? 'Pembelian kredit dicatat pada tanggal barang diterima dan masuk stok.' : 'Ringkasan pemasukan dan pengeluaran kas harian, termasuk setoran dari kasir ke rekening.'}</p>
+                            <p className="mt-1 max-w-3xl text-sm text-slate-600">{activeTab === 'rekap' ? 'Lihat saldo kas dan bank aktual cabang, piutang yang belum tertagih, hutang supplier, dan pengeluaran periode.' : activeTab === 'sheet' ? 'Rincian dikelompokkan menurut Cash, EDC, Transfer/QRIS, diskon, netto LIPH, dan total setoran. Hari kerja mengikuti batas operasional.' : activeTab === 'monitoring' ? 'Laporan harian mengikuti format Excel dan tanggal operasional.' : activeTab === 'kinerja' ? 'Penjualan dibagi menurut jam transaksi ke shift Pagi/Sore, terlepas dari waktu login kasir.' : activeTab === 'piutang' ? 'Penjualan kredit dan retur dikelompokkan berdasarkan tanggal operasional transaksi.' : activeTab === 'hutang' ? 'Pembelian kredit dikelompokkan berdasarkan tanggal operasional pencatatan penerimaan.' : 'Ringkasan pemasukan dan pengeluaran kas harian; penjualan tunai mengikuti tanggal operasional.'}</p>
+                            <p className="mt-1 text-xs font-medium text-blue-700">Hari operasional: 07.30 sampai sebelum 07.30 esok hari · Pagi 07.30–15.30 · Sore 15.31–07.29.</p>
                         </div>
                     </div>
                     <form onSubmit={applyFilters} className="w-full rounded-3xl border border-blue-100/80 bg-white p-3 shadow-sm xl:w-auto xl:min-w-[450px]">
@@ -196,7 +197,37 @@ export default function Cashflow({ days = [], monitoringDays = [], kinerjaDays =
                     </button>)}
                 </div>
 
-                {activeTab === 'rekap' ? <RekapCashflow recap={recapCashflow} monthLabel={`${monthOptions.find((option) => String(option.value) === String(month))?.label || ''} ${year}`} /> : activeTab === 'keuangan' ? <KeuanganDaily days={keuanganDays} saldoAwal={saldoAwalKas} setorAccounts={setorAccounts} /> : activeTab === 'monitoring' ? <MonitoringPenjualan days={monitoringDays} /> : activeTab === 'kinerja' ? <KinerjaOmzet days={kinerjaDays} debtors={kinerjaDebtors} /> : activeTab === 'piutang' ? <TradeDailyCashflow title="Piutang Dagang" description="Total penjualan kredit per debitur, dikelompokkan berdasarkan tanggal transaksi selesai." report={piutangDagang} /> : activeTab === 'hutang' ? <TradeDailyCashflow title="Hutang Dagang" description="Total pembelian kredit per supplier, dikelompokkan berdasarkan tanggal barang diterima." report={hutangDagang} /> : <>
+                {activeTab === 'rekap' ? <RekapCashflow recap={recapCashflow} monthLabel={`${monthOptions.find((option) => String(option.value) === String(month))?.label || ''} ${year}`} /> : activeTab === 'keuangan' ? <KeuanganDaily days={keuanganDays} saldoAwal={saldoAwalKas} setorAccounts={setorAccounts} /> : activeTab === 'monitoring' ? <MonitoringPenjualan days={monitoringDays} /> : activeTab === 'kinerja' ? <KinerjaOmzet days={kinerjaDays} debtors={kinerjaDebtors} /> : activeTab === 'piutang' ? <TradeDailyCashflow
+                    title="Piutang Dagang"
+                    description="Penjualan kredit dan retur dikelompokkan berdasarkan tanggal operasional transaksi."
+                    report={piutangDagang}
+                    reconciliation={{
+                        opening: piutangDagang.openingBalance,
+                        activity: piutangDagang.periodTotal,
+                        payments: piutangDagang.periodPayments,
+                        closing: piutangDagang.closingBalance,
+                        activityLabel: 'Tagihan kredit bersih',
+                        paymentLabel: 'Pembayaran diterima',
+                        closingLabel: 'Saldo akhir piutang',
+                        periodLabel: `${monthOptions.find((option) => String(option.value) === String(month))?.label || ''} ${year}`,
+                        note: 'Saldo berjalan dari tagihan bulan sebelumnya, penjualan kredit dan retur periode ini, serta pembayaran yang sudah dicatat di Finance.',
+                    }}
+                /> : activeTab === 'hutang' ? <TradeDailyCashflow
+                    title="Hutang Dagang"
+                    description="Pembelian kredit dikelompokkan berdasarkan tanggal operasional pencatatan penerimaan."
+                    report={hutangDagang}
+                    reconciliation={{
+                        opening: hutangDagang.openingBalance,
+                        activity: hutangDagang.periodTotal,
+                        payments: hutangDagang.periodPayments,
+                        closing: hutangDagang.closingBalance,
+                        activityLabel: 'Pembelian kredit bersih',
+                        paymentLabel: 'Pembayaran hutang',
+                        closingLabel: 'Saldo akhir hutang',
+                        periodLabel: `${monthOptions.find((option) => String(option.value) === String(month))?.label || ''} ${year}`,
+                        note: 'Saldo berjalan dari sisa tagihan bulan sebelumnya, pembelian kredit dan retur periode ini, serta pembayaran yang sudah dicatat di Finance.',
+                    }}
+                /> : <>
                     <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                         <Metric label="Total setoran" value={totals.deposit} note="Cash + Transfer/QRIS; EDC pending dikecualikan" icon={CalendarDays} tone="bg-blue-50 text-blue-700" />
                         <Metric label="Cash" value={totals.cash} note="Penerimaan tunai" icon={Wallet} tone="bg-emerald-50 text-emerald-700" />
@@ -231,7 +262,7 @@ export default function Cashflow({ days = [], monitoringDays = [], kinerjaDays =
                                             <th key={shift.key + '-disc'} rowSpan="2" className="border border-slate-500 px-2 py-2">DISC</th>,
                                             <th key={shift.key + '-total'} rowSpan="2" className="border border-slate-500 px-2 py-2">JUMLAH</th>,
                                         ])}
-                                        <th rowSpan="2" className="border border-slate-500 px-2 py-2">PAGI</th><th rowSpan="2" className="border border-slate-500 px-2 py-2">MALAM</th><th rowSpan="2" className="border border-slate-500 px-2 py-2">JUMLAH</th>
+                                        <th rowSpan="2" className="border border-slate-500 px-2 py-2">PAGI</th><th rowSpan="2" className="border border-slate-500 px-2 py-2">SORE</th><th rowSpan="2" className="border border-slate-500 px-2 py-2">NETTO (LIPH)</th>
                                     </tr>
                                     <tr className="bg-slate-200">
                                         {shifts.flatMap((shift) => banks.flatMap((bank) => [
@@ -294,7 +325,7 @@ export default function Cashflow({ days = [], monitoringDays = [], kinerjaDays =
 
                     {days.some((day) => day.otherShift?.count > 0) && <section className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
                         <h3 className="font-bold text-amber-900">Transaksi dengan shift belum terpetakan</h3>
-                        <p className="mt-1 text-xs text-amber-800">Transaksi ini tetap masuk total periode, tetapi shift-nya tidak dikenali sebagai Pagi atau Malam.</p>
+                        <p className="mt-1 text-xs text-amber-800">Transaksi ini tetap masuk total periode, tetapi waktu transaksinya belum dapat dipetakan ke shift Pagi atau Sore.</p>
                         <div className="mt-3 overflow-x-auto"><table className="w-full min-w-[640px] text-sm"><thead><tr className="text-left text-xs text-amber-900"><th className="py-2">Tanggal</th><th>Jumlah transaksi</th><th>Omzet</th><th>EDC pending</th><th>Total setoran</th></tr></thead><tbody>{days.filter((day) => day.otherShift?.count > 0).map((day) => <tr key={day.date} className="border-t border-amber-200"><td className="py-2">{day.date}</td><td>{day.otherShift.count}</td><td>{money(day.otherShift.total)}</td><td>{money(day.otherShift.edcPending)}</td><td>{money(day.otherShift.directDeposit)}</td></tr>)}</tbody></table></div>
                     </section>}
 
@@ -304,7 +335,7 @@ export default function Cashflow({ days = [], monitoringDays = [], kinerjaDays =
                         <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                             {days.flatMap((day) => ['morning', 'evening', 'otherShift'].flatMap((key) => (day[key]?.otherMethods || []).map((method) => (
                                 <div key={`${day.date}-${key}-${method.label}`} className="rounded-xl border border-violet-200 bg-white p-3">
-                                    <div className="text-xs font-semibold text-violet-900">{day.date} · {key === 'morning' ? 'Pagi' : key === 'evening' ? 'Malam' : otherShiftLabel} · {method.label}</div>
+                                    <div className="text-xs font-semibold text-violet-900">{day.date} · {key === 'morning' ? 'Pagi' : key === 'evening' ? 'Sore' : otherShiftLabel} · {method.label}</div>
                                     <div className="mt-1 font-bold text-slate-900">{money(method.amount)}</div>
                                     <div className="text-xs text-slate-500">{method.count} transaksi</div>
                                 </div>

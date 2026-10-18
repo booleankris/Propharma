@@ -60,7 +60,7 @@ class KinerjaOmzetExport implements FromArray, WithEvents, WithStyles, WithTitle
         $middle[$this->debtorStart] = 'KREDIT';
 
         $leaf = $this->blanks();
-        $leaf[1] = 'PAGI'; $leaf[2] = 'MALAM'; $leaf[3] = 'PAGI'; $leaf[4] = 'MALAM';
+        $leaf[1] = 'PAGI'; $leaf[2] = 'SORE'; $leaf[3] = 'PAGI'; $leaf[4] = 'SORE';
         foreach ($this->data['debtors'] as $index => $debtor) $leaf[$this->debtorStart + $index] = $debtor['name'];
         $leaf[$this->debtorStart + $this->debtorCount] = 'TOTAL KREDIT';
         $leaf[$this->debtorStart + $this->debtorCount + 1] = 'PPN';

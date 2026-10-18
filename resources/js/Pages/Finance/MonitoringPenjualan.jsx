@@ -213,9 +213,9 @@ export default function MonitoringPenjualan({ days = [] }) {
                         <th colSpan="2" className="border-2 border-black bg-orange-100 px-2 py-2">Realisasi</th>
                     </tr>
                     <tr className="bg-white">
-                        {days.flatMap((day) => ['Pagi', 'Malam', '%'].map((label) => <th key={`${day.date}-${label}`} className="border-2 border-black px-2 py-1">{label}</th>))}
+                        {days.flatMap((day) => ['Pagi', 'Sore', '%'].map((label) => <th key={`${day.date}-${label}`} className="border-2 border-black px-2 py-1">{label}</th>))}
                         <th className="border-2 border-black bg-sky-200 px-2 py-1">Pagi</th>
-                        <th className="border-2 border-black bg-sky-200 px-2 py-1">Malam</th>
+                        <th className="border-2 border-black bg-sky-200 px-2 py-1">Sore</th>
                         <th className="border-2 border-black bg-orange-100 px-2 py-1">Total</th>
                         <th className="border-2 border-black bg-orange-100 px-2 py-1">% ase</th>
                     </tr>

@@ -26,6 +26,8 @@ use App\Services\Finance\KinerjaOmzetService;
 use App\Services\Finance\MonitoringPenjualanService;
 use App\Services\Finance\KeuanganReportService;
 use App\Services\ConsignmentService;
+use App\Support\FinanceShift;
+use App\Support\LiphTransactionScope;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
@@ -647,7 +649,7 @@ class FinanceController extends Controller
 
         $balance = (float) $opening->amount;
         foreach ($payments as $payment) {
-            if (in_array($payment->payment_type, ['PIUTANG', 'PENDAPATAN', 'PENJUALAN TUNAI'], true)) $balance += (float) $payment->amount;
+            if (in_array($payment->payment_type, ['PIUTANG', 'PENDAPATAN', 'PENJUALAN TUNAI', 'PENJUALAN NON TUNAI'], true)) $balance += (float) $payment->amount;
             elseif (in_array($payment->payment_type, ['KREDIT', 'CASH', 'KONSINYASI', 'BIAYA', 'SETOR'], true)) $balance -= (float) $payment->amount;
         }
         $balance += (float) FinancePayment::where('payment_type', 'SETOR')
@@ -669,9 +671,14 @@ class FinanceController extends Controller
                 ->where('payment_type', 'PIUTANG')
                 ->whereDate('payment_date', '<=', $asOfDate)], 'amount')
             ->where('pharmacy_id', $pharmacyId)
-            ->where('status', 1)
             ->whereIn('transaction_type', ['KREDIT', 'RESEP KREDIT', 'RETUR KREDIT'])
-            ->whereDate('created_at', '<=', $asOfDate)
+            ->where(function ($period) use ($asOfDate) {
+                $period->where('created_at', '<', FinanceShift::endExclusive($asOfDate))
+                    ->orWhere(function ($legacy) use ($asOfDate) {
+                        $legacy->whereNull('created_at')->where('updated_at', '<', FinanceShift::endExclusive($asOfDate));
+                    });
+            })
+            ->tap(fn ($query) => LiphTransactionScope::applySalesStatus($query))
             ->get(['id', 'debtor_id', 'transaction_type', 'subtotal', 'paid']);
 
         $balancesByDebtor = [];
@@ -716,6 +723,7 @@ class FinanceController extends Controller
         $details = ReceivingDetails::query()
             ->with([
                 'receiving:id,pharmacy_id,status,date,created_at',
+                'creditor:code,ppn_type',
                 'receiving_items:id,receiving_details_id,total,raw_price,qty_received',
                 'payments' => fn ($query) => $query->whereDate('payment_date', '<=', $asOfDate),
             ])
@@ -734,10 +742,6 @@ class FinanceController extends Controller
 
         $balance = 0.0;
         foreach ($details as $detail) {
-            if ((int) ($detail->receiving?->status ?? 0) === 3) {
-                continue;
-            }
-
             $subtotal = 0.0;
             foreach ($detail->receiving_items as $item) {
                 $lineTotal = (float) ($item->total ?? 0);
@@ -747,7 +751,7 @@ class FinanceController extends Controller
                 $subtotal += $lineTotal;
             }
 
-            $ppnType = strtoupper(trim((string) ($detail->invoice_ppn ?? 'TANPA')));
+            $ppnType = strtoupper(trim((string) ($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA')));
             $invoiceTotal = $subtotal + ($ppnType === 'EXCLUDE' ? round($subtotal * 0.11, 2) : 0);
             $paid = (float) $detail->payments->sum('amount');
             $balance += max(0, $invoiceTotal - $paid);
@@ -828,7 +832,8 @@ class FinanceController extends Controller
             ->orderByRaw("CASE WHEN account_type = 'kas_apotek' THEN 0 ELSE 1 END")
             ->orderBy('code')->get(['id', 'name', 'code', 'account_type', 'balance']);
         $totalCashBank = (float) $accounts->sum('balance');
-        $periodEnd = min($endDate, now()->toDateString());
+        $todayOperationalDate = FinanceShift::operationalDate(now());
+        $periodEnd = max($startDate, min($endDate, $todayOperationalDate));
         $dayBeforeStart = \Carbon\Carbon::parse($startDate)->subDay()->toDateString();
         $openingAccountRows = [];
         $closingAccountRows = [];
@@ -902,7 +907,7 @@ class FinanceController extends Controller
         $payablesByCreditor = [];
         $creditDetails = ReceivingDetails::with([
             'receiving:id,pharmacy_id,status',
-            'creditor:code,name',
+            'creditor:code,name,ppn_type',
             'receiving_items:id,receiving_details_id,total,raw_price,qty_received',
             'payments:id,receiving_detail_id,amount',
         ])
@@ -910,14 +915,13 @@ class FinanceController extends Controller
             ->whereHas('receiving', fn ($query) => $query->where('pharmacy_id', $pharmacyId)->whereIn('status', [1, 2, 3]))
             ->get();
         foreach ($creditDetails as $detail) {
-            if ((int) ($detail->receiving?->status ?? 0) === 3) continue;
             $subtotal = 0.0;
             foreach ($detail->receiving_items as $item) {
                 $lineTotal = (float) ($item->total ?? 0);
                 if ($lineTotal <= 0) $lineTotal = (float) $item->raw_price * (float) $item->qty_received;
                 $subtotal += $lineTotal;
             }
-            $ppnType = strtoupper(trim((string) ($detail->invoice_ppn ?? 'TANPA')));
+            $ppnType = strtoupper(trim((string) ($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA')));
             $invoiceTotal = $subtotal + ($ppnType === 'EXCLUDE' ? round($subtotal * 0.11, 2) : 0);
             $outstanding = max(0, $invoiceTotal - (float) $detail->payments->sum('amount'));
             if ($outstanding <= 0) continue;
@@ -971,8 +975,9 @@ class FinanceController extends Controller
         }
 
         $periodTransactions = MedicineTransactions::query()
-            ->where('pharmacy_id', $pharmacyId)->where('status', 1)
-            ->whereBetween(DB::raw('DATE(created_at)'), [$startDate, $endDate])
+            ->where('pharmacy_id', $pharmacyId)
+            ->tap(fn ($query) => LiphTransactionScope::applySalesStatus($query))
+            ->tap(fn ($query) => LiphTransactionScope::applyPeriod($query, \Carbon\Carbon::parse($startDate), \Carbon\Carbon::parse($endDate)))
             ->get(['transaction_type', 'payment_method', 'subtotal', 'discount']);
         $periodCashSales = 0.0;
         $periodEdcTransferSales = 0.0;
@@ -993,13 +998,23 @@ class FinanceController extends Controller
             }
         }
 
-        $periodReceipts = FinancePayment::where('pharmacy_id', $pharmacyId)
+        $periodReceipts = FinancePayment::with('transaction:id,pharmacy_id')
             ->whereBetween('payment_date', [$startDate, $endDate])
+            ->where(function ($query) use ($pharmacyId) {
+                $query->where('pharmacy_id', $pharmacyId)
+                    ->orWhere(function ($legacy) use ($pharmacyId) {
+                        $legacy->whereNull('pharmacy_id')
+                            ->whereHas('transaction', fn ($transaction) => $transaction->where('pharmacy_id', $pharmacyId));
+                    });
+            })
             ->whereIn('payment_type', ['PIUTANG', 'PENDAPATAN'])
             ->get(['payment_type', 'amount']);
         $periodReceivablePayments = (float) $periodReceipts->where('payment_type', 'PIUTANG')->sum('amount');
         $periodOtherIncome = (float) $periodReceipts->where('payment_type', 'PENDAPATAN')->sum('amount');
         $periodSupplierPaymentsByType = ['cash' => 0.0, 'bank' => 0.0];
+        $periodCreditSupplierPayments = (float) $periodPayments
+            ->where('payment_type', 'KREDIT')
+            ->sum('amount');
         foreach ($periodPayments as $payment) {
             if (in_array($payment->payment_type, ['KREDIT', 'KONSINYASI'], true)) {
                 $type = $payment->account?->account_type === 'bank' ? 'bank' : 'cash';
@@ -1007,17 +1022,25 @@ class FinanceController extends Controller
             }
         }
 
-        $periodCreditPurchases = (float) DB::table('receiving_items as ri')
-            ->join('receiving_details as rd', 'rd.id', '=', 'ri.receiving_details_id')
-            ->join('receiving as r', 'r.id', '=', 'rd.receiving_id')
-            ->where('r.pharmacy_id', $pharmacyId)
-            ->whereRaw('UPPER(TRIM(COALESCE(rd.invoice_payment, ""))) = ?', ['KREDIT'])
-            ->whereBetween(DB::raw('DATE(ri.created_at)'), [$startDate, $endDate])
-            ->sum(DB::raw('CASE WHEN CAST(COALESCE(NULLIF(ri.total, ""), "0") AS DECIMAL(15,2)) > 0 THEN CAST(ri.total AS DECIMAL(15,2)) ELSE CAST(COALESCE(NULLIF(ri.raw_price, ""), "0") AS DECIMAL(15,2)) * CAST(COALESCE(NULLIF(ri.qty_received, ""), "0") AS DECIMAL(15,2)) END'));
+        $periodCreditDetails = ReceivingDetails::with(['creditor:code,ppn_type', 'receiving_items' => fn ($query) => $query
+            ->whereRaw('created_at >= ? AND created_at < ?', [FinanceShift::start($startDate), FinanceShift::endExclusive($endDate)])])
+            ->whereRaw('UPPER(TRIM(COALESCE(invoice_payment, ""))) = ?', ['KREDIT'])
+            ->whereHas('receiving', fn ($query) => $query->where('pharmacy_id', $pharmacyId)->whereIn('status', [1, 2, 3]))
+            ->whereHas('receiving_items', fn ($query) => $query
+                ->whereRaw('created_at >= ? AND created_at < ?', [FinanceShift::start($startDate), FinanceShift::endExclusive($endDate)]))
+            ->get();
+        $periodCreditPurchases = (float) $periodCreditDetails->sum(function ($detail) {
+            $subtotal = (float) $detail->receiving_items->sum(function ($item) {
+                $lineTotal = (float) ($item->total ?? 0);
+                return $lineTotal > 0 ? $lineTotal : (float) ($item->raw_price ?? 0) * (float) ($item->qty_received ?? 0);
+            });
+            $ppnType = strtoupper(trim((string) ($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA')));
+            return $subtotal + ($ppnType === 'EXCLUDE' ? round($subtotal * 0.11, 2) : 0);
+        });
         $periodPurchaseReturns = (float) DB::table('items_log as il')
             ->join('receiving as r', 'r.code', '=', 'il.transaction_code')
             ->where('il.status', 4)->where('r.pharmacy_id', $pharmacyId)
-            ->whereBetween(DB::raw('DATE(il.date)'), [$startDate, $endDate])
+            ->whereRaw('il.date >= ? AND il.date < ?', [FinanceShift::start($startDate), FinanceShift::endExclusive($endDate)])
             ->sum(DB::raw('ABS(CAST(COALESCE(NULLIF(il.total, ""), "0") AS DECIMAL(15,2)))'));
 
         $openingReceivable = $this->receivableBalanceAtDate($pharmacyId, $dayBeforeStart);
@@ -1061,6 +1084,7 @@ class FinanceController extends Controller
             'periodAdjustments' => 0,
             'periodSupplierCashPayments' => $periodSupplierPaymentsByType['cash'],
             'periodSupplierBankPayments' => $periodSupplierPaymentsByType['bank'],
+            'periodCreditSupplierPayments' => $periodCreditSupplierPayments,
             'periodCreditPurchases' => $periodCreditPurchases,
             'periodPurchaseReturns' => $periodPurchaseReturns,
             'periodCashPurchases' => $cashPurchases,

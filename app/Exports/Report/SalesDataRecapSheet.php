@@ -122,6 +122,7 @@ class SalesDataRecapSheet implements FromArray, WithStyles, WithColumnWidths, Wi
 
         $query = MedicineTransactions::query()
             ->with([
+                'transactions' => fn ($q) => $q->where('status', 1),
                 'transactions.user.roles',
                 'patients',
                 'user.roles',
@@ -134,8 +135,8 @@ class SalesDataRecapSheet implements FromArray, WithStyles, WithColumnWidths, Wi
         }
 
         if ($startDateObj || $endDateObj) {
-            $start = $startDateObj ? $startDateObj->copy()->startOfDay() : null;
-            $end   = $endDateObj ? $endDateObj->copy()->addDay()->startOfDay() : null;
+            $start = $startDateObj ? $startDateObj->copy()->startOfDay()->setTime(7, 30, 0) : null;
+            $end   = $endDateObj ? $endDateObj->copy()->startOfDay()->addDay()->setTime(7, 30, 0) : null;
             $query->where(function ($period) use ($start, $end) {
                 $period->where(function ($main) use ($start, $end) {
                     if ($start) $main->where('created_at', '>=', $start);
@@ -230,7 +231,7 @@ class SalesDataRecapSheet implements FromArray, WithStyles, WithColumnWidths, Wi
             $patientName = $trx->patients?->name ?? 'Umum / Tanpa Pasien';
 
             $isReturn = in_array(strtoupper(trim((string) $trx->transaction_type)), ['RETUR JUAL', 'RETUR KREDIT'], true) || strtoupper(trim((string) ($trx->transaction_code ?? ''))) === 'RT';
-            $items = $trx->transactions;
+            $items = $trx->transactions->where('status', 1);
 
             $rawSubtotal = $items->isNotEmpty()
                 ? $items->sum(fn ($i) => (int) ($i->total_price ?? ($i->item_price * $i->quantity)))

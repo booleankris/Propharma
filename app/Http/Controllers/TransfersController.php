@@ -281,6 +281,9 @@ class TransfersController extends Controller
             $transfer = MedicineTransfers::create([
                 'code' => $this->generateTransfersCode(),
                 'user_id' => auth()->id(),
+                'requested_by' => auth()->id(),
+                'sent_by' => null,
+                'received_by' => null,
                 'status' => 0,
                 'is_request' => true,
                 'source_pharmacy_id' => $validated['source_pharmacy_id'],
@@ -431,6 +434,7 @@ class TransfersController extends Controller
                 $transfer->update([
                     'request_status' => 1,
                     'user_id' => auth()->id(),
+                    'sent_by' => auth()->id(),
                 ]);
             });
 
@@ -486,6 +490,7 @@ class TransfersController extends Controller
                     'code' => $request->code,
                     'submission_key' => $request->submission_key,
                     'user_id' => auth()->id(),
+                    'sent_by' => auth()->id(),
                     'status' => 0,
                     'source_pharmacy_id' => getActivePharmacyId(),
                     'destination_pharmacy_id' => (int) $request->pharmacy,
@@ -643,11 +648,76 @@ class TransfersController extends Controller
         $transfer = MedicineTransfers::with([
             'items.batches.medicines',
             'items.batches.pharmacy',
+            'items.sourceBatch.pharmacy',
+            'items.requestedMedicine',
             'users.pharmacy',
+            'sender.pharmacy',
+            'receiver.pharmacy',
+            'requester.pharmacy',
+            'sourcePharmacy',
+            'destinationPharmacy',
         ])->findOrFail($id);
         $this->authorizeTransferParticipant($transfer);
 
-        $pdf = Pdf::loadView('kasir.transfers.receipt', compact('transfer'))
+        // Urut abjad berdasarkan nama item obat
+        $sortedItems = $transfer->items->sort(function ($a, $b) {
+            $nameA = trim((string) ($a->batches?->medicines?->name ?? $a->requestedMedicine?->name ?? ''));
+            $nameB = trim((string) ($b->batches?->medicines?->name ?? $b->requestedMedicine?->name ?? ''));
+            $cmp = strcasecmp($nameA, $nameB);
+            if ($cmp === 0) {
+                $batchA = trim((string) ($a->batches?->name ?? $a->sourceBatch?->name ?? ''));
+                $batchB = trim((string) ($b->batches?->name ?? $b->sourceBatch?->name ?? ''));
+                return strcasecmp($batchA, $batchB);
+            }
+            return $cmp;
+        })->values();
+
+        $transfer->setRelation('items', $sortedItems);
+
+        // Akun pengeluar stok (Yang Menyerahkan) - BUKAN akun yang sedang login
+        $senderUser = null;
+        if ($transfer->sent_by) {
+            $senderUser = $transfer->sender ?: \App\Models\User::find($transfer->sent_by);
+        } elseif ($transfer->is_request) {
+            // Untuk Permintaan Mutasi:
+            // Hanya ada pengirim jika permintaan sudah disetujui/dikeluarkan stoknya (request_status == 1)
+            if ((int) $transfer->request_status === 1) {
+                $outgoingLog = \App\Models\ItemsLog::where('transaction_code', $transfer->code)
+                    ->where('type', 'MU')
+                    ->whereRaw('qty_before > qty_after')
+                    ->first();
+                if ($outgoingLog && $outgoingLog->user_id) {
+                    $senderUser = \App\Models\User::find($outgoingLog->user_id);
+                } elseif ($transfer->user_id && (int) $transfer->user_id !== (int) $transfer->requested_by) {
+                    $senderUser = $transfer->users ?: \App\Models\User::find($transfer->user_id);
+                }
+            }
+        } else {
+            // Mutasi Langsung: pembuat mutasi adalah pengirim barang
+            $senderUser = $transfer->users ?: ($transfer->user_id ? \App\Models\User::find($transfer->user_id) : null);
+        }
+        $senderName = $senderUser?->name ?? ($senderUser?->username ?? null);
+
+        // Akun penerima (Yang Menerima) - HANYA orang yang benar-benar menekan tombol terima
+        $receiverName = null;
+        if ((int) $transfer->status === 1) {
+            $receiverUser = null;
+            if ($transfer->received_by) {
+                $receiverUser = $transfer->receiver ?: \App\Models\User::find($transfer->received_by);
+            } else {
+                // Fallback transfer riwayat: ambil user_id dari log penerimaan MU
+                $receiverLog = \App\Models\ItemsLog::where('transaction_code', $transfer->code)
+                    ->where('type', 'MU')
+                    ->whereRaw('qty_after > qty_before')
+                    ->first();
+                if ($receiverLog && $receiverLog->user_id) {
+                    $receiverUser = \App\Models\User::find($receiverLog->user_id);
+                }
+            }
+            $receiverName = $receiverUser?->name ?? ($receiverUser?->username ?? null);
+        }
+
+        $pdf = Pdf::loadView('kasir.transfers.receipt', compact('transfer', 'senderName', 'receiverName'))
             ->setPaper('a4', 'portrait');
 
         return $pdf->stream('tanda-terima-barang-' . $transfer->code . '.pdf');
@@ -741,13 +811,13 @@ class TransfersController extends Controller
         };
 
         // ── Mutasi Keluar: transfers WHERE source batch belongs to this pharmacy ──
-        $pendingRequests = MedicineTransfers::with(['users.pharmacy', 'sourcePharmacy', 'destinationPharmacy', 'items.requestedMedicine', 'items.sourceBatch'])
+        $pendingRequests = MedicineTransfers::with(['users.pharmacy', 'sourcePharmacy', 'destinationPharmacy', 'sender', 'receiver', 'requester', 'items.requestedMedicine', 'items.sourceBatch'])
             ->where('is_request', true)->where('request_status', 0)
             ->where('source_pharmacy_id', $pharmacyId)->latest()->get();
-        $submittedRequests = MedicineTransfers::with(['users.pharmacy', 'sourcePharmacy', 'destinationPharmacy', 'items.requestedMedicine', 'items.sourceBatch'])
+        $submittedRequests = MedicineTransfers::with(['users.pharmacy', 'sourcePharmacy', 'destinationPharmacy', 'sender', 'receiver', 'requester', 'items.requestedMedicine', 'items.sourceBatch'])
             ->where('is_request', true)->where('destination_pharmacy_id', $pharmacyId)->latest()->get();
 
-        $pendingQuery = MedicineTransfers::with(['users.pharmacy', 'sourcePharmacy', 'destinationPharmacy'])
+        $pendingQuery = MedicineTransfers::with(['users.pharmacy', 'sourcePharmacy', 'destinationPharmacy', 'sender', 'receiver', 'requester'])
             ->where(function ($query) {
                 $query->where('is_request', false)->orWhere('request_status', 1);
             })
@@ -767,7 +837,7 @@ class TransfersController extends Controller
             ->withQueryString();
 
         // ── Mutasi Masuk: transfers WHERE destination batch belongs to this pharmacy ──
-        $acceptedQuery = MedicineTransfers::with(['users.pharmacy', 'sourcePharmacy', 'destinationPharmacy'])
+        $acceptedQuery = MedicineTransfers::with(['users.pharmacy', 'sourcePharmacy', 'destinationPharmacy', 'sender', 'receiver', 'requester'])
             ->where(function ($query) {
                 $query->where('is_request', false)->orWhere('request_status', 1);
             })
@@ -784,7 +854,7 @@ class TransfersController extends Controller
             ->withQueryString();
 
         // ── Ditolak: transfers with denied status involving this pharmacy ──
-        $deniedQuery = MedicineTransfers::with(['users.pharmacy'])
+        $deniedQuery = MedicineTransfers::with(['users.pharmacy', 'sourcePharmacy', 'destinationPharmacy', 'sender', 'receiver', 'requester'])
             ->where(function ($q) {
                 $q->where('status', 2)
                     ->orWhereHas('items', fn($i) => $i->where('status', 2));
@@ -965,7 +1035,10 @@ class TransfersController extends Controller
                 // ── Update parent transfer status ─────────────────────────
                 if ($lockedTransfer->items()->where('status', 0)->doesntExist()) {
                     $hasAccepted = $lockedTransfer->items()->where('status', 1)->exists();
-                    $lockedTransfer->update(['status' => $hasAccepted ? 1 : 2]);
+                    $lockedTransfer->update([
+                        'status' => $hasAccepted ? 1 : 2,
+                        'received_by' => $hasAccepted ? auth()->id() : null,
+                    ]);
                 }
             });
 
@@ -1027,7 +1100,16 @@ class TransfersController extends Controller
                 // ── Update parent transfer status ─────────────────────────
                 if ($transfer->items()->where('status', 0)->doesntExist()) {
                     $hasAccepted = $transfer->items()->where('status', 1)->exists();
-                    $transfer->update(['status' => $hasAccepted ? 1 : 2]);
+                    $transfer->update([
+                        'status' => $hasAccepted ? 1 : 2,
+                        'received_by' => $hasAccepted ? ($transfer->received_by ?: auth()->id()) : null,
+                    ]);
+                } else {
+                    if (!$transfer->received_by) {
+                        $transfer->update([
+                            'received_by' => auth()->id(),
+                        ]);
+                    }
                 }
             });
 

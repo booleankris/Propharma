@@ -21,7 +21,10 @@ class CreateShiftLog
                 'status' => 'auto_closed'
             ]);
 
-        $getshift = Shifts::all();
+        $getshift = Shifts::where('status', 1)->get();
+        if ($getshift->isEmpty()) {
+            $getshift = Shifts::all();
+        }
 
         $shifts = $getshift->map(function ($shift) {
             return [

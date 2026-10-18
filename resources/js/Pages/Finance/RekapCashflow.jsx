@@ -32,6 +32,7 @@ export default function RekapCashflow({ recap = {}, monthLabel = '' }) {
         { label: 'PIUTANG DAGANG', amount: recap.closingReceivable || 0 },
         { label: 'PIUTANG USAHA', amount: recap.closingOtherReceivables || 0, muted: true },
     ];
+    const openingCashBank = Number(recap.openingCashBank || 0);
     const openingAssets = Number(recap.openingAssets || 0);
     const closingAssets = Number(recap.closingAssets || 0);
     const incomeRows = [
@@ -43,8 +44,10 @@ export default function RekapCashflow({ recap = {}, monthLabel = '' }) {
         ['Penerimaan Cash Bond', recap.periodCashbondReceipts],
         ['Penyesuaian', recap.periodAdjustments],
     ];
-    const totalIncome = sum(incomeRows.map((row) => row[1]));
-    const openingPlusIncome = openingAssets + totalIncome;
+    // Penjualan kredit menambah piutang, bukan kas. Pembayaran piutang sudah
+    // dicatat sebagai penerimaan kas saat dibayar, jadi kredit tidak ikut total arus kas.
+    const totalIncome = sum(incomeRows.filter(([label]) => label !== 'Hasil Penjualan Kredit').map((row) => row[1]));
+    const openingPlusIncome = openingCashBank + totalIncome;
     const expenseRows = [
         ['Hutang Dagang By Cash', recap.periodSupplierCashPayments],
         ['Hutang Dagang By Cek', recap.periodSupplierBankPayments],
@@ -55,7 +58,10 @@ export default function RekapCashflow({ recap = {}, monthLabel = '' }) {
     const totalExpenses = sum(expenseRows.map((row) => row[1]));
     const cashflowSurplus = openingPlusIncome - totalExpenses;
     const totalDebtBeforePayments = Number(recap.openingPayables || 0) + Number(recap.periodCreditPurchases || 0) - Number(recap.periodPurchaseReturns || 0);
-    const periodSupplierPayments = Number(recap.periodSupplierCashPayments || 0) + Number(recap.periodSupplierBankPayments || 0);
+    // Jadwal hutang dagang hanya dikurangi pembayaran faktur KREDIT.
+    // Pembayaran konsinyasi tetap tampil sebagai arus kas keluar di atas,
+    // tetapi tidak boleh mengurangi saldo hutang dagang.
+    const periodSupplierPayments = Number(recap.periodCreditSupplierPayments || 0);
     const netAssets = closingAssets - Number(recap.closingPayables || 0);
     const effectiveEnd = recap.periodEffectiveEnd || recap.periodEnd;
     const endingDateLabel = effectiveEnd ? new Date(`${effectiveEnd}T00:00:00`).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
@@ -78,9 +84,9 @@ export default function RekapCashflow({ recap = {}, monthLabel = '' }) {
                     <AmountRow label="TOTAL SALDO AWAL AKTIVA" total={openingAssets} emphasized />
 
                     <SectionRow number="2" title="Pemasukan" />
-                    {incomeRows.map(([label, amount]) => <AmountRow key={label} label={label} amount={amount} />)}
-                    <AmountRow label="TOTAL PEMASUKAN PERIODE" total={totalIncome} emphasized />
-                    <AmountRow label="GRAND TOTAL (SALDO AWAL + PEMASUKAN)" grandTotal={openingPlusIncome} emphasized />
+                    {incomeRows.map(([label, amount]) => <AmountRow key={label} label={label} amount={amount} muted={label === 'Hasil Penjualan Kredit'} />)}
+                    <AmountRow label="TOTAL PEMASUKAN KAS / BANK PERIODE" total={totalIncome} emphasized />
+                    <AmountRow label="GRAND TOTAL (SALDO AWAL KAS / BANK + PEMASUKAN)" grandTotal={openingPlusIncome} emphasized />
 
                     <SectionRow number="3" title="Pengeluaran" />
                     {expenseRows.map(([label, amount]) => <AmountRow key={label} label={label} amount={amount} />)}
@@ -104,7 +110,7 @@ export default function RekapCashflow({ recap = {}, monthLabel = '' }) {
         </div>
         <footer className="flex items-start gap-2 border-t border-slate-200 bg-slate-50 px-4 py-3 text-[11px] leading-relaxed text-slate-600">
             <CircleHelp className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
-            <span>Piutang Dagang berisi sisa tagihan penjualan kredit. Piutang Usaha belum memiliki sumber data terpisah di aplikasi, jadi ditampilkan nol agar tidak menggandakan Piutang Dagang. Saldo kas/bank mengikuti saldo rekening cabang; penerimaan Cash Bond dan Penyesuaian masih nol karena belum ada pencatatan sumbernya.</span>
+            <span>Penjualan kredit ditampilkan sebagai informasi piutang dan tidak dijumlahkan sebagai arus kas; penerimaan piutang baru dihitung saat uang diterima. Saldo awal/akhir kas dan bank mengikuti saldo rekening cabang. Piutang Usaha, penerimaan/pembayaran Cash Bond, dan Penyesuaian belum memiliki sumber pencatatan terpisah sehingga sementara ditampilkan nol.</span>
         </footer>
     </section>;
 }

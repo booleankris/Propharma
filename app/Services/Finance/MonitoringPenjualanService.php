@@ -3,8 +3,10 @@
 namespace App\Services\Finance;
 
 use App\Models\MedicineTransactions;
+use App\Support\FinanceShift;
 use App\Support\LiphTransactionScope;
 use Carbon\CarbonPeriod;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
 class MonitoringPenjualanService
@@ -121,21 +123,19 @@ class MonitoringPenjualanService
                 'transactions' => fn ($query) => $query->where('status', 1),
                 'transactions.user.roles',
                 'user.roles',
-                'shift_logs.shift',
             ])
             ->whereIn('pharmacy_id', $pharmacyIds)
-            ->whereDate('created_at', '>=', $startDate)
-            ->whereDate('created_at', '<=', $endDate)
             ->tap(fn ($q) => LiphTransactionScope::applySalesStatus($q))
+            ->tap(fn ($q) => LiphTransactionScope::applyPeriod($q, Carbon::parse($startDate), Carbon::parse($endDate)))
             ->orderBy('created_at')
             ->get();
 
         foreach ($transactions as $transaction) {
-            $date = optional($transaction->created_at)->toDateString();
+            $effectiveAt = $transaction->created_at ?? $transaction->updated_at;
+            $date = FinanceShift::operationalDate($effectiveAt);
             if (!$date || !isset($days[$date])) continue;
 
-            $time = optional($transaction->created_at)->format('H:i:s') ?? '12:00:00';
-            $shiftKey = ($time <= '15:30:59') ? 'morning' : 'evening';
+            $shiftKey = FinanceShift::key($effectiveAt);
             $shift = &$days[$date][$shiftKey];
             $items = $transaction->transactions;
             $users = collect([$transaction->user])->concat($items->pluck('user'))->filter()->unique('id');

@@ -126,6 +126,7 @@ class SalesDataDetailSheet implements FromArray, WithStyles, WithColumnWidths, W
 
         $query = MedicineTransactions::query()
             ->with([
+                'transactions' => fn ($q) => $q->where('status', 1),
                 'transactions.medicine',
                 'transactions.user.roles',
                 'patients',
@@ -139,8 +140,8 @@ class SalesDataDetailSheet implements FromArray, WithStyles, WithColumnWidths, W
         }
 
         if ($startDateObj || $endDateObj) {
-            $start = $startDateObj ? $startDateObj->copy()->startOfDay() : null;
-            $end   = $endDateObj ? $endDateObj->copy()->addDay()->startOfDay() : null;
+            $start = $startDateObj ? $startDateObj->copy()->startOfDay()->setTime(7, 30, 0) : null;
+            $end   = $endDateObj ? $endDateObj->copy()->startOfDay()->addDay()->setTime(7, 30, 0) : null;
             $query->where(function ($period) use ($start, $end) {
                 $period->where(function ($main) use ($start, $end) {
                     if ($start) $main->where('created_at', '>=', $start);
@@ -235,7 +236,7 @@ class SalesDataDetailSheet implements FromArray, WithStyles, WithColumnWidths, W
 
             $isReturn = in_array(strtoupper(trim((string) $trx->transaction_type)), ['RETUR JUAL', 'RETUR KREDIT'], true) || strtoupper(trim((string) ($trx->transaction_code ?? ''))) === 'RT';
             $cartDiscount = is_numeric($trx->discount) ? (int) $trx->discount : 0;
-            $items = $trx->transactions;
+            $items = $trx->transactions->where('status', 1);
 
             $payMethod = \App\Support\PaymentMethod::label(
                 $trx->payment_method,

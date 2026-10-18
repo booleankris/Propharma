@@ -34,6 +34,7 @@ class SalesDataController extends Controller
                 ->join('medicine_transactions', 'medicine_transactions.id', '=', 'medicine_cart.transaction_id')
                 ->with(['transactions.patients', 'transactions.user.roles', 'transactions.transactions.user.roles', 'transactions', 'user.roles'])
                 ->where('medicine_transactions.status', 1)
+                ->where('medicine_cart.status', 1)
                 ->whereHas('transactions', function ($transaction) {
                     $transaction->where('pharmacy_id', getActivePharmacyId());
                 })
@@ -119,23 +120,20 @@ class SalesDataController extends Controller
                 $dateFrom = $dateTo;
             }
 
-            if ($dateFrom) {
+            if ($dateFrom || $dateTo) {
                 try {
-                    $d = Carbon::createFromFormat('d/m/Y', $dateFrom)->startOfDay();
-                    $query->where(function ($q) use ($d) {
-                        $q->where('medicine_transactions.created_at', '>=', $d)
-                          ->orWhere(fn ($sub) => $sub->whereNull('medicine_transactions.created_at')->where('medicine_transactions.updated_at', '>=', $d));
-                    });
-                } catch (\Exception $e) {
-                }
-            }
+                    $startObj = $dateFrom ? Carbon::createFromFormat('d/m/Y', $dateFrom)->startOfDay()->setTime(7, 30, 0) : null;
+                    $endObj   = $dateTo   ? Carbon::createFromFormat('d/m/Y', $dateTo)->startOfDay()->addDay()->setTime(7, 30, 0) : null;
 
-            if ($dateTo) {
-                try {
-                    $d = Carbon::createFromFormat('d/m/Y', $dateTo)->endOfDay();
-                    $query->where(function ($q) use ($d) {
-                        $q->where('medicine_transactions.created_at', '<=', $d)
-                          ->orWhere(fn ($sub) => $sub->whereNull('medicine_transactions.created_at')->where('medicine_transactions.updated_at', '<=', $d));
+                    $query->where(function ($q) use ($startObj, $endObj) {
+                        $q->where(function ($main) use ($startObj, $endObj) {
+                            if ($startObj) $main->where('medicine_transactions.created_at', '>=', $startObj);
+                            if ($endObj)   $main->where('medicine_transactions.created_at', '<', $endObj);
+                        })->orWhere(function ($legacy) use ($startObj, $endObj) {
+                            $legacy->whereNull('medicine_transactions.created_at');
+                            if ($startObj) $legacy->where('medicine_transactions.updated_at', '>=', $startObj);
+                            if ($endObj)   $legacy->where('medicine_transactions.updated_at', '<', $endObj);
+                        });
                     });
                 } catch (\Exception $e) {
                 }
@@ -337,29 +335,27 @@ class SalesDataController extends Controller
             }
 
             // If only one date was sent, treat it as a single-day filter
+            // If only one date was sent, treat it as a single-day filter
             if ($dateFrom && !$dateTo) {
                 $dateTo = $dateFrom;
             } elseif ($dateTo && !$dateFrom) {
                 $dateFrom = $dateTo;
             }
 
-            if ($dateFrom) {
+            if ($dateFrom || $dateTo) {
                 try {
-                    $d = Carbon::createFromFormat('d/m/Y', $dateFrom)->startOfDay();
-                    $query->where(function ($q) use ($d) {
-                        $q->where('medicine_cart.updated_at', '>=', $d)
-                          ->orWhere('medicine_transactions.updated_at', '>=', $d);
-                    });
-                } catch (\Exception $e) {
-                }
-            }
+                    $startObj = $dateFrom ? Carbon::createFromFormat('d/m/Y', $dateFrom)->startOfDay()->setTime(7, 30, 0) : null;
+                    $endObj   = $dateTo   ? Carbon::createFromFormat('d/m/Y', $dateTo)->startOfDay()->addDay()->setTime(7, 30, 0) : null;
 
-            if ($dateTo) {
-                try {
-                    $d = Carbon::createFromFormat('d/m/Y', $dateTo)->endOfDay();
-                    $query->where(function ($q) use ($d) {
-                        $q->where('medicine_cart.updated_at', '<=', $d)
-                          ->orWhere('medicine_transactions.updated_at', '<=', $d);
+                    $query->where(function ($q) use ($startObj, $endObj) {
+                        $q->where(function ($main) use ($startObj, $endObj) {
+                            if ($startObj) $main->where('medicine_cart.created_at', '>=', $startObj);
+                            if ($endObj)   $main->where('medicine_cart.created_at', '<', $endObj);
+                        })->orWhere(function ($legacy) use ($startObj, $endObj) {
+                            $legacy->whereNull('medicine_cart.created_at');
+                            if ($startObj) $legacy->where('medicine_cart.updated_at', '>=', $startObj);
+                            if ($endObj)   $legacy->where('medicine_cart.updated_at', '<', $endObj);
+                        });
                     });
                 } catch (\Exception $e) {
                 }

@@ -13,6 +13,9 @@ class MedicineTransfers extends Model
         'code',
         'submission_key',
         'user_id',
+        'sent_by',
+        'received_by',
+        'requested_by',
         'status',
         'is_request',
         'source_pharmacy_id',
@@ -35,6 +38,21 @@ class MedicineTransfers extends Model
     public function users()
     {
         return $this->belongsTo(User::class, 'user_id');
+    }
+
+    public function sender()
+    {
+        return $this->belongsTo(User::class, 'sent_by');
+    }
+
+    public function receiver()
+    {
+        return $this->belongsTo(User::class, 'received_by');
+    }
+
+    public function requester()
+    {
+        return $this->belongsTo(User::class, 'requested_by');
     }
 
     public function sourcePharmacy()

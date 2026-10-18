@@ -4,7 +4,7 @@ import { formatRupiah } from './Components/Utils';
 
 const groups = [
     { title: 'PEMASUKAN', tone: 'bg-emerald-100', cols: [
-        ['pagi', 'PAGI'], ['malam', 'MALAM'], ['jumlah', 'JUMLAH'], ['piutang', 'PIUTANG'],
+        ['pagi', 'PAGI'], ['sore', 'SORE'], ['jumlah', 'JUMLAH'], ['piutang', 'PIUTANG'],
         ['pendapatan_lain', 'PENDAPATAN LAIN-LAIN'], ['bank', 'BANK'], ['cashbond_masuk', 'CASHBOND'], ['total_pemasukan', 'TOTAL PEMASUKAN'],
     ] },
     { title: 'PENGELUARAN', tone: 'bg-rose-100', cols: [

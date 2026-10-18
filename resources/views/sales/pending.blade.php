@@ -399,7 +399,6 @@
                                     <th>Tipe</th>
                                     <th>Pasien</th>
                                     <th class="col-right">Harga</th>
-                                    <th class="col-right">Pembayaran</th>
                                     <th></th>
                                 </tr>
                             </thead>
@@ -571,10 +570,6 @@
                     {
                         data: 'final_price',
                         className: 'col-price'
-                    },
-                    {
-                        data: 'payment_method',
-                        defaultContent: '-'
                     },
                     {
                         data: null,

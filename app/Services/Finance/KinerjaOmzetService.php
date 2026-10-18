@@ -5,7 +5,10 @@ namespace App\Services\Finance;
 use App\Models\Debtors;
 use App\Models\MedicineTransactions;
 use App\Models\Receiving;
+use App\Support\FinanceShift;
+use App\Support\LiphTransactionScope;
 use Carbon\CarbonPeriod;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class KinerjaOmzetService
@@ -17,12 +20,6 @@ class KinerjaOmzetService
             'sales' => ['cash' => ['morning' => 0, 'evening' => 0], 'bank' => ['morning' => 0, 'evening' => 0], 'credit' => ['morning' => [], 'evening' => []], 'returns' => ['morning' => 0, 'evening' => 0]],
             'purchases' => ['pbf' => 0, 'consignment' => 0, 'return' => 0, 'cash' => 0, 'ppn' => 0],
         ];
-    }
-
-    private function shiftKey($shift): string
-    {
-        $name = mb_strtolower(trim((string) $shift));
-        return str_contains($name, 'malam') ? 'evening' : 'morning';
     }
 
     private function number($value): float
@@ -80,13 +77,15 @@ class KinerjaOmzetService
         $extraDebtors = [];
         foreach (MedicineTransactions::query()->with([
             'transactions' => fn ($query) => $query->where('status', 1),
-            'shift_logs.shift', 'debtors',
-        ])->where('status', 1)->whereIn('pharmacy_id', $pharmacyIds)
-            ->whereDate('created_at', '>=', $startDate)->whereDate('created_at', '<=', $endDate)
+            'debtors',
+        ])->whereIn('pharmacy_id', $pharmacyIds)
+            ->tap(fn ($q) => LiphTransactionScope::applySalesStatus($q))
+            ->tap(fn ($q) => LiphTransactionScope::applyPeriod($q, Carbon::parse($startDate), Carbon::parse($endDate)))
             ->orderBy('created_at')->get() as $transaction) {
-            $date = optional($transaction->created_at)->toDateString();
+            $effectiveAt = $transaction->created_at ?? $transaction->updated_at;
+            $date = FinanceShift::operationalDate($effectiveAt);
             if (!$date || !isset($days[$date])) continue;
-            $shift = $this->shiftKey($transaction->shift_logs?->shift?->name);
+            $shift = FinanceShift::key($effectiveAt);
             $type = mb_strtoupper(trim((string) $transaction->transaction_type));
             $payment = mb_strtoupper(trim((string) $transaction->payment_method));
             $items = $transaction->transactions;

@@ -75,18 +75,79 @@
             border-bottom: 1px solid #ddd;
         }
 
-        .qty-col {
+        .no-col {
+            width: 32px;
             text-align: left;
-            width: 120px;
         }
 
-        .receiver {
-            margin-top: 30px;
+        .batch-col {
+            width: 140px;
+        }
+
+        .qty-col {
+            text-align: left;
+            width: 100px;
+        }
+
+        table.signatures {
+            width: 100%;
+            margin-top: 40px;
+            page-break-inside: avoid;
+        }
+
+        table.signatures td {
+            width: 50%;
+            text-align: center;
+            vertical-align: top;
+        }
+
+        .sign-title {
+            font-size: 12px;
+            font-weight: 700;
+            color: #111;
+        }
+
+        .sign-sub {
+            font-size: 11px;
+            color: #555;
+            margin-top: 3px;
+        }
+
+        .sign-space {
+            height: 60px;
+        }
+
+        .sign-name {
+            font-size: 12px;
+            font-weight: 700;
+            color: #111;
         }
     </style>
 </head>
 
 <body>
+    @php
+        $sourcePharmacyName = $transfer->sourcePharmacy?->name
+            ?? ($transfer->items->first()?->sourceBatch?->pharmacy?->name
+            ?? ($transfer->items->first()?->source_type === 'gudang' ? 'GUDANG PMI' : ($transfer->users?->pharmacy?->name ?? 'GUDANG PMI')));
+
+        $destinationPharmacyName = $transfer->destinationPharmacy?->name
+            ?? ($transfer->items->first()?->batches?->pharmacy?->name ?? '—');
+
+        $sortedItems = $transfer->items->sort(function ($a, $b) {
+            $nameA = trim((string) ($a->batches?->medicines?->name ?? $a->requestedMedicine?->name ?? ''));
+            $nameB = trim((string) ($b->batches?->medicines?->name ?? $b->requestedMedicine?->name ?? ''));
+            $cmp = strcasecmp($nameA, $nameB);
+            if ($cmp === 0) {
+                $batchA = trim((string) ($a->batches?->name ?? $a->sourceBatch?->name ?? ''));
+                $batchB = trim((string) ($b->batches?->name ?? $b->sourceBatch?->name ?? ''));
+                return strcasecmp($batchA, $batchB);
+            }
+            return $cmp;
+        })->values();
+
+        $senderDisplayName = $senderName;
+    @endphp
 
     <h1>Tanda Terima Barang</h1>
     <div class="divider"></div>
@@ -95,12 +156,12 @@
         <tr>
             <td width="70%">
                 <div style="padding-top:6px"><span class="label">Nomor Terima</span>: {{ $transfer->code }}</div>
-                <div style="padding-top:6px"><span class="label">Apotek Asal</span>: {{ $transfer->items->first()?->sourceBatch?->pharmacy?->name ?? ($transfer->items->first()?->source_type === 'gudang' ? 'GUDANG PMI' : ($transfer->users?->pharmacy?->name ?? '—')) }}</div>
-                <div style="padding-top:6px"><span class="label">Apotek Tujuan</span>: {{ $transfer->items->first()?->batches?->pharmacy?->name ?? '—' }}</div>
+                <div style="padding-top:6px"><span class="label">Apotek Asal</span>: {{ $sourcePharmacyName }}</div>
+                <div style="padding-top:6px"><span class="label">Apotek Tujuan</span>: {{ $destinationPharmacyName }}</div>
             </td>
             <td width="30%" class="date-box">
                 <div>Date:</div>
-                <div class="date-value">{{ $transfer->updated_at->format('d F Y') }}</div>
+                <div class="date-value">{{ $transfer->updated_at ? $transfer->updated_at->format('d F Y') : ($transfer->created_at ? $transfer->created_at->format('d F Y') : date('d F Y')) }}</div>
             </td>
         </tr>
     </table>
@@ -110,23 +171,52 @@
     <table class="items">
         <thead>
             <tr>
+                <th class="no-col">No</th>
                 <th>Item</th>
-                <th>Batch</th>
+                <th class="batch-col">Batch</th>
                 <th class="qty-col">Quantity</th>
             </tr>
         </thead>
         <tbody>
-            @foreach($transfer->items as $item)
+            @foreach($sortedItems as $index => $item)
             <tr>
-                <td>{{ $item->batches?->medicines?->name ?? '—' }}</td>
-                <td>{{ $item->batches?->name ?? '—' }}</td>
+                <td class="no-col">{{ $index + 1 }}</td>
+                <td>{{ $item->batches?->medicines?->name ?? ($item->requestedMedicine?->name ?? '—') }}</td>
+                <td class="batch-col">{{ $item->batches?->name ?? ($item->sourceBatch?->name ?? '—') }}</td>
                 <td class="qty-col">{{ $item->original_qty ?? $item->qty }}</td>
             </tr>
             @endforeach
         </tbody>
     </table>
 
-
+    <table class="signatures">
+        <tr>
+            <td>
+                <div class="sign-title">Yang Menyerahkan,</div>
+                <div class="sign-sub">({{ $sourcePharmacyName }})</div>
+                <div class="sign-space"></div>
+                <div class="sign-name">
+                    @if(!empty($senderDisplayName))
+                        ( {{ $senderDisplayName }} )
+                    @else
+                        ( .................................... )
+                    @endif
+                </div>
+            </td>
+            <td>
+                <div class="sign-title">Yang Menerima,</div>
+                <div class="sign-sub">({{ $destinationPharmacyName }})</div>
+                <div class="sign-space"></div>
+                <div class="sign-name">
+                    @if(!empty($receiverName))
+                        ( {{ $receiverName }} )
+                    @else
+                        ( .................................... )
+                    @endif
+                </div>
+            </td>
+        </tr>
+    </table>
 
 </body>
 

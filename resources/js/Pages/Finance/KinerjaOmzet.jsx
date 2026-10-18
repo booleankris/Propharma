@@ -46,7 +46,7 @@ export default function KinerjaOmzet({ days = [], debtors = [] }) {
                         <th rowSpan="2" className={header}>PBF</th><th rowSpan="2" className={header}>KONSINYASI</th><th rowSpan="2" className={`${header} bg-yellow-100`}>RETUR PEMBELIAN</th><th rowSpan="2" className={header}>CASH</th><th rowSpan="2" className={header}>JUMLAH BELI</th><th rowSpan="2" className={header}>PPN FAKTUR</th><th rowSpan="2" className={header}>BELI EXC PPN</th><th rowSpan="2" className={header}>MARGIN EXC PPN</th><th rowSpan="2" className={header}>HPP %</th>
                     </tr>
                     <tr className="bg-emerald-50">
-                        <th className={header}>PAGI</th><th className={header}>MALAM</th><th className={header}>PAGI</th><th className={header}>MALAM</th>
+                        <th className={header}>PAGI</th><th className={header}>SORE</th><th className={header}>PAGI</th><th className={header}>SORE</th>
                         {debtors.map((debtor) => <th key={debtor.id} className={`${header} min-w-[128px]`}>{debtor.name}</th>)}
                         <th className={header}>TOTAL KREDIT</th><th className={header}>PPN</th><th className={header}>KREDIT EXC PPN</th>
                     </tr>

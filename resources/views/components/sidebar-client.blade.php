@@ -1694,7 +1694,8 @@
                 </div>
                 @php
                     $getshift = \Illuminate\Support\Facades\Cache::remember('sidebar_shifts', 3600, function () {
-                        return \App\Models\Shifts::select('id', 'name')->get();
+                        $shifts = \App\Models\Shifts::where('status', 1)->select('id', 'name')->get();
+                        return $shifts->isNotEmpty() ? $shifts : \App\Models\Shifts::select('id', 'name')->get();
                     });
                 @endphp
                 <div id="shift-select">

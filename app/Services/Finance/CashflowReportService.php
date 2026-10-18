@@ -3,6 +3,7 @@
 namespace App\Services\Finance;
 
 use Carbon\CarbonPeriod;
+use App\Support\FinanceShift;
 use Illuminate\Support\Facades\DB;
 
 class CashflowReportService
@@ -18,14 +19,34 @@ class CashflowReportService
             ->where('status', 1)
             ->groupBy('transaction_id');
 
+        $start = FinanceShift::start($startDate);
+        $until = FinanceShift::endExclusive($endDate);
+        $effectiveAt = 'COALESCE(mt.created_at, mt.updated_at)';
+        $operationalDate = FinanceShift::sqlOperationalDate($effectiveAt);
+        $shiftExpression = "CASE WHEN TIME({$effectiveAt}) BETWEEN '".FinanceShift::MORNING_START."' AND '".FinanceShift::MORNING_END."' THEN 'PAGI' ELSE 'SORE' END";
+
         $records = DB::table('medicine_transactions as mt')
             ->leftJoinSub($itemDiscounts, 'cart_discounts', fn ($join) => $join->on('cart_discounts.transaction_id', '=', 'mt.id'))
-            ->where('mt.status', 1)
+            ->where(function ($status) {
+                $status->where('mt.status', 1)
+                    ->orWhere(function ($unpaid) {
+                        $unpaid->whereNotNull('mt.transaction_code')
+                            ->whereExists(function ($cart) {
+                                $cart->selectRaw('1')->from('medicine_cart as mc')->whereColumn('mc.transaction_id', 'mt.id')->where('mc.status', 1);
+                            })
+                            ->where(function ($type) {
+                                $type->whereRaw("UPPER(TRIM(COALESCE(mt.payment_method, ''))) = 'BELUM BAYAR'")
+                                    ->orWhereIn('mt.transaction_type', ['KREDIT', 'RESEP KREDIT']);
+                            });
+                    })
+                    ->orWhere(function ($return) {
+                        $return->whereIn('mt.transaction_type', ['RETUR JUAL', 'RETUR KREDIT'])->where('mt.transaction_code', 'RT');
+                    });
+            })
             ->whereIn('mt.pharmacy_id', $pharmacyIds)
-            ->whereDate('mt.created_at', '>=', $startDate)
-            ->whereDate('mt.created_at', '<=', $endDate)
-            ->selectRaw("DATE(mt.created_at) as sale_date, CASE WHEN TIME(mt.created_at) <= '15:30:59' THEN 'PAGI' ELSE 'SIANG' END as shift_name, UPPER(TRIM(COALESCE(mt.payment_method, ''))) as payment_method, TRIM(COALESCE(mt.transfer_bank_name, '')) as bank_name, mt.transaction_type, COUNT(*) as transaction_count, SUM(CAST(COALESCE(NULLIF(mt.subtotal, ''), '0') AS DECIMAL(15,2)) - CAST(COALESCE(NULLIF(mt.discount, ''), '0') AS DECIMAL(15,2))) as amount, SUM(CAST(COALESCE(NULLIF(mt.subtotal, ''), '0') AS DECIMAL(15,2)) + COALESCE(cart_discounts.item_discount, 0)) as gross_amount, SUM(CAST(COALESCE(NULLIF(mt.discount, ''), '0') AS DECIMAL(15,2))) as transaction_discount, SUM(COALESCE(cart_discounts.item_discount, 0)) as item_discount")
-            ->groupByRaw("DATE(mt.created_at), CASE WHEN TIME(mt.created_at) <= '15:30:59' THEN 'PAGI' ELSE 'SIANG' END, UPPER(TRIM(COALESCE(mt.payment_method, ''))), TRIM(COALESCE(mt.transfer_bank_name, '')), mt.transaction_type")
+            ->whereRaw("{$effectiveAt} >= ? AND {$effectiveAt} < ?", [$start, $until])
+            ->selectRaw("{$operationalDate} as sale_date, {$shiftExpression} as shift_name, UPPER(TRIM(COALESCE(mt.payment_method, ''))) as payment_method, TRIM(COALESCE(mt.transfer_bank_name, '')) as bank_name, mt.transaction_type, COUNT(*) as transaction_count, SUM(CAST(COALESCE(NULLIF(mt.subtotal, ''), '0') AS DECIMAL(15,2)) - CAST(COALESCE(NULLIF(mt.discount, ''), '0') AS DECIMAL(15,2))) as amount, SUM(CAST(COALESCE(NULLIF(mt.subtotal, ''), '0') AS DECIMAL(15,2)) + COALESCE(cart_discounts.item_discount, 0)) as gross_amount, SUM(CAST(COALESCE(NULLIF(mt.discount, ''), '0') AS DECIMAL(15,2))) as transaction_discount, SUM(COALESCE(cart_discounts.item_discount, 0)) as item_discount")
+            ->groupByRaw("{$operationalDate}, {$shiftExpression}, UPPER(TRIM(COALESCE(mt.payment_method, ''))), TRIM(COALESCE(mt.transfer_bank_name, '')), mt.transaction_type")
             ->orderBy('sale_date')
             ->get();
 
@@ -35,7 +56,7 @@ class CashflowReportService
                 $banks[$bank] = ['edc' => 0, 'transfer' => 0, 'qris' => 0, 'edcCount' => 0, 'transferCount' => 0, 'qrisCount' => 0];
             }
 
-            return ['cash' => 0, 'cashCount' => 0, 'banks' => $banks, 'otherMethods' => [], 'discount' => 0, 'itemDiscount' => 0, 'total' => 0, 'edcPending' => 0, 'directDeposit' => 0, 'count' => 0];
+            return ['cash' => 0, 'cashCount' => 0, 'banks' => $banks, 'otherMethods' => [], 'discount' => 0, 'itemDiscount' => 0, 'total' => 0, 'grossTotal' => 0, 'edcPending' => 0, 'directDeposit' => 0, 'count' => 0];
         };
 
         $days = [];
@@ -60,7 +81,6 @@ class CashflowReportService
                 }
             }
 
-            // Kolom omzet memakai nilai bruto; kolom metode bayar/setoran tetap memakai nilai bersih.
             $amount = (float) $record->amount;
             $grossAmount = (float) $record->gross_amount;
             if (in_array($record->transaction_type, ['RETUR JUAL', 'RETUR KREDIT'], true)) {
@@ -72,7 +92,9 @@ class CashflowReportService
             $shift['count'] += $count;
             $shift['discount'] += (float) $record->transaction_discount;
             $shift['itemDiscount'] += (float) $record->item_discount;
-            $shift['total'] += $grossAmount;
+            // Cashflow total reconciles to LIPH Netto Akhir; gross is retained separately.
+            $shift['total'] += $amount;
+            $shift['grossTotal'] += $grossAmount;
 
             if (in_array($method, ['CASH', 'TUNAI'], true)) {
                 $shift['cash'] += $amount;

@@ -20,7 +20,7 @@ class KeuanganReportService
         foreach (CarbonPeriod::create($calculationStart, $endDate) as $date) {
             $key = $date->toDateString();
             $days[$key] = [
-                'date' => $key, 'pagi' => 0.0, 'malam' => 0.0, 'jumlah' => 0.0,
+                'date' => $key, 'pagi' => 0.0, 'sore' => 0.0, 'jumlah' => 0.0,
                 'piutang' => 0.0, 'pendapatan_lain' => 0.0, 'bank' => 0.0, 'cashbond_masuk' => 0.0,
                 'total_pemasukan' => 0.0, 'hutang_dagang' => 0.0, 'retur_pembelian' => 0.0,
                 'pembelian_cash' => 0.0, 'biaya_pajak' => 0.0, 'biaya_operasional' => 0.0,
@@ -33,7 +33,7 @@ class KeuanganReportService
             $key = $saleDay['date'];
             if (!isset($days[$key])) continue;
             $days[$key]['pagi'] = (float) ($saleDay['morning']['cash'] ?? 0);
-            $days[$key]['malam'] = (float) ($saleDay['evening']['cash'] ?? 0);
+            $days[$key]['sore'] = (float) ($saleDay['evening']['cash'] ?? 0);
         }
 
         $payments = FinancePayment::with(['expenseAccount:id,name,category', 'transferAccount:id,name'])
@@ -87,7 +87,7 @@ class KeuanganReportService
         $balance = 0.0;
         foreach ($days as $date => &$day) {
             if ($openingDate === $date) $balance = (float) $opening->amount;
-            $day['jumlah'] = $day['pagi'] + $day['malam'];
+            $day['jumlah'] = $day['pagi'] + $day['sore'];
             $day['total_pemasukan'] = $day['jumlah'] + $day['piutang'] + $day['pendapatan_lain'] + $day['cashbond_masuk'];
             $day['total_biaya'] = $day['hutang_dagang'] + $day['retur_pembelian'] + $day['pembelian_cash'] + $day['biaya_pajak'] + $day['biaya_operasional'];
             $day['total_pengeluaran'] = $day['total_biaya'] + $day['cashbond_keluar'] + array_sum($day['setoran']);
