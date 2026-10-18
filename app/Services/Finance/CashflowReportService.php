@@ -25,7 +25,7 @@ class CashflowReportService
         $operationalDate = FinanceShift::sqlOperationalDate($effectiveAt);
         $shiftExpression = "CASE WHEN TIME({$effectiveAt}) BETWEEN '".FinanceShift::MORNING_START."' AND '".FinanceShift::MORNING_END."' THEN 'PAGI' ELSE 'SORE' END";
 
-        $records = DB::table('medicine_transactions as mt')
+        $salesByTransaction = DB::table('medicine_transactions as mt')
             ->leftJoinSub($itemDiscounts, 'cart_discounts', fn ($join) => $join->on('cart_discounts.transaction_id', '=', 'mt.id'))
             ->where(function ($status) {
                 $status->where('mt.status', 1)
@@ -45,8 +45,14 @@ class CashflowReportService
             })
             ->whereIn('mt.pharmacy_id', $pharmacyIds)
             ->whereRaw("{$effectiveAt} >= ? AND {$effectiveAt} < ?", [$start, $until])
-            ->selectRaw("{$operationalDate} as sale_date, {$shiftExpression} as shift_name, UPPER(TRIM(COALESCE(mt.payment_method, ''))) as payment_method, TRIM(COALESCE(mt.transfer_bank_name, '')) as bank_name, mt.transaction_type, COUNT(*) as transaction_count, SUM(CAST(COALESCE(NULLIF(mt.subtotal, ''), '0') AS DECIMAL(15,2)) - CAST(COALESCE(NULLIF(mt.discount, ''), '0') AS DECIMAL(15,2))) as amount, SUM(CAST(COALESCE(NULLIF(mt.subtotal, ''), '0') AS DECIMAL(15,2)) + COALESCE(cart_discounts.item_discount, 0)) as gross_amount, SUM(CAST(COALESCE(NULLIF(mt.discount, ''), '0') AS DECIMAL(15,2))) as transaction_discount, SUM(COALESCE(cart_discounts.item_discount, 0)) as item_discount")
-            ->groupByRaw("{$operationalDate}, {$shiftExpression}, UPPER(TRIM(COALESCE(mt.payment_method, ''))), TRIM(COALESCE(mt.transfer_bank_name, '')), mt.transaction_type")
+            ->selectRaw("{$operationalDate} as sale_date, {$shiftExpression} as shift_name, UPPER(TRIM(COALESCE(mt.payment_method, ''))) as payment_method, TRIM(COALESCE(mt.transfer_bank_name, '')) as bank_name, mt.transaction_type, CAST(COALESCE(NULLIF(mt.subtotal, ''), '0') AS DECIMAL(15,2)) - CAST(COALESCE(NULLIF(mt.discount, ''), '0') AS DECIMAL(15,2)) as amount, CAST(COALESCE(NULLIF(mt.subtotal, ''), '0') AS DECIMAL(15,2)) + COALESCE(cart_discounts.item_discount, 0) as gross_amount, CAST(COALESCE(NULLIF(mt.discount, ''), '0') AS DECIMAL(15,2)) as transaction_discount, COALESCE(cart_discounts.item_discount, 0) as item_discount");
+
+        // Aggregate only the derived columns. Grouping by the same CASE expressions
+        // directly can still fail with MySQL ONLY_FULL_GROUP_BY on production.
+        $records = DB::query()
+            ->fromSub($salesByTransaction, 'sales')
+            ->selectRaw('sale_date, shift_name, payment_method, bank_name, transaction_type, COUNT(*) as transaction_count, SUM(amount) as amount, SUM(gross_amount) as gross_amount, SUM(transaction_discount) as transaction_discount, SUM(item_discount) as item_discount')
+            ->groupBy('sale_date', 'shift_name', 'payment_method', 'bank_name', 'transaction_type')
             ->orderBy('sale_date')
             ->get();
 
