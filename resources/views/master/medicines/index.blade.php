@@ -130,67 +130,146 @@
 @section('content')
     <section class="section px-4">
         <div class="section-body">
-            <div class="flex flex-col lg:flex-row gap-4">
+
+            {{-- ══════════════════════════════════════════════════════════ --}}
+            {{-- PAGE HEADER & DEDICATED MASTER ACTION TOOLBAR              --}}
+            {{-- ══════════════════════════════════════════════════════════ --}}
+            <div
+                class="mb-5 bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                {{-- Left: Page Title & Counter Badge --}}
+                <div class="flex items-center gap-3.5">
+                    <div class="rounded-2xl text-[#2563eb] flex items-center justify-center  flex-shrink-0">
+                        <svg class="w-12 h-10 text-[#2563eb]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2.5 flex-wrap">
+                            <h1 class="text-xl sm:text-2xl font-black text-slate-800 tracking-tight leading-tight">Master &
+                                Katalog Obat</h1>
+                            <span id="badgeTotalMedicines"
+                                class="px-2.5 py-0.5 text-xs font-bold rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                                Total: {{ number_format(\App\Models\Medicines::count(), 0, ',', '.') }} Obat
+                            </span>
+                        </div>
+                        <p class="text-xs text-slate-500 font-medium mt-0.5">
+                            Pusat manajemen data obat, formulasi harga, stok, serta export & import katalog farmasi
+                        </p>
+                    </div>
+                </div>
+
+                {{-- Right: Dedicated Actions Toolbar (Prominent, clean, never cramped) --}}
+                <div class="flex items-center gap-2 flex-wrap">
+                    {{-- Status Filter --}}
+                    <div
+                        class="flex items-center gap-1.5 bg-slate-50 border border-slate-200/90 rounded-xl px-3 py-1.5 shadow-2xs">
+                        <span class="text-xs font-bold text-slate-500">Filter:</span>
+                        <select id="statusFilter"
+                            class="text-xs font-semibold bg-transparent border-0 p-0 text-slate-800 focus:ring-0 cursor-pointer">
+                            <option value="1" selected>🟢 Aktif Saja</option>
+                            <option value="0">🔴 Nonaktif Saja</option>
+                            <option value="all">⚪ Semua Status</option>
+                        </select>
+                    </div>
+
+                    {{-- Export Master Excel (.xlsx) Button --}}
+                    <button type="button" id="btnExportMasterExcel" onclick="exportMasterExcel()"
+                        class="inline-flex items-center px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 active:scale-95 text-white text-xs font-bold rounded-xl shadow-xs shadow-emerald-500/20 transition-all gap-2 cursor-pointer"
+                        title="Download seluruh katalog obat ke file Excel (.xlsx) rapi dan berformat">
+                        <svg class="w-4 h-4 text-emerald-100" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <span id="btnExportMasterExcelText">Export Excel (.xlsx)</span>
+                    </button>
+
+                    {{-- Export Dropdown / More Options (CSV & Rekap Stok) --}}
+                    <div class="relative inline-block text-left" id="dropdownExportMoreWrapper">
+                        <button type="button" id="btnExportMoreToggle" onclick="toggleExportMenu(event)"
+                            class="inline-flex items-center px-3 py-2 bg-white hover:bg-slate-50 active:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold shadow-2xs transition gap-1.5 cursor-pointer">
+                            <span>Opsi Lain</span>
+                            <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor"
+                                viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+                        <div id="exportMoreMenu"
+                            class="hidden absolute right-0 mt-1.5 w-56 bg-white rounded-xl shadow-xl border border-slate-100 py-1.5 z-50">
+                            <a href="{{ route('master-data.export', ['type' => 'medicines', 'format' => 'csv']) }}"
+                                class="flex items-center gap-2 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition">
+                                <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor"
+                                    viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-8-4 4 4m0 0 4-4m-4 4V4" />
+                                </svg>
+                                <span>Export Format Ringkas CSV</span>
+                            </a>
+                            <button type="button" onclick="exportExcelGudang()"
+                                class="w-full text-left flex items-center gap-2 px-3.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition cursor-pointer">
+                                <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor"
+                                    viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                                </svg>
+                                <span>Export Rekap Saldo Stok</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    {{-- Import Excel Button --}}
+                    <button type="button" id="btnOpenImport"
+                        class="inline-flex items-center px-3.5 py-2 bg-white hover:bg-slate-50 active:bg-slate-100 text-slate-700 border border-slate-300 rounded-xl text-xs font-bold shadow-2xs transition gap-1.5 cursor-pointer"
+                        title="Import atau perbarui katalog obat dari file Excel">
+                        <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                        </svg>
+                        <span>Import Excel</span>
+                    </button>
+                </div>
+            </div>
+
+            {{-- ══════════════════════════════════════════════════════════ --}}
+            {{-- MAIN TWO-COLUMN WORKSPACE: TABLE PANEL + FORM PANEL         --}}
+            {{-- ══════════════════════════════════════════════════════════ --}}
+            <div class="flex flex-col lg:flex-row gap-4 items-start">
 
                 {{-- ─────────────────── TABLE PANEL ─────────────────── --}}
-                <div class="card w-full md:w-[40%] shadow-md rounded-2xl p-6 bg-white">
-                    <div class="flex items-center justify-between mb-4">
-                        <div class="flex items-center">
-                            <svg class="mr-2" width="28" height="28" viewBox="0 0 24 24" fill="none">
-                                <path fill-rule="evenodd" clip-rule="evenodd"
-                                    d="M7.46778 2.25H7.53223C7.97201 2.24998 8.35136 2.24997 8.66265 2.27818C8.99183 2.30802 9.31779 2.37407 9.625 2.55144C9.96704 2.74892 10.2511 3.03296 10.4486 3.375C10.6259 3.68221 10.692 4.00817 10.7218 4.33735C10.75 4.64865 10.75 5.028 10.75 5.4678L10.75 14.5322C10.75 14.972 10.75 15.3514 10.7218 15.6627C10.692 15.9918 10.6259 16.3178 10.4486 16.625C10.2511 16.967 9.96704 17.2511 9.625 17.4486C9.31779 17.6259 8.99183 17.692 8.66265 17.7218C8.35135 17.75 7.972 17.75 7.53221 17.75H7.46779C7.028 17.75 6.64865 17.75 6.33735 17.7218C6.00817 17.692 5.68221 17.6259 5.375 17.4486C5.03296 17.2511 4.74892 16.967 4.55144 16.625C4.37407 16.3178 4.30802 15.9918 4.27818 15.6627C4.24997 15.3514 4.24998 14.972 4.25 14.5322L4.25 5.5C4.25 5.48922 4.25 5.47848 4.25 5.46778C4.24998 5.02799 4.24997 4.64864 4.27818 4.33735C4.30802 4.00817 4.37407 3.68221 4.55144 3.375C4.74892 3.03296 5.03296 2.74892 5.375 2.55144C5.68221 2.37408 6.00817 2.30802 6.33735 2.27818C6.64864 2.24997 7.02799 2.24998 7.46778 2.25ZM6.47274 3.77206C6.2476 3.79247 6.16586 3.82689 6.125 3.85048C6.01098 3.91631 5.91631 4.01099 5.85048 4.125C5.82689 4.16587 5.79246 4.2476 5.77206 4.47275C5.75072 4.7082 5.75 5.01889 5.75 5.5L5.75 14.5C5.75 14.9811 5.75072 15.2918 5.77206 15.5273C5.79246 15.7524 5.82689 15.8341 5.85048 15.875C5.91631 15.989 6.01098 16.0837 6.125 16.1495C6.16586 16.1731 6.2476 16.2075 6.47274 16.2279C6.7082 16.2493 7.01889 16.25 7.5 16.25C7.98111 16.25 8.2918 16.2493 8.52725 16.2279C8.7524 16.2075 8.83414 16.1731 8.875 16.1495C8.98901 16.0837 9.08369 15.989 9.14952 15.875C9.17311 15.8341 9.20754 15.7524 9.22794 15.5273C9.24928 15.2918 9.25 14.9811 9.25 14.5L9.25 5.5C9.25 5.01889 9.24928 4.7082 9.22794 4.47275C9.20753 4.2476 9.17311 4.16586 9.14952 4.125C9.08369 4.01099 8.98901 3.91631 8.875 3.85048C8.83414 3.82689 8.7524 3.79247 8.52725 3.77206C8.2918 3.75072 7.98111 3.75 7.5 3.75C7.01889 3.75 6.7082 3.75072 6.47274 3.77206ZM16.4678 5.25H16.5322C16.972 5.24998 17.3514 5.24997 17.6627 5.27818C17.9918 5.30802 18.3178 5.37407 18.625 5.55144C18.967 5.74892 19.2511 6.03296 19.4486 6.375C19.6259 6.68221 19.692 7.00817 19.7218 7.33735C19.75 7.64864 19.75 8.02797 19.75 8.46775V14.5322C19.75 14.972 19.75 15.3514 19.7218 15.6627C19.692 15.9918 19.6259 16.3178 19.4486 16.625C19.2511 16.967 18.967 17.2511 18.625 17.4486C18.3178 17.6259 17.9918 17.692 17.6627 17.7218C17.3514 17.75 16.972 17.75 16.5322 17.75H16.4678C16.028 17.75 15.6486 17.75 15.3373 17.7218C15.0082 17.692 14.6822 17.6259 14.375 17.4486C14.033 17.2511 13.7489 16.967 13.5514 16.625C13.3741 16.3178 13.308 15.9918 13.2782 15.6627C13.25 15.3514 13.25 14.972 13.25 14.5322V8.46776C13.25 8.02798 13.25 7.64864 13.2782 7.33735C13.308 7.00817 13.3741 6.68222 13.5514 6.375C13.7489 6.03296 14.033 5.74892 14.375 5.55144C14.6822 5.37408 15.0082 5.30802 15.3373 5.27818C15.6486 5.24997 16.028 5.24998 16.4678 5.25ZM15.4727 6.77206C15.2476 6.79247 15.1659 6.82689 15.125 6.85048C15.011 6.91631 14.9163 7.01099 14.8505 7.125C14.8269 7.16586 14.7925 7.2476 14.7721 7.47275C14.7507 7.7082 14.75 8.01889 14.75 8.5V14.5C14.75 14.9811 14.7507 15.2918 14.7721 15.5273C14.7925 15.7524 14.8269 15.8341 14.8505 15.875C14.9163 15.989 15.011 16.0837 15.125 16.1495C15.1659 16.1731 15.2476 16.2075 15.4727 16.2279C15.7082 16.2493 16.0189 16.25 16.5 16.25C16.9811 16.25 17.2918 16.2493 17.5273 16.2279C17.7524 16.2075 17.8341 16.1731 17.875 16.1495C17.989 16.0837 18.0837 15.989 18.1495 15.875C18.1731 15.8341 18.2075 15.7524 18.2279 15.5273C18.2493 15.2918 18.25 14.9811 18.25 14.5V8.5C18.25 8.01889 18.2493 7.7082 18.2279 7.47275C18.2075 7.2476 18.1731 7.16586 18.1495 7.125C18.0837 7.01099 17.989 6.91631 17.875 6.85048C17.8341 6.82689 17.7524 6.79247 17.5273 6.77206C17.2918 6.75072 16.9811 6.75 16.5 6.75C16.0189 6.75 15.7082 6.75072 15.4727 6.77206ZM1.25 21C1.25 20.5858 1.58579 20.25 2 20.25H22C22.4142 20.25 22.75 20.5858 22.75 21C22.75 21.4142 22.4142 21.75 22 21.75H2C1.58579 21.75 1.25 21.4142 1.25 21Z"
-                                    fill="#688af8" />
-                            </svg>
-                            <h2 class="text-2xl font-bold text-gray-800">Data Obat</h2>
+                <div
+                    class="card w-full lg:w-[42%] shadow-sm border border-slate-200/80 rounded-2xl p-5 bg-white flex flex-col gap-3.5">
+                    {{-- Header: Title & Hint --}}
+                    <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                        <div>
+                            <h2 class="text-base font-bold text-slate-800 leading-tight">Daftar Katalog Obat</h2>
+                            <p class="text-[11px] text-slate-500 font-medium">Klik 1x untuk preview detail, double-klik
+                                untuk edit formulir</p>
                         </div>
-                        <div class="flex items-center gap-2">
-                            @include('master.partials.export-button', ['type' => 'medicines'])
-                            <button type="button" id="btnOpenImport"
-                                class="inline-flex items-center px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg shadow-sm transition gap-1.5 cursor-pointer">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                                </svg>
-                                <span>Import Excel</span>
-                            </button>
-                            <label for="statusFilter" class="text-xs font-semibold text-gray-600">Status:</label>
-                            <select id="statusFilter"
-                                class="text-xs font-medium bg-gray-50 border border-gray-300 rounded-lg px-2.5 py-1.5 focus:ring-blue-500 focus:border-blue-500 text-gray-700 cursor-pointer shadow-sm">
-                                <option value="1" selected>🟢 Aktif</option>
-                                <option value="0">🔴 Nonaktif</option>
-                                <option value="all">⚪ Semua Status</option>
-                            </select>
-                        </div>
+                        <span
+                            class="text-[11px] font-semibold text-slate-400 bg-slate-50 border border-slate-100 px-2 py-0.5 rounded-lg">
+                            Tabel Cepat
+                        </span>
                     </div>
 
-                    <div class="dbl-hint">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <circle cx="12" cy="12" r="10" />
-                            <line x1="12" y1="8" x2="12" y2="12" />
-                            <line x1="12" y1="16" x2="12.01" y2="16" />
-                        </svg>
-                        Double-klik baris untuk edit, klik sekali untuk preview
-                    </div>
-
-                    <div class="overflow-x-auto mt-3">
-                        <table id="table-data" class="min-w-full text-sm text-left text-gray-600">
-                            <thead class="bg-gray-100 text-gray-700 uppercase text-xs">
+                    <div class="overflow-x-auto rounded-xl border border-slate-100 shadow-2xs">
+                        <table id="table-data" class="min-w-full text-xs text-left text-slate-600">
+                            <thead
+                                class="bg-slate-50 text-slate-700 uppercase font-bold text-[10px] tracking-wider border-b border-slate-200">
                                 <tr>
-                                    <th class="px-4 py-3">#</th>
-                                    <th class="px-4 py-3">Kode</th>
-                                    <th class="px-4 py-3">Nama</th>
-                                    <th class="px-4 py-3">Kategori</th>
-                                    <th class="px-4 py-3">Status</th>
+                                    <th class="px-3 py-2.5">#</th>
+                                    <th class="px-3 py-2.5">Kode</th>
+                                    <th class="px-3 py-2.5">Nama</th>
+                                    <th class="px-3 py-2.5">Kategori</th>
+                                    <th class="px-3 py-2.5 text-center">Status</th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-gray-100"></tbody>
+                            <tbody class="divide-y divide-slate-100"></tbody>
                         </table>
                     </div>
                 </div>
 
                 {{-- ─────────────────── FORM PANEL ─────────────────── --}}
-                <div class="bg-white p-6 rounded-2xl shadow-md w-full md:w-[60%] mx-auto">
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200/80 w-full lg:w-[58%]">
 
                     {{-- Mode indicator bar --}}
                     <div id="formModeBar">
@@ -366,7 +445,9 @@
 
                             <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
                                 <div>
-                                    <label class="block text-xs font-bold text-gray-700 mb-1"><span>Harga HNA (Beli)</span> <span id="hnaUnitLabel" class="font-medium text-blue-600">(per satuan)</span></label>
+                                    <label class="block text-xs font-bold text-gray-700 mb-1"><span>Harga HNA (Beli)</span>
+                                        <span id="hnaUnitLabel" class="font-medium text-blue-600">(per
+                                            satuan)</span></label>
                                     <input id="pharmacy_net_price" name="pharmacy_net_price" type="text"
                                         class="w-full rounded-lg border border-gray-300 px-3.5 py-2 text-xs font-semibold text-gray-800"
                                         placeholder="Rp 0">
@@ -496,28 +577,35 @@
     </section>
 
     {{-- ─────────────────── MODAL IMPORT MASTER OBAT ─────────────────── --}}
-    <div id="modalImportMedicine" class="fixed inset-0 hidden overflow-y-auto" style="z-index: 99999 !important;" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+    <div id="modalImportMedicine" class="fixed inset-0 hidden overflow-y-auto" style="z-index: 99999 !important;"
+        aria-labelledby="modal-title" role="dialog" aria-modal="true">
         <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-            <div class="fixed inset-0 transition-opacity bg-gray-900 bg-opacity-60 backdrop-blur-sm" style="z-index: 99998 !important;" id="backdropImport"></div>
+            <div class="fixed inset-0 transition-opacity bg-gray-900 bg-opacity-60 backdrop-blur-sm"
+                style="z-index: 99998 !important;" id="backdropImport"></div>
 
             <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
 
-            <div class="relative inline-block px-6 pt-6 pb-6 overflow-hidden text-left align-bottom transition-all transform bg-white rounded-2xl shadow-2xl sm:my-8 sm:align-middle sm:max-w-lg sm:w-full border border-gray-100" style="z-index: 99999 !important;">
+            <div class="relative inline-block px-6 pt-6 pb-6 overflow-hidden text-left align-bottom transition-all transform bg-white rounded-2xl shadow-2xl sm:my-8 sm:align-middle sm:max-w-lg sm:w-full border border-gray-100"
+                style="z-index: 99999 !important;">
                 <div class="flex items-center justify-between pb-4 border-b border-gray-100">
                     <div class="flex items-center gap-2.5">
                         <div class="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                             </svg>
                         </div>
                         <div>
-                            <h3 class="text-base font-bold text-gray-800" id="modal-title">Import Master Obat dari Excel</h3>
+                            <h3 class="text-base font-bold text-gray-800" id="modal-title">Import Master Obat dari Excel
+                            </h3>
                             <p class="text-xs text-gray-500">Mendukung format .xlsx, .xls, .csv (hingga 100MB)</p>
                         </div>
                     </div>
-                    <button type="button" id="btnCloseImport" class="text-gray-400 hover:text-gray-600 transition cursor-pointer">
+                    <button type="button" id="btnCloseImport"
+                        class="text-gray-400 hover:text-gray-600 transition cursor-pointer">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M6 18L18 6M6 6l12 12" />
                         </svg>
                     </button>
                 </div>
@@ -526,36 +614,37 @@
                     @csrf
                     <input type="file" id="importFileInput" name="file" accept=".xlsx,.xls,.csv" class="hidden">
                     <div>
-                        <label class="block text-xs font-semibold text-gray-700 mb-1.5">Pilih File Excel Master Obat</label>
-                        <div id="dropzoneImport" class="border-2 border-dashed border-gray-300 hover:border-emerald-500 rounded-xl p-6 text-center cursor-pointer transition bg-gray-50/50 hover:bg-emerald-50/30">
-                            <svg class="w-10 h-10 mx-auto text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                        <label class="block text-xs font-semibold text-gray-700 mb-1.5">Pilih File Excel Master
+                            Obat</label>
+                        <div id="dropzoneImport"
+                            class="border-2 border-dashed border-gray-300 hover:border-emerald-500 rounded-xl p-6 text-center cursor-pointer transition bg-gray-50/50 hover:bg-emerald-50/30">
+                            <svg class="w-10 h-10 mx-auto text-gray-400 mb-2" fill="none" stroke="currentColor"
+                                viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                    d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                             </svg>
-                            <p id="fileNamePreview" class="text-xs font-medium text-gray-700">Klik untuk memilih file atau drag & drop ke sini</p>
-                            <p class="text-[11px] text-gray-400 mt-1">Format kolom B = Kode, C = Nama, O = HNA, P = HET, Q = Barcode, R = PBF, dll.</p>
+                            <p id="fileNamePreview" class="text-xs font-medium text-gray-700">Klik untuk memilih file atau
+                                drag & drop ke sini</p>
+                            <p class="text-[11px] text-emerald-600 font-semibold mt-1">✨ Mendukung file hasil Export Excel
+                                Master Obat, file dengan judul kolom, maupun format kolom lama.</p>
                         </div>
                     </div>
 
                     {{-- Panduan Kolom --}}
                     <div class="bg-slate-50 border border-slate-200/80 rounded-xl p-3 text-[11px] text-slate-600">
-                        <div class="font-semibold text-slate-700 mb-1">Layout Kolom Excel (Mulai Baris 2):</div>
+                        <div class="font-semibold text-slate-700 mb-1">Panduan Format File:</div>
+                        <p class="mb-2 text-slate-500">Sistem otomatis mendeteksi header kolom. Anda dapat mengunggah file
+                            hasil <strong>Export Master (.xlsx)</strong> langsung, atau menggunakan layout kolom berikut:
+                        </p>
                         <div class="grid grid-cols-2 gap-x-2 gap-y-0.5">
-                            <div>• <strong>B</strong>: Kode Obat</div>
-                            <div>• <strong>C</strong>: Nama Obat</div>
-                            <div>• <strong>O</strong>: HNA (Harga Beli)</div>
-                            <div>• <strong>P</strong>: HET</div>
-                            <div>• <strong>Q</strong>: Barcode</div>
-                            <div>• <strong>R</strong>: PBF (Distributor)</div>
-                            <div>• <strong>AC</strong>: Surat Pesanan</div>
-                            <div>• <strong>AE</strong>: Isi (Content)</div>
-                            <div>• <strong>AF</strong>: Strip</div>
-                            <div>• <strong>AG</strong>: Dosis</div>
-                            <div>• <strong>AH</strong>: Pabrik</div>
-                            <div>• <strong>AI</strong>: Kemasan</div>
-                            <div>• <strong>AJ</strong>: Satuan</div>
-                            <div>• <strong>AK</strong>: Sediaan</div>
-                            <div>• <strong>AL</strong>: Golongan</div>
-                            <div>• <strong>AN</strong>: Komposisi</div>
+                            <div>• <strong>Kode Obat</strong> / Kolom B</div>
+                            <div>• <strong>Nama Obat</strong> / Kolom C</div>
+                            <div>• <strong>Harga Beli (HNA)</strong> / Kolom O</div>
+                            <div>• <strong>HET</strong> / Kolom P</div>
+                            <div>• <strong>Barcode</strong> / Kolom Q</div>
+                            <div>• <strong>Supplier/PBF</strong> / Kolom R</div>
+                            <div>• <strong>Pabrik</strong> / Kolom AH</div>
+                            <div>• <strong>Golongan/Kategori</strong> / Kolom AL</div>
                         </div>
                     </div>
 
@@ -564,7 +653,8 @@
                         <div class="flex items-center justify-between text-xs font-medium text-gray-600">
                             <span class="flex items-center gap-1.5">
                                 <svg class="w-4 h-4 animate-spin text-emerald-600" fill="none" viewBox="0 0 24 24">
-                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <circle class="opacity-25" cx="12" cy="12" r="10"
+                                        stroke="currentColor" stroke-width="4"></circle>
                                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
                                 </svg>
                                 <span id="importProgressLabel">Sedang menganalisis file...</span>
@@ -579,26 +669,80 @@
                     <div id="importSummary" class="hidden rounded-xl border border-blue-200 bg-blue-50 p-4 space-y-2">
                         <div class="font-semibold text-sm text-slate-800">Ringkasan sebelum import</div>
                         <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                            <div class="rounded-lg bg-white p-2"><div class="text-slate-500">Baris data</div><strong id="summaryTotal" class="text-slate-800">0</strong></div>
-                            <div class="rounded-lg bg-white p-2"><div class="text-slate-500">Obat baru</div><strong id="summaryCreate" class="text-emerald-700">0</strong></div>
-                            <div class="rounded-lg bg-white p-2"><div class="text-slate-500">Akan diperbarui</div><strong id="summaryUpdate" class="text-blue-700">0</strong></div>
-                            <div class="rounded-lg bg-white p-2"><div class="text-slate-500">Dilewati</div><strong id="summarySkipped" class="text-amber-700">0</strong></div>
+                            <div class="rounded-lg bg-white p-2">
+                                <div class="text-slate-500">Baris data</div><strong id="summaryTotal"
+                                    class="text-slate-800">0</strong>
+                            </div>
+                            <div class="rounded-lg bg-white p-2">
+                                <div class="text-slate-500">Obat baru</div><strong id="summaryCreate"
+                                    class="text-emerald-700">0</strong>
+                            </div>
+                            <div class="rounded-lg bg-white p-2">
+                                <div class="text-slate-500">Akan diperbarui</div><strong id="summaryUpdate"
+                                    class="text-blue-700">0</strong>
+                            </div>
+                            <div class="rounded-lg bg-white p-2">
+                                <div class="text-slate-500">Dilewati</div><strong id="summarySkipped"
+                                    class="text-amber-700">0</strong>
+                            </div>
                         </div>
-                        <div class="text-[11px] text-slate-600">Pastikan ringkasan sudah sesuai. Perubahan database baru dijalankan setelah tombol konfirmasi ditekan.</div>
-                        <div class="text-[11px] text-slate-600"><strong>Kolom yang disinkronkan:</strong> nama, satuan, HNA dan net price + PPN 11%, barcode, HET, kemasan, sediaan, dan golongan.</div>
+                        <div class="text-[11px] text-slate-600">Pastikan ringkasan sudah sesuai. Perubahan database baru
+                            dijalankan setelah tombol konfirmasi ditekan.</div>
+                        <div class="text-[11px] text-slate-600"><strong>Kolom yang disinkronkan:</strong> nama, satuan, HNA
+                            dan net price + PPN 11%, barcode, HET, kemasan, sediaan, dan golongan.</div>
                         <ul id="summarySkippedSamples" class="hidden list-disc pl-5 text-[11px] text-amber-800"></ul>
                     </div>
 
                     <div class="flex items-center justify-end gap-2 pt-3 border-t border-gray-100">
-                        <button type="button" id="btnCancelImport" class="px-4 py-2 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition cursor-pointer">Batal</button>
-                        <button type="submit" id="btnSubmitImport" class="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow transition flex items-center gap-1.5 cursor-pointer">
+                        <button type="button" id="btnCancelImport"
+                            class="px-4 py-2 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition cursor-pointer">Batal</button>
+                        <button type="submit" id="btnSubmitImport"
+                            class="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow transition flex items-center gap-1.5 cursor-pointer">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                             </svg>
                             <span>Tampilkan Ringkasan</span>
                         </button>
                     </div>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    {{-- ══════════════════════════════════════════════════════════ --}}
+    {{-- EXPORT LOADING POPUP MODAL                                 --}}
+    {{-- ══════════════════════════════════════════════════════════ --}}
+    <div id="exportLoadingModal"
+        class="hidden fixed inset-0 z-50 items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 transition-all"
+        style="z-index: 99999 !important;">
+        <div
+            class="bg-white rounded-3xl p-6 sm:p-7 shadow-2xl max-w-md w-full border border-slate-100 text-center animate-scaleUp">
+            <div
+                class="w-16 h-16 rounded-2xl bg-emerald-50 border border-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-4 relative shadow-sm">
+                <svg class="w-8 h-8 animate-pulse text-emerald-600" fill="none" stroke="currentColor"
+                    viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <div class="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full animate-ping"></div>
+            </div>
+            <h3 class="text-lg font-bold text-slate-800 mb-1.5">Menyiapkan File Excel Master Obat</h3>
+            <p class="text-xs text-slate-500 mb-5 leading-relaxed">
+                Sedang menyusun 8.000+ data katalog obat lengkap (harga, barcode, supplier, stok) ke format Excel rapi.
+                Unduhan akan berjalan otomatis dalam beberapa detik.
+            </p>
+            <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden p-0.5 mb-3">
+                <div class="bg-gradient-to-r from-emerald-500 via-teal-500 to-blue-600 h-full rounded-full animate-pulse"
+                    style="width: 100%"></div>
+            </div>
+            <div class="flex items-center justify-center gap-2 text-[11px] font-semibold text-slate-400">
+                <svg class="w-3.5 h-3.5 animate-spin text-emerald-600" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                        stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                </svg>
+                <span>Mengompresi dan memformat spreadsheet...</span>
             </div>
         </div>
     </div>
@@ -612,6 +756,116 @@
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
     <script>
+        function toggleExportMenu(e) {
+            e.stopPropagation();
+            const menu = document.getElementById('exportMoreMenu');
+            if (menu) menu.classList.toggle('hidden');
+        }
+
+        document.addEventListener('click', function(e) {
+            const menu = document.getElementById('exportMoreMenu');
+            const wrapper = document.getElementById('dropdownExportMoreWrapper');
+            if (menu && !menu.classList.contains('hidden') && wrapper && !wrapper.contains(e.target)) {
+                menu.classList.add('hidden');
+            }
+        });
+
+        function exportMasterExcel() {
+            const btn = document.getElementById('btnExportMasterExcel');
+            const btnText = document.getElementById('btnExportMasterExcelText');
+            const statusVal = document.getElementById('statusFilter')?.value || '1';
+
+            // Generate unique token for download tracking
+            const token = 'token_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+
+            // Disable button
+            if (btn) {
+                btn.disabled = true;
+                btn.classList.add('opacity-75', 'cursor-not-allowed');
+            }
+            if (btnText) {
+                btnText.innerText = 'Menyiapkan File...';
+            }
+
+            // Show Sleek Loading Modal / Popup
+            const modalEl = document.getElementById('exportLoadingModal');
+            if (modalEl) {
+                modalEl.classList.remove('hidden');
+                modalEl.classList.add('flex');
+            }
+
+            // Build URL
+            const url = "{{ route('master-data.export', ['type' => 'medicines']) }}?status=" + encodeURIComponent(
+                statusVal) + "&download_token=" + encodeURIComponent(token);
+
+            // Trigger download via hidden iframe
+            let iframe = document.getElementById('exportDownloadFrame');
+            if (!iframe) {
+                iframe = document.createElement('iframe');
+                iframe.id = 'exportDownloadFrame';
+                iframe.style.display = 'none';
+                document.body.appendChild(iframe);
+            }
+            iframe.src = url;
+
+            // Watch for download completion via cookie
+            const checkInterval = setInterval(() => {
+                if (document.cookie.split(';').some(c => c.trim().startsWith('download_token=' + token))) {
+                    clearInterval(checkInterval);
+                    clearTimeout(fallbackTimeout);
+                    finishExportMaster();
+                }
+            }, 300);
+
+            // Fallback timeout after 12 seconds in case cookies disabled
+            const fallbackTimeout = setTimeout(() => {
+                clearInterval(checkInterval);
+                finishExportMaster();
+            }, 12000);
+
+            function finishExportMaster() {
+                // Delete tracking cookie
+                document.cookie = 'download_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+
+                if (modalEl) {
+                    modalEl.classList.add('hidden');
+                    modalEl.classList.remove('flex');
+                }
+
+                if (btn) {
+                    btn.disabled = false;
+                    btn.classList.remove('opacity-75', 'cursor-not-allowed');
+                }
+                if (btnText) {
+                    btnText.innerText = 'Export Excel (.xlsx)';
+                }
+
+                iziToast.success({
+                    title: 'Export Berhasil',
+                    message: 'File Master Obat (.xlsx) berhasil diunduh secara lengkap.',
+                    position: 'topRight',
+                    timeout: 4000
+                });
+            }
+        }
+
+        function exportExcelGudang() {
+            const menu = document.getElementById('exportMoreMenu');
+            if (menu) menu.classList.add('hidden');
+
+            const statusVal = document.getElementById('statusFilter')?.value || '1';
+
+            iziToast.info({
+                title: 'Export Rekap Stok',
+                message: 'Sedang menyusun data stok gudang & obat ke Excel. Unduhan akan segera dimulai otomatis...',
+                position: 'topRight',
+                timeout: 4000
+            });
+
+            let url = "{{ route('supplies.printstockdata') }}?status=" + encodeURIComponent(statusVal);
+            window.location.href = url;
+        }
+
         // ════════════════════════════════════════════════
         // GLOBALS
         // ════════════════════════════════════════════════
@@ -1409,6 +1663,16 @@
                 ],
             });
 
+            tableData.on('xhr.dt', function(e, settings, json, xhr) {
+                if (json && json.recordsTotal !== undefined) {
+                    const badge = document.getElementById('badgeTotalMedicines');
+                    if (badge) {
+                        badge.innerText = 'Total: ' + Number(json.recordsTotal).toLocaleString('id-ID') +
+                            ' Obat';
+                    }
+                }
+            });
+
             $('#statusFilter').on('change', function() {
                 resetForm();
                 tableData.ajax.reload();
@@ -1476,7 +1740,8 @@
                     $('.select2').select2('close');
                 } catch (e) {}
                 $fileInput.val('');
-                $namePreview.text('Klik untuk memilih file atau drag & drop ke sini').removeClass('text-emerald-600 font-semibold');
+                $namePreview.text('Klik untuk memilih file atau drag & drop ke sini').removeClass(
+                    'text-emerald-600 font-semibold');
                 $progress.addClass('hidden');
                 resetImportPreview();
                 $btnSubmit.prop('disabled', false).removeClass('opacity-50');
@@ -1500,7 +1765,9 @@
             $fileInput.on('change', function() {
                 resetImportPreview();
                 if (this.files && this.files[0]) {
-                    $namePreview.text(`${this.files[0].name} (${(this.files[0].size / 1024 / 1024).toFixed(2)} MB)`).addClass('text-emerald-600 font-semibold');
+                    $namePreview.text(
+                            `${this.files[0].name} (${(this.files[0].size / 1024 / 1024).toFixed(2)} MB)`)
+                        .addClass('text-emerald-600 font-semibold');
                 }
             });
 
@@ -1523,7 +1790,9 @@
                 if (e.originalEvent.dataTransfer && e.originalEvent.dataTransfer.files.length) {
                     $fileInput[0].files = e.originalEvent.dataTransfer.files;
                     resetImportPreview();
-                    $namePreview.text(`${$fileInput[0].files[0].name} (${($fileInput[0].files[0].size / 1024 / 1024).toFixed(2)} MB)`).addClass('text-emerald-600 font-semibold');
+                    $namePreview.text(
+                        `${$fileInput[0].files[0].name} (${($fileInput[0].files[0].size / 1024 / 1024).toFixed(2)} MB)`
+                    ).addClass('text-emerald-600 font-semibold');
                 }
             });
 
@@ -1547,54 +1816,63 @@
                 $btnSubmit.prop('disabled', true).addClass('opacity-50');
 
                 axios.post(isExecuting ? executeImportUrl : importPreviewUrl, formData, {
-                    headers: { 'Content-Type': 'multipart/form-data' }
-                })
-                .then(function(res) {
-                    $progress.addClass('hidden');
-                    $btnSubmit.prop('disabled', false).removeClass('opacity-50');
+                        headers: {
+                            'Content-Type': 'multipart/form-data'
+                        }
+                    })
+                    .then(function(res) {
+                        $progress.addClass('hidden');
+                        $btnSubmit.prop('disabled', false).removeClass('opacity-50');
 
-                    if (!isExecuting) {
-                        const summary = res.data.summary || {};
-                        previewToken = res.data.preview_token;
-                        $('#summaryTotal').text(Number(summary.total_rows || 0).toLocaleString('id-ID'));
-                        $('#summaryCreate').text(Number(summary.created_count || 0).toLocaleString('id-ID'));
-                        $('#summaryUpdate').text(Number(summary.updated_count || 0).toLocaleString('id-ID'));
-                        $('#summarySkipped').text(Number(summary.skipped_count || 0).toLocaleString('id-ID'));
+                        if (!isExecuting) {
+                            const summary = res.data.summary || {};
+                            previewToken = res.data.preview_token;
+                            $('#summaryTotal').text(Number(summary.total_rows || 0).toLocaleString(
+                                'id-ID'));
+                            $('#summaryCreate').text(Number(summary.created_count || 0).toLocaleString(
+                                'id-ID'));
+                            $('#summaryUpdate').text(Number(summary.updated_count || 0).toLocaleString(
+                                'id-ID'));
+                            $('#summarySkipped').text(Number(summary.skipped_count || 0).toLocaleString(
+                                'id-ID'));
 
-                        const skippedSamples = summary.skipped_samples || [];
-                        if (skippedSamples.length) {
-                            const $samples = $('#summarySkippedSamples').empty();
-                            skippedSamples.forEach(item => {
-                                $('<li>').text(`Baris ${Number(item.row)}: ${String(item.reason || '')}`).appendTo($samples);
-                            });
-                            $samples.removeClass('hidden');
+                            const skippedSamples = summary.skipped_samples || [];
+                            if (skippedSamples.length) {
+                                const $samples = $('#summarySkippedSamples').empty();
+                                skippedSamples.forEach(item => {
+                                    $('<li>').text(
+                                        `Baris ${Number(item.row)}: ${String(item.reason || '')}`
+                                    ).appendTo($samples);
+                                });
+                                $samples.removeClass('hidden');
+                            }
+
+                            $summary.removeClass('hidden');
+                            $btnSubmit.find('span').text('Konfirmasi & Import');
+                            if (Number(summary.created_count || 0) + Number(summary.updated_count ||
+                                    0) === 0) {
+                                $btnSubmit.prop('disabled', true).addClass('opacity-50');
+                            }
+                            return;
                         }
 
-                        $summary.removeClass('hidden');
-                        $btnSubmit.find('span').text('Konfirmasi & Import');
-                        if (Number(summary.created_count || 0) + Number(summary.updated_count || 0) === 0) {
-                            $btnSubmit.prop('disabled', true).addClass('opacity-50');
-                        }
-                        return;
-                    }
-
-                    $modalImport.addClass('hidden');
-                    swal({
-                        title: 'Import Berhasil!',
-                        text: res.data.message || 'Data master obat berhasil diimpor.',
-                        icon: 'success',
-                        button: 'OK',
-                    }).then(() => tableData.ajax.reload());
-                })
-                .catch(function(err) {
-                    $progress.addClass('hidden');
-                    $btnSubmit.prop('disabled', false).removeClass('opacity-50');
-                    if (isExecuting) resetImportPreview();
-                    const msg = err.response && err.response.data && err.response.data.message 
-                        ? err.response.data.message 
-                        : (err.message || 'Gagal memproses file import.');
-                    swal(isExecuting ? 'Gagal Import' : 'Gagal Menganalisis', msg, 'error');
-                });
+                        $modalImport.addClass('hidden');
+                        swal({
+                            title: 'Import Berhasil!',
+                            text: res.data.message || 'Data master obat berhasil diimpor.',
+                            icon: 'success',
+                            button: 'OK',
+                        }).then(() => tableData.ajax.reload());
+                    })
+                    .catch(function(err) {
+                        $progress.addClass('hidden');
+                        $btnSubmit.prop('disabled', false).removeClass('opacity-50');
+                        if (isExecuting) resetImportPreview();
+                        const msg = err.response && err.response.data && err.response.data.message ?
+                            err.response.data.message :
+                            (err.message || 'Gagal memproses file import.');
+                        swal(isExecuting ? 'Gagal Import' : 'Gagal Menganalisis', msg, 'error');
+                    });
             });
 
         });

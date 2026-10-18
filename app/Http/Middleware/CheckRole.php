@@ -13,18 +13,25 @@ class CheckRole
 
         $roles = explode('|', $role);
         
-        // HO and Online can access Kasir routes
+        // HO and all Online roles can access Kasir routes
         if (in_array('Kasir', $roles)) {
             if (!in_array('HO', $roles)) {
                 $roles[] = 'HO';
             }
-            if (!in_array('Online', $roles)) {
-                $roles[] = 'Online';
+            foreach (['Online', 'Online Grab', 'Online Shopee', 'Digital'] as $onlineRole) {
+                if (!in_array($onlineRole, $roles)) {
+                    $roles[] = $onlineRole;
+                }
             }
         }
 
         if (! $user->hasAnyRole($roles)) {
             if ($user->hasRole('General Manager')) {
+                return redirect()->route('home');
+            }
+
+            // Semua role online tidak mengakses /dashboard, dialihkan ke /home
+            if (isOnlineRole($user)) {
                 return redirect()->route('home');
             }
 
@@ -36,7 +43,7 @@ class CheckRole
                 return redirect('/home');
             }
 
-            if ($user->hasRole('Kasir') || $user->hasRole('HO') || $user->hasRole('Online')) {
+            if ($user->hasRole('Kasir') || $user->hasRole('HO')) {
                 return redirect('/home');
             }
 

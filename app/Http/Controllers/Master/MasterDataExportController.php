@@ -2,20 +2,44 @@
 
 namespace App\Http\Controllers\Master;
 
+use App\Exports\Master\MasterMedicinesExport;
 use App\Http\Controllers\Controller;
+use App\Models\Pharmacies;
 use Illuminate\Database\Query\Builder;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class MasterDataExportController extends Controller
 {
     private const CHUNK_SIZE = 2000;
 
-    public function __invoke(string $type): StreamedResponse
+    public function __invoke(string $type, Request $request = null): Response
     {
+        $request = $request ?: request();
         $export = config("master_exports.{$type}");
 
         abort_unless(is_array($export), 404);
+
+        if ($type === 'medicines' && $request->get('format') !== 'csv') {
+            @ini_set('memory_limit', '512M');
+            @set_time_limit(180);
+
+            $status = $request->get('status', '1');
+            $pharmacy = Pharmacies::find(getActivePharmacyId());
+            $branch = $pharmacy ? preg_replace('/[^A-Za-z0-9_]/', '_', $pharmacy->name) : 'Apotek';
+            $filename = sprintf('Master_Obat_%s_%s.xlsx', $branch, now()->format('Ymd_His'));
+
+            $download = Excel::download(new MasterMedicinesExport($status), $filename);
+
+            if ($token = $request->get('download_token')) {
+                $download->headers->setCookie(cookie('download_token', $token, 2, '/', null, false, false));
+            }
+
+            return $download;
+        }
 
         $filename = sprintf('%s-%s.csv', $export['filename'], now()->format('Ymd-His'));
 

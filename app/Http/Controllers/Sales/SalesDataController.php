@@ -19,12 +19,16 @@ class SalesDataController extends Controller
 {
     public function index(Request $request)
     {
+        $restrictedRole    = getRestrictedOnlineRole();
+        $restrictedChannel = getRestrictedOnlineChannelKey();
+
         if ($request->ajax()) {
 
             $search   = trim((string) $request->input('search.value'));
             $dateFrom = $request->input('date_from');
             $dateTo   = $request->input('date_to');
-            $channel  = $request->input('channel');
+            // Jika user dibatasi role online (Online, Online Shopee, Online Grab, Digital), kunci channel ke role mereka
+            $channel  = $restrictedChannel ?: $request->input('channel');
 
             $query = MedicineCart::query()
                 ->join('medicine_transactions', 'medicine_transactions.id', '=', 'medicine_cart.transaction_id')
@@ -47,18 +51,22 @@ class SalesDataController extends Controller
                 ->groupBy('transaction_id')
                 ->orderBy('transaction_code');
 
-            // Filter Channel / Jenis Transaksi
-            if ($channel) {
-                $applyChannel = function ($q, $roleName) {
-                    $q->where(function ($sub) use ($roleName) {
-                        $sub->whereHas('user.roles', function ($r) use ($roleName) {
-                            $r->where('name', $roleName);
-                        })->orWhereHas('transactions.user.roles', function ($r) use ($roleName) {
-                            $r->where('name', $roleName);
-                        });
+            $applyChannel = function ($q, $roleName) {
+                $q->where(function ($sub) use ($roleName) {
+                    $sub->whereHas('user.roles', function ($r) use ($roleName) {
+                        $r->where('name', $roleName);
+                    })->orWhereHas('transactions.user.roles', function ($r) use ($roleName) {
+                        $r->where('name', $roleName);
+                    })->orWhereHas('transactions.transactions.user.roles', function ($r) use ($roleName) {
+                        $r->where('name', $roleName);
                     });
-                };
+                });
+            };
 
+            // Filter Channel / Jenis Transaksi
+            if ($restrictedRole) {
+                $applyChannel($query, $restrictedRole);
+            } elseif ($channel) {
                 if ($channel === 'shopee') {
                     $applyChannel($query, 'Online Shopee');
                 } elseif ($channel === 'grab') {
@@ -72,6 +80,8 @@ class SalesDataController extends Controller
                         $q->whereDoesntHave('user.roles', function ($r) {
                             $r->whereIn('name', ['Online Shopee', 'Online Grab', 'Online', 'Digital']);
                         })->whereDoesntHave('transactions.user.roles', function ($r) {
+                            $r->whereIn('name', ['Online Shopee', 'Online Grab', 'Online', 'Digital']);
+                        })->whereDoesntHave('transactions.transactions.user.roles', function ($r) {
                             $r->whereIn('name', ['Online Shopee', 'Online Grab', 'Online', 'Digital']);
                         });
                     });
@@ -189,15 +199,23 @@ class SalesDataController extends Controller
                 ->make(true);
         }
 
-        return view('sales.salesdata');
+        return view('sales.salesdata', [
+            'restrictedChannel'     => $restrictedChannel,
+            'restrictedRole'        => $restrictedRole,
+            'restrictedChannelName' => $restrictedRole ? getOnlineChannelName() : null,
+        ]);
     }
 
     public function export(Request $request)
     {
-        $pharmacyId = getActivePharmacyId();
+        $pharmacyId        = getActivePharmacyId();
+        $restrictedRole    = getRestrictedOnlineRole();
+        $restrictedChannel = getRestrictedOnlineChannelKey();
+
         $dateFrom   = $request->input('date_from');
         $dateTo     = $request->input('date_to');
-        $channel    = $request->input('channel');
+        // Jika user dibatasi role online, paksa channel sesuai role mereka
+        $channel    = $restrictedChannel ?: $request->input('channel');
         $search     = $request->input('search');
         $mode       = $request->input('mode', 'all');
 
@@ -206,7 +224,8 @@ class SalesDataController extends Controller
 
         $safePharmacy = $pharmacy ? preg_replace('/[^A-Za-z0-9_]/', '_', $pharmacy->name) . '_' : '';
         $modeSuffix = $mode === 'all' ? 'Lengkap' : ucfirst($mode);
-        $fileName = 'Data_Penjualan_' . $safePharmacy . $modeSuffix . '_' . date('Ymd_His') . '.xlsx';
+        $channelSuffix = $restrictedChannel ? '_' . ucfirst($restrictedChannel) : ($channel ? '_' . ucfirst($channel) : '');
+        $fileName = 'Data_Penjualan_' . $safePharmacy . $modeSuffix . $channelSuffix . '_' . date('Ymd_His') . '.xlsx';
 
         return Excel::download(
             new SalesDataExport(
@@ -224,12 +243,16 @@ class SalesDataController extends Controller
 
     public function pending(Request $request)
     {
+        $restrictedRole    = getRestrictedOnlineRole();
+        $restrictedChannel = getRestrictedOnlineChannelKey();
+
         if ($request->ajax()) {
 
             $search   = trim((string) $request->input('search.value'));
             $dateFrom = $request->input('date_from');
             $dateTo   = $request->input('date_to');
-            $channel  = $request->input('channel');
+            // Jika user dibatasi role online, paksa channel sesuai role mereka
+            $channel  = $restrictedChannel ?: $request->input('channel');
 
             $query = MedicineCart::query()
                 ->join('medicine_transactions', 'medicine_transactions.id', '=', 'medicine_cart.transaction_id')
@@ -252,18 +275,22 @@ class SalesDataController extends Controller
                 ->groupBy('transaction_id')
                 ->orderBy('transaction_code');
 
-            // Filter Channel / Jenis Transaksi
-            if ($channel) {
-                $applyChannel = function ($q, $roleName) {
-                    $q->where(function ($sub) use ($roleName) {
-                        $sub->whereHas('user.roles', function ($r) use ($roleName) {
-                            $r->where('name', $roleName);
-                        })->orWhereHas('transactions.user.roles', function ($r) use ($roleName) {
-                            $r->where('name', $roleName);
-                        });
+            $applyChannel = function ($q, $roleName) {
+                $q->where(function ($sub) use ($roleName) {
+                    $sub->whereHas('user.roles', function ($r) use ($roleName) {
+                        $r->where('name', $roleName);
+                    })->orWhereHas('transactions.user.roles', function ($r) use ($roleName) {
+                        $r->where('name', $roleName);
+                    })->orWhereHas('transactions.transactions.user.roles', function ($r) use ($roleName) {
+                        $r->where('name', $roleName);
                     });
-                };
+                });
+            };
 
+            // Filter Channel / Jenis Transaksi
+            if ($restrictedRole) {
+                $applyChannel($query, $restrictedRole);
+            } elseif ($channel) {
                 if ($channel === 'shopee') {
                     $applyChannel($query, 'Online Shopee');
                 } elseif ($channel === 'grab') {
@@ -277,6 +304,8 @@ class SalesDataController extends Controller
                         $q->whereDoesntHave('user.roles', function ($r) {
                             $r->whereIn('name', ['Online Shopee', 'Online Grab', 'Online', 'Digital']);
                         })->whereDoesntHave('transactions.user.roles', function ($r) {
+                            $r->whereIn('name', ['Online Shopee', 'Online Grab', 'Online', 'Digital']);
+                        })->whereDoesntHave('transactions.transactions.user.roles', function ($r) {
                             $r->whereIn('name', ['Online Shopee', 'Online Grab', 'Online', 'Digital']);
                         });
                     });
@@ -363,6 +392,16 @@ class SalesDataController extends Controller
 
                     return $type;
                 })
+                ->addColumn('type_slug', function ($row) {
+                    $dbType = $row->transactions?->transaction_type ?? '';
+                    return match ($dbType) {
+                        'RESEP TUNAI' => 'resep',
+                        'KREDIT' => 'kredit',
+                        'UPDS' => 'upds',
+                        'HV/OTC' => 'hv',
+                        default => 'resep',
+                    };
+                })
                 ->addColumn('name', function ($row) {
                     return $row->transactions?->patients?->name ?? '-';
                 })
@@ -385,7 +424,11 @@ class SalesDataController extends Controller
                 ->make(true);
         }
 
-        return view('sales.pending');
+        return view('sales.pending', [
+            'restrictedChannel'     => $restrictedChannel,
+            'restrictedRole'        => $restrictedRole,
+            'restrictedChannelName' => $restrictedRole ? getOnlineChannelName() : null,
+        ]);
     }
 
     public function transactionItems($transactionId)

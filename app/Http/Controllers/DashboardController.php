@@ -18,6 +18,10 @@ class DashboardController extends Controller
 
     public function index()
     {
+        if (isOnlineRole()) {
+            return redirect()->route('home');
+        }
+
         $totalproduct = Item::count('id');
         $cart_total = ItemCart::where('status', '0')->where('user_id', Auth()->id())->count('id');
         $get_subtotal = ItemCart::with('item')->where('user_id', Auth()->id())->where('status', '!=', '1')->get();

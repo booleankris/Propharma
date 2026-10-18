@@ -18,6 +18,10 @@ class LoginController extends Controller
 
     protected function authenticated(Request $request, $user)
     {
+        if (isOnlineRole($user)) {
+            return redirect()->route('home');
+        }
+
         if ($user->hasRole('General Manager')) {
             return redirect()->route('home');
         }

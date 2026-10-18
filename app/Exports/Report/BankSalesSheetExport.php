@@ -26,6 +26,7 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
     protected $isRecap;
     protected $allBanksData;
     protected $transactions;
+    protected $hasTrxDiscount = false;
 
     public function __construct(
         $pharmacyId,
@@ -184,33 +185,19 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
                 'user',
                 'shift_logs',
             ])
-                ->where('pharmacy_id', $this->pharmacyId)
-                ->where('status', 1)
-                ->whereBetween('updated_at', [$this->startDate, $this->endDate]);
+                ->where('pharmacy_id', $this->pharmacyId);
 
-            if ($this->shiftType === 'shift' && !empty($this->shift)) {
-                $shiftObj = is_numeric($this->shift) ? \App\Models\Shifts::find($this->shift) : null;
-                $shiftName = $shiftObj ? strtoupper(trim($shiftObj->name)) : strtoupper(trim((string) $this->shift));
-
-                if ($shiftName === 'PAGI' || $this->shift == 2) {
-                    $query->whereTime('updated_at', '<=', '15:30:59');
-                } elseif ($shiftName === 'SIANG' || $this->shift == 3) {
-                    $query->whereTime('updated_at', '>=', '15:31:00');
-                } elseif ($shiftName === 'MALAM' || $this->shift == 1) {
-                    $query->where(function ($q) {
-                        $q->whereTime('updated_at', '>=', '23:01:00')
-                          ->orWhereTime('updated_at', '<', '08:00:00');
-                    });
-                } else {
-                    $query->whereHas('shift_logs', function ($q) {
-                        $q->where('shift_id', $this->shift);
-                    });
-                }
-            }
+            \App\Support\LiphTransactionScope::applySalesStatus($query);
+            \App\Support\LiphTransactionScope::applyPeriod(
+                $query,
+                $this->startDate,
+                $this->endDate,
+                $this->shiftType,
+                $this->shift
+            );
 
             $transactions = $query->orderBy('updated_at', 'asc')->get()
                 ->filter(fn ($trx) => BankSalesExport::resolveCategory($trx) === $this->bankName);
-
         }
 
         $rows = [];
@@ -218,8 +205,9 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
 
         $no = 1;
         $totalQty = 0;
-        $totalDiscount = 0;
-        $totalAmount = 0;
+        $totalItemDiscount = 0;
+        $totalItemAmount = 0;
+        $totalTrxDiscount = 0;
 
         foreach ($transactions as $trx) {
             $dateCol = $trx->updated_at ?? $trx->created_at;
@@ -231,16 +219,23 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
             $kasir = $trx->user->name ?? '-';
             $shift = $trx->shift_logs->shift_name ?? ($trx->shift_logs_id ? 'Shift ' . $trx->shift_logs_id : '-');
 
+            $originalMap = LiphExport::TYPE_MAP[$trx->transaction_type] ?? null;
+            $originalLabel = $originalMap[1] ?? '';
+            $isReturnTrx = in_array($originalLabel, ['Retur Tunai', 'Retur Kredit'], true)
+                || in_array(strtoupper(trim((string) $trx->transaction_type)), ['RETUR JUAL', 'RETUR KREDIT'], true)
+                || strtoupper(trim((string) ($trx->transaction_code ?? ''))) === 'RT';
+
+            $trxDiscount = (int) ($trx->discount ?? 0);
             $items = $trx->transactions;
 
             if ($items->isEmpty()) {
                 // If no cart items found, still show transaction total
-                $subtotal = (float) ($trx->subtotal ?? 0);
-                $discount = (float) ($trx->discount ?? 0);
-                $netto    = $subtotal - $discount;
+                $subtotal = (int) ($trx->subtotal ?? 0);
+                $signedSubtotal = $isReturnTrx ? -abs($subtotal) : $subtotal;
+                $qty = $isReturnTrx ? -1 : 1;
 
-                $totalDiscount += $discount;
-                $totalAmount   += $netto;
+                $totalQty += $qty;
+                $totalItemAmount += $signedSubtotal;
 
                 $rows[] = [
                     $no++,
@@ -248,16 +243,36 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
                     $code,
                     $type,
                     '-',
-                    'Transaksi Tanpa Detail Item',
-                    1,
-                    $subtotal,
-                    $discount,
-                    $netto,
+                    $isReturnTrx ? '[RETUR PENJUALAN]' : 'Transaksi Tanpa Detail Item',
+                    $qty,
+                    $signedSubtotal,
+                    0,
+                    $signedSubtotal,
                     $pasien,
                     $dokter,
                     $kasir,
                     $shift,
                 ];
+
+                if ($trxDiscount > 0 && !$isReturnTrx) {
+                    $totalTrxDiscount += $trxDiscount;
+                    $rows[] = [
+                        $no++,
+                        $tgl,
+                        $code,
+                        $type,
+                        '-',
+                        '[DISKON TRANSAKSI]',
+                        0,
+                        0,
+                        0,
+                        -$trxDiscount,
+                        $pasien,
+                        $dokter,
+                        $kasir,
+                        $shift,
+                    ];
+                }
                 continue;
             }
 
@@ -265,14 +280,30 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
                 $medicine = $item->medicine;
                 $medCode  = $medicine->code ?? '-';
                 $medName  = $medicine->name ?? 'Obat Tidak Ditemukan';
-                $qty      = (float) ($item->quantity ?? 0);
-                $price    = (int) ($item->item_price ?? 0);
-                $discount = (int) ($item->discount ?? 0);
-                $final    = (int) ($item->final_price ?? ($item->total_price ?? ($qty * $price - $discount)));
+                $qty      = (int) ($item->quantity ?? 0);
+                $itemDiscount = (int) ($item->discount ?? 0);
+                $final    = (int) ($item->final_price ?? ($item->total_price ?? ($qty * ($item->item_price ?? 0) - $itemDiscount)));
 
-                $totalQty      += $qty;
-                $totalDiscount += $discount;
-                $totalAmount   += $final;
+                $effectiveType = $item->cart_type
+                    ? (LiphExport::CART_TYPE_ABBR[$item->cart_type] ?? $item->cart_type)
+                    : $trx->transaction_type;
+                $effectiveMap = LiphExport::TYPE_MAP[$effectiveType] ?? $originalMap;
+                $isReturn = $isReturnTrx || in_array($effectiveMap[1] ?? $originalLabel, ['Retur Tunai', 'Retur Kredit'], true);
+
+                $unitPrice = ($qty > 0)
+                    ? (int) round(($item->total_price ?? ($final + $itemDiscount)) / $qty)
+                    : (int) ($item->item_price ?? 0);
+
+                if ($isReturn) {
+                    $qty = -abs($qty);
+                    $unitPrice = -abs($unitPrice);
+                    $itemDiscount = 0;
+                    $final = -abs($final);
+                }
+
+                $totalQty += $qty;
+                $totalItemDiscount += $itemDiscount;
+                $totalItemAmount += $final;
 
                 $rows[] = [
                     $no++,
@@ -282,9 +313,29 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
                     $medCode,
                     $medName,
                     $qty,
-                    $price,
-                    $discount,
+                    $unitPrice,
+                    $itemDiscount,
                     $final,
+                    $pasien,
+                    $dokter,
+                    $kasir,
+                    $shift,
+                ];
+            }
+
+            if ($trxDiscount > 0 && !$isReturnTrx) {
+                $totalTrxDiscount += $trxDiscount;
+                $rows[] = [
+                    $no++,
+                    $tgl,
+                    $code,
+                    $type,
+                    '-',
+                    '[DISKON TRANSAKSI]',
+                    0,
+                    0,
+                    0,
+                    -$trxDiscount,
                     $pasien,
                     $dokter,
                     $kasir,
@@ -297,23 +348,76 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
             $rows[] = ['-', '-', '-', '-', '-', 'Tidak ada transaksi untuk pembayaran ini', 0, 0, 0, 0, '-', '-', '-', '-'];
         }
 
-        // Summary Total Row
-        $rows[] = [
-            '',
-            'TOTAL ' . strtoupper($this->bankName ?: 'PEMBAYARAN'),
-            '',
-            '',
-            '',
-            '',
-            $totalQty,
-            '',
-            (int) $totalDiscount,
-            (int) $totalAmount,
-            '',
-            '',
-            '',
-            '',
-        ];
+        $this->hasTrxDiscount = ($totalTrxDiscount > 0);
+        $bankTitle = strtoupper($this->bankName ?: 'PEMBAYARAN');
+
+        if ($totalTrxDiscount > 0) {
+            $rows[] = [
+                '',
+                'SUBTOTAL ITEM ' . $bankTitle,
+                '',
+                '',
+                '',
+                '',
+                $totalQty,
+                '',
+                (int) $totalItemDiscount,
+                (int) $totalItemAmount,
+                '',
+                '',
+                '',
+                '',
+            ];
+            $rows[] = [
+                '',
+                'TOTAL DISKON TRANSAKSI',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                (int) (-$totalTrxDiscount),
+                '',
+                '',
+                '',
+                '',
+            ];
+            $rows[] = [
+                '',
+                'TOTAL NETTO ' . $bankTitle,
+                '',
+                '',
+                '',
+                '',
+                $totalQty,
+                '',
+                (int) ($totalItemDiscount + $totalTrxDiscount),
+                (int) ($totalItemAmount - $totalTrxDiscount),
+                '',
+                '',
+                '',
+                '',
+            ];
+        } else {
+            $rows[] = [
+                '',
+                'TOTAL ' . $bankTitle,
+                '',
+                '',
+                '',
+                '',
+                $totalQty,
+                '',
+                (int) $totalItemDiscount,
+                (int) $totalItemAmount,
+                '',
+                '',
+                '',
+                '',
+            ];
+        }
 
         return $rows;
     }
@@ -366,19 +470,10 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
             // Number Formats
             if ($this->isRecap) {
                 // Column C..G numeric
+                $sheet->getStyle("A8:A{$highestRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
                 $sheet->getStyle("C8:C{$highestRow}")->getNumberFormat()->setFormatCode('#,##0');
                 $sheet->getStyle("D8:D{$highestRow}")->getNumberFormat()->setFormatCode('#,##0');
                 $sheet->getStyle("E8:G{$highestRow}")->getNumberFormat()->setFormatCode('#,##0');
-                $sheet->getStyle("A8:A{$highestRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-                // Detail numeric format
-                $sheet->getStyle("C8:C{$highestRow}")->getNumberFormat()->setFormatCode(\PhpOffice\PhpSpreadsheet\Style\NumberFormat::FORMAT_TEXT);
-                $sheet->getStyle("E8:E{$highestRow}")->getNumberFormat()->setFormatCode(\PhpOffice\PhpSpreadsheet\Style\NumberFormat::FORMAT_TEXT);
-                $sheet->getStyle("G8:G{$highestRow}")->getNumberFormat()->setFormatCode('#,##0');
-                $sheet->getStyle("H8:J{$highestRow}")->getNumberFormat()->setFormatCode('#,##0');
-                $sheet->getStyle("A8:A{$highestRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-                $sheet->getStyle("B8:B{$highestRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-                $sheet->getStyle("C8:C{$highestRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-                $sheet->getStyle("E8:E{$highestRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
                 for ($row = 8; $row <= $highestRow; $row++) {
                     $label = strtoupper((string) $sheet->getCell("B{$row}")->getValue());
@@ -387,28 +482,78 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
                         $sheet->getStyle("A{$row}:G{$row}")->getFont()->setBold(true);
                     }
                 }
+            } else {
+                // Detail numeric and text format
+                $sheet->getStyle("A8:A{$highestRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                $sheet->getStyle("B8:B{$highestRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                $sheet->getStyle("C8:C{$highestRow}")->getNumberFormat()->setFormatCode(\PhpOffice\PhpSpreadsheet\Style\NumberFormat::FORMAT_TEXT);
+                $sheet->getStyle("C8:C{$highestRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                $sheet->getStyle("D8:D{$highestRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                $sheet->getStyle("E8:E{$highestRow}")->getNumberFormat()->setFormatCode(\PhpOffice\PhpSpreadsheet\Style\NumberFormat::FORMAT_TEXT);
+                $sheet->getStyle("E8:E{$highestRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+                $sheet->getStyle("G8:G{$highestRow}")->getNumberFormat()->setFormatCode('#,##0');
+                $sheet->getStyle("H8:J{$highestRow}")->getNumberFormat()->setFormatCode('#,##0');
+                $sheet->getStyle("N8:N{$highestRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
             }
 
             // Total Bottom Row Highlight
-            $sheet->getStyle("A{$highestRow}:{$highestColumn}{$highestRow}")->applyFromArray([
-                'font' => [
-                    'bold' => true,
-                ],
-                'fill' => [
-                    'fillType'   => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
-                    'startColor' => ['rgb' => 'F8FAFC'],
-                ],
-                'borders' => [
-                    'top' => [
-                        'borderStyle' => Border::BORDER_MEDIUM,
-                        'color'       => ['rgb' => '94A3B8'],
+            if (! $this->isRecap && $this->hasTrxDiscount && $highestRow >= 10) {
+                $subtotalRow = $highestRow - 2;
+                $discRow     = $highestRow - 1;
+                $netRow      = $highestRow;
+
+                // Subtotal Item row
+                $sheet->getStyle("A{$subtotalRow}:{$highestColumn}{$subtotalRow}")->applyFromArray([
+                    'font' => ['bold' => true],
+                    'borders' => [
+                        'top' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => '94A3B8']],
                     ],
-                    'bottom' => [
-                        'borderStyle' => Border::BORDER_DOUBLE,
-                        'color'       => ['rgb' => '64748B'],
+                ]);
+
+                // Total Diskon Transaksi row
+                $sheet->getStyle("A{$discRow}:{$highestColumn}{$discRow}")->applyFromArray([
+                    'font' => ['bold' => true, 'italic' => true],
+                ]);
+
+                // Total Netto row
+                $sheet->getStyle("A{$netRow}:{$highestColumn}{$netRow}")->applyFromArray([
+                    'font' => ['bold' => true],
+                    'fill' => [
+                        'fillType'   => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
+                        'startColor' => ['rgb' => 'F8FAFC'],
                     ],
-                ],
-            ]);
+                    'borders' => [
+                        'top' => [
+                            'borderStyle' => Border::BORDER_THIN,
+                            'color'       => ['rgb' => '94A3B8'],
+                        ],
+                        'bottom' => [
+                            'borderStyle' => Border::BORDER_DOUBLE,
+                            'color'       => ['rgb' => '64748B'],
+                        ],
+                    ],
+                ]);
+            } else {
+                $sheet->getStyle("A{$highestRow}:{$highestColumn}{$highestRow}")->applyFromArray([
+                    'font' => [
+                        'bold' => true,
+                    ],
+                    'fill' => [
+                        'fillType'   => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
+                        'startColor' => ['rgb' => 'F8FAFC'],
+                    ],
+                    'borders' => [
+                        'top' => [
+                            'borderStyle' => Border::BORDER_MEDIUM,
+                            'color'       => ['rgb' => '94A3B8'],
+                        ],
+                        'bottom' => [
+                            'borderStyle' => Border::BORDER_DOUBLE,
+                            'color'       => ['rgb' => '64748B'],
+                        ],
+                    ],
+                ]);
+            }
         }
 
         return [];

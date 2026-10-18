@@ -276,18 +276,17 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
         return $rows;
     }
 
-    private function buildDetail($transactions, array $returns = []): array
+    protected function buildDetail($transactions, array $returns = []): array
     {
         $itemsList = [];
 
         foreach ($transactions as $trx) {
             foreach ($trx->transactions ?? [] as $item) {
                 $medicine = $item->medicine;
-                $medName = $medicine?->name ?? ($item->medicine_name ?? '-');
+                $medName  = $medicine?->name ?? ($item->medicine_name ?? '-');
 
-                $trxCode = $trx->transaction_code ?? '-';
-                $cartType = $item->cart_type ? '/' . $item->cart_type : '';
-                $nomor = $trxCode . $cartType;
+                $trxCode  = $trx->transaction_code ?? '-';
+                $jnsHarga = !empty($item->cart_type) ? (string) $item->cart_type : '-';
 
                 $qty   = (float) ($item->quantity ?? 0);
                 $bruto = (int) ($item->total_price ?? ($item->raw_total ?? 0));
@@ -295,24 +294,26 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
                 $netto = (int) ($item->final_price ?? 0);
 
                 $itemsList[] = [
-                    'nomor'    => $nomor,
-                    'name'     => $medName,
-                    'qty'      => $qty,
-                    'bruto'    => $bruto,
-                    'disc'     => $disc,
-                    'netto'    => $netto,
+                    'nomor'     => $trxCode,
+                    'jns_harga' => $jnsHarga,
+                    'name'      => $medName,
+                    'qty'       => $qty,
+                    'bruto'     => $bruto,
+                    'disc'      => $disc,
+                    'netto'     => $netto,
                 ];
             }
         }
 
         foreach ($returns as $ret) {
             $itemsList[] = [
-                'nomor' => $ret['nomor'],
-                'name'  => $ret['name'],
-                'qty'   => -(float) $ret['qty'],
-                'bruto' => -(int) $ret['total'],
-                'disc'  => 0,
-                'netto' => -(int) $ret['total'],
+                'nomor'     => $ret['nomor'],
+                'jns_harga' => 'RT',
+                'name'      => $ret['name'],
+                'qty'       => -(float) $ret['qty'],
+                'bruto'     => -(int) $ret['total'],
+                'disc'      => 0,
+                'netto'     => -(int) $ret['total'],
             ];
         }
 
@@ -326,7 +327,7 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
         });
 
         $rows   = [];
-        $rows[] = ['No.', 'Nomor', 'Nama Obat', 'Qty', 'Bruto', 'Disc', 'Netto'];
+        $rows[] = ['No.', 'Nomor', 'JNS_HARGA', 'Nama Obat', 'Qty', 'Bruto', 'Disc', 'Netto'];
 
         $no = 1;
         $grandQty = 0;
@@ -338,6 +339,7 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
             $rows[] = [
                 $no++,
                 $row['nomor'],
+                $row['jns_harga'],
                 $row['name'],
                 $row['qty'],
                 (int) $row['bruto'],
@@ -351,7 +353,7 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
             $grandNetto += $row['netto'];
         }
 
-        $rows[] = ['', 'TOTAL', '', $grandQty, (int) $grandBruto, (int) $grandDisc, (int) $grandNetto];
+        $rows[] = ['', 'TOTAL', '', '', $grandQty, (int) $grandBruto, (int) $grandDisc, (int) $grandNetto];
 
         $potonganTransaksi = (int) $transactions->reject(function ($trx) {
             return in_array(strtoupper(trim((string) $trx->transaction_type)), ['RETUR JUAL', 'RETUR KREDIT'], true)
@@ -360,13 +362,13 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
 
         if ($potonganTransaksi > 0) {
             $rows[] = [
-                '', 'POTONGAN TRANSAKSI (DISKON NOTA)', '',
+                '', 'POTONGAN TRANSAKSI (DISKON NOTA)', '', '',
                 '', '', '',
                 -$potonganTransaksi,
             ];
 
             $rows[] = [
-                '', 'TOTAL NETTO AKHIR', '',
+                '', 'TOTAL NETTO AKHIR', '', '',
                 $grandQty,
                 '', '',
                 (int) ($grandNetto - $potonganTransaksi),
@@ -649,15 +651,25 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
             $sheet->getStyle("F" . ($dataStartRow + 1) . ":G{$lastRow}")
                 ->getFont()->getColor()->setRGB('B91C1C');
         } else {
-            // Align Qty, Bruto, Disc, Netto right
-            $sheet->getStyle("D{$dataStartRow}:G{$lastRow}")
+            // Align Qty, Bruto, Disc, Netto right (Columns E to H)
+            $sheet->getStyle("E{$dataStartRow}:H{$lastRow}")
                 ->getAlignment()
                 ->setHorizontal(Alignment::HORIZONTAL_RIGHT);
 
             // Format Qty, Bruto, Disc, Netto as number
-            $sheet->getStyle("D" . ($dataStartRow + 1) . ":G{$lastRow}")
+            $sheet->getStyle("E" . ($dataStartRow + 1) . ":H{$lastRow}")
                 ->getNumberFormat()
                 ->setFormatCode('#,##0');
+
+            // Center Nomor (Col B) and JNS_HARGA (Col C)
+            $sheet->getStyle("B{$dataStartRow}:C{$lastRow}")
+                ->getAlignment()
+                ->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+            // Text format for Nomor (Col B) to prevent Excel from converting numbers
+            $sheet->getStyle("B" . ($dataStartRow + 1) . ":B{$lastRow}")
+                ->getNumberFormat()
+                ->setFormatCode(\PhpOffice\PhpSpreadsheet\Style\NumberFormat::FORMAT_TEXT);
         }
     }
 
@@ -702,13 +714,14 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
                 'I' => 18,
             ]
             : [
-                'A' => 6,
-                'B' => 24,
-                'C' => 38,
-                'D' => 12,
-                'E' => 18,
-                'F' => 16,
-                'G' => 20,
+                'A' => 6,   // No.
+                'B' => 20,  // Nomor
+                'C' => 14,  // JNS_HARGA
+                'D' => 38,  // Nama Obat
+                'E' => 12,  // Qty
+                'F' => 18,  // Bruto
+                'G' => 16,  // Disc
+                'H' => 20,  // Netto
             ];
     }
 

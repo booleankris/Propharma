@@ -386,8 +386,8 @@
                                     </svg>
                                 </div>
                                 <div>
-                                    <h2 class="text-[15px] font-semibold text-gray-800 leading-tight">Data Penjualan</h2>
-                                    <p class="text-[12px] text-gray-400">Data dan riwayat penjualan kasir</p>
+                                    <h2 class="text-[15px] font-semibold text-gray-800 leading-tight">Data Penjualan{{ !empty($restrictedChannelName) ? ' — ' . $restrictedChannelName : '' }}</h2>
+                                    <p class="text-[12px] text-gray-400">Data dan riwayat penjualan kasir{{ !empty($restrictedChannelName) ? ' (' . $restrictedChannelName . ')' : '' }}</p>
                                 </div>
                             </div>
                         </div>
@@ -411,14 +411,20 @@
                             </div>
                             <div class="channel-filter-wrap !mb-0">
                                 <label>Jenis Transaksi</label>
-                                <select id="channel-filter">
-                                    <option value="">Semua Jenis Transaksi</option>
-                                    <option value="kasir">Kasir (Offline)</option>
-                                    <option value="online">Online (Chat WA)</option>
-                                    <option value="shopee">Online Shopee</option>
-                                    <option value="grab">Online Grab</option>
-                                    <option value="digital">Digital (Aplikasi Mobile)</option>
-                                </select>
+                                @if (!empty($restrictedChannel))
+                                    <select id="channel-filter" disabled class="bg-gray-100 cursor-not-allowed text-gray-700 font-medium">
+                                        <option value="{{ $restrictedChannel }}" selected>{{ $restrictedChannelName }}</option>
+                                    </select>
+                                @else
+                                    <select id="channel-filter">
+                                        <option value="">Semua Jenis Transaksi</option>
+                                        <option value="kasir">Kasir (Offline)</option>
+                                        <option value="online">Online (Chat WA)</option>
+                                        <option value="shopee">Online Shopee</option>
+                                        <option value="grab">Online Grab</option>
+                                        <option value="digital">Digital (Aplikasi Mobile)</option>
+                                    </select>
+                                @endif
                             </div>
                         </div>
 
@@ -639,7 +645,7 @@
                         const parts = val.split(' to ');
                         d.date_from = parts[0] ?? '';
                         d.date_to = parts[1] ?? '';
-                        d.channel = $('#channel-filter').val();
+                        d.channel = '{{ $restrictedChannel ?? '' }}' || $('#channel-filter').val();
                     }
                 },
                 language: {
@@ -895,7 +901,7 @@
             const parts = val.split(' to ');
             const dateFrom = parts[0] ? parts[0].trim() : '';
             const dateTo = parts[1] ? parts[1].trim() : dateFrom;
-            const channel = $('#channel-filter').val() || '';
+            const channel = '{{ $restrictedChannel ?? '' }}' || $('#channel-filter').val() || '';
             const search = (tableData && typeof tableData.search === 'function') ? (tableData.search() || '') : '';
 
             const url = new URL("{{ route('salesdata.export') }}", window.location.origin);

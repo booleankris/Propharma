@@ -357,25 +357,36 @@
         };
 
         let currentMode = 'jual';
-        let startDate = '';
-        let endDate = '';
+        let startDate = '{{ now()->startOfMonth()->format('Y-m-d') }}';
+        let endDate = '{{ now()->format('Y-m-d') }}';
         let searchTimer = null;
         let Table = null;
+        let datePickerInstance = null;
 
         // ── Flatpickr ────────────────────────────────
-        flatpickr('#dateRange', {
+        datePickerInstance = flatpickr('#dateRange', {
             mode: 'range',
             dateFormat: 'Y-m-d',
+            defaultDate: [startDate, endDate],
             locale: {
                 rangeSeparator: ' s/d '
             },
-            onClose(selectedDates) {
+            onChange(selectedDates) {
                 if (selectedDates.length === 2) {
-                    startDate = selectedDates[0].toISOString().slice(0, 10);
-                    endDate = selectedDates[1].toISOString().slice(0, 10);
+                    startDate = flatpickr.formatDate(selectedDates[0], 'Y-m-d');
+                    endDate = flatpickr.formatDate(selectedDates[1], 'Y-m-d');
                     loadTable();
-                    updateExportUrl();
-
+                }
+            },
+            onClose(selectedDates) {
+                if (selectedDates.length === 1) {
+                    startDate = flatpickr.formatDate(selectedDates[0], 'Y-m-d');
+                    endDate = flatpickr.formatDate(selectedDates[0], 'Y-m-d');
+                    loadTable();
+                } else if (selectedDates.length === 2) {
+                    startDate = flatpickr.formatDate(selectedDates[0], 'Y-m-d');
+                    endDate = flatpickr.formatDate(selectedDates[1], 'Y-m-d');
+                    loadTable();
                 }
             },
         });
@@ -427,12 +438,13 @@
                 processing: true,
                 serverSide: true,
                 searching: false,
+                ordering: false,
                 ajax: {
                     url: ROUTES[currentMode],
-                    data: {
-                        start_date: startDate,
-                        end_date: endDate,
-                        search_medicine: $('#searchMedicine').val(),
+                    data: function(d) {
+                        d.start_date = startDate;
+                        d.end_date = endDate;
+                        d.search_medicine = $('#searchMedicine').val();
                     },
                 },
                 language: {
@@ -448,24 +460,26 @@
                     },
                 },
                 columns: [{
-                        data: 'DT_RowIndex',
+                        data: 'rank',
                         orderable: false,
                         searchable: false,
                         width: '40px',
-                        className: 'text-gray-400 text-xs'
+                        className: 'text-gray-400 text-xs text-center'
                     },
                     {
-                        data: 'medicine_name'
+                        data: 'medicine_name',
+                        orderable: false
                     },
                     {
                         data: 'medicine_code',
+                        orderable: false,
                         className: 'font-mono text-xs text-gray-500'
                     },
                     {
                         data: 'total_qty',
                         orderable: false,
                         className: 'text-right',
-                        render: val => parseInt(val).toLocaleString('id-ID'),
+                        render: val => parseFloat(val).toLocaleString('id-ID'),
                     },
                     {
                         data: 'total_jumlah_fmt',
@@ -501,19 +515,8 @@
                         className: 'text-gray-500'
                     },
                 ],
-                order: [
-                    [4, 'desc']
-                ],
                 pageLength: 25,
                 lengthMenu: [10, 25, 50, 100],
-                drawCallback() {
-                    const info = this.api().page.info();
-                    this.api().column(0, {
-                        page: 'current'
-                    }).nodes().each((cell, i) => {
-                        cell.innerHTML = info.start + i + 1;
-                    });
-                },
             });
         }
 
@@ -522,7 +525,6 @@
             clearTimeout(searchTimer);
             searchTimer = setTimeout(() => {
                 loadTable();
-                updateExportUrl();
             }, 400);
         });
 
@@ -530,10 +532,13 @@
         $('#btnReset').on('click', function() {
             startDate = '';
             endDate = '';
-            $('#dateRange').val('');
+            if (datePickerInstance) {
+                datePickerInstance.clear();
+            } else {
+                $('#dateRange').val('');
+            }
             $('#searchMedicine').val('');
             loadTable();
-            updateExportUrl();
         });
 
         let exportInterval = null;

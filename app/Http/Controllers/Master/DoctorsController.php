@@ -114,10 +114,10 @@ class DoctorsController extends Controller
             'code'        => $code,
             'pharmacy_id' => $validated['pharmacy_id'],
             'name'        => $validated['name'],
-            'specialist'  => $validated['specialist'] ?? null,
-            'address'     => $validated['address'] ?? null,
-            'city'        => $validated['city'] ?? null,
-            'phone'       => $validated['phone'] ?? null,
+            'specialist'  => $validated['specialist'] ?? '-',
+            'address'     => $validated['address'] ?? '-',
+            'city'        => $validated['city'] ?? '-',
+            'phone'       => $validated['phone'] ?? '-',
             'status'      => $request->status ?? 0,
         ]);
 
@@ -149,10 +149,10 @@ class DoctorsController extends Controller
         $doctor->update([
             'pharmacy_id' => $validated['pharmacy_id'],
             'name'        => $validated['name'],
-            'specialist'  => $validated['specialist'] ?? null,
-            'address'     => $validated['address'] ?? null,
-            'city'        => $validated['city'] ?? null,
-            'phone'       => $validated['phone'] ?? null,
+            'specialist'  => $validated['specialist'] ?? '-',
+            'address'     => $validated['address'] ?? '-',
+            'city'        => $validated['city'] ?? '-',
+            'phone'       => $validated['phone'] ?? '-',
             'status'      => $request->status ?? 0,
         ]);
 

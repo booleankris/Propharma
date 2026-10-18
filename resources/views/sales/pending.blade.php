@@ -136,6 +136,31 @@
             line-height: 1.4;
         }
 
+        /* ── Resume button ── */
+        .btn-resume {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+            font-weight: 500;
+            padding: 3px 9px;
+            border-radius: 6px;
+            border: 0.5px solid #a7f3d0;
+            background: #ecfdf5;
+            color: #047857;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all .15s ease;
+            line-height: 1.4;
+            text-decoration: none !important;
+        }
+
+        .btn-resume:hover {
+            background: #10b981;
+            color: #ffffff;
+            border-color: #10b981;
+        }
+
         .status-completed {
             display: inline-flex;
             align-items: center;
@@ -322,8 +347,8 @@
                                     </svg>
                                 </div>
                                 <div>
-                                    <h2 class="text-[15px] font-semibold text-gray-800 leading-tight">Data Kunjungan</h2>
-                                    <p class="text-[12px] text-gray-400">Data dan riwayat transaksi yang belum selesai</p>
+                                    <h2 class="text-[15px] font-semibold text-gray-800 leading-tight">Data Kunjungan{{ !empty($restrictedChannelName) ? ' — ' . $restrictedChannelName : '' }}</h2>
+                                    <p class="text-[12px] text-gray-400">Data dan riwayat transaksi yang belum selesai{{ !empty($restrictedChannelName) ? ' (' . $restrictedChannelName . ')' : '' }}</p>
                                 </div>
                             </div>
                         </div>
@@ -346,14 +371,20 @@
                         </div>
                         <div class="channel-filter-wrap !mb-0">
                             <label>Jenis Transaksi</label>
-                            <select id="channel-filter">
-                                <option value="">Semua Jenis Transaksi</option>
-                                <option value="kasir">Kasir (Offline)</option>
-                                <option value="online">Online (Chat WA)</option>
-                                <option value="shopee">Online Shopee</option>
-                                <option value="grab">Online Grab</option>
-                                <option value="digital">Digital (Aplikasi Mobile)</option>
-                            </select>
+                            @if (!empty($restrictedChannel))
+                                <select id="channel-filter" disabled class="bg-gray-100 cursor-not-allowed text-gray-700 font-medium">
+                                    <option value="{{ $restrictedChannel }}" selected>{{ $restrictedChannelName }}</option>
+                                </select>
+                            @else
+                                <select id="channel-filter">
+                                    <option value="">Semua Jenis Transaksi</option>
+                                    <option value="kasir">Kasir (Offline)</option>
+                                    <option value="online">Online (Chat WA)</option>
+                                    <option value="shopee">Online Shopee</option>
+                                    <option value="grab">Online Grab</option>
+                                    <option value="digital">Digital (Aplikasi Mobile)</option>
+                                </select>
+                            @endif
                         </div>
                     </div>
                     <div class="overflow-x-auto">
@@ -434,6 +465,15 @@
                             <span>Total</span>
                             <span id="detail-total">—</span>
                         </div>
+                        <div class="mt-4 pt-3 border-t border-gray-100">
+                            <a id="btn-detail-resume" href="#"
+                                class="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm transition-all duration-150">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                                    <polygon points="5 3 19 12 5 21 5 3"/>
+                                </svg>
+                                Lanjutkan Transaksi Ini di Kasir
+                            </a>
+                        </div>
                     </div>
 
                 </div>
@@ -489,7 +529,7 @@
                         const parts = val.split(' to ');
                         d.date_from = parts[0] ?? '';
                         d.date_to = parts[1] ?? '';
-                        d.channel = $('#channel-filter').val();
+                        d.channel = '{{ $restrictedChannel ?? '' }}' || $('#channel-filter').val();
                     }
                 },
                 language: {
@@ -537,13 +577,26 @@
                         data: null,
                         orderable: false,
                         searchable: false,
-                        render: (d) =>
-                            `<button class="btn-print" onclick="event.stopPropagation(); window.open('/print/receipt/${d.transactions.id}','_blank')">
-                    <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
-                        <polyline points="4 6 4 1 12 1 12 6"/>
-                        <path d="M4 12H3a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1"/>
-                        <rect x="4" y="10" width="8" height="5"/>
-                    </svg>Cetak</button>`
+                        render: (d) => {
+                            const typeSlug = d.type_slug || 'resep';
+                            const trxId = d.transaction_id;
+                            return `
+                                <div class="flex items-center justify-center gap-1.5" onclick="event.stopPropagation()">
+                                    <a href="/transaction/${typeSlug}/${trxId}" class="btn-resume" title="Lanjutkan Transaksi di Kasir">
+                                        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                                            <polygon points="5 3 19 12 5 21 5 3"/>
+                                        </svg>
+                                        Lanjutkan
+                                    </a>
+                                    <button class="btn-print" onclick="window.open('/print/receipt/${trxId}','_blank')">
+                                        <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
+                                            <polyline points="4 6 4 1 12 1 12 6"/>
+                                            <path d="M4 12H3a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1"/>
+                                            <rect x="4" y="10" width="8" height="5"/>
+                                        </svg>Cetak</button>
+                                </div>
+                            `;
+                        }
                     },
                 ],
             });
@@ -563,6 +616,8 @@
                 document.getElementById('detail-channel-badge').innerHTML = data.channel || '';
                 document.getElementById('detail-patient').textContent = data.name || 'Umum / Tanpa Pasien';
                 document.getElementById('detail-creator').textContent = data.creator_name || '-';
+                const typeSlug = data.type_slug || 'resep';
+                document.getElementById('btn-detail-resume').href = `/transaction/${typeSlug}/${data.transaction_id}`;
                 loadItems(data.transaction_id, data.final_price, data.subtotal, data.totaldiscount);
             });
         });

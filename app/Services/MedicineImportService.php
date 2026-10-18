@@ -28,9 +28,10 @@ class MedicineImportService
         $spreadsheet = $reader->load($filePath);
         $sheet = $spreadsheet->getActiveSheet();
         $highestRow = (int) $sheet->getHighestRow();
-        $highestCol = Coordinate::columnIndexFromString($sheet->getHighestColumn()) < 40
-            ? 'AN'
-            : $sheet->getHighestColumn();
+        $highestCol = $sheet->getHighestColumn();
+        if (Coordinate::columnIndexFromString($highestCol) < 40) {
+            $highestCol = 'AN';
+        }
 
         $summary = [
             'total_rows' => 0,
@@ -40,7 +41,13 @@ class MedicineImportService
             'skipped_samples' => [],
         ];
 
-        if ($highestRow < 2) {
+        $mapping = $this->resolveColumnMapping($sheet, $highestRow, $highestCol);
+        $startRow = $mapping['start_row'];
+        $cols = $mapping['columns'];
+
+        if ($highestRow < $startRow) {
+            $spreadsheet->disconnectWorksheets();
+            unset($spreadsheet);
             return $summary;
         }
 
@@ -49,17 +56,21 @@ class MedicineImportService
             ->flip();
         $categoryMap = $this->buildCategoryMap();
         $seenCodes = [];
-        $rows = $sheet->rangeToArray("A2:{$highestCol}{$highestRow}", null, false, false, true);
+        $rows = $sheet->rangeToArray("A{$startRow}:{$highestCol}{$highestRow}", null, false, false, true);
+
+        $nameCol = $cols['name'] ?? 'C';
+        $codeCol = $cols['code'] ?? 'B';
+        $categoryCol = $cols['category'] ?? 'AL';
 
         foreach ($rows as $rowIndex => $row) {
-            $name = trim((string) ($row['C'] ?? ''));
+            $name = trim((string) ($row[$nameCol] ?? ''));
             if ($name === '') {
                 continue;
             }
 
             $summary['total_rows']++;
-            $code = trim((string) ($row['B'] ?? ''));
-            $categoryName = trim((string) ($row['AL'] ?? ''));
+            $code = trim((string) ($row[$codeCol] ?? ''));
+            $categoryName = trim((string) ($row[$categoryCol] ?? ''));
             $categoryId = $this->resolveCategoryId($categoryName, $categoryMap);
             $codeKey = strtoupper($code);
             $exists = $code !== '' && ($existingCodes->has($codeKey) || isset($seenCodes[$codeKey]));
@@ -141,10 +152,14 @@ class MedicineImportService
             $highestCol = 'AN';
         }
 
-        if ($highestRow < 2) {
+        $mapping = $this->resolveColumnMapping($sheet, $highestRow, $highestCol);
+        $startRow = $mapping['start_row'];
+        $cols = $mapping['columns'];
+
+        if ($highestRow < $startRow) {
             return [
                 'success' => false,
-                'message' => 'File Excel kosong atau tidak memiliki data pada baris 2.',
+                'message' => 'File Excel kosong atau tidak memiliki data pada baris ' . $startRow . '.',
                 'total_rows' => 0,
                 'created_count' => 0,
                 'updated_count' => 0,
@@ -164,8 +179,8 @@ class MedicineImportService
             return strtoupper(trim((string) $item->code));
         });
 
-        // 2. Read rows with column letter keys (B, C, O, P, etc.)
-        $rows = $sheet->rangeToArray("A2:{$highestCol}{$highestRow}", null, false, false, true);
+        // 2. Read rows with column letter keys
+        $rows = $sheet->rangeToArray("A{$startRow}:{$highestCol}{$highestRow}", null, false, false, true);
 
         $totalRows = 0;
         $createdCount = 0;
@@ -173,10 +188,33 @@ class MedicineImportService
         $skippedCount = 0;
         $skippedRows = [];
 
+        $nameCol = $cols['name'] ?? 'C';
+        $codeCol = $cols['code'] ?? 'B';
+        $barcodeCol = $cols['barcode'] ?? 'Q';
+        $genericCol = $cols['generic'] ?? null;
+        $rawPriceCol = $cols['raw_price'] ?? 'O';
+        $hetCol = $cols['het_price'] ?? 'P';
+        $netPriceCol = $cols['net_price'] ?? null;
+        $pbfCol = $cols['creditor'] ?? 'R';
+        $typeCol = $cols['type'] ?? 'AC';
+        $contentCol = $cols['content'] ?? 'AE';
+        $stripCol = $cols['strip'] ?? 'AF';
+        $dosageCol = $cols['dosage'] ?? 'AG';
+        $factoryCol = $cols['factory'] ?? 'AH';
+        $packagingCol = $cols['packaging'] ?? 'AI';
+        $unitCol = $cols['unit'] ?? 'AJ';
+        $prepCol = $cols['preparations'] ?? 'AK';
+        $categoryCol = $cols['category'] ?? 'AL';
+        $compCol = $cols['composition'] ?? 'AN';
+        $componentCol = $cols['component'] ?? null;
+        $minStockCol = $cols['minimal_stock'] ?? null;
+
+        $targetPharmacyId = getActivePharmacyId() ?: 1;
+
         DB::beginTransaction();
         try {
             foreach ($rows as $rowIndex => $row) {
-                $name = trim((string) ($row['C'] ?? ''));
+                $name = trim((string) ($row[$nameCol] ?? ''));
 
                 // If name is empty, skip row
                 if ($name === '') {
@@ -185,21 +223,33 @@ class MedicineImportService
 
                 $totalRows++;
 
-                $rawCode = trim((string) ($row['B'] ?? ''));
-                $barcode = trim((string) $sheet->getCell("Q{$rowIndex}")->getFormattedValue());
-                $hna = $this->parsePrice($row['O'] ?? null);
-                $het = $this->parsePrice($row['P'] ?? null);
-                $pbfName = trim((string) ($row['R'] ?? ''));
-                $spType = trim((string) ($row['AC'] ?? ''));
-                $content = trim((string) ($row['AE'] ?? ''));
-                $strip = trim((string) ($row['AF'] ?? ''));
-                $dosage = trim((string) ($row['AG'] ?? ''));
-                $factoryName = trim((string) ($row['AH'] ?? ''));
-                $packaging = trim((string) ($row['AI'] ?? ''));
-                $unit = trim((string) ($row['AJ'] ?? ''));
-                $preparations = trim((string) ($row['AK'] ?? ''));
-                $categoryName = trim((string) ($row['AL'] ?? ''));
-                $compositionName = trim((string) ($row['AN'] ?? ''));
+                $rawCode = trim((string) ($row[$codeCol] ?? ''));
+                $barcode = '';
+                if ($barcodeCol) {
+                    $barcode = trim((string) $sheet->getCell("{$barcodeCol}{$rowIndex}")->getFormattedValue());
+                    if ($barcode === '' && isset($row[$barcodeCol])) {
+                        $barcode = trim((string) $row[$barcodeCol]);
+                    }
+                }
+                $hna = $this->parsePrice($row[$rawPriceCol] ?? null);
+                $het = $this->parsePrice($row[$hetCol] ?? null);
+                $providedNetPrice = $netPriceCol ? $this->parsePrice($row[$netPriceCol] ?? null) : 0.0;
+                $netPrice = $providedNetPrice > 0 ? (string) $providedNetPrice : (string) floor($hna * 1.11);
+
+                $pbfName = $pbfCol ? trim((string) ($row[$pbfCol] ?? '')) : '';
+                $generic = $genericCol ? trim((string) ($row[$genericCol] ?? '')) : '';
+                $spType = $typeCol ? trim((string) ($row[$typeCol] ?? '')) : '';
+                $content = $contentCol ? trim((string) ($row[$contentCol] ?? '')) : '';
+                $strip = $stripCol ? trim((string) ($row[$stripCol] ?? '')) : '';
+                $dosage = $dosageCol ? trim((string) ($row[$dosageCol] ?? '')) : '';
+                $factoryName = $factoryCol ? trim((string) ($row[$factoryCol] ?? '')) : '';
+                $packaging = $packagingCol ? trim((string) ($row[$packagingCol] ?? '')) : '';
+                $unit = $unitCol ? trim((string) ($row[$unitCol] ?? '')) : '';
+                $preparations = $prepCol ? trim((string) ($row[$prepCol] ?? '')) : '';
+                $categoryName = $categoryCol ? trim((string) ($row[$categoryCol] ?? '')) : '';
+                $compositionName = $compCol ? trim((string) ($row[$compCol] ?? '')) : '';
+                $component = $componentCol ? trim((string) ($row[$componentCol] ?? '')) : null;
+                $minimalStock = $minStockCol ? (float) $this->parsePrice($row[$minStockCol] ?? null) : 0;
 
                 // Resolve Foreign Keys
                 $factoryId = $this->resolveFactoryId($factoryName, $factoryMap);
@@ -245,13 +295,11 @@ class MedicineImportService
                     continue;
                 }
 
-                $netPrice = (string) floor($hna * 1.11);
-
                 $payload = [
                     'code'                 => $code,
                     'name'                 => $name,
                     'barcode'              => $barcode !== '' ? $barcode : null,
-                    'pharmacy_id'          => 1,
+                    'pharmacy_id'          => $targetPharmacyId,
                     'medicine_category_id' => $categoryId,
                     'composition_id'       => $compositionId,
                     'factory_id'           => $factoryId,
@@ -267,9 +315,17 @@ class MedicineImportService
                     'pharmacy_net_price'   => (string) $hna,
                     'net_price'            => $netPrice,
                     'het_price'            => (string) $het,
-                    'minimal_stock'        => 0,
+                    'minimal_stock'        => $minimalStock,
                     'status'               => 1,
                 ];
+
+                if ($generic !== '') {
+                    $payload['generic'] = $generic;
+                }
+
+                if ($component !== null && $component !== '') {
+                    $payload['component'] = $component;
+                }
 
                 if ($isExisting) {
                     $medicine = $existingMedicines->get($codeKey);
@@ -423,7 +479,135 @@ class MedicineImportService
         }
 
         $category = $map[$this->normalizeLookupKey($trimmed)] ?? null;
-        return $category?->id;
+        if ($category) {
+            return $category->id;
+        }
+
+        // Try fuzzy or prefix match (e.g. "OBAT BEBAS/OTC (B)" vs "OBAT BEBAS")
+        $cleanNorm = $this->normalizeLookupKey($trimmed);
+        foreach ($map as $key => $cat) {
+            if ($key !== '' && (str_contains($cleanNorm, $key) || str_contains($key, $cleanNorm))) {
+                return $cat->id;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Detect header row and map column letters dynamically.
+     * Supports both modern exported header names (Row 1 or Row 5, etc.) and legacy fixed columns.
+     */
+    public function resolveColumnMapping($sheet, int $highestRow, string $highestCol): array
+    {
+        $maxScanRows = min($highestRow, 10);
+        $highestColIdx = Coordinate::columnIndexFromString($highestCol);
+
+        $fieldPatterns = [
+            'name'          => ['nama obat', 'nama barang', 'nama', 'name', 'item name'],
+            'code'          => ['kode obat', 'kode barang', 'kode', 'code', 'item code'],
+            'barcode'       => ['barcode', 'kode barcode', 'upc', 'ean'],
+            'generic'       => ['generik', 'nama generik', 'generic'],
+            'category'      => ['kategori', 'golongan', 'golongan obat', 'kategori obat', 'category'],
+            'raw_price'     => ['hna', 'harga dasar (beli)', 'harga dasar', 'harga beli', 'hna (netto apotek)', 'beli', 'buy price'],
+            'het_price'     => ['het', 'harga het', 'h.e.t'],
+            'net_price'     => ['harga jual netto', 'harga netto', 'harga jual', 'net price'],
+            'creditor'      => ['supplier utama', 'supplier', 'kreditur', 'distributor', 'pbf', 'vendor'],
+            'composition'   => ['komposisi', 'zat aktif'],
+            'component'     => ['komponen sp', 'komponen'],
+            'factory'       => ['pabrik (produsen)', 'pabrik', 'produsen', 'factory', 'manufacturer'],
+            'packaging'     => ['kemasan', 'packaging', 'package'],
+            'unit'          => ['satuan', 'unit'],
+            'content'       => ['isi', 'content'],
+            'strip'         => ['strip'],
+            'dosage'        => ['dosis', 'dosage'],
+            'preparations'  => ['sediaan', 'preparations'],
+            'type'          => ['surat pesanan', 'tipe', 'sp type'],
+            'minimal_stock' => ['stok minimal', 'minimal stok', 'min stok', 'minimum stock'],
+        ];
+
+        for ($row = 1; $row <= $maxScanRows; $row++) {
+            $mapped = [];
+
+            // Pass 1: Exact normalized matching
+            for ($colIdx = 1; $colIdx <= $highestColIdx; $colIdx++) {
+                $colLetter = Coordinate::stringFromColumnIndex($colIdx);
+                $cellVal = trim((string) $sheet->getCell("{$colLetter}{$row}")->getValue());
+                if ($cellVal === '') continue;
+
+                $normalized = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $cellVal));
+
+                foreach ($fieldPatterns as $field => $patterns) {
+                    if (isset($mapped[$field])) continue;
+
+                    foreach ($patterns as $pattern) {
+                        $normPattern = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $pattern));
+                        if ($normalized === $normPattern) {
+                            $mapped[$field] = $colLetter;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Pass 2: Partial contains for unmapped columns (avoid short substrings like 'isi' inside 'komposisi')
+            for ($colIdx = 1; $colIdx <= $highestColIdx; $colIdx++) {
+                $colLetter = Coordinate::stringFromColumnIndex($colIdx);
+                if (in_array($colLetter, $mapped, true)) continue;
+
+                $cellVal = trim((string) $sheet->getCell("{$colLetter}{$row}")->getValue());
+                if ($cellVal === '') continue;
+
+                $normalized = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $cellVal));
+
+                foreach ($fieldPatterns as $field => $patterns) {
+                    if (isset($mapped[$field])) continue;
+
+                    foreach ($patterns as $pattern) {
+                        $normPattern = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $pattern));
+                        if (strlen($normPattern) >= 4 && str_contains($normalized, $normPattern)) {
+                            $mapped[$field] = $colLetter;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // If this row has both 'name' and at least one of ('code', 'barcode', 'category', 'raw_price')
+            if (isset($mapped['name']) && (isset($mapped['code']) || isset($mapped['category']) || isset($mapped['barcode']) || isset($mapped['raw_price']))) {
+                return [
+                    'header_row' => $row,
+                    'start_row'  => $row + 1,
+                    'columns'    => $mapped,
+                    'is_header_detected' => true,
+                ];
+            }
+        }
+
+        // Fallback to legacy fixed column layout (Row 2 onwards)
+        return [
+            'header_row' => 1,
+            'start_row'  => 2,
+            'columns'    => [
+                'code'         => 'B',
+                'name'         => 'C',
+                'raw_price'    => 'O',
+                'het_price'    => 'P',
+                'barcode'      => 'Q',
+                'creditor'     => 'R',
+                'type'         => 'AC',
+                'content'      => 'AE',
+                'strip'        => 'AF',
+                'dosage'       => 'AG',
+                'factory'      => 'AH',
+                'packaging'    => 'AI',
+                'unit'         => 'AJ',
+                'preparations' => 'AK',
+                'category'     => 'AL',
+                'composition'  => 'AN',
+            ],
+            'is_header_detected' => false,
+        ];
     }
 
     private function normalizeLookupKey(string $value): string

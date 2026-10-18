@@ -37,26 +37,38 @@
 
         #orderItemsTable thead th {
             background-color: #f8fafc !important;
-            color: #475569 !important;
-            font-weight: 600 !important;
+            color: #334155 !important;
+            font-weight: 700 !important;
             font-size: 11px !important;
             text-transform: uppercase !important;
-            letter-spacing: 0.04em !important;
-            border-bottom: 1px solid #e2e8f0 !important;
-            padding: 12px 16px !important;
+            letter-spacing: 0.05em !important;
+            border-bottom: 2px solid #e2e8f0 !important;
+            padding: 13px 16px !important;
             white-space: nowrap;
         }
 
         #orderItemsTable tbody td {
-            padding: 12px 16px !important;
+            padding: 11px 16px !important;
             font-size: 13px !important;
             vertical-align: middle !important;
-            color: #475569 !important;
+            color: #334155 !important;
             border-bottom: 1px solid #f1f5f9 !important;
         }
 
+        #orderItemsTable tbody tr:nth-child(even) td {
+            background-color: #fafbfd !important;
+        }
+
         #orderItemsTable tbody tr:hover td {
-            background-color: #f8fafc !important;
+            background-color: #eff6ff !important;
+        }
+
+        #orderItemsTable td.cell-storage {
+            background-color: #fffbeb !important;
+        }
+
+        #orderItemsTable tbody tr:hover td.cell-storage {
+            background-color: #fef3c7 !important;
         }
 
         .dataTables_wrapper .dataTables_paginate .paginate_button {
@@ -129,40 +141,13 @@
                 </div>
 
                 <button id="exportBtn" onclick="startExportExcel()"
-                    class="inline-flex items-center gap-2 px-4 h-10 rounded-lg text-sm font-semibold text-white bg-emerald-500 hover:bg-emerald-600 transition shadow-sm shrink-0 w-fit cursor-pointer">
+                    class="inline-flex items-center gap-2 px-4 h-10 rounded-lg text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 transition shadow-sm shrink-0 w-fit cursor-pointer">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
-                    <span>Export Excel</span>
+                    <span id="exportBtnText">Export Excel (.xlsx)</span>
                 </button>
-            </div>
-
-            <!-- Export Progress Container -->
-            <div id="progressContainer"
-                class="hidden bg-white rounded-xl border border-blue-200/80 shadow-sm p-4 transition-all duration-300">
-                <div class="flex items-center justify-between mb-2">
-                    <div class="flex items-center gap-2">
-                        <svg class="w-5 h-5 text-blue-600 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none"
-                            viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
-                                stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor"
-                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
-                            </path>
-                        </svg>
-                        <span class="text-sm font-semibold text-slate-700" id="progressStatus">Mempersiapkan data
-                            export...</span>
-                    </div>
-                    <span class="text-sm font-bold text-blue-600" id="progressText">0%</span>
-                </div>
-                <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
-                    <div id="progressBar"
-                        class="bg-gradient-to-r from-blue-500 to-indigo-600 h-2.5 rounded-full transition-all duration-300"
-                        style="width: 0%"></div>
-                </div>
-                <p class="text-xs text-slate-400 mt-1.5">Harap tunggu, proses generate file Excel sedang berjalan di latar
-                    belakang.</p>
             </div>
 
             <div class="bg-white rounded-xl border border-slate-200/80 shadow-sm p-5">
@@ -186,24 +171,69 @@
                     <table id="orderItemsTable" class="w-full text-sm text-left text-slate-600">
                         <thead>
                             <tr>
-                                <th class="px-4 py-3">#</th>
-                                <th class="px-4 py-3">Kode Obat</th>
-                                <th class="px-4 py-3">Nama Obat</th>
-                                <th class="px-4 py-3">Satuan</th>
-                                <th class="px-4 py-3 text-center">QTY Awal</th>
-                                <th class="px-4 py-3 text-center">QTY Beli</th>
-                                <th class="px-4 py-3 text-center">
+                                <th class="px-4 py-3.5 text-center w-12">#</th>
+                                <th class="px-4 py-3.5">Kode Obat</th>
+                                <th class="px-4 py-3.5">Nama Obat</th>
+                                <th class="px-4 py-3.5 text-center">Satuan</th>
+                                <th class="px-4 py-3.5 text-right">QTY Awal</th>
+                                <th class="px-4 py-3.5 text-right">QTY Beli</th>
+                                <th class="px-4 py-3.5 text-right">
                                     {{ $canSeeWarehouse ? 'QTY Jual (PMI)' : 'QTY Jual' }}
                                 </th>
-                                <th class="px-4 py-3 text-center">Sisa Stok</th>
+                                <th class="px-4 py-3.5 text-right">Sisa Stok</th>
                                 @if($canSeeWarehouse)
-                                    <th class="px-4 py-3 text-center">Stok Gudang</th>
-                                    <th class="px-4 py-3 text-center">Stok Pelayanan PMI</th>
+                                    <th class="px-4 py-3.5 text-center !bg-amber-50/80 !border-b-2 !border-amber-300">
+                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-100 text-amber-900 font-bold text-xs border border-amber-300">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icon-tabler-building-warehouse">
+                                                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                                <path d="M3 21v-13l9 -4l9 4v13" />
+                                                <path d="M13 13h4v8h-10v-6h6" />
+                                                <path d="M13 21v-9a1 1 0 0 0 -1 -1h-2a1 1 0 0 0 -1 1v3" />
+                                            </svg>
+                                            Stok Gudang
+                                        </span>
+                                    </th>
+                                    <th class="px-4 py-3.5 text-center !bg-sky-50/80 !border-b-2 !border-sky-300">
+                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-sky-100 text-sky-900 font-bold text-xs border border-sky-300">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icon-tabler-building-store">
+                                                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                                <path d="M3 21l18 0" />
+                                                <path d="M3 7v1a3 3 0 0 0 6 0v-1m0 1a3 3 0 0 0 6 0v-1m0 1a3 3 0 0 0 6 0v-1h-18l2 -4h14l2 4" />
+                                                <path d="M5 21l0 -10.15" />
+                                                <path d="M19 21l0 -10.15" />
+                                                <path d="M9 21v-4a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v4" />
+                                            </svg>
+                                            Pelayanan
+                                        </span>
+                                    </th>
                                 @else
-                                    <th class="px-4 py-3 text-center">Stok Etalase</th>
+                                    <th class="px-4 py-3.5 text-center !bg-sky-50/80 !border-b-2 !border-sky-300">
+                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-sky-100 text-sky-900 font-bold text-xs border border-sky-300">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icon-tabler-building-store">
+                                                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                                <path d="M3 21l18 0" />
+                                                <path d="M3 7v1a3 3 0 0 0 6 0v-1m0 1a3 3 0 0 0 6 0v-1m0 1a3 3 0 0 0 6 0v-1h-18l2 -4h14l2 4" />
+                                                <path d="M5 21l0 -10.15" />
+                                                <path d="M19 21l0 -10.15" />
+                                                <path d="M9 21v-4a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v4" />
+                                            </svg>
+                                            Stok Etalase
+                                        </span>
+                                    </th>
                                 @endif
-                                <th class="px-4 py-3 text-center">Total Stok</th>
-                                <th class="px-4 py-3 text-center">Keterangan</th>
+                                <th class="px-4 py-3.5 text-center !bg-emerald-50/80 !border-b-2 !border-emerald-300">
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-100 text-emerald-900 font-bold text-xs border border-emerald-300">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icon-tabler-chart-bar">
+                                            <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                            <path d="M3 13a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v6a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z" />
+                                            <path d="M15 9a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v10a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z" />
+                                            <path d="M9 5a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v14a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z" />
+                                            <path d="M4 20h14" />
+                                        </svg>
+                                        Total Stok
+                                    </span>
+                                </th>
+                                <th class="px-4 py-3.5 text-center">Keterangan</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100"></tbody>
@@ -228,137 +258,50 @@
         let selectedMedicineId = '';
         let isExporting = false;
 
-        async function startExportExcel() {
+        function formatQty(val) {
+            let num = parseFloat(val);
+            if (isNaN(num)) return '0';
+            return num.toLocaleString('id-ID');
+        }
+
+        function startExportExcel() {
             if (isExporting) return;
 
             const exportBtn = document.getElementById('exportBtn');
-            const progressContainer = document.getElementById('progressContainer');
-            const progressBar = document.getElementById('progressBar');
-            const progressText = document.getElementById('progressText');
-            const progressStatus = document.getElementById('progressStatus');
+            const exportBtnText = document.getElementById('exportBtnText');
 
             isExporting = true;
-            exportBtn.disabled = true;
-            exportBtn.innerHTML = `
-                <svg class="w-4 h-4 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                <span>Memproses Export...</span>
-            `;
-            exportBtn.classList.add('opacity-75', 'cursor-not-allowed');
-
-            progressContainer.classList.remove('hidden');
-            progressBar.style.width = '10%';
-            progressText.innerText = '10%';
-            progressStatus.innerText = 'Memulai proses export...';
-
-            try {
-                let url = "{{ route('supplies.exportStockData') }}?start_date=" + encodeURIComponent(startDate) +
-                    "&end_date=" + encodeURIComponent(endDate) +
-                    "&medicine_id=" + encodeURIComponent(selectedMedicineId);
-
-                const response = await fetch(url, {
-                    headers: {
-                        'Accept': 'application/json'
-                    }
-                });
-
-                if (!response.ok) throw new Error('Gagal memulai proses export');
-                const data = await response.json();
-
-                if (data.job_id) {
-                    pollExportStatus(data.job_id);
-                } else {
-                    throw new Error('ID job export tidak valid');
-                }
-            } catch (error) {
-                iziToast.error({
-                    title: 'Gagal',
-                    message: error.message || 'Terjadi kesalahan saat memulai export.',
-                    position: 'topRight'
-                });
-                resetExportState();
-            }
-        }
-
-        function pollExportStatus(jobId) {
-            const progressBar = document.getElementById('progressBar');
-            const progressText = document.getElementById('progressText');
-            const progressStatus = document.getElementById('progressStatus');
-            const progressContainer = document.getElementById('progressContainer');
-
-            let interval = setInterval(() => {
-                fetch(`/stock-data/export/status/${jobId}`)
-                    .then(res => res.json())
-                    .then(data => {
-                        let prog = data.progress || 0;
-                        progressBar.style.width = prog + "%";
-                        progressText.innerText = prog + "%";
-
-                        if (prog < 50) {
-                            progressStatus.innerText = 'Mempersiapkan data dan stok...';
-                        } else if (prog < 100) {
-                            progressStatus.innerText = 'Menyusun file Excel...';
-                        }
-
-                        if (data.status === "completed") {
-                            clearInterval(interval);
-                            progressBar.style.width = "100%";
-                            progressText.innerText = "100%";
-                            progressStatus.innerText = 'Selesai! Mengunduh file...';
-
-                            iziToast.success({
-                                title: 'Selesai',
-                                message: 'File Excel Data Stok siap diunduh!',
-                                position: 'topRight'
-                            });
-
-                            setTimeout(() => {
-                                progressContainer.classList.add('hidden');
-                                resetExportState();
-                            }, 2000);
-
-                            if (data.file) {
-                                window.location.href = data.file;
-                            }
-                        } else if (data.status === "failed") {
-                            clearInterval(interval);
-                            iziToast.error({
-                                title: 'Gagal',
-                                message: 'Terjadi kesalahan saat meng-generate file Excel.',
-                                position: 'topRight'
-                            });
-                            progressContainer.classList.add('hidden');
-                            resetExportState();
-                        }
-                    })
-                    .catch(err => {
-                        clearInterval(interval);
-                        iziToast.error({
-                            title: 'Error',
-                            message: 'Gagal memeriksa status export.',
-                            position: 'topRight'
-                        });
-                        resetExportState();
-                    });
-            }, 1000);
-        }
-
-        function resetExportState() {
-            isExporting = false;
-            const exportBtn = document.getElementById('exportBtn');
             if (exportBtn) {
-                exportBtn.disabled = false;
-                exportBtn.innerHTML = `
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
-                    <span>Export Excel</span>
-                `;
-                exportBtn.classList.remove('opacity-75', 'cursor-not-allowed');
+                exportBtn.disabled = true;
+                exportBtn.classList.add('opacity-75', 'cursor-not-allowed');
             }
+            if (exportBtnText) {
+                exportBtnText.innerText = 'Menyiapkan File Excel...';
+            }
+
+            iziToast.info({
+                title: 'Export Excel',
+                message: 'Sedang menyusun data stok ke file Excel berformat rapi. Unduhan akan segera dimulai otomatis...',
+                position: 'topRight',
+                timeout: 4000
+            });
+
+            let url = "{{ route('supplies.printstockdata') }}?start_date=" + encodeURIComponent(startDate) +
+                "&end_date=" + encodeURIComponent(endDate) +
+                "&medicine_id=" + encodeURIComponent(selectedMedicineId);
+
+            window.location.href = url;
+
+            setTimeout(() => {
+                isExporting = false;
+                if (exportBtn) {
+                    exportBtn.disabled = false;
+                    exportBtn.classList.remove('opacity-75', 'cursor-not-allowed');
+                }
+                if (exportBtnText) {
+                    exportBtnText.innerText = 'Export Excel (.xlsx)';
+                }
+            }, 4500);
         }
 
         document.addEventListener('DOMContentLoaded', function() {
@@ -423,55 +366,109 @@
                     {
                         data: 'DT_RowIndex',
                         orderable: false,
-                        searchable: false
+                        searchable: false,
+                        className: 'text-center text-xs font-medium text-slate-400'
                     },
                     {
-                        data: 'code'
+                        data: 'code',
+                        className: 'font-mono text-xs font-semibold text-slate-700 whitespace-nowrap',
+                        render: function(data) {
+                            return `<span class="inline-block px-2 py-0.5 bg-slate-100 text-slate-700 rounded border border-slate-200/80">${data || '-'}</span>`;
+                        }
                     },
                     {
-                        data: 'name'
+                        data: 'name',
+                        render: function(data) {
+                            return `<div class="font-bold text-slate-800 text-[13px] leading-tight">${data || '-'}</div>`;
+                        }
                     },
                     {
-                        data: 'unit'
+                        data: 'unit',
+                        className: 'text-center',
+                        render: function(data) {
+                            return `<span class="inline-block px-2 py-0.5 text-xs font-medium text-slate-600 bg-slate-50 rounded border border-slate-200/60">${data || '-'}</span>`;
+                        }
                     },
                     {
                         data: 'qty_start',
-                        className: 'text-center font-medium text-slate-700'
+                        className: 'text-right font-medium text-slate-600 tabular-nums',
+                        render: function(data) {
+                            return formatQty(data);
+                        }
                     },
                     {
                         data: 'qty_orders',
-                        className: 'text-center font-semibold text-emerald-600'
+                        className: 'text-right font-semibold tabular-nums',
+                        render: function(data) {
+                            let n = parseFloat(data || 0);
+                            return `<span class="${n > 0 ? 'text-emerald-600' : 'text-slate-400'}">${n > 0 ? '+' : ''}${formatQty(data)}</span>`;
+                        }
                     },
                     {
                         data: 'qty_sales',
-                        className: 'text-center font-semibold text-blue-600'
+                        className: 'text-right font-semibold tabular-nums',
+                        render: function(data) {
+                            let n = parseFloat(data || 0);
+                            return `<span class="${n > 0 ? 'text-blue-600' : 'text-slate-400'}">${n > 0 ? '-' : ''}${formatQty(data)}</span>`;
+                        }
                     },
                     {
                         data: 'qty_remaining',
-                        className: 'text-center font-bold text-teal-600'
+                        className: 'text-right font-bold text-slate-700 tabular-nums',
+                        render: function(data) {
+                            return formatQty(data);
+                        }
                     },
                     @if($canSeeWarehouse)
                     {
                         data: 'qty_storage',
-                        className: 'text-center font-bold text-amber-600'
+                        className: 'text-center font-bold cell-storage tabular-nums',
+                        render: function(data) {
+                            return `<span class="inline-flex items-center justify-center min-w-[56px] px-2.5 py-1 rounded-md text-xs font-bold bg-amber-100/90 text-amber-900 border border-amber-300 shadow-2xs">${formatQty(data)}</span>`;
+                        }
                     },
                     {
                         data: 'qty_counter',
-                        className: 'text-center font-bold text-indigo-600'
+                        className: 'text-center font-bold tabular-nums',
+                        render: function(data) {
+                            return `<span class="inline-flex items-center justify-center min-w-[56px] px-2.5 py-1 rounded-md text-xs font-bold bg-sky-50 text-sky-800 border border-sky-200 shadow-2xs">${formatQty(data)}</span>`;
+                        }
                     },
                     @else
                     {
                         data: 'qty_counter',
-                        className: 'text-center font-bold text-indigo-600'
+                        className: 'text-center font-bold tabular-nums',
+                        render: function(data) {
+                            return `<span class="inline-flex items-center justify-center min-w-[56px] px-2.5 py-1 rounded-md text-xs font-bold bg-sky-50 text-sky-800 border border-sky-200 shadow-2xs">${formatQty(data)}</span>`;
+                        }
                     },
                     @endif
                     {
                         data: 'qty_now',
-                        className: 'text-center font-bold text-slate-800'
+                        className: 'text-center font-bold tabular-nums',
+                        render: function(data) {
+                            let n = parseFloat(data || 0);
+                            if (n <= 0) {
+                                return `<span class="inline-flex items-center gap-1 justify-center min-w-[62px] px-2.5 py-1 rounded-md text-xs font-black bg-rose-50 text-rose-700 border border-rose-300 shadow-2xs"><span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>${formatQty(n)}</span>`;
+                            }
+                            return `<span class="inline-flex items-center justify-center min-w-[62px] px-2.5 py-1 rounded-md text-xs font-black bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-2xs">${formatQty(n)}</span>`;
+                        }
                     },
                     {
                         data: 'keterangan',
-                        className: 'text-center font-medium text-slate-700'
+                        className: 'text-center font-medium',
+                        render: function(data) {
+                            if (!data) return '<span class="text-xs text-slate-300">-</span>';
+                            let val = String(data).toUpperCase().trim();
+                            if (val === 'CASH' || val === 'TUNAI') {
+                                return `<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">${val}</span>`;
+                            } else if (val === 'KREDIT') {
+                                return `<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">${val}</span>`;
+                            } else if (val === 'KONSINYASI') {
+                                return `<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-200">${val}</span>`;
+                            }
+                            return `<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-600 border border-slate-200">${val}</span>`;
+                        }
                     }
                 ],
                 paging: true,

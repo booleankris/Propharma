@@ -16,6 +16,10 @@ class RedirectIfAuthenticated
             if (Auth::guard($guard)->check()) {
                 $user = Auth::guard($guard)->user();
 
+                if (isOnlineRole($user)) {
+                    return redirect()->route('home');
+                }
+
                 if ($user->hasRole('administrator') || $user->hasRole('Manager')) {
                     return redirect()->route('dashboard');
                 }

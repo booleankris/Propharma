@@ -17,7 +17,7 @@ class BankSalesExport implements WithMultipleSheets
     protected $shift;
     protected $shiftType;
 
-    public const STANDARD_BANKS = ['CASH',
+    public const STANDARD_BANKS = ['CASH', 'BELUM BAYAR',
         'TRANSFER MANDIRI', 'TRANSFER BNI', 'TRANSFER BCA', 'TRANSFER BRI', 'TRANSFER BTN',
         'DEBIT MANDIRI', 'DEBIT BNI', 'DEBIT BCA', 'DEBIT BRI', 'DEBIT BTN',
         'QRIS MANDIRI', 'QRIS BNI', 'QRIS BCA', 'QRIS BRI', 'QRIS BTN'];
@@ -197,7 +197,7 @@ class BankSalesExport implements WithMultipleSheets
                 $signedSubtotal = $isReturn ? -abs($subtotal) : $subtotal;
                 $summary['gross_sum'] += $signedSubtotal;
                 $summary['net_sum'] += $signedSubtotal - $trxDiscount;
-                $summary['qty_sum'] += 1;
+                $summary['qty_sum'] += ($isReturn ? -1 : 1);
                 continue;
             }
 
@@ -212,9 +212,12 @@ class BankSalesExport implements WithMultipleSheets
                 $effectiveMap = LiphExport::TYPE_MAP[$effectiveType] ?? $originalMap;
                 $isReturn = in_array($effectiveMap[1] ?? $originalLabel, ['Retur Tunai', 'Retur Kredit'], true);
 
-                $summary['qty_sum'] += $qty;
-                $summary['gross_sum'] += $isReturn ? -abs($qty * $price) : ($qty * $price);
-                $summary['net_sum'] += $isReturn ? -abs($final) : $final;
+                $signedQty = $isReturn ? -abs($qty) : $qty;
+                $signedFinal = $isReturn ? -abs($final) : $final;
+
+                $summary['qty_sum'] += $signedQty;
+                $summary['gross_sum'] += $signedFinal;
+                $summary['net_sum'] += $signedFinal;
             }
 
             $summary['net_sum'] -= $trxDiscount;

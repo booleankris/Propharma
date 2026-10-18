@@ -991,9 +991,9 @@
             </a>
         @endif
 
-        @hasanyrole('Finance|General Manager|administrator|HO')
+        @hasanyrole('Finance|General Manager|administrator|HO|Koordinator')
             @if (!isWarehousePharmacy() && !isOnlineRole())
-                <a href="{{ route('pareto.index') }}" class="nav-item" style="cursor:pointer;">
+                <a href="{{ route('pareto.index') }}" class="nav-item {{ request()->is('pareto*') ? 'active' : '' }}" style="cursor:pointer;">
 
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
                         fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
@@ -2868,6 +2868,94 @@
                     <input type="text" id="export_center_end_date" value="{{ now()->format('Y-m-d') }}"
                         autocomplete="off"
                         class="flatpickr-date rounded-xl border-slate-200 text-xs font-semibold py-2 px-3 focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 shadow-xs cursor-pointer">
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 0: Katalog & Master Data Obat -->
+        <div>
+            <div class="flex items-center gap-2 mb-3">
+                <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Katalog & Master Data</span>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <!-- Card Master Obat -->
+                <div class="bg-gradient-to-br from-emerald-50/70 to-teal-50/70 border border-emerald-200/90 rounded-2xl p-4 flex flex-col justify-between hover:shadow-md transition-all">
+                    <div>
+                        <div class="flex items-start justify-between gap-2 mb-2">
+                            <div class="w-8 h-8 rounded-xl bg-emerald-100 border border-emerald-200 flex items-center justify-center text-emerald-700">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icon-tabler-pill">
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                    <path d="M4.5 12.5l8 -8a4.95 4.95 0 1 1 7 7l-8 8a4.95 4.95 0 0 1 -7 -7z" />
+                                    <path d="M8.5 8.5l7 7" />
+                                </svg>
+                            </div>
+                            <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">Format Resmi (.xlsx)</span>
+                        </div>
+                        <h4 class="text-sm font-bold text-slate-800 leading-snug mb-1">Master Data Obat</h4>
+                        <p class="text-[11px] text-slate-500 leading-relaxed mb-4">Export seluruh database obat (kode, barcode, nama, kategori, harga dasar, HNA, harga jual, stok) lengkap dan rapi.</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <a href="{{ route('master-data.export', ['type' => 'medicines', 'status' => 1]) }}"
+                            class="flex-1 inline-flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-download">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2"/>
+                                <path d="M7 11l5 5l5 -5"/>
+                                <path d="M12 4l0 12"/>
+                            </svg>
+                            Export Excel (.xlsx)
+                        </a>
+                        <a href="{{ route('medicines.index') }}" title="Buka Halaman Master Obat"
+                            class="inline-flex items-center justify-center p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                <path d="M12 6h-6a2 2 0 0 0 -2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-6"/>
+                                <path d="M11 13l9 -9"/>
+                                <path d="M15 4h5v5"/>
+                            </svg>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Card Rekap Stok Gudang -->
+                <div class="bg-gradient-to-br from-blue-50/70 to-indigo-50/70 border border-blue-200/90 rounded-2xl p-4 flex flex-col justify-between hover:shadow-md transition-all">
+                    <div>
+                        <div class="flex items-start justify-between gap-2 mb-2">
+                            <div class="w-8 h-8 rounded-xl bg-blue-100 border border-blue-200 flex items-center justify-center text-blue-700">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icon-tabler-package">
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                    <path d="M12 3l8 4.5l0 9l-8 4.5l-8 -4.5l0 -9l8 -4.5"/>
+                                    <path d="M12 12l8 -4.5"/>
+                                    <path d="M12 12l0 9"/>
+                                    <path d="M12 12l-8 -4.5"/>
+                                </svg>
+                            </div>
+                            <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200">Gudang & Apotek</span>
+                        </div>
+                        <h4 class="text-sm font-bold text-slate-800 leading-snug mb-1">Rekap Saldo Stok Obat</h4>
+                        <p class="text-[11px] text-slate-500 leading-relaxed mb-4">Export posisi stok fisik seluruh obat di gudang logistik dan unit pelayanan apotek.</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <a href="{{ route('supplies.printstockdata', ['status' => 1]) }}"
+                            class="flex-1 inline-flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-download">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2"/>
+                                <path d="M7 11l5 5l5 -5"/>
+                                <path d="M12 4l0 12"/>
+                            </svg>
+                            Export Stok Gudang
+                        </a>
+                        <a href="{{ route('supplies.stockData') }}" title="Buka Data Stok"
+                            class="inline-flex items-center justify-center p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                <path d="M12 6h-6a2 2 0 0 0 -2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-6"/>
+                                <path d="M11 13l9 -9"/>
+                                <path d="M15 4h5v5"/>
+                            </svg>
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>

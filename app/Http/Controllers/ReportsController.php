@@ -103,7 +103,7 @@ class ReportsController extends Controller
                         // Dynamically find table header row (usually contains 'No' / 'No.')
                         $headerEndIndex = 6;
                         foreach ($rawRows as $idx => $r) {
-                            if (is_array($r) && count($r) > 1 && in_array(strtolower(trim((string)($r[0] ?? ''))), ['no', 'no.', 'no ', 'id'])) {
+                            if (is_array($r) && count($r) > 1 && in_array(strtolower(trim((string)($r[0] ?? ''))), ['no', 'no.', 'no ', 'id', 'nm_kreditur', 'kreditur', 'kd_kreditur', 'kode'])) {
                                 $headerEndIndex = $idx;
                                 break;
                             }
@@ -166,7 +166,7 @@ class ReportsController extends Controller
                 // Dynamically find table header row (usually contains 'No' / 'No.')
                 $headerEndIndex = 6;
                 foreach ($rawRows as $idx => $r) {
-                    if (is_array($r) && count($r) > 1 && in_array(strtolower(trim((string)($r[0] ?? ''))), ['no', 'no.', 'no ', 'id'])) {
+                    if (is_array($r) && count($r) > 1 && in_array(strtolower(trim((string)($r[0] ?? ''))), ['no', 'no.', 'no ', 'id', 'nm_kreditur', 'kreditur', 'kd_kreditur', 'kode'])) {
                         $headerEndIndex = $idx;
                         break;
                     }

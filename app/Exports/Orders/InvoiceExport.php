@@ -134,14 +134,19 @@ class InvoiceExport implements WithMultipleSheets
      */
     public function array(): array
     {
+        $ptype = ($this->paymentType && strtoupper($this->paymentType) !== 'SEMUA')
+            ? strtoupper($this->paymentType)
+            : null;
+        $title = $ptype ? ucfirst(strtolower($ptype)) : 'Semua';
+
         return (new InvoiceSingleSheetExport(
             $this->pharmacyId,
             $this->startDate,
             $this->endDate,
             $this->selectedType,
             $this->supplier,
-            null,
-            'Semua'
+            $ptype,
+            $title
         ))->array();
     }
 }

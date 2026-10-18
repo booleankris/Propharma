@@ -59,12 +59,12 @@ abstract class ParetoBaseSheet implements FromArray, WithStyles, WithColumnWidth
     {
         $this->pharmacyId      = $pharmacyId;
         $this->searchMedicine  = $searchMedicine;
-        $this->startDate       = $startDate
+        $this->startDate       = !empty($startDate)
             ? Carbon::parse($startDate)->startOfDay()
-            : Carbon::now()->startOfMonth();
-        $this->endDate         = $endDate
+            : null;
+        $this->endDate         = !empty($endDate)
             ? Carbon::parse($endDate)->endOfDay()
-            : Carbon::now()->endOfDay();
+            : null;
     }
 
     // ── Subclasses supply the report label and the data rows ──
@@ -76,12 +76,20 @@ abstract class ParetoBaseSheet implements FromArray, WithStyles, WithColumnWidth
     {
         $pharmacy = \App\Models\Pharmacies::find($this->pharmacyId);
 
+        $periodeText = ($this->startDate && $this->endDate)
+            ? 'Periode : ' . $this->startDate->format('d/m/Y') . ' s/d ' . $this->endDate->format('d/m/Y')
+            : ($this->startDate
+                ? 'Periode : Mulai ' . $this->startDate->format('d/m/Y')
+                : ($this->endDate
+                    ? 'Periode : Sampai ' . $this->endDate->format('d/m/Y')
+                    : 'Periode : Semua Transaksi'));
+
         $header = [
             [$pharmacy->name    ?? 'APOTEK'],
             [$pharmacy->address ?? ''],
             [''],
             [$this->reportTitle()],
-            ['Periode : ' . $this->startDate->format('d/m/Y') . ' s/d ' . $this->endDate->format('d/m/Y')],
+            [$periodeText],
             [''],
         ];
 
@@ -102,23 +110,20 @@ abstract class ParetoBaseSheet implements FromArray, WithStyles, WithColumnWidth
             ];
         }
 
-        $grandTotal  = (float) $items->sum('total_jumlah');
         $rows        = [$columnHeader];
-
-        $no          = 1;
-        $cumulative  = 0.0;
-        $grandQty    = 0;
+        $grandQty    = 0.0;
         $grandJumlah = 0.0;
+        $sumPersen   = 0.0;
 
         foreach ($items as $item) {
             $jumlah     = (float) ($item->total_jumlah ?? 0);
-            $qty        = (int)   ($item->total_qty    ?? 0);
+            $qty        = (float) ($item->total_qty    ?? 0);
             $freq       = (int)   ($item->freq         ?? 0);
-            $persen     = $grandTotal > 0 ? round(($jumlah / $grandTotal) * 100, 2) : 0.0;
-            $cumulative = round($cumulative + $persen, 2);
+            $persen     = (float) ($item->persen       ?? 0.0);
+            $cumulative = (float) ($item->kumulatif    ?? 0.0);
 
             $rows[] = [
-                $no++,
+                $item->rank ?? '-',
                 $item->medicine_code ?? '-',
                 $item->medicine_name ?? '-',
                 $qty,
@@ -131,10 +136,14 @@ abstract class ParetoBaseSheet implements FromArray, WithStyles, WithColumnWidth
 
             $grandQty    += $qty;
             $grandJumlah += $jumlah;
+            $sumPersen   += $persen;
         }
 
-        // Total row — persen/kumulatif left blank when data may be filtered
-        $rows[] = ['', '', 'TOTAL', $grandQty, $grandJumlah, '', '', '', ''];
+        $label = !empty($this->searchMedicine) ? 'TOTAL (TERFILTER)' : 'TOTAL';
+        $persenDisplay = !empty($this->searchMedicine) ? round($sumPersen, 2) : 100.0;
+        $cumDisplay = !empty($this->searchMedicine) ? '' : 100.0;
+
+        $rows[] = ['', '', $label, $grandQty, $grandJumlah, $persenDisplay, $cumDisplay, '', ''];
 
         return $rows;
     }
@@ -276,33 +285,71 @@ class ParetoSalesSheet extends ParetoBaseSheet
 
     protected function fetchItems(): \Illuminate\Support\Collection
     {
-        $query = DB::table('medicine_cart')
+        $baseQuery = DB::table('medicine_cart')
             ->join('medicine_transactions', 'medicine_transactions.id', '=', 'medicine_cart.transaction_id')
             ->join('medicines', 'medicines.id', '=', 'medicine_cart.medicine_id')
             ->where('medicine_transactions.pharmacy_id', $this->pharmacyId)
             ->where('medicine_cart.status', 1)
-            ->where('medicine_transactions.status', 1)
-            ->whereBetween('medicine_cart.created_at', [$this->startDate, $this->endDate])
+            ->where(function ($q) {
+                $q->where('medicine_transactions.status', 1)
+                    ->orWhere(function ($unpaid) {
+                        $unpaid->whereNotNull('medicine_transactions.transaction_code')
+                            ->where(function ($unpaidType) {
+                                $unpaidType->whereRaw("UPPER(TRIM(COALESCE(medicine_transactions.payment_method, ''))) = 'BELUM BAYAR'")
+                                    ->orWhereIn('medicine_transactions.transaction_type', ['KREDIT', 'RESEP KREDIT']);
+                            });
+                    });
+            });
+
+        if ($this->startDate) {
+            $baseQuery->where('medicine_transactions.created_at', '>=', $this->startDate);
+        }
+        if ($this->endDate) {
+            $baseQuery->where('medicine_transactions.created_at', '<=', $this->endDate);
+        }
+
+        $allRows = (clone $baseQuery)
             ->select([
+                'medicines.id   as medicine_id',
                 'medicines.code as medicine_code',
                 'medicines.name as medicine_name',
                 'medicines.unit as medicine_unit',
-                DB::raw('SUM(medicine_cart.quantity)    as total_qty'),
-                DB::raw('SUM(medicine_cart.final_price) as total_jumlah'),
+                DB::raw('SUM(CAST(COALESCE(medicine_cart.quantity, 0) AS DECIMAL(12,2)))    as total_qty'),
+                DB::raw('SUM(CAST(COALESCE(medicine_cart.final_price, 0) AS DECIMAL(16,2))) as total_jumlah'),
                 DB::raw('COUNT(DISTINCT medicine_cart.transaction_id) as freq'),
-            ]);
+            ])
+            ->groupBy('medicines.id', 'medicines.code', 'medicines.name', 'medicines.unit')
+            ->orderByDesc('total_jumlah')
+            ->orderByDesc('total_qty')
+            ->orderBy('medicines.name')
+            ->get();
+
+        $overallGrandTotal = (float) $allRows->sum('total_jumlah');
+        $runningSum        = 0.0;
+        $rank              = 1;
+
+        $decorated = $allRows->map(function ($item) use ($overallGrandTotal, &$runningSum, &$rank) {
+            $jumlah     = (float) $item->total_jumlah;
+            $persen     = $overallGrandTotal > 0 ? round(($jumlah / $overallGrandTotal) * 100, 2) : 0.0;
+            $runningSum += $jumlah;
+            $cumulative = $overallGrandTotal > 0 ? min(100.0, round(($runningSum / $overallGrandTotal) * 100, 2)) : 0.0;
+
+            $item->rank      = $rank++;
+            $item->persen    = $persen;
+            $item->kumulatif = $cumulative;
+
+            return $item;
+        });
 
         if (!empty($this->searchMedicine)) {
-            $kw = $this->searchMedicine;
-            $query->where(function ($q) use ($kw) {
-                $q->where('medicines.name', 'like', "%{$kw}%")
-                    ->orWhere('medicines.code', 'like', "%{$kw}%");
-            });
+            $kw = mb_strtolower(trim($this->searchMedicine));
+            $decorated = $decorated->filter(function ($item) use ($kw) {
+                return str_contains(mb_strtolower($item->medicine_name ?? ''), $kw)
+                    || str_contains(mb_strtolower($item->medicine_code ?? ''), $kw);
+            })->values();
         }
 
-        return $query->groupBy('medicine_cart.medicine_id', 'medicines.code', 'medicines.name', 'medicines.unit')
-            ->orderBy('total_jumlah', 'desc')
-            ->get();
+        return $decorated;
     }
 }
 
@@ -330,31 +377,60 @@ class ParetoOrdersSheet extends ParetoBaseSheet
             ? [9, 1]
             : [(int) $this->pharmacyId];
 
-        $query = DB::table('receiving_items')
+        $baseQuery = DB::table('receiving_items')
             ->join('order_items', 'order_items.id', '=', 'receiving_items.order_items_id')
             ->join('medicines', 'medicines.id', '=', 'order_items.medicine_id')
             ->join('orders', 'orders.id', '=', 'order_items.order_id')
-            ->whereIn('orders.pharmacy_id', $targetPharmacyIds)
-            ->whereBetween('receiving_items.created_at', [$this->startDate, $this->endDate])
+            ->whereIn('orders.pharmacy_id', $targetPharmacyIds);
+
+        if ($this->startDate) {
+            $baseQuery->where('receiving_items.created_at', '>=', $this->startDate);
+        }
+        if ($this->endDate) {
+            $baseQuery->where('receiving_items.created_at', '<=', $this->endDate);
+        }
+
+        $allRows = (clone $baseQuery)
             ->select([
+                'medicines.id   as medicine_id',
                 'medicines.code as medicine_code',
                 'medicines.name as medicine_name',
                 'medicines.unit as medicine_unit',
-                DB::raw('SUM(receiving_items.qty)   as total_qty'),
-                DB::raw('SUM(receiving_items.total) as total_jumlah'),
+                DB::raw('SUM(CAST(COALESCE(receiving_items.qty, 0) AS DECIMAL(12,2)))   as total_qty'),
+                DB::raw('SUM(CAST(COALESCE(receiving_items.total, 0) AS DECIMAL(16,2))) as total_jumlah'),
                 DB::raw('COUNT(DISTINCT receiving_items.receiving_details_id) as freq'),
-            ]);
+            ])
+            ->groupBy('medicines.id', 'medicines.code', 'medicines.name', 'medicines.unit')
+            ->orderByDesc('total_jumlah')
+            ->orderByDesc('total_qty')
+            ->orderBy('medicines.name')
+            ->get();
+
+        $overallGrandTotal = (float) $allRows->sum('total_jumlah');
+        $runningSum        = 0.0;
+        $rank              = 1;
+
+        $decorated = $allRows->map(function ($item) use ($overallGrandTotal, &$runningSum, &$rank) {
+            $jumlah     = (float) $item->total_jumlah;
+            $persen     = $overallGrandTotal > 0 ? round(($jumlah / $overallGrandTotal) * 100, 2) : 0.0;
+            $runningSum += $jumlah;
+            $cumulative = $overallGrandTotal > 0 ? min(100.0, round(($runningSum / $overallGrandTotal) * 100, 2)) : 0.0;
+
+            $item->rank      = $rank++;
+            $item->persen    = $persen;
+            $item->kumulatif = $cumulative;
+
+            return $item;
+        });
 
         if (!empty($this->searchMedicine)) {
-            $kw = $this->searchMedicine;
-            $query->where(function ($q) use ($kw) {
-                $q->where('medicines.name', 'like', "%{$kw}%")
-                    ->orWhere('medicines.code', 'like', "%{$kw}%");
-            });
+            $kw = mb_strtolower(trim($this->searchMedicine));
+            $decorated = $decorated->filter(function ($item) use ($kw) {
+                return str_contains(mb_strtolower($item->medicine_name ?? ''), $kw)
+                    || str_contains(mb_strtolower($item->medicine_code ?? ''), $kw);
+            })->values();
         }
 
-        return $query->groupBy('order_items.medicine_id', 'medicines.code', 'medicines.name', 'medicines.unit')
-            ->orderBy('total_jumlah', 'desc')
-            ->get();
+        return $decorated;
     }
 }

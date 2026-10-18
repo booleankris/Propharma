@@ -75,7 +75,7 @@
                         $firstCell = trim((string)($row[0] ?? ''));
                         $secondCell = trim((string)($row[1] ?? ''));
 
-                        if (in_array(strtolower($firstCell), ['no', 'no.', 'no ', 'id'])) {
+                        if (in_array(strtolower($firstCell), ['no', 'no.', 'no ', 'id', 'nm_kreditur', 'kreditur', 'kode', 'kd_kreditur'])) {
                             $isHeader = true;
                             $headerMap = array_map(fn($c) => strtolower(trim((string)$c)), $row);
                         }
@@ -91,7 +91,7 @@
                                 }
                             }
                         }
-                        if ($firstCell !== '' && !in_array(strtolower($firstCell), ['no', 'no.', 'no ', 'id']) && $secondCell === '') {
+                        if ($firstCell !== '' && !in_array(strtolower($firstCell), ['no', 'no.', 'no ', 'id', 'nm_kreditur', 'kreditur', 'kode', 'kd_kreditur']) && $secondCell === '') {
                             $isGroupHeader = true;
                         }
                     }
@@ -163,10 +163,11 @@
 
                                     $shouldNotFormat = $isHeader || $isCodeOrTextHeader || $hasLeadingZero;
                                     $isNumeric = is_numeric($col) && $colStr !== '' && !$shouldNotFormat;
-                                    $isNoCol = ($colIndex === 0 && !$isHeader && $colStr !== '');
-                                    $isCenterCol = $isHeader || $isNoCol || stripos($colHeader, 'kode') !== false || stripos($colHeader, 'struk') !== false || stripos($colHeader, 'tanggal') !== false || stripos($colHeader, 'shift') !== false;
+                                    $isNoCol = ($colIndex === 0 && !$isHeader && $colStr !== '' && in_array(strtolower($headerMap[0] ?? ''), ['no', 'no.', 'no ', 'id']));
+                                    $isCenterCol = $isHeader || $isNoCol || stripos($colHeader, 'struk') !== false || stripos($colHeader, 'tanggal') !== false || stripos($colHeader, 'tgl') !== false || stripos($colHeader, 'shift') !== false || stripos($colHeader, 'tempo') !== false || stripos($colHeader, 'wkt') !== false || stripos($colHeader, 'jns') !== false || stripos($colHeader, 'no_terima') !== false || stripos($colHeader, 'no terima') !== false;
+                                    $isRightCol = $isNumeric || stripos($colHeader, 'faktur') !== false;
                                 @endphp
-                                <td @if(isset($mergedCellSpans[$rowIndex][$colIndex])) rowspan="{{ $mergedCellSpans[$rowIndex][$colIndex] }}" @endif class="px-3 py-1.5 border border-slate-200 align-middle {{ $isCenterCol ? 'text-center' : ($isNumeric ? 'text-right' : 'text-left') }} {{ $isNumeric && (float)$col < 0 ? 'text-red-600' : '' }}">
+                                <td @if(isset($mergedCellSpans[$rowIndex][$colIndex])) rowspan="{{ $mergedCellSpans[$rowIndex][$colIndex] }}" @endif class="px-3 py-1.5 border border-slate-200 align-middle {{ $isCenterCol ? 'text-center' : ($isRightCol ? 'text-right' : 'text-left') }} {{ $isNumeric && (float)$col < 0 ? 'text-red-600' : '' }}">
                                     @if($shouldNotFormat)
                                         {{ $col }}
                                     @elseif($isNumeric)

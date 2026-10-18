@@ -326,7 +326,7 @@ class OrdersController extends Controller
         $order = \App\Models\Order::findOrFail($orderId);
         $pharmacyId = $order->pharmacy_id;
 
-        $type = strtoupper($medicine->type);
+        $type = strtoupper(trim((string) ($medicine->type ?? '')));
         $code = '';
         if ($type == 'NARKOTIKA') {
             $code = 'N';
@@ -344,7 +344,13 @@ class OrdersController extends Controller
 
         if ($type !== 'NARKOTIKA') {
             $existingItem = \App\Models\OrderItems::where('order_id', $orderId)
-                ->where('creditor_code', $creditorCode)
+                ->where(function ($q) use ($creditorCode) {
+                    if (!empty($creditorCode)) {
+                        $q->where('creditor_code', $creditorCode);
+                    } else {
+                        $q->whereNull('creditor_code')->orWhere('creditor_code', '');
+                    }
+                })
                 ->whereHas('medicines', function ($query) use ($type) {
                     if ($type == 'OBAT-OBAT TERTENTU (OOT)' || $type == 'OBAT TERTENTU') {
                         $query->whereIn(\Illuminate\Support\Facades\DB::raw('UPPER(type)'), ['OBAT-OBAT TERTENTU (OOT)', 'OBAT TERTENTU']);
@@ -1100,27 +1106,57 @@ class OrdersController extends Controller
             'order_id' => 'required|exists:orders,id',
             'items' => 'required|array|min:1',
             'items.*.medicine_id' => 'required|exists:medicines,id',
-            'items.*.quantity' => 'required|integer|min:1',
-            'items.*.pack' => 'nullable|boolean',
+            'items.*.quantity' => 'required|numeric|gt:0',
+            'items.*.pack' => 'nullable',
         ]);
 
         try {
             DB::beginTransaction();
 
+            $order = Order::findOrFail($request->order_id);
+            $pharmacyId = (int) $order->pharmacy_id;
+
+            $user = auth()->user();
+            $role = $user && ($user->hasRole('HO') || $user->hasRole('administrator') || $user->hasRole('Manager') || $user->hasRole('manager') || $user->hasRole('Koordinator')) ? 'HO' : 'Cabang';
+
+            // Pre-load all medicines in one query to prevent N+1 query overhead and table lock timeouts
+            $medicineIds = collect($request->items)->pluck('medicine_id')->filter()->unique()->all();
+            $medicinesMap = Medicines::whereIn('id', $medicineIds)->get()->keyBy('id');
+
+            // Category code cache (so we don't recalculate the exact same SP sequence query repeatedly in bulk)
+            $codeCache = [];
+
             foreach ($request->items as $item) {
-                $medicine = Medicines::find($item['medicine_id']);
-                $qty = $item['quantity'];
+                $medId = $item['medicine_id'];
+                $medicine = $medicinesMap[$medId] ?? Medicines::find($medId);
+                if (!$medicine) {
+                    continue;
+                }
+
+                $qty = (float) $item['quantity'];
                 $isPack = filter_var($item['pack'] ?? false, FILTER_VALIDATE_BOOLEAN);
                 $content = max(1, (float) ($medicine->content ?: 1));
                 $price = (float) $medicine->raw_price * ($isPack ? $content : 1);
 
-                $itemCode = $this->getOrdersCode($item['medicine_id'], $request->order_id, null);
+                $medType = strtoupper(trim((string) ($medicine->type ?? '')));
+                $isNarkotika = ($medType === 'NARKOTIKA');
+
+                // Reuse generated code within the same transaction for non-narcotics
+                if (!$isNarkotika && isset($codeCache[$medType])) {
+                    $itemCode = $codeCache[$medType];
+                } else {
+                    $itemCode = $this->getOrdersCode($medId, $request->order_id, null);
+                    if (!$isNarkotika) {
+                        $codeCache[$medType] = $itemCode;
+                    }
+                }
 
                 OrderItems::create([
                     'order_items_code' => $itemCode,
                     'order_id' => $request->order_id,
-                    'medicine_id' => $item['medicine_id'],
+                    'medicine_id' => $medId,
                     'creditor_code' => null,
+                    'branch_creditor_code' => null,
                     'pack' => $isPack ? 1 : 0,
                     'price' => $price,
                     'quantity' => $qty,
@@ -1132,6 +1168,12 @@ class OrdersController extends Controller
             DB::commit();
         } catch (\Exception $e) {
             DB::rollBack();
+            Log::error('Smart Order addItemsBulk failed: ' . $e->getMessage(), [
+                'order_id' => $request->order_id,
+                'items_count' => count($request->items ?? []),
+                'user_id' => auth()->id(),
+                'trace' => $e->getTraceAsString(),
+            ]);
             return response()->json([
                 'success' => false,
                 'message' => 'Gagal menambahkan item! ' . $e->getMessage()

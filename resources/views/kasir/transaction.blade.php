@@ -207,7 +207,18 @@
                         </svg>
                         Tambah Transaksi
                     </button>
-                    <button type="button" onclick="back()" class="trx-btn trx-btn-back" tabindex="5">
+                    @if ($check_transaction != 0)
+                        <button type="button" onclick="openVisitorModal()" class="trx-btn trx-btn-visitor" tabindex="5" title="Simpan sebagai Data Kunjungan dan buka transaksi baru">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="8.5" cy="7" r="4"></circle>
+                                <line x1="20" y1="8" x2="20" y2="14"></line>
+                                <line x1="23" y1="11" x2="17" y2="11"></line>
+                            </svg>
+                            Tandai Kunjungan
+                        </button>
+                    @endif
+                    <button type="button" onclick="back()" class="trx-btn trx-btn-back" tabindex="6">
                         <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
                             <polyline points="9 14 4 9 9 4" />
                             <path d="M20 20v-7a4 4 0 0 0-4-4H4" />
@@ -878,8 +889,8 @@
         <form id="newPatientForm" method="POST" class="space-y-3">
 
             <div>
-                <label for="patientName" class="block mb-1 text-sm font-medium text-gray-700">Nama</label>
-                <input id="patientName" type="text" name="name" placeholder="Nama"
+                <label for="patientName" class="block mb-1 text-sm font-medium text-gray-700">Nama <span class="text-red-500">*</span></label>
+                <input id="patientName" type="text" name="name" placeholder="Nama Pasien" required
                     class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300">
             </div>
 
@@ -925,26 +936,32 @@
         <form id="newDoctorForm">
             @csrf
 
-            <label class="block text-sm font-medium mb-1">Nama Dokter</label>
+            <label class="block text-sm font-medium mb-1">Nama Dokter <span class="text-red-500">*</span></label>
             <input type="text" name="name" id="doctorName"
                 class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                placeholder="Contoh: dr. John Doe"
                 required>
 
-            <label class="block text-sm font-medium mb-1">Spesialis</label>
+            <label class="block text-sm font-medium mb-1 mt-3">Spesialis <span class="text-red-500">*</span></label>
             <input type="text" name="specialist" id="doctorSpecialist"
-                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300">
+                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                placeholder="Contoh: Umum, Sp.A, Sp.PD (wajib diisi)"
+                required>
 
-            <label class="block text-sm font-medium mb-1">Alamat</label>
+            <label class="block text-sm font-medium mb-1 mt-3">Alamat</label>
             <input type="text" name="address" id="doctorAddress"
-                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300">
+                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                placeholder="Alamat praktik / RS (opsional)">
 
-            <label class="block text-sm font-medium mb-1">Kota</label>
+            <label class="block text-sm font-medium mb-1 mt-3">Kota</label>
             <input type="text" name="city" id="doctorCity"
-                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300">
+                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                placeholder="Kota (opsional)">
 
-            <label class="block text-sm font-medium mb-1">Telepon</label>
+            <label class="block text-sm font-medium mb-1 mt-3">Telepon</label>
             <input type="text" name="phone" id="doctorPhone"
-                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300">
+                class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300"
+                placeholder="Nomor telepon (opsional)">
 
             <div class="flex justify-end mt-4">
                 <button type="button" id="closeNewDoctorBtn" class="px-4 py-2 bg-gray-300 rounded mr-2">
@@ -993,6 +1010,90 @@
     </div>
 </div>
 
+<!-- Patient Confirmation Modal -->
+<div id="confirmPatientModal"
+    class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center hidden z-[999999]">
+    <div class="bg-white p-6 rounded-xl shadow-xl w-[480px] max-w-full">
+        <div class="flex items-center text-amber-600 mb-2">
+            <svg class="w-6 h-6 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <h3 id="confirmPatientTitle" class="text-lg font-bold">Pasien Serupa Ditemukan</h3>
+        </div>
+        <p id="confirmPatientDesc" class="text-sm text-gray-600 mb-3">Pasien dengan nama atau nomor telepon mirip sudah ada di sistem. Silakan pilih pasien yang sudah ada atau tetap buat pasien baru:
+        </p>
+
+        <div id="confirmPatientNote"
+            class="hidden mb-3 p-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg text-xs leading-relaxed">
+            💡 <b>Pemberitahuan:</b> Jika ini pasien yang berbeda, Anda dapat memilih <i>"Tetap Buat Pasien Baru"</i> atau gunakan pembeda agar mudah dikenali di laporan.
+        </div>
+
+        <div id="patientSuggestionsList" class="space-y-2 mb-4 max-h-48 overflow-y-auto"></div>
+
+        <div class="flex justify-between items-center pt-3 border-t border-gray-100">
+            <button type="button" id="cancelConfirmPatientBtn"
+                class="px-3 py-2 text-xs text-gray-600 hover:text-gray-800 bg-gray-100 rounded-lg font-medium">
+                Batal
+            </button>
+            <button type="button" id="forceCreatePatientBtn"
+                class="px-4 py-2 text-xs bg-amber-500 hover:bg-amber-600 text-white font-medium rounded-lg shadow">
+                Tetap Buat Pasien Baru
+            </button>
+        </div>
+    </div>
+</div>
+
+{{-- Modal Tandai Sebagai Pengunjung --}}
+<div id="visitorModal" class="fixed inset-0 bg-black/50 hidden justify-center items-center z-[99999]">
+    <div class="bg-white p-6 rounded-2xl shadow-2xl w-[480px] max-w-full mx-4 relative">
+        <div class="flex items-center text-amber-600 mb-3">
+            <div class="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center mr-3 flex-shrink-0">
+                <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+            </div>
+            <div>
+                <h3 class="text-base font-bold text-gray-800">Tandai Sebagai Pengunjung</h3>
+                <p class="text-xs text-gray-400">Simpan transaksi ini ke Data Kunjungan & buka kasir baru</p>
+            </div>
+        </div>
+
+        <div class="my-4 space-y-3">
+            <div>
+                <label class="block text-xs font-semibold text-gray-700 mb-1">Nama / Keterangan Pengunjung (Opsional)</label>
+                <input type="text" id="visitorNameInput" placeholder="Contoh: Bpk. Ahmad / Tanya Obat Batuk..."
+                    class="w-full text-xs rounded-xl border border-gray-300 px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-amber-400">
+                <p class="text-[11px] text-gray-400 mt-1">Kosongkan jika pengunjung tidak menyebutkan nama.</p>
+            </div>
+
+            <div class="p-3 bg-amber-50 rounded-xl border border-amber-100 flex items-start gap-2.5">
+                <svg class="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <div class="text-[11px] text-amber-800 leading-relaxed">
+                    Daftar obat saat ini (<b id="visitorItemCount">0</b> item) akan tersimpan di <b>Data Kunjungan</b>. Jika pengunjung kembali, Anda bisa klik <i>"Lanjutkan Transaksi"</i> untuk langsung bayar.
+                </div>
+            </div>
+        </div>
+
+        <div class="flex justify-end items-center gap-2 pt-3 border-t border-gray-100">
+            <button type="button" onclick="closeVisitorModal()"
+                class="px-4 py-2 text-xs text-gray-600 hover:text-gray-800 bg-gray-100 rounded-xl font-medium transition">
+                Batal
+            </button>
+            <button type="button" id="btnConfirmVisitor" onclick="submitMarkAsVisitor()"
+                class="px-5 py-2 text-xs bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-xl shadow-sm transition flex items-center gap-1.5">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                </svg>
+                Simpan & Buka Kasir Baru
+            </button>
+        </div>
+    </div>
+</div>
+
 @if ($check_transaction != 0)
     {{-- Modal Pembayaran --}}
     <div id="paymentModal" class="fixed inset-0 bg-black/50 hidden justify-center items-center z-[99999]">
@@ -1018,6 +1119,7 @@
                         <div class="flex items-center">
                             <div class="searchdebtors w-full">
                                 <input autofocus required id="patientSearch" type="text"
+                                    value="{{ $transaction->patients->name ?? '' }}"
                                     placeholder="Ketik ID / Nama…"
                                     class="w-full rounded-xl border my-1 border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
                                     autocomplete="off" />
@@ -1045,7 +1147,7 @@
                                     Baru
                                 </button>
                             </div>
-                            <input type="hidden" id="selectedPatientId" />
+                            <input type="hidden" id="selectedPatientId" value="{{ $transaction->patient_id ?? '' }}" />
                         </div>
                     </div>
                     @if ($transaction->transaction_type == 'KREDIT' || $transaction->transaction_type == 'RESEP TUNAI')
@@ -1054,6 +1156,7 @@
                             <div class="flex items-center">
                                 <div class="searchdoctors w-full">
                                     <input autofocus required id="doctorSearch" type="text"
+                                        value="{{ $transaction->doctors->name ?? '' }}"
                                         placeholder="Ketik ID / Nama…"
                                         class="w-full rounded-xl border my-1 border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
                                         autocomplete="off" />
@@ -1302,8 +1405,9 @@
                     <input type="hidden" name="changes" id="changes">
                     <input type="hidden" name="transaction_id" id="transaction_id">
                     <input type="hidden" name="print_receipt" id="print_receipt">
-                    <input type="hidden" required name="patient_id" id="patient_id" />
-                    <input type="hidden" @if ($transaction->transaction_type == 'RESEP TUNAI') value="0" @endif required
+                    <input type="hidden" required name="patient_id" id="patient_id"
+                        value="{{ $transaction->patient_id ?? '' }}" />
+                    <input type="hidden" @if ($transaction->transaction_type == 'RESEP TUNAI') value="{{ $transaction->doctor_id ?? '0' }}" @else value="{{ $transaction->doctor_id ?? '' }}" @endif required
                         name="doctor_id" id="doctor_id" />
                     <input type="hidden" required name="debtor_id" id="debtor_id"
                         value="{{ $transaction->debtor_id ?? '' }}" />
@@ -1321,6 +1425,13 @@
                                 Selesaikan
                             </button>
                         @endif
+                        <button type="button" onclick="openVisitorModal()" id="btnMarkVisitorBottom"
+                            class="w-full mt-2 rounded-lg border-2 border-amber-500 text-amber-600 hover:bg-amber-500 hover:text-white font-semibold py-3 transition flex items-center justify-center gap-2 text-sm shadow-sm">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                            </svg>
+                            Tandai Sebagai Pengunjung
+                        </button>
                     @endif
                 </form>
             </div>
@@ -4735,39 +4846,181 @@
         }
     });
 
-    // Inset Patient
-    newPatientForm.addEventListener('submit', function(e) {
-        e.preventDefault();
+    // Submit Patient Form
+    let isSubmittingPatient = false;
 
-        let formData = new FormData(this);
+    function submitPatientForm(force = false) {
+        if (isSubmittingPatient) return;
+
+        const patientNameInput = document.getElementById('patientName');
+        const patientNameVal = patientNameInput ? patientNameInput.value.trim() : '';
+        if (!patientNameVal) {
+            alert('Nama pasien tidak boleh kosong!');
+            if (patientNameInput) patientNameInput.focus();
+            return;
+        }
+
+        isSubmittingPatient = true;
+
+        const submitBtn = newPatientForm.querySelector('button[type="submit"]');
+        const originalBtnText = submitBtn ? submitBtn.innerText : 'Simpan';
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerText = 'Memproses...';
+        }
+
+        let formData = new FormData(newPatientForm);
+        if (force) {
+            formData.append('force', '1');
+        }
 
         axios.post("{{ route('transaction.addPatient') }}", formData, {
                 headers: {
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    'Content-Type': 'multipart/form-data'
                 }
             })
             .then(response => {
-                if (response.data.success) {
+                if (response.data.existing) {
+                    alert(response.data.message || "Pasien sudah terdaftar, otomatis dipilih.");
+                    selectPatientAndClose(response.data.patient);
+                } else if (response.data.needs_confirmation) {
+                    showPatientConfirmation(response.data);
+                } else if (response.data.success) {
                     alert("Pasien berhasil ditambahkan!");
-                    newPatientModal.classList.add('hidden');
-                    newPatientForm.reset();
-
-                    // Auto-fill patient field with new patient
-                    inputpatient.value = response.data.patient.name;
-                    document.getElementById("patient_id").value = response.data.patient.id;
-
-
-
-                    document.getElementById("selectedPatientId").value = response.data.patient.id;
+                    selectPatientAndClose(response.data.patient);
                 } else {
-                    alert("Gagal menambahkan pasien.");
+                    alert(response.data.message || "Gagal menambahkan pasien.");
                 }
             })
             .catch(error => {
                 console.error(error);
-                alert("Terjadi kesalahan, coba lagi.");
+                let msg = error.response?.data?.message || "Terjadi kesalahan, coba lagi.";
+                alert(msg);
+            })
+            .finally(() => {
+                isSubmittingPatient = false;
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerText = originalBtnText;
+                }
             });
+    }
+
+    function selectPatientAndClose(patient) {
+        newPatientModal.classList.add('hidden');
+        const confirmModal = document.getElementById('confirmPatientModal');
+        if (confirmModal) confirmModal.classList.add('hidden');
+        newPatientForm.reset();
+
+        // Auto-fill patient fields
+        if (typeof inputpatient !== 'undefined' && inputpatient) {
+            inputpatient.value = patient.name;
+        }
+        if (document.getElementById("patient_id")) {
+            document.getElementById("patient_id").value = patient.id;
+        }
+        if (document.getElementById("selectedPatientId")) {
+            document.getElementById("selectedPatientId").value = patient.id;
+        }
+    }
+
+    function showPatientConfirmation(data) {
+        const confirmModal = document.getElementById('confirmPatientModal');
+        const suggestionsList = document.getElementById('patientSuggestionsList');
+        const confirmTitle = document.getElementById('confirmPatientTitle');
+        const confirmDesc = document.getElementById('confirmPatientDesc');
+        const confirmNote = document.getElementById('confirmPatientNote');
+        if (!confirmModal || !suggestionsList) return;
+
+        const isExact = !!data.is_exact;
+        const isPhoneMatch = !!data.is_phone_match;
+        const suggestions = data.suggestions || [];
+        const patName = data.existing_patient?.name || suggestions[0]?.name || '';
+        const patCode = data.existing_patient?.code || suggestions[0]?.code || '';
+
+        if (confirmTitle) {
+            if (isPhoneMatch) {
+                confirmTitle.innerText = "Pasien dengan No. Telepon Sama Ditemukan";
+            } else if (isExact) {
+                confirmTitle.innerText = "Pasien Sudah Terdaftar Sebelumnya";
+            } else {
+                confirmTitle.innerText = "Pasien Serupa Ditemukan";
+            }
+        }
+        if (confirmDesc) {
+            if (isPhoneMatch) {
+                confirmDesc.innerHTML = `Nomor telepon ini sudah terdaftar untuk pasien <b>"${escapeHtml(patName)}"</b> (${escapeHtml(patCode || 'Kode: -')}).<br><span class="text-xs text-gray-500 mt-1 inline-block">Silakan pilih pasien yang sudah ada atau tetap buat pasien baru:</span>`;
+            } else if (isExact) {
+                confirmDesc.innerHTML = `Pasien bernama <b>"${escapeHtml(patName)}"</b> sudah pernah terdaftar di sistem dengan kode <b>${escapeHtml(patCode || 'Kode: -')}</b>.<br><span class="text-xs text-emerald-700 font-semibold mt-1 inline-block">ℹ <b>Catatan:</b> Tidak ada data baru yang dibuat di database saat ini.</span>`;
+            } else {
+                confirmDesc.innerHTML = "Pasien dengan nama mirip sudah ada di sistem. Silakan pilih pasien yang sudah ada atau tetap buat pasien baru:";
+            }
+        }
+        if (confirmNote) {
+            if (isExact || isPhoneMatch) {
+                confirmNote.classList.remove('hidden');
+            } else {
+                confirmNote.classList.add('hidden');
+            }
+        }
+
+        suggestionsList.innerHTML = '';
+        suggestions.forEach(pat => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className =
+                'w-full text-left p-3 rounded-xl border border-blue-200 bg-blue-50/50 hover:bg-blue-100 hover:border-blue-400 transition-all flex items-center justify-between group shadow-sm';
+
+            const detailParts = [];
+            if (pat.phone && pat.phone !== '-' && pat.phone !== '0') {
+                detailParts.push('📞 ' + escapeHtml(pat.phone));
+            }
+            if (pat.address && pat.address !== '-') {
+                detailParts.push(escapeHtml(pat.address));
+            } else if (pat.city && pat.city !== '-') {
+                detailParts.push(escapeHtml(pat.city));
+            }
+            const detailText = detailParts.length ? detailParts.join(' • ') : 'Tanpa info alamat/telepon';
+            const labelCode = (pat.code && pat.code !== '0') ? pat.code : ('ID: ' + pat.id);
+
+            btn.innerHTML = `
+                <div>
+                    <div class="font-bold text-sm text-gray-800 group-hover:text-blue-700">${escapeHtml(pat.name)}</div>
+                    <div class="text-xs text-gray-500">${detailText}</div>
+                </div>
+                <span class="text-xs bg-blue-600 text-white px-2.5 py-1 rounded-lg font-semibold shadow-sm group-hover:bg-blue-700">Pilih Pasien Ini (${escapeHtml(labelCode)})</span>
+            `;
+            btn.addEventListener('click', () => {
+                selectPatientAndClose(pat);
+            });
+            suggestionsList.appendChild(btn);
+        });
+
+        confirmModal.classList.remove('hidden');
+    }
+
+    newPatientForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        submitPatientForm(false);
     });
+
+    const cancelConfirmPatientBtn = document.getElementById('cancelConfirmPatientBtn');
+    if (cancelConfirmPatientBtn) {
+        cancelConfirmPatientBtn.addEventListener('click', () => {
+            document.getElementById('confirmPatientModal').classList.add('hidden');
+            document.getElementById('newPatientModal').classList.add('hidden');
+            newPatientForm.reset();
+        });
+    }
+
+    const forceCreatePatientBtn = document.getElementById('forceCreatePatientBtn');
+    if (forceCreatePatientBtn) {
+        forceCreatePatientBtn.addEventListener('click', () => {
+            document.getElementById('confirmPatientModal').classList.add('hidden');
+            submitPatientForm(true);
+        });
+    }
 
     // Open modal
     if (openNewDoctorBtn) {
@@ -4793,6 +5046,24 @@
 
         function submitDoctorForm(force = false) {
             if (isSubmittingDoctor) return;
+
+            const nameInput = document.getElementById('doctorName');
+            const specInput = document.getElementById('doctorSpecialist');
+            const nameVal = nameInput ? nameInput.value.trim() : '';
+            const specVal = specInput ? specInput.value.trim() : '';
+
+            if (!nameVal) {
+                alert('Nama dokter tidak boleh kosong!');
+                if (nameInput) nameInput.focus();
+                return;
+            }
+
+            if (!specVal) {
+                alert('Spesialis dokter tidak boleh kosong! (Contoh: Umum, Sp.A, Sp.PD)');
+                if (specInput) specInput.focus();
+                return;
+            }
+
             isSubmittingDoctor = true;
 
             const submitBtn = newDoctorForm.querySelector('button[type="submit"]');
@@ -5755,6 +6026,98 @@
             });
         }, 500);
     })();
+
+    // ── Tandai Sebagai Pengunjung Logic ──
+    function openVisitorModal() {
+        const rowCount = document.querySelectorAll('.cart-row').length;
+        if (rowCount === 0) {
+            iziToast.warning({
+                title: 'Keranjang Kosong',
+                message: 'Silakan input minimal 1 obat yang ditanyakan pengunjung sebelum menandai sebagai data kunjungan.',
+                position: 'topRight'
+            });
+            return;
+        }
+
+        const modal = document.getElementById('visitorModal');
+        const itemCountEl = document.getElementById('visitorItemCount');
+        const nameInput = document.getElementById('visitorNameInput');
+        const patientSearch = document.getElementById('patientSearch');
+
+        if (itemCountEl) itemCountEl.textContent = rowCount;
+        if (nameInput) {
+            nameInput.value = (patientSearch && patientSearch.value) ? patientSearch.value.trim() : '';
+        }
+
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        setTimeout(() => {
+            if (nameInput) nameInput.focus();
+        }, 100);
+    }
+
+    function closeVisitorModal() {
+        const modal = document.getElementById('visitorModal');
+        if (modal) {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+    }
+
+    function submitMarkAsVisitor() {
+        const btn = document.getElementById('btnConfirmVisitor');
+        const nameInput = document.getElementById('visitorNameInput');
+        const visitorName = nameInput ? nameInput.value.trim() : '';
+        const patientIdEl = document.getElementById('patient_id');
+        const patientId = patientIdEl ? patientIdEl.value : '';
+
+        btn.disabled = true;
+        btn.innerHTML = `<svg class="animate-spin h-4 w-4 text-white inline mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg> Menyimpan...`;
+
+        axios.post('{{ route("transaction.markVisitor") }}', {
+            transaction_id: '{{ $trx_id }}',
+            visitor_name: visitorName,
+            patient_id: patientId
+        }).then(res => {
+            if (res.data && res.data.success) {
+                iziToast.success({
+                    title: 'Berhasil',
+                    message: res.data.message || 'Kunjungan berhasil disimpan.',
+                    position: 'topRight'
+                });
+                window.location.href = res.data.redirect_url;
+            } else {
+                iziToast.error({
+                    title: 'Gagal',
+                    message: res.data?.message || 'Gagal menandai pengunjung',
+                    position: 'topRight'
+                });
+                btn.disabled = false;
+                btn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Simpan & Buka Kasir Baru`;
+            }
+        }).catch(err => {
+            console.error('submitMarkAsVisitor error:', err);
+            iziToast.error({
+                title: 'Error',
+                message: err.response?.data?.message || 'Terjadi kesalahan sistem saat menyimpan data kunjungan.',
+                position: 'topRight'
+            });
+            btn.disabled = false;
+            btn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Simpan & Buka Kasir Baru`;
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const vInput = document.getElementById('visitorNameInput');
+        if (vInput) {
+            vInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    submitMarkAsVisitor();
+                }
+            });
+        }
+    });
 </script>
 
 {{-- ------------------- Fixed Cart Card --------------------- --}}

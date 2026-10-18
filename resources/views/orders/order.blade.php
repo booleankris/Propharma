@@ -2050,20 +2050,33 @@
         }
 
         function confirmSmartOrder() {
-            const items = Object.values(smartSelected).map(s => ({
-                medicine_id: s.medicine.medicine_id,
-                quantity: s.quantity,
-                pack: !!s.pack
-            }));
+            const rawItems = Object.values(smartSelected || {});
+            const items = [];
+            for (const s of rawItems) {
+                if (!s || !s.medicine) continue;
+                const medId = s.medicine.medicine_id || s.medicine.id;
+                const qty = Math.max(1, parseInt(s.quantity) || 1);
+                if (medId) {
+                    items.push({
+                        medicine_id: medId,
+                        quantity: qty,
+                        pack: !!s.pack
+                    });
+                }
+            }
 
             if (!items.length) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Perhatian',
-                    text: 'Silakan pilih minimal 1 obat untuk ditambahkan ke pesanan.',
-                    timer: 2000,
-                    showConfirmButton: false
-                });
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Perhatian',
+                        text: 'Silakan pilih minimal 1 obat untuk ditambahkan ke pesanan.',
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+                } else {
+                    alert('Silakan pilih minimal 1 obat untuk ditambahkan ke pesanan.');
+                }
                 return;
             }
 
@@ -2087,27 +2100,75 @@
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
                 }
             }).then(res => {
-                if (res.data.success) {
-                    orderItemsTable.ajax.reload(null, false);
-                    const item = res.data.summary;
-                    d_price = item.price_item;
-                    d_ppn = item.price_ppn;
-                    d_total = item.price_total;
-                    $('#d_price').val(formatRupiah(d_price));
-                    $('#d_ppn').val(formatRupiah(d_ppn));
-                    $('#d_total').val(formatRupiah(d_total));
+                if (res.data && res.data.success) {
+                    if (typeof orderItemsTable !== 'undefined' && orderItemsTable) {
+                        orderItemsTable.ajax.reload(null, false);
+                    }
+                    if (res.data.summary) {
+                        const item = res.data.summary;
+                        d_price = item.price_item;
+                        d_ppn = item.price_ppn;
+                        d_total = item.price_total;
+                        $('#d_price').val(formatRupiah(d_price));
+                        $('#d_ppn').val(formatRupiah(d_ppn));
+                        $('#d_total').val(formatRupiah(d_total));
+                    }
 
-                    iziToast.success({
-                        title: 'Berhasil',
-                        message: `${items.length} obat berhasil ditambahkan ke daftar pesanan`,
-                        position: 'topRight'
-                    });
+                    if (typeof iziToast !== 'undefined') {
+                        iziToast.success({
+                            title: 'Berhasil',
+                            message: `${items.length} obat berhasil ditambahkan ke daftar pesanan`,
+                            position: 'topRight'
+                        });
+                    } else if (typeof Swal !== 'undefined') {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Berhasil',
+                            text: `${items.length} obat berhasil ditambahkan ke daftar pesanan`,
+                            timer: 2000,
+                            showConfirmButton: false
+                        });
+                    } else {
+                        alert(`${items.length} obat berhasil ditambahkan ke daftar pesanan`);
+                    }
 
                     closeSmartOrder();
+                } else {
+                    const msg = (res.data && res.data.message) ? res.data.message : 'Gagal menambahkan item!';
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire({ icon: 'error', title: 'Gagal Menambahkan Item', text: msg });
+                    } else {
+                        alert(msg);
+                    }
                 }
             }).catch(err => {
-                console.error(err);
-                alert('Gagal menambahkan item!');
+                console.error('Smart order bulk add error:', err);
+                let msg = 'Gagal menambahkan item!';
+                if (err.response && err.response.status === 419) {
+                    msg = 'Sesi Anda telah berakhir (Page Expired). Silakan refresh halaman dan coba kembali.';
+                } else if (err.response && err.response.data) {
+                    if (err.response.data.message) {
+                        msg = err.response.data.message;
+                    }
+                    if (err.response.data.errors) {
+                        const errorDetails = Object.values(err.response.data.errors).flat().join('\n');
+                        if (errorDetails) {
+                            msg += '\n' + errorDetails;
+                        }
+                    }
+                } else if (err.message) {
+                    msg = err.message;
+                }
+
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Gagal Menambahkan Item',
+                        text: msg
+                    });
+                } else {
+                    alert(msg);
+                }
             }).finally(() => {
                 if (submitBtn) {
                     submitBtn.disabled = false;

@@ -195,6 +195,7 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
 
     Route::get('/transaction/{type}/{id?}', [SalesController::class, 'index'])->name('transaction');
     Route::post('/transaction/checkout', [SalesController::class, 'checkout'])->name('transaction.checkout');
+    Route::post('/transaction/mark-visitor', [SalesController::class, 'markVisitor'])->name('transaction.markVisitor');
     Route::post('/gettransaction/', [SalesController::class, 'getTransactionItem'])->name('transaction.getTransactionItem');
     Route::get('/getcart/cartItem/{id}', [SalesController::class, 'getCartItem']);
     Route::post('/getcart/update-cart', [SalesController::class, 'updateCart'])

@@ -69,16 +69,29 @@ class SalesController extends Controller
         // 3. Resolve which transaction to use
         if ($id !== null) {
             // Tab already has a specific transaction, load it, guard status
-            $transaction = MedicineTransactions::where('pharmacy_id', $pharmacy_id)
+            $transaction = MedicineTransactions::with(['patients', 'doctors', 'debtors'])
+                ->where('pharmacy_id', $pharmacy_id)
                 ->where('id', $id)
-                ->where('user_id', Auth()->user()->id)
                 ->where('status', 0)
                 ->first();
 
             if (!$transaction) {
-                // Transaction finished or doesn't belong to this user id
+                // Transaction finished or doesn't belong to this pharmacy
                 // Fall back to opening a fresh transaction of the requested type
                 return redirect()->route('transaction', ['type' => $type])->with('message', 'Transaksi sudah selesai atau tidak ditemukan. Membuka transaksi baru.');
+            }
+
+            // Ensure route type matches the transaction's existing type to prevent accidental type change & cart deletion
+            $actualType = $this->dbTypeToRouteType($transaction->transaction_type ?? 'RESEP TUNAI');
+            if ($type !== $actualType) {
+                return redirect()->route('transaction', ['type' => $actualType, 'id' => $transaction->id]);
+            }
+
+            // If another cashier resumes this pending transaction in the same pharmacy, take over user_id so subsequent cart operations and checkout work cleanly
+            if ($transaction->user_id !== Auth()->user()->id) {
+                $transaction->update(['user_id' => Auth()->user()->id]);
+                MedicineCart::where('transaction_id', $transaction->id)
+                    ->update(['user_id' => Auth()->user()->id]);
             }
 
             $trx_id = $transaction->id;
@@ -667,27 +680,78 @@ class SalesController extends Controller
             'totalbought' => $total_raw,
         ]);
     }
+    private function generatePatientCode()
+    {
+        $last = Patients::where('code', 'like', 'PT%')->orderByDesc('id')->first();
+
+        if (!$last || !$last->code) {
+            return 'PT0001';
+        }
+
+        $number = (int) substr($last->code, 2);
+        return 'PT' . str_pad($number + 1, 4, '0', STR_PAD_LEFT);
+    }
+
     public function addPatient(Request $request)
     {
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'address' => 'nullable|string|max:255',
-            'phone' => 'nullable|string|max:50',
-            'city' => 'nullable|string|max:100',
-            'birth' => 'nullable|date',
-        ]);
+        $name = trim(preg_replace('/\s+/', ' ', (string) $request->name));
+        $phone = trim((string) $request->phone);
+
+        if ($name === '') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Nama pasien wajib diisi.',
+            ], 422);
+        }
+
+        $matches = \App\Support\PatientMatcher::findMatches(
+            $name,
+            $phone,
+            Patients::select(['id', 'code', 'name', 'address', 'city', 'phone', 'birth'])->get()
+        );
+
+        // Jika nama sama persis atau no telepon sama persis -> minta konfirmasi jika belum force
+        if ($matches['exact'] && !$request->boolean('force')) {
+            $suggestions = array_values(array_unique(array_merge([$matches['exact']], $matches['similar']), SORT_REGULAR));
+            return response()->json([
+                'success'            => false,
+                'needs_confirmation' => true,
+                'is_exact'           => true,
+                'is_phone_match'     => $matches['is_phone_match'],
+                'match_reason'       => $matches['match_reason'],
+                'message'            => 'Data pasien "' . $matches['exact']->name . '" sudah ada di sistem (' . $matches['match_reason'] . ').',
+                'existing_patient'   => $matches['exact'],
+                'suggestions'        => $suggestions,
+            ]);
+        }
+
+        // Jika nama mirip (kemungkinan typo) -> minta konfirmasi jika belum force
+        if (!empty($matches['similar']) && !$request->boolean('force')) {
+            return response()->json([
+                'success'            => false,
+                'needs_confirmation' => true,
+                'is_exact'           => false,
+                'is_phone_match'     => false,
+                'match_reason'       => 'similar',
+                'message'            => 'Pasien dengan nama serupa ditemukan di sistem.',
+                'suggestions'        => $matches['similar'],
+            ]);
+        }
+
+        $code = $this->generatePatientCode();
 
         $patient = Patients::create([
-            'name' => $request->get('name'),
-            'address' => $request->get('address'),
-            'phone' => $request->get('phone'),
-            'city' => $request->get('city'),
-            'birth' => $request->get('birth'),
+            'code'    => $code,
+            'name'    => $name,
+            'address' => $request->get('address') ?: '-',
+            'phone'   => $phone ?: '-',
+            'city'    => $request->get('city') ?: '-',
+            'birth'   => $request->get('birth') ?: '-',
         ]);
 
         return response()->json([
             'success' => true,
-            'patient' => $patient
+            'patient' => $patient,
         ]);
     }
     private function generateDoctorCode()
@@ -704,11 +768,19 @@ class SalesController extends Controller
     public function addDoctor(Request $request)
     {
         $name = trim(preg_replace('/\s+/', ' ', (string) $request->name));
+        $specialist = trim((string) $request->specialist);
 
         if ($name === '') {
             return response()->json([
                 'success' => false,
-                'message' => 'Nama dokter wajib diisi.',
+                'message' => 'Nama dokter tidak boleh kosong.',
+            ], 422);
+        }
+
+        if ($specialist === '') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Spesialis dokter tidak boleh kosong. Silakan isi spesialis (contoh: Umum, Sp.A, Sp.PD).',
             ], 422);
         }
 
@@ -743,17 +815,17 @@ class SalesController extends Controller
 
         $doctor = Doctors::create([
             'pharmacy_id' => "1",
-            'code' => $code,
-            'name' => $name,
-            'specialist' => $request->specialist,
-            'address' => $request->address,
-            'city' => $request->city,
-            'phone' => $request->phone,
+            'code'        => $code,
+            'name'        => $name,
+            'specialist'  => $specialist ?: '-',
+            'address'     => trim((string) $request->address) ?: '-',
+            'city'        => trim((string) $request->city) ?: '-',
+            'phone'       => trim((string) $request->phone) ?: '-',
         ]);
 
         return response()->json([
             'success' => true,
-            'doctor' => $doctor
+            'doctor'  => $doctor
         ]);
     }
 
@@ -1571,6 +1643,9 @@ class SalesController extends Controller
     {
         $perPage = 30;
 
+        $restrictedRole = getRestrictedOnlineRole();
+        $pharmacyId     = getActivePharmacyId();
+
         $query = MedicineCart::query()
             ->selectRaw('
             transaction_id, 
@@ -1582,6 +1657,24 @@ class SalesController extends Controller
                 'transactions:id,transaction_code,patient_id,created_at,status,transaction_type',
                 'transactions.patients:id,name'
             ]);
+
+        if ($pharmacyId) {
+            $query->whereHas('transactions', function ($t) use ($pharmacyId) {
+                $t->where('pharmacy_id', $pharmacyId);
+            });
+        }
+
+        if ($restrictedRole) {
+            $query->where(function ($sub) use ($restrictedRole) {
+                $sub->whereHas('user.roles', function ($r) use ($restrictedRole) {
+                    $r->where('name', $restrictedRole);
+                })->orWhereHas('transactions.user.roles', function ($r) use ($restrictedRole) {
+                    $r->where('name', $restrictedRole);
+                })->orWhereHas('transactions.transactions.user.roles', function ($r) use ($restrictedRole) {
+                    $r->where('name', $restrictedRole);
+                });
+            });
+        }
 
         if ($request->search) {
             $search = $request->search;
@@ -1614,7 +1707,7 @@ class SalesController extends Controller
 
         $result = $query->orderByDesc('created_at')->paginate($perPage);
         $typeMap = [
-            'RESEP TUNAI' => 'receipt',
+            'RESEP TUNAI' => 'resep',
             'KREDIT' => 'kredit',
             'UPDS' => 'upds',
             'HV/OTC' => 'hv',
@@ -1657,6 +1750,62 @@ class SalesController extends Controller
 
         return response()->json([
             'data' => $items
+        ]);
+    }
+
+    public function markVisitor(Request $request)
+    {
+        $pharmacyId = getActivePharmacyId();
+        $transactionId = $request->input('transaction_id');
+        $visitorName = trim((string) $request->input('visitor_name'));
+        $patientId = $request->input('patient_id');
+
+        $transaction = MedicineTransactions::where('pharmacy_id', $pharmacyId)
+            ->where('id', $transactionId)
+            ->where('status', 0)
+            ->first();
+
+        if (!$transaction) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Transaksi tidak ditemukan atau sudah selesai.',
+            ], 404);
+        }
+
+        // If visitor name was entered and no patient_id was bound yet:
+        if (!empty($visitorName) && empty($transaction->patient_id) && empty($patientId)) {
+            $patient = Patients::where('name', $visitorName)->first();
+            if (!$patient) {
+                $patient = Patients::create([
+                    'code' => $this->generatePatientCode(),
+                    'name' => $visitorName,
+                    'address' => '-',
+                    'city' => '-',
+                    'phone' => '-',
+                ]);
+            }
+            $transaction->patient_id = $patient->id;
+        } elseif (!empty($patientId)) {
+            $transaction->patient_id = $patientId;
+        }
+
+        // Update totals from cart if cart items exist
+        $cartSummary = MedicineCart::where('transaction_id', $transaction->id)
+            ->selectRaw('SUM(final_price) as final_price, SUM(total_price) as subtotal, SUM(discount) as discount')
+            ->first();
+
+        $transaction->subtotal = $cartSummary->subtotal ?? 0;
+        $transaction->discount = $cartSummary->discount ?? 0;
+        $transaction->status = 0; // Remains pending / visitor
+        $transaction->save();
+
+        // Determine type slug
+        $typeSlug = $this->dbTypeToRouteType($transaction->transaction_type ?? 'RESEP TUNAI');
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Transaksi berhasil ditandai sebagai data pengunjung.',
+            'redirect_url' => route('transaction', ['type' => $typeSlug]),
         ]);
     }
 }

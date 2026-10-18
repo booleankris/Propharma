@@ -823,8 +823,8 @@
                                 Pembelian</span>
                         </a>
 
-                        {{-- Pareto (Khusus Finance & General Manager) --}}
-                        @hasanyrole('Finance|General Manager|administrator|HO')
+                        {{-- Pareto (Khusus Finance, General Manager, & Koordinator) --}}
+                        @hasanyrole('Finance|General Manager|administrator|HO|Koordinator')
                         <a href="{{ route('pareto.index') }}"
                             class="menu-tile group flex flex-col items-center gap-2 rounded-2xl border border-slate-200/70 bg-slate-50/60 p-4 text-center hover:bg-white hover:border-pink-200 hover:shadow-md hover:shadow-pink-500/5 cursor-pointer">
                             <div

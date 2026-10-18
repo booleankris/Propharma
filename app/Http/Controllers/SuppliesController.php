@@ -16,6 +16,7 @@ use App\Models\MedicineTransfers;
 use App\Models\MedicineTransferItems;
 use App\Models\ReceivingItems;
 use App\Models\Etalases;
+use App\Models\Pharmacies;
 use App\Models\StockOpname;
 use App\Services\StockOpnameImportService;
 use Carbon\Carbon;
@@ -133,14 +134,12 @@ class SuppliesController extends Controller
             $pharmacyId = $isWarehouse ? 1 : $activePharmacyId;
             $canSeeWarehouse = canAccessWarehouseStock($activePharmacyId);
 
-            // Jika akun gudang PMI atau HO/PMI central, sertakan pharmacy_id Gudang PMI (9) dan Apotek PMI (1)
-            $targetPharmacyIds = ($isWarehouse || $canSeeWarehouse || in_array($activePharmacyId, [1, 6, 9]))
-                ? array_unique([$activePharmacyId, $warehouseId, 1])
-                : [$activePharmacyId];
+            // Kartu stock menampilkan riwayat fisik cabang aktif yang sedang dibuka saja
+            $targetPharmacyIds = [$activePharmacyId];
 
             $baseQuery = ItemsLog::query();
 
-            $baseQuery->where(function ($q) use ($targetPharmacyIds, $isWarehouse, $activePharmacyId) {
+            $baseQuery->where(function ($q) use ($targetPharmacyIds) {
                 // 1. Pembelian (Status 2)
                 $q->where(function ($sub) use ($targetPharmacyIds) {
                     $sub->where('status', 2)
@@ -157,11 +156,11 @@ class SuppliesController extends Controller
                                 $r->whereIn('pharmacy_id', $targetPharmacyIds);
                             })->orWhereHas('batches', function ($b) use ($targetPharmacyIds) {
                                 $b->whereIn('pharmacy_id', $targetPharmacyIds);
-                            })->orWhereHas('users', function ($u) use ($targetPharmacyIds) {
-                                $u->whereIn('pharmacy_id', $targetPharmacyIds);
-                                if (in_array(9, $targetPharmacyIds)) {
-                                    $u->orWhereHas('roles', fn($rq) => $rq->where('name', 'Gudang PMI'));
-                                }
+                            })->orWhere(function ($fallbackQ) use ($targetPharmacyIds) {
+                                $fallbackQ->whereNull('batches_id')
+                                    ->whereHas('users', function ($u) use ($targetPharmacyIds) {
+                                        $u->whereIn('pharmacy_id', $targetPharmacyIds);
+                                    });
                             });
                         });
                 })
@@ -172,14 +171,18 @@ class SuppliesController extends Controller
                             $b->whereIn('pharmacy_id', $targetPharmacyIds);
                         });
                 })
-                // 4. Status lainnya (Penjualan = 1, Retur Jual = 3, dll)
+                // 4. Status lainnya (Penjualan = 1, Retur Jual = 3, Stock Opname = 5, Adjustment = 6, dll)
                 ->orWhere(function ($sub) use ($targetPharmacyIds) {
                     $sub->whereNotIn('status', [2, 4, 7])
-                        ->whereHas('users', function ($u) use ($targetPharmacyIds) {
-                            $u->whereIn('pharmacy_id', $targetPharmacyIds);
-                            if (in_array(9, $targetPharmacyIds)) {
-                                $u->orWhereHas('roles', fn($rq) => $rq->where('name', 'Gudang PMI'));
-                            }
+                        ->where(function ($otherQ) use ($targetPharmacyIds) {
+                            $otherQ->whereHas('batches', function ($b) use ($targetPharmacyIds) {
+                                $b->whereIn('pharmacy_id', $targetPharmacyIds);
+                            })->orWhere(function ($noBatchQ) use ($targetPharmacyIds) {
+                                $noBatchQ->whereNull('batches_id')
+                                    ->whereHas('users', function ($u) use ($targetPharmacyIds) {
+                                        $u->whereIn('pharmacy_id', $targetPharmacyIds);
+                                    });
+                            });
                         });
                 });
             });
@@ -237,6 +240,25 @@ class SuppliesController extends Controller
                     : Medicines::where('name', $searchValue)->orWhere('code', $searchValue)->first();
             }
 
+            // Balance calculation: Real-time stock if medicine is selected, otherwise last record's qty_after
+            $balance = 0;
+            $storageStock = 0;
+            $counterStock = 0;
+
+            if ($med) {
+                $storageStock = $canSeeWarehouse ? $this->calculateRealtimeStock($med->id, $pharmacyId, 'storage') : 0;
+                $counterStock = $this->calculateRealtimeStock($med->id, $pharmacyId, 'counter');
+                $balance = $isWarehouse ? $storageStock : $counterStock;
+            } else if ($lastRecord) {
+                $storageStock = $canSeeWarehouse ? (int) Batches::where('pharmacy_id', $warehouseId)->sum('stock') : 0;
+                $counterStock = (int) MedicineTransferItems::whereHas('batches', function ($b) use ($pharmacyId) {
+                    $b->where('pharmacy_id', $pharmacyId);
+                })->where('status', 1)->where(function ($q) {
+                    $q->whereNull('source_type')->orWhere('source_type', '!=', 'retur_gudang');
+                })->sum('qty');
+                $balance = $isWarehouse ? $storageStock : $counterStock;
+            }
+
             // Hitung running balance sekuensial HANYA jika ada filter spesifik 1 obat.
             // Uses the same stockLogDelta() + anchor-to-realtime approach as
             // medicineStockLog() so that Stock Opname / Adjustment rows are
@@ -256,8 +278,8 @@ class SuppliesController extends Controller
                     ->get();
 
                 if ($allRowsForBalance->isNotEmpty()) {
-                    // Anchor to real-time stock and replay backwards to find opening
-                    $currentStock = $this->calculateRealtimeStock($med->id, $pharmacyId, 'total');
+                    // Anchor to real-time stock of active location and replay backwards to find opening
+                    $currentStock = $balance;
                     $totalMovement = $allRowsForBalance->sum(fn($log) => $this->stockLogDelta($log));
                     $currRunning = $currentStock - $totalMovement;
                     $initialStartBalance = $currRunning;
@@ -276,25 +298,6 @@ class SuppliesController extends Controller
                         ];
                     }
                 }
-            }
-
-            // Balance calculation: Real-time stock if medicine is selected, otherwise last record's qty_after
-            $balance = 0;
-            $storageStock = 0;
-            $counterStock = 0;
-
-            if ($med) {
-                $storageStock = $canSeeWarehouse ? $this->calculateRealtimeStock($med->id, $pharmacyId, 'storage') : 0;
-                $counterStock = $this->calculateRealtimeStock($med->id, $pharmacyId, 'counter');
-                $balance = $storageStock + $counterStock;
-            } else if ($lastRecord) {
-                $storageStock = $canSeeWarehouse ? (int) Batches::where('pharmacy_id', $warehouseId)->sum('stock') : 0;
-                $counterStock = (int) MedicineTransferItems::whereHas('batches', function ($b) use ($pharmacyId) {
-                    $b->where('pharmacy_id', $pharmacyId);
-                })->where('status', 1)->where(function ($q) {
-                    $q->whereNull('source_type')->orWhere('source_type', '!=', 'retur_gudang');
-                })->sum('qty');
-                $balance = $storageStock + $counterStock;
             }
 
             // 5. RETURN DATATABLES RESPONSE
@@ -784,11 +787,27 @@ class SuppliesController extends Controller
     }
     public function printStockData(Request $request)
     {
-        return Excel::download(new StockDataExport($request), 'stock_data.xlsx');
+        @ini_set('memory_limit', '512M');
+        @set_time_limit(180);
+
+        $pharmacy = Pharmacies::find(getActivePharmacyId());
+        $branch = $pharmacy ? preg_replace('/[^A-Za-z0-9_]/', '_', $pharmacy->name) : 'Gudang_PMI';
+        $fileName = 'Data_Stok_' . $branch . '_' . date('Ymd_His') . '.xlsx';
+
+        return Excel::download(new StockDataExport($request), $fileName);
     }
 
     public function exportStockData(Request $request)
     {
+        // Bersihkan job lama yang macet (> 5 menit status processing / pending)
+        ExportJob::where('type', 'stock_data')
+            ->whereIn('status', ['pending', 'processing'])
+            ->where('created_at', '<', now()->subMinutes(5))
+            ->update([
+                'status' => 'failed',
+                'error_message' => 'Job kedaluwarsa otomatis dibersihkan.',
+            ]);
+
         $job = ExportJob::create([
             'type' => 'stock_data',
             'status' => 'pending',
@@ -797,7 +816,7 @@ class SuppliesController extends Controller
 
         $pharmacyId = getActivePharmacyId();
         dispatch(new ProcessStockDataExport($job->id, array_merge(
-            $request->only(['start_date', 'end_date', 'medicine_id']),
+            $request->only(['start_date', 'end_date', 'medicine_id', 'status']),
             ['active_pharmacy_id' => $pharmacyId]
         )));
 
@@ -811,6 +830,14 @@ class SuppliesController extends Controller
     {
         $job = ExportJob::findOrFail($id);
 
+        // Anti-stuck watchdog: Jika job masih pending/processing lebih dari 2 menit
+        if (in_array($job->status, ['pending', 'processing']) && $job->created_at < now()->subMinutes(2)) {
+            $job->update([
+                'status' => 'failed',
+                'error_message' => 'Waktu proses melebihi 2 menit. Silakan unduh langsung.',
+            ]);
+        }
+
         $downloadUrl = null;
         if (($job->status === 'completed' || $job->status === 'finished') && $job->file_path) {
             $downloadUrl = route('supplies.exportStockDataDownload', $job->id);
@@ -820,6 +847,7 @@ class SuppliesController extends Controller
             'status' => $job->status,
             'progress' => (int) $job->progress,
             'file' => $downloadUrl,
+            'error' => $job->error_message,
         ]);
     }
 

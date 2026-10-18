@@ -198,3 +198,59 @@ if (!function_exists('getOnlineChannelName')) {
         return 'Online';
     }
 }
+
+if (!function_exists('getRestrictedOnlineRole')) {
+    /**
+     * Get the specific online role if the user should be restricted to their online role's sales data.
+     * Roles like administrator, General Manager, HO, Manager, Koordinator are not restricted (returns null).
+     */
+    function getRestrictedOnlineRole($user = null): ?string
+    {
+        $user = $user ?? auth()->user();
+        if (!$user) {
+            return null;
+        }
+
+        // Jika user memiliki role manajerial / supervisor / HO, tidak dibatasi
+        if ($user->hasAnyRole(['administrator', 'General Manager', 'HO', 'Manager', 'manager', 'Koordinator'])) {
+            return null;
+        }
+
+        if ($user->hasRole('Online Shopee')) {
+            return 'Online Shopee';
+        }
+        if ($user->hasRole('Online Grab')) {
+            return 'Online Grab';
+        }
+        if ($user->hasRole('Digital')) {
+            return 'Digital';
+        }
+        if ($user->hasRole('Online')) {
+            return 'Online';
+        }
+
+        return null;
+    }
+}
+
+if (!function_exists('getRestrictedOnlineChannelKey')) {
+    /**
+     * Get channel key ('shopee', 'grab', 'digital', 'online') if the user is restricted to an online role.
+     */
+    function getRestrictedOnlineChannelKey($user = null): ?string
+    {
+        $role = getRestrictedOnlineRole($user);
+        if (!$role) {
+            return null;
+        }
+
+        return match ($role) {
+            'Online Shopee' => 'shopee',
+            'Online Grab'   => 'grab',
+            'Digital'       => 'digital',
+            'Online'        => 'online',
+            default         => null,
+        };
+    }
+}
+

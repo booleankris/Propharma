@@ -27,6 +27,9 @@ class ProcessStockDataExport implements ShouldQueue
 
     public function handle()
     {
+        @ini_set('memory_limit', '512M');
+        @set_time_limit(300);
+
         $job = ExportJob::find($this->exportJobId);
         if (!$job) return;
 
@@ -64,8 +67,9 @@ class ProcessStockDataExport implements ShouldQueue
             ]);
         } catch (\Throwable $e) {
             $job->update([
-                'status'   => 'failed',
-                'progress' => 0,
+                'status'        => 'failed',
+                'progress'      => 0,
+                'error_message' => $e->getMessage(),
             ]);
             Log::error("Stock Data Export Failed: " . $e->getMessage());
         }
