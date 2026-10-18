@@ -1045,7 +1045,7 @@
 </div>
 
 {{-- Modal Tandai Sebagai Pengunjung --}}
-<div id="visitorModal" class="fixed inset-0 bg-black/50 hidden justify-center items-center z-[99999]">
+<div id="visitorModal" class="fixed inset-0 bg-black/60 hidden justify-center items-center z-[9999999]" style="z-index: 9999999;" onclick="if(event.target === this) closeVisitorModal()">
     <div class="bg-white p-6 rounded-2xl shadow-2xl w-[480px] max-w-full mx-4 relative">
         <div class="flex items-center text-amber-600 mb-3">
             <div class="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center mr-3 flex-shrink-0">
@@ -6114,9 +6114,20 @@
                 if (e.key === 'Enter') {
                     e.preventDefault();
                     submitMarkAsVisitor();
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    closeVisitorModal();
                 }
             });
         }
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                const modal = document.getElementById('visitorModal');
+                if (modal && !modal.classList.contains('hidden')) {
+                    closeVisitorModal();
+                }
+            }
+        });
     });
 </script>
 

@@ -265,7 +265,7 @@ class SalesDataController extends Controller
                 transaction_id,
                 MAX(medicine_cart.user_id) as user_id,
                 MAX(medicine_transactions.transaction_code) as transaction_code,
-                MAX(medicine_cart.updated_at) as updated_at,
+                MAX(COALESCE(medicine_transactions.updated_at, medicine_cart.updated_at)) as updated_at,
                 SUM(medicine_cart.discount) as totaldiscount,
                 MAX(medicine_cart.status) as status,
                 SUM(final_price) as final_price,
@@ -345,14 +345,22 @@ class SalesDataController extends Controller
 
             if ($dateFrom) {
                 try {
-                    $query->whereDate('medicine_cart.updated_at', '>=', Carbon::createFromFormat('d/m/Y', $dateFrom)->format('Y-m-d'));
+                    $d = Carbon::createFromFormat('d/m/Y', $dateFrom)->startOfDay();
+                    $query->where(function ($q) use ($d) {
+                        $q->where('medicine_cart.updated_at', '>=', $d)
+                          ->orWhere('medicine_transactions.updated_at', '>=', $d);
+                    });
                 } catch (\Exception $e) {
                 }
             }
 
             if ($dateTo) {
                 try {
-                    $query->whereDate('medicine_cart.updated_at', '<=', Carbon::createFromFormat('d/m/Y', $dateTo)->format('Y-m-d'));
+                    $d = Carbon::createFromFormat('d/m/Y', $dateTo)->endOfDay();
+                    $query->where(function ($q) use ($d) {
+                        $q->where('medicine_cart.updated_at', '<=', $d)
+                          ->orWhere('medicine_transactions.updated_at', '<=', $d);
+                    });
                 } catch (\Exception $e) {
                 }
             }

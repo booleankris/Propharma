@@ -272,36 +272,24 @@ class VisitorTransactionFlowTest extends TestCase
         $this->assertSame($this->kasir2->id, $cart->user_id);
     }
 
-    public function test_resuming_transaction_with_mismatched_url_type_redirects_safely_without_deleting_cart(): void
+    public function test_cashier_can_switch_transaction_type_to_resep_tunai(): void
     {
         $this->actingAs($this->kasir1);
 
-        // Transaction created as HV/OTC
+        // Transaction created as UPDS
         $transaction = MedicineTransactions::create([
             'pharmacy_id' => 1,
             'user_id' => $this->kasir1->id,
-            'transaction_type' => 'HV/OTC',
+            'transaction_type' => 'UPDS',
             'status' => 0,
         ]);
 
-        MedicineCart::create([
-            'user_id' => $this->kasir1->id,
-            'medicine_id' => $this->medicine->id,
-            'transaction_id' => $transaction->id,
-            'quantity' => 1,
-            'item_price' => 25000,
-            'total_price' => 25000,
-            'final_price' => 25000,
-            'status' => '0',
-        ]);
-
-        // Access via 'resep' slug instead of 'hv'
+        // Cashier clicks "Resep Tunai" chip
         $response = $this->get(route('transaction', ['type' => 'resep', 'id' => $transaction->id]));
+        $response->assertOk();
 
-        // It should redirect to correct type 'hv' and keep cart items intact!
-        $response->assertRedirect(route('transaction', ['type' => 'hv', 'id' => $transaction->id]));
-
-        $this->assertSame(1, MedicineCart::where('transaction_id', $transaction->id)->count());
+        $transaction->refresh();
+        $this->assertSame('RESEP TUNAI', $transaction->transaction_type);
     }
 
     public function test_pending_sales_data_includes_type_slug(): void
@@ -334,5 +322,86 @@ class VisitorTransactionFlowTest extends TestCase
         $data = $response->json('data');
         $this->assertNotEmpty($data);
         $this->assertSame('hv', $data[0]['type_slug']);
+    }
+
+    public function test_pending_sales_data_filters_by_date_range_for_today(): void
+    {
+        $this->actingAs($this->kasir1);
+
+        // Transaction from today
+        $todayTrx = MedicineTransactions::create([
+            'pharmacy_id' => 1,
+            'user_id' => $this->kasir1->id,
+            'transaction_type' => 'RESEP TUNAI',
+            'status' => 0,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        MedicineCart::create([
+            'user_id' => $this->kasir1->id,
+            'medicine_id' => $this->medicine->id,
+            'transaction_id' => $todayTrx->id,
+            'quantity' => 1,
+            'item_price' => 15000,
+            'total_price' => 15000,
+            'final_price' => 15000,
+            'status' => '0',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // Transaction from 5 days ago
+        $pastDate = now()->subDays(5);
+        $pastTrx = MedicineTransactions::create([
+            'pharmacy_id' => 1,
+            'user_id' => $this->kasir1->id,
+            'transaction_type' => 'UPDS',
+            'status' => 0,
+            'created_at' => $pastDate,
+            'updated_at' => $pastDate,
+        ]);
+        $pastCart = MedicineCart::create([
+            'user_id' => $this->kasir1->id,
+            'medicine_id' => $this->medicine->id,
+            'transaction_id' => $pastTrx->id,
+            'quantity' => 1,
+            'item_price' => 30000,
+            'total_price' => 30000,
+            'final_price' => 30000,
+            'status' => '0',
+        ]);
+
+        DB::table('medicine_transactions')->where('id', $pastTrx->id)->update([
+            'created_at' => $pastDate,
+            'updated_at' => $pastDate,
+        ]);
+        DB::table('medicine_cart')->where('id', $pastCart->id)->update([
+            'created_at' => $pastDate,
+            'updated_at' => $pastDate,
+        ]);
+
+        $todayStr = now()->format('d/m/Y');
+
+        // Filter by today's date (default behavior in UI)
+        $responseToday = $this->getJson(route('salesdata.pending', [
+            'date_from' => $todayStr,
+            'date_to' => $todayStr,
+        ]), [
+            'X-Requested-With' => 'XMLHttpRequest',
+        ]);
+        $responseToday->assertOk();
+
+        $dataToday = $responseToday->json('data');
+        $this->assertCount(1, $dataToday);
+        $this->assertEquals($todayTrx->id, $dataToday[0]['transaction_id']);
+
+        // Without date filter, both transactions are returned
+        $responseAll = $this->getJson(route('salesdata.pending'), [
+            'X-Requested-With' => 'XMLHttpRequest',
+        ]);
+        $responseAll->assertOk();
+
+        $dataAll = $responseAll->json('data');
+        $this->assertCount(2, $dataAll);
     }
 }

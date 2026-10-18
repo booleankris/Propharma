@@ -81,11 +81,6 @@ class SalesController extends Controller
                 return redirect()->route('transaction', ['type' => $type])->with('message', 'Transaksi sudah selesai atau tidak ditemukan. Membuka transaksi baru.');
             }
 
-            // Ensure route type matches the transaction's existing type to prevent accidental type change & cart deletion
-            $actualType = $this->dbTypeToRouteType($transaction->transaction_type ?? 'RESEP TUNAI');
-            if ($type !== $actualType) {
-                return redirect()->route('transaction', ['type' => $actualType, 'id' => $transaction->id]);
-            }
 
             // If another cashier resumes this pending transaction in the same pharmacy, take over user_id so subsequent cart operations and checkout work cleanly
             if ($transaction->user_id !== Auth()->user()->id) {
@@ -1798,6 +1793,8 @@ class SalesController extends Controller
         $transaction->discount = $cartSummary->discount ?? 0;
         $transaction->status = 0; // Remains pending / visitor
         $transaction->save();
+
+        MedicineCart::where('transaction_id', $transaction->id)->update(['updated_at' => now()]);
 
         // Determine type slug
         $typeSlug = $this->dbTypeToRouteType($transaction->transaction_type ?? 'RESEP TUNAI');

@@ -498,12 +498,15 @@
         $(function() {
 
             // ── Flatpickr instances ───────────────────────────────────────────
+            const today = flatpickr.formatDate(new Date(), 'd/m/Y');
+
             const fpRange = flatpickr('#date-range', {
                 mode: 'range',
                 dateFormat: 'd/m/Y',
                 locale: {
                     firstDayOfWeek: 1
                 },
+                defaultDate: [today, today],
                 onClose: function(selectedDates) {
                     if (selectedDates.length === 1 || selectedDates.length === 2) {
                         tableData.ajax.reload();
