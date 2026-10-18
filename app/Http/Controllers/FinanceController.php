@@ -215,6 +215,7 @@ class FinanceController extends Controller
             'recapCashflow' => $recapCashflow,
             'setorAccounts' => $this->branchKasBankAccountsQuery()->where('account_type', 'bank')->where('id', '!=', $drawerAccount?->id ?? 0)->orderBy('code')->get(['id', 'name', 'code']),
             'filters' => ['month' => $month, 'year' => $year],
+            'stats' => $this->getStats(),
             'branchContext' => $this->getBranchContext(),
         ]);
     }
@@ -347,9 +348,9 @@ class FinanceController extends Controller
                 'due' => array_sum(array_column($consignments, 'due')),
                 'ready_count' => count(array_filter($consignments, fn($item) => $item['due'] > 0)),
             ],
-            'stats' => [
+            'stats' => array_merge($this->getStats(), [
                 'countKonsinyasiSiapBayar' => count(array_filter($consignments, fn($item) => $item['due'] > 0)),
-            ],
+            ]),
             'branchContext' => $this->getBranchContext(),
         ]);
     }
