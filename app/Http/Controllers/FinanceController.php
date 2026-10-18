@@ -192,6 +192,12 @@ class FinanceController extends Controller
         $pharmacyIds = $this->getTargetPharmacyIds();
 
         $reportDays = $cashflowReport->build($pharmacyIds, $startDate, $endDate);
+        $cashflowTransactionCount = (int) array_sum(array_map(
+            fn (array $day) => (int) ($day['morning']['count'] ?? 0)
+                + (int) ($day['evening']['count'] ?? 0)
+                + (int) ($day['otherShift']['count'] ?? 0),
+            $reportDays
+        ));
         if ($request->boolean('download_xlsx')) {
             $fileName = 'cashflow-omzet_' . $startDate . '_sd_' . $endDate . '.xlsx';
             return Excel::download(new CashflowExport($reportDays), $fileName);
@@ -215,7 +221,9 @@ class FinanceController extends Controller
             'recapCashflow' => $recapCashflow,
             'setorAccounts' => $this->branchKasBankAccountsQuery()->where('account_type', 'bank')->where('id', '!=', $drawerAccount?->id ?? 0)->orderBy('code')->get(['id', 'name', 'code']),
             'filters' => ['month' => $month, 'year' => $year],
-            'stats' => $this->getStats(),
+            'stats' => array_merge($this->getStats(), [
+                'cashflowTransactionCount' => $cashflowTransactionCount,
+            ]),
             'branchContext' => $this->getBranchContext(),
         ]);
     }
@@ -2730,7 +2738,9 @@ class FinanceController extends Controller
 
         $isCashBank = $validated['category'] === 'Kas & Bank';
         $pharmacyId = $isCashBank ? getActivePharmacyId() : null;
-        $accountType = $isCashBank ? ($validated['account_type'] ?? 'bank') : null;
+        // Kolom account_type wajib terisi di database. Untuk kategori selain
+        // Kas & Bank nilainya tidak dipakai, tetapi tetap gunakan default bank.
+        $accountType = $isCashBank ? ($validated['account_type'] ?? 'bank') : 'bank';
 
         // Jika kode tidak diisi, otomatis buat kode melanjutkan nomor sebelumnya
         $code = $accountType === 'kas_apotek' ? '1-10001' : (!empty($validated['code'])
@@ -2754,7 +2764,7 @@ class FinanceController extends Controller
             'code' => $code,
             'category' => $validated['category'],
             'account_type' => $accountType,
-            'account_number' => $accountType === 'bank' ? ($validated['account_number'] ?? null) : null,
+            'account_number' => $isCashBank && $accountType === 'bank' ? ($validated['account_number'] ?? null) : null,
             'balance' => 0,
             'is_active' => true,
         ]);
@@ -2783,7 +2793,7 @@ class FinanceController extends Controller
 
         $isCashBank = $validated['category'] === 'Kas & Bank';
         $pharmacyId = $isCashBank ? getActivePharmacyId() : null;
-        $accountType = $isCashBank ? ($validated['account_type'] ?? $account->account_type ?? 'bank') : null;
+        $accountType = $isCashBank ? ($validated['account_type'] ?? $account->account_type ?? 'bank') : 'bank';
         if ($account->account_type === 'kas_apotek' && $accountType !== 'kas_apotek') {
             return back()->withErrors(['account_type' => 'Kategori akun Kas Apotek tidak dapat diubah karena dipakai untuk pencatatan otomatis penjualan tunai.']);
         }
@@ -2804,7 +2814,7 @@ class FinanceController extends Controller
             'category' => $validated['category'],
             'pharmacy_id' => $pharmacyId,
             'account_type' => $accountType,
-            'account_number' => $accountType === 'bank' ? ($validated['account_number'] ?? null) : null,
+            'account_number' => $isCashBank && $accountType === 'bank' ? ($validated['account_number'] ?? null) : null,
         ]);
 
         $this->clearStatsCache();

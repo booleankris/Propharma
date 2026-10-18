@@ -71,7 +71,10 @@ export default function FinanceLayout({ title, subtitle, children, stats = {} })
             href: '/finance/cashflow',
             icon: ArrowDownUp,
             active: currentUrl.startsWith('/finance/cashflow'),
-            badge: null,
+            badge: stats.cashflowTransactionCount > 0 ? {
+                text: stats.cashflowTransactionCount,
+                color: 'bg-blue-50 text-blue-700',
+            } : null,
         },
         {
             name: 'Konsinyasi',
