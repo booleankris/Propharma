@@ -60,11 +60,11 @@ export default function FloatingActionBar({
     };
 
     return (
-        <div className="fixed bottom-6 inset-x-0 mx-auto w-[92%] max-w-4xl z-40 animate-in slide-in-from-bottom-6 fade-in duration-200 pointer-events-auto">
-            <div className={`backdrop-blur-md shadow-2xl ${themeStyles.amount} w-full rounded-2xl p-5.5 sm:p-4 text-white flex flex-col md:flex-row md:items-center justify-between gap-3.5 sm:gap-4`}>
+        <div className="finance-floating-action-bar fixed z-[60] animate-in slide-in-from-bottom-6 fade-in duration-200 pointer-events-none" aria-live="polite">
+            <div className="finance-floating-action-panel pointer-events-auto">
 
                 {/* 1. SEKSI KIRI: Item Count & Batas */}
-                <div className="flex items-center gap-3 shrink-0">
+                <div className="finance-floating-selection flex items-center gap-3 shrink-0">
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-slate-300 shrink-0 shadow-inner ${themeStyles.btn}`}>
                         <CheckSquare className="w-5 h-5 text-white" />
                     </div>
@@ -91,7 +91,7 @@ export default function FloatingActionBar({
                 </div>
 
                 {/* 2. SEKSI TENGAH: Total Nominal (Sangat Sensitif & Akurat) */}
-                <div className="flex-1 md:border-l md:border-r border-slate-800 md:px-5 flex flex-col justify-center">
+                <div className="finance-floating-total flex-1 md:border-l md:border-r border-slate-200 md:px-5 flex flex-col justify-center min-w-0">
                     <div className="text-[11px] font-semibold text-slate-800 uppercase tracking-wider flex items-center justify-between">
                         <span>{titleAmount}</span>
                         {cleanFullAmount != null && cleanFullAmount !== cleanAmount && (
@@ -110,7 +110,7 @@ export default function FloatingActionBar({
                 </div>
 
                 {/* 3. SEKSI KANAN: Tombol Aksi */}
-                <div className="flex items-center gap-2 shrink-0 justify-end">
+                <div className="finance-floating-actions flex items-center gap-2 shrink-0 justify-end">
                     <button
                         type="button"
                         onClick={onClear}
