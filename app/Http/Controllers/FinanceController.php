@@ -28,6 +28,7 @@ use App\Services\Finance\KeuanganReportService;
 use App\Services\ConsignmentService;
 use App\Support\FinanceShift;
 use App\Support\LiphTransactionScope;
+use App\Support\ReceivingInvoiceTotals;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
@@ -761,7 +762,7 @@ class FinanceController extends Controller
             }
 
             $ppnType = strtoupper(trim((string) ($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA')));
-            $invoiceTotal = $subtotal + ($ppnType === 'EXCLUDE' ? round($subtotal * 0.11, 2) : 0);
+            $invoiceTotal = ReceivingInvoiceTotals::calculate($detail->receiving_items, $ppnType)['total'];
             $paid = (float) $detail->payments->sum('amount');
             $balance += max(0, $invoiceTotal - $paid);
         }
@@ -931,7 +932,7 @@ class FinanceController extends Controller
                 $subtotal += $lineTotal;
             }
             $ppnType = strtoupper(trim((string) ($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA')));
-            $invoiceTotal = $subtotal + ($ppnType === 'EXCLUDE' ? round($subtotal * 0.11, 2) : 0);
+            $invoiceTotal = ReceivingInvoiceTotals::calculate($detail->receiving_items, $ppnType)['total'];
             $outstanding = max(0, $invoiceTotal - (float) $detail->payments->sum('amount'));
             if ($outstanding <= 0) continue;
 
@@ -1039,12 +1040,8 @@ class FinanceController extends Controller
                 ->whereRaw('created_at >= ? AND created_at < ?', [FinanceShift::start($startDate), FinanceShift::endExclusive($endDate)]))
             ->get();
         $periodCreditPurchases = (float) $periodCreditDetails->sum(function ($detail) {
-            $subtotal = (float) $detail->receiving_items->sum(function ($item) {
-                $lineTotal = (float) ($item->total ?? 0);
-                return $lineTotal > 0 ? $lineTotal : (float) ($item->raw_price ?? 0) * (float) ($item->qty_received ?? 0);
-            });
             $ppnType = strtoupper(trim((string) ($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA')));
-            return $subtotal + ($ppnType === 'EXCLUDE' ? round($subtotal * 0.11, 2) : 0);
+            return ReceivingInvoiceTotals::calculate($detail->receiving_items, $ppnType)['total'];
         });
         $periodPurchaseReturns = (float) DB::table('items_log as il')
             ->join('receiving as r', 'r.code', '=', 'il.transaction_code')
@@ -1212,8 +1209,10 @@ class FinanceController extends Controller
                 }
 
                 $ppnType = strtoupper(trim($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA'));
-                $ppnNominal = ($ppnType === 'EXCLUDE') ? round($subtotal * 0.11, 2) : 0;
-                $total = round($subtotal + $ppnNominal, 2);
+                $invoiceAmounts = ReceivingInvoiceTotals::calculate($detail->receiving_items, $ppnType);
+                $subtotal = $invoiceAmounts['subtotal'];
+                $ppnNominal = $invoiceAmounts['ppn'];
+                $total = $invoiceAmounts['total'];
 
                 $paymentHistory = [];
                 $totalTerbayar = 0;
@@ -1346,8 +1345,10 @@ class FinanceController extends Controller
                 }
 
                 $ppnType = strtoupper(trim($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA'));
-                $ppnNominal = ($ppnType === 'EXCLUDE') ? round($subtotal * 0.11, 2) : 0;
-                $total = round($subtotal + $ppnNominal, 2);
+                $invoiceAmounts = ReceivingInvoiceTotals::calculate($detail->receiving_items, $ppnType);
+                $subtotal = $invoiceAmounts['subtotal'];
+                $ppnNominal = $invoiceAmounts['ppn'];
+                $total = $invoiceAmounts['total'];
 
                 $latestPayment = $detail->payments->last();
                 $akunPembayaran = null;
@@ -2106,8 +2107,7 @@ class FinanceController extends Controller
             $subtotal += $totalItem;
         }
         $ppnType = strtoupper(trim($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA'));
-        $ppnNominal = ($ppnType === 'EXCLUDE') ? round($subtotal * 0.11, 2) : 0;
-        $totalInvoice = round($subtotal + $ppnNominal, 2);
+        $totalInvoice = ReceivingInvoiceTotals::calculate($detail->receiving_items, $ppnType)['total'];
 
         // Akumulasi yang sudah terbayar
         $alreadyPaid = (float) FinancePayment::where('receiving_detail_id', $detail->id)->sum('amount');
@@ -2303,8 +2303,7 @@ class FinanceController extends Controller
                 $subtotal += $totalItem;
             }
             $ppnType = strtoupper(trim($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA'));
-            $ppnNominal = ($ppnType === 'EXCLUDE') ? round($subtotal * 0.11, 2) : 0;
-            $totalInvoice = round($subtotal + $ppnNominal, 2);
+            $totalInvoice = ReceivingInvoiceTotals::calculate($detail->receiving_items, $ppnType)['total'];
 
             // Cek apakah sudah pernah ada payment record untuk detail ini
             $existingPayment = FinancePayment::where('receiving_detail_id', $detail->id)->first();
@@ -2390,8 +2389,7 @@ class FinanceController extends Controller
                     $subtotal += $totalItem;
                 }
                 $ppnType = strtoupper(trim($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA'));
-                $ppnNominal = ($ppnType === 'EXCLUDE') ? round($subtotal * 0.11, 2) : 0;
-                $totalInvoice = round($subtotal + $ppnNominal, 2);
+                $totalInvoice = ReceivingInvoiceTotals::calculate($detail->receiving_items, $ppnType)['total'];
 
                 // Hitung sisa yang belum terbayar
                 $alreadyPaid = (float) FinancePayment::where('receiving_detail_id', $detail->id)->sum('amount');
@@ -2542,7 +2540,7 @@ class FinanceController extends Controller
                     $subtotal += (float) ($item->total ?? ($qty * $price));
                 }
                 $ppnType = strtoupper(trim($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA'));
-                $invoiceTotal = round($subtotal + ($ppnType === 'EXCLUDE' ? round($subtotal * 0.11, 2) : 0), 2);
+                $invoiceTotal = ReceivingInvoiceTotals::calculate($detail->receiving_items, $ppnType)['total'];
                 $alreadyPaid = (float) FinancePayment::where('receiving_detail_id', $detail->id)->sum('amount');
                 $remaining = round(max(0, $invoiceTotal - $alreadyPaid), 2);
                 if ($remaining < 0.005) {
@@ -2615,8 +2613,7 @@ class FinanceController extends Controller
                     $subtotal += $totalItem;
                 }
                 $ppnType = strtoupper(trim($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA'));
-                $ppnNominal = ($ppnType === 'EXCLUDE') ? round($subtotal * 0.11, 2) : 0;
-                $totalInvoice = round($subtotal + $ppnNominal, 2);
+                $totalInvoice = ReceivingInvoiceTotals::calculate($detail->receiving_items, $ppnType)['total'];
 
                 $existingPayment = FinancePayment::where('receiving_detail_id', $detail->id)->first();
                 if ($existingPayment) {

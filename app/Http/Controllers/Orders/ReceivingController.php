@@ -2936,12 +2936,12 @@ class ReceivingController extends Controller
             'expired_date' => 'required',
             'batch' => 'required',
             'status' => 'required',
-            'invoice_date' => 'required',
+            'invoice_date' => 'required|date',
             'invoice_due' => 'required',
             'invoice_number' => 'required',
             'invoice_payment' => 'required',
             'invoice_ppn' => 'required',
-            'invoice_times' => 'required',
+            'invoice_times' => 'required|integer|min:0',
         ]);
 
         $receiving = Receiving::findOrFail($request->receiving_id);
@@ -2986,12 +2986,19 @@ class ReceivingController extends Controller
                     'creditor_code' => $request->creditor_code,
                 ]
             );
+            $creditorPpn = Creditor::where('code', $request->creditor_code)->value('ppn_type');
+            $invoicePpn = $details->exists && filled($details->invoice_ppn)
+                ? strtoupper(trim((string) $details->invoice_ppn))
+                : strtoupper(trim((string) ($creditorPpn ?: 'TANPA')));
+            $invoicePayment = strtoupper(trim((string) $request->invoice_payment));
+            $invoiceTimes = $invoicePayment === 'TUNAI' ? 0 : (int) $request->invoice_times;
+            $invoiceDue = Carbon::parse($request->invoice_date)->addDays($invoiceTimes)->toDateString();
             $details->fill([
                 'invoice_date' => $request->invoice_date,
-                'invoice_times' => $request->invoice_times,
-                'invoice_due' => $request->invoice_due,
-                'invoice_payment' => $request->invoice_payment,
-                'invoice_ppn' => $request->invoice_ppn,
+                'invoice_times' => $invoiceTimes,
+                'invoice_due' => $invoiceDue,
+                'invoice_payment' => $invoicePayment,
+                'invoice_ppn' => $invoicePpn,
             ]);
             if (empty($details->receiving_details_code)) {
                 $pId = $receiving->pharmacy_id ?? getPurchasingPharmacyId();

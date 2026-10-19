@@ -171,8 +171,10 @@
             @php
                 $ppnType = strtoupper(trim($details->invoice_ppn ?? $details->creditor?->ppn_type ?? 'TANPA'));
                 if ($ppnType === 'EXCLUDE') {
-                    $ppn = floor($fakturTotal * 0.11);
-                    $finalTotal = $fakturTotal + $ppn;
+                    $invoiceAmounts = \App\Support\ReceivingInvoiceTotals::calculate($details->receiving_items, $ppnType);
+                    $fakturTotal = $invoiceAmounts['subtotal'];
+                    $ppn = $invoiceAmounts['ppn'];
+                    $finalTotal = $invoiceAmounts['total'];
                     $ppnLabel = 'PPN (11%)';
                 } elseif ($ppnType === 'INCLUDE') {
                     $finalTotal = $fakturTotal;

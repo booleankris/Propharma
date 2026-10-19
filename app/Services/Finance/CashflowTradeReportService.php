@@ -10,6 +10,7 @@ use App\Models\ReceivingDetails;
 use App\Models\ReceivingItems;
 use App\Support\FinanceShift;
 use App\Support\LiphTransactionScope;
+use App\Support\ReceivingInvoiceTotals;
 use Carbon\CarbonPeriod;
 use Illuminate\Support\Carbon;
 
@@ -93,10 +94,8 @@ class CashflowTradeReportService
                 $rows['entities'][$key] = $this->blankEntity($key, $name, $rows['dates']);
             }
 
-            $amount = $this->number($item->total);
-            if ($amount <= 0) {
-                $amount = $this->number($item->raw_price) * $this->number($item->qty_received);
-            }
+            $ppnType = mb_strtoupper(trim((string) ($detail?->invoice_ppn ?? $creditor?->ppn_type ?? 'TANPA')));
+            $amount = ReceivingInvoiceTotals::calculate([$item], $ppnType)['total'];
             $rows['entities'][$key]['amounts'][$date] += $amount;
             $rows['entities'][$key]['total'] += $amount;
         }
@@ -189,12 +188,8 @@ class CashflowTradeReportService
         foreach ($details as $detail) {
             $code = (string) ($detail->creditor_code ?? '');
             $key = 'creditor:' . ($code !== '' ? $code : 'unknown');
-            $subtotal = $detail->receiving_items->sum(function ($item) {
-                $total = $this->number($item->total);
-                return $total > 0 ? $total : $this->number($item->raw_price) * $this->number($item->qty_received);
-            });
             $ppnType = mb_strtoupper(trim((string) ($detail->invoice_ppn ?? 'TANPA')));
-            $invoiceTotal = $subtotal + ($ppnType === 'EXCLUDE' ? round($subtotal * 0.11, 2) : 0);
+            $invoiceTotal = ReceivingInvoiceTotals::calculate($detail->receiving_items, $ppnType)['total'];
             $paid = $detail->payments->sum(fn ($payment) => $this->number($payment->amount));
             $balances[$key] = ($balances[$key] ?? 0) + max(0, $invoiceTotal - $paid);
         }

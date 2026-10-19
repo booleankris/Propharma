@@ -5,6 +5,7 @@ namespace App\Exports\Finance;
 use App\Models\Creditors;
 use App\Models\Pharmacies;
 use App\Models\Receiving;
+use App\Support\ReceivingInvoiceTotals;
 use Carbon\Carbon;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\WithColumnWidths;
@@ -117,13 +118,13 @@ class HutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         foreach ($query->get() as $rcv) {
             foreach ($rcv->receiving_details as $detail) {
                 $items = $detail->receiving_items ?? collect();
-                $subtotal = 0;
-                foreach ($items as $item) {
-                    $subtotal += (float) ($item->total ?? 0);
-                }
-
-                $ppn = (float) ($detail->ppn ?? round($subtotal * 0.11, 2));
-                $calculatedTotal = (float) ($detail->total ?? ($subtotal + $ppn));
+                $invoiceAmounts = ReceivingInvoiceTotals::calculate(
+                    $items,
+                    $detail->invoice_ppn ?? $detail->creditor?->ppn_type
+                );
+                $subtotal = $invoiceAmounts['subtotal'];
+                $ppn = $invoiceAmounts['ppn'];
+                $calculatedTotal = $invoiceAmounts['total'];
                 $nominal = (float) ($detail->nominal ?? $calculatedTotal);
                 $finalTotal = $nominal > 0 ? $nominal : $calculatedTotal;
 

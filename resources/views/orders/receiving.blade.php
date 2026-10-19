@@ -349,7 +349,8 @@
                     <div>
                         <label for="invoice_ppn" class="block text-xs font-semibold text-gray-700 mb-1">Jenis PPN</label>
                         <select id="invoice_ppn" name="invoice_ppn"
-                            class="w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            disabled
+                            class="w-full rounded-xl border border-gray-300 bg-gray-100 px-3.5 py-2.5 text-xs text-gray-500 cursor-not-allowed">
                             <option value="INCLUDE">Include</option>
                             <option value="EXCLUDE">Exclude</option>
                             <option value="TANPA">Tanpa</option>
@@ -839,6 +840,7 @@
         const invoice_times = document.getElementById('invoice_times');
         const invoice_due = document.getElementById('invoice_due');
         const invoice_ppn = document.getElementById('invoice_ppn');
+        let supplierCreditTime = invoice_times.value || '';
         const receiving_items_id = document.getElementById('receiving_items_id');
         const receiving_details_id = document.getElementById('receiving_details_id');
         let date_now = "{{ \Carbon\Carbon::now()->format('Y-m-d') }}";
@@ -1322,14 +1324,14 @@
                 })
                     .then(function (response) {
                         invoice_number.value = response.data.query?.invoice_number || '';
-                        invoice_times.value = response.data.query?.invoice_times || response.data.creditor
+                        supplierCreditTime = response.data.query?.invoice_times || response.data.creditor
                             ?.credit_time || '';
+                        invoice_times.value = supplierCreditTime;
                         $('#invoice_payment').val(response.data.query?.invoice_payment || '').trigger('change');
-                        invoice_due.value = response.data.query?.invoice_due || '';
                         invoice_date.value = response.data.query?.invoice_date ?? invoice_date.value;
                         document.getElementById('invoice_ppn').value = response.data.query?.invoice_ppn
                             ?.trim() || response.data.creditor?.ppn_type?.trim() || 'TANPA';
-                        count_due();
+                        syncPaymentTerms();
                         calculateVisualTotal();
                     })
                     .catch(console.error);
@@ -1372,12 +1374,12 @@
 
                         // console.log(invoice_times.value);
 
-                        invoice_times.value = response.data.query?.invoice_times || response.data.creditor
+                        supplierCreditTime = response.data.query?.invoice_times || response.data.creditor
                             .credit_time || '';
+                        invoice_times.value = supplierCreditTime;
                         $('#invoice_payment')
                             .val(response.data.query?.invoice_payment || '')
                             .trigger('change');
-                        invoice_due.value = response.data.query?.invoice_due || '';
                         invoice_date.value = response.data.query?.invoice_date ?? invoice_date.value;
 
                         const ppn =
@@ -1387,7 +1389,7 @@
 
                         document.getElementById('invoice_ppn').value = ppn;
 
-                        count_due();
+                        syncPaymentTerms();
                         calculateVisualTotal();
                         // invoice_number.value = response.data.query?.invoice_number || '';
 
@@ -2003,6 +2005,12 @@
         // Count Due
         function count_due() {
 
+            if ((invoice_payment.value || '').trim().toUpperCase() === 'TUNAI') {
+                invoice_times.value = '0';
+                invoice_due.value = invoice_date.value || '';
+                return;
+            }
+
             const days = parseInt(invoice_times.value);
             const baseDateValue = invoice_date.value;
 
@@ -2020,6 +2028,34 @@
 
             invoice_due.value = `${yyyy}-${mm}-${dd}`;
         }
+
+        function syncPaymentTerms() {
+            const isCash = (invoice_payment.value || '').trim().toUpperCase() === 'TUNAI';
+            if (isCash) {
+                if (!invoice_times.disabled && invoice_times.value !== '0') {
+                    supplierCreditTime = invoice_times.value;
+                }
+                invoice_times.value = '0';
+                invoice_times.disabled = true;
+                invoice_times.classList.add('bg-gray-100', 'text-gray-500', 'cursor-not-allowed');
+            } else {
+                if (invoice_times.disabled) {
+                    invoice_times.value = supplierCreditTime;
+                }
+                invoice_times.disabled = false;
+                invoice_times.classList.remove('bg-gray-100', 'text-gray-500', 'cursor-not-allowed');
+                count_due();
+            }
+        }
+
+        $('#invoice_payment').on('change select2:select select2:clear', syncPaymentTerms);
+        invoice_date.addEventListener('change', count_due);
+        invoice_times.addEventListener('input', () => {
+            if ((invoice_payment.value || '').trim().toUpperCase() !== 'TUNAI') {
+                supplierCreditTime = invoice_times.value;
+                count_due();
+            }
+        });
         // // Count Items Left
         // function count_itemsleft() {
         //     const qtyOrder = parseFloat(document.getElementById('qty').value) || 0;
@@ -2098,7 +2134,7 @@
         });
         invoice_times.addEventListener('keydown', function (e) {
             if (e.key == 'Enter') {
-                invoice_ppn.focus();
+                document.getElementById('print_faktur').focus();
             }
         });
         batch.addEventListener('keydown', function (e) {
