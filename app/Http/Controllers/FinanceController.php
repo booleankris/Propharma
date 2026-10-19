@@ -1177,7 +1177,6 @@ class FinanceController extends Controller
                 $query->where('invoice_payment', 'KREDIT');
             })
             ->latest('updated_at')
-            ->take(150)
             ->get();
 
         $hutangDagang = [];
