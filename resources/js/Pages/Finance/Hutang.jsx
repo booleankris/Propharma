@@ -617,7 +617,7 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                                         <th className="py-2.5 font-normal">Deskripsi</th>
                                         <th className="py-2.5 font-normal text-center">Kuantitas</th>
                                         <th className="py-2.5 font-normal">Satuan</th>
-                                        <th className="py-2.5 font-normal text-center">Discount</th>
+                                        <th className="py-2.5 font-normal text-center">Diskon / Ex. Diskon</th>
                                         <th className="py-2.5 font-normal text-right">Harga</th>
                                         <th className="py-2.5 font-normal text-center">Pajak</th>
                                         <th className="py-2.5 font-normal text-right">Jumlah</th>
@@ -635,7 +635,10 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                                                 <td className="py-3 text-slate-400">-</td>
                                                 <td className="py-3 text-center font-medium">{it.qty}</td>
                                                 <td className="py-3">{it.satuan}</td>
-                                                <td className="py-3 text-center">{it.diskon || '0%'}</td>
+                                                <td className="py-3 text-center">
+                                                    <div>{it.diskon || '0%'}</div>
+                                                    <div className="text-[10px] text-slate-400">Ex. {it.extraDiskon || '0%'}</div>
+                                                </td>
                                                 <td className="py-3 text-right">{formatNumberOnly(it.harga)}</td>
                                                 <td className="py-3 text-center text-slate-500">{it.pajak || 'PPN11'}</td>
                                                 <td className="py-3 text-right font-semibold text-slate-900">

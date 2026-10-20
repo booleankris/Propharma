@@ -1184,7 +1184,13 @@ class FinanceController extends Controller
 
                 $vendorName = $detail->creditor->name ?? ($detail->creditor_code ?: 'PBF / Vendor');
                 $itemsList = [];
-                $subtotal = 0;
+                $ppnType = strtoupper(trim($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA'));
+                $formatDiscount = static function ($value) {
+                    $value = (float) $value;
+                    return $value > 100
+                        ? 'Rp ' . number_format($value, 0, ',', '.')
+                        : rtrim(rtrim(number_format($value, 2, '.', ''), '0'), '.') . '%';
+                };
 
                 foreach ($detail->receiving_items as $item) {
                     $medName = $item->order_items->medicines->name ?? 'Obat';
@@ -1192,23 +1198,22 @@ class FinanceController extends Controller
                     $qty = (float) ($item->qty_received ?? 0);
                     $harga = (float) ($item->raw_price ?? ($item->order_items->price ?? 0));
                     $diskon = (float) ($item->discount ?? 0);
-                    $totalItem = (float) ($item->total ?? ($qty * $harga));
-
-                    $subtotal += $totalItem;
+                    $extraDiskon = (float) ($item->extra_discount ?? 0);
+                    $lineAmounts = ReceivingInvoiceTotals::lineAmounts($item, $ppnType);
 
                     $itemsList[] = [
                         'sku' => $sku,
                         'nama' => $medName,
                         'qty' => $qty,
                         'satuan' => $item->order_items->medicines->unit ?? 'Pcs',
-                        'diskon' => $diskon . '%',
+                        'diskon' => $formatDiscount($diskon),
+                        'extraDiskon' => $formatDiscount($extraDiskon),
                         'harga' => $harga,
-                        'pajak' => strtoupper($detail->invoice_ppn ?? 'PPN11'),
-                        'jumlah' => $totalItem,
+                        'pajak' => $ppnType,
+                        'jumlah' => $lineAmounts['total'],
                     ];
                 }
 
-                $ppnType = strtoupper(trim($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA'));
                 $invoiceAmounts = ReceivingInvoiceTotals::calculate($detail->receiving_items, $ppnType);
                 $subtotal = $invoiceAmounts['subtotal'];
                 $ppnNominal = $invoiceAmounts['ppn'];
@@ -1320,7 +1325,13 @@ class FinanceController extends Controller
 
                 $vendorName = $detail->creditor->name ?? ($detail->creditor_code ?: 'PBF / Vendor');
                 $itemsList = [];
-                $subtotal = 0;
+                $ppnType = strtoupper(trim($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA'));
+                $formatDiscount = static function ($value) {
+                    $value = (float) $value;
+                    return $value > 100
+                        ? 'Rp ' . number_format($value, 0, ',', '.')
+                        : rtrim(rtrim(number_format($value, 2, '.', ''), '0'), '.') . '%';
+                };
 
                 foreach ($detail->receiving_items as $item) {
                     $medName = $item->order_items->medicines->name ?? 'Obat';
@@ -1328,23 +1339,22 @@ class FinanceController extends Controller
                     $qty = (float) ($item->qty_received ?? 0);
                     $harga = (float) ($item->raw_price ?? ($item->order_items->price ?? 0));
                     $diskon = (float) ($item->discount ?? 0);
-                    $totalItem = (float) ($item->total ?? ($qty * $harga));
-
-                    $subtotal += $totalItem;
+                    $extraDiskon = (float) ($item->extra_discount ?? 0);
+                    $lineAmounts = ReceivingInvoiceTotals::lineAmounts($item, $ppnType);
 
                     $itemsList[] = [
                         'sku' => $sku,
                         'nama' => $medName,
                         'qty' => $qty,
                         'satuan' => $item->order_items->medicines->unit ?? 'Pcs',
-                        'diskon' => $diskon . '%',
+                        'diskon' => $formatDiscount($diskon),
+                        'extraDiskon' => $formatDiscount($extraDiskon),
                         'harga' => $harga,
-                        'pajak' => strtoupper($detail->invoice_ppn ?? 'PPN11'),
-                        'jumlah' => $totalItem,
+                        'pajak' => $ppnType,
+                        'jumlah' => $lineAmounts['total'],
                     ];
                 }
 
-                $ppnType = strtoupper(trim($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA'));
                 $invoiceAmounts = ReceivingInvoiceTotals::calculate($detail->receiving_items, $ppnType);
                 $subtotal = $invoiceAmounts['subtotal'];
                 $ppnNominal = $invoiceAmounts['ppn'];

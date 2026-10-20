@@ -9,52 +9,56 @@ namespace App\Support;
  */
 class ReceivingInvoiceTotals
 {
+    /** @return array{subtotal: float, ppn: float, total: float} */
+    public static function lineAmounts(object $item, ?string $ppnType = null): array
+    {
+        $type = strtoupper(trim((string) $ppnType));
+        $qty = (float) ($item->qty_received ?? $item->qty ?? 0);
+        $rawPrice = (float) ($item->raw_price ?? $item->order_items->price ?? 0);
+        $gross = $rawPrice * $qty;
+        $discount = self::discountAmount($gross, $item->discount ?? 0);
+        $extraDiscount = self::discountAmount($gross, $item->extra_discount ?? 0);
+        $net = max(0, $gross - $discount - $extraDiscount);
+
+        if ($type === 'EXCLUDE') {
+            $total = $net + round($net * 0.11);
+            return ['subtotal' => $net, 'ppn' => $total - $net, 'total' => $total];
+        }
+
+        if ($type === 'INCLUDE') {
+            $dpp = $net / 1.11;
+            return ['subtotal' => $dpp, 'ppn' => $net - $dpp, 'total' => $net];
+        }
+
+        return ['subtotal' => $net, 'ppn' => 0.0, 'total' => $net];
+    }
+
     /** @param iterable<object> $items */
     public static function calculate(iterable $items, ?string $ppnType = null): array
     {
-        $type = strtoupper(trim((string) $ppnType));
-        $dpp = 0.0;
+        $subtotal = 0.0;
+        $ppn = 0.0;
         $total = 0.0;
 
         foreach ($items as $item) {
-            $qty = (float) ($item->qty_received ?? 0);
-            $rawPrice = (float) ($item->raw_price ?? 0);
-            $gross = $rawPrice * $qty;
-            $discount = self::discountAmount($gross, $item->discount ?? 0);
-            $extraDiscount = self::discountAmount($gross, $item->extra_discount ?? 0);
-            $lineDpp = max(0, $gross - $discount - $extraDiscount);
-
-            $savedTotal = $item->total ?? null;
-            $lineTotal = ($savedTotal !== null && (float) $savedTotal > 0)
-                ? (float) $savedTotal
-                : ($type === 'EXCLUDE' ? $lineDpp + round($lineDpp * 0.11) : $lineDpp);
-            $total += $lineTotal;
-
-            if ($type === 'EXCLUDE') {
-                $dpp += $lineDpp;
-            }
+            $line = self::lineAmounts($item, $ppnType);
+            $subtotal += $line['subtotal'];
+            $ppn += $line['ppn'];
+            $total += $line['total'];
         }
 
-        $total = round($total, 2);
-        if ($type === 'EXCLUDE') {
-            // Derive tax from the exact saved line totals, including their rounding.
-            $ppn = round($total - $dpp, 2);
-            if ($ppn < 0) {
-                $dpp = $total;
-                $ppn = 0.0;
-            }
-
-            return ['subtotal' => round($dpp, 2), 'ppn' => $ppn, 'total' => $total];
-        }
-
-        return ['subtotal' => $total, 'ppn' => 0.0, 'total' => $total];
+        return [
+            'subtotal' => round($subtotal, 2),
+            'ppn' => round($ppn, 2),
+            'total' => round($total, 2),
+        ];
     }
 
     private static function discountAmount(float $amount, mixed $value): float
     {
         $discount = (float) $value;
         if ($discount > 0 && $discount <= 100) {
-            return (float) round($amount * $discount / 100);
+            return $amount * $discount / 100;
         }
 
         return max(0, $discount);
