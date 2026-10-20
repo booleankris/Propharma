@@ -1082,6 +1082,14 @@
         }
 
         function addItem() {
+            const isCash = (factor_payment.value || '').trim().toUpperCase() === 'TUNAI';
+            if (isCash) {
+                factor_times.value = '0';
+                if (!factor_due.value && factor_date.value) {
+                    factor_due.value = factor_date.value;
+                }
+            }
+
             const requiredFields = [{
                     el: receiving_items_id,
                     name: "Receiving Items ID"
@@ -1118,14 +1126,16 @@
                     el: factor_date,
                     name: "Tanggal Faktur"
                 },
-                {
-                    el: factor_times,
-                    name: "Waktu Kredit (Hari)"
-                },
-                {
-                    el: factor_due,
-                    name: "Jatuh Tempo"
-                },
+                ...(!isCash ? [
+                    {
+                        el: factor_times,
+                        name: "Waktu Kredit (Hari)"
+                    },
+                    {
+                        el: factor_due,
+                        name: "Jatuh Tempo"
+                    }
+                ] : []),
                 {
                     el: factor_ppn,
                     name: "Jenis PPN"
@@ -1173,14 +1183,14 @@
                 factor_payment: factor_payment.value,
                 factor_number: factor_number.value,
                 factor_date: factor_date.value,
-                factor_times: factor_times.value,
-                factor_due: factor_due.value,
+                factor_times: isCash ? 0 : (factor_times.value || 0),
+                factor_due: isCash ? (factor_due.value || factor_date.value || '') : factor_due.value,
                 factor_ppn: factor_ppn.value,
                 invoice_payment: factor_payment.value,
                 invoice_number: factor_number.value,
                 invoice_date: factor_date.value,
-                invoice_times: factor_times.value,
-                invoice_due: factor_due.value,
+                invoice_times: isCash ? 0 : (factor_times.value || 0),
+                invoice_due: isCash ? (factor_due.value || factor_date.value || '') : factor_due.value,
                 invoice_ppn: factor_ppn.value,
             };
 
@@ -1266,6 +1276,12 @@
 
         // Count Due
         function count_due() {
+            const isCash = (factor_payment.value || '').trim().toUpperCase() === 'TUNAI';
+            if (isCash) {
+                factor_times.value = '0';
+                factor_due.value = factor_date.value || '';
+                return;
+            }
 
             const days = parseInt(factor_times.value);
             const baseDateValue = factor_date.value;
@@ -1284,6 +1300,21 @@
 
             factor_due.value = `${yyyy}-${mm}-${dd}`;
         }
+
+        $('#factor_payment').on('change select2:select select2:clear', function() {
+            const isCash = (factor_payment.value || '').trim().toUpperCase() === 'TUNAI';
+            if (isCash) {
+                factor_times.value = '0';
+                factor_times.disabled = true;
+                factor_times.classList.add('bg-gray-100', 'text-gray-500', 'cursor-not-allowed');
+                count_due();
+            } else {
+                factor_times.disabled = false;
+                factor_times.classList.remove('bg-gray-100', 'text-gray-500', 'cursor-not-allowed');
+                count_due();
+            }
+        });
+        factor_date.addEventListener('change', count_due);
         // Count Items Left
         function count_itemsleft() {
             const qtyOrder = parseFloat(document.getElementById('qty').value) || 0;

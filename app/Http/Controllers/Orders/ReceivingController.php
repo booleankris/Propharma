@@ -2964,11 +2964,11 @@ class ReceivingController extends Controller
             'batch' => 'required',
             'status' => 'required',
             'invoice_date' => 'required|date',
-            'invoice_due' => 'required',
+            'invoice_due' => 'nullable',
             'invoice_number' => 'required',
             'invoice_payment' => 'required',
             'invoice_ppn' => 'required',
-            'invoice_times' => 'required|integer|min:0',
+            'invoice_times' => 'nullable|integer|min:0',
         ]);
 
         $receiving = Receiving::findOrFail($request->receiving_id);
@@ -3018,8 +3018,10 @@ class ReceivingController extends Controller
                 ? strtoupper(trim((string) $details->invoice_ppn))
                 : strtoupper(trim((string) ($creditorPpn ?: 'TANPA')));
             $invoicePayment = strtoupper(trim((string) $request->invoice_payment));
-            $invoiceTimes = $invoicePayment === 'TUNAI' ? 0 : (int) $request->invoice_times;
-            $invoiceDue = Carbon::parse($request->invoice_date)->addDays($invoiceTimes)->toDateString();
+            $invoiceTimes = $invoicePayment === 'TUNAI' ? 0 : (int) ($request->invoice_times ?? 0);
+            $invoiceDue = ($invoicePayment === 'TUNAI' || empty($request->invoice_due))
+                ? Carbon::parse($request->invoice_date)->addDays($invoiceTimes)->toDateString()
+                : Carbon::parse($request->invoice_due)->toDateString();
             $details->fill([
                 'invoice_date' => $request->invoice_date,
                 'invoice_times' => $invoiceTimes,

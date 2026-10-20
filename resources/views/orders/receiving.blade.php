@@ -1738,6 +1738,13 @@
             }
 
             let finalItemTotal = calculateVisualTotal();
+            const isCash = (invoice_payment.value || '').trim().toUpperCase() === 'TUNAI';
+            if (isCash) {
+                invoice_times.value = '0';
+                if (!invoice_due.value && invoice_date.value) {
+                    invoice_due.value = invoice_date.value;
+                }
+            }
             const payload = {
                 creditor_code: creditor.value,
                 receiving_items_id: document.getElementById('receiving_items_id').value,
@@ -1758,8 +1765,8 @@
                 invoice_payment: invoice_payment.value,
                 invoice_number: invoice_number.value,
                 invoice_date: invoice_date.value,
-                invoice_times: invoice_times.value,
-                invoice_due: invoice_due.value,
+                invoice_times: isCash ? 0 : (invoice_times.value || 0),
+                invoice_due: isCash ? (invoice_due.value || invoice_date.value || '') : invoice_due.value,
                 invoice_ppn: invoice_ppn.value,
             };
 
@@ -2038,6 +2045,7 @@
                 invoice_times.value = '0';
                 invoice_times.disabled = true;
                 invoice_times.classList.add('bg-gray-100', 'text-gray-500', 'cursor-not-allowed');
+                count_due();
             } else {
                 if (invoice_times.disabled) {
                     invoice_times.value = supplierCreditTime;
