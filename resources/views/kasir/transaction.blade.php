@@ -2627,7 +2627,7 @@
         </div>
  
         <div class="flex flex-col items-end flex-shrink-0 pt-0.5">
-            <div class="text-sm font-bold text-gray-900 whitespace-nowrap">${formatRupiah(it.net_price)}</div>
+            <div class="text-sm font-bold text-gray-900 whitespace-nowrap">${formatRupiah(getTransactionMedicinePrice(it))}</div>
             ${it.het_price && Number(it.het_price)
                 ? `<div class="text-[11px] font-semibold text-red-600 bg-red-50 border border-red-200 rounded px-1.5 py-0.5 mt-1 whitespace-nowrap">HET: ${formatRupiah(it.het_price)}</div>`
                 : ''}
@@ -2648,15 +2648,19 @@
         const hetPrice = Number(medicine?.het_price) || 0;
         const factor = Number(parameters) || 0;
 
-        // Use the selected invoice type's configured factor. HET is a ceiling,
-        // not a fixed price that makes UPDS/HV/credit settings ineffective.
+        // A configured HET is the sale price. Transaction factors are the fallback
+        // for medicines that do not have a usable HET in master data.
+        if (hetPrice > 0) {
+            return hetPrice;
+        }
+
         if (netPrice > 0 && factor > 0) {
             const debtorRounding = transaction_type === 'KREDIT' ? (Number(rounding) || 0) : 0;
             const calculatedPrice = netPrice * factor + debtorRounding;
-            return hetPrice > 0 ? Math.min(calculatedPrice, hetPrice) : calculatedPrice;
+            return calculatedPrice;
         }
 
-        return hetPrice > 0 ? hetPrice : netPrice;
+        return netPrice;
     }
 
     function selectItem(it) {
