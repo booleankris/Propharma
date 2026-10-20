@@ -62,6 +62,16 @@ class SuppliesController extends Controller
             return abs((int) $log->qty);
         }
 
+        // Revisi Penerimaan (status 8): qty is already signed (+ for added, - for reduced)
+        if ($status === 8) {
+            return (int) $log->qty;
+        }
+
+        // Hapus Penerimaan (status 9): qty is reversed inventory (-)
+        if ($status === 9) {
+            return -abs((int) $log->qty);
+        }
+
         // Opname (status 5): prefer the `total` field which stores the actual
         // signed discrepancy (counterPhysic - counterBefore). The qty_before /
         // qty_after columns on legacy rows may contain global medicines.stock
@@ -211,7 +221,7 @@ class SuppliesController extends Controller
             // 2. STATS CALCULATION: Calculate all sums 
             $stats = (clone $baseQuery)->selectRaw("
                 SUM(CASE WHEN status = 1 THEN qty ELSE 0 END) as qty_sold,
-                SUM(CASE WHEN status = 2 THEN qty ELSE 0 END) as qty_bought,
+                SUM(CASE WHEN status = 2 THEN qty WHEN status = 8 THEN qty WHEN status = 9 THEN qty ELSE 0 END) as qty_bought,
                 SUM(CASE WHEN status = 3 THEN qty ELSE 0 END) as qty_sold_rt,
                 SUM(CASE WHEN status = 4 THEN qty ELSE 0 END) as qty_bought_rt
             ")->first();
@@ -310,7 +320,7 @@ class SuppliesController extends Controller
                     return $row->medicines->name;
                 })
                 ->addColumn('batch_name', function ($row) {
-                    if (in_array($row->status, [2, 4, 7]) && $row->batches) {
+                    if (in_array($row->status, [2, 4, 7, 8, 9]) && $row->batches) {
                         return $row->batches->name;
                     }
                     return '-';
@@ -319,6 +329,14 @@ class SuppliesController extends Controller
                     if (in_array($row->status, [2, 4])) {
                         $detail = $row->receiving?->receiving_details?->first();
                         $codeStr = $detail?->receiving_details_code ?: ($detail?->invoice_number ?: $row->transaction_code);
+                    } elseif (in_array($row->status, [8, 9])) {
+                        if (preg_match('/REV-(?:ADD-|DEL-)?(\d+)/', (string) $row->transaction_code, $matches)) {
+                            $rItem = \App\Models\ReceivingItems::with('receiving_details')->find($matches[1]);
+                            $inv = $rItem?->receiving_details?->invoice_number ?: $rItem?->receiving_details?->receiving_details_code;
+                            $codeStr = $inv ? $row->transaction_code . ' (' . $inv . ')' : $row->transaction_code;
+                        } else {
+                            $codeStr = $row->transaction_code;
+                        }
                     } else {
                         $codeStr = $row->transaction_code;
                     }
@@ -347,6 +365,17 @@ class SuppliesController extends Controller
                         $creditorName = $row->receiving?->receiving_details?->first()?->creditor?->name;
                         if ($creditorName) {
                             return $creditorName;
+                        }
+                    }
+
+                    // Case 1b: Revisi Faktur (Status = 8) or Hapus Terima (Status = 9) -> Find PBF from related receiving item
+                    if (in_array($row->status, [8, 9])) {
+                        if (preg_match('/REV-(?:ADD-|DEL-)?(\d+)/', (string) $row->transaction_code, $matches)) {
+                            $rItem = \App\Models\ReceivingItems::with(['receiving_details.creditor', 'order_items.creditors'])->find($matches[1]);
+                            $pbfName = $rItem?->receiving_details?->creditor?->name ?? $rItem?->order_items?->creditors?->name;
+                            if ($pbfName) {
+                                return $pbfName;
+                            }
                         }
                     }
 
@@ -390,6 +419,16 @@ class SuppliesController extends Controller
                             // Penambahan (ke etalase/tujuan)
                             return "<div style='color:#248787;font-weight:bold;'><span>+</span><b>" . abs($row->qty) . "</b></div>";
                         }
+                    } else if ($row->status == 8) {
+                        if ($row->qty > 0) {
+                            return "<div style='color:#4173d3;font-weight:bold;'><span>+</span><b>" . abs($row->qty) . "</b></div>";
+                        } else if ($row->qty < 0) {
+                            return "<div style='color:#d34163;font-weight:bold;'><span>-</span><b>" . abs($row->qty) . "</b></div>";
+                        } else {
+                            return "<div style='color:#64748b;font-weight:bold;'><b>0</b></div>";
+                        }
+                    } else if ($row->status == 9) {
+                        return "<div style='color:#d34163;font-weight:bold;'><span>-</span><b>" . abs($row->qty) . "</b></div>";
                     }
                     return "";
                 })
@@ -435,6 +474,10 @@ class SuppliesController extends Controller
                         return "<div style='text-align: center; font-weight: bold; text-transform: uppercase; background-color: #fff035; color: #7a7817; padding: 6px 4px; width:100px; font-size: 9px; font-family: Poppins; border-radius: 25px;'>Stock Opname</div>";
                     } else if ($row->status == 7) {
                         return "<div style='text-align: center; font-weight: bold; text-transform: uppercase; background-color: #aeffeaad; color: #238787; padding: 6px 4px; width:100px; font-size: 9px; font-family: Poppins; border-radius: 25px;'>Mutasi Stok</div>";
+                    } else if ($row->status == 8) {
+                        return "<div style='text-align: center; font-weight: bold; text-transform: uppercase; background-color: #e0e7ff; color: #4338ca; padding: 6px 4px; width:100px; font-size: 9px; font-family: Poppins; border-radius: 25px;'>Revisi Faktur</div>";
+                    } else if ($row->status == 9) {
+                        return "<div style='text-align: center; font-weight: bold; text-transform: uppercase; background-color: #fee2e2; color: #b91c1c; padding: 6px 4px; width:100px; font-size: 9px; font-family: Poppins; border-radius: 25px;'>Hapus Terima</div>";
                     }
                     return "-";
                 })
@@ -1133,7 +1176,7 @@ class SuppliesController extends Controller
             }
 
             $total_sales = (clone $periodQuery)->where('status', 1)->sum('qty');
-            $total_orders = (clone $periodQuery)->where('status', 2)->sum('qty');
+            $total_orders = (clone $periodQuery)->whereIn('status', [2, 8, 9])->sum('qty');
 
             // Calculate the period opening from the same reconstructed ledger.
             // Quick-filter chips must not alter balances, only which rows are shown.
@@ -1169,7 +1212,7 @@ class SuppliesController extends Controller
                 } elseif ($ft === 'sales') {
                     $items->where('status', 1);
                 } elseif ($ft === 'purchase') {
-                    $items->where('status', 2);
+                    $items->whereIn('status', [2, 8, 9]);
                 } elseif ($ft === 'mutation') {
                     $items->where('status', 7);
                 } elseif ($ft === 'retur') {
@@ -1234,6 +1277,10 @@ class SuppliesController extends Controller
                             return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200 whitespace-nowrap">Penyesuaian</span>';
                         case 7:
                             return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-teal-50 text-teal-700 border border-teal-200 whitespace-nowrap">Mutasi Stok</span>';
+                        case 8:
+                            return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 whitespace-nowrap">Revisi Faktur</span>';
+                        case 9:
+                            return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap">Hapus Terima</span>';
                         default:
                             $lbl = e($row->type ?: 'Lainnya');
                             return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200 whitespace-nowrap">' . $lbl . '</span>';
@@ -1242,7 +1289,7 @@ class SuppliesController extends Controller
                 ->addColumn('batch_info', function ($row) {
                     $batch = $row->batches;
                     if (!$batch) return '<span class="text-slate-400 text-xs">—</span>';
-                    $batchName = e($batch->batch_1 ?: '-');
+                    $batchName = e($batch->name ?: ($batch->batch_1 ?: '-'));
                     $parsedExpiredDate = StockOpnameImportService::parseSmartExpiredDate($batch->expired_date);
                     $ed = $parsedExpiredDate ? Carbon::parse($parsedExpiredDate)->format('d/m/Y') : '-';
                     return '<div class="flex flex-col whitespace-nowrap leading-tight">

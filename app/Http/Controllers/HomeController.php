@@ -396,6 +396,20 @@ class HomeController extends Controller
                     $info['class'] = 'qty-out';
                     $info['color'] = 4;
                 }
+            } elseif ($log->status == 8) {
+                if ($log->qty > 0) {
+                    $info['label'] = 'Revisi Masuk';
+                    $info['icon'] = '↑';
+                    $info['sign'] = '+';
+                    $info['class'] = 'qty-in';
+                    $info['color'] = 2;
+                } elseif ($log->qty < 0) {
+                    $info['label'] = 'Revisi Keluar';
+                    $info['icon'] = '↓';
+                    $info['sign'] = '-';
+                    $info['class'] = 'qty-out';
+                    $info['color'] = 4;
+                }
             }
 
             $pharmacyName = $log->pharmacy_name ?? '-';

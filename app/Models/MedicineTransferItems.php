@@ -11,6 +11,7 @@ class MedicineTransferItems extends Model
     protected $fillable = [
         'medicine_transfer_id',
         'batches_id',
+        'receiving_items_id',
         'requested_medicine_id',
         'source_batches_id',
         'source_type',
