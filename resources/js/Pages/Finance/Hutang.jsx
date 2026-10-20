@@ -71,6 +71,7 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [datePreset, setDatePreset] = useState('all');
+    const [dateField, setDateField] = useState('due');
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 10;
 
@@ -161,10 +162,13 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
     // Filter & Sorting data
     const filteredHutang = useMemo(() => {
         let result = hutangDagang.filter((item) => {
-            const matchSearch =
-                (item.nomor && item.nomor.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                (item.vendor && item.vendor.toLowerCase().includes(searchTerm.toLowerCase())) ||
-                (item.referensi && item.referensi.toLowerCase().includes(searchTerm.toLowerCase()));
+            const normalizedSearch = searchTerm.trim().toLowerCase();
+            const matchSearch = !normalizedSearch || [
+                item.nomor,
+                item.vendor,
+                item.vendor_code,
+                item.referensi,
+            ].some((value) => String(value || '').toLowerCase().includes(normalizedSearch));
 
             let matchStatus = true;
             if (statusFilter === 'LUNAS') {
@@ -176,7 +180,7 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
             }
 
             const matchPbf = filterPbf
-                ? (item.vendor && item.vendor.toLowerCase().includes(filterPbf.toLowerCase()))
+                ? [item.vendor, item.vendor_code].some((value) => String(value || '').toLowerCase().includes(filterPbf.trim().toLowerCase()))
                 : true;
 
             const dueInfo = computeDueInfo(item);
@@ -187,7 +191,11 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                 matchDue = !dueInfo.isOverdue && dueInfo.daysRemaining <= 7 && !dueInfo.isLunas && dueInfo.hasDate;
             }
 
-            const itemDate = item.raw_tanggal?.slice(0, 10) || (item.tanggal?.includes('/') ? item.tanggal.split('/').reverse().join('-') : '');
+            const itemDate = dateField === 'invoice'
+                ? (item.raw_tanggal || '')
+                : dateField === 'received'
+                    ? (item.raw_tanggal_terima || '')
+                    : (item.raw_jatuh_tempo || '');
             const matchStartDate = !startDate || (itemDate && itemDate >= startDate);
             const matchEndDate = !endDate || (itemDate && itemDate <= endDate);
 
@@ -207,12 +215,17 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                 return dateB - dateA;
             }
 
-            // Default: Urutkan Waktu Faktur/Penerimaan (ASC atau DESC)
-            const timeA = a.raw_tanggal ? new Date(a.raw_tanggal).getTime() : (Number(a.id) || 0);
-            const timeB = b.raw_tanggal ? new Date(b.raw_tanggal).getTime() : (Number(b.id) || 0);
+            // Default: urutkan memakai tanggal yang sedang dipilih untuk filter rentang.
+            const sortDateKey = dateField === 'invoice'
+                ? 'raw_tanggal'
+                : dateField === 'received'
+                    ? 'raw_tanggal_terima'
+                    : 'raw_jatuh_tempo';
+            const timeA = a[sortDateKey] ? new Date(a[sortDateKey]).getTime() : (Number(a.id) || 0);
+            const timeB = b[sortDateKey] ? new Date(b[sortDateKey]).getTime() : (Number(b.id) || 0);
             return sortOrder === 'asc' ? timeA - timeB : timeB - timeA;
         });
-    }, [hutangDagang, searchTerm, statusFilter, filterPbf, sortOrder, dueFilter, startDate, endDate]);
+    }, [hutangDagang, searchTerm, statusFilter, filterPbf, sortOrder, dueFilter, startDate, endDate, dateField]);
 
     const totalPages = Math.ceil(filteredHutang.length / itemsPerPage) || 1;
     const paginatedHutang = useMemo(() => {
@@ -833,7 +846,7 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                                     <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                                     <input
                                         type="text"
-                                        placeholder="Cari faktur, PBF, atau kode NT..."
+                                        placeholder="Cari nomor faktur, PBF, kode PBF, atau penerimaan..."
                                         value={searchTerm}
                                         onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                                         className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 focus:bg-white focus:outline-none"
@@ -878,7 +891,7 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
 
 
 
-                                {/* Filter 1: Waktu Pembuatan ASC / DESC */}
+                                {/* Urutan tanggal faktur */}
                                 <button
                                     type="button"
                                     onClick={() => {
@@ -889,14 +902,14 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                                             ? 'bg-amber-50 border-amber-300 text-amber-800 font-bold shadow-2xs'
                                             : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
                                         }`}
-                                    title="Klik untuk mengubah urutan waktu faktur"
+                                    title="Klik untuk mengubah urutan tanggal faktur"
                                 >
                                     {sortOrder === 'asc' ? (
                                         <ArrowUp className="w-3.5 h-3.5 text-amber-600" />
                                     ) : (
                                         <ArrowDown className="w-3.5 h-3.5 text-slate-500" />
                                     )}
-                                    <span>Waktu: {sortOrder === 'asc' ? 'Terlama (ASC)' : 'Terbaru (DESC)'}</span>
+                                    <span>{dateField === 'invoice' ? 'Faktur' : dateField === 'received' ? 'Terima' : 'Jatuh tempo'}: {sortOrder === 'asc' ? 'Terlama (ASC)' : 'Terbaru (DESC)'}</span>
                                 </button>
 
                                 {/* Filter 2: Berdasarkan Jatuh Tempo */}
@@ -981,7 +994,7 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                                     <span>Import Pembayaran</span>
                                 </button>
                                 <a
-                                    href={`/finance/export/hutang?search=${encodeURIComponent(searchTerm)}&status=${encodeURIComponent(statusFilter === 'ALL' ? '' : statusFilter)}&pbf=${encodeURIComponent(filterPbf)}&sort_order=${encodeURIComponent(sortOrder)}&due_mode=${encodeURIComponent(dueFilter)}`}
+                                    href={`/finance/export/hutang?search=${encodeURIComponent(searchTerm)}&status=${encodeURIComponent(statusFilter === 'ALL' ? '' : statusFilter)}&pbf=${encodeURIComponent(filterPbf)}&sort_order=${encodeURIComponent(sortOrder)}&due_mode=${encodeURIComponent(dueFilter)}&date_field=${encodeURIComponent(dateField)}&start_date=${encodeURIComponent(startDate)}&end_date=${encodeURIComponent(endDate)}`}
                                     className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100/80 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-semibold transition shadow-2xs cursor-pointer"
                                     title="Export data hutang dagang ke Excel (.xlsx) dengan format rapi dan estetik"
                                 >
@@ -1002,7 +1015,19 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                             )}
                         </div>
 
-                        <div className="flex items-center border-t border-slate-100 pt-3">
+                        <div className="flex flex-wrap items-center gap-3 border-t border-slate-100 pt-3">
+                            <label className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600">
+                                <span>Filter tanggal berdasarkan</span>
+                                <select
+                                    value={dateField}
+                                    onChange={(e) => { setDateField(e.target.value); setCurrentPage(1); }}
+                                    className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-700 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                >
+                                    <option value="due">Jatuh tempo</option>
+                                    <option value="invoice">Tanggal faktur</option>
+                                    <option value="received">Tanggal terima</option>
+                                </select>
+                            </label>
                             <DateRangeFilter
                                 startDate={startDate}
                                 endDate={endDate}

@@ -49,11 +49,10 @@ export default function PbfCombobox({ pbfs = [], selectedPbf = '', onSelectPbf, 
                     type="text"
                     value={query}
                     onChange={(e) => {
-                        setQuery(e.target.value);
+                        const value = e.target.value;
+                        setQuery(value);
                         setIsOpen(true);
-                        if (!e.target.value) {
-                            onSelectPbf('');
-                        }
+                        onSelectPbf(value);
                     }}
                     onFocus={() => setIsOpen(true)}
                     placeholder={placeholder}

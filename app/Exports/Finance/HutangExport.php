@@ -2,7 +2,6 @@
 
 namespace App\Exports\Finance;
 
-use App\Models\Creditors;
 use App\Models\Pharmacies;
 use App\Models\Receiving;
 use App\Support\ReceivingInvoiceTotals;
@@ -45,9 +44,7 @@ class HutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         $filterStatus = $this->filters['status'] ?? 'SEMUA';
         $filterPbf = 'Semua PBF';
         if (!empty($this->filters['pbf'])) {
-            $pbf = Creditors::where('code', $this->filters['pbf'])->orWhere('id', $this->filters['pbf'])->first();
-            if ($pbf)
-                $filterPbf = $pbf->name;
+            $filterPbf = $this->filters['pbf'];
         }
 
         $rows = [
@@ -89,11 +86,10 @@ class HutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
 
         if (!empty($this->filters['search'])) {
             $s = trim($this->filters['search']);
-            $query->where(function ($q) use ($s) {
-                $q
-                    ->where('invoice_number', 'like', "%{$s}%")
-                    ->orWhere('ref_number', 'like', "%{$s}%")
-                    ->orWhereHas('receiving_details.creditor', function ($qc) use ($s) {
+            $query->whereHas('receiving_details', function ($q) use ($s) {
+                $q->where('invoice_number', 'like', "%{$s}%")
+                    ->orWhere('receiving_details_code', 'like', "%{$s}%")
+                    ->orWhereHas('creditor', function ($qc) use ($s) {
                         $qc->where('name', 'like', "%{$s}%")->orWhere('code', 'like', "%{$s}%");
                     });
             });
@@ -102,11 +98,11 @@ class HutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
         if (!empty($this->filters['pbf'])) {
             $p = $this->filters['pbf'];
             $query->whereHas('receiving_details.creditor', function ($qc) use ($p) {
-                $qc->where('code', $p)->orWhere('id', $p);
+                $qc->where('name', 'like', "%{$p}%")->orWhere('code', 'like', "%{$p}%");
             });
         }
 
-        $query->orderBy('date', 'desc')->orderBy('id', 'desc');
+        $query->orderBy('date', ($this->filters['sort_order'] ?? 'desc') === 'asc' ? 'asc' : 'desc')->orderBy('id', 'desc');
 
         $no = 1;
         $totalSubtotalSemua = 0;
@@ -143,7 +139,32 @@ class HutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                 }
 
                 $tglFaktur = $this->safeFormatDate($rcv->date);
-                $tempoDate = $this->safeFormatDate($detail->payment_due_date);
+                $tempoDate = $this->safeFormatDate($detail->invoice_due);
+                $dateField = $this->filters['date_field'] ?? 'due';
+                $filterDate = match ($dateField) {
+                    'invoice' => $detail->invoice_date,
+                    'received' => $rcv->date,
+                    default => $detail->invoice_due,
+                };
+                $filterDate = $this->safeParseDate($filterDate)?->format('Y-m-d') ?? '';
+                if (!empty($this->filters['start_date']) && (!$filterDate || $filterDate < $this->filters['start_date'])) {
+                    continue;
+                }
+                if (!empty($this->filters['end_date']) && (!$filterDate || $filterDate > $this->filters['end_date'])) {
+                    continue;
+                }
+
+                $dueMode = $this->filters['due_mode'] ?? 'all';
+                $dueDate = $this->safeParseDate($detail->invoice_due);
+                if ($dueMode === 'overdue' && ($isLunas || !$dueDate || $dueDate->endOfDay()->isFuture())) {
+                    continue;
+                }
+                if ($dueMode === 'due_soon') {
+                    $daysRemaining = $dueDate ? (int) Carbon::now()->startOfDay()->diffInDays($dueDate->copy()->startOfDay(), false) : null;
+                    if ($isLunas || $daysRemaining === null || $daysRemaining < 0 || $daysRemaining > 7) {
+                        continue;
+                    }
+                }
 
                 $totalSubtotalSemua += $subtotal;
                 $totalPpnSemua += $ppn;
@@ -373,6 +394,34 @@ class HutangExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
             return Carbon::parse($str)->format('d/m/Y');
         } catch (\Throwable $e) {
             return $str;
+        }
+    }
+
+    protected function safeParseDate($date): ?Carbon
+    {
+        if (empty($date)) {
+            return null;
+        }
+        if ($date instanceof \DateTimeInterface) {
+            return Carbon::instance($date);
+        }
+
+        $value = trim((string) $date);
+        foreach (['!Y-m-d', '!d/m/Y', '!Y-m-d H:i:s', '!d/m/Y H:i:s'] as $format) {
+            try {
+                $parsed = Carbon::createFromFormat($format, $value);
+                if ($parsed !== false) {
+                    return $parsed;
+                }
+            } catch (\Throwable $e) {
+                // Continue trying supported legacy formats.
+            }
+        }
+
+        try {
+            return Carbon::parse($value);
+        } catch (\Throwable $e) {
+            return null;
         }
     }
 }

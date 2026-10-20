@@ -1151,6 +1151,35 @@ class FinanceController extends Controller
         ];
     }
 
+    private function normalizeFinanceDate($value): ?string
+    {
+        if (empty($value)) {
+            return null;
+        }
+
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format('Y-m-d');
+        }
+
+        $date = trim((string) $value);
+        foreach (['!Y-m-d', '!d/m/Y', '!Y-m-d H:i:s', '!d/m/Y H:i:s'] as $format) {
+            try {
+                $parsed = \Carbon\Carbon::createFromFormat($format, $date);
+                if ($parsed !== false) {
+                    return $parsed->format('Y-m-d');
+                }
+            } catch (\Throwable $e) {
+                // Try the next known legacy date format.
+            }
+        }
+
+        try {
+            return \Carbon\Carbon::parse($date)->format('Y-m-d');
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
     /**
      * Helper: Ambil data faktur pembelian KREDIT (Hutang Dagang).
      */
@@ -1250,7 +1279,9 @@ class FinanceController extends Controller
                     $statusLabel = 'Dibayar Sebagian';
                 }
 
-                $dueCarbon = $detail->invoice_due ? \Carbon\Carbon::parse($detail->invoice_due)->endOfDay() : null;
+                $invoiceDate = $this->normalizeFinanceDate($detail->invoice_date);
+                $dueDate = $this->normalizeFinanceDate($detail->invoice_due);
+                $dueCarbon = $dueDate ? \Carbon\Carbon::parse($dueDate)->endOfDay() : null;
                 $isOverdue = ($dueCarbon && !$isLunas) ? $dueCarbon->isPast() : false;
                 $daysOverdue = ($isOverdue && $dueCarbon) ? (int) $dueCarbon->diffInDays(now()) : 0;
                 $daysRemaining = (!$isOverdue && $dueCarbon && !$isLunas) ? (int) now()->diffInDays($dueCarbon) : 0;
@@ -1260,9 +1291,11 @@ class FinanceController extends Controller
                     'receiving_id' => $rec->id,
                     'nomor' => $detail->invoice_number ?: $rec->code,
                     'vendor' => $vendorName,
+                    'vendor_code' => $detail->creditor_code ?: ($detail->creditor->code ?? ''),
                     'referensi' => $detail->receiving_details_code ?: $rec->code,
-                    'tanggal' => $detail->invoice_date ? \Carbon\Carbon::parse($detail->invoice_date)->format('d/m/Y') : ($rec->date ?: '-'),
-                    'raw_tanggal' => $detail->invoice_date ? \Carbon\Carbon::parse($detail->invoice_date)->format('Y-m-d') : ($rec->date ?: null),
+                    'tanggal' => $invoiceDate ? \Carbon\Carbon::parse($invoiceDate)->format('d/m/Y') : ($rec->date ?: '-'),
+                    'raw_tanggal' => $invoiceDate,
+                    'raw_tanggal_terima' => $this->normalizeFinanceDate($rec->date),
                     'jatuhTempo' => $dueCarbon ? $dueCarbon->format('d/m/Y') : '-',
                     'raw_jatuh_tempo' => $dueCarbon ? $dueCarbon->format('Y-m-d') : null,
                     'is_overdue' => $isOverdue,
@@ -3160,6 +3193,11 @@ class FinanceController extends Controller
             'search' => $request->query('search', ''),
             'pbf' => $request->query('pbf', ''),
             'status' => $request->query('status', ''),
+            'due_mode' => $request->query('due_mode', 'all'),
+            'date_field' => $request->query('date_field', 'due'),
+            'start_date' => $request->query('start_date', ''),
+            'end_date' => $request->query('end_date', ''),
+            'sort_order' => $request->query('sort_order', 'desc'),
         ];
 
         return Excel::download(new HutangExport($targetPharmacyIds, $filters, $activePharmacy), $filename);
