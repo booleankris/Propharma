@@ -282,6 +282,7 @@
                                 <th style="width: 140px;">No. Terima & Faktur</th>
                                 <th>Nama Obat & Satuan</th>
                                 <th style="width: 180px;">PBF / Distributor</th>
+                                <th style="width: 170px;">Nama Apotek</th>
                                 <th style="width: 130px;">Harga Beli (Faktur)</th>
                                 <th style="width: 150px;">Master Saat Ini</th>
                                 <th style="width: 220px; text-align: right;">Aksi</th>
@@ -428,6 +429,13 @@
                         orderable: false,
                         render: function(data) {
                             return `<div class="text-xs font-medium text-slate-700 max-w-[200px] truncate" title="${data || '-'}">${data || '-'}</div>`;
+                        }
+                    },
+                    {
+                        data: 'pharmacy_name',
+                        orderable: false,
+                        render: function(data) {
+                            return `<div class="text-xs font-medium text-slate-700 max-w-[180px] truncate" title="${data || '-'}">${data || '-'}</div>`;
                         }
                     },
                     {

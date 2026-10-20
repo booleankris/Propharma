@@ -72,6 +72,7 @@ class BuyPriceHistoryExport implements FromArray, ShouldAutoSize, WithStyles, Wi
                 'No. Terima',
                 'No. Faktur',
                 'PBF / Distributor',
+                'Nama Apotek',
                 'Kode Obat',
                 'Nama Obat',
                 'Kemasan & Satuan',
@@ -132,6 +133,7 @@ class BuyPriceHistoryExport implements FromArray, ShouldAutoSize, WithStyles, Wi
             $creditor = $row->receiving_details?->creditor?->name 
                 ?? $row->order_items?->creditors?->name 
                 ?? '-';
+            $pharmacy = $row->receiving_details?->receiving?->pharmacy?->name ?? '-';
 
             // Diff & status
             $diff = $unitHnaReceived - $masterUnitHna;
@@ -153,6 +155,7 @@ class BuyPriceHistoryExport implements FromArray, ShouldAutoSize, WithStyles, Wi
                 $noTerima,
                 $noFaktur,
                 $creditor,
+                $pharmacy,
                 $med?->code ?? '-',
                 $med?->name ?? '-',
                 $satuanLabel,
@@ -172,14 +175,14 @@ class BuyPriceHistoryExport implements FromArray, ShouldAutoSize, WithStyles, Wi
         $highestRow = $sheet->getHighestRow();
 
         // Header Title
-        $sheet->mergeCells('A1:M1');
-        $sheet->mergeCells('A2:M2');
+        $sheet->mergeCells('A1:N1');
+        $sheet->mergeCells('A2:N2');
 
         $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
         $sheet->getStyle('A2')->getFont()->setSize(10)->getColor()->setRGB('64748B');
 
         // Table Header Row 4
-        $headerRange = 'A4:M4';
+        $headerRange = 'A4:N4';
         $sheet->getStyle($headerRange)->applyFromArray([
             'font' => [
                 'bold' => true,
@@ -200,7 +203,7 @@ class BuyPriceHistoryExport implements FromArray, ShouldAutoSize, WithStyles, Wi
         $sheet->getRowDimension(4)->setRowHeight(28);
 
         if ($highestRow >= 5) {
-            $dataRange = "A5:M{$highestRow}";
+            $dataRange = "A5:N{$highestRow}";
 
             // Borders
             $sheet->getStyle($dataRange)->applyFromArray([
@@ -218,18 +221,18 @@ class BuyPriceHistoryExport implements FromArray, ShouldAutoSize, WithStyles, Wi
             // Alignments
             $sheet->getStyle("A5:A{$highestRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
             $sheet->getStyle("B5:B{$highestRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle("F5:F{$highestRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle("H5:H{$highestRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle("M5:M{$highestRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle("G5:G{$highestRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle("I5:I{$highestRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle("N5:N{$highestRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-            // Currency formatting on column I, J, K, L
-            $sheet->getStyle("I5:L{$highestRow}")->getNumberFormat()->setFormatCode('#,##0');
-            $sheet->getStyle("I5:L{$highestRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+            // Currency formatting on columns J, K, L, M
+            $sheet->getStyle("J5:M{$highestRow}")->getNumberFormat()->setFormatCode('#,##0');
+            $sheet->getStyle("J5:M{$highestRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
 
             // Zebra striping
             for ($r = 5; $r <= $highestRow; $r++) {
                 if ($r % 2 === 0) {
-                    $sheet->getStyle("A{$r}:M{$r}")->getFill()->applyFromArray([
+                    $sheet->getStyle("A{$r}:N{$r}")->getFill()->applyFromArray([
                         'fillType' => Fill::FILL_SOLID,
                         'startColor' => ['rgb' => 'F8FAFC'],
                     ]);

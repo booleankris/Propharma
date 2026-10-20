@@ -1062,6 +1062,9 @@ class ReceivingController extends Controller
                     ?? $row->order_items?->creditors?->name 
                     ?? '-';
             })
+            ->addColumn('pharmacy_name', function ($row) {
+                return $row->receiving_details?->receiving?->pharmacy?->name ?? '-';
+            })
             ->addColumn('raw_price_num', function ($row) use ($getRawReceived) {
                 $isPack = ($row->order_items?->pack == 1);
                 $content = (float) ($row->order_items?->medicines?->content ?? 1);
@@ -1997,6 +2000,7 @@ class ReceivingController extends Controller
     {
         $order = Order::with([
             'order_items.medicines',
+            'order_items.creditors',
             'order_items.receivingItems.batches',
             'order_items.receivingItems.locations',
             'order_items.receivingItems.etalases',

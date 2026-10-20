@@ -79,6 +79,94 @@
             bindRecalc('add_raw_price', 'input', e => { formatInputRupiah(e); recalcAddTotal(); });
             bindRecalc('add_discount', 'input', recalcAddTotal);
             bindRecalc('add_extra_discount', 'input', recalcAddTotal);
+
+            const receivingInput = document.getElementById('revisionFilterReceiving');
+            const medicineInput = document.getElementById('revisionFilterMedicine');
+            const pbfSelect = document.getElementById('revisionFilterPbf');
+            const resetButton = document.getElementById('revisionFilterReset');
+            const countLabel = document.getElementById('revisionFilterCount');
+            const emptyState = document.getElementById('revisionFilterEmpty');
+
+            const normalizeSearch = value => (value || '').toLocaleLowerCase('id-ID').trim();
+            const applyRevisionFilters = () => {
+                if (!receivingInput || !medicineInput || !pbfSelect) return;
+
+                const receivingQuery = normalizeSearch(receivingInput.value);
+                const medicineQuery = normalizeSearch(medicineInput.value);
+                const selectedPbf = pbfSelect.value;
+                let visibleItems = 0;
+                let visibleEmptyDetails = 0;
+                const detailItemsById = new Map();
+                document.querySelectorAll('[data-revision-detail-item]').forEach(row => {
+                    const detailId = row.dataset.detailId;
+                    if (!detailItemsById.has(detailId)) detailItemsById.set(detailId, []);
+                    detailItemsById.get(detailId).push(row);
+                });
+
+                document.querySelectorAll('[data-revision-detail-header]').forEach(header => {
+                    const detailId = header.dataset.detailId;
+                    const receivingMatches = normalizeSearch(header.dataset.receivingCode).includes(receivingQuery);
+                    const detailItems = detailItemsById.get(detailId) || [];
+                    const emptyRow = document.querySelector(`[data-revision-detail-empty][data-detail-id="${detailId}"]`);
+
+                    let matchedItems = 0;
+                    detailItems.forEach(row => {
+                        const medicineMatches = normalizeSearch(row.dataset.medicineName).includes(medicineQuery);
+                        const pbfMatches = !selectedPbf || row.dataset.pbfCode === selectedPbf;
+                        const visible = receivingMatches && medicineMatches && pbfMatches;
+                        row.classList.toggle('hidden', !visible);
+                        if (visible) matchedItems++;
+                    });
+
+                    const emptyPbfMatches = !selectedPbf || header.dataset.pbfCode === selectedPbf;
+                    const showEmpty = Boolean(emptyRow) && receivingMatches && !medicineQuery && emptyPbfMatches;
+                    if (emptyRow) emptyRow.classList.toggle('hidden', !showEmpty);
+
+                    const showHeader = matchedItems > 0 || showEmpty;
+                    header.classList.toggle('hidden', !showHeader);
+                    visibleItems += matchedItems;
+                    if (showEmpty) visibleEmptyDetails++;
+                });
+
+                let visibleOrphans = 0;
+                document.querySelectorAll('[data-revision-orphan-item]').forEach(row => {
+                    const medicineMatches = normalizeSearch(row.dataset.medicineName).includes(medicineQuery);
+                    const pbfMatches = !selectedPbf || row.dataset.pbfCode === selectedPbf;
+                    const visible = !receivingQuery && medicineMatches && pbfMatches;
+                    row.classList.toggle('hidden', !visible);
+                    if (visible) visibleOrphans++;
+                });
+                const orphanHeader = document.querySelector('[data-revision-orphan-header]');
+                if (orphanHeader) orphanHeader.classList.toggle('hidden', visibleOrphans === 0);
+
+                const totalVisibleItems = visibleItems + visibleOrphans;
+                const hasVisibleRows = totalVisibleItems > 0 || visibleEmptyDetails > 0;
+                if (emptyState) emptyState.classList.toggle('hidden', hasVisibleRows);
+                const noDetailsRow = document.querySelector('[data-revision-no-details]');
+                if (noDetailsRow) {
+                    const hasOrphanRows = document.querySelectorAll('[data-revision-orphan-item]').length > 0;
+                    noDetailsRow.classList.toggle('hidden', hasOrphanRows);
+                }
+                if (countLabel) {
+                    countLabel.textContent = `${totalVisibleItems} item tampil` +
+                        (visibleEmptyDetails ? ` · ${visibleEmptyDetails} nomor terima kosong` : '');
+                }
+            };
+
+            if (receivingInput && medicineInput && pbfSelect) {
+                receivingInput.addEventListener('input', applyRevisionFilters);
+                medicineInput.addEventListener('input', applyRevisionFilters);
+                pbfSelect.addEventListener('change', applyRevisionFilters);
+                if (resetButton) {
+                    resetButton.addEventListener('click', () => {
+                        receivingInput.value = '';
+                        medicineInput.value = '';
+                        pbfSelect.value = '';
+                        applyRevisionFilters();
+                    });
+                }
+                applyRevisionFilters();
+            }
         });
 
         // ================== MODAL TAMBAH OBAT ==================

@@ -2643,6 +2643,22 @@
         });
     }
 
+    function getTransactionMedicinePrice(medicine) {
+        const netPrice = Number(medicine?.net_price) || 0;
+        const hetPrice = Number(medicine?.het_price) || 0;
+        const factor = Number(parameters) || 0;
+
+        // Use the selected invoice type's configured factor. HET is a ceiling,
+        // not a fixed price that makes UPDS/HV/credit settings ineffective.
+        if (netPrice > 0 && factor > 0) {
+            const debtorRounding = transaction_type === 'KREDIT' ? (Number(rounding) || 0) : 0;
+            const calculatedPrice = netPrice * factor + debtorRounding;
+            return hetPrice > 0 ? Math.min(calculatedPrice, hetPrice) : calculatedPrice;
+        }
+
+        return hetPrice > 0 ? hetPrice : netPrice;
+    }
+
     function selectItem(it) {
         if (!it) {
             isScanning = false;
@@ -2672,16 +2688,9 @@
             dosage.value = it.dosage;
         }
 
-        let raw;
-        if (it.het_price !== null && it.het_price !== 0 && it.het_price !== '') {
-            raw = Number(it.het_price);
-            rawprice = raw;
-            het = 1;
-        } else {
-            raw = Number(it.net_price) * Number(parameters || 1);
-            rawprice = it.net_price;
-            het = 0;
-        }
+        const raw = getTransactionMedicinePrice(it);
+        rawprice = Number(it.net_price) || raw;
+        het = Number(it.het_price) > 0 ? 1 : 0;
 
         price.value = formatRupiah(raw);
         price2 = raw;
@@ -4687,12 +4696,7 @@
             // // }
 
             if (selectedMedicine) {
-                if (het === 1) {
-                    raw = Number(selectedMedicine.het_price || rawprice);
-                } else {
-                    raw = Number(rawprice) * Number(parameters || 1) +
-                        (transaction_type === 'KREDIT' ? Number(rounding || 0) : 0);
-                }
+                raw = getTransactionMedicinePrice(selectedMedicine);
 
                 price.value = formatRupiah(raw);
                 console.log("harga Total : " + raw);

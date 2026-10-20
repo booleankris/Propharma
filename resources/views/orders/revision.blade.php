@@ -47,11 +47,47 @@
 
             <!-- Main Table Section -->
             <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 space-y-4">
+                @php
+                    $revisionPbfOptions = $order->order_items
+                        ->pluck('creditors')
+                        ->merge($allReceivingDetails->pluck('creditor'))
+                        ->filter()
+                        ->unique('code')
+                        ->sortBy('name');
+                @endphp
                 <div class="flex items-center justify-between">
                     <div>
                         <h2 class="text-sm font-bold text-gray-800">Daftar Penerimaan & Rincian Faktur</h2>
                         <p class="text-xs text-gray-500">Kelola item obat, tambahkan obat ke nomor terima tertentu, atau
                             gabungkan nomor terima yang terpisah.</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3 rounded-xl border border-gray-200 bg-gray-50 p-3">
+                    <label class="block">
+                        <span class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-gray-500">Nomor Terima</span>
+                        <input id="revisionFilterReceiving" type="search" placeholder="Cari nomor terima..." autocomplete="off"
+                            class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs text-gray-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
+                    </label>
+                    <label class="block">
+                        <span class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-gray-500">Nama Obat</span>
+                        <input id="revisionFilterMedicine" type="search" placeholder="Cari nama obat..." autocomplete="off"
+                            class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs text-gray-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
+                    </label>
+                    <label class="block">
+                        <span class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-gray-500">PBF</span>
+                        <select id="revisionFilterPbf"
+                            class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs text-gray-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
+                            <option value="">Semua PBF</option>
+                            @foreach ($revisionPbfOptions as $pbf)
+                                <option value="{{ $pbf->code }}">{{ $pbf->name }}</option>
+                            @endforeach
+                        </select>
+                    </label>
+                    <div class="md:col-span-3 flex items-center justify-between gap-3">
+                        <span id="revisionFilterCount" class="text-[11px] text-gray-500" aria-live="polite"></span>
+                        <button id="revisionFilterReset" type="button"
+                            class="rounded-lg px-3 py-1.5 text-[11px] font-semibold text-blue-700 hover:bg-blue-50">Reset filter</button>
                     </div>
                 </div>
 
@@ -77,7 +113,8 @@
                                     $itemsCount = $rd->receiving_items->count();
                                 @endphp
                                 <!-- Group Header for this Nomor Terima -->
-                                <tr class="bg-blue-50/70 border-t border-b border-blue-100">
+                                <tr class="bg-blue-50/70 border-t border-b border-blue-100" data-revision-detail-header data-detail-id="{{ $rd->id }}"
+                                    data-receiving-code="{{ $rd->receiving_details_code }}" data-pbf-code="{{ $rd->creditor_code ?? '' }}">
                                     <td colspan="6" class="px-4 py-2.5">
                                         <div class="flex flex-wrap items-center gap-2">
                                             <span class="text-xs font-bold text-blue-900 font-mono tracking-wide">
@@ -148,7 +185,7 @@
                                 </tr>
 
                                 @if ($itemsCount === 0)
-                                    <tr class="bg-gray-50/60">
+                                    <tr class="bg-gray-50/60" data-revision-detail-empty data-detail-id="{{ $rd->id }}">
                                         <td colspan="9" class="px-4 py-5 text-center text-xs text-gray-500 italic">
                                             Belum ada obat di Nomor Terima ini. Klik tombol <button type="button"
                                                 data-details-id="{{ $rd->id }}"
@@ -163,7 +200,8 @@
                                         @php
                                             $ri->medicine_name = $ri->order_items->medicines->name ?? '-';
                                         @endphp
-                                        <tr data-item='@json($ri)'>
+                                        <tr data-item='@json($ri)' data-revision-detail-item data-detail-id="{{ $rd->id }}"
+                                            data-medicine-name="{{ $ri->medicine_name }}" data-pbf-code="{{ $ri->order_items->creditor_code ?? ($rd->creditor_code ?? '') }}">
                                             <td class="px-4 py-3 font-medium text-gray-800">{{ $ri->medicine_name }}</td>
                                             <td class="px-3 py-3 text-center font-mono">{{ $ri->batch ?? '-' }}</td>
                                             <td class="px-3 py-3 text-center">{{ $ri->expired_date ?? '-' }}</td>
@@ -193,7 +231,7 @@
                                     @endforeach
                                 @endif
                             @empty
-                                <tr>
+                                <tr data-revision-no-details>
                                     <td colspan="9" class="px-4 py-8 text-center text-xs text-gray-500 italic">
                                         Tidak ada data penerimaan untuk pesanan ini.
                                     </td>
@@ -202,7 +240,7 @@
 
                             <!-- Orphaned items if any -->
                             @if (isset($orphanedItems) && $orphanedItems->isNotEmpty())
-                                <tr class="bg-amber-50 border-t border-b border-amber-200">
+                                <tr class="bg-amber-50 border-t border-b border-amber-200" data-revision-orphan-header>
                                     <td colspan="9" class="px-4 py-2.5 text-xs font-bold text-amber-800">
                                         Item Tanpa Nomor Terima (Belum Terkait)
                                     </td>
@@ -211,7 +249,8 @@
                                     @php
                                         $ri->medicine_name = $ri->order_items->medicines->name ?? '-';
                                     @endphp
-                                    <tr data-item='@json($ri)'>
+                                    <tr data-item='@json($ri)' data-revision-orphan-item
+                                        data-medicine-name="{{ $ri->medicine_name }}" data-pbf-code="{{ $ri->order_items->creditor_code ?? '' }}">
                                         <td class="px-4 py-3 font-medium text-gray-800">{{ $ri->medicine_name }}</td>
                                         <td class="px-3 py-3 text-center font-mono">{{ $ri->batch ?? '-' }}</td>
                                         <td class="px-3 py-3 text-center">{{ $ri->expired_date ?? '-' }}</td>
@@ -238,6 +277,11 @@
                                         </td>
                                     </tr>
                                 @endforeach
+                            @endif
+                            @if ($allReceivingDetails->isNotEmpty() || (isset($orphanedItems) && $orphanedItems->isNotEmpty()))
+                                <tr id="revisionFilterEmpty" class="hidden">
+                                    <td colspan="9" class="px-4 py-8 text-center text-xs text-gray-500">Tidak ada item yang cocok dengan filter.</td>
+                                </tr>
                             @endif
                         </tbody>
                     </table>

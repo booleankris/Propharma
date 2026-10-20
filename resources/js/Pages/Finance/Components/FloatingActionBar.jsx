@@ -60,8 +60,10 @@ export default function FloatingActionBar({
     };
 
     return (
-        <div className="finance-floating-action-bar fixed z-[60] animate-in slide-in-from-bottom-6 fade-in duration-200 pointer-events-none" aria-live="polite">
-            <div className="finance-floating-action-panel pointer-events-auto">
+        <>
+            <div className="finance-floating-action-spacer" aria-hidden="true" />
+            <div className="finance-floating-action-bar fixed z-[60] animate-in slide-in-from-bottom-6 fade-in duration-200 pointer-events-none" aria-live="polite">
+                <div className="finance-floating-action-panel pointer-events-auto">
 
                 {/* 1. SEKSI KIRI: Item Count & Batas */}
                 <div className="finance-floating-selection flex items-center gap-3 shrink-0">
@@ -147,7 +149,8 @@ export default function FloatingActionBar({
                     </button>
                 </div>
 
+                </div>
             </div>
-        </div>
+        </>
     );
 }
