@@ -722,7 +722,11 @@ class ReceivingController extends Controller
 
     public function gethistory(Request $request)
     {
-        $query = MedicinePriceHistory::with(['medicines', 'user'])
+        $query = MedicinePriceHistory::with([
+            'medicines',
+            'user',
+            'sourceReceivingItem.receiving_details.receiving.pharmacy',
+        ])
             ->select('medicine_price_history.*');
 
         if ($request->filled('medicine_id')) {
@@ -756,6 +760,16 @@ class ReceivingController extends Controller
                 return 'Rp ' . number_format((float) $row->new_price, 0, ',', '.');
             })
             ->addColumn('changed_by', fn($row) => $row->user?->name ?? '-')
+            ->addColumn('source_pharmacy', function ($row) {
+                $item = $row->sourceReceivingItem;
+                if (!$item) return 'Tidak tercatat';
+
+                $receiving = $item->receiving_details?->receiving;
+                $pharmacy = $receiving?->pharmacy?->name ?? '-';
+                $receipt = $receiving?->code ?? '-';
+                $invoice = $item->receiving_details?->invoice_number ?? '-';
+                return '<div class="font-semibold">' . e($pharmacy) . '</div><div class="text-xs text-slate-500">Terima ' . e($receipt) . ' · Faktur ' . e($invoice) . '</div>';
+            })
             ->addColumn('changed_at', fn($row) => $row->created_at?->format('d/m/Y H:i') ?? '-')
             ->addColumn('direction', function ($row) {
                 if ($row->old_price === null || $row->old_price === '' || (float) $row->old_price <= 0) {
@@ -779,7 +793,7 @@ class ReceivingController extends Controller
                 }
                 return '<span class="badge-same">— Tetap</span>';
             })
-            ->rawColumns(['direction'])
+            ->rawColumns(['direction', 'source_pharmacy'])
             ->make(true);
     }
 
@@ -1224,10 +1238,18 @@ class ReceivingController extends Controller
 
         $request->validate([
             'medicine_id' => 'required|exists:medicines,id',
+            'receiving_item_id' => 'required|exists:receiving_items,id',
             'new_raw_price' => 'required|numeric|min:0',
         ]);
 
         $medicine = Medicines::findOrFail($request->medicine_id);
+        $sourceItem = ReceivingItems::with('order_items')->findOrFail($request->receiving_item_id);
+        if ((int) $sourceItem->order_items?->medicine_id !== (int) $medicine->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Item penerimaan tidak sesuai dengan obat yang akan diperbarui.',
+            ], 422);
+        }
         $oldPrice = (float) ($medicine->raw_price ?? $medicine->pharmacy_net_price ?? 0);
         $newRawPrice = (float) $request->new_raw_price;
 
@@ -1240,6 +1262,7 @@ class ReceivingController extends Controller
         MedicinePriceHistory::create([
             'user_id' => $user->id,
             'medicine_id' => $medicine->id,
+            'source_receiving_item_id' => $sourceItem->id,
             'old_price' => $oldPrice,
             'new_price' => $newRawPrice,
         ]);

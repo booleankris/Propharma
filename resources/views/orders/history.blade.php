@@ -339,6 +339,7 @@
                         <tr>
                             <th>#</th>
                             <th>Tanggal</th>
+                            <th>Apotek Sumber Perubahan</th>
                             <th>Kode Obat</th>
                             <th>Nama Obat</th>
                             <th>Satuan</th>
@@ -505,6 +506,11 @@
                     {
                         data: 'changed_at',
                         width: '130px'
+                    },
+                    {
+                        data: 'source_pharmacy',
+                        orderable: false,
+                        defaultContent: 'Tidak tercatat'
                     },
                     {
                         data: 'medicine_code',

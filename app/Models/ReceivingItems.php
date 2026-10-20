@@ -48,4 +48,9 @@ class ReceivingItems extends Model
     {
         return $this->belongsTo(Batches::class, 'batches_id');
     }
+
+    public function priceHistorySource()
+    {
+        return $this->hasMany(MedicinePriceHistory::class, 'source_receiving_item_id');
+    }
 }

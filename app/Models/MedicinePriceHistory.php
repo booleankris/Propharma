@@ -14,6 +14,7 @@ class MedicinePriceHistory extends Model
     protected $fillable = [
         'user_id',
         'medicine_id',
+        'source_receiving_item_id',
         'old_price',
         'new_price',
     ];
@@ -26,5 +27,10 @@ class MedicinePriceHistory extends Model
     public function medicines()
     {
         return $this->belongsTo(Medicines::class, 'medicine_id');
+    }
+
+    public function sourceReceivingItem()
+    {
+        return $this->belongsTo(ReceivingItems::class, 'source_receiving_item_id');
     }
 }
