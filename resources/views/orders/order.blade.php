@@ -389,11 +389,15 @@
                                     class="flex flex-wrap gap-2 mb-2 min-h-[42px] p-2 bg-white rounded-lg border border-dashed border-gray-300">
                                     <!-- Pills spawn here -->
                                 </div>
+                                <p id="creditorPickerHelp" class="mb-2 text-xs text-gray-500">
+                                    Cari PBF yang sudah ada. Memilih hasil akan menautkan sekaligus memilihnya untuk item ini.
+                                </p>
                                 <div class="relative">
-                                    <input id="creditorPillSearch" type="text" placeholder="Cari & tambah kreditur..."
+                                    <input id="creditorPillSearch" type="text" placeholder="Cari nama atau kode PBF..."
                                         class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         autocomplete="off">
                                     <ul id="creditorPillDropdown"
+                                        role="listbox" aria-label="Hasil pencarian kreditur"
                                         class="absolute z-[99999] mt-1 w-full rounded-xl border border-gray-200 bg-white shadow-xl max-h-48 overflow-y-auto hidden">
                                     </ul>
                                 </div>
@@ -744,7 +748,9 @@
         let total_transaction = '';
         let itempack = '0';
         var itemcreditor = '';
-        let allSystemCreditors = []; // all creditors from GET /creditors/all
+        let allSystemCreditors = []; // active creditors from GET /creditors/all
+        let creditorsLoadPromise = null;
+        let creditorSearchActiveIndex = -1;
         let medicineCreditors = []; // creditors currently linked to selected medicine
         let currentMedicineId = null;
 
@@ -787,7 +793,6 @@
         });
         // Datatable
         document.addEventListener('DOMContentLoaded', function() {
-            loadAllSystemCreditors();
             orderItemsTable = $('#orderItemsTable').DataTable({
                 processing: true,
                 serverSide: true,
@@ -1214,11 +1219,20 @@
 
 
         function loadAllSystemCreditors() {
-            axios.get("{{ route('creditors.all') }}")
+            if (creditorsLoadPromise) return creditorsLoadPromise;
+
+            creditorsLoadPromise = axios.get("{{ route('creditors.all') }}")
                 .then(res => {
-                    allSystemCreditors = res.data.creditors;
+                    allSystemCreditors = Array.isArray(res.data.creditors) ? res.data.creditors : [];
+                    return allSystemCreditors;
                 })
-                .catch(err => console.error(err));
+                .catch(err => {
+                    creditorsLoadPromise = null;
+                    console.error('Gagal memuat daftar kreditur:', err);
+                    throw err;
+                });
+
+            return creditorsLoadPromise;
         }
 
         function loadMedicineCreditors(medicineId, preselectedCode = null) {
@@ -1266,41 +1280,138 @@
             if (preselectedCode) select.value = preselectedCode;
         }
 
-        document.getElementById('creditorPillSearch').addEventListener('input', function() {
-            const keyword = this.value.toLowerCase().trim();
+        function normalizeCreditorSearch(value) {
+            return String(value ?? '').toLocaleLowerCase('id-ID').trim().replace(/\s+/g, ' ');
+        }
+
+        function showCreditorPickerMessage(message, isError = false) {
             const ul = document.getElementById('creditorPillDropdown');
+            ul.innerHTML = '';
+            const li = document.createElement('li');
+            li.className = `px-4 py-3 text-sm ${isError ? 'text-red-600' : 'text-gray-500'}`;
+            li.textContent = message;
+            ul.appendChild(li);
+            ul.classList.remove('hidden');
+        }
 
-            if (!keyword) {
+        function chooseMedicineCreditor(creditor) {
+            if (!creditor || !creditor.code) return;
+
+            if (!medicineCreditors.some(item => String(item.code) === String(creditor.code))) {
+                medicineCreditors.push({ ...creditor, discount: creditor.discount ?? 0 });
+            }
+
+            renderPills();
+            renderCreditorSelect(creditor.code);
+            document.getElementById('creditorPillSearch').value = '';
+            document.getElementById('creditorPillDropdown').classList.add('hidden');
+            document.getElementById('creditorPickerHelp').textContent =
+                `${creditor.name} ditambahkan dan langsung dipilih. Klik “Tambahkan” untuk menyimpan item pemesanan.`;
+            document.getElementById('creditor').focus();
+        }
+
+        function renderCreditorSearchResults(keyword) {
+            const ul = document.getElementById('creditorPillDropdown');
+            const normalizedKeyword = normalizeCreditorSearch(keyword);
+            creditorSearchActiveIndex = -1;
+
+            if (!normalizedKeyword) {
                 ul.classList.add('hidden');
                 return;
             }
 
-            const filtered = allSystemCreditors.filter(c =>
-                c.name.toLowerCase().includes(keyword) &&
-                !medicineCreditors.find(m => m.code === c.code)
-            );
-
-            if (!filtered.length) {
-                ul.classList.add('hidden');
-                return;
-            }
+            const linkedCodes = new Set(medicineCreditors.map(item => String(item.code)));
+            const filtered = allSystemCreditors
+                .filter(creditor => {
+                    const name = normalizeCreditorSearch(creditor.name);
+                    const code = normalizeCreditorSearch(creditor.code);
+                    return (name.includes(normalizedKeyword) || code.includes(normalizedKeyword)) &&
+                        !linkedCodes.has(String(creditor.code));
+                })
+                .sort((a, b) => {
+                    const aName = normalizeCreditorSearch(a.name);
+                    const bName = normalizeCreditorSearch(b.name);
+                    const aStarts = aName.startsWith(normalizedKeyword) || normalizeCreditorSearch(a.code).startsWith(normalizedKeyword);
+                    const bStarts = bName.startsWith(normalizedKeyword) || normalizeCreditorSearch(b.code).startsWith(normalizedKeyword);
+                    return Number(bStarts) - Number(aStarts) || aName.localeCompare(bName, 'id');
+                })
+                .slice(0, 20);
 
             ul.innerHTML = '';
-            filtered.forEach(c => {
+            if (!filtered.length) {
+                showCreditorPickerMessage('Kreditur aktif tidak ditemukan. Periksa nama/kode atau statusnya di Data Kreditur.');
+                return;
+            }
+
+            filtered.forEach((creditor, index) => {
                 const li = document.createElement('li');
-                li.className = 'px-4 py-2 text-[13px] hover:bg-blue-50 cursor-pointer';
-                li.textContent = c.name;
-                li.addEventListener('mousedown', e => {
-                    e.preventDefault();
-                    medicineCreditors.push(c);
-                    renderPills();
-                    renderCreditorSelect();
-                    document.getElementById('creditorPillSearch').value = '';
-                    ul.classList.add('hidden');
-                });
+                li.className = 'cursor-pointer border-b border-gray-100 last:border-0 hover:bg-blue-50';
+                li.setAttribute('role', 'option');
+                li.dataset.index = index;
+
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left';
+
+                const text = document.createElement('span');
+                text.className = 'min-w-0';
+                const name = document.createElement('span');
+                name.className = 'block truncate text-sm font-medium text-gray-800';
+                name.textContent = creditor.name;
+                const code = document.createElement('span');
+                code.className = 'block text-xs text-gray-500';
+                code.textContent = creditor.code;
+                text.append(name, code);
+
+                const action = document.createElement('span');
+                action.className = 'shrink-0 text-xs font-semibold text-blue-600';
+                action.textContent = 'Tambah & pilih';
+                button.append(text, action);
+                button.addEventListener('mousedown', event => event.preventDefault());
+                button.addEventListener('click', () => chooseMedicineCreditor(creditor));
+                li.appendChild(button);
                 ul.appendChild(li);
             });
+
             ul.classList.remove('hidden');
+        }
+
+        document.getElementById('creditorPillSearch').addEventListener('input', async function() {
+            const keyword = this.value;
+            if (!normalizeCreditorSearch(keyword)) {
+                document.getElementById('creditorPillDropdown').classList.add('hidden');
+                return;
+            }
+
+            showCreditorPickerMessage('Mencari kreditur aktif...');
+            try {
+                await loadAllSystemCreditors();
+                // Respect the latest text in case the user typed while the list was loading.
+                renderCreditorSearchResults(this.value);
+            } catch (error) {
+                showCreditorPickerMessage('Daftar kreditur gagal dimuat. Coba cari lagi.', true);
+            }
+        });
+
+        document.getElementById('creditorPillSearch').addEventListener('keydown', function(event) {
+            const ul = document.getElementById('creditorPillDropdown');
+            const options = [...ul.querySelectorAll('[role="option"]')];
+            if (ul.classList.contains('hidden') || !options.length) return;
+
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                event.preventDefault();
+                creditorSearchActiveIndex = event.key === 'ArrowDown'
+                    ? (creditorSearchActiveIndex + 1) % options.length
+                    : (creditorSearchActiveIndex <= 0 ? options.length - 1 : creditorSearchActiveIndex - 1);
+                options.forEach((option, index) => {
+                    option.classList.toggle('bg-blue-50', index === creditorSearchActiveIndex);
+                });
+            } else if (event.key === 'Enter' && creditorSearchActiveIndex >= 0) {
+                event.preventDefault();
+                options[creditorSearchActiveIndex].querySelector('button')?.click();
+            } else if (event.key === 'Escape') {
+                ul.classList.add('hidden');
+            }
         });
 
         document.getElementById('creditorPillSearch').addEventListener('blur', function() {

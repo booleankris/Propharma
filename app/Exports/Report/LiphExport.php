@@ -195,10 +195,10 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
     }
 
     /**
-     * Groups a transaction's cart items by their EFFECTIVE type
-     * (cart_type if the user switched it, otherwise the transaction's
-     * own transaction_type), and allocates Lembar/R/ proportionally
-     * across whichever effective types are present.
+     * Groups a transaction's cart items by their LIPH type. Credit-parent
+     * transactions remain in the credit bucket even when an item invoice type
+     * was switched; other transactions use each item's selected cart type.
+     * Lembar/R/ is allocated across the resulting groups.
      *
      * Potongan (item discount) is summed strictly per effective type.
      * Potongan Transaksi (transaction-level discount) follows the
@@ -242,7 +242,11 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
             // Bucket cart items by effective type label
             $byLabel = [];
             foreach ($items as $item) {
-                if ($item->cart_type) {
+                if ($trx->transaction_type === 'KREDIT') {
+                    // A switched item may retain UPDS/HV as its database invoice
+                    // type, but LIPH must count the parent sale as credit.
+                    $effectiveType = 'KREDIT';
+                } elseif ($item->cart_type) {
                     $effectiveType = self::CART_TYPE_ABBR[$item->cart_type] ?? $item->cart_type;
                 } else {
                     $effectiveType = $trx->transaction_type;

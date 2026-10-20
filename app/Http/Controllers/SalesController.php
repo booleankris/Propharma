@@ -554,8 +554,13 @@ class SalesController extends Controller
                 if (!in_array($cartType, ['UK', 'UP', 'HV'], true)) {
                     abort(422, 'Jenis item resep kredit tidak valid.');
                 }
-                // Keep the invoice/receivable as credit while classifying each line separately.
-                $medicineType = 'KREDIT';
+                // Keep the parent invoice as credit, but persist the selected
+                // invoice type on each item for database/detail reporting.
+                $medicineType = [
+                    'UK' => 'KREDIT',
+                    'UP' => 'UPDS',
+                    'HV' => 'HV/OTC',
+                ][$cartType];
                 if ($cartType !== 'UK') {
                     $embalase = 0;
                 }
@@ -1388,6 +1393,11 @@ class SalesController extends Controller
             if (!in_array($cartType, ['UK', 'UP', 'HV'], true)) {
                 return response()->json(['message' => 'Jenis item resep kredit tidak valid.'], 422);
             }
+            $medicineType = [
+                'UK' => 'KREDIT',
+                'UP' => 'UPDS',
+                'HV' => 'HV/OTC',
+            ][$cartType];
             $serviceFee = $cartType === 'UK' && (int) $request->input('racikstatus', 0) !== 1
                 ? (float) $request->input('service', 0)
                 : 0;
@@ -1406,7 +1416,7 @@ class SalesController extends Controller
         $cart->update([
             'cart_type' => $cartType,
             'medicine_type' => $parentTransaction->transaction_type === 'KREDIT'
-                ? 'KREDIT'
+                ? $medicineType
                 : $cart->medicine_type,
             'service_fee' => $serviceFee,
             'embalase' => $embalase,
