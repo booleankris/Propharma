@@ -74,8 +74,9 @@
             bindRecalc('edit_raw_price', 'input', e => { formatInputRupiah(e); recalcEditTotal(); });
             bindRecalc('edit_discount', 'input', recalcEditTotal);
             bindRecalc('edit_extra_discount', 'input', recalcEditTotal);
+            bindRecalc('edit_qty_received', 'input', updateEditQuantityEquivalence);
 
-            bindRecalc('add_qty_received', 'input', recalcAddTotal);
+            bindRecalc('add_qty_received', 'input', () => { recalcAddTotal(); updateAddQuantityEquivalence(); });
             bindRecalc('add_raw_price', 'input', e => { formatInputRupiah(e); recalcAddTotal(); });
             bindRecalc('add_discount', 'input', recalcAddTotal);
             bindRecalc('add_extra_discount', 'input', recalcAddTotal);
@@ -194,6 +195,8 @@
                 option.dataset.disc = item.discount;
                 option.dataset.rem = item.remaining_qty;
                 option.dataset.pack = item.pack ? '1' : '0';
+                option.dataset.unit = item.unit || '';
+                option.dataset.packaging = item.packaging || '';
                 select.add(option);
             });
         }
@@ -216,8 +219,10 @@
             document.getElementById('add_status').value = '1';
             document.getElementById('add_content').value = '';
             document.getElementById('add_pack').checked = false;
+            document.getElementById('add_pack').disabled = false;
             addBasePrice = 0;
             addContent = 1;
+            setQuantityUnitLabel('add', '', '', 1, false);
             setAddMode('bpba');
 
             document.getElementById('addModal').classList.remove('hidden');
@@ -242,6 +247,8 @@
             addContent = parseFloat(opt.dataset.content) || 1;
             document.getElementById('add_content').value = addContent;
             document.getElementById('add_pack').checked = opt.dataset.pack === '1';
+            document.getElementById('add_pack').disabled = true;
+            setQuantityUnitLabel('add', opt.dataset.unit, opt.dataset.packaging, addContent, opt.dataset.pack === '1');
             applyAddPackPrice();
 
             if (rem > 0) {
@@ -262,6 +269,56 @@
             if (boxInfo) {
                 boxInfo.textContent = pack && addContent > 1 ? `(Box: ${formatRupiah(price)})` : '';
             }
+            if (addMode === 'master') {
+                const selected = masterCache[document.getElementById('add_medicine_id').value];
+                setQuantityUnitLabel('add', selected?.unit, selected?.packaging, addContent, pack);
+            }
+        }
+
+        function formatQty(value) {
+            return new Intl.NumberFormat('id-ID', { maximumFractionDigits: 2 }).format(Number(value) || 0);
+        }
+
+        function setQuantityUnitLabel(prefix, unit, packaging, content, isPack) {
+            const qty = parseFloat(document.getElementById(`${prefix}_qty_received`)?.value) || 0;
+            const quantityUnit = isPack ? (packaging || 'kemasan') : (unit || 'unit');
+            const label = document.getElementById(`${prefix}_qty_label`);
+            const info = document.getElementById(`${prefix}_quantity_equivalence`);
+            if (label) label.textContent = `QTY Diterima (${quantityUnit})${prefix === 'add' ? ' *' : ''}`;
+            if (info) {
+                const factor = isPack ? Math.max(1, parseInt(content, 10) || 1) : 1;
+                if (isPack && factor > 1) {
+                    info.textContent = `${formatQty(qty)} ${quantityUnit} = ${formatQty(qty * factor)} ${unit || 'unit'} stok`;
+                    info.classList.remove('hidden');
+                } else {
+                    info.textContent = '';
+                    info.classList.add('hidden');
+                }
+            }
+        }
+
+        function updateAddQuantityEquivalence() {
+            if (addMode === 'bpba') {
+                const select = document.getElementById('add_order_items_id');
+                const opt = select?.options[select.selectedIndex];
+                if (opt?.value) setQuantityUnitLabel('add', opt.dataset.unit, opt.dataset.packaging, addContent, opt.dataset.pack === '1');
+                else setQuantityUnitLabel('add', '', '', 1, false);
+            } else {
+                const selected = masterCache[document.getElementById('add_medicine_id').value];
+                if (selected) setQuantityUnitLabel('add', selected.unit, selected.packaging, addContent, document.getElementById('add_pack').checked);
+                else setQuantityUnitLabel('add', '', '', 1, false);
+            }
+        }
+
+        function updateEditQuantityEquivalence() {
+            const data = window.currentRevisionEditItem;
+            if (!data) return;
+            const medicine = data.order_items?.medicines || {};
+            const isPack = data.receipt_is_pack !== null && data.receipt_is_pack !== undefined
+                ? Boolean(Number(data.receipt_is_pack))
+                : Number(data.order_items?.pack) === 1;
+            const factor = data.stock_unit_factor || (isPack ? medicine.content : 1);
+            setQuantityUnitLabel('edit', medicine.unit, medicine.packaging, factor, isPack);
         }
 
         function onAddPackChange() {
@@ -292,12 +349,18 @@
                 bpbaSection.classList.add('hidden');
                 masterSection.classList.remove('hidden');
                 document.getElementById('add_order_items_id').value = '';
+                document.getElementById('add_pack').disabled = false;
+                updateAddQuantityEquivalence();
             } else {
                 masterBtn.className = inactive;
                 bpbaBtn.className = active;
                 masterSection.classList.add('hidden');
                 bpbaSection.classList.remove('hidden');
                 resetMasterSelection();
+                const selected = document.getElementById('add_order_items_id');
+                const opt = selected?.options[selected.selectedIndex];
+                document.getElementById('add_pack').disabled = Boolean(opt?.value);
+                updateAddQuantityEquivalence();
             }
         }
 
@@ -376,6 +439,8 @@
             document.getElementById('master_search_dropdown').classList.add('hidden');
             document.getElementById('add_content').value = addContent;
             document.getElementById('add_pack').checked = false;
+            document.getElementById('add_pack').disabled = false;
+            setQuantityUnitLabel('add', item.unit, item.packaging, addContent, false);
             applyAddPackPrice();
             recalcAddTotal();
         }
@@ -480,6 +545,7 @@
         function editRow(btn) {
             const row = btn.closest('tr');
             const data = JSON.parse(row.dataset.item);
+            window.currentRevisionEditItem = data;
 
             document.getElementById('edit_id').value = data.id;
             document.getElementById('edit_batch').value = data.batch;
@@ -490,6 +556,7 @@
             document.getElementById('edit_extra_discount').value = data.extra_discount;
             document.getElementById('edit_status').value = data.status;
             document.getElementById('edit_total').value = formatRupiah(data.total);
+            updateEditQuantityEquivalence();
 
             if (data.receiving_details_id) {
                 document.getElementById('edit_receiving_details_id').value = data.receiving_details_id;

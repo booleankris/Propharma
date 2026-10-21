@@ -2551,6 +2551,13 @@
                 otherBranchIds = [1, 3, 5, 2].filter(id => id !== currentId);
             }
 
+            const formatBadgeStock = (val) => {
+                if (val === undefined || val === null || val === '' || val === '—') return '0';
+                const num = Number(val);
+                if (isNaN(num)) return String(val);
+                return parseFloat(num.toFixed(3)).toString();
+            };
+
             const otherBranchesHtml = otherBranchIds.map(branchId => {
                 const b = branchPillsDef[branchId];
                 if (!b) return '';
@@ -2559,7 +2566,7 @@
                     <div class="flex items-center gap-1 ${b.bg} border ${b.border} rounded-md px-2 py-1" title="${b.title}">
                         <span class="w-1 h-1 rounded-full ${b.dot}"></span>
                         <span class="text-[10px] ${b.textLabel} font-bold">${b.code}</span>
-                        <span class="text-xs font-bold ${b.textValue}">${escapeHtml(String(val))}</span>
+                        <span class="text-xs font-bold ${b.textValue}">${escapeHtml(formatBadgeStock(val))}</span>
                     </div>
                 `;
             }).join('');
@@ -2608,19 +2615,19 @@
                 <div class="flex items-center gap-1 bg-emerald-50 border border-emerald-200 rounded-md px-2 py-1" title="Total Stok">
                     <span class="w-1 h-1 rounded-full bg-emerald-500"></span>
                     <span class="text-[10px] text-emerald-600 font-medium">Stok</span>
-                    <span class="text-xs font-bold text-emerald-700">${escapeHtml(String(stock || '—'))}</span>
+                    <span class="text-xs font-bold text-emerald-700">${escapeHtml(formatBadgeStock(stock))}</span>
                 </div>
                 ${canSeeWarehouse ? `
                 <div class="flex items-center gap-1 bg-violet-50 border border-violet-200 rounded-md px-2 py-1" title="Stok Gudang PMI">
                     <span class="w-1 h-1 rounded-full bg-violet-500"></span>
                     <span class="text-[10px] text-violet-600 font-medium">Gudang</span>
-                    <span class="text-xs font-bold text-violet-700">${escapeHtml(String(it.storage_stock || '—'))}</span>
+                    <span class="text-xs font-bold text-violet-700">${escapeHtml(formatBadgeStock(it.storage_stock))}</span>
                 </div>
                 ` : ''}
                 <div class="flex items-center gap-1 bg-amber-50 border border-amber-200 rounded-md px-2 py-1" title="Stok Pelayanan Cabang Ini">
                     <span class="w-1 h-1 rounded-full bg-amber-500"></span>
                     <span class="text-[10px] text-amber-600 font-medium">Pelayanan</span>
-                    <span class="text-xs font-bold text-amber-700">${escapeHtml(String(it.counter_stock || '—'))}</span>
+                    <span class="text-xs font-bold text-amber-700">${escapeHtml(formatBadgeStock(it.counter_stock))}</span>
                 </div>
                 ${otherBranchesHtml}
             </div>

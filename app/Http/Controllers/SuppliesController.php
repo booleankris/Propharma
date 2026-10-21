@@ -62,6 +62,16 @@ class SuppliesController extends Controller
             return abs((int) $log->qty);
         }
 
+        // Revisi Penerimaan (status 8): qty is already signed (+ for added, - for reduced)
+        if ($status === 8) {
+            return (int) $log->qty;
+        }
+
+        // Hapus Penerimaan (status 9): qty is reversed inventory (-)
+        if ($status === 9) {
+            return -abs((int) $log->qty);
+        }
+
         // Opname (status 5): prefer the `total` field which stores the actual
         // signed discrepancy (counterPhysic - counterBefore). The qty_before /
         // qty_after columns on legacy rows may contain global medicines.stock
@@ -211,14 +221,16 @@ class SuppliesController extends Controller
             // 2. STATS CALCULATION: Calculate all sums 
             $stats = (clone $baseQuery)->selectRaw("
                 SUM(CASE WHEN status = 1 THEN qty ELSE 0 END) as qty_sold,
-                SUM(CASE WHEN status = 2 THEN qty ELSE 0 END) as qty_bought,
+                SUM(CASE WHEN status = 2 THEN qty WHEN status = 8 THEN qty WHEN status = 9 THEN qty ELSE 0 END) as qty_bought,
                 SUM(CASE WHEN status = 3 THEN qty ELSE 0 END) as qty_sold_rt,
                 SUM(CASE WHEN status = 4 THEN qty ELSE 0 END) as qty_bought_rt
             ")->first();
 
+            $effectiveDateSql = "CASE WHEN (LENGTH(date) <= 10 OR TIME(date) = '00:00:00') AND created_at IS NOT NULL THEN CONCAT(DATE(date), ' ', TIME(created_at)) ELSE date END";
+
             // 3. BALANCE CALCULATION: Get the very first and very last records for the balances
-            $firstRecord = (clone $baseQuery)->orderBy('date', 'asc')->orderBy('id', 'asc')->first();
-            $lastRecord = (clone $baseQuery)->orderBy('date', 'desc')->orderBy('id', 'desc')->first();
+            $firstRecord = (clone $baseQuery)->orderByRaw($effectiveDateSql . ' ASC')->orderBy('id', 'asc')->first();
+            $lastRecord = (clone $baseQuery)->orderByRaw($effectiveDateSql . ' DESC')->orderBy('id', 'desc')->first();
 
             // 4. TABLE QUERY: Eager load relations nested deep to prevent performance issues
             $itemsQuery = (clone $baseQuery)->with([
@@ -228,7 +240,7 @@ class SuppliesController extends Controller
                 'medicine_transaction.user',            // Fetch cashier user through transactions
                 'users'                                 // Fetch user for creator display
             ])->whereNotIn('status', [5, 6])
-              ->orderBy('date', 'asc')
+              ->orderByRaw($effectiveDateSql . ' ASC')
               ->orderBy('id', 'asc');
 
             // Tentukan apakah ada filter 1 obat spesifik
@@ -273,7 +285,7 @@ class SuppliesController extends Controller
                 // rows are inserted later but carry the original movement date, so
                 // they must sit next to the logs they cancel.
                 $allRowsForBalance = (clone $baseQuery)->with(['medicines', 'batches'])
-                    ->orderBy('date', 'asc')
+                    ->orderByRaw($effectiveDateSql . ' ASC')
                     ->orderBy('id', 'asc')
                     ->get();
 
@@ -302,15 +314,30 @@ class SuppliesController extends Controller
 
             // 5. RETURN DATATABLES RESPONSE
             return DataTables::eloquent($itemsQuery)
+                ->order(function ($q) use ($request, $effectiveDateSql) {
+                    if ($request->has('order') && is_array($request->order)) {
+                        $colIdx = $request->order[0]['column'] ?? null;
+                        $orderDir = strtolower($request->order[0]['dir'] ?? 'asc') === 'desc' ? 'DESC' : 'ASC';
+                        if ((int) $colIdx === 1) {
+                            $q->orderByRaw($effectiveDateSql . ' ' . $orderDir)->orderBy('id', $orderDir);
+                            return;
+                        }
+                    }
+                    $q->orderByRaw($effectiveDateSql . ' ASC')->orderBy('id', 'asc');
+                })
                 ->addIndexColumn()
                 ->addColumn('date', function ($row) {
-                    return $row->date;
+                    $d = $row->date;
+                    if ($d && $d->format('H:i:s') === '00:00:00' && $row->created_at) {
+                        return $d->format('Y-m-d') . ' ' . $row->created_at->format('H:i:s');
+                    }
+                    return $d ? $d->format('Y-m-d H:i:s') : '-';
                 })
                 ->addColumn('medicine_name', function ($row) {
                     return $row->medicines->name;
                 })
                 ->addColumn('batch_name', function ($row) {
-                    if (in_array($row->status, [2, 4, 7]) && $row->batches) {
+                    if (in_array($row->status, [2, 4, 7, 8, 9]) && $row->batches) {
                         return $row->batches->name;
                     }
                     return '-';
@@ -319,6 +346,14 @@ class SuppliesController extends Controller
                     if (in_array($row->status, [2, 4])) {
                         $detail = $row->receiving?->receiving_details?->first();
                         $codeStr = $detail?->receiving_details_code ?: ($detail?->invoice_number ?: $row->transaction_code);
+                    } elseif (in_array($row->status, [8, 9])) {
+                        if (preg_match('/REV-(?:ADD-|DEL-)?(\d+)/', (string) $row->transaction_code, $matches)) {
+                            $rItem = \App\Models\ReceivingItems::with('receiving_details')->find($matches[1]);
+                            $inv = $rItem?->receiving_details?->invoice_number ?: $rItem?->receiving_details?->receiving_details_code;
+                            $codeStr = $inv ? $row->transaction_code . ' (' . $inv . ')' : $row->transaction_code;
+                        } else {
+                            $codeStr = $row->transaction_code;
+                        }
                     } else {
                         $codeStr = $row->transaction_code;
                     }
@@ -347,6 +382,17 @@ class SuppliesController extends Controller
                         $creditorName = $row->receiving?->receiving_details?->first()?->creditor?->name;
                         if ($creditorName) {
                             return $creditorName;
+                        }
+                    }
+
+                    // Case 1b: Revisi Faktur (Status = 8) or Hapus Terima (Status = 9) -> Find PBF from related receiving item
+                    if (in_array($row->status, [8, 9])) {
+                        if (preg_match('/REV-(?:ADD-|DEL-)?(\d+)/', (string) $row->transaction_code, $matches)) {
+                            $rItem = \App\Models\ReceivingItems::with(['receiving_details.creditor', 'order_items.creditors'])->find($matches[1]);
+                            $pbfName = $rItem?->receiving_details?->creditor?->name ?? $rItem?->order_items?->creditors?->name;
+                            if ($pbfName) {
+                                return $pbfName;
+                            }
                         }
                     }
 
@@ -390,6 +436,16 @@ class SuppliesController extends Controller
                             // Penambahan (ke etalase/tujuan)
                             return "<div style='color:#248787;font-weight:bold;'><span>+</span><b>" . abs($row->qty) . "</b></div>";
                         }
+                    } else if ($row->status == 8) {
+                        if ($row->qty > 0) {
+                            return "<div style='color:#4173d3;font-weight:bold;'><span>+</span><b>" . abs($row->qty) . "</b></div>";
+                        } else if ($row->qty < 0) {
+                            return "<div style='color:#d34163;font-weight:bold;'><span>-</span><b>" . abs($row->qty) . "</b></div>";
+                        } else {
+                            return "<div style='color:#64748b;font-weight:bold;'><b>0</b></div>";
+                        }
+                    } else if ($row->status == 9) {
+                        return "<div style='color:#d34163;font-weight:bold;'><span>-</span><b>" . abs($row->qty) . "</b></div>";
                     }
                     return "";
                 })
@@ -435,6 +491,10 @@ class SuppliesController extends Controller
                         return "<div style='text-align: center; font-weight: bold; text-transform: uppercase; background-color: #fff035; color: #7a7817; padding: 6px 4px; width:100px; font-size: 9px; font-family: Poppins; border-radius: 25px;'>Stock Opname</div>";
                     } else if ($row->status == 7) {
                         return "<div style='text-align: center; font-weight: bold; text-transform: uppercase; background-color: #aeffeaad; color: #238787; padding: 6px 4px; width:100px; font-size: 9px; font-family: Poppins; border-radius: 25px;'>Mutasi Stok</div>";
+                    } else if ($row->status == 8) {
+                        return "<div style='text-align: center; font-weight: bold; text-transform: uppercase; background-color: #e0e7ff; color: #4338ca; padding: 6px 4px; width:100px; font-size: 9px; font-family: Poppins; border-radius: 25px;'>Revisi Faktur</div>";
+                    } else if ($row->status == 9) {
+                        return "<div style='text-align: center; font-weight: bold; text-transform: uppercase; background-color: #fee2e2; color: #b91c1c; padding: 6px 4px; width:100px; font-size: 9px; font-family: Poppins; border-radius: 25px;'>Hapus Terima</div>";
                     }
                     return "-";
                 })
@@ -499,7 +559,13 @@ class SuppliesController extends Controller
 
             return DataTables::eloquent($items)
                 ->addIndexColumn()
-                ->addColumn('date', fn($r) => $r->date)
+                ->addColumn('date', function ($r) {
+                    $d = $r->date;
+                    if ($d && $d->format('H:i:s') === '00:00:00' && $r->created_at) {
+                        return $d->format('Y-m-d') . ' ' . $r->created_at->format('H:i:s');
+                    }
+                    return $d ? $d->format('Y-m-d H:i:s') : '-';
+                })
                 ->addColumn('code', fn($r) => $r->code)
                 ->addColumn('type', fn($r) => $r->type)
                 ->addColumn('name', fn($r) => $r->medicines->name ?? '-')
@@ -1092,7 +1158,7 @@ class SuppliesController extends Controller
             // Older sale-return rows stored only the calendar date, which casts to
             // midnight and incorrectly places the return before same-day sales.
             // Use created_at as the effective timestamp for those legacy rows.
-            $effectiveDateSql = "CASE WHEN status = 3 AND TIME(date) = '00:00:00' AND created_at IS NOT NULL THEN created_at ELSE date END";
+            $effectiveDateSql = "CASE WHEN (LENGTH(date) <= 10 OR TIME(date) = '00:00:00') AND created_at IS NOT NULL THEN CONCAT(DATE(date), ' ', TIME(created_at)) ELSE date END";
             $ledgerRows = $request->filled('searchMedicine')
                 ? $baseMedicineLogQuery()
                     ->orderByRaw($effectiveDateSql . ' ASC')
@@ -1133,7 +1199,7 @@ class SuppliesController extends Controller
             }
 
             $total_sales = (clone $periodQuery)->where('status', 1)->sum('qty');
-            $total_orders = (clone $periodQuery)->where('status', 2)->sum('qty');
+            $total_orders = (clone $periodQuery)->whereIn('status', [2, 8, 9])->sum('qty');
 
             // Calculate the period opening from the same reconstructed ledger.
             // Quick-filter chips must not alter balances, only which rows are shown.
@@ -1169,7 +1235,7 @@ class SuppliesController extends Controller
                 } elseif ($ft === 'sales') {
                     $items->where('status', 1);
                 } elseif ($ft === 'purchase') {
-                    $items->where('status', 2);
+                    $items->whereIn('status', [2, 8, 9]);
                 } elseif ($ft === 'mutation') {
                     $items->where('status', 7);
                 } elseif ($ft === 'retur') {
@@ -1194,8 +1260,8 @@ class SuppliesController extends Controller
                 ->addIndexColumn()
                 ->addColumn('date', function ($row) {
                     $dateValue = $row->date;
-                    if ((int) $row->status === 3 && $row->date && $row->date->format('H:i:s') === '00:00:00' && $row->created_at) {
-                        $dateValue = $row->created_at;
+                    if ($row->date && $row->date->format('H:i:s') === '00:00:00' && $row->created_at) {
+                        $dateValue = Carbon::parse($row->date->format('Y-m-d') . ' ' . $row->created_at->format('H:i:s'));
                     }
                     $d = $this->parseStockOpnameDateTime($dateValue);
                     if (!$d) return '<span class="text-slate-400 text-xs">—</span>';
@@ -1234,6 +1300,10 @@ class SuppliesController extends Controller
                             return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200 whitespace-nowrap">Penyesuaian</span>';
                         case 7:
                             return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-teal-50 text-teal-700 border border-teal-200 whitespace-nowrap">Mutasi Stok</span>';
+                        case 8:
+                            return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 whitespace-nowrap">Revisi Faktur</span>';
+                        case 9:
+                            return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap">Hapus Terima</span>';
                         default:
                             $lbl = e($row->type ?: 'Lainnya');
                             return '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200 whitespace-nowrap">' . $lbl . '</span>';
@@ -1242,7 +1312,7 @@ class SuppliesController extends Controller
                 ->addColumn('batch_info', function ($row) {
                     $batch = $row->batches;
                     if (!$batch) return '<span class="text-slate-400 text-xs">—</span>';
-                    $batchName = e($batch->batch_1 ?: '-');
+                    $batchName = e($batch->name ?: ($batch->batch_1 ?: '-'));
                     $parsedExpiredDate = StockOpnameImportService::parseSmartExpiredDate($batch->expired_date);
                     $ed = $parsedExpiredDate ? Carbon::parse($parsedExpiredDate)->format('d/m/Y') : '-';
                     return '<div class="flex flex-col whitespace-nowrap leading-tight">

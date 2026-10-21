@@ -246,6 +246,7 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
             ->name('master-data.export');
 
         Route::resource('creditors', CreditorsController::class)->except(['show']);
+        Route::post('creditors/{id}/restore', [CreditorsController::class, 'restore'])->name('creditors.restore');
         Route::resource('debtors', DebtorsController::class)->except(['show']);
         Route::resource('patients', PatientsController::class)->except(['show']);
         Route::get('doctors/duplicates', [DoctorsController::class, 'getDuplicates'])->name('doctors.duplicates');

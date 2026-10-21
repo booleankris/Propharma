@@ -14,14 +14,26 @@
             <div class="flex flex-col lg:flex-row gap-4">
 
                 <div class="card w-full md:w-[65%] shadow-md rounded-2xl p-6 bg-white">
-                    <div class="flex items-center mb-6">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-blue-600 mr-3 drop-shadow-md"
-                            fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round"
-                                d="M16 11c1.657 0 3-1.343 3-3S17.657 5 16 5s-3 1.343-3 3 1.343 3 3 3zM8 11c1.657 0 3-1.343 3-3S9.657 5 8 5 5 6.343 5 8s1.343 3 3 3zm0 2c-2.5 0-4.5 1.5-4.5 3.5V19h9v-2.5C12.5 14.5 10.5 13 8 13zm8 0c-2.5 0-4.5 1.5-4.5 3.5V19h9v-2.5c0-2-2-3.5-4.5-3.5z" />
-                        </svg>
-                        <h2 class="text-2xl font-bold text-gray-800 tracking-wide drop-shadow-sm">Data Kreditur</h2>
-                        @include('master.partials.export-button', ['type' => 'creditors'])
+                    <div class="flex items-center justify-between mb-6 flex-wrap gap-2">
+                        <div class="flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-blue-600 mr-3 drop-shadow-md"
+                                fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M16 11c1.657 0 3-1.343 3-3S17.657 5 16 5s-3 1.343-3 3 1.343 3 3 3zM8 11c1.657 0 3-1.343 3-3S9.657 5 8 5 5 6.343 5 8s1.343 3 3 3zm0 2c-2.5 0-4.5 1.5-4.5 3.5V19h9v-2.5C12.5 14.5 10.5 13 8 13zm8 0c-2.5 0-4.5 1.5-4.5 3.5V19h9v-2.5c0-2-2-3.5-4.5-3.5z" />
+                            </svg>
+                            <h2 class="text-2xl font-bold text-gray-800 tracking-wide drop-shadow-sm">Data Kreditur</h2>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-xl px-3 py-1.5">
+                                <span class="text-xs font-bold text-gray-500">Filter:</span>
+                                <select id="statusFilter" class="text-xs font-semibold bg-transparent border-0 p-0 text-gray-800 focus:ring-0 cursor-pointer">
+                                    <option value="1" selected>🟢 Aktif Saja</option>
+                                    <option value="0">🔴 Nonaktif Saja</option>
+                                    <option value="all">⚪ Semua Status</option>
+                                </select>
+                            </div>
+                            @include('master.partials.export-button', ['type' => 'creditors'])
+                        </div>
                     </div>
 
                     <div class="overflow-x-auto p-3">
@@ -35,6 +47,7 @@
                                     <th class="px-4 py-3">PPN</th>
                                     <th class="px-4 py-3">Phone</th>
                                     <th class="px-4 py-3">Waktu Kredit</th>
+                                    <th class="px-4 py-3">Status</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-100"></tbody>
@@ -145,7 +158,13 @@
                             <div>
                                 <button type="button" id="deleteData"
                                     class="px-5 py-3 w-full bg-red-500 hover:bg-red-600 text-white rounded-lg shadow-lg hover:shadow-red-400/70 transition-all duration-300">
-                                    Delete
+                                    Nonaktifkan
+                                </button>
+                            </div>
+                            <div>
+                                <button type="button" id="restoreData"
+                                    class="hidden px-5 py-3 w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-lg hover:shadow-emerald-400/70 transition-all duration-300">
+                                    Aktifkan Kembali
                                 </button>
                             </div>
                             <div>
@@ -182,7 +201,12 @@
                 autoWidth: false,
                 processing: true,
                 serverSide: true,
-                ajax: '{{ route('creditors.index') }}',
+                ajax: {
+                    url: '{{ route('creditors.index') }}',
+                    data: function(d) {
+                        d.status_filter = $('#statusFilter').val();
+                    }
+                },
                 columns: [{
                         data: 'DT_RowIndex',
                         orderable: false,
@@ -206,7 +230,18 @@
                     {
                         data: 'credit_time'
                     },
+                    {
+                        data: 'status_label',
+                        orderable: false,
+                        searchable: false
+                    },
                 ],
+            });
+
+            // Filter status change
+            $('#statusFilter').on('change', function() {
+                $('#cancelEdit').click();
+                tableData.ajax.reload();
             });
 
             // Row select to edit
@@ -228,6 +263,14 @@
                 $('#bank_name').val(selectedData.bank_name);
                 $('#bank_number').val(selectedData.bank_number);
                 $('#npwp').val(selectedData.npwp);
+
+                if (selectedData.status == 0) {
+                    $('#deleteData').addClass('hidden');
+                    $('#restoreData').removeClass('hidden');
+                } else {
+                    $('#deleteData').removeClass('hidden');
+                    $('#restoreData').addClass('hidden');
+                }
             });
             // BACK
             $('#back').click(function() {
@@ -239,19 +282,21 @@
                 $('#creditor_id').val('');
                 $('#table-data tbody tr').removeClass('bg-blue-100');
                 selectedData = null;
+                $('#deleteData').removeClass('hidden');
+                $('#restoreData').addClass('hidden');
             });
 
-            // Delete
+            // Nonaktifkan (Soft Delete)
             $('#deleteData').on('click', function() {
                 const id = $('#creditor_id').val();
                 if (!id) return iziToast.warning({
                     title: 'No Row Selected',
-                    message: 'Select a row to delete.'
+                    message: 'Pilih kreditur yang ingin dinonaktifkan.'
                 });
 
                 swal({
-                    title: 'Are you sure?',
-                    text: 'This will delete the selected creditor.',
+                    title: 'Apakah Anda yakin?',
+                    text: 'Kreditur yang dipilih akan dinonaktifkan.',
                     icon: 'warning',
                     buttons: true,
                     dangerMode: true,
@@ -265,13 +310,63 @@
                             },
                             success: function(res) {
                                 iziToast.success({
-                                    title: 'Deleted',
+                                    title: 'Berhasil',
                                     message: res.message ??
-                                        'Creditor deleted successfully!',
+                                        'Kreditur berhasil dinonaktifkan!',
                                     position: 'topRight'
                                 });
                                 $('#cancelEdit').click();
                                 tableData.ajax.reload(null, false);
+                            },
+                            error: function(err) {
+                                iziToast.error({
+                                    title: 'Gagal',
+                                    message: err.responseJSON?.message ?? 'Terjadi kesalahan.',
+                                    position: 'topRight'
+                                });
+                            }
+                        });
+                    }
+                });
+            });
+
+            // Aktifkan Kembali (Restore)
+            $('#restoreData').on('click', function() {
+                const id = $('#creditor_id').val();
+                if (!id) return iziToast.warning({
+                    title: 'No Row Selected',
+                    message: 'Pilih kreditur yang ingin diaktifkan kembali.'
+                });
+
+                swal({
+                    title: 'Aktifkan Kembali?',
+                    text: 'Kreditur yang dipilih akan diaktifkan kembali.',
+                    icon: 'info',
+                    buttons: true,
+                }).then((willRestore) => {
+                    if (willRestore) {
+                        $.ajax({
+                            url: '/creditors/' + id + '/restore',
+                            type: 'POST',
+                            data: {
+                                _token: '{{ csrf_token() }}'
+                            },
+                            success: function(res) {
+                                iziToast.success({
+                                    title: 'Berhasil',
+                                    message: res.message ??
+                                        'Kreditur berhasil diaktifkan kembali!',
+                                    position: 'topRight'
+                                });
+                                $('#cancelEdit').click();
+                                tableData.ajax.reload(null, false);
+                            },
+                            error: function(err) {
+                                iziToast.error({
+                                    title: 'Gagal',
+                                    message: err.responseJSON?.message ?? 'Terjadi kesalahan.',
+                                    position: 'topRight'
+                                });
                             }
                         });
                     }

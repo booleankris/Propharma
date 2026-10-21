@@ -353,14 +353,18 @@ class SalesController extends Controller
 
             foreach ($items as $item) {
                 $bs = $branchStocks->get($item->id);
-                $item->stock_pmi = (int) ($bs?->stock_pmi ?? 0);
-                $item->stock_asm = (int) ($bs?->stock_asm ?? 0);
-                $item->stock_mim = (int) ($bs?->stock_mim ?? 0);
-                $item->stock_asa = (int) ($bs?->stock_asa ?? 0);
+                $item->counter_stock = (float) ($item->counter_stock ?? 0);
+                $item->storage_stock = (float) ($item->storage_stock ?? 0);
+                $item->stock_pmi = (float) ($bs?->stock_pmi ?? 0);
+                $item->stock_asm = (float) ($bs?->stock_asm ?? 0);
+                $item->stock_mim = (float) ($bs?->stock_mim ?? 0);
+                $item->stock_asa = (float) ($bs?->stock_asa ?? 0);
                 $item->active_pharmacy_id = (int) $pharmacyId;
             }
         } else {
             foreach ($items as $item) {
+                $item->counter_stock = (float) ($item->counter_stock ?? 0);
+                $item->storage_stock = (float) ($item->storage_stock ?? 0);
                 $item->stock_pmi = 0;
                 $item->stock_asm = 0;
                 $item->stock_mim = 0;

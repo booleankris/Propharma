@@ -205,7 +205,19 @@
                                             <td class="px-4 py-3 font-medium text-gray-800">{{ $ri->medicine_name }}</td>
                                             <td class="px-3 py-3 text-center font-mono">{{ $ri->batch ?? '-' }}</td>
                                             <td class="px-3 py-3 text-center">{{ $ri->expired_date ?? '-' }}</td>
-                                            <td class="px-3 py-3 text-center font-semibold">{{ $ri->qty_received }}</td>
+                                            @php
+                                                $medicine = $ri->order_items->medicines ?? null;
+                                                $isPack = $ri->receipt_is_pack !== null ? (bool) $ri->receipt_is_pack : (bool) ($ri->order_items->pack ?? false);
+                                                $receiptUnit = $isPack ? ($medicine->packaging ?? 'kemasan') : ($medicine->unit ?? 'unit');
+                                                $baseUnit = $medicine->unit ?? 'unit';
+                                                $baseQty = (float) $ri->qty_received * max(1, (int) ($ri->stock_unit_factor ?? ($isPack ? ($medicine->content ?? 1) : 1)));
+                                            @endphp
+                                            <td class="px-3 py-3 text-center font-semibold">
+                                                <span>{{ rtrim(rtrim(number_format((float) $ri->qty_received, 2, ',', '.'), '0'), ',') }} {{ $receiptUnit }}</span>
+                                                @if ($isPack && (int) ($medicine->content ?? 1) > 1)
+                                                    <span class="block text-[10px] font-normal text-gray-500">= {{ rtrim(rtrim(number_format($baseQty, 2, ',', '.'), '0'), ',') }} {{ $baseUnit }}</span>
+                                                @endif
+                                            </td>
                                             <td class="px-4 py-3 text-right">Rp
                                                 {{ number_format($ri->raw_price, 0, ',', '.') }}</td>
                                             <td class="px-3 py-3 text-center">Rp
@@ -254,7 +266,19 @@
                                         <td class="px-4 py-3 font-medium text-gray-800">{{ $ri->medicine_name }}</td>
                                         <td class="px-3 py-3 text-center font-mono">{{ $ri->batch ?? '-' }}</td>
                                         <td class="px-3 py-3 text-center">{{ $ri->expired_date ?? '-' }}</td>
-                                        <td class="px-3 py-3 text-center font-semibold">{{ $ri->qty_received }}</td>
+                                        @php
+                                            $medicine = $ri->order_items->medicines ?? null;
+                                            $isPack = $ri->receipt_is_pack !== null ? (bool) $ri->receipt_is_pack : (bool) ($ri->order_items->pack ?? false);
+                                            $receiptUnit = $isPack ? ($medicine->packaging ?? 'kemasan') : ($medicine->unit ?? 'unit');
+                                            $baseUnit = $medicine->unit ?? 'unit';
+                                            $baseQty = (float) $ri->qty_received * max(1, (int) ($ri->stock_unit_factor ?? ($isPack ? ($medicine->content ?? 1) : 1)));
+                                        @endphp
+                                        <td class="px-3 py-3 text-center font-semibold">
+                                            <span>{{ rtrim(rtrim(number_format((float) $ri->qty_received, 2, ',', '.'), '0'), ',') }} {{ $receiptUnit }}</span>
+                                            @if ($isPack && (int) ($medicine->content ?? 1) > 1)
+                                                <span class="block text-[10px] font-normal text-gray-500">= {{ rtrim(rtrim(number_format($baseQty, 2, ',', '.'), '0'), ',') }} {{ $baseUnit }}</span>
+                                            @endif
+                                        </td>
                                         <td class="px-4 py-3 text-right">Rp
                                             {{ number_format($ri->raw_price, 0, ',', '.') }}</td>
                                         <td class="px-3 py-3 text-center">Rp
@@ -381,11 +405,12 @@
                                 class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
                         </div>
                         <div>
-                            <label class="text-xs font-semibold text-gray-700">QTY Diterima <span
+                            <label id="add_qty_label" class="text-xs font-semibold text-gray-700">QTY Diterima <span
                                     class="text-red-500">*</span></label>
                             <input id="add_qty_received" type="number" min="0.01" step="any" placeholder="0"
                                 class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
                         </div>
+                        <div id="add_quantity_equivalence" class="hidden sm:col-span-2 rounded-lg bg-blue-50 px-3 py-2 text-[11px] text-blue-800"></div>
                         <div>
                             <label class="text-xs font-semibold text-gray-700">HNA<span class="text-red-500">*</span>
                                 <span id="add_box_price_info"
@@ -471,10 +496,11 @@
                                 class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
                         </div>
                         <div>
-                            <label class="text-xs font-semibold text-gray-700">QTY Diterima</label>
+                            <label id="edit_qty_label" class="text-xs font-semibold text-gray-700">QTY Diterima</label>
                             <input id="edit_qty_received" type="number" min="0.01" step="any"
                                 class="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none">
                         </div>
+                        <div id="edit_quantity_equivalence" class="hidden sm:col-span-2 rounded-lg bg-blue-50 px-3 py-2 text-[11px] text-blue-800"></div>
                         <div>
                             <label class="text-xs font-semibold text-gray-700">HNA</label>
                             <input id="edit_raw_price" type="text"

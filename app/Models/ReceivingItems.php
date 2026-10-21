@@ -15,6 +15,8 @@ class ReceivingItems extends Model
         'order_items_id',
         'qty_received',
         'qty',
+        'receipt_is_pack',
+        'stock_unit_factor',
         'discount',
         'extra_discount',
         'expired_date',
