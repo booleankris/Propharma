@@ -805,12 +805,12 @@
             });
         });
 
-        // ── Print Struk with optional full receipt for Resep Tunai ─────────
+        // ── Print Struk with optional full receipt for Resep Tunai & Resep Kredit ─
         function printStruk(trxId, trxType) {
             window.open(`/print/receipt/${trxId}`, '_blank');
 
-            // If RESEP TUNAI (UM), ask to also print detail/full receipt
-            if (trxType === 'UM') {
+            // If RESEP TUNAI (UM) or RESEP KREDIT (UK), ask to also print detail/full receipt
+            if (trxType === 'UM' || trxType === 'UK' || trxType === 'RESEP TUNAI' || trxType === 'KREDIT') {
                 Swal.fire({
                     title: 'Cetak Struk Detail?',
                     text: 'Apakah Anda ingin mencetak struk detail (semua obat racikan)?',
