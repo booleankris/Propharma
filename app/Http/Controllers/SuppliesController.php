@@ -226,9 +226,11 @@ class SuppliesController extends Controller
                 SUM(CASE WHEN status = 4 THEN qty ELSE 0 END) as qty_bought_rt
             ")->first();
 
+            $effectiveDateSql = "CASE WHEN (LENGTH(date) <= 10 OR TIME(date) = '00:00:00') AND created_at IS NOT NULL THEN CONCAT(DATE(date), ' ', TIME(created_at)) ELSE date END";
+
             // 3. BALANCE CALCULATION: Get the very first and very last records for the balances
-            $firstRecord = (clone $baseQuery)->orderBy('date', 'asc')->orderBy('id', 'asc')->first();
-            $lastRecord = (clone $baseQuery)->orderBy('date', 'desc')->orderBy('id', 'desc')->first();
+            $firstRecord = (clone $baseQuery)->orderByRaw($effectiveDateSql . ' ASC')->orderBy('id', 'asc')->first();
+            $lastRecord = (clone $baseQuery)->orderByRaw($effectiveDateSql . ' DESC')->orderBy('id', 'desc')->first();
 
             // 4. TABLE QUERY: Eager load relations nested deep to prevent performance issues
             $itemsQuery = (clone $baseQuery)->with([
@@ -238,7 +240,7 @@ class SuppliesController extends Controller
                 'medicine_transaction.user',            // Fetch cashier user through transactions
                 'users'                                 // Fetch user for creator display
             ])->whereNotIn('status', [5, 6])
-              ->orderBy('date', 'asc')
+              ->orderByRaw($effectiveDateSql . ' ASC')
               ->orderBy('id', 'asc');
 
             // Tentukan apakah ada filter 1 obat spesifik
@@ -283,7 +285,7 @@ class SuppliesController extends Controller
                 // rows are inserted later but carry the original movement date, so
                 // they must sit next to the logs they cancel.
                 $allRowsForBalance = (clone $baseQuery)->with(['medicines', 'batches'])
-                    ->orderBy('date', 'asc')
+                    ->orderByRaw($effectiveDateSql . ' ASC')
                     ->orderBy('id', 'asc')
                     ->get();
 
@@ -312,9 +314,24 @@ class SuppliesController extends Controller
 
             // 5. RETURN DATATABLES RESPONSE
             return DataTables::eloquent($itemsQuery)
+                ->order(function ($q) use ($request, $effectiveDateSql) {
+                    if ($request->has('order') && is_array($request->order)) {
+                        $colIdx = $request->order[0]['column'] ?? null;
+                        $orderDir = strtolower($request->order[0]['dir'] ?? 'asc') === 'desc' ? 'DESC' : 'ASC';
+                        if ((int) $colIdx === 1) {
+                            $q->orderByRaw($effectiveDateSql . ' ' . $orderDir)->orderBy('id', $orderDir);
+                            return;
+                        }
+                    }
+                    $q->orderByRaw($effectiveDateSql . ' ASC')->orderBy('id', 'asc');
+                })
                 ->addIndexColumn()
                 ->addColumn('date', function ($row) {
-                    return $row->date;
+                    $d = $row->date;
+                    if ($d && $d->format('H:i:s') === '00:00:00' && $row->created_at) {
+                        return $d->format('Y-m-d') . ' ' . $row->created_at->format('H:i:s');
+                    }
+                    return $d ? $d->format('Y-m-d H:i:s') : '-';
                 })
                 ->addColumn('medicine_name', function ($row) {
                     return $row->medicines->name;
@@ -542,7 +559,13 @@ class SuppliesController extends Controller
 
             return DataTables::eloquent($items)
                 ->addIndexColumn()
-                ->addColumn('date', fn($r) => $r->date)
+                ->addColumn('date', function ($r) {
+                    $d = $r->date;
+                    if ($d && $d->format('H:i:s') === '00:00:00' && $r->created_at) {
+                        return $d->format('Y-m-d') . ' ' . $r->created_at->format('H:i:s');
+                    }
+                    return $d ? $d->format('Y-m-d H:i:s') : '-';
+                })
                 ->addColumn('code', fn($r) => $r->code)
                 ->addColumn('type', fn($r) => $r->type)
                 ->addColumn('name', fn($r) => $r->medicines->name ?? '-')
@@ -1135,7 +1158,7 @@ class SuppliesController extends Controller
             // Older sale-return rows stored only the calendar date, which casts to
             // midnight and incorrectly places the return before same-day sales.
             // Use created_at as the effective timestamp for those legacy rows.
-            $effectiveDateSql = "CASE WHEN status = 3 AND TIME(date) = '00:00:00' AND created_at IS NOT NULL THEN created_at ELSE date END";
+            $effectiveDateSql = "CASE WHEN (LENGTH(date) <= 10 OR TIME(date) = '00:00:00') AND created_at IS NOT NULL THEN CONCAT(DATE(date), ' ', TIME(created_at)) ELSE date END";
             $ledgerRows = $request->filled('searchMedicine')
                 ? $baseMedicineLogQuery()
                     ->orderByRaw($effectiveDateSql . ' ASC')
@@ -1237,8 +1260,8 @@ class SuppliesController extends Controller
                 ->addIndexColumn()
                 ->addColumn('date', function ($row) {
                     $dateValue = $row->date;
-                    if ((int) $row->status === 3 && $row->date && $row->date->format('H:i:s') === '00:00:00' && $row->created_at) {
-                        $dateValue = $row->created_at;
+                    if ($row->date && $row->date->format('H:i:s') === '00:00:00' && $row->created_at) {
+                        $dateValue = Carbon::parse($row->date->format('Y-m-d') . ' ' . $row->created_at->format('H:i:s'));
                     }
                     $d = $this->parseStockOpnameDateTime($dateValue);
                     if (!$d) return '<span class="text-slate-400 text-xs">—</span>';

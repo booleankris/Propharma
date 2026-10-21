@@ -21,7 +21,12 @@ class CreditorsController extends Controller
     public function index(Request $request)
     {
         if ($request->ajax()) {
-            $creditors = Creditor::select('id', 'code', 'name', 'address', 'phone', 'bank_type','numbers', 'ppn_type', 'bank_name', 'bank_number', 'npwp', 'credit_time','status', 'created_at');
+            $statusFilter = $request->input('status_filter', '1');
+
+            $creditors = Creditor::select('id', 'code', 'name', 'address', 'phone', 'bank_type', 'numbers', 'ppn_type', 'bank_name', 'bank_number', 'npwp', 'credit_time', 'status', 'created_at')
+                ->when($statusFilter !== 'all', function ($q) use ($statusFilter) {
+                    $q->where('status', (int) $statusFilter);
+                });
 
             if (!$request->has('order')) {
                 $creditors = $creditors->orderBy('created_at', 'ASC');
@@ -50,7 +55,7 @@ class CreditorsController extends Controller
                     $button .= '</div></div>';
                     return $button;
                 })
-                ->escapeColumns([])
+                ->rawColumns(['status_label', 'action'])
                 ->toJson();
         }
 
@@ -90,11 +95,11 @@ class CreditorsController extends Controller
 
         ]);
         $creditor = Creditor::create([
-            'code'    => $nextCode,
-            'name'    => $request->name,
-            'address' => $request->address ?? '-',
-            'city'    => $request->city ?? '-',
-            'phone'   => $request->phone ?? '-',
+            'code'        => $nextCode,
+            'name'        => $request->name,
+            'address'     => $request->address ?? '-',
+            'city'        => $request->city ?? '-',
+            'phone'       => $request->phone ?? '-',
             'contact'     => $request->contact,
             'fax'         => $request->fax ?? '-',
             'ppn_type'    => $request->ppn_type ?? '-',
@@ -103,7 +108,7 @@ class CreditorsController extends Controller
             'bank_number' => $request->bank_number ?? '-',
             'bank_name'   => $request->bank_name ?? '-',
             'npwp'        => $request->npwp ?? '-',
-            'status'      => $request->status ?? 0,
+            'status'      => $request->has('status') ? (int) $request->status : 1,
         ]);
 
         if ($request->ajax()) {
@@ -150,11 +155,11 @@ class CreditorsController extends Controller
         ]);
 
         $creditor->update([
-            'name'    => $validated['name'],
-            'address' => $validated['address'] ?? '-',
-            'city'    => $validated['city'] ?? '-',
-            'phone'   => $validated['phone'] ?? '-',
-            'contact' => $validated['contact'] ?? '-',
+            'name'        => $validated['name'],
+            'address'     => $validated['address'] ?? '-',
+            'city'        => $validated['city'] ?? '-',
+            'phone'       => $validated['phone'] ?? '-',
+            'contact'     => $validated['contact'] ?? '-',
             'fax'         => $validated['fax'] ?? '-',
             'ppn_type'    => $validated['ppn_type'] ?? '-',
             'numbers'     => $validated['numbers'] ?? '-',
@@ -162,7 +167,7 @@ class CreditorsController extends Controller
             'bank_number' => $validated['bank_number'] ?? '-',
             'bank_name'   => $validated['bank_name'] ?? '-',
             'npwp'        => $validated['npwp'] ?? '-',
-            'status'  => $request->status ?? 0,
+            'status'      => $request->has('status') ? (int) $request->status : ($creditor->status ?? 1),
         ]);
 
         if ($request->ajax()) {
@@ -180,19 +185,40 @@ class CreditorsController extends Controller
     {
         $search = $request->q;
 
-        return Creditor::when($search, function ($query) use ($search) {
-            $query->where('name', 'like', "%{$search}%");
-        })
+        return Creditor::where('status', 1)
+            ->when($search, function ($query) use ($search) {
+                $query->where('name', 'like', "%{$search}%");
+            })
             ->orderBy('name', 'ASC')
             ->limit(20)
             ->get(['id', 'name']);
     }
 
+    /**
+     * Soft Delete (Deactivate)
+     */
     public function destroy($id)
     {
         $creditor = Creditor::findOrFail($id);
-        $creditor->delete();
+        $creditor->update(['status' => 0]);
 
-        return response()->json(['status' => true, 'message' => 'Berhasil Menghapus Kreditur!']);
+        return response()->json([
+            'status'  => true,
+            'message' => 'Berhasil Menonaktifkan Kreditur!'
+        ]);
+    }
+
+    /**
+     * Restore (Activate)
+     */
+    public function restore($id)
+    {
+        $creditor = Creditor::findOrFail($id);
+        $creditor->update(['status' => 1]);
+
+        return response()->json([
+            'status'  => true,
+            'message' => 'Berhasil Mengaktifkan Kembali Kreditur!'
+        ]);
     }
 }

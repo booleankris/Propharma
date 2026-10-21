@@ -3595,7 +3595,7 @@ class ReceivingController extends Controller
                 ]);
             }
 
-            $now = Carbon::now()->format('Y-m-d');
+            $now = Carbon::now()->format('Y-m-d H:i:s');
             $pharmacyId = $order->pharmacy_id ?? getPurchasingPharmacyId();
 
             $medicineIds = $receivingItems->pluck('order_items.medicine_id')->filter()->unique()->values();
