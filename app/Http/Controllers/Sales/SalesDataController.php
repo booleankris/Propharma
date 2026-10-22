@@ -516,7 +516,7 @@ class SalesDataController extends Controller
         }
 
         $validated = $request->validate([
-            'payment_method' => 'required|in:CASH,QRIS,TRANSFER,DEBIT,BELUM BAYAR',
+            'payment_method' => 'required|in:CASH,QRIS,TRANSFER,DEBIT,BELUM BAYAR,KREDIT',
             'bank_name'      => 'nullable|string|max:50',
             'user_id'        => 'required|exists:users,id',
         ]);

@@ -951,8 +951,9 @@ class SalesController extends Controller
                 ]);
             }
 
-            $paymentMethod = strtoupper(trim($validated['paymentType'] ?? 'CASH'));
-            $isUnpaid = $paymentMethod === 'BELUM BAYAR';
+            $isCreditTransaction = strtoupper((string) ($transaction->transaction_type ?? '')) === 'KREDIT';
+            $paymentMethod = $isCreditTransaction ? 'KREDIT' : strtoupper(trim($validated['paymentType'] ?? 'CASH'));
+            $isUnpaid = in_array($paymentMethod, ['BELUM BAYAR', 'KREDIT'], true);
             $nonCashPaymentMethods = ['QRIS', 'DEBIT', 'TRANSFER'];
             $bankAccount = null;
 

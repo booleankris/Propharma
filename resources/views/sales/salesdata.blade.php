@@ -719,6 +719,7 @@
                                 <option value="TRANSFER">TRANSFER BANK</option>
                                 <option value="DEBIT">KARTU DEBIT</option>
                                 <option value="BELUM BAYAR">BELUM BAYAR</option>
+                                <option value="KREDIT">KREDIT</option>
                             </select>
                         </div>
 

@@ -2047,8 +2047,7 @@
     var transaction_id = trx_id;
     var total_discount = {{ $discount_total }};
     var discount = "";
-    var subtotal_discount = "";
-    var paymentType = "CASH";
+    var paymentType = (currenttransaction === 'KREDIT') ? "KREDIT" : "CASH";
 
     const subtotalpreview = document.getElementById('subtotal');
 
@@ -4200,6 +4199,7 @@
         // TRANSACTION TYPE
         if (currenttransaction === 'KREDIT') {
 
+            paymentType = 'KREDIT';
             doctor_id = document.getElementById('doctor_id').value || null;
             debtor_id = document.getElementById('debtor_id').value || null;
 
