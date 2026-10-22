@@ -6,7 +6,55 @@
     <link rel="stylesheet" href="{{ asset('templates/library/datatables/media/css/jquery.dataTables.min.css') }}">
     <link rel="stylesheet" href="{{ asset('templates/library/izitoast/dist/css/iziToast.min.css') }}">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
     <style>
+        /* ── Select2 styling inside modal ── */
+        .select2-container {
+            width: 100% !important;
+        }
+        .select2-container .select2-selection--single {
+            height: 38px !important;
+            border-radius: 8px !important;
+            border: 1px solid #d1d5db !important;
+            display: flex !important;
+            align-items: center !important;
+            padding: 4px 10px !important;
+            font-size: 12px !important;
+        }
+        .select2-container--default .select2-selection--single .select2-selection__rendered {
+            line-height: 28px !important;
+            color: #1f2937 !important;
+            padding-left: 0 !important;
+        }
+        .select2-container--default .select2-selection--single .select2-selection__arrow {
+            height: 36px !important;
+            right: 8px !important;
+        }
+        .select2-dropdown {
+            border-radius: 10px !important;
+            border: 1px solid #e5e7eb !important;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+            font-size: 12px !important;
+            z-index: 99999 !important;
+        }
+        .select2-results__group {
+            background: #f8fafc !important;
+            color: #475569 !important;
+            font-weight: 700 !important;
+            font-size: 11px !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.05em !important;
+            padding: 6px 12px !important;
+            border-top: 1px solid #f1f5f9;
+        }
+        .select2-results__option {
+            padding: 7px 12px !important;
+        }
+        .select2-container--default .select2-results__option--highlighted[aria-selected] {
+            background-color: #ea580c !important;
+            color: white !important;
+        }
+
         /* ── DataTables overrides ── */
         .dataTables_wrapper .dataTables_filter {
             float: none !important;
@@ -202,6 +250,29 @@
             color: #6b7280 !important;
             border-color: #d1d5db !important;
             cursor: not-allowed;
+        }
+
+        .btn-edit-payment {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 6px;
+            border: 0.5px solid #fed7aa;
+            background: #fff7ed;
+            color: #ea580c;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all .12s;
+            line-height: 1.4;
+        }
+
+        .btn-edit-payment:hover {
+            background: #ffedd5;
+            color: #c2410c;
+            border-color: #fdba74;
         }
 
         /* ── Qty badge ── */
@@ -569,12 +640,110 @@
                                 <span>Cetak Kwitansi</span>
                             </button>
                         </div>
+
+                        @if (!empty($canEditPayment))
+                            <div class="mt-2.5">
+                                <button type="button" id="btn-detail-edit-payment"
+                                    class="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg border border-orange-200 bg-orange-50 hover:bg-orange-100 text-orange-700 text-xs font-semibold transition-all shadow-xs">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                    </svg>
+                                    <span>Edit Pembayaran & Kasir</span>
+                                </button>
+                            </div>
+                        @endif
                     </div>
 
                 </div>
 
             </div>
         </div>
+
+        @if (!empty($canEditPayment))
+            {{-- Modal Edit Pembayaran & Kasir (Khusus General Manager) --}}
+            <div id="modalEditPayment" class="fixed inset-0 z-50 hidden overflow-y-auto bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+                <div class="bg-white rounded-2xl shadow-2xl border border-gray-100 w-full max-w-md overflow-hidden transform transition-all">
+                    <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-orange-50/50 to-amber-50/50">
+                        <div class="flex items-center gap-2.5">
+                            <div class="w-8 h-8 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center font-bold">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 class="text-sm font-semibold text-gray-800">Edit Pembayaran & Kasir</h3>
+                                <p class="text-[11px] text-gray-500">Otoritas Khusus: General Manager</p>
+                            </div>
+                        </div>
+                        <button type="button" onclick="closeEditPaymentModal()" class="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                        </button>
+                    </div>
+
+                    <form id="formEditPayment" class="p-5 space-y-4">
+                        <input type="hidden" id="edit_trx_id" name="trx_id">
+
+                        <div class="p-3 bg-gray-50 rounded-xl border border-gray-100 text-[12px] flex justify-between items-center">
+                            <div>
+                                <span class="text-gray-400 block text-[10px] uppercase font-medium">No. Transaksi</span>
+                                <span id="edit_display_code" class="font-mono font-semibold text-gray-700">—</span>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-gray-400 block text-[10px] uppercase font-medium">Total Tagihan</span>
+                                <span id="edit_display_total" class="font-semibold text-emerald-600 font-mono">—</span>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label for="edit_user_id" class="block text-xs font-semibold text-gray-700 mb-1.5">Kasir / Pembuat Transaksi</label>
+                            <select id="edit_user_id" name="user_id" required class="select2-modal w-full text-xs rounded-lg border border-gray-300 px-3 py-2 bg-white text-gray-800">
+                                @foreach ($cashiers ?? [] as $groupName => $userList)
+                                    <optgroup label="{{ $groupName }}">
+                                        @foreach ($userList as $cashier)
+                                            <option value="{{ $cashier->id }}">{{ $cashier->name }} ({{ $cashier->username }})</option>
+                                        @endforeach
+                                    </optgroup>
+                                @endforeach
+                            </select>
+                            <span class="text-[11px] text-gray-400 mt-1 block">Mengubah kasir pada transaksi dan seluruh item keranjang penjualan.</span>
+                        </div>
+
+                        <div>
+                            <label for="edit_payment_method" class="block text-xs font-semibold text-gray-700 mb-1.5">Metode Pembayaran</label>
+                            <select id="edit_payment_method" name="payment_method" required onchange="toggleBankVisibility(this.value)" class="w-full text-xs rounded-lg border border-gray-300 px-3 py-2 bg-white text-gray-800 focus:ring-2 focus:ring-orange-200 focus:border-orange-500 transition-all">
+                                <option value="CASH">CASH (Tunai)</option>
+                                <option value="QRIS">QRIS</option>
+                                <option value="TRANSFER">TRANSFER BANK</option>
+                                <option value="DEBIT">KARTU DEBIT</option>
+                                <option value="BELUM BAYAR">BELUM BAYAR</option>
+                            </select>
+                        </div>
+
+                        <div id="wrap_bank_name" class="hidden">
+                            <label for="edit_bank_name" class="block text-xs font-semibold text-gray-700 mb-1.5">Rekening Bank Tujuan</label>
+                            <select id="edit_bank_name" name="bank_name" class="w-full text-xs rounded-lg border border-gray-300 px-3 py-2 bg-white text-gray-800 focus:ring-2 focus:ring-orange-200 focus:border-orange-500 transition-all">
+                                <option value="">-- Pilih Rekening Bank --</option>
+                                @foreach ($availableBanks ?? [] as $bank)
+                                    <option value="{{ $bank['bank_name'] }}">{{ $bank['name'] }} @if(!empty($bank['account_number']))({{ $bank['account_number'] }})@endif</option>
+                                @endforeach
+                            </select>
+                            <span class="text-[11px] text-gray-400 mt-1 block">Saldo keuangan apotek akan disesuaikan otomatis dengan rekening bank ini.</span>
+                        </div>
+
+                        <div class="pt-3 border-t border-gray-100 flex items-center justify-end gap-2">
+                            <button type="button" onclick="closeEditPaymentModal()" class="px-4 py-2 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+                                Batal
+                            </button>
+                            <button type="submit" id="btnSubmitEditPayment" class="px-4 py-2 text-xs font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded-lg shadow-sm transition-colors flex items-center gap-1.5">
+                                <span>Simpan Perubahan</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        @endif
     </section>
 @endsection
 
@@ -585,6 +754,7 @@
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script src="{{ asset('templates/library/izitoast/dist/js/iziToast.min.js') }}"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
     <script>
         let tableData = null;
@@ -707,6 +877,20 @@
                             const trxId = d.transactions?.id || d.transaction_id;
                             const trxType = d.type || '';
                             const printed = !!(d.kwitansi_printed_at || d.transactions?.kwitansi_printed_at || printedKwitansi.has(String(trxId)));
+                            const canEditPayment = {{ !empty($canEditPayment) ? 'true' : 'false' }};
+
+                            let editBtnHtml = '';
+                            if (canEditPayment) {
+                                editBtnHtml = `
+                                    <button class="btn-edit-payment" onclick="event.stopPropagation(); triggerEditPaymentModal('${trxId}')" title="Edit Pembayaran & Kasir (General Manager)">
+                                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                        </svg>Edit
+                                    </button>
+                                `;
+                            }
+
                             return `<div class="flex items-center gap-1 justify-center">
                                 <button class="btn-print" onclick="event.stopPropagation(); printStruk('${trxId}', '${trxType}')" title="Cetak Struk POS Thermal">
                                     <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
@@ -723,6 +907,7 @@
                                         <line x1="16" y1="17" x2="8" y2="17"/>
                                     </svg><span>${printed ? 'Sudah Dicetak' : 'Kwitansi'}</span>
                                 </button>
+                                ${editBtnHtml}
                             </div>`;
                         }
                     },
@@ -803,6 +988,140 @@
                     window.open(`/print/kwitansi/${currentSelectedTrxId}`, '_blank');
                 }
             });
+
+            $('#btn-detail-edit-payment').on('click', function() {
+                if (currentSelectedTrxId) {
+                    triggerEditPaymentModal(currentSelectedTrxId);
+                }
+            });
+        });
+
+        // ── Modal Edit Pembayaran & Kasir (General Manager) ──────────────────
+        function toggleBankVisibility(method) {
+            const wrap = document.getElementById('wrap_bank_name');
+            const select = document.getElementById('edit_bank_name');
+            if (!wrap) return;
+
+            const nonCashMethods = ['QRIS', 'TRANSFER', 'DEBIT'];
+            if (nonCashMethods.includes((method || '').toUpperCase())) {
+                wrap.classList.remove('hidden');
+                if (select) select.required = true;
+            } else {
+                wrap.classList.add('hidden');
+                if (select) {
+                    select.required = false;
+                    select.value = '';
+                }
+            }
+        }
+
+        function openEditPaymentModal(data) {
+            if (!data) return;
+            const modal = document.getElementById('modalEditPayment');
+            if (!modal) return;
+
+            const trxId = data.transactions?.id || data.transaction_id;
+            document.getElementById('edit_trx_id').value = trxId;
+            document.getElementById('edit_display_code').textContent = data.code || '—';
+            document.getElementById('edit_display_total').textContent = data.final_price || '—';
+
+            // Set user_id / kasir
+            const cashierSelect = document.getElementById('edit_user_id');
+            const rawUserId = data.raw_user_id || data.user_id;
+            if (cashierSelect && rawUserId) {
+                $(cashierSelect).val(rawUserId);
+            }
+
+            // Set payment method
+            const paymentSelect = document.getElementById('edit_payment_method');
+            const rawMethod = (data.raw_payment_method || data.transactions?.payment_method || 'CASH').toUpperCase();
+            if (paymentSelect) {
+                paymentSelect.value = rawMethod;
+            }
+            toggleBankVisibility(rawMethod);
+
+            // Set bank
+            const bankSelect = document.getElementById('edit_bank_name');
+            const rawBank = data.raw_bank_name || data.transactions?.transfer_bank_name || '';
+            if (bankSelect && rawBank) {
+                bankSelect.value = rawBank;
+            }
+
+            modal.classList.remove('hidden');
+
+            // Initialize or refresh Select2 with dropdownParent inside modal
+            if (typeof $.fn.select2 !== 'undefined' && $('#edit_user_id').length) {
+                if ($('#edit_user_id').hasClass('select2-hidden-accessible')) {
+                    $('#edit_user_id').val(rawUserId).trigger('change.select2');
+                } else {
+                    $('#edit_user_id').select2({
+                        dropdownParent: $('#modalEditPayment'),
+                        width: '100%',
+                        placeholder: '-- Pilih Kasir / User --'
+                    });
+                }
+            }
+        }
+
+        function closeEditPaymentModal() {
+            const modal = document.getElementById('modalEditPayment');
+            if (modal) {
+                modal.classList.add('hidden');
+                if (typeof $.fn.select2 !== 'undefined' && $('#edit_user_id').data('select2')) {
+                    $('#edit_user_id').select2('close');
+                }
+            }
+        }
+
+        function triggerEditPaymentModal(trxId) {
+            if (!tableData) return;
+            const rows = tableData.rows().data().toArray();
+            const found = rows.find(r => String(r.transactions?.id || r.transaction_id) === String(trxId));
+            if (found) {
+                openEditPaymentModal(found);
+            }
+        }
+
+        $(document).on('submit', '#formEditPayment', function(e) {
+            e.preventDefault();
+            const trxId = $('#edit_trx_id').val();
+            if (!trxId) return;
+
+            const btn = $('#btnSubmitEditPayment');
+            const originalText = btn.html();
+            btn.prop('disabled', true).html('<span>Menyimpan...</span>');
+
+            const payload = {
+                payment_method: $('#edit_payment_method').val(),
+                bank_name: $('#edit_bank_name').val(),
+                user_id: $('#edit_user_id').val(),
+            };
+
+            axios.post(`/data/sales/${trxId}/update-payment`, payload)
+                .then(res => {
+                    closeEditPaymentModal();
+                    iziToast.success({
+                        title: 'Berhasil',
+                        message: res.data?.message || 'Pembayaran dan kasir berhasil diperbarui',
+                        position: 'topRight',
+                        timeout: 2500
+                    });
+                    if (tableData) {
+                        tableData.ajax.reload(null, false);
+                    }
+                })
+                .catch(err => {
+                    const msg = err.response?.data?.message || 'Gagal memperbarui pembayaran dan kasir';
+                    iziToast.error({
+                        title: 'Gagal',
+                        message: msg,
+                        position: 'topRight',
+                        timeout: 3500
+                    });
+                })
+                .finally(() => {
+                    btn.prop('disabled', false).html(originalText);
+                });
         });
 
         // ── Print Struk with optional full receipt for Resep Tunai & Resep Kredit ─

@@ -289,6 +289,7 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
     Route::get('/data/sales/export', [SalesDataController::class, 'export'])->name('salesdata.export');
     Route::get('/data/pending', [SalesDataController::class, 'pending'])->name('salesdata.pending');
     Route::get('/sales/transaction/{id}/items', [SalesDataController::class, 'transactionItems']);
+    Route::post('/data/sales/{id}/update-payment', [SalesDataController::class, 'updatePayment'])->name('salesdata.update-payment');
 
     // Medicine Order History
     Route::get('/medicineorderhistory', [MedicineOrderHistoryController::class, 'index'])

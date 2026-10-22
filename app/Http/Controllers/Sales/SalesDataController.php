@@ -4,14 +4,18 @@ namespace App\Http\Controllers\Sales;
 
 use App\Exports\Report\SalesDataExport;
 use App\Http\Controllers\Controller;
+use App\Models\FinanceAccount;
+use App\Models\FinancePayment;
 use App\Models\MedicineCart;
 use App\Models\MedicineTransactions;
 use App\Models\Pharmacies;
 use App\Models\Retur;
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use DataTables;
 use Form;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -193,14 +197,57 @@ class SalesDataController extends Controller
                         $row->transactions?->transfer_bank_name
                     );
                 })
+                ->addColumn('raw_payment_method', function ($row) {
+                    return strtoupper(trim((string) ($row->transactions?->payment_method ?? 'CASH')));
+                })
+                ->addColumn('raw_bank_name', function ($row) {
+                    return $row->transactions?->transfer_bank_name ?? '';
+                })
+                ->addColumn('raw_user_id', function ($row) {
+                    return $row->transactions?->user_id ?? $row->user_id;
+                })
                 ->rawColumns(['final_price', 'channel'])
                 ->make(true);
         }
+
+        $user = auth()->user();
+        $canEditPayment = $user && ($user->hasRole('General Manager') || $user->hasRole('administrator'));
+        $pharmacyId = getActivePharmacyId();
+
+        $availableBanks = FinanceAccount::where('pharmacy_id', $pharmacyId)
+            ->where('category', 'Kas & Bank')
+            ->where('account_type', 'bank')
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'account_number'])
+            ->map(function ($acc) {
+                $bankClean = preg_replace('/^Rekening\s+/i', '', trim($acc->name));
+                return [
+                    'id' => $acc->id,
+                    'name' => $acc->name,
+                    'bank_name' => $bankClean,
+                    'account_number' => $acc->account_number,
+                ];
+            });
+
+        $cashiers = User::with('pharmacy')
+            ->orderByRaw("CASE WHEN pharmacy_id = ? THEN 0 WHEN pharmacy_id IS NULL THEN 1 ELSE 2 END", [$pharmacyId])
+            ->orderBy('name')
+            ->get(['id', 'name', 'username', 'pharmacy_id'])
+            ->groupBy(function ($u) use ($pharmacyId) {
+                if ($u->pharmacy_id == $pharmacyId) {
+                    return 'Cabang Ini (' . ($u->pharmacy->name ?? 'Cabang') . ')';
+                }
+                return $u->pharmacy?->name ?? 'Pusat / Lainnya';
+            });
 
         return view('sales.salesdata', [
             'restrictedChannel'     => $restrictedChannel,
             'restrictedRole'        => $restrictedRole,
             'restrictedChannelName' => $restrictedRole ? getOnlineChannelName() : null,
+            'canEditPayment'        => $canEditPayment,
+            'availableBanks'        => $availableBanks,
+            'cashiers'              => $cashiers,
         ]);
     }
 
@@ -455,5 +502,146 @@ class SalesDataController extends Controller
             })
 
             ->make(true);
+    }
+
+    public function updatePayment(Request $request, $id)
+    {
+        $currentUser = auth()->user();
+        if (!$currentUser || (!$currentUser->hasRole('General Manager') && !$currentUser->hasRole('administrator'))) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Akses ditolak. Fitur ini hanya dapat diakses oleh akun General Manager.',
+            ], 403);
+        }
+
+        $validated = $request->validate([
+            'payment_method' => 'required|in:CASH,QRIS,TRANSFER,DEBIT,BELUM BAYAR',
+            'bank_name'      => 'nullable|string|max:50',
+            'user_id'        => 'required|exists:users,id',
+        ]);
+
+        $newPaymentMethod = strtoupper(trim($validated['payment_method']));
+        $newBankName = in_array($newPaymentMethod, ['QRIS', 'TRANSFER', 'DEBIT'], true)
+            ? trim((string) ($validated['bank_name'] ?? ''))
+            : null;
+
+        if (in_array($newPaymentMethod, ['QRIS', 'TRANSFER', 'DEBIT'], true) && empty($newBankName)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Nama bank wajib dipilih untuk pembayaran non-tunai (' . $newPaymentMethod . ').',
+            ], 422);
+        }
+
+        $newUserId = (int) $validated['user_id'];
+
+        return DB::transaction(function () use ($id, $newPaymentMethod, $newBankName, $newUserId, $currentUser) {
+            $transaction = MedicineTransactions::lockForUpdate()->findOrFail($id);
+            $pharmacyId = (int) $transaction->pharmacy_id;
+            $totalAmount = round((float) ($transaction->subtotal - ($transaction->discount ?? 0)), 2);
+
+            // Reconcile FinancePayment & Account Balances jika bukan KREDIT
+            if (strtoupper((string) $transaction->transaction_type) !== 'KREDIT') {
+                $existingPayment = FinancePayment::where('medicine_transaction_id', $transaction->id)->lockForUpdate()->first();
+
+                // 1. Rollback saldo dari akun lama jika sebelumnya ada finance payment
+                if ($existingPayment && $existingPayment->account_id) {
+                    $oldAccount = FinanceAccount::where('id', $existingPayment->account_id)->lockForUpdate()->first();
+                    if ($oldAccount) {
+                        $oldAccount->decrement('balance', $existingPayment->amount);
+                    }
+                }
+
+                // 2. Tentukan akun keuangan baru berdasarkan metode pembayaran baru
+                $newTargetAccount = null;
+                $newPaymentType = null;
+                $newNotes = null;
+
+                if ($newPaymentMethod === 'CASH') {
+                    $newTargetAccount = FinanceAccount::where('pharmacy_id', $pharmacyId)
+                        ->where('category', 'Kas & Bank')
+                        ->where('account_type', 'kas_apotek')
+                        ->where('is_active', true)
+                        ->lockForUpdate()
+                        ->first();
+                    $newPaymentType = 'PENJUALAN TUNAI';
+                    $newNotes = 'Penerimaan penjualan tunai kasir (diedit oleh ' . $currentUser->name . ')';
+                } elseif (in_array($newPaymentMethod, ['QRIS', 'TRANSFER', 'DEBIT'], true)) {
+                    $normalizeBankName = static fn ($value) => preg_replace('/[^A-Z0-9]/', '', strtoupper((string) $value));
+                    $bankKey = $normalizeBankName($newBankName);
+                    $newTargetAccount = FinanceAccount::where('pharmacy_id', $pharmacyId)
+                        ->where('category', 'Kas & Bank')
+                        ->where('account_type', 'bank')
+                        ->where('is_active', true)
+                        ->lockForUpdate()
+                        ->get()
+                        ->first(function ($account) use ($normalizeBankName, $bankKey) {
+                            return $bankKey !== '' && str_contains($normalizeBankName($account->name), $bankKey);
+                        });
+
+                    if (!$newTargetAccount) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => "Rekening bank {$newBankName} tidak ditemukan atau belum aktif di cabang ini.",
+                        ], 422);
+                    }
+
+                    $newPaymentType = 'PENJUALAN NON TUNAI';
+                    $newNotes = "Penerimaan penjualan {$newPaymentMethod} melalui {$newBankName} (diedit oleh {$currentUser->name})";
+                }
+
+                // 3. Update atau create FinancePayment record
+                if ($newTargetAccount) {
+                    $amount = $existingPayment ? $existingPayment->amount : $totalAmount;
+                    if ($existingPayment) {
+                        $existingPayment->update([
+                            'account_id' => $newTargetAccount->id,
+                            'payment_type' => $newPaymentType,
+                            'notes' => $newNotes,
+                        ]);
+                    } else {
+                        FinancePayment::create([
+                            'pharmacy_id' => $pharmacyId,
+                            'medicine_transaction_id' => $transaction->id,
+                            'account_id' => $newTargetAccount->id,
+                            'payment_type' => $newPaymentType,
+                            'payment_date' => Carbon::parse($transaction->created_at ?? $transaction->updated_at)->toDateString(),
+                            'amount' => $amount,
+                            'reference_number' => $transaction->transaction_code,
+                            'notes' => $newNotes,
+                            'created_by' => $currentUser->id,
+                        ]);
+                    }
+                    $newTargetAccount->increment('balance', $amount);
+                } elseif ($newPaymentMethod === 'BELUM BAYAR' && $existingPayment) {
+                    $existingPayment->delete();
+                }
+
+                Cache::forget('finance_stats_summary_branch_' . $pharmacyId . '_' . $pharmacyId);
+            }
+
+            // 4. Update data transaksi
+            $transaction->update([
+                'payment_method' => $newPaymentMethod,
+                'transfer_bank_name' => $newBankName,
+                'user_id' => $newUserId,
+            ]);
+
+            // 5. Update user_id di medicine_cart agar konsisten
+            MedicineCart::where('transaction_id', $transaction->id)->update([
+                'user_id' => $newUserId,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Metode pembayaran dan kasir transaksi berhasil diperbarui.',
+                'data' => [
+                    'id' => $transaction->id,
+                    'transaction_code' => $transaction->transaction_code,
+                    'payment_method' => $transaction->payment_method,
+                    'transfer_bank_name' => $transaction->transfer_bank_name,
+                    'user_id' => $transaction->user_id,
+                ],
+            ]);
+        });
     }
 }

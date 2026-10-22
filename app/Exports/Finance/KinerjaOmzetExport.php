@@ -19,7 +19,7 @@ class KinerjaOmzetExport implements FromArray, WithEvents, WithStyles, WithTitle
     private array $data;
     private int $month;
     private int $year;
-    private int $debtorStart = 9;
+    private int $debtorStart = 6;
     private int $debtorCount;
     private int $purchaseStart;
     private int $lastColumn;
@@ -31,7 +31,7 @@ class KinerjaOmzetExport implements FromArray, WithEvents, WithStyles, WithTitle
         $this->month = $month;
         $this->year = $year;
         $this->debtorCount = count($data['debtors']);
-        $this->purchaseStart = $this->debtorStart + $this->debtorCount + 3;
+        $this->purchaseStart = $this->debtorStart + $this->debtorCount + 1;
         $this->lastColumn = $this->purchaseStart + 8;
         $this->lastRow = 6 + count($data['days']);
     }
@@ -56,15 +56,13 @@ class KinerjaOmzetExport implements FromArray, WithEvents, WithStyles, WithTitle
 
         $middle = $this->blanks();
         $middle[1] = 'TUNAI'; $middle[3] = 'BANK';
-        $middle[5] = 'JUMLAH OMS'; $middle[6] = 'PPN'; $middle[7] = 'JUMLAH EXC PPN'; $middle[8] = 'RETUR';
+        $middle[5] = 'JUMLAH OMS';
         $middle[$this->debtorStart] = 'KREDIT';
 
         $leaf = $this->blanks();
         $leaf[1] = 'PAGI'; $leaf[2] = 'SORE'; $leaf[3] = 'PAGI'; $leaf[4] = 'SORE';
         foreach ($this->data['debtors'] as $index => $debtor) $leaf[$this->debtorStart + $index] = $debtor['name'];
         $leaf[$this->debtorStart + $this->debtorCount] = 'TOTAL KREDIT';
-        $leaf[$this->debtorStart + $this->debtorCount + 1] = 'PPN';
-        $leaf[$this->debtorStart + $this->debtorCount + 2] = 'KREDIT EXC PPN';
         $purchaseLabels = ['PBF', 'KONSINYASI', 'RETUR PEMBELIAN', 'CASH', 'JUMLAH BELI', 'PPN FAKTUR', 'BELI EXC PPN', 'MARGIN EXC PPN', 'HPP %'];
         foreach ($purchaseLabels as $index => $label) $middle[$this->purchaseStart + $index] = $label;
 
@@ -77,16 +75,11 @@ class KinerjaOmzetExport implements FromArray, WithEvents, WithStyles, WithTitle
             $row[3] = $this->number($day['sales']['bank']['morning'] ?? 0);
             $row[4] = $this->number($day['sales']['bank']['evening'] ?? 0);
             $row[5] = $this->number($day['sales']['cashBankTotal'] ?? 0);
-            $row[6] = $this->number($day['sales']['cashBankPpn'] ?? 0);
-            $row[7] = $this->number($day['sales']['cashBankExVat'] ?? 0);
-            $row[8] = $this->number($day['sales']['returns']['morning'] ?? 0) + $this->number($day['sales']['returns']['evening'] ?? 0);
             foreach ($this->data['debtors'] as $index => $debtor) {
                 $row[$this->debtorStart + $index] = $this->number($day['sales']['credit']['morning'][$debtor['id']] ?? 0) + $this->number($day['sales']['credit']['evening'][$debtor['id']] ?? 0);
             }
             $creditIndex = $this->debtorStart + $this->debtorCount;
             $row[$creditIndex] = $this->number($day['sales']['creditTotal'] ?? 0);
-            $row[$creditIndex + 1] = $this->number($day['sales']['creditPpn'] ?? 0);
-            $row[$creditIndex + 2] = $this->number($day['sales']['creditExVat'] ?? 0);
 
             $purchaseValues = [
                 $day['purchases']['pbf'] ?? 0, $day['purchases']['consignment'] ?? 0, $day['purchases']['return'] ?? 0,
@@ -105,7 +98,7 @@ class KinerjaOmzetExport implements FromArray, WithEvents, WithStyles, WithTitle
             if ($column === $this->purchaseStart + 8) continue;
             $total[$column] = array_sum(array_map(fn ($row) => is_numeric($row[$column] ?? null) ? (float) $row[$column] : 0, array_slice($rows, 5)));
         }
-        $salesExVatTotal = $total[7] + $total[$this->debtorStart + $this->debtorCount + 2];
+        $salesExVatTotal = array_sum(array_map(fn ($d) => $this->number($d['sales']['exVat'] ?? 0), $this->data['days']));
         $purchaseExVatTotal = $total[$this->purchaseStart + 6];
         $total[$this->purchaseStart + 7] = $salesExVatTotal - $purchaseExVatTotal;
         $total[$this->purchaseStart + 8] = $salesExVatTotal > 0 ? $purchaseExVatTotal / $salesExVatTotal * 100 : 0;
@@ -137,7 +130,7 @@ class KinerjaOmzetExport implements FromArray, WithEvents, WithStyles, WithTitle
             $sheet->mergeCells("{$purchaseStart}3:{$last}3");
             $sheet->mergeCells('B4:C4');
             $sheet->mergeCells('D4:E4');
-            foreach (['F', 'G', 'H', 'I'] as $column) $sheet->mergeCells("{$column}4:{$column}5");
+            $sheet->mergeCells('F4:F5');
             $creditStart = Coordinate::stringFromColumnIndex($this->debtorStart + 1);
             $creditEnd = Coordinate::stringFromColumnIndex($this->purchaseStart);
             $sheet->mergeCells("{$creditStart}4:{$creditEnd}4");
@@ -153,8 +146,7 @@ class KinerjaOmzetExport implements FromArray, WithEvents, WithStyles, WithTitle
             $sheet->getStyle("A1:{$last}2")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
             $sheet->getStyle("A6:{$last}{$this->lastRow}")->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->getColor()->setARGB('FF708078');
             $sheet->getStyle("B6:{$last}{$this->lastRow}")->getNumberFormat()->setFormatCode('#,##0;[Red](#,##0);-');
-            $sheet->getStyle("B6:H{$this->lastRow}")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF00E000');
-            $sheet->getStyle("I6:I{$this->lastRow}")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFFFFF00');
+            $sheet->getStyle("B6:F{$this->lastRow}")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF00E000');
             $sheet->getStyle("A{$this->lastRow}:{$last}{$this->lastRow}")->getFont()->setBold(true);
             $sheet->getStyle("A{$this->lastRow}:{$last}{$this->lastRow}")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFFFFF00');
             $sheet->freezePane('B6');

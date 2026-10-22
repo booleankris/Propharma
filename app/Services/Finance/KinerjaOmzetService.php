@@ -75,13 +75,29 @@ class KinerjaOmzetService
 
         $debtors = Debtors::query()->orderBy('name')->get(['id', 'name']);
         $extraDebtors = [];
-        foreach (MedicineTransactions::query()->with([
+        $transactions = MedicineTransactions::query()->with([
             'transactions' => fn ($query) => $query->where('status', 1),
             'debtors',
         ])->whereIn('pharmacy_id', $pharmacyIds)
             ->tap(fn ($q) => LiphTransactionScope::applySalesStatus($q))
             ->tap(fn ($q) => LiphTransactionScope::applyPeriod($q, Carbon::parse($startDate), Carbon::parse($endDate)))
-            ->orderBy('created_at')->get() as $transaction) {
+            ->orderBy('created_at')->get();
+
+        // Preload metadata to match returns with their original sale
+        $returnTrx = $transactions->filter(fn ($t) => in_array(mb_strtoupper(trim((string) $t->transaction_type)), ['RETUR JUAL', 'RETUR KREDIT'], true));
+        $rtDates = $returnTrx->pluck('created_at')->map(fn ($c) => (string) $c)->all();
+        $itemLogs = DB::table('items_log')->whereIn('date', $rtDates)->where('type', 'RT')->get(['date', 'transaction_code'])->keyBy('date');
+        $trxCodes = $itemLogs->pluck('transaction_code')->filter()->unique()->all();
+        $trxByCode = MedicineTransactions::whereIn('transaction_code', $trxCodes)->get()->keyBy('transaction_code');
+
+        $patientIds = $returnTrx->pluck('patient_id')->filter()->unique()->all();
+        $candsByPatient = MedicineTransactions::whereIn('patient_id', $patientIds)
+            ->whereNotIn('transaction_type', ['RETUR JUAL', 'RETUR KREDIT'])
+            ->orderByDesc('id')
+            ->get(['id', 'patient_id', 'transaction_type', 'payment_method', 'debtor_id', 'created_at'])
+            ->groupBy('patient_id');
+
+        foreach ($transactions as $transaction) {
             $effectiveAt = $transaction->created_at ?? $transaction->updated_at;
             $date = FinanceShift::operationalDate($effectiveAt);
             if (!$date || !isset($days[$date])) continue;
@@ -93,17 +109,44 @@ class KinerjaOmzetService
             if ($items->isEmpty()) $amount = max(0, $this->number($transaction->subtotal) - $this->number($transaction->discount));
             elseif (!in_array($type, ['RETUR JUAL', 'RETUR KREDIT'], true)) $amount = max(0, $amount - $this->number($transaction->discount));
 
-            if (in_array($type, ['RETUR JUAL', 'RETUR KREDIT'], true)) {
+            if ($type === 'RETUR KREDIT') {
+                $debtorId = (int) $transaction->debtor_id;
+                $name = $transaction->debtors?->name ?: 'Debitur tidak tercatat';
+                if (!$transaction->debtors) $extraDebtors[$debtorId] = $name;
+                $days[$date]['sales']['credit'][$shift][$debtorId] = ($days[$date]['sales']['credit'][$shift][$debtorId] ?? 0) - abs($amount);
                 $days[$date]['sales']['returns'][$shift] -= abs($amount);
+            } elseif ($type === 'RETUR JUAL') {
+                // Determine original transaction's payment method and shift if retur is linked
+                $origTrx = null;
+                $log = $itemLogs->get((string) $transaction->created_at);
+                if ($log && $log->transaction_code) {
+                    $origTrx = $trxByCode->get($log->transaction_code);
+                }
+                if (!$origTrx && $transaction->patient_id) {
+                    $cands = $candsByPatient->get($transaction->patient_id);
+                    $origTrx = $cands ? $cands->first(fn ($c) => $c->id < $transaction->id) : null;
+                }
+
+                $targetPayment = $origTrx ? mb_strtoupper(trim((string) $origTrx->payment_method)) : $payment;
+                $targetShift = $origTrx ? FinanceShift::key($origTrx->created_at) : $shift;
+                $targetDate = $origTrx ? FinanceShift::operationalDate($origTrx->created_at) : $date;
+                $targetDay = (isset($days[$targetDate])) ? $targetDate : $date;
+
+                if (in_array($targetPayment, ['QRIS', 'TRANSFER', 'DEBIT', 'EDC'], true)) {
+                    $days[$targetDay]['sales']['bank'][$targetShift] -= abs($amount);
+                } else {
+                    $days[$targetDay]['sales']['cash'][$targetShift] -= abs($amount);
+                }
+                $days[$targetDay]['sales']['returns'][$targetShift] -= abs($amount);
             } elseif (in_array($type, ['KREDIT', 'RESEP KREDIT'], true)) {
                 $debtorId = (int) $transaction->debtor_id;
                 $name = $transaction->debtors?->name ?: 'Debitur tidak tercatat';
                 if (!$transaction->debtors) $extraDebtors[$debtorId] = $name;
                 $days[$date]['sales']['credit'][$shift][$debtorId] = ($days[$date]['sales']['credit'][$shift][$debtorId] ?? 0) + $amount;
-            } elseif (in_array($payment, ['CASH', 'TUNAI'], true)) {
-                $days[$date]['sales']['cash'][$shift] += $amount;
-            } else {
+            } elseif (in_array($payment, ['QRIS', 'TRANSFER', 'DEBIT', 'EDC'], true)) {
                 $days[$date]['sales']['bank'][$shift] += $amount;
+            } else {
+                $days[$date]['sales']['cash'][$shift] += $amount;
             }
         }
 
@@ -159,7 +202,7 @@ class KinerjaOmzetService
         foreach ($days as &$day) {
             $day['sales']['cashBankTotal'] = $day['sales']['cash']['morning'] + $day['sales']['cash']['evening'] + $day['sales']['bank']['morning'] + $day['sales']['bank']['evening'];
             $debtorSales = array_sum($day['sales']['credit']['morning']) + array_sum($day['sales']['credit']['evening']);
-            $day['sales']['creditTotal'] = $debtorSales + $day['sales']['returns']['morning'] + $day['sales']['returns']['evening'];
+            $day['sales']['creditTotal'] = $debtorSales;
             $day['sales']['cashBankExVat'] = $day['sales']['cashBankTotal'] / 1.11;
             $day['sales']['cashBankPpn'] = $day['sales']['cashBankTotal'] - $day['sales']['cashBankExVat'];
             $day['sales']['creditExVat'] = $day['sales']['creditTotal'] / 1.11;
