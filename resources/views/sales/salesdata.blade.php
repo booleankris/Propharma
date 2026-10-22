@@ -478,7 +478,8 @@
                                 <label>Periode</label>
                                 <input type="text" id="date-range" placeholder="dd/mm/yyyy — dd/mm/yyyy" readonly
                                     style="width: 210px;">
-                                <button class="btn-clear-date" id="btn-clear-date">Reset</button>
+                                <button type="button" class="btn-clear-date" id="btn-clear-date" title="Tampilkan seluruh riwayat tanpa batas tanggal">Semua Waktu</button>
+                                <button type="button" class="btn-clear-date" id="btn-today-date" title="Kembali ke hari ini">Hari Ini</button>
                             </div>
                             <div class="channel-filter-wrap !mb-0">
                                 <label>Jenis Transaksi</label>
@@ -798,6 +799,11 @@
 
             $('#btn-clear-date').on('click', function() {
                 fpRange.clear();
+                tableData.ajax.reload();
+            });
+
+            $('#btn-today-date').on('click', function() {
+                fpRange.setDate([today, today]);
                 tableData.ajax.reload();
             });
 

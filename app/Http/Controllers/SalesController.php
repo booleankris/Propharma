@@ -1326,7 +1326,7 @@ class SalesController extends Controller
                 ->latest('id')
                 ->first();
 
-            if (!$latestRecipeItem || (int) $latestRecipeItem->recipe_status !== 0) {
+            if (!$latestRecipeItem) {
                 abort(422, 'Tidak ada racikan aktif yang dapat diselesaikan.');
             }
 

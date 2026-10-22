@@ -93,38 +93,39 @@ class SalesDataController extends Controller
                 }
             }
 
-            // text search only
+            // text search (mencari nomor transaksi, nama pasien, kasir, atau tahun)
             if ($search) {
                 $query->where(function ($q) use ($search) {
-                    if (preg_match('/^\d{4}$/', $search)) {
-                        $q->whereYear('medicine_transactions.updated_at', $search);
-                    } else {
-                        $q->whereHas('transactions', function ($t) use ($search) {
-                            $t->where('transaction_code', 'like', "%{$search}%");
+                    $q->where('medicine_transactions.transaction_code', 'like', "%{$search}%")
+                        ->orWhereHas('transactions.patients', function ($p) use ($search) {
+                            $p->where('name', 'like', "%{$search}%");
                         })
-                            ->orWhereHas('transactions.patients', function ($p) use ($search) {
-                                $p->where('name', 'like', "%{$search}%");
-                            })
-                            ->orWhereHas('transactions.user', function ($u) use ($search) {
-                                $u->where('name', 'like', "%{$search}%")
-                                    ->orWhere('username', 'like', "%{$search}%");
-                            })
-                            ->orWhereHas('user', function ($u) use ($search) {
-                                $u->where('name', 'like', "%{$search}%")
-                                    ->orWhere('username', 'like', "%{$search}%");
-                            });
+                        ->orWhereHas('transactions.user', function ($u) use ($search) {
+                            $u->where('name', 'like', "%{$search}%")
+                                ->orWhere('username', 'like', "%{$search}%");
+                        })
+                        ->orWhereHas('user', function ($u) use ($search) {
+                            $u->where('name', 'like', "%{$search}%")
+                                ->orWhere('username', 'like', "%{$search}%");
+                        });
+
+                    if (preg_match('/^(19|20)\d{2}$/', $search)) {
+                        $q->orWhereYear('medicine_transactions.updated_at', $search)
+                          ->orWhereYear('medicine_transactions.created_at', $search);
                     }
                 });
             }
 
-            // If only one date was sent, treat it as a single-day filter
-            if ($dateFrom && !$dateTo) {
-                $dateTo = $dateFrom;
-            } elseif ($dateTo && !$dateFrom) {
-                $dateFrom = $dateTo;
-            }
+            // If search is active (e.g. user searching for transaction_code or patient), bypass date restriction
+            // so transactions from any past date can be immediately found.
+            if (!$search && ($dateFrom || $dateTo)) {
+                // If only one date was sent, treat it as a single-day filter
+                if ($dateFrom && !$dateTo) {
+                    $dateTo = $dateFrom;
+                } elseif ($dateTo && !$dateFrom) {
+                    $dateFrom = $dateTo;
+                }
 
-            if ($dateFrom || $dateTo) {
                 try {
                     $startObj = $dateFrom ? Carbon::createFromFormat('d/m/Y', $dateFrom)->startOfDay()->setTime(7, 30, 0) : null;
                     $endObj   = $dateTo   ? Carbon::createFromFormat('d/m/Y', $dateTo)->startOfDay()->addDay()->setTime(7, 30, 0) : null;
