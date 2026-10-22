@@ -425,43 +425,46 @@
                     <div class="flex flex-wrap gap-4 items-center">
 
                         {{-- F1 - Pembayaran --}}
-                        <div class="flex items-center gap-2">
+                        <button type="button" onclick="document.getElementById('openModalPayment')?.click()"
+                            class="flex items-center gap-2 cursor-pointer border-none bg-transparent p-1 -m-1 rounded-lg hover:bg-slate-100 active:scale-95 transition select-none">
                             <div
-                                class="py-[5px] bg-[#0074ce] text-white shadow-[0_0_11px_2px_#0097dd] border-none px-[10px] rounded-md">
+                                class="py-[5px] bg-[#0074ce] text-white shadow-[0_0_11px_2px_#0097dd] border-none px-[10px] rounded-md font-semibold text-[11px]">
                                 F1
                             </div>
-                            <div class="font-semibold font-poppins text-[11px]">
+                            <div class="font-semibold font-poppins text-[11px] text-slate-800">
                                 Pembayaran
                             </div>
-                        </div>
+                        </button>
 
                         {{-- F2 - Resep --}}
                         @if ($transaction->transaction_type == 'KREDIT' || $transaction->transaction_type == 'RESEP TUNAI')
-                            <div class="flex items-center gap-2">
+                            <button type="button" onclick="if (typeof checkbox !== 'undefined' && checkbox) { checkbox.checked = !checkbox.checked; checkbox.dispatchEvent(new Event('change')); }"
+                                class="flex items-center gap-2 cursor-pointer border-none bg-transparent p-1 -m-1 rounded-lg hover:bg-slate-100 active:scale-95 transition select-none">
                                 <div
-                                    class="py-[5px] bg-[#16a34a] text-white shadow-[0_0_11px_2px_#22c55e] border-none px-[10px] rounded-md">
+                                    class="py-[5px] bg-[#16a34a] text-white shadow-[0_0_11px_2px_#22c55e] border-none px-[10px] rounded-md font-semibold text-[11px]">
                                     F2
                                 </div>
-                                <div class="font-semibold font-poppins text-[11px]">
+                                <div class="font-semibold font-poppins text-[11px] text-slate-800">
                                     Resep
                                 </div>
-                            </div>
+                            </button>
                         @endif
 
-                        {{-- F3 - Pembayaran --}}
-                        <div class="flex items-center gap-2">
+                        {{-- F3 - Ganti Faktur Item --}}
+                        <button type="button" id="btnSwitchFaktur" onclick="switchFaktur()"
+                            class="flex items-center gap-2 cursor-pointer border-none bg-transparent p-1 -m-1 rounded-lg hover:bg-slate-100 active:scale-95 transition select-none">
                             <div
-                                class="py-[5px] bg-[#eab308] text-white shadow-[0_0_11px_2px_#facc15] border-none px-[10px] rounded-md">
+                                class="py-[5px] bg-[#eab308] text-white shadow-[0_0_11px_2px_#facc15] border-none px-[10px] rounded-md font-semibold text-[11px]">
                                 F3
                             </div>
-                            <div class="font-semibold font-poppins text-[11px]">
+                            <div class="font-semibold font-poppins text-[11px] text-slate-800">
                                 @if ($transaction->transaction_type == 'KREDIT')
                                     Ganti Faktur Item
                                 @else
                                     Ganti Faktor
                                 @endif
                             </div>
-                        </div>
+                        </button>
                         <svg class="w-6 h-6 text-gray-800 dark:text-white" aria-hidden="true"
                             xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none"
                             viewBox="0 0 24 24">
@@ -4599,128 +4602,94 @@
         }
     }
 
+    function switchFaktur() {
+        let raw;
+        if (currenttransaction === 'KREDIT') {
+            if (transaction_type === 'KREDIT') {
+                parameters = {{ $parameterUP }};
+                rounding = {{ $ChangeFakturRounding }};
+                transaction_type = 'UPDS';
+                faktur.innerHTML = `<span class="bg-green-100 text-green-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md">UPDS</span>`;
+            } else if (transaction_type === 'UPDS') {
+                parameters = {{ $parameterHV }};
+                rounding = {{ $ChangeFakturRounding }};
+                transaction_type = 'HV/OTC';
+                faktur.innerHTML = `<span class="bg-blue-100 text-blue-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md">HV/OTC</span>`;
+            } else {
+                parameters = creditItemParameters;
+                rounding = creditItemRounding;
+                transaction_type = 'KREDIT';
+                faktur.innerHTML = `<span class="bg-yellow-100 text-yellow-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md">Resep Kredit</span>`;
+            }
+        } else if (currenttransaction == "RESEP TUNAI") {
+            if (transaction_type == 'RESEP TUNAI') {
+                parameters = {{ $parameterUP }};
+                transaction_type = "UPDS";
+                faktur.innerHTML = `
+                        <span
+                        class="bg-green-100 text-green-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md dark:bg-green-900 dark:text-green-300">UPDS</span>
+                `;
+            } else if (transaction_type == "UPDS") {
+                parameters = {{ $parameterHV }};
+                transaction_type = "HV/OTC";
+                faktur.innerHTML = `
+                    <span class="bg-blue-100 text-blue-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md dark:bg-blue-900 dark:text-blue-300">HV/OTC</span>
+                `;
+            } else if (transaction_type == "HV/OTC") {
+                parameters = {{ $parameterRT }};
+                transaction_type = "RESEP TUNAI";
+                faktur.innerHTML = `
+                        <span class="bg-red-100 text-red-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md dark:bg-red-900 dark:text-red-300">Resep Tunai</span>
+                `;
+            }
+        } else if (currenttransaction == "HV/OTC") {
+
+        } else {
+            if (transaction_type == 'HV/OTC') {
+                parameters = {{ $parameterUP }};
+                transaction_type = "UPDS";
+                faktur.innerHTML = `
+                        <span
+                        class="bg-green-100 text-green-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md dark:bg-green-900 dark:text-green-300">UPDS</span>
+                `;
+            } else if (transaction_type == "UPDS") {
+                parameters = {{ $parameterHV }};
+                transaction_type = "HV/OTC";
+                faktur.innerHTML = `
+                    <span class="bg-blue-100 text-blue-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md dark:bg-blue-900 dark:text-blue-300">HV/OTC</span>
+                `;
+            }
+        }
+
+        if (currenttransaction === 'KREDIT') {
+            cart_type = transaction_type === 'UPDS' ? 'UP' :
+                transaction_type === 'HV/OTC' ? 'HV' : 'UK';
+        }
+
+        console.log("Changed the Parameter To : " + parameters + "Harga ASLI : " + rawprice);
+
+        if (selectedMedicine) {
+            raw = getTransactionMedicinePrice(selectedMedicine);
+
+            price.value = formatRupiah(raw);
+            console.log("harga Total : " + raw);
+            price2 = raw;
+            item_finalprice = raw;
+            const selectedQuantity = Number(quantity.value) || 0;
+            if (selectedQuantity > 0) {
+                count(selectedQuantity);
+            }
+        }
+    }
+
     function onF3Key(e) {
         const isF3 = e.key === 'F3' || e.keyCode === 114;
         if (isF3) {
             e.preventDefault();
-            let raw;
-            if (currenttransaction === 'KREDIT') {
-                if (transaction_type === 'KREDIT') {
-                    parameters = {{ $parameterUP }};
-                    rounding = {{ $ChangeFakturRounding }};
-                    transaction_type = 'UPDS';
-                    faktur.innerHTML = `<span class="bg-green-100 text-green-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md">UPDS</span>`;
-                } else if (transaction_type === 'UPDS') {
-                    parameters = {{ $parameterHV }};
-                    rounding = {{ $ChangeFakturRounding }};
-                    transaction_type = 'HV/OTC';
-                    faktur.innerHTML = `<span class="bg-blue-100 text-blue-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md">HV/OTC</span>`;
-                } else {
-                    parameters = creditItemParameters;
-                    rounding = creditItemRounding;
-                    transaction_type = 'KREDIT';
-                    faktur.innerHTML = `<span class="bg-yellow-100 text-yellow-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md">Resep Kredit</span>`;
-                }
-            } else if (currenttransaction == "RESEP TUNAI") {
-                if (transaction_type == 'RESEP TUNAI') {
-                    parameters = {{ $parameterUP }};
-                    transaction_type = "UPDS";
-                    faktur.innerHTML = `
-                            <span
-                            class="bg-green-100 text-green-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md dark:bg-green-900 dark:text-green-300">UPDS</span>
-                    `;
-                } else if (transaction_type == "UPDS") {
-                    parameters = {{ $parameterHV }};
-                    transaction_type = "HV/OTC";
-                    faktur.innerHTML = `
-                        <span class="bg-blue-100 text-blue-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md dark:bg-blue-900 dark:text-blue-300">HV/OTC</span>
-                    `;
-                } else if (transaction_type == "HV/OTC") {
-                    parameters = {{ $parameterRT }};
-                    transaction_type = "RESEP TUNAI";
-                    faktur.innerHTML = `
-                            <span class="bg-red-100 text-red-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md dark:bg-red-900 dark:text-red-300">Resep Tunai</span>
-                    `;
-                }
-            } else if (currenttransaction == "HV/OTC") {
-
-            } else {
-                if (transaction_type == 'HV/OTC') {
-                    parameters = {{ $parameterUP }};
-                    transaction_type = "UPDS";
-                    faktur.innerHTML = `
-                            <span
-                            class="bg-green-100 text-green-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md dark:bg-green-900 dark:text-green-300">UPDS</span>
-                    `;
-                } else if (transaction_type == "UPDS") {
-                    parameters = {{ $parameterHV }};
-                    transaction_type = "HV/OTC";
-                    faktur.innerHTML = `
-                        <span class="bg-blue-100 text-blue-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md dark:bg-blue-900 dark:text-blue-300">HV/OTC</span>
-                    `;
-                }
-                // } else if (transaction_type == "HV/OTC") {
-                //     parameters = {{ $parameterRT }};
-                //     transaction_type = "RESEP TUNAI";
-                //     faktur.innerHTML = `
-                //             <span class="bg-red-100 text-red-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md dark:bg-red-900 dark:text-red-300">Resep Tunai</span>
-                //     `;
-                // }
-            }
-
-            if (currenttransaction === 'KREDIT') {
-                cart_type = transaction_type === 'UPDS' ? 'UP' :
-                    transaction_type === 'HV/OTC' ? 'HV' : 'UK';
-            }
-
-            // if (checkbox.checked) {
-            //     document.getElementById('receiptbox').checked = false;
-
-            //     packageInput.removeAttribute('readonly');
-            //     dosageRInput.removeAttribute('readonly');
-            //     packageInput.classList.remove('readonly');
-            //     dosageRInput.classList.remove('readonly');
-            //     quantity.setAttribute('readonly', true);
-            //     quantity.classList.add('readonly');
-            // } else {
-            //     document.getElementById('receiptbox').checked = true;
-            //     packageInput.setAttribute('readonly', true);
-            //     dosageRInput.setAttribute('readonly', true);
-            //     packageInput.classList.add('readonly');
-            //     dosageRInput.classList.add('readonly');
-            // }
-            console.log("Changed the Parameter To : " + parameters + "Harga ASLI : " + rawprice);
-            // let raw;
-            // // console.log(it);
-
-            // // if (it.het_price !== null && it.het_price !== 0 && it.het_price !== '') {
-            // //     raw = Number(it.het_price);
-            // // } else {
-            // //     raw = Number(it.net_price) * Number(parameters || 1);
-            // // }
-
-            // // let rounded;
-            // // if (currenttransaction === 'KREDIT') {
-            // //     rounded = Math.round(raw);
-            // // } else {
-            // //     rounded = Math.floor(raw / 1000) * 1000;
-            // // }
-
-            if (selectedMedicine) {
-                raw = getTransactionMedicinePrice(selectedMedicine);
-
-                price.value = formatRupiah(raw);
-                console.log("harga Total : " + raw);
-                price2 = raw;
-                item_finalprice = raw;
-                const selectedQuantity = Number(quantity.value) || 0;
-                if (selectedQuantity > 0) {
-                    count(selectedQuantity);
-                }
-            }
-
+            switchFaktur();
         }
     }
+
 
     function onF4Key(e) {
         const isF4 = e.key === 'F4' || e.keyCode === 115;
