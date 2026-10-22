@@ -363,6 +363,7 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
     // Stock Detail
     Route::get('/stock-storage', [SuppliesController::class, 'storageSupplies'])->name('supplies.storage');
     Route::get('/getstockstorage', [SuppliesController::class, 'getStorageSupplies'])->name('supplies.getStorageSupplies');
+    Route::get('/getstockstorage-batches', [SuppliesController::class, 'getStorageBatches'])->name('supplies.getStorageBatches');
 
     // Transfers
     Route::get('/transfers/create', [TransfersController::class, 'transfersCreate'])->name('transfers.create');

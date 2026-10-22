@@ -130,17 +130,38 @@
                     </div>
                 </div>
 
-                <!-- Total Stock Info -->
-                <div id="stockInfoContainer"
-                    class="mt-4 hidden p-3 bg-blue-50/50 border border-blue-100 rounded-lg inline-flex items-center justify-between">
-                    <div class="px-1 flex items-center gap-2 text-blue-700">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                        </svg>
-                        <span class="text-sm font-semibold">Total Stok di Gudang :</span>
+                <!-- Total Stock & Batch Info Container -->
+                <div id="stockInfoContainer" class="mt-4 hidden space-y-3">
+                    <div class="flex flex-wrap items-center justify-between gap-3 p-3.5 bg-gradient-to-r from-blue-50 to-indigo-50/40 border border-blue-100 rounded-xl">
+                        <div class="flex items-center gap-2.5 text-blue-800">
+                            <div class="w-8 h-8 rounded-lg bg-blue-100/80 flex items-center justify-center text-blue-600 shrink-0">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                                </svg>
+                            </div>
+                            <div>
+                                <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider block">Total Stok di Gudang</span>
+                                <span id="totalStockDisplay" class="text-2xl font-black text-blue-700 leading-tight">0</span>
+                            </div>
+                        </div>
+                        <div class="text-xs text-slate-500 font-medium">
+                            <span id="batchCountDisplay" class="font-bold text-slate-700">0</span> batch terdaftar di gudang
+                        </div>
                     </div>
-                    <span id="totalStockDisplay" class="text-xl font-bold text-blue-700 ml-3">0</span>
+
+                    <!-- Batch Breakdown Cards -->
+                    <div class="p-3 bg-slate-50 border border-slate-200/80 rounded-xl">
+                        <div class="text-xs font-bold uppercase tracking-wider text-slate-600 mb-2.5 flex items-center gap-1.5">
+                            <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                            </svg>
+                            Rincian Stok Tiap Batch di Gudang
+                        </div>
+                        <div id="batchListContainer" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5">
+                            <!-- Populated via JS -->
+                        </div>
+                    </div>
                 </div>
 
                 <div class="mt-4 overflow-x-auto">
@@ -149,13 +170,14 @@
                             <tr>
                                 <th>#</th>
                                 <th>Tanggal</th>
-                                <th>Kode Obat</th>
+                                <th>No. Transaksi</th>
                                 <th>Nama Obat</th>
-                                <th>Status</th>
-                                <th>QTY</th>
-                                <th>QTY Awal</th>
-                                <th>QTY Akhir</th>
-                                <th>Stok Saat Ini</th>
+                                <th class="text-center">Tipe</th>
+                                <th>Batch & ED</th>
+                                <th class="text-right">Saldo Awal</th>
+                                <th class="text-center">Mutasi</th>
+                                <th class="text-right">Saldo Akhir</th>
+                                <th>PBF / Petugas</th>
                             </tr>
                         </thead>
                         <tbody></tbody>
@@ -176,6 +198,56 @@
         let table, startDate = '',
             endDate = '';
         let selectedMedicineId = '';
+
+        function loadStorageBatches(medicineId) {
+            const container = document.getElementById('batchListContainer');
+            const batchCountDisplay = document.getElementById('batchCountDisplay');
+            if (!medicineId) {
+                container.innerHTML = '';
+                return;
+            }
+
+            container.innerHTML = '<div class="col-span-full text-xs text-slate-400 py-2">Memuat data batch...</div>';
+
+            fetch(`{{ route('supplies.getStorageBatches') }}?medicine_id=${medicineId}`)
+                .then(res => res.json())
+                .then(data => {
+                    const batches = data.batches || [];
+                    batchCountDisplay.textContent = batches.length;
+
+                    if (batches.length === 0) {
+                        container.innerHTML = '<div class="col-span-full text-xs text-slate-400 py-2">Belum ada batch terdaftar di gudang untuk obat ini.</div>';
+                        return;
+                    }
+
+                    container.innerHTML = batches.map(b => {
+                        const isZero = b.stock === 0;
+                        const badgeBg = isZero ? 'bg-slate-100 text-slate-500 border-slate-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200';
+                        return `
+                            <div class="p-2.5 bg-white border border-slate-200 rounded-lg shadow-xs flex items-center justify-between gap-2">
+                                <div class="min-w-0">
+                                    <div class="text-xs font-bold text-slate-800 truncate" title="${b.name}">
+                                        ${b.name}
+                                    </div>
+                                    <div class="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
+                                        <span>ED:</span>
+                                        <span class="font-medium text-slate-600">${b.expired_date}</span>
+                                    </div>
+                                </div>
+                                <div class="text-right shrink-0">
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold border ${badgeBg}">
+                                        ${b.stock.toLocaleString('id-ID')}
+                                    </span>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                })
+                .catch(err => {
+                    console.error(err);
+                    container.innerHTML = '<div class="col-span-full text-xs text-red-500 py-2">Gagal memuat batch.</div>';
+                });
+        }
 
         document.addEventListener('DOMContentLoaded', function() {
 
@@ -220,6 +292,7 @@
                 }
             }).on('change', function() {
                 selectedMedicineId = $(this).val() || '';
+                loadStorageBatches(selectedMedicineId);
                 table.ajax.reload();
             });
 
@@ -238,52 +311,54 @@
                 columns: [{
                         data: 'DT_RowIndex',
                         orderable: false,
-                        searchable: false
+                        searchable: false,
+                        className: 'text-center text-xs font-semibold text-slate-400'
                     },
                     {
                         data: 'date',
-                        orderable: true
+                        orderable: true,
+                        className: 'text-xs'
                     },
                     {
-                        data: 'code',
+                        data: 'transaction_code',
                         orderable: false
                     },
                     {
                         data: 'name',
-                        orderable: false
+                        orderable: false,
+                        className: 'font-medium text-slate-700'
                     },
                     {
                         data: 'status',
                         orderable: false,
-                        render(data) {
-                            return data;
-                        }
+                        className: 'text-center'
                     },
                     {
-                        data: 'stock',
-                        orderable: false,
-                        render(data) {
-                            return data;
-                        }
+                        data: 'batch_info',
+                        orderable: false
                     },
                     {
                         data: 'qty_before',
                         orderable: false,
-                        render(data) {
-                            return data;
-                        }
+                        className: 'text-right'
+                    },
+                    {
+                        data: 'stock',
+                        orderable: false,
+                        className: 'text-center'
                     },
                     {
                         data: 'qty_after',
                         orderable: false,
-                        render(data) {
-                            return data;
-                        }
+                        className: 'text-right'
                     },
                     {
-                        data: 'supply',
+                        data: 'operator_info',
                         orderable: false
                     },
+                ],
+                order: [
+                    [1, 'desc']
                 ],
                 searching: false,
                 info: true,
@@ -315,7 +390,7 @@
                 if (medicineId) {
                     stockContainer.classList.remove('hidden');
                     let total = json.total_stock_gudang !== undefined ? json.total_stock_gudang : 0;
-                    stockDisplay.textContent = total;
+                    stockDisplay.textContent = Number(total).toLocaleString('id-ID');
                 } else {
                     stockContainer.classList.add('hidden');
                 }

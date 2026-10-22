@@ -535,19 +535,49 @@ class SuppliesController extends Controller
         if ($request->ajax()) {
             $warehouseId = getWarehousePharmacyId();
 
-            $items = ItemsLog::with('medicines')
-                ->whereIn('status', [2, 4, 5, 6, 7])
-                ->whereHas('batches', function ($q) use ($warehouseId) {
-                    $q->where('pharmacy_id', $warehouseId);
-                });
+            $baseQuery = function () use ($warehouseId, $request) {
+                $q = ItemsLog::where(function ($scope) use ($warehouseId) {
+                    $scope->whereHas('batches', function ($batch) use ($warehouseId) {
+                        $batch->where('pharmacy_id', $warehouseId);
+                    });
+                })->whereIn('status', [2, 4, 5, 6, 7, 8, 9]);
+
+                if ($request->filled('medicine_id')) {
+                    $q->where('medicine_id', $request->medicine_id);
+                }
+
+                return $q;
+            };
 
             $totalStockGudang = 0;
             if ($request->filled('medicine_id')) {
-                $items->where('medicine_id', $request->medicine_id);
                 $totalStockGudang = $this->calculateRealtimeStock($request->medicine_id, $warehouseId, 'storage');
             } else {
                 $totalStockGudang = (int) Batches::where('pharmacy_id', $warehouseId)->sum('stock');
             }
+
+            $effectiveDateSql = "CASE WHEN (LENGTH(date) <= 10 OR TIME(date) = '00:00:00') AND created_at IS NOT NULL THEN CONCAT(DATE(date), ' ', TIME(created_at)) ELSE date END";
+
+            // If a specific medicine is chosen, build running ledger balances anchored to current warehouse stock
+            $runningMap = [];
+            if ($request->filled('medicine_id')) {
+                $ledgerRows = $baseQuery()
+                    ->orderByRaw($effectiveDateSql . ' ASC')
+                    ->orderBy('id', 'asc')
+                    ->get(['id', 'medicine_id', 'qty', 'qty_before', 'qty_after', 'total', 'status', 'date', 'created_at']);
+
+                $running = $totalStockGudang - $ledgerRows->sum(fn($log) => $this->stockLogDelta($log));
+                foreach ($ledgerRows as $log) {
+                    $before = $running;
+                    $running += $this->stockLogDelta($log);
+                    $runningMap[$log->id] = [
+                        'before' => $before,
+                        'after' => $running,
+                    ];
+                }
+            }
+
+            $items = $baseQuery()->with(['medicines', 'batches', 'users']);
 
             if ($request->filled('start_date')) {
                 $items->whereDate('date', '>=', $request->start_date);
@@ -558,6 +588,17 @@ class SuppliesController extends Controller
             }
 
             return DataTables::eloquent($items)
+                ->order(function ($q) use ($request, $effectiveDateSql) {
+                    if ($request->has('order')) {
+                        $orderColIdx = (int) $request->input('order.0.column');
+                        $orderDir = strtolower($request->input('order.0.dir', 'asc')) === 'desc' ? 'desc' : 'asc';
+                        if ($orderColIdx === 1) {
+                            $q->orderByRaw($effectiveDateSql . ' ' . strtoupper($orderDir))->orderBy('id', $orderDir);
+                            return;
+                        }
+                    }
+                    $q->orderByRaw($effectiveDateSql . ' ASC')->orderBy('id', 'asc');
+                })
                 ->addIndexColumn()
                 ->addColumn('date', function ($r) {
                     $d = $r->date;
@@ -566,46 +607,67 @@ class SuppliesController extends Controller
                     }
                     return $d ? $d->format('Y-m-d H:i:s') : '-';
                 })
-                ->addColumn('code', fn($r) => $r->code)
+                ->addColumn('transaction_code', function ($r) {
+                    $code = $r->transaction_code ?: $r->code;
+                    if (!$code) return '<span class="text-slate-400 text-xs">—</span>';
+                    $safe = e($code);
+                    return '
+                    <div class="inline-flex items-center gap-1.5 whitespace-nowrap">
+                        <span class="text-[11px] font-mono font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">' . $safe . '</span>
+                        <button type="button" onclick="navigator.clipboard.writeText(\'' . $safe . '\'); iziToast.success({title: \'Tersalin\', message: \'Kode ' . $safe . ' disalin\', position: \'topRight\'})" class="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Salin kode">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                        </button>
+                    </div>';
+                })
+                ->addColumn('batch_info', function ($r) {
+                    $batch = $r->batches;
+                    if (!$batch) return '<span class="text-slate-400 text-xs">—</span>';
+                    $batchName = e($batch->name ?: '-');
+                    $parsedExpiredDate = StockOpnameImportService::parseSmartExpiredDate($batch->expired_date);
+                    $ed = $parsedExpiredDate ? Carbon::parse($parsedExpiredDate)->format('d/m/Y') : '-';
+                    return '<div class="flex flex-col whitespace-nowrap leading-tight">
+                        <span class="font-bold text-slate-700 text-xs">' . $batchName . '</span>
+                        <span class="text-[10px] text-slate-400">ED: ' . $ed . '</span>
+                    </div>';
+                })
                 ->addColumn('type', fn($r) => $r->type)
                 ->addColumn('name', fn($r) => $r->medicines->name ?? '-')
                 ->addColumn('stock', function ($row) {
-
-                    // status 2 — Pembelian (Stok masuk gudang)
-                    if ($row->status == 2) {
-                        $sign = $row->qty > 0 ? '+' : '';
-                        $color = $row->qty >= 0 ? '#854F0B' : '#A32D2D';
-                        return "<div style='color:{$color};font-weight:600;'>{$sign}{$row->qty}</div>";
+                    $delta = $this->stockLogDelta($row);
+                    if ($delta > 0) {
+                        return '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 whitespace-nowrap">+ ' . number_format($delta) . '</span>';
+                    } elseif ($delta < 0) {
+                        return '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 whitespace-nowrap">- ' . number_format(abs($delta)) . '</span>';
+                    } else {
+                        return '<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-slate-500 bg-slate-50 border border-slate-200 whitespace-nowrap">0</span>';
                     }
-                    // status 4 — Retur Beli (Stok keluar gudang kembali ke supplier)
-                    if ($row->status == 4) {
-                        return "<div style='color:#A32D2D;font-weight:600;'>-{$row->qty}</div>";
-                    }
-                    // status 5 — Stock Opname
-                    if ($row->status == 5) {
-                        $sign = $row->qty > 0 ? '+' : '';
-                        $color = $row->qty >= 0 ? '#854F0B' : '#A32D2D';
-                        return "<div style='color:{$color};font-weight:600;'>{$sign}{$row->qty}</div>";
-                    }
-                    // status 6 
-                    if ($row->status == 6) {
-                        $diff = $row->qty_after - $row->qty_before;
-                        $sign = $diff > 0 ? '+' : '-';
-                        return "<div style='color:#185FA5;font-weight:600;'>{$sign}" . abs($diff) . "</div>";
-                    }
-                    // status 7 — Mutasi Stok
-                    if ($row->status == 7) {
-                        $diff = $row->qty_after - $row->qty_before;
-                        $sign = $diff > 0 ? '+' : '-';
-                        $color = $diff > 0 ? '#854F0B' : '#0F6E56';
-                        return "<div style='color:{$color};font-weight:600;'>{$sign}" . abs($diff) . "</div>";
-                    }
-                    return $row->qty;
                 })
-                ->addColumn('qty_before', fn($r) => "<b>{$r->qty_before}</b>")
-                ->addColumn('qty_after', fn($r) => "<b>{$r->qty_after}</b>")
-                ->addColumn('qty_before_number', fn($r) => $r->qty_before)
-                ->addColumn('qty_after_number', fn($r) => $r->qty_after)
+                ->addColumn('qty_before', function ($r) use ($runningMap) {
+                    $val = isset($runningMap[$r->id]) ? $runningMap[$r->id]['before'] : (int) $r->qty_before;
+                    return '<span class="font-semibold text-slate-600 text-xs">' . number_format($val) . '</span>';
+                })
+                ->addColumn('qty_after', function ($r) use ($runningMap) {
+                    $val = isset($runningMap[$r->id]) ? $runningMap[$r->id]['after'] : (int) $r->qty_after;
+                    return '<span class="font-bold text-slate-800 text-xs">' . number_format($val) . '</span>';
+                })
+                ->addColumn('operator_info', function ($r) {
+                    // PBF if purchase/retur beli/revisi faktur
+                    if (in_array((int) $r->status, [2, 4])) {
+                        $pbf = $r->receiving?->receiving_details?->first()?->creditor?->name;
+                        if ($pbf) return '<span class="text-xs font-medium text-blue-700 truncate max-w-[130px] block" title="' . e($pbf) . '">' . e($pbf) . '</span>';
+                    }
+                    if (in_array((int) $r->status, [8, 9])) {
+                        if (preg_match('/REV-(?:ADD-|DEL-)?(\d+)/', (string) $r->transaction_code, $matches)) {
+                            $rItem = \App\Models\ReceivingItems::with(['receiving_details.creditor', 'order_items.creditors'])->find($matches[1]);
+                            $pbf = $rItem?->receiving_details?->creditor?->name ?? $rItem?->order_items?->creditors?->name;
+                            if ($pbf) return '<span class="text-xs font-medium text-blue-700 truncate max-w-[130px] block" title="' . e($pbf) . '">' . e($pbf) . '</span>';
+                        }
+                    }
+                    // User / Operator
+                    $name = $r->users?->name;
+                    if ($name) return '<span class="text-xs font-medium text-slate-600 truncate max-w-[110px] block" title="' . e($name) . '">' . e($name) . '</span>';
+                    return '<span class="text-slate-400 text-xs">—</span>';
+                })
                 ->addColumn('supply', function ($r) use ($warehouseId) {
                     static $storageCache = [];
                     $medId = $r->medicine_id;
@@ -619,26 +681,65 @@ class SuppliesController extends Controller
                 })
                 ->addColumn('status', function ($row) {
                     $map = [
-                        2 => ['label' => 'Pembelian', 'bg' => '#caffc5', 'color' => '#457b00'],
-                        4 => ['label' => 'Retur Beli', 'bg' => '#FFE4D6', 'color' => '#C17800'],
-                        5 => ['label' => 'Stock Opname', 'bg' => '#FAEEDA', 'color' => '#633806'],
-                        6 => ['label' => 'Adjustment', 'bg' => '#E6F1FB', 'color' => '#0C447C'],
-                        7 => ['label' => 'Mutasi Stok', 'bg' => '#E1F5EE', 'color' => '#085041'],
+                        2 => ['label' => 'Pembelian', 'bg' => '#dbeafe', 'color' => '#1d4ed8'],
+                        4 => ['label' => 'Retur Beli', 'bg' => '#ffedd5', 'color' => '#c2410c'],
+                        5 => ['label' => 'Stock Opname', 'bg' => '#f3e8ff', 'color' => '#7e22ce'],
+                        6 => ['label' => 'Adjustment', 'bg' => '#e0f2fe', 'color' => '#0369a1'],
+                        7 => ['label' => 'Mutasi Stok', 'bg' => '#ccfbf1', 'color' => '#0f766e'],
+                        8 => ['label' => 'Revisi Faktur', 'bg' => '#e0e7ff', 'color' => '#4338ca'],
+                        9 => ['label' => 'Hapus Terima', 'bg' => '#ffe4e6', 'color' => '#be123c'],
                     ];
-                    $s = $map[$row->status] ?? ['label' => '—', 'bg' => '#F1EFE8', 'color' => '#5F5E5A'];
+                    $s = $map[$row->status] ?? ['label' => $row->type ?: '—', 'bg' => '#F1EFE8', 'color' => '#5F5E5A'];
                     return "
                     <div style='
-                        text-align:center;font-weight:500;text-transform:uppercase;
+                        text-align:center;font-weight:600;text-transform:uppercase;
                         background:{$s['bg']};color:{$s['color']};
-                        padding:4px 10px;font-size:11px;font-family:inherit;
-                        border-radius:20px;letter-spacing:0.04em;'>
+                        padding:3px 8px;font-size:10px;font-family:inherit;
+                        border-radius:20px;letter-spacing:0.04em;display:inline-block;'>
                         {$s['label']}
                     </div>";
                 })
-                ->rawColumns(['status', 'stock', 'qty_before', 'qty_after'])
+                ->rawColumns(['status', 'stock', 'qty_before', 'qty_after', 'transaction_code', 'batch_info', 'operator_info'])
                 ->with('total_stock_gudang', $totalStockGudang)
                 ->make(true);
         }
+    }
+
+    /**
+     * Get real-time batches and stock per batch in Central Warehouse for a specific medicine.
+     */
+    public function getStorageBatches(Request $request)
+    {
+        if (!canAccessWarehouseStock()) {
+            return response()->json(['batches' => [], 'total' => 0]);
+        }
+
+        $medicineId = $request->get('medicine_id');
+        if (!$medicineId) {
+            return response()->json(['batches' => [], 'total' => 0]);
+        }
+
+        $warehouseId = getWarehousePharmacyId();
+        $batches = Batches::where('medicine_id', $medicineId)
+            ->where('pharmacy_id', $warehouseId)
+            ->orderBy('expired_date', 'asc')
+            ->get();
+
+        $data = $batches->map(function ($b) {
+            $parsedEd = StockOpnameImportService::parseSmartExpiredDate($b->expired_date);
+            return [
+                'id' => $b->id,
+                'name' => $b->name ?: '-',
+                'expired_date' => $parsedEd ? Carbon::parse($parsedEd)->format('d/m/Y') : ($b->expired_date ?: '-'),
+                'stock' => (int) $b->stock,
+                'is_active' => (int) $b->status === 1,
+            ];
+        });
+
+        return response()->json([
+            'batches' => $data,
+            'total' => $batches->sum('stock'),
+        ]);
     }
 
     // Data Stok
