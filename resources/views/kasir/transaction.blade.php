@@ -3497,8 +3497,22 @@
             debtorname.value = it.name;
             debtorSearch.value = it.name;
 
-            parameters = it.parameters[0].receipt;
-            rounding = it.parameters[0].rounding;
+            const debtorParam = (it.parameters && it.parameters.length > 0) ? it.parameters[0] : null;
+
+            if (debtorParam) {
+                parameters = debtorParam.receipt || {{ $parameters }};
+                rounding = debtorParam.rounding ?? {{ $rounding }};
+                const embalasVal = debtorParam.embalas ?? 0;
+                if (document.getElementById('embalase')) document.getElementById('embalase').value = embalasVal;
+                service = embalasVal;
+            } else {
+                parameters = {{ $parameters }};
+                rounding = {{ $rounding }};
+                const embalasVal = @json($service) || 0;
+                if (document.getElementById('embalase')) document.getElementById('embalase').value = embalasVal;
+                service = embalasVal;
+            }
+
             if (currenttransaction === 'KREDIT') {
                 creditItemParameters = parameters;
                 creditItemRounding = rounding;
@@ -3513,8 +3527,6 @@
             }
             if (document.getElementById('debtorSearch')) document.getElementById('debtorSearch').value = it.name;
             if (document.getElementById('debtor_name')) document.getElementById('debtor_name').value = it.name;
-            document.getElementById('embalase').value = it.parameters[0].embalas;
-            service = it.parameters[0].embalas;
             closedebtorBox();
         }
     }
