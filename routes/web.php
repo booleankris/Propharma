@@ -606,6 +606,27 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
         Route::post('/piutang/bulk-submit', [\App\Http\Controllers\FinanceController::class, 'bulkSubmitPiutang'])->name('piutang.bulk-submit');
         Route::post('/hutang/{id}/submit', [\App\Http\Controllers\FinanceController::class, 'submitHutang'])->name('hutang.submit');
         Route::post('/piutang/{id}/submit', [\App\Http\Controllers\FinanceController::class, 'submitPiutang'])->name('piutang.submit');
+
+        // Master Ketentuan Retur
+        Route::prefix('return-policies')->name('returnPolicies.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Finance\ReturnPolicyController::class, 'index'])->name('index');
+            Route::post('/', [\App\Http\Controllers\Finance\ReturnPolicyController::class, 'store'])->name('store');
+            Route::put('/{id}', [\App\Http\Controllers\Finance\ReturnPolicyController::class, 'update'])->name('update');
+            Route::delete('/{id}', [\App\Http\Controllers\Finance\ReturnPolicyController::class, 'destroy'])->name('destroy');
+            Route::get('/export', [\App\Http\Controllers\Finance\ReturnPolicyController::class, 'export'])->name('export');
+        });
+
+        // Monitoring Retur Beli
+        Route::prefix('purchase-returns')->name('purchaseReturns.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Finance\PurchaseReturnController::class, 'index'])->name('index');
+            Route::get('/search-invoices', [\App\Http\Controllers\Finance\PurchaseReturnController::class, 'searchInvoices'])->name('searchInvoices');
+            Route::get('/invoice-items/{id}', [\App\Http\Controllers\Finance\PurchaseReturnController::class, 'getInvoiceItems'])->name('invoiceItems');
+            Route::get('/search-medicines', [\App\Http\Controllers\Finance\PurchaseReturnController::class, 'searchMedicines'])->name('searchMedicines');
+            Route::post('/', [\App\Http\Controllers\Finance\PurchaseReturnController::class, 'store'])->name('store');
+            Route::put('/items/{id}', [\App\Http\Controllers\Finance\PurchaseReturnController::class, 'updateItem'])->name('updateItem');
+            Route::delete('/items/{id}', [\App\Http\Controllers\Finance\PurchaseReturnController::class, 'destroyItem'])->name('destroyItem');
+            Route::get('/export', [\App\Http\Controllers\Finance\PurchaseReturnController::class, 'export'])->name('export');
+        });
     });
 
     Route::get('/compositions/select', [CompositionsController::class, 'select'])->name('composition.select');

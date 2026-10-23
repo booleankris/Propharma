@@ -17,6 +17,8 @@ import {
     X,
     HandCoins,
     ArrowDownUp,
+    Undo2,
+    BookOpenCheck,
 } from 'lucide-react';
 
 export default function FinanceLayout({ title, subtitle, children, stats = {} }) {
@@ -65,6 +67,23 @@ export default function FinanceLayout({ title, subtitle, children, stats = {} })
                 text: stats.totalCashCount,
                 color: 'bg-emerald-50 text-emerald-600',
             } : null,
+        },
+        {
+            name: 'Monitoring Retur Beli',
+            href: '/finance/purchase-returns',
+            icon: Undo2,
+            active: currentUrl.startsWith('/finance/purchase-returns'),
+            badge: stats.countPendingRetur > 0 ? {
+                text: stats.countPendingRetur,
+                color: 'bg-amber-100 text-amber-700',
+            } : null,
+        },
+        {
+            name: 'Ketentuan Retur',
+            href: '/finance/return-policies',
+            icon: BookOpenCheck,
+            active: currentUrl.startsWith('/finance/return-policies'),
+            badge: null,
         },
         {
             name: 'Cashflow',

@@ -1,0 +1,682 @@
+<?php
+
+namespace App\Http\Controllers\Finance;
+
+use App\Http\Controllers\Controller;
+use App\Models\Creditor;
+use App\Models\Medicines;
+use App\Models\Pharmacies;
+use App\Models\PurchaseReturn;
+use App\Models\PurchaseReturnItem;
+use App\Models\ReceivingDetails;
+use App\Models\ReturnPolicy;
+use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Inertia\Inertia;
+use Symfony\Component\HttpFoundation\StreamedResponse;
+
+class PurchaseReturnController extends Controller
+{
+    public function __construct()
+    {
+        $this->middleware('auth');
+        $this->middleware(function ($request, $next) {
+            $user = auth()->user();
+            if (!$user || (!$user->hasRole('Finance') && !$user->hasRole('General Manager') && !$user->hasRole('administrator') && !$user->hasRole('HO'))) {
+                abort(403, 'Akses ditolak: Monitoring Retur Beli hanya dapat diakses oleh role Finance, General Manager, dan Administrator.');
+            }
+            return $next($request);
+        });
+    }
+
+    protected function getBranchContext(): array
+    {
+        $activePharmacyId = function_exists('getActivePharmacyId') ? getActivePharmacyId() : 1;
+        $activePharmacy = Pharmacies::find($activePharmacyId);
+        if (!$activePharmacy) {
+            $activePharmacy = Pharmacies::first();
+        }
+
+        $user = auth()->user();
+        $isHoOrAdmin = $user && ($user->hasRole('HO') || $user->hasRole('administrator') || $user->hasRole('General Manager'));
+
+        $branches = [];
+        if ($isHoOrAdmin) {
+            $branches = Pharmacies::whereIn('id', [1, 9, 2, 3, 4, 5])
+                ->orderByRaw('FIELD(id, 1, 9, 2, 3, 4, 5)')
+                ->get(['id', 'name']);
+        }
+
+        return [
+            'activePharmacy' => $activePharmacy ? [
+                'id' => $activePharmacy->id,
+                'name' => $activePharmacy->name,
+            ] : [
+                'id' => $activePharmacyId,
+                'name' => 'Apotek Cabang',
+            ],
+            'branches' => $branches,
+            'canSwitchBranch' => $isHoOrAdmin,
+        ];
+    }
+
+    /**
+     * Normalisasi nama pabrik untuk pencocokan toleran terhadap simbol/spasi/tanda kurung
+     */
+    protected function normalizeFactoryName(?string $str): string
+    {
+        if (!$str) return '';
+        $str = strtoupper(trim($str));
+        $str = preg_replace('/\([^)]+\)/', '', $str);
+        $str = preg_replace('/[^A-Z0-9]/', '', $str);
+        return $str ?: '';
+    }
+
+    /**
+     * Cari aturan ketentuan retur berdasarkan PBF dan Pabrik
+     */
+    protected function findReturnPolicy(?string $creditorCode, $factoryId, ?string $factoryName, $preloadedPolicies = null)
+    {
+        if (!$creditorCode) return null;
+
+        $policies = $preloadedPolicies !== null
+            ? $preloadedPolicies
+            : ReturnPolicy::where('creditor_code', $creditorCode)->get();
+
+        // 1. Cek pencocokan langsung berdasarkan factory_id
+        if ($factoryId) {
+            foreach ($policies as $p) {
+                if ($p->factory_id == $factoryId) {
+                    return $p;
+                }
+            }
+        }
+
+        // 2. Cek pencocokan nama ternormalisasi
+        if ($factoryName) {
+            $normF = $this->normalizeFactoryName($factoryName);
+            if (!empty($normF)) {
+                foreach ($policies as $p) {
+                    $normP = $this->normalizeFactoryName($p->factory_name);
+                    if (!empty($normP)) {
+                        if ($normP === $normF || (strlen($normP) >= 4 && str_contains($normF, $normP)) || (strlen($normF) >= 4 && str_contains($normP, $normF))) {
+                            return $p;
+                        }
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Hitung status kesesuaian ketentuan retur berdasarkan tanggal ED dan aturan Master
+     */
+    protected function evaluateReturnEligibility($policy, ?string $expiredDateStr): array
+    {
+        if (!$policy) {
+            return [
+                'status' => 'unknown',
+                'badge' => 'bg-slate-100 text-slate-600 border-slate-200',
+                'label' => 'Belum Ada Aturan',
+                'message' => 'Kombinasi Pabrik & PBF ini belum diatur di Master Ketentuan Retur.',
+                'is_returnable' => null,
+                'policy' => null,
+            ];
+        }
+
+        if (!$policy->is_returnable) {
+            return [
+                'status' => 'forbidden',
+                'badge' => 'bg-rose-100 text-rose-800 border-rose-300',
+                'label' => 'No Retur (X)',
+                'message' => 'Ketentuan: TIDAK BISA DIRETUR (NO RETUR). ' . ($policy->notes ?: ''),
+                'is_returnable' => false,
+                'policy' => [
+                    'id' => $policy->id,
+                    'factory_name' => $policy->factory_name,
+                    'is_returnable' => false,
+                    'notes' => $policy->notes,
+                    'raw_rule' => $policy->raw_rule,
+                ],
+            ];
+        }
+
+        $monthsBefore = $policy->months_before_ed ?? 0;
+        $monthsAfter = $policy->months_after_ed ?? 0;
+
+        if (empty($expiredDateStr)) {
+            return [
+                'status' => 'allowed',
+                'badge' => 'bg-emerald-100 text-emerald-800 border-emerald-300',
+                'label' => "Bisa Retur (H-{$monthsBefore})",
+                'message' => "Ketentuan retur: " . ($policy->notes ?: "H-{$monthsBefore} Bulan sebelum ED"),
+                'is_returnable' => true,
+                'policy' => [
+                    'id' => $policy->id,
+                    'factory_name' => $policy->factory_name,
+                    'is_returnable' => true,
+                    'months_before_ed' => $monthsBefore,
+                    'months_after_ed' => $monthsAfter,
+                    'notes' => $policy->notes,
+                    'raw_rule' => $policy->raw_rule,
+                ],
+            ];
+        }
+
+        try {
+            $now = Carbon::now()->startOfMonth();
+            $ed = Carbon::parse($expiredDateStr)->startOfMonth();
+            $diffMonths = $now->diffInMonths($ed, false);
+
+            $policyData = [
+                'id' => $policy->id,
+                'factory_name' => $policy->factory_name,
+                'is_returnable' => true,
+                'months_before_ed' => $monthsBefore,
+                'months_after_ed' => $monthsAfter,
+                'notes' => $policy->notes,
+                'raw_rule' => $policy->raw_rule,
+            ];
+
+            if ($diffMonths <= $monthsBefore && $diffMonths >= (-1 * $monthsAfter)) {
+                return [
+                    'status' => 'eligible',
+                    'badge' => 'bg-emerald-100 text-emerald-800 border-emerald-300',
+                    'label' => "Sesuai Ketentuan (H-{$monthsBefore})",
+                    'message' => "Memenuhi syarat retur: ED " . Carbon::parse($expiredDateStr)->format('m/Y') . " (Sisa {$diffMonths} bln, ketentuan H-{$monthsBefore})",
+                    'is_returnable' => true,
+                    'policy' => $policyData,
+                ];
+            } elseif ($diffMonths > $monthsBefore) {
+                return [
+                    'status' => 'too_early',
+                    'badge' => 'bg-amber-100 text-amber-800 border-amber-300',
+                    'label' => "Belum Periode (H-{$monthsBefore})",
+                    'message' => "ED masih {$diffMonths} bulan lagi. Ketentuan retur adalah H-{$monthsBefore} bulan sebelum ED.",
+                    'is_returnable' => true,
+                    'policy' => $policyData,
+                ];
+            } else {
+                return [
+                    'status' => 'expired_passed',
+                    'badge' => 'bg-rose-100 text-rose-800 border-rose-300',
+                    'label' => 'Lewat Batas Retur',
+                    'message' => "Sudah melewati batas waktu retur (H+{$monthsAfter} bulan setelah ED).",
+                    'is_returnable' => true,
+                    'policy' => $policyData,
+                ];
+            }
+        } catch (\Exception $e) {
+            return [
+                'status' => 'allowed',
+                'badge' => 'bg-emerald-100 text-emerald-800 border-emerald-300',
+                'label' => "Bisa Retur",
+                'message' => $policy->notes ?: "Bisa retur",
+                'is_returnable' => true,
+                'policy' => null,
+            ];
+        }
+    }
+
+    public function index(Request $request)
+    {
+        $search = trim($request->input('search', ''));
+        $creditorFilter = $request->input('creditor_code', '');
+        $statusFilter = $request->input('status', '');
+        $reasonFilter = $request->input('reason', '');
+        $perPage = (int) $request->input('per_page', 25);
+
+        // Query item-level rows to match exact format in Excel monitoring
+        $itemsQuery = PurchaseReturnItem::with(['purchaseReturn.creditor', 'medicine.factory'])
+            ->join('purchase_returns', 'purchase_return_items.purchase_return_id', '=', 'purchase_returns.id')
+            ->select('purchase_return_items.*')
+            ->orderBy('purchase_returns.created_at', 'desc')
+            ->orderBy('purchase_return_items.id', 'desc');
+
+        if ($search !== '') {
+            $itemsQuery->where(function ($q) use ($search) {
+                $q->where('purchase_return_items.medicine_name', 'LIKE', "%{$search}%")
+                    ->orWhere('purchase_return_items.batch_number', 'LIKE', "%{$search}%")
+                    ->orWhere('purchase_returns.invoice_number', 'LIKE', "%{$search}%")
+                    ->orWhere('purchase_returns.return_no', 'LIKE', "%{$search}%")
+                    ->orWhereHas('purchaseReturn.creditor', function ($cq) use ($search) {
+                        $cq->where('name', 'LIKE', "%{$search}%")
+                            ->orWhere('code', 'LIKE', "%{$search}%");
+                    });
+            });
+        }
+
+        if ($creditorFilter !== '') {
+            $itemsQuery->where('purchase_returns.creditor_code', $creditorFilter);
+        }
+
+        if ($statusFilter !== '') {
+            if ($statusFilter === 'sudah_potong') {
+                $itemsQuery->whereNotNull('purchase_return_items.deduction_note')
+                    ->where('purchase_return_items.deduction_note', '!=', '');
+            } elseif ($statusFilter === 'belum_potong') {
+                $itemsQuery->where(function ($q) {
+                    $q->whereNull('purchase_return_items.deduction_note')
+                        ->orWhere('purchase_return_items.deduction_note', '');
+                });
+            } elseif ($statusFilter === 'sudah_ambil') {
+                $itemsQuery->whereNotNull('purchase_return_items.pickup_date');
+            } elseif ($statusFilter === 'belum_ambil') {
+                $itemsQuery->whereNull('purchase_return_items.pickup_date');
+            }
+        }
+
+        if ($reasonFilter !== '') {
+            $itemsQuery->where('purchase_return_items.reason', $reasonFilter);
+        }
+
+        $items = $itemsQuery->paginate($perPage)->withQueryString();
+
+        // Preload policies for creditors in current page
+        $usedCreditorCodes = $items->pluck('purchaseReturn.creditor_code')->filter()->unique()->values()->all();
+        $creditorPolicies = ReturnPolicy::whereIn('creditor_code', $usedCreditorCodes)->get()->groupBy('creditor_code');
+
+        $items->getCollection()->transform(function ($item) use ($creditorPolicies) {
+            $creditorCode = $item->purchaseReturn ? $item->purchaseReturn->creditor_code : null;
+            $factoryId = $item->medicine ? $item->medicine->factory_id : null;
+            $factoryName = $item->medicine && $item->medicine->factory ? $item->medicine->factory->name : null;
+
+            $policies = $creditorCode && isset($creditorPolicies[$creditorCode]) ? $creditorPolicies[$creditorCode] : collect();
+            $policy = $this->findReturnPolicy($creditorCode, $factoryId, $factoryName, $policies);
+            $evaluation = $this->evaluateReturnEligibility($policy, $item->expired_date);
+
+            $item->factory_name = $factoryName;
+            $item->return_policy_info = $evaluation;
+            return $item;
+        });
+
+        // Metrik Monitoring
+        $totalItemsCount = PurchaseReturnItem::count();
+        $totalReturValue = (float) PurchaseReturnItem::sum('subtotal');
+        $sudahPotongCount = PurchaseReturnItem::whereNotNull('deduction_note')->where('deduction_note', '!=', '')->count();
+        $belumPotongCount = PurchaseReturnItem::where(function ($q) {
+            $q->whereNull('deduction_note')->orWhere('deduction_note', '');
+        })->count();
+        $sudahDiambilCount = PurchaseReturnItem::whereNotNull('pickup_date')->count();
+
+        $creditors = Creditor::select('code', 'name')
+            ->whereNotNull('code')
+            ->where('code', '!=', '')
+            ->orderBy('name')
+            ->get();
+
+        return Inertia::render('Finance/PurchaseReturns', [
+            'items' => $items,
+            'filters' => [
+                'search' => $search,
+                'creditor_code' => $creditorFilter,
+                'status' => $statusFilter,
+                'reason' => $reasonFilter,
+                'per_page' => $perPage,
+            ],
+            'stats' => [
+                'total_items' => $totalItemsCount,
+                'total_value' => $totalReturValue,
+                'sudah_potong' => $sudahPotongCount,
+                'belum_potong' => $belumPotongCount,
+                'sudah_diambil' => $sudahDiambilCount,
+            ],
+            'creditors' => $creditors,
+            'branchContext' => $this->getBranchContext(),
+        ]);
+    }
+
+    /**
+     * Cari faktur penerimaan yang sudah ada di sistem
+     */
+    public function searchInvoices(Request $request)
+    {
+        $q = trim($request->input('query', ''));
+        if (strlen($q) < 2) {
+            return response()->json([]);
+        }
+
+        $invoices = ReceivingDetails::with(['creditor'])
+            ->whereNotNull('invoice_number')
+            ->where('invoice_number', '!=', '')
+            ->where(function ($query) use ($q) {
+                $query->where('invoice_number', 'LIKE', "%{$q}%")
+                    ->orWhere('receiving_details_code', 'LIKE', "%{$q}%")
+                    ->orWhere('creditor_code', 'LIKE', "%{$q}%")
+                    ->orWhereHas('creditor', function ($cq) use ($q) {
+                        $cq->where('name', 'LIKE', "%{$q}%");
+                    });
+            })
+            ->orderBy('id', 'desc')
+            ->limit(20)
+            ->get();
+
+        $results = $invoices->map(function ($inv) {
+            return [
+                'id' => $inv->id,
+                'invoice_number' => $inv->invoice_number,
+                'receiving_code' => $inv->receiving_details_code,
+                'invoice_date' => $inv->invoice_date,
+                'creditor_code' => $inv->creditor_code,
+                'creditor_name' => $inv->creditor ? $inv->creditor->name : $inv->creditor_code,
+            ];
+        });
+
+        return response()->json($results);
+    }
+
+    /**
+     * Ambil rincian obat dari faktur penerimaan
+     */
+    public function getInvoiceItems($id)
+    {
+        $receivingDetail = ReceivingDetails::with(['creditor'])->findOrFail($id);
+
+        $items = DB::table('receiving_items')
+            ->leftJoin('batches', 'receiving_items.batches_id', '=', 'batches.id')
+            ->leftJoin('medicines as mb', 'batches.medicine_id', '=', 'mb.id')
+            ->leftJoin('factories as fb', 'mb.factory_id', '=', 'fb.id')
+            ->leftJoin('order_items', 'receiving_items.order_items_id', '=', 'order_items.id')
+            ->leftJoin('medicines as mo', 'order_items.medicine_id', '=', 'mo.id')
+            ->leftJoin('factories as fo', 'mo.factory_id', '=', 'fo.id')
+            ->where('receiving_items.receiving_details_id', $receivingDetail->id)
+            ->select(
+                'receiving_items.id as ri_id',
+                'receiving_items.batch',
+                'receiving_items.expired_date',
+                'receiving_items.qty_received',
+                'receiving_items.qty',
+                'receiving_items.raw_price',
+                'receiving_items.total',
+                'batches.id as batch_id',
+                'batches.stock as current_stock',
+                DB::raw('COALESCE(mb.id, mo.id) as medicine_id'),
+                DB::raw('COALESCE(mb.name, mo.name) as medicine_name'),
+                DB::raw('COALESCE(mb.packaging, mo.packaging, "BOX") as unit'),
+                DB::raw('COALESCE(mb.factory_id, mo.factory_id) as factory_id'),
+                DB::raw('COALESCE(fb.name, fo.name) as factory_name')
+            )
+            ->get();
+
+        $policies = ReturnPolicy::where('creditor_code', $receivingDetail->creditor_code)->get();
+
+        $itemsWithPolicy = $items->map(function ($it) use ($receivingDetail, $policies) {
+            $policy = $this->findReturnPolicy($receivingDetail->creditor_code, $it->factory_id, $it->factory_name, $policies);
+            $evaluation = $this->evaluateReturnEligibility($policy, $it->expired_date);
+
+            return [
+                'ri_id' => $it->ri_id,
+                'batch' => $it->batch,
+                'expired_date' => $it->expired_date,
+                'qty_received' => $it->qty_received,
+                'qty' => $it->qty,
+                'raw_price' => $it->raw_price,
+                'total' => $it->total,
+                'batch_id' => $it->batch_id,
+                'current_stock' => $it->current_stock,
+                'medicine_id' => $it->medicine_id,
+                'medicine_name' => $it->medicine_name,
+                'unit' => $it->unit,
+                'factory_id' => $it->factory_id,
+                'factory_name' => $it->factory_name,
+                'return_policy' => $evaluation,
+            ];
+        });
+
+        return response()->json([
+            'invoice' => [
+                'id' => $receivingDetail->id,
+                'invoice_number' => $receivingDetail->invoice_number,
+                'invoice_date' => $receivingDetail->invoice_date,
+                'creditor_code' => $receivingDetail->creditor_code,
+                'creditor_name' => $receivingDetail->creditor ? $receivingDetail->creditor->name : $receivingDetail->creditor_code,
+            ],
+            'items' => $itemsWithPolicy,
+        ]);
+    }
+
+    /**
+     * Cari obat dari master medicines untuk custom/manual return
+     */
+    public function searchMedicines(Request $request)
+    {
+        $q = trim($request->input('query', ''));
+        $creditorCode = $request->input('creditor_code', '');
+
+        if (strlen($q) < 2) {
+            return response()->json([]);
+        }
+
+        $medicines = Medicines::with(['factory'])
+            ->where(function ($query) use ($q) {
+                $query->where('name', 'LIKE', "%{$q}%")
+                    ->orWhere('code', 'LIKE', "%{$q}%")
+                    ->orWhere('barcode', 'LIKE', "%{$q}%");
+            })
+            ->orderBy('name')
+            ->limit(20)
+            ->get();
+
+        $policies = $creditorCode ? ReturnPolicy::where('creditor_code', $creditorCode)->get() : collect();
+
+        $results = $medicines->map(function ($m) use ($creditorCode, $policies) {
+            $factoryName = $m->factory ? $m->factory->name : null;
+            $policy = $creditorCode ? $this->findReturnPolicy($creditorCode, $m->factory_id, $factoryName, $policies) : null;
+            $evaluation = $this->evaluateReturnEligibility($policy, null);
+
+            return [
+                'id' => $m->id,
+                'code' => $m->code,
+                'name' => $m->name,
+                'unit' => $m->packaging ?: 'BOX',
+                'factory_id' => $m->factory_id,
+                'factory_name' => $factoryName,
+                'raw_price' => (float) $m->raw_price,
+                'return_policy' => $evaluation,
+            ];
+        });
+
+        return response()->json($results);
+    }
+
+    /**
+     * Simpan input retur pembelian baru (Bisa custom/manual atau dari faktur sistem)
+     */
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'invoice_number' => 'required|string|max:100',
+            'invoice_date' => 'nullable|date',
+            'received_date' => 'nullable|date',
+            'creditor_code' => 'required|exists:creditors,code',
+            'receiving_id' => 'nullable|integer',
+            'notes' => 'nullable|string|max:500',
+            'items' => 'required|array|min:1',
+            'items.*.medicine_id' => 'nullable|integer',
+            'items.*.medicine_name' => 'required|string|max:255',
+            'items.*.unit' => 'nullable|string|max:50',
+            'items.*.batch_number' => 'nullable|string|max:100',
+            'items.*.expired_date' => 'nullable|date',
+            'items.*.qty' => 'required|numeric|min:0.01',
+            'items.*.unit_price' => 'required|numeric|min:0',
+            'items.*.reason' => 'nullable|string|max:100',
+            'items.*.pickup_date' => 'nullable|date',
+            'items.*.deduction_note' => 'nullable|string|max:255',
+        ]);
+
+        $activePharmacyId = function_exists('getActivePharmacyId') ? getActivePharmacyId() : 1;
+        $yearMonth = date('ym');
+        $latest = PurchaseReturn::where('return_no', 'LIKE', "RET-{$yearMonth}/%")->count();
+        $nextSeq = str_pad($latest + 1, 4, '0', STR_PAD_LEFT);
+        $returnNo = "RET-{$yearMonth}/{$nextSeq}";
+
+        DB::transaction(function () use ($validated, $activePharmacyId, $returnNo) {
+            $totalAmount = 0;
+            foreach ($validated['items'] as $it) {
+                $subtotal = (float)$it['qty'] * (float)$it['unit_price'];
+                $totalAmount += $subtotal;
+            }
+
+            $purchaseReturn = PurchaseReturn::create([
+                'return_no' => $returnNo,
+                'invoice_number' => $validated['invoice_number'],
+                'invoice_date' => $validated['invoice_date'] ?? null,
+                'received_date' => $validated['received_date'] ?? null,
+                'creditor_code' => $validated['creditor_code'],
+                'pharmacy_id' => $activePharmacyId,
+                'user_id' => auth()->id(),
+                'receiving_id' => $validated['receiving_id'] ?? null,
+                'total_amount' => $totalAmount,
+                'status' => 'diajukan',
+                'notes' => $validated['notes'] ?? null,
+                'is_manual' => empty($validated['receiving_id']),
+            ]);
+
+            foreach ($validated['items'] as $it) {
+                $subtotal = (float)$it['qty'] * (float)$it['unit_price'];
+                PurchaseReturnItem::create([
+                    'purchase_return_id' => $purchaseReturn->id,
+                    'medicine_id' => $it['medicine_id'] ?? null,
+                    'medicine_name' => $it['medicine_name'],
+                    'unit' => $it['unit'] ?? 'BOX',
+                    'batch_number' => $it['batch_number'] ?? '-',
+                    'expired_date' => $it['expired_date'] ?? null,
+                    'qty' => $it['qty'],
+                    'unit_price' => $it['unit_price'],
+                    'subtotal' => $subtotal,
+                    'reason' => $it['reason'] ?? 'ED DEKAT',
+                    'pickup_date' => $it['pickup_date'] ?? null,
+                    'deduction_note' => $it['deduction_note'] ?? null,
+                ]);
+            }
+        });
+
+        return redirect()->back()->with('success', 'Data Retur Pembelian berhasil disimpan.');
+    }
+
+    /**
+     * Update status item retur (misal update tanggal diambil atau potong tagihan langsung di tabel)
+     */
+    public function updateItem(Request $request, $id)
+    {
+        $item = PurchaseReturnItem::findOrFail($id);
+
+        $validated = $request->validate([
+            'pickup_date' => 'nullable|date',
+            'deduction_note' => 'nullable|string|max:255',
+            'reason' => 'nullable|string|max:100',
+            'qty' => 'nullable|numeric|min:0.01',
+            'unit_price' => 'nullable|numeric|min:0',
+        ]);
+
+        if (isset($validated['qty']) || isset($validated['unit_price'])) {
+            $qty = $validated['qty'] ?? $item->qty;
+            $unitPrice = $validated['unit_price'] ?? $item->unit_price;
+            $validated['subtotal'] = (float)$qty * (float)$unitPrice;
+        }
+
+        $item->update($validated);
+
+        // Recalculate total header amount
+        $parent = $item->purchaseReturn;
+        if ($parent) {
+            $newTotal = $parent->items()->sum('subtotal');
+            $parent->update(['total_amount' => $newTotal]);
+        }
+
+        return redirect()->back()->with('success', 'Item retur berhasil diperbarui.');
+    }
+
+    /**
+     * Hapus item retur
+     */
+    public function destroyItem($id)
+    {
+        $item = PurchaseReturnItem::findOrFail($id);
+        $parent = $item->purchaseReturn;
+
+        $item->delete();
+
+        if ($parent) {
+            if ($parent->items()->count() === 0) {
+                $parent->delete();
+            } else {
+                $parent->update(['total_amount' => $parent->items()->sum('subtotal')]);
+            }
+        }
+
+        return redirect()->back()->with('success', 'Item retur berhasil dihapus.');
+    }
+
+    /**
+     * Export Laporan Monitoring Retur Beli ke Excel
+     */
+    public function export(Request $request)
+    {
+        $items = PurchaseReturnItem::with(['purchaseReturn.creditor', 'medicine.factory'])
+            ->join('purchase_returns', 'purchase_return_items.purchase_return_id', '=', 'purchase_returns.id')
+            ->select('purchase_return_items.*')
+            ->orderBy('purchase_returns.created_at', 'desc')
+            ->get();
+
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Monitoring Retur Beli');
+
+        $headers = [
+            'NO', 'NAMA OBAT', 'JUMLAH', 'SATUAN', 'BATCH', 'NO FAKTUR',
+            'ED', 'KETENTUAN RETUR', 'PBF', 'TANGGAL ENTRI / FAKTUR', 'KETERANGAN', 'TGL BRG DI AMBIL', 'STATUS POTONG TAGIHAN', 'TOTAL HARGA'
+        ];
+        $sheet->fromArray($headers, null, 'A1');
+
+        $usedCreditorCodes = $items->pluck('purchaseReturn.creditor_code')->filter()->unique()->values()->all();
+        $creditorPolicies = ReturnPolicy::whereIn('creditor_code', $usedCreditorCodes)->get()->groupBy('creditor_code');
+
+        $rows = [];
+        foreach ($items as $idx => $it) {
+            $p = $it->purchaseReturn;
+            $creditorCode = $p ? $p->creditor_code : null;
+            $factoryId = $it->medicine ? $it->medicine->factory_id : null;
+            $factoryName = $it->medicine && $it->medicine->factory ? $it->medicine->factory->name : null;
+
+            $policies = $creditorCode && isset($creditorPolicies[$creditorCode]) ? $creditorPolicies[$creditorCode] : collect();
+            $policy = $this->findReturnPolicy($creditorCode, $factoryId, $factoryName, $policies);
+            $eval = $this->evaluateReturnEligibility($policy, $it->expired_date);
+
+            $rows[] = [
+                $idx + 1,
+                $it->medicine_name . ($factoryName ? " ({$factoryName})" : ''),
+                (float) $it->qty,
+                $it->unit,
+                $it->batch_number,
+                $p ? $p->invoice_number : '',
+                $it->expired_date ? Carbon::parse($it->expired_date)->format('d/m/Y') : '-',
+                $eval['label'] . ($eval['policy']['notes'] ?? '' ? ' - ' . $eval['policy']['notes'] : ''),
+                $p && $p->creditor ? $p->creditor->name : ($p->creditor_code ?? ''),
+                $p && $p->invoice_date ? Carbon::parse($p->invoice_date)->format('d/m/Y') : ($it->created_at->format('d/m/Y')),
+                $it->reason ?: ($p->reason ?? 'ED DEKAT'),
+                $it->pickup_date ? Carbon::parse($it->pickup_date)->format('d/m/Y') : '-',
+                $it->deduction_note ?: '-',
+                (float) $it->subtotal,
+            ];
+        }
+
+        if (!empty($rows)) {
+            $sheet->fromArray($rows, null, 'A2');
+        }
+
+        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+        $fileName = 'Monitoring_Retur_Beli_' . date('Ymd_His') . '.xlsx';
+
+        return new StreamedResponse(function () use ($writer) {
+            $writer->save('php://output');
+        }, 200, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => "attachment; filename=\"{$fileName}\"",
+            'Cache-Control' => 'max-age=0',
+        ]);
+    }
+}
