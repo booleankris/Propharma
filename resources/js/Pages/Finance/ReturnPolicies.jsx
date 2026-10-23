@@ -103,7 +103,7 @@ export default function ReturnPolicies({ policies, filters, stats, creditors, fa
         >
             <Head title="Master Ketentuan Retur - Finance ERP" />
 
-            <div className="p-6 max-w-7xl mx-auto space-y-6">
+            <div className="mx-auto space-y-6">
                 {/* Header Title & Actions */}
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
                     <div>
@@ -308,13 +308,12 @@ export default function ReturnPolicies({ policies, filters, stats, creditors, fa
                                         key={i}
                                         disabled={!link.url || link.active}
                                         onClick={() => link.url && router.get(link.url, {}, { preserveState: true })}
-                                        className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
-                                            link.active
+                                        className={`px-3 py-1.5 rounded-lg font-medium transition-all ${link.active
                                                 ? 'bg-blue-600 text-white font-bold'
                                                 : link.url
-                                                ? 'bg-slate-50 hover:bg-slate-100 text-slate-700'
-                                                : 'text-slate-300 cursor-not-allowed'
-                                        }`}
+                                                    ? 'bg-slate-50 hover:bg-slate-100 text-slate-700'
+                                                    : 'text-slate-300 cursor-not-allowed'
+                                            }`}
                                         dangerouslySetInnerHTML={{ __html: link.label }}
                                     />
                                 ))}

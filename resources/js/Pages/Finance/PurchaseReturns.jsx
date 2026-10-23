@@ -97,7 +97,7 @@ export default function PurchaseReturns({ items, filters, stats, creditors, bran
             fetch(`/finance/purchase-returns/search-medicines?query=${encodeURIComponent(medSearchQuery)}${creditorParam}`)
                 .then(res => res.json())
                 .then(data => setMedSearchResults(data))
-                .catch(() => {});
+                .catch(() => { });
         }, 300);
         return () => clearTimeout(timer);
     }, [medSearchQuery, formData.creditor_code]);
@@ -179,14 +179,14 @@ export default function PurchaseReturns({ items, filters, stats, creditors, bran
 
     const handleCreateSubmit = (e) => {
         e.preventDefault();
-        
+
         // Filter items that are selected if in invoice mode, or all items if in manual mode
         const itemsToSubmit = entryType === 'invoice'
             ? formData.items.filter(it => it.selected)
             : formData.items;
 
         if (itemsToSubmit.length === 0) {
-            alert(entryType === 'invoice' 
+            alert(entryType === 'invoice'
                 ? 'Silakan centang minimal 1 obat dari faktur yang ingin Anda retur.'
                 : 'Silakan masukkan minimal 1 obat yang akan diretur.'
             );
@@ -246,7 +246,7 @@ export default function PurchaseReturns({ items, filters, stats, creditors, bran
         >
             <Head title="Monitoring Retur Beli - Finance ERP" />
 
-            <div className="p-6 max-w-7xl mx-auto space-y-6">
+            <div className="mx-auto space-y-6">
                 {/* Header Title & Actions */}
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
                     <div>
@@ -415,9 +415,8 @@ export default function PurchaseReturns({ items, filters, stats, creditors, bran
                                         return (
                                             <tr
                                                 key={item.id}
-                                                className={`transition-colors hover:bg-amber-50/30 ${
-                                                    hasDeduction ? 'bg-emerald-50/40' : ''
-                                                }`}
+                                                className={`transition-colors hover:bg-amber-50/30 ${hasDeduction ? 'bg-emerald-50/40' : ''
+                                                    }`}
                                             >
                                                 <td className="py-2.5 px-3 text-center text-slate-400 font-mono text-[11px]">
                                                     {(items.current_page - 1) * items.per_page + idx + 1}
@@ -534,13 +533,12 @@ export default function PurchaseReturns({ items, filters, stats, creditors, bran
                                         key={i}
                                         disabled={!link.url || link.active}
                                         onClick={() => link.url && router.get(link.url, {}, { preserveState: true })}
-                                        className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
-                                            link.active
-                                                ? 'bg-blue-600 text-white font-bold'
-                                                : link.url
+                                        className={`px-3 py-1.5 rounded-lg font-medium transition-all ${link.active
+                                            ? 'bg-blue-600 text-white font-bold'
+                                            : link.url
                                                 ? 'bg-slate-50 hover:bg-slate-100 text-slate-700'
                                                 : 'text-slate-300 cursor-not-allowed'
-                                        }`}
+                                            }`}
                                         dangerouslySetInnerHTML={{ __html: link.label }}
                                     />
                                 ))}
@@ -576,22 +574,20 @@ export default function PurchaseReturns({ items, filters, stats, creditors, bran
                                 <button
                                     type="button"
                                     onClick={() => setEntryType('manual')}
-                                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                                        entryType === 'manual'
-                                            ? 'bg-blue-600 text-white shadow-xs'
-                                            : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
-                                    }`}
+                                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${entryType === 'manual'
+                                        ? 'bg-blue-600 text-white shadow-xs'
+                                        : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                                        }`}
                                 >
                                     Input Manual / Custom Retur
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => setEntryType('invoice')}
-                                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                                        entryType === 'invoice'
-                                            ? 'bg-blue-600 text-white shadow-xs'
-                                            : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
-                                    }`}
+                                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${entryType === 'invoice'
+                                        ? 'bg-blue-600 text-white shadow-xs'
+                                        : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                                        }`}
                                 >
                                     Cari dari Faktur Penerimaan Sistem
                                 </button>
@@ -606,484 +602,479 @@ export default function PurchaseReturns({ items, filters, stats, creditors, bran
                         {/* Form Container with Flex-1 and Scrollable Body */}
                         <form onSubmit={handleCreateSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
                             <div className="p-5 space-y-5 overflow-y-auto flex-1">
-                            {/* Search Invoice if invoice mode */}
-                            {entryType === 'invoice' && (
-                                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 relative">
-                                    <label className="block font-semibold text-slate-700 mb-1">Cari No Faktur Penerimaan</label>
-                                    <div className="relative">
-                                        <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                                        <input
-                                            type="text"
-                                            placeholder="Ketik nomor faktur (misal: 14_506659 atau nama PBF)..."
-                                            value={invoiceSearchQuery}
-                                            onChange={(e) => setInvoiceSearchQuery(e.target.value)}
-                                            className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        />
-                                    </div>
-                                    {invoiceSearchResults.length > 0 && (
-                                        <div className="absolute left-4 right-4 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-20 max-h-48 overflow-y-auto">
-                                            {invoiceSearchResults.map((inv) => (
-                                                <button
-                                                    key={inv.id}
-                                                    type="button"
-                                                    onClick={() => selectInvoice(inv)}
-                                                    className="w-full text-left px-3.5 py-2 hover:bg-blue-50 flex items-center justify-between border-b border-slate-100 last:border-b-0"
-                                                >
-                                                    <div>
-                                                        <span className="font-bold text-slate-800">{inv.invoice_number}</span>
-                                                        <span className="text-slate-400 ml-2">({inv.creditor_name})</span>
-                                                    </div>
-                                                    <span className="text-[11px] text-slate-400">{inv.invoice_date}</span>
-                                                </button>
-                                            ))}
+                                {/* Search Invoice if invoice mode */}
+                                {entryType === 'invoice' && (
+                                    <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 relative">
+                                        <label className="block font-semibold text-slate-700 mb-1">Cari No Faktur Penerimaan</label>
+                                        <div className="relative">
+                                            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                                            <input
+                                                type="text"
+                                                placeholder="Ketik nomor faktur (misal: 14_506659 atau nama PBF)..."
+                                                value={invoiceSearchQuery}
+                                                onChange={(e) => setInvoiceSearchQuery(e.target.value)}
+                                                className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            />
                                         </div>
-                                    )}
-                                </div>
-                            )}
+                                        {invoiceSearchResults.length > 0 && (
+                                            <div className="absolute left-4 right-4 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-20 max-h-48 overflow-y-auto">
+                                                {invoiceSearchResults.map((inv) => (
+                                                    <button
+                                                        key={inv.id}
+                                                        type="button"
+                                                        onClick={() => selectInvoice(inv)}
+                                                        className="w-full text-left px-3.5 py-2 hover:bg-blue-50 flex items-center justify-between border-b border-slate-100 last:border-b-0"
+                                                    >
+                                                        <div>
+                                                            <span className="font-bold text-slate-800">{inv.invoice_number}</span>
+                                                            <span className="text-slate-400 ml-2">({inv.creditor_name})</span>
+                                                        </div>
+                                                        <span className="text-[11px] text-slate-400">{inv.invoice_date}</span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
 
-                            {/* Faktur Headers */}
-                            <div className={`p-4 rounded-xl border space-y-3 ${
-                                entryType === 'invoice' && formData.receiving_id
+                                {/* Faktur Headers */}
+                                <div className={`p-4 rounded-xl border space-y-3 ${entryType === 'invoice' && formData.receiving_id
                                     ? 'bg-slate-100/80 border-slate-300'
                                     : 'bg-slate-50 border-slate-200'
-                            }`}>
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                    <div>
+                                    }`}>
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                        <div>
+                                            <div className="flex items-center justify-between mb-1">
+                                                <label className="font-semibold text-slate-700">Nomor Faktur</label>
+                                                {entryType === 'invoice' && formData.receiving_id && (
+                                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-500 bg-slate-200 px-1.5 py-0.5 rounded">
+                                                        <Lock className="w-3 h-3 text-slate-500" /> Terkunci
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <input
+                                                type="text"
+                                                required
+                                                readOnly={entryType === 'invoice' && !!formData.receiving_id}
+                                                placeholder="Contoh: 63250024422"
+                                                value={formData.invoice_number}
+                                                onChange={(e) => setFormData({ ...formData, invoice_number: e.target.value })}
+                                                className={`w-full border rounded-xl px-3 py-2 font-mono ${entryType === 'invoice' && formData.receiving_id
+                                                    ? 'bg-slate-200/70 border-slate-300 text-slate-700 cursor-not-allowed font-bold'
+                                                    : 'bg-white border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500'
+                                                    }`}
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <div className="flex items-center justify-between mb-1">
+                                                <label className="font-semibold text-slate-700">Tanggal Faktur</label>
+                                                {entryType === 'invoice' && formData.receiving_id && (
+                                                    <Lock className="w-3 h-3 text-slate-400" />
+                                                )}
+                                            </div>
+                                            <input
+                                                type="date"
+                                                readOnly={entryType === 'invoice' && !!formData.receiving_id}
+                                                value={formData.invoice_date}
+                                                onChange={(e) => setFormData({ ...formData, invoice_date: e.target.value })}
+                                                className={`w-full border rounded-xl px-3 py-2 ${entryType === 'invoice' && formData.receiving_id
+                                                    ? 'bg-slate-200/70 border-slate-300 text-slate-700 cursor-not-allowed'
+                                                    : 'bg-white border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500'
+                                                    }`}
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="block font-semibold text-slate-700 mb-1">Tanggal Terima Barang</label>
+                                            <input
+                                                type="date"
+                                                value={formData.received_date}
+                                                onChange={(e) => setFormData({ ...formData, received_date: e.target.value })}
+                                                className="w-full border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="pt-2 border-t border-slate-200/80">
                                         <div className="flex items-center justify-between mb-1">
-                                            <label className="font-semibold text-slate-700">Nomor Faktur</label>
+                                            <label className="font-semibold text-slate-700">PBF / Distributor</label>
                                             {entryType === 'invoice' && formData.receiving_id && (
-                                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-500 bg-slate-200 px-1.5 py-0.5 rounded">
-                                                    <Lock className="w-3 h-3 text-slate-500" /> Terkunci
+                                                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500">
+                                                    <Lock className="w-3 h-3 text-slate-400" /> Sesuai Faktur Penerimaan
                                                 </span>
                                             )}
                                         </div>
-                                        <input
-                                            type="text"
-                                            required
-                                            readOnly={entryType === 'invoice' && !!formData.receiving_id}
-                                            placeholder="Contoh: 63250024422"
-                                            value={formData.invoice_number}
-                                            onChange={(e) => setFormData({ ...formData, invoice_number: e.target.value })}
-                                            className={`w-full border rounded-xl px-3 py-2 font-mono ${
-                                                entryType === 'invoice' && formData.receiving_id
-                                                    ? 'bg-slate-200/70 border-slate-300 text-slate-700 cursor-not-allowed font-bold'
-                                                    : 'bg-white border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500'
-                                            }`}
-                                        />
+                                        {entryType === 'invoice' && formData.receiving_id ? (
+                                            <div className="bg-white border border-slate-300 rounded-xl px-3.5 py-2.5 flex items-center justify-between shadow-xs">
+                                                <span className="font-bold text-slate-800 text-sm">
+                                                    {creditors.find((c) => c.code === formData.creditor_code)?.name || formData.creditor_code || '-'}
+                                                </span>
+                                                <span className="font-mono text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded">
+                                                    {formData.creditor_code}
+                                                </span>
+                                            </div>
+                                        ) : (
+                                            <select
+                                                required
+                                                value={formData.creditor_code}
+                                                onChange={(e) => setFormData({ ...formData, creditor_code: e.target.value })}
+                                                className="w-full border rounded-xl px-3.5 py-2.5 bg-white border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                                            >
+                                                <option value="">-- Pilih PBF / Distributor --</option>
+                                                {creditors.map((c) => (
+                                                    <option key={c.code} value={c.code}>{c.name}</option>
+                                                ))}
+                                            </select>
+                                        )}
                                     </div>
+                                </div>
 
-                                    <div>
-                                        <div className="flex items-center justify-between mb-1">
-                                            <label className="font-semibold text-slate-700">Tanggal Faktur</label>
-                                            {entryType === 'invoice' && formData.receiving_id && (
-                                                <Lock className="w-3 h-3 text-slate-400" />
+                                {/* Daftar Obat Yang Diretur */}
+                                <div>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <div>
+                                            <h4 className="font-bold text-slate-800 text-sm">
+                                                {entryType === 'invoice'
+                                                    ? 'Pilih Obat Yang Akan Diretur dari Faktur Ini'
+                                                    : 'Obat / Barang Yang Diretur'}
+                                            </h4>
+                                            {entryType === 'invoice' && (
+                                                <p className="text-[11px] text-slate-500">
+                                                    Centang obat yang ingin diretur dan sesuaikan jumlah retur (maksimal sejumlah barang di faktur). Detail obat, batch & harga dikunci sesuai faktur asli.
+                                                </p>
                                             )}
                                         </div>
-                                        <input
-                                            type="date"
-                                            readOnly={entryType === 'invoice' && !!formData.receiving_id}
-                                            value={formData.invoice_date}
-                                            onChange={(e) => setFormData({ ...formData, invoice_date: e.target.value })}
-                                            className={`w-full border rounded-xl px-3 py-2 ${
-                                                entryType === 'invoice' && formData.receiving_id
-                                                    ? 'bg-slate-200/70 border-slate-300 text-slate-700 cursor-not-allowed'
-                                                    : 'bg-white border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500'
-                                            }`}
-                                        />
-                                    </div>
 
-                                    <div>
-                                        <label className="block font-semibold text-slate-700 mb-1">Tanggal Terima Barang</label>
-                                        <input
-                                            type="date"
-                                            value={formData.received_date}
-                                            onChange={(e) => setFormData({ ...formData, received_date: e.target.value })}
-                                            className="w-full border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="pt-2 border-t border-slate-200/80">
-                                    <div className="flex items-center justify-between mb-1">
-                                        <label className="font-semibold text-slate-700">PBF / Distributor</label>
-                                        {entryType === 'invoice' && formData.receiving_id && (
-                                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500">
-                                                <Lock className="w-3 h-3 text-slate-400" /> Sesuai Faktur Penerimaan
-                                            </span>
-                                        )}
-                                    </div>
-                                    {entryType === 'invoice' && formData.receiving_id ? (
-                                        <div className="bg-white border border-slate-300 rounded-xl px-3.5 py-2.5 flex items-center justify-between shadow-xs">
-                                            <span className="font-bold text-slate-800 text-sm">
-                                                {creditors.find((c) => c.code === formData.creditor_code)?.name || formData.creditor_code || '-'}
-                                            </span>
-                                            <span className="font-mono text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded">
-                                                {formData.creditor_code}
-                                            </span>
-                                        </div>
-                                    ) : (
-                                        <select
-                                            required
-                                            value={formData.creditor_code}
-                                            onChange={(e) => setFormData({ ...formData, creditor_code: e.target.value })}
-                                            className="w-full border rounded-xl px-3.5 py-2.5 bg-white border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
-                                        >
-                                            <option value="">-- Pilih PBF / Distributor --</option>
-                                            {creditors.map((c) => (
-                                                <option key={c.code} value={c.code}>{c.name}</option>
-                                            ))}
-                                        </select>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Daftar Obat Yang Diretur */}
-                            <div>
-                                <div className="flex items-center justify-between mb-2">
-                                    <div>
-                                        <h4 className="font-bold text-slate-800 text-sm">
-                                            {entryType === 'invoice'
-                                                ? 'Pilih Obat Yang Akan Diretur dari Faktur Ini'
-                                                : 'Obat / Barang Yang Diretur'}
-                                        </h4>
-                                        {entryType === 'invoice' && (
-                                            <p className="text-[11px] text-slate-500">
-                                                Centang obat yang ingin diretur dan sesuaikan jumlah retur (maksimal sejumlah barang di faktur). Detail obat, batch & harga dikunci sesuai faktur asli.
-                                            </p>
-                                        )}
-                                    </div>
-
-                                    {entryType === 'manual' && (
-                                        <div className="relative">
-                                            <input
-                                                type="text"
-                                                placeholder="Ketik & pilih obat dari master..."
-                                                value={medSearchQuery}
-                                                onChange={(e) => setMedSearchQuery(e.target.value)}
-                                                className="border border-slate-200 rounded-xl px-3 py-1.5 text-xs w-64 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                            />
-                                            {medSearchResults.length > 0 && (
-                                                <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-20 w-88 max-h-56 overflow-y-auto">
-                                                    {medSearchResults.map((m) => (
-                                                        <button
-                                                            key={m.id}
-                                                            type="button"
-                                                            onClick={() => addManualItemRow(m)}
-                                                            className="w-full text-left px-3 py-2 hover:bg-blue-50 flex items-center justify-between border-b border-slate-100 last:border-b-0 text-xs"
-                                                        >
-                                                            <div className="flex-1 pr-2">
-                                                                <div className="font-bold text-slate-800">{m.name}</div>
-                                                                <div className="text-[10px] text-slate-400">
-                                                                    {m.factory_name ? `${m.factory_name} • ` : ''}{m.unit} • {formatRupiah(m.raw_price)}
-                                                                </div>
-                                                                {m.return_policy && (
-                                                                    <div className="mt-0.5">
-                                                                        <span className={`inline-block px-1.5 py-0.2 rounded text-[9px] font-bold border ${m.return_policy.badge}`}>
-                                                                            {m.return_policy.label}
-                                                                        </span>
+                                        {entryType === 'manual' && (
+                                            <div className="relative">
+                                                <input
+                                                    type="text"
+                                                    placeholder="Ketik & pilih obat dari master..."
+                                                    value={medSearchQuery}
+                                                    onChange={(e) => setMedSearchQuery(e.target.value)}
+                                                    className="border border-slate-200 rounded-xl px-3 py-1.5 text-xs w-64 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                />
+                                                {medSearchResults.length > 0 && (
+                                                    <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-20 w-88 max-h-56 overflow-y-auto">
+                                                        {medSearchResults.map((m) => (
+                                                            <button
+                                                                key={m.id}
+                                                                type="button"
+                                                                onClick={() => addManualItemRow(m)}
+                                                                className="w-full text-left px-3 py-2 hover:bg-blue-50 flex items-center justify-between border-b border-slate-100 last:border-b-0 text-xs"
+                                                            >
+                                                                <div className="flex-1 pr-2">
+                                                                    <div className="font-bold text-slate-800">{m.name}</div>
+                                                                    <div className="text-[10px] text-slate-400">
+                                                                        {m.factory_name ? `${m.factory_name} • ` : ''}{m.unit} • {formatRupiah(m.raw_price)}
                                                                     </div>
-                                                                )}
-                                                            </div>
-                                                            <Plus className="w-4 h-4 text-blue-600 shrink-0" />
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="border border-slate-200 rounded-xl overflow-hidden">
-                                    <table className="w-full text-left text-xs text-slate-600">
-                                        <thead className="bg-slate-100 text-slate-700 font-semibold uppercase text-[10px]">
-                                            <tr>
-                                                {entryType === 'invoice' && (
-                                                    <th className="py-2.5 px-3 w-10 text-center">
-                                                        <input
-                                                            type="checkbox"
-                                                            title="Pilih Semua"
-                                                            onChange={(e) => toggleSelectAll(e.target.checked)}
-                                                            className="rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
-                                                        />
-                                                    </th>
+                                                                    {m.return_policy && (
+                                                                        <div className="mt-0.5">
+                                                                            <span className={`inline-block px-1.5 py-0.2 rounded text-[9px] font-bold border ${m.return_policy.badge}`}>
+                                                                                {m.return_policy.label}
+                                                                            </span>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                                <Plus className="w-4 h-4 text-blue-600 shrink-0" />
+                                                            </button>
+                                                        ))}
+                                                    </div>
                                                 )}
-                                                <th className="py-2.5 px-3">Nama Obat</th>
-                                                <th className="py-2.5 px-2 w-36 text-center">Ketentuan Retur</th>
-                                                <th className="py-2.5 px-2 w-24 text-center">
-                                                    {entryType === 'invoice' ? 'Qty Retur / Faktur' : 'Jumlah'}
-                                                </th>
-                                                <th className="py-2.5 px-2 w-16 text-center">Satuan</th>
-                                                <th className="py-2.5 px-2 w-28">Batch</th>
-                                                <th className="py-2.5 px-2 w-28">Expired Date</th>
-                                                <th className="py-2.5 px-2 w-24 text-right">Harga Beli</th>
-                                                <th className="py-2.5 px-2 w-32">Keterangan</th>
-                                                <th className="py-2.5 px-2 w-10"></th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-100">
-                                            {formData.items.length === 0 ? (
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="border border-slate-200 rounded-xl overflow-hidden">
+                                        <table className="w-full text-left text-xs text-slate-600">
+                                            <thead className="bg-slate-100 text-slate-700 font-semibold uppercase text-[10px]">
                                                 <tr>
-                                                    <td colSpan={entryType === 'invoice' ? 10 : 9} className="text-center py-8 text-slate-400">
-                                                        {entryType === 'invoice'
-                                                            ? 'Cari dan pilih nomor faktur penerimaan di atas untuk memuat daftar obat.'
-                                                            : (
-                                                                <>
-                                                                    Belum ada obat yang dimasukkan. Cari obat di atas atau klik{' '}
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => addManualItemRow()}
-                                                                        className="text-blue-600 font-bold underline"
-                                                                    >
-                                                                        + Tambah Baris Kosong
-                                                                    </button>
-                                                                </>
-                                                            )}
-                                                    </td>
+                                                    {entryType === 'invoice' && (
+                                                        <th className="py-2.5 px-3 w-10 text-center">
+                                                            <input
+                                                                type="checkbox"
+                                                                title="Pilih Semua"
+                                                                onChange={(e) => toggleSelectAll(e.target.checked)}
+                                                                className="rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                                            />
+                                                        </th>
+                                                    )}
+                                                    <th className="py-2.5 px-3">Nama Obat</th>
+                                                    <th className="py-2.5 px-2 w-36 text-center">Ketentuan Retur</th>
+                                                    <th className="py-2.5 px-2 w-24 text-center">
+                                                        {entryType === 'invoice' ? 'Qty Retur / Faktur' : 'Jumlah'}
+                                                    </th>
+                                                    <th className="py-2.5 px-2 w-16 text-center">Satuan</th>
+                                                    <th className="py-2.5 px-2 w-28">Batch</th>
+                                                    <th className="py-2.5 px-2 w-28">Expired Date</th>
+                                                    <th className="py-2.5 px-2 w-24 text-right">Harga Beli</th>
+                                                    <th className="py-2.5 px-2 w-32">Keterangan</th>
+                                                    <th className="py-2.5 px-2 w-10"></th>
                                                 </tr>
-                                            ) : (
-                                                formData.items.map((row, idx) => {
-                                                    const isFromInvoice = entryType === 'invoice';
-                                                    return (
-                                                        <tr
-                                                            key={idx}
-                                                            className={`transition-colors ${
-                                                                isFromInvoice
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100">
+                                                {formData.items.length === 0 ? (
+                                                    <tr>
+                                                        <td colSpan={entryType === 'invoice' ? 10 : 9} className="text-center py-8 text-slate-400">
+                                                            {entryType === 'invoice'
+                                                                ? 'Cari dan pilih nomor faktur penerimaan di atas untuk memuat daftar obat.'
+                                                                : (
+                                                                    <>
+                                                                        Belum ada obat yang dimasukkan. Cari obat di atas atau klik{' '}
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => addManualItemRow()}
+                                                                            className="text-blue-600 font-bold underline"
+                                                                        >
+                                                                            + Tambah Baris Kosong
+                                                                        </button>
+                                                                    </>
+                                                                )}
+                                                        </td>
+                                                    </tr>
+                                                ) : (
+                                                    formData.items.map((row, idx) => {
+                                                        const isFromInvoice = entryType === 'invoice';
+                                                        return (
+                                                            <tr
+                                                                key={idx}
+                                                                className={`transition-colors ${isFromInvoice
                                                                     ? row.selected
                                                                         ? 'bg-blue-50/70 font-medium'
                                                                         : 'bg-white opacity-70 hover:opacity-100 hover:bg-slate-50'
                                                                     : 'hover:bg-slate-50'
-                                                            }`}
-                                                        >
-                                                            {isFromInvoice && (
-                                                                <td className="py-2 px-3 text-center">
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        checked={!!row.selected}
-                                                                        onChange={(e) => updateItemRow(idx, 'selected', e.target.checked)}
-                                                                        className="rounded text-blue-600 focus:ring-blue-500 cursor-pointer w-4 h-4"
-                                                                    />
-                                                                </td>
-                                                            )}
-                                                            <td className="py-2 px-3">
-                                                                {isFromInvoice ? (
-                                                                    <div>
-                                                                        <div className="font-bold text-slate-800 flex items-center gap-1.5">
-                                                                            <Lock className="w-3 h-3 text-slate-400 shrink-0" />
-                                                                            <span>{row.medicine_name}</span>
-                                                                        </div>
-                                                                        {row.factory_name && (
-                                                                            <div className="text-[10px] text-slate-400 font-medium pl-4.5">
-                                                                                Pabrik: {row.factory_name}
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-                                                                ) : (
-                                                                    <div>
+                                                                    }`}
+                                                            >
+                                                                {isFromInvoice && (
+                                                                    <td className="py-2 px-3 text-center">
                                                                         <input
-                                                                            type="text"
-                                                                            required
-                                                                            placeholder="Nama obat..."
-                                                                            value={row.medicine_name}
-                                                                            onChange={(e) => updateItemRow(idx, 'medicine_name', e.target.value)}
-                                                                            className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                                                            type="checkbox"
+                                                                            checked={!!row.selected}
+                                                                            onChange={(e) => updateItemRow(idx, 'selected', e.target.checked)}
+                                                                            className="rounded text-blue-600 focus:ring-blue-500 cursor-pointer w-4 h-4"
                                                                         />
-                                                                        {row.factory_name && (
-                                                                            <div className="text-[10px] text-slate-400 font-medium mt-0.5">
-                                                                                Pabrik: {row.factory_name}
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
+                                                                    </td>
                                                                 )}
-                                                            </td>
-                                                            <td className="py-2 px-2 text-center">
-                                                                {row.return_policy ? (
-                                                                    <div className="inline-flex flex-col items-center">
-                                                                        <span
-                                                                            className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold border ${row.return_policy.badge}`}
-                                                                            title={row.return_policy.message}
-                                                                        >
-                                                                            {row.return_policy.label}
-                                                                        </span>
-                                                                        {row.return_policy.policy?.notes && (
-                                                                            <span className="text-[9px] text-slate-500 mt-0.5 max-w-[120px] truncate" title={row.return_policy.policy.notes}>
-                                                                                {row.return_policy.policy.notes}
+                                                                <td className="py-2 px-3">
+                                                                    {isFromInvoice ? (
+                                                                        <div>
+                                                                            <div className="font-bold text-slate-800 flex items-center gap-1.5">
+                                                                                <Lock className="w-3 h-3 text-slate-400 shrink-0" />
+                                                                                <span>{row.medicine_name}</span>
+                                                                            </div>
+                                                                            {row.factory_name && (
+                                                                                <div className="text-[10px] text-slate-400 font-medium pl-4.5">
+                                                                                    Pabrik: {row.factory_name}
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div>
+                                                                            <input
+                                                                                type="text"
+                                                                                required
+                                                                                placeholder="Nama obat..."
+                                                                                value={row.medicine_name}
+                                                                                onChange={(e) => updateItemRow(idx, 'medicine_name', e.target.value)}
+                                                                                className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                                                            />
+                                                                            {row.factory_name && (
+                                                                                <div className="text-[10px] text-slate-400 font-medium mt-0.5">
+                                                                                    Pabrik: {row.factory_name}
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    )}
+                                                                </td>
+                                                                <td className="py-2 px-2 text-center">
+                                                                    {row.return_policy ? (
+                                                                        <div className="inline-flex flex-col items-center">
+                                                                            <span
+                                                                                className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold border ${row.return_policy.badge}`}
+                                                                                title={row.return_policy.message}
+                                                                            >
+                                                                                {row.return_policy.label}
+                                                                            </span>
+                                                                            {row.return_policy.policy?.notes && (
+                                                                                <span className="text-[9px] text-slate-500 mt-0.5 max-w-[120px] truncate" title={row.return_policy.policy.notes}>
+                                                                                    {row.return_policy.policy.notes}
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                    ) : (
+                                                                        <span className="text-slate-300 text-[10px]">-</span>
+                                                                    )}
+                                                                </td>
+                                                                <td className="py-2 px-2 text-center">
+                                                                    <div className="flex items-center justify-center gap-1">
+                                                                        <input
+                                                                            type="number"
+                                                                            min="0.1"
+                                                                            max={isFromInvoice ? (row.max_qty || 9999) : undefined}
+                                                                            step="any"
+                                                                            required
+                                                                            disabled={isFromInvoice && !row.selected}
+                                                                            value={row.qty === '' ? '' : row.qty}
+                                                                            onFocus={(e) => e.target.select()}
+                                                                            onChange={(e) => {
+                                                                                let raw = e.target.value;
+                                                                                if (raw === '') {
+                                                                                    updateItemRow(idx, 'qty', '');
+                                                                                    return;
+                                                                                }
+                                                                                let cleaned = raw.replace(/^0+(?=\d)/, '');
+                                                                                let val = parseFloat(cleaned);
+                                                                                if (isNaN(val)) val = 0;
+                                                                                if (isFromInvoice && row.max_qty && val > row.max_qty) {
+                                                                                    val = row.max_qty;
+                                                                                }
+                                                                                updateItemRow(idx, 'qty', val);
+                                                                            }}
+                                                                            className={`w-14 border rounded-lg px-1.5 py-1 text-xs text-center font-bold ${isFromInvoice && !row.selected
+                                                                                ? 'bg-slate-100 text-slate-400 border-slate-200'
+                                                                                : 'border-blue-300 text-blue-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500'
+                                                                                }`}
+                                                                        />
+                                                                        {isFromInvoice && (
+                                                                            <span className="text-[11px] text-slate-400 font-normal">
+                                                                                / {row.max_qty}
                                                                             </span>
                                                                         )}
                                                                     </div>
-                                                                ) : (
-                                                                    <span className="text-slate-300 text-[10px]">-</span>
-                                                                )}
-                                                            </td>
-                                                            <td className="py-2 px-2 text-center">
-                                                                <div className="flex items-center justify-center gap-1">
-                                                                    <input
-                                                                        type="number"
-                                                                        min="0.1"
-                                                                        max={isFromInvoice ? (row.max_qty || 9999) : undefined}
-                                                                        step="any"
-                                                                        required
-                                                                        disabled={isFromInvoice && !row.selected}
-                                                                        value={row.qty === '' ? '' : row.qty}
-                                                                        onFocus={(e) => e.target.select()}
-                                                                        onChange={(e) => {
-                                                                            let raw = e.target.value;
-                                                                            if (raw === '') {
-                                                                                updateItemRow(idx, 'qty', '');
-                                                                                return;
-                                                                            }
-                                                                            let cleaned = raw.replace(/^0+(?=\d)/, '');
-                                                                            let val = parseFloat(cleaned);
-                                                                            if (isNaN(val)) val = 0;
-                                                                            if (isFromInvoice && row.max_qty && val > row.max_qty) {
-                                                                                val = row.max_qty;
-                                                                            }
-                                                                            updateItemRow(idx, 'qty', val);
-                                                                        }}
-                                                                        className={`w-14 border rounded-lg px-1.5 py-1 text-xs text-center font-bold ${
-                                                                            isFromInvoice && !row.selected
-                                                                                ? 'bg-slate-100 text-slate-400 border-slate-200'
-                                                                                : 'border-blue-300 text-blue-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500'
-                                                                        }`}
-                                                                    />
-                                                                    {isFromInvoice && (
-                                                                        <span className="text-[11px] text-slate-400 font-normal">
-                                                                            / {row.max_qty}
+                                                                </td>
+                                                                <td className="py-2 px-2 text-center">
+                                                                    {isFromInvoice ? (
+                                                                        <span className="font-semibold text-slate-700 uppercase text-[11px]">
+                                                                            {row.unit || 'BOX'}
                                                                         </span>
+                                                                    ) : (
+                                                                        <select
+                                                                            value={row.unit}
+                                                                            onChange={(e) => updateItemRow(idx, 'unit', e.target.value)}
+                                                                            className="w-full border border-slate-200 rounded-lg px-1 py-1 text-xs text-center uppercase focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                                                        >
+                                                                            <option value="BOX">BOX</option>
+                                                                            <option value="BTL">BTL</option>
+                                                                            <option value="TUBE">TUBE</option>
+                                                                            <option value="PCS">PCS</option>
+                                                                            <option value="STRIP">STRIP</option>
+                                                                            <option value="AMP">AMP</option>
+                                                                            <option value="VIAL">VIAL</option>
+                                                                        </select>
                                                                     )}
-                                                                </div>
-                                                            </td>
-                                                            <td className="py-2 px-2 text-center">
-                                                                {isFromInvoice ? (
-                                                                    <span className="font-semibold text-slate-700 uppercase text-[11px]">
-                                                                        {row.unit || 'BOX'}
-                                                                    </span>
-                                                                ) : (
+                                                                </td>
+                                                                <td className="py-2 px-2">
+                                                                    {isFromInvoice ? (
+                                                                        <span className="font-mono text-slate-700 text-[11px]">
+                                                                            {row.batch_number || '-'}
+                                                                        </span>
+                                                                    ) : (
+                                                                        <input
+                                                                            type="text"
+                                                                            placeholder="No batch..."
+                                                                            value={row.batch_number}
+                                                                            onChange={(e) => updateItemRow(idx, 'batch_number', e.target.value)}
+                                                                            className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                                                        />
+                                                                    )}
+                                                                </td>
+                                                                <td className="py-2 px-2">
+                                                                    {isFromInvoice ? (
+                                                                        <span className="text-slate-700 text-[11px]">
+                                                                            {row.expired_date || '-'}
+                                                                        </span>
+                                                                    ) : (
+                                                                        <input
+                                                                            type="date"
+                                                                            value={row.expired_date}
+                                                                            onChange={(e) => updateItemRow(idx, 'expired_date', e.target.value)}
+                                                                            className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                                                        />
+                                                                    )}
+                                                                </td>
+                                                                <td className="py-2 px-2 text-right">
+                                                                    {isFromInvoice ? (
+                                                                        <span className="font-mono text-slate-800 font-semibold text-[11px]">
+                                                                            {formatRupiah(row.unit_price)}
+                                                                        </span>
+                                                                    ) : (
+                                                                        <input
+                                                                            type="number"
+                                                                            min="0"
+                                                                            value={row.unit_price === '' ? '' : row.unit_price}
+                                                                            onFocus={(e) => e.target.select()}
+                                                                            onChange={(e) => {
+                                                                                let raw = e.target.value;
+                                                                                if (raw === '') {
+                                                                                    updateItemRow(idx, 'unit_price', '');
+                                                                                    return;
+                                                                                }
+                                                                                let cleaned = raw.replace(/^0+(?=\d)/, '');
+                                                                                let val = parseFloat(cleaned);
+                                                                                updateItemRow(idx, 'unit_price', isNaN(val) ? 0 : val);
+                                                                            }}
+                                                                            className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs text-right font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                                                        />
+                                                                    )}
+                                                                </td>
+                                                                <td className="py-2 px-2">
                                                                     <select
-                                                                        value={row.unit}
-                                                                        onChange={(e) => updateItemRow(idx, 'unit', e.target.value)}
-                                                                        className="w-full border border-slate-200 rounded-lg px-1 py-1 text-xs text-center uppercase focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                                                        disabled={isFromInvoice && !row.selected}
+                                                                        value={row.reason}
+                                                                        onChange={(e) => updateItemRow(idx, 'reason', e.target.value)}
+                                                                        className="w-full border border-slate-200 rounded-lg px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
                                                                     >
-                                                                        <option value="BOX">BOX</option>
-                                                                        <option value="BTL">BTL</option>
-                                                                        <option value="TUBE">TUBE</option>
-                                                                        <option value="PCS">PCS</option>
-                                                                        <option value="STRIP">STRIP</option>
-                                                                        <option value="AMP">AMP</option>
-                                                                        <option value="VIAL">VIAL</option>
+                                                                        <option value="ED DEKAT">ED DEKAT</option>
+                                                                        <option value="SALAH PESAN">SALAH PESAN</option>
+                                                                        <option value="DISKON TIDAK SESUAI">DISKON TIDAK SESUAI</option>
+                                                                        <option value="TERDOUBLE">TERDOUBLE</option>
+                                                                        <option value="PESAN YANG INJ">PESAN YANG INJ</option>
+                                                                        <option value="RUSAK">RUSAK</option>
                                                                     </select>
-                                                                )}
-                                                            </td>
-                                                            <td className="py-2 px-2">
-                                                                {isFromInvoice ? (
-                                                                    <span className="font-mono text-slate-700 text-[11px]">
-                                                                        {row.batch_number || '-'}
-                                                                    </span>
-                                                                ) : (
-                                                                    <input
-                                                                        type="text"
-                                                                        placeholder="No batch..."
-                                                                        value={row.batch_number}
-                                                                        onChange={(e) => updateItemRow(idx, 'batch_number', e.target.value)}
-                                                                        className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                                                    />
-                                                                )}
-                                                            </td>
-                                                            <td className="py-2 px-2">
-                                                                {isFromInvoice ? (
-                                                                    <span className="text-slate-700 text-[11px]">
-                                                                        {row.expired_date || '-'}
-                                                                    </span>
-                                                                ) : (
-                                                                    <input
-                                                                        type="date"
-                                                                        value={row.expired_date}
-                                                                        onChange={(e) => updateItemRow(idx, 'expired_date', e.target.value)}
-                                                                        className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                                                    />
-                                                                )}
-                                                            </td>
-                                                            <td className="py-2 px-2 text-right">
-                                                                {isFromInvoice ? (
-                                                                    <span className="font-mono text-slate-800 font-semibold text-[11px]">
-                                                                        {formatRupiah(row.unit_price)}
-                                                                    </span>
-                                                                ) : (
-                                                                    <input
-                                                                        type="number"
-                                                                        min="0"
-                                                                        value={row.unit_price === '' ? '' : row.unit_price}
-                                                                        onFocus={(e) => e.target.select()}
-                                                                        onChange={(e) => {
-                                                                            let raw = e.target.value;
-                                                                            if (raw === '') {
-                                                                                updateItemRow(idx, 'unit_price', '');
-                                                                                return;
-                                                                            }
-                                                                            let cleaned = raw.replace(/^0+(?=\d)/, '');
-                                                                            let val = parseFloat(cleaned);
-                                                                            updateItemRow(idx, 'unit_price', isNaN(val) ? 0 : val);
-                                                                        }}
-                                                                        className="w-full border border-slate-200 rounded-lg px-2 py-1 text-xs text-right font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                                                    />
-                                                                )}
-                                                            </td>
-                                                            <td className="py-2 px-2">
-                                                                <select
-                                                                    disabled={isFromInvoice && !row.selected}
-                                                                    value={row.reason}
-                                                                    onChange={(e) => updateItemRow(idx, 'reason', e.target.value)}
-                                                                    className="w-full border border-slate-200 rounded-lg px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
-                                                                >
-                                                                    <option value="ED DEKAT">ED DEKAT</option>
-                                                                    <option value="SALAH PESAN">SALAH PESAN</option>
-                                                                    <option value="DISKON TIDAK SESUAI">DISKON TIDAK SESUAI</option>
-                                                                    <option value="TERDOUBLE">TERDOUBLE</option>
-                                                                    <option value="PESAN YANG INJ">PESAN YANG INJ</option>
-                                                                    <option value="RUSAK">RUSAK</option>
-                                                                </select>
-                                                            </td>
-                                                            <td className="py-2 px-2 text-center">
-                                                                {!isFromInvoice && (
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => removeItemRow(idx)}
-                                                                        className="p-1 text-slate-400 hover:text-rose-600 rounded-lg"
-                                                                    >
-                                                                        <Trash2 className="w-3.5 h-3.5" />
-                                                                    </button>
-                                                                )}
-                                                            </td>
-                                                        </tr>
-                                                    );
-                                                })
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
-                                {entryType === 'manual' && (
-                                    <div className="mt-2 flex justify-end">
-                                        <button
-                                            type="button"
-                                            onClick={() => addManualItemRow()}
-                                            className="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1"
-                                        >
-                                            <Plus className="w-3.5 h-3.5" /> Tambah Baris Obat Lain
-                                        </button>
+                                                                </td>
+                                                                <td className="py-2 px-2 text-center">
+                                                                    {!isFromInvoice && (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => removeItemRow(idx)}
+                                                                            className="p-1 text-slate-400 hover:text-rose-600 rounded-lg"
+                                                                        >
+                                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                                        </button>
+                                                                    )}
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })
+                                                )}
+                                            </tbody>
+                                        </table>
                                     </div>
-                                )}
-                            </div>
+                                    {entryType === 'manual' && (
+                                        <div className="mt-2 flex justify-end">
+                                            <button
+                                                type="button"
+                                                onClick={() => addManualItemRow()}
+                                                className="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                                            >
+                                                <Plus className="w-3.5 h-3.5" /> Tambah Baris Obat Lain
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
 
-                            {/* Catatan / Keterangan Umum */}
-                            <div>
-                                <label className="block font-semibold text-slate-700 mb-1">Catatan Tambahan (Opsional)</label>
-                                <textarea
-                                    rows="2"
-                                    placeholder="Contoh: Titipan retur sudah diserahkan ke sales saat kunjungan..."
-                                    value={formData.notes}
-                                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                                    className="w-full border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
-                            </div>
+                                {/* Catatan / Keterangan Umum */}
+                                <div>
+                                    <label className="block font-semibold text-slate-700 mb-1">Catatan Tambahan (Opsional)</label>
+                                    <textarea
+                                        rows="2"
+                                        placeholder="Contoh: Titipan retur sudah diserahkan ke sales saat kunjungan..."
+                                        value={formData.notes}
+                                        onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                                        className="w-full border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
+                                </div>
                             </div>
 
                             {/* Modal Footer (Fixed at bottom) */}
