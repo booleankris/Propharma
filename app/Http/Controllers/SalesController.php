@@ -637,6 +637,14 @@ class SalesController extends Controller
         });
         $transaction->load('medicine');
 
+        $activeCart = MedicineCart::where('transaction_id', $transaction->transaction_id)
+            ->where('user_id', auth()->id())
+            ->where('status', '0');
+        $total_transaction = (float) $activeCart->sum('final_price');
+        $total_discount = (float) $activeCart->sum('discount');
+        $totalboughtCalc = (clone $activeCart)->selectRaw('SUM(total_price) as total_price, SUM(embalase) as embalase')->first();
+        $total_raw = (float) ($totalboughtCalc->total_price ?? 0) + (float) ($totalboughtCalc->embalase ?? 0);
+
         return response()->json([
             'id' => $transaction->id,
             'name' => $transaction->medicine->name,
@@ -647,8 +655,12 @@ class SalesController extends Controller
             'discount' => $transaction->discount,
             'total_price' => $transaction->total_price,
             'embalase' => $transaction->embalase,
+            'service_fee' => $transaction->service_fee,
             'final_price' => $transaction->final_price,
             'cart_type' => $transaction->cart_type,
+            'total_transaction' => $total_transaction,
+            'total_discount' => $total_discount,
+            'totalbought' => $total_raw,
             'remove_url' => route('sales.removeItem', $transaction->id),
         ]);
     }
@@ -1320,18 +1332,26 @@ class SalesController extends Controller
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            $latestRecipeItem = MedicineCart::where('transaction_id', $parentTransaction->id)
+            $openRecipeItem = MedicineCart::where('transaction_id', $parentTransaction->id)
+                ->where('user_id', auth()->id())
+                ->where('status', 0)
+                ->whereNotNull('recipe_number')
+                ->where('recipe_status', 0)
+                ->latest('id')
+                ->first();
+
+            $targetRecipeItem = $openRecipeItem ?? MedicineCart::where('transaction_id', $parentTransaction->id)
                 ->where('user_id', auth()->id())
                 ->where('status', 0)
                 ->whereNotNull('recipe_number')
                 ->latest('id')
                 ->first();
 
-            if (!$latestRecipeItem) {
+            if (!$targetRecipeItem) {
                 abort(422, 'Tidak ada racikan aktif yang dapat diselesaikan.');
             }
 
-            $recipeNumber = $latestRecipeItem->recipe_number;
+            $recipeNumber = $targetRecipeItem->recipe_number;
             $recipeItems = MedicineCart::where('transaction_id', $parentTransaction->id)
                 ->where('user_id', auth()->id())
                 ->where('status', 0)

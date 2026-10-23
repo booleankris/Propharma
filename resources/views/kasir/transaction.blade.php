@@ -3759,10 +3759,21 @@
                     const item = response.data;
                     let recipe_row = "";
 
-                    totaltransaction += total_price;
-                    totalbought = parseFloat(totalbought) + parseFloat(grossprice);
-                    total_discount += parseFloat(discount);
-                    // price2 = formatRupiah(totaltransaction);
+                    if (response.data.total_transaction !== undefined) {
+                        totaltransaction = parseFloat(response.data.total_transaction);
+                    } else {
+                        totaltransaction += parseFloat(item.final_price ?? total_price);
+                    }
+                    if (response.data.totalbought !== undefined) {
+                        totalbought = parseFloat(response.data.totalbought);
+                    } else {
+                        totalbought = parseFloat(totalbought) + parseFloat(item.final_price ?? grossprice);
+                    }
+                    if (response.data.total_discount !== undefined) {
+                        total_discount = parseFloat(response.data.total_discount);
+                    } else {
+                        total_discount += parseFloat(discount || 0);
+                    }
                     // Reset input fields
                     [stock, unit, quantity, price, name, totalprice].forEach(el => el.value = "");
                     discount = "";
@@ -3801,6 +3812,7 @@
                         recipe_row = "bg-[#eefff8]";
                     }
 
+                    const itemEmbalase = parseFloat(item.embalase || item.service_fee || 0);
                     document.getElementById('carts').insertAdjacentHTML('beforeend', `
                     <tr id="itemincart${item.id}" data-id="${item.id}" 
                         class="cart-row border-b ${recipe_row} hover:bg-blue-50 transition text-[10px] cursor-pointer">
@@ -3815,7 +3827,7 @@
                         <td class="px-1 py-1 text-center">${formatRupiah(item.discount)}</td>
                         <td class="px-1 py-1 text-center">${formatRupiah(item.total_price)}</td>
                         ${(currenttransaction === 'RESEP TUNAI' || currenttransaction === 'KREDIT')
-                            ? `<td class="px-1 py-1 text-center clEmbalase">${formatRupiah(item.jasa)}</td>`
+                            ? `<td class="px-1 py-1 text-center clEmbalase">${formatRupiah(itemEmbalase)}</td>`
                             : ''
                         }
                         <td class="px-1 py-1 text-center clFinalprice font-semibold text-blue-600">
@@ -5780,8 +5792,11 @@
     }
 
     function sendEmbalase(valEmbalase) {
-        var valEmbalase = document.getElementById('jasa').value;
-        let jasaValue = parseInt(valEmbalase.replace(/[^0-9]/g, ""), 10);
+        const rawVal = valEmbalase !== undefined && valEmbalase !== null
+            ? String(valEmbalase)
+            : (document.getElementById('jasa')?.value || "0");
+        const cleanedDigits = rawVal.replace(/[^0-9]/g, "");
+        const jasaValue = cleanedDigits !== "" ? parseInt(cleanedDigits, 10) : 0;
         axios.post("{{ route('sales.sendembalase') }}", {
             jasaValue,
             transaction_id,
@@ -5805,27 +5820,31 @@
                 recipeRow.querySelector('.clFinalprice')?.replaceChildren(formatRupiah(racikembalaseprice));
             }
 
-            document.getElementById('jasa').value = "";
-            document.getElementById('dosage_r2').value = "Tidak";
-            checkbox.checked = false;
-            checkbox.dispatchEvent(new Event('change'));
-            document.getElementById('productSearch').focus();
+            if (document.getElementById('jasa')) document.getElementById('jasa').value = "";
+            if (document.getElementById('dosage_r2')) document.getElementById('dosage_r2').value = "Tidak";
+            if (checkbox) {
+                checkbox.checked = false;
+                checkbox.dispatchEvent(new Event('change'));
+            }
+            document.getElementById('productSearch')?.focus();
             totaltransaction = response.data.totaltransaction;
             const roundedtotal = roundUpToNearestThousand(totaltransaction);
-            cartTotalInput.value = formatRupiah(roundedtotal);
-            subtotalpreview.value = formatRupiah(roundedtotal);
+            if (cartTotalInput) cartTotalInput.value = formatRupiah(roundedtotal);
+            if (subtotalpreview) subtotalpreview.value = formatRupiah(roundedtotal);
 
             console.log('Before:', totaltransaction);
             console.log('After:', roundUpToNearestThousand(totaltransaction));
 
             totalbought = response.data.totalbought;
-            previewtransactiontotal.value = formatRupiah(totaltransaction);
-            payment_total.value = formatRupiah(totalbought);
+            if (previewtransactiontotal) previewtransactiontotal.value = formatRupiah(totaltransaction);
+            if (payment_total) payment_total.value = formatRupiah(totalbought);
 
 
         }).catch(error => {
             console.error("Error Updating Embalase:", error.response ? error.response.data : error.message);
-            alert(error.response?.data?.message || 'Racikan gagal diselesaikan. Periksa kembali item racikan yang aktif.');
+            const serverMsg = error.response?.data?.message;
+            const validationErrors = error.response?.data?.errors ? Object.values(error.response.data.errors).flat().join(', ') : '';
+            alert(serverMsg || validationErrors || (error.response ? `Gagal (${error.response.status}): Periksa kembali item racikan yang aktif.` : error.message));
         });
 
     }
@@ -5890,7 +5909,8 @@
                         focusConfirm: true,
                         allowOutsideClick: false,
                     }).then(() => {
-                        sendEmbalase(this.value);
+                        const jasaInputVal = document.getElementById('jasa').value;
+                        sendEmbalase(jasaInputVal);
                         document.getElementById('package').value = "";
                     });
                 }
