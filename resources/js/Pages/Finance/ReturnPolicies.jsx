@@ -17,6 +17,14 @@ export default function ReturnPolicies({ policies, filters, stats, creditors, fa
     const [editingPolicy, setEditingPolicy] = useState(null);
 
     // Form state
+    const toSecureUrl = (url) => {
+        if (!url) return null;
+        if (typeof window !== 'undefined' && window.location.protocol === 'https:' && url.startsWith('http://')) {
+            return url.replace('http://', 'https://');
+        }
+        return url;
+    };
+
     const [formData, setFormData] = useState({
         factory_id: '',
         factory_name: '',
@@ -307,7 +315,7 @@ export default function ReturnPolicies({ policies, filters, stats, creditors, fa
                                     <button
                                         key={i}
                                         disabled={!link.url || link.active}
-                                        onClick={() => link.url && router.get(link.url, {}, { preserveState: true })}
+                                        onClick={() => link.url && router.get(toSecureUrl(link.url), {}, { preserveState: true })}
                                         className={`px-3 py-1.5 rounded-lg font-medium transition-all ${link.active
                                                 ? 'bg-blue-600 text-white font-bold'
                                                 : link.url
