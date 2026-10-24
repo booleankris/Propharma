@@ -114,12 +114,19 @@ class FinanceController extends Controller
         usort($upcomingHutang, fn($a, $b) => $a['diff_raw'] <=> $b['diff_raw']);
         $upcomingHutang = array_slice($upcomingHutang, 0, 5);
 
+        $branchContext = $this->getBranchContext();
+        $pharmacyId = $branchContext['activePharmacy']['id'] ?? null;
+        $returAlertService = new \App\Services\Finance\PurchaseReturnAlertService();
+        $returAlertStats = $returAlertService->getQuickSummary($pharmacyId);
+
         return Inertia::render('Finance/Dashboard', [
-            'stats' => $stats,
+            'stats' => array_merge($stats, [
+                'returAlert' => $returAlertStats,
+            ]),
             'recentMutasi' => $recentMutasi,
             'upcomingHutang' => $upcomingHutang,
             'accounts' => $accounts,
-            'branchContext' => $this->getBranchContext(),
+            'branchContext' => $branchContext,
         ]);
     }
 

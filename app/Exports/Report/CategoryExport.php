@@ -158,7 +158,7 @@ class CategoryExport implements FromArray, WithStyles, WithColumnWidths, WithTit
                 }
 
                 $grouped[$category]['qty']   += (float) ($item->quantity ?? 0);
-                $grouped[$category]['total'] += (int) ($item->final_price ?? 0);
+                $grouped[$category]['total'] += (int) round((float) ($item->final_price ?? 0));
             }
         }
 
@@ -258,7 +258,7 @@ class CategoryExport implements FromArray, WithStyles, WithColumnWidths, WithTit
                 }
 
                 $grouped[$key]['qty']   += (float) ($item->quantity ?? 0);
-                $grouped[$key]['total'] += (int) ($item->final_price ?? 0);
+                $grouped[$key]['total'] += (int) round((float) ($item->final_price ?? 0));
             }
         }
 

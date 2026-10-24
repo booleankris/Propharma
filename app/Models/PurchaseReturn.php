@@ -22,6 +22,8 @@ class PurchaseReturn extends Model
         'receiving_id',
         'total_amount',
         'status',
+        'status_date',
+        'confirmed_date',
         'pickup_date',
         'deduction_status',
         'deduction_date',
@@ -33,6 +35,8 @@ class PurchaseReturn extends Model
     protected $casts = [
         'invoice_date' => 'date',
         'received_date' => 'date',
+        'status_date' => 'date',
+        'confirmed_date' => 'date',
         'pickup_date' => 'date',
         'deduction_date' => 'date',
         'total_amount' => 'decimal:2',

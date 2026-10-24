@@ -3,13 +3,18 @@
 namespace App\Http\Controllers\Finance;
 
 use App\Http\Controllers\Controller;
+use App\Models\Batches;
 use App\Models\Creditor;
+use App\Models\FinanceAccount;
+use App\Models\FinancePayment;
+use App\Models\ItemsLog;
 use App\Models\Medicines;
 use App\Models\Pharmacies;
 use App\Models\PurchaseReturn;
 use App\Models\PurchaseReturnItem;
 use App\Models\ReceivingDetails;
 use App\Models\ReturnPolicy;
+use App\Support\ReceivingInvoiceTotals;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -254,14 +259,10 @@ class PurchaseReturnController extends Controller
         }
 
         if ($statusFilter !== '') {
-            if ($statusFilter === 'sudah_potong') {
-                $itemsQuery->whereNotNull('purchase_return_items.deduction_note')
-                    ->where('purchase_return_items.deduction_note', '!=', '');
+            if (in_array($statusFilter, ['diajukan', 'dikonfirmasi', 'sudah_potong', 'barang_kembali_pmi'], true)) {
+                $itemsQuery->where('purchase_return_items.status', $statusFilter);
             } elseif ($statusFilter === 'belum_potong') {
-                $itemsQuery->where(function ($q) {
-                    $q->whereNull('purchase_return_items.deduction_note')
-                        ->orWhere('purchase_return_items.deduction_note', '');
-                });
+                $itemsQuery->where('purchase_return_items.status', '!=', 'sudah_potong');
             } elseif ($statusFilter === 'sudah_ambil') {
                 $itemsQuery->whereNotNull('purchase_return_items.pickup_date');
             } elseif ($statusFilter === 'belum_ambil') {
@@ -290,17 +291,23 @@ class PurchaseReturnController extends Controller
 
             $item->factory_name = $factoryName;
             $item->return_policy_info = $evaluation;
+            $item->formatted_expired_date = $item->expired_date ? Carbon::parse($item->expired_date)->format('d/m/Y') : '-';
+            $item->formatted_invoice_date = ($item->purchaseReturn && $item->purchaseReturn->invoice_date) ? Carbon::parse($item->purchaseReturn->invoice_date)->format('d/m/Y') : '-';
+            $item->formatted_status_date = $item->status_date ? Carbon::parse($item->status_date)->format('d/m/Y') : ($item->created_at ? $item->created_at->format('d/m/Y') : '-');
+            $item->formatted_pickup_date = $item->pickup_date ? Carbon::parse($item->pickup_date)->format('d/m/Y') : null;
+            $item->formatted_confirmed_date = $item->confirmed_date ? Carbon::parse($item->confirmed_date)->format('d/m/Y') : null;
             return $item;
         });
 
         // Metrik Monitoring
         $totalItemsCount = PurchaseReturnItem::count();
         $totalReturValue = (float) PurchaseReturnItem::sum('subtotal');
-        $sudahPotongCount = PurchaseReturnItem::whereNotNull('deduction_note')->where('deduction_note', '!=', '')->count();
-        $belumPotongCount = PurchaseReturnItem::where(function ($q) {
-            $q->whereNull('deduction_note')->orWhere('deduction_note', '');
+        $diajukanCount = PurchaseReturnItem::where(function ($q) {
+            $q->where('status', 'diajukan')->orWhereNull('status');
         })->count();
-        $sudahDiambilCount = PurchaseReturnItem::whereNotNull('pickup_date')->count();
+        $dikonfirmasiCount = PurchaseReturnItem::where('status', 'dikonfirmasi')->count();
+        $sudahPotongCount = PurchaseReturnItem::where('status', 'sudah_potong')->count();
+        $pmiCount = PurchaseReturnItem::where('status', 'barang_kembali_pmi')->count();
 
         $creditors = Creditor::select('code', 'name')
             ->whereNotNull('code')
@@ -308,7 +315,21 @@ class PurchaseReturnController extends Controller
             ->orderBy('name')
             ->get();
 
+        $activeTab = $request->query('tab', 'monitoring');
+
+        $approachingFilters = [
+            'search' => $request->query('approaching_search', ''),
+            'creditor_code' => $request->query('approaching_creditor', ''),
+            'urgency' => $request->query('approaching_urgency', ''),
+        ];
+
+        $alertService = new \App\Services\Finance\PurchaseReturnAlertService();
+        $branchContext = $this->getBranchContext();
+        $pharmacyId = $branchContext['activePharmacy']['id'] ?? null;
+        $approachingResult = $alertService->getApproachingReturns($pharmacyId, $approachingFilters, 25);
+
         return Inertia::render('Finance/PurchaseReturns', [
+            'activeTab' => $activeTab,
             'items' => $items,
             'filters' => [
                 'search' => $search,
@@ -320,12 +341,18 @@ class PurchaseReturnController extends Controller
             'stats' => [
                 'total_items' => $totalItemsCount,
                 'total_value' => $totalReturValue,
+                'diajukan' => $diajukanCount,
+                'dikonfirmasi' => $dikonfirmasiCount,
                 'sudah_potong' => $sudahPotongCount,
-                'belum_potong' => $belumPotongCount,
-                'sudah_diambil' => $sudahDiambilCount,
+                'barang_kembali_pmi' => $pmiCount,
+                'approaching_count' => $approachingResult['stats']['total_count'] ?? 0,
+                'eligible_count' => $approachingResult['stats']['eligible_count'] ?? 0,
             ],
+            'approachingItems' => $approachingResult['data'],
+            'approachingStats' => $approachingResult['stats'],
+            'approachingFilters' => $approachingFilters,
             'creditors' => $creditors,
-            'branchContext' => $this->getBranchContext(),
+            'branchContext' => $branchContext,
         ]);
     }
 
@@ -370,6 +397,7 @@ class PurchaseReturnController extends Controller
 
     /**
      * Ambil rincian obat dari faktur penerimaan
+     * Mengunci obat yang sudah pernah diretur untuk faktur ini
      */
     public function getInvoiceItems($id)
     {
@@ -390,6 +418,8 @@ class PurchaseReturnController extends Controller
                 'receiving_items.qty_received',
                 'receiving_items.qty',
                 'receiving_items.raw_price',
+                'receiving_items.discount',
+                'receiving_items.extra_discount',
                 'receiving_items.total',
                 'batches.id as batch_id',
                 'batches.stock as current_stock',
@@ -403,9 +433,30 @@ class PurchaseReturnController extends Controller
 
         $policies = ReturnPolicy::where('creditor_code', $receivingDetail->creditor_code)->get();
 
-        $itemsWithPolicy = $items->map(function ($it) use ($receivingDetail, $policies) {
+        // Cari obat yang sudah pernah diretur pada faktur ini (kunci 1 faktur 1 obat hanya 1x retur)
+        $existingReturns = DB::table('purchase_return_items')
+            ->join('purchase_returns', 'purchase_return_items.purchase_return_id', '=', 'purchase_returns.id')
+            ->where(function ($q) use ($receivingDetail) {
+                $q->where('purchase_returns.invoice_number', $receivingDetail->invoice_number)
+                    ->orWhere('purchase_returns.receiving_id', $receivingDetail->id);
+            })
+            ->where('purchase_returns.status', '!=', 'dibatalkan')
+            ->get(['purchase_return_items.medicine_id', 'purchase_return_items.medicine_name', 'purchase_returns.return_no']);
+
+        $returnedMedicineIds = $existingReturns->pluck('medicine_id')->filter()->all();
+        $returnedMedicineNames = $existingReturns->pluck('medicine_name')->map(fn($n) => strtoupper(trim($n)))->all();
+
+        $itemsWithPolicy = $items->map(function ($it) use ($receivingDetail, $policies, $returnedMedicineIds, $returnedMedicineNames) {
             $policy = $this->findReturnPolicy($receivingDetail->creditor_code, $it->factory_id, $it->factory_name, $policies);
             $evaluation = $this->evaluateReturnEligibility($policy, $it->expired_date);
+
+            $isAlreadyReturned = ($it->medicine_id && in_array($it->medicine_id, $returnedMedicineIds))
+                || in_array(strtoupper(trim($it->medicine_name)), $returnedMedicineNames);
+
+            // Hitung harga satuan konsisten dengan penerimaan (termasuk diskon / PPN baris penerimaan)
+            $qtyReceived = (float) ($it->qty_received ?: $it->qty ?: 1);
+            $lineAmounts = ReceivingInvoiceTotals::lineAmounts($it, $receivingDetail->invoice_ppn);
+            $consistentUnitPrice = $qtyReceived > 0 ? round($lineAmounts['total'] / $qtyReceived, 2) : (float) $it->raw_price;
 
             return [
                 'ri_id' => $it->ri_id,
@@ -414,7 +465,8 @@ class PurchaseReturnController extends Controller
                 'qty_received' => $it->qty_received,
                 'qty' => $it->qty,
                 'raw_price' => $it->raw_price,
-                'total' => $it->total,
+                'unit_price' => $consistentUnitPrice,
+                'total' => $lineAmounts['total'],
                 'batch_id' => $it->batch_id,
                 'current_stock' => $it->current_stock,
                 'medicine_id' => $it->medicine_id,
@@ -423,6 +475,7 @@ class PurchaseReturnController extends Controller
                 'factory_id' => $it->factory_id,
                 'factory_name' => $it->factory_name,
                 'return_policy' => $evaluation,
+                'is_already_returned' => $isAlreadyReturned,
             ];
         });
 
@@ -484,6 +537,8 @@ class PurchaseReturnController extends Controller
 
     /**
      * Simpan input retur pembelian baru (Bisa custom/manual atau dari faktur sistem)
+     * Mengunci 1 faktur 1 obat hanya bisa dikembalikan 1 kali
+     * Status default: 'diajukan' (Diajukan Retur)
      */
     public function store(Request $request)
     {
@@ -507,13 +562,41 @@ class PurchaseReturnController extends Controller
             'items.*.deduction_note' => 'nullable|string|max:255',
         ]);
 
+        $invoiceNumber = trim($validated['invoice_number']);
+
+        // Kunci jika obat sudah pernah diajukan retur pada faktur tersebut
+        $existingReturns = DB::table('purchase_return_items')
+            ->join('purchase_returns', 'purchase_return_items.purchase_return_id', '=', 'purchase_returns.id')
+            ->where(function ($q) use ($invoiceNumber, $validated) {
+                $q->where('purchase_returns.invoice_number', $invoiceNumber);
+                if (!empty($validated['receiving_id'])) {
+                    $q->orWhere('purchase_returns.receiving_id', $validated['receiving_id']);
+                }
+            })
+            ->where('purchase_returns.status', '!=', 'dibatalkan')
+            ->get(['purchase_return_items.medicine_id', 'purchase_return_items.medicine_name']);
+
+        $existingMedIds = $existingReturns->pluck('medicine_id')->filter()->all();
+        $existingMedNames = $existingReturns->pluck('medicine_name')->map(fn($n) => strtoupper(trim($n)))->all();
+
+        foreach ($validated['items'] as $it) {
+            $mId = $it['medicine_id'] ?? null;
+            $mName = strtoupper(trim($it['medicine_name']));
+            if (($mId && in_array($mId, $existingMedIds)) || in_array($mName, $existingMedNames)) {
+                return back()->withErrors([
+                    'items' => "Obat '{$it['medicine_name']}' sudah pernah di-input retur pada faktur '{$invoiceNumber}'. Dalam 1 faktur, 1 obat hanya bisa dikembalikan 1 kali."
+                ]);
+            }
+        }
+
         $activePharmacyId = function_exists('getActivePharmacyId') ? getActivePharmacyId() : 1;
         $yearMonth = date('ym');
         $latest = PurchaseReturn::where('return_no', 'LIKE', "RET-{$yearMonth}/%")->count();
         $nextSeq = str_pad($latest + 1, 4, '0', STR_PAD_LEFT);
         $returnNo = "RET-{$yearMonth}/{$nextSeq}";
+        $todayDate = now()->toDateString();
 
-        DB::transaction(function () use ($validated, $activePharmacyId, $returnNo) {
+        DB::transaction(function () use ($validated, $activePharmacyId, $returnNo, $todayDate) {
             $totalAmount = 0;
             foreach ($validated['items'] as $it) {
                 $subtotal = (float)$it['qty'] * (float)$it['unit_price'];
@@ -531,6 +614,7 @@ class PurchaseReturnController extends Controller
                 'receiving_id' => $validated['receiving_id'] ?? null,
                 'total_amount' => $totalAmount,
                 'status' => 'diajukan',
+                'status_date' => $todayDate,
                 'notes' => $validated['notes'] ?? null,
                 'is_manual' => empty($validated['receiving_id']),
             ]);
@@ -547,6 +631,9 @@ class PurchaseReturnController extends Controller
                     'qty' => $it['qty'],
                     'unit_price' => $it['unit_price'],
                     'subtotal' => $subtotal,
+                    'status' => 'diajukan',
+                    'status_date' => $todayDate,
+                    'stock_deducted' => false,
                     'reason' => $it['reason'] ?? 'ED DEKAT',
                     'pickup_date' => $it['pickup_date'] ?? null,
                     'deduction_note' => $it['deduction_note'] ?? null,
@@ -554,7 +641,227 @@ class PurchaseReturnController extends Controller
             }
         });
 
-        return redirect()->back()->with('success', 'Data Retur Pembelian berhasil disimpan.');
+        return redirect()->back()->with('success', 'Data Retur Pembelian berhasil disimpan dengan status Diajukan Retur.');
+    }
+
+    /**
+     * Generate Kode Items Log (Kartu Stok)
+     */
+    protected function generateItemsLogCode(): string
+    {
+        $now = Carbon::now();
+        $year = $now->format('y');
+        $month = $now->format('m');
+        $prefix = "{$year}{$month}LOG-";
+
+        $lastCode = ItemsLog::where('code', 'like', "{$prefix}%")
+            ->orderBy('code', 'desc')
+            ->value('code');
+
+        if ($lastCode) {
+            $lastNumber = (int) substr($lastCode, -4);
+            $nextNumber = $lastNumber + 1;
+        } else {
+            $nextNumber = 1;
+        }
+
+        return $prefix . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * Konfirmasi Retur: Ubah status ke 'dikonfirmasi' dan kurangi stok barang (perbolehkan minus stok)
+     * NOTE: Wajib mencatat tanggal konfirmasi retur
+     */
+    public function confirmItem(Request $request, $id)
+    {
+        $validated = $request->validate([
+            'confirmed_date' => 'required|date',
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        $item = PurchaseReturnItem::with(['purchaseReturn', 'medicine'])->findOrFail($id);
+        $confirmedDate = $validated['confirmed_date'];
+
+        DB::transaction(function () use ($item, $confirmedDate, $validated) {
+            // Kurangi stok barang jika belum dikurangi
+            if (!$item->stock_deducted) {
+                if ($item->medicine_id) {
+                    $med = Medicines::find($item->medicine_id);
+                    if ($med) {
+                        $qtyBefore = (float) $med->stock;
+                        $qtyDeduct = (float) $item->qty;
+
+                        // Kurangi stok fisik obat (diperbolehkan minus stok)
+                        $med->decrement('stock', $qtyDeduct);
+                        $qtyAfter = $qtyBefore - $qtyDeduct;
+
+                        // Kurangi stok batch jika ada
+                        $batch = null;
+                        if ($item->batch_id) {
+                            $batch = Batches::find($item->batch_id);
+                        } elseif ($item->batch_number && $item->batch_number !== '-') {
+                            $batch = Batches::where('medicine_id', $med->id)->where('name', $item->batch_number)->first();
+                        }
+                        if ($batch) {
+                            $batch->decrement('stock', $qtyDeduct);
+                        }
+
+                        // Catat ke kartu stok / ItemsLog (status 4 = Retur Pembelian)
+                        ItemsLog::create([
+                            'transaction_code' => $item->purchaseReturn?->return_no ?? ('RET-' . date('ymd')),
+                            'code' => $this->generateItemsLogCode(),
+                            'type' => 'RT',
+                            'medicine_id' => $med->id,
+                            'qty' => $qtyDeduct,
+                            'qty_before' => $qtyBefore,
+                            'qty_after' => $qtyAfter,
+                            'total' => $item->subtotal,
+                            'date' => $confirmedDate,
+                            'status' => 4,
+                            'batches_id' => $batch?->id ?? null,
+                            'user_id' => auth()->id(),
+                        ]);
+                    }
+                }
+                $item->stock_deducted = true;
+            }
+
+            $item->status = 'dikonfirmasi';
+            $item->status_date = $confirmedDate;
+            $item->confirmed_date = $confirmedDate;
+            if (!empty($validated['notes'])) {
+                $item->notes = $validated['notes'];
+            }
+            $item->save();
+
+            $p = $item->purchaseReturn;
+            if ($p) {
+                $p->update([
+                    'status' => 'dikonfirmasi',
+                    'status_date' => $confirmedDate,
+                    'confirmed_date' => $confirmedDate,
+                ]);
+            }
+        });
+
+        return redirect()->back()->with('success', "Retur {$item->medicine_name} berhasil dikonfirmasi. Stok barang telah dikurangi.");
+    }
+
+    /**
+     * Ubah Status Retur setelah dikonfirmasi:
+     * - 'dikonfirmasi' (Sudah Dikonfirmasi)
+     * - 'sudah_potong' (Sudah Potong Tagihan -> kurangi tagihan hutang dagang pada receiving terkait secara konsisten)
+     * - 'barang_kembali_pmi' (Barang Kembali PMI)
+     * NOTE: TIAP PERUBAHAN STATUS, WAJIB CATAT TANGGALNYA
+     */
+    public function changeItemStatus(Request $request, $id)
+    {
+        $validated = $request->validate([
+            'status' => 'required|in:dikonfirmasi,sudah_potong,barang_kembali_pmi',
+            'status_date' => 'required|date',
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        $item = PurchaseReturnItem::with(['purchaseReturn', 'medicine'])->findOrFail($id);
+        $oldStatus = $item->status;
+        $newStatus = $validated['status'];
+        $statusDate = $validated['status_date'];
+
+        DB::transaction(function () use ($item, $oldStatus, $newStatus, $statusDate, $validated) {
+            $p = $item->purchaseReturn;
+            $refNo = ($p ? $p->return_no : 'RET') . '-ITEM-' . $item->id;
+
+            // Cari receiving detail terkait jika ada
+            $receivingDetail = null;
+            if ($p) {
+                if ($p->receiving_id) {
+                    $receivingDetail = ReceivingDetails::with(['receiving', 'receiving_items'])->find($p->receiving_id);
+                }
+                if (!$receivingDetail && $p->invoice_number) {
+                    $receivingDetail = ReceivingDetails::with(['receiving', 'receiving_items'])
+                        ->where('invoice_number', $p->invoice_number)
+                        ->first();
+                }
+            }
+
+            if ($newStatus === 'sudah_potong') {
+                $item->deduction_date = $statusDate;
+                $formattedDate = Carbon::parse($statusDate)->format('d/m/Y');
+                $item->deduction_note = "SUDAH POTONG TAGIHAN ({$formattedDate})";
+
+                // Potong tagihan hutang dagang pada receiving terkait
+                if ($receivingDetail) {
+                    $pharmacyId = $receivingDetail->receiving?->pharmacy_id ?? $p?->pharmacy_id ?? 1;
+                    $account = FinanceAccount::where('pharmacy_id', $pharmacyId)->where('category', 'Kas & Bank')->first()
+                        ?? FinanceAccount::where('category', 'Kas & Bank')->first()
+                        ?? FinanceAccount::first();
+
+                    $payment = FinancePayment::firstOrNew(['reference_number' => $refNo]);
+                    $payment->pharmacy_id = $pharmacyId;
+                    $payment->receiving_id = $receivingDetail->receiving_id;
+                    $payment->receiving_detail_id = $receivingDetail->id;
+                    $payment->account_id = $account?->id ?? 1;
+                    $payment->payment_type = 'RETUR';
+                    $payment->payment_date = $statusDate;
+                    $payment->amount = (float) $item->subtotal;
+                    $payment->reference_number = $refNo;
+                    $payment->notes = 'Potong Tagihan Retur Beli: ' . $item->medicine_name . ' (' . ($p->return_no ?? '-') . ')';
+                    $payment->created_by = auth()->id();
+                    $payment->save();
+
+                    // Cek jika seluruh faktur penerimaan sudah lunas
+                    $ppnType = strtoupper(trim($receivingDetail->invoice_ppn ?? $receivingDetail->creditor?->ppn_type ?? 'TANPA'));
+                    $totalInvoice = ReceivingInvoiceTotals::calculate($receivingDetail->receiving_items, $ppnType)['total'];
+                    $totalPaid = (float) FinancePayment::where('receiving_detail_id', $receivingDetail->id)->sum('amount');
+                    if (($totalPaid >= $totalInvoice || ($totalInvoice - $totalPaid) < 0.005) && $receivingDetail->receiving) {
+                        $receivingDetail->receiving->update(['status' => 3]);
+                    }
+                }
+            } else {
+                // Jika status sebelumnya 'sudah_potong' dan sekarang diubah, hapus potongan tagihannya
+                if ($oldStatus === 'sudah_potong') {
+                    FinancePayment::where('reference_number', $refNo)->delete();
+                    $item->deduction_date = null;
+                    $item->deduction_note = null;
+
+                    if ($receivingDetail && $receivingDetail->receiving && (int)$receivingDetail->receiving->status === 3) {
+                        $ppnType = strtoupper(trim($receivingDetail->invoice_ppn ?? $receivingDetail->creditor?->ppn_type ?? 'TANPA'));
+                        $totalInvoice = ReceivingInvoiceTotals::calculate($receivingDetail->receiving_items, $ppnType)['total'];
+                        $totalPaid = (float) FinancePayment::where('receiving_detail_id', $receivingDetail->id)->sum('amount');
+                        if ($totalPaid < $totalInvoice) {
+                            $receivingDetail->receiving->update(['status' => $totalPaid > 0 ? 2 : 1]);
+                        }
+                    }
+                }
+
+                if ($newStatus === 'barang_kembali_pmi') {
+                    $item->pickup_date = $statusDate;
+                }
+            }
+
+            $item->status = $newStatus;
+            $item->status_date = $statusDate;
+            if (isset($validated['notes'])) {
+                $item->notes = $validated['notes'];
+            }
+            $item->save();
+
+            if ($p) {
+                $p->update([
+                    'status' => $newStatus,
+                    'status_date' => $statusDate,
+                ]);
+            }
+        });
+
+        $statusLabels = [
+            'dikonfirmasi' => 'Sudah Dikonfirmasi',
+            'sudah_potong' => 'Sudah Potong Tagihan',
+            'barang_kembali_pmi' => 'Barang Kembali PMI',
+        ];
+        $label = $statusLabels[$newStatus] ?? $newStatus;
+
+        return redirect()->back()->with('success', "Status retur {$item->medicine_name} berhasil diubah menjadi: {$label}.");
     }
 
     /**

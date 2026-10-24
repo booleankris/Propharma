@@ -174,7 +174,7 @@ class FactoryExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
                 }
 
                 $grouped[$factory]['qty']   += (float) ($item->quantity ?? 0);
-                $grouped[$factory]['total'] += (int) ($item->final_price ?? 0);
+                $grouped[$factory]['total'] += (int) round((float) ($item->final_price ?? 0));
             }
         }
 
@@ -286,7 +286,7 @@ class FactoryExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
                 }
 
                 $grouped[$key]['qty']   += (float) ($item->quantity ?? 0);
-                $grouped[$key]['total'] += (int) ($item->final_price ?? 0);
+                $grouped[$key]['total'] += (int) round((float) ($item->final_price ?? 0));
             }
         }
 

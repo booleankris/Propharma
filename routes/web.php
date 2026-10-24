@@ -624,10 +624,12 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
         // Monitoring Retur Beli
         Route::prefix('purchase-returns')->name('purchaseReturns.')->group(function () {
             Route::get('/', [\App\Http\Controllers\Finance\PurchaseReturnController::class, 'index'])->name('index');
+            Route::post('/', [\App\Http\Controllers\Finance\PurchaseReturnController::class, 'store'])->name('store');
             Route::get('/search-invoices', [\App\Http\Controllers\Finance\PurchaseReturnController::class, 'searchInvoices'])->name('searchInvoices');
             Route::get('/invoice-items/{id}', [\App\Http\Controllers\Finance\PurchaseReturnController::class, 'getInvoiceItems'])->name('invoiceItems');
             Route::get('/search-medicines', [\App\Http\Controllers\Finance\PurchaseReturnController::class, 'searchMedicines'])->name('searchMedicines');
-            Route::post('/', [\App\Http\Controllers\Finance\PurchaseReturnController::class, 'store'])->name('store');
+            Route::post('/items/{id}/confirm', [\App\Http\Controllers\Finance\PurchaseReturnController::class, 'confirmItem'])->name('confirmItem');
+            Route::post('/items/{id}/change-status', [\App\Http\Controllers\Finance\PurchaseReturnController::class, 'changeItemStatus'])->name('changeItemStatus');
             Route::put('/items/{id}', [\App\Http\Controllers\Finance\PurchaseReturnController::class, 'updateItem'])->name('updateItem');
             Route::delete('/items/{id}', [\App\Http\Controllers\Finance\PurchaseReturnController::class, 'destroyItem'])->name('destroyItem');
             Route::get('/export', [\App\Http\Controllers\Finance\PurchaseReturnController::class, 'export'])->name('export');

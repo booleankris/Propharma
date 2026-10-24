@@ -3,15 +3,34 @@ import { Head, router } from '@inertiajs/react';
 import FinanceLayout from './Layouts/FinanceLayout';
 import {
     Undo2, Search, Filter, Plus, Download, Edit2, Trash2, CheckCircle2,
-    Calendar, AlertTriangle, Clock, Building2, Package, X, Check, ArrowRight, Lock
+    Calendar, AlertTriangle, Clock, Building2, Package, X, Check, ArrowRight, Lock, RotateCcw,
+    AlertCircle, Sparkles, ShieldAlert
 } from 'lucide-react';
 import { formatRupiah } from './Components/Utils';
 
-export default function PurchaseReturns({ items, filters, stats, creditors, branchContext }) {
+export default function PurchaseReturns({
+    activeTab = 'monitoring',
+    items,
+    filters,
+    stats,
+    approachingItems = { data: [] },
+    approachingStats = {},
+    approachingFilters = {},
+    creditors = [],
+    branchContext,
+}) {
+    const [currentTab, setCurrentTab] = useState(activeTab || 'monitoring');
+
+    // Monitoring filters
     const [search, setSearch] = useState(filters.search || '');
     const [creditorFilter, setCreditorFilter] = useState(filters.creditor_code || '');
     const [statusFilter, setStatusFilter] = useState(filters.status || '');
     const [reasonFilter, setReasonFilter] = useState(filters.reason || '');
+
+    // Approaching filters
+    const [approachingSearch, setApproachingSearch] = useState(approachingFilters.search || '');
+    const [approachingCreditor, setApproachingCreditor] = useState(approachingFilters.creditor_code || '');
+    const [approachingUrgency, setApproachingUrgency] = useState(approachingFilters.urgency || '');
 
     // Modal Input Retur (Custom / Dari Faktur)
     const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -37,6 +56,98 @@ export default function PurchaseReturns({ items, filters, stats, creditors, bran
         items: [],
     });
 
+    // Format display tanggal rapi (DD/MM/YYYY)
+    const formatDateDisplay = (val) => {
+        if (!val) return '-';
+        const datePart = String(val).split('T')[0];
+        const parts = datePart.split('-');
+        if (parts.length === 3) {
+            const [y, m, d] = parts;
+            return `${d}/${m}/${y}`;
+        }
+        return val;
+    };
+
+    const getStatusBadge = (status) => {
+        switch (status) {
+            case 'dikonfirmasi':
+                return {
+                    label: 'Sudah Dikonfirmasi',
+                    badgeClass: 'bg-blue-100 text-blue-800 border-blue-200',
+                    dotClass: 'bg-blue-500',
+                };
+            case 'sudah_potong':
+                return {
+                    label: 'Sudah Potong Tagihan',
+                    badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+                    dotClass: 'bg-emerald-500',
+                };
+            case 'barang_kembali_pmi':
+                return {
+                    label: 'Barang Kembali PMI',
+                    badgeClass: 'bg-purple-100 text-purple-800 border-purple-200',
+                    dotClass: 'bg-purple-500',
+                };
+            case 'diajukan':
+            default:
+                return {
+                    label: 'Diajukan Retur',
+                    badgeClass: 'bg-amber-100 text-amber-800 border-amber-200',
+                    dotClass: 'bg-amber-500',
+                };
+        }
+    };
+
+    // Modal Konfirmasi Retur (Kurangi Stok)
+    const [confirmModalOpen, setConfirmModalOpen] = useState(false);
+    const [confirmingItem, setConfirmingItem] = useState(null);
+    const [confirmForm, setConfirmForm] = useState({
+        confirmed_date: new Date().toISOString().split('T')[0],
+        notes: '',
+    });
+
+    const openConfirmModal = (item) => {
+        setConfirmingItem(item);
+        setConfirmForm({
+            confirmed_date: new Date().toISOString().split('T')[0],
+            notes: '',
+        });
+        setConfirmModalOpen(true);
+    };
+
+    const handleConfirmSubmit = (e) => {
+        e.preventDefault();
+        router.post(`/finance/purchase-returns/items/${confirmingItem.id}/confirm`, confirmForm, {
+            onSuccess: () => setConfirmModalOpen(false),
+        });
+    };
+
+    // Modal Ubah Status Retur
+    const [statusModalOpen, setStatusModalOpen] = useState(false);
+    const [statusItem, setStatusItem] = useState(null);
+    const [statusForm, setStatusForm] = useState({
+        status: 'dikonfirmasi',
+        status_date: new Date().toISOString().split('T')[0],
+        notes: '',
+    });
+
+    const openStatusModal = (item) => {
+        setStatusItem(item);
+        setStatusForm({
+            status: item.status && item.status !== 'diajukan' ? item.status : 'dikonfirmasi',
+            status_date: item.status_date ? String(item.status_date).split('T')[0] : new Date().toISOString().split('T')[0],
+            notes: item.notes || '',
+        });
+        setStatusModalOpen(true);
+    };
+
+    const handleStatusSubmit = (e) => {
+        e.preventDefault();
+        router.post(`/finance/purchase-returns/items/${statusItem.id}/change-status`, statusForm, {
+            onSuccess: () => setStatusModalOpen(false),
+        });
+    };
+
     // Modal Edit Item Rincian (Update Tgl Diambil & Potong Tagihan)
     const [editItemModalOpen, setEditItemModalOpen] = useState(false);
     const [editingItem, setEditingItem] = useState(null);
@@ -60,11 +171,69 @@ export default function PurchaseReturns({ items, filters, stats, creditors, bran
 
     const handleFilterChange = (creditor, status, reason) => {
         router.get('/finance/purchase-returns', {
+            tab: currentTab,
             search,
             creditor_code: creditor,
             status,
             reason,
         }, { preserveState: true });
+    };
+
+    const handleTabSwitch = (newTab) => {
+        setCurrentTab(newTab);
+        const url = new URL(window.location.href);
+        url.searchParams.set('tab', newTab);
+        window.history.replaceState({}, '', url.toString());
+    };
+
+    const handleApproachingSearchSubmit = (e) => {
+        if (e) e.preventDefault();
+        router.get('/finance/purchase-returns', {
+            tab: 'approaching',
+            approaching_search: approachingSearch,
+            approaching_creditor: approachingCreditor,
+            approaching_urgency: approachingUrgency,
+        }, { preserveState: true });
+    };
+
+    const handleApproachingFilterChange = (cred, urg) => {
+        router.get('/finance/purchase-returns', {
+            tab: 'approaching',
+            approaching_search: approachingSearch,
+            approaching_creditor: cred,
+            approaching_urgency: urg,
+        }, { preserveState: true });
+    };
+
+    const handleApplyReturnFromAlert = (item) => {
+        setEntryType('manual');
+        setFormData({
+            invoice_number: item.invoice_number && item.invoice_number !== '-' ? item.invoice_number : '',
+            invoice_date: item.invoice_date || new Date().toISOString().split('T')[0],
+            received_date: new Date().toISOString().split('T')[0],
+            creditor_code: item.creditor_code || (creditors[0]?.code || ''),
+            receiving_id: item.receiving_id || null,
+            notes: `Pengajuan retur ED sesuai ketentuan: ${item.rule_text}`,
+            items: [{
+                selected: true,
+                medicine_id: item.medicine_id,
+                medicine_name: item.medicine_name,
+                unit: item.unit || 'BOX',
+                batch_number: item.batch_number || '',
+                expired_date: item.expired_date || '',
+                max_qty: Number(item.stock || 9999),
+                qty: Number(item.stock || 1),
+                unit_price: Number(item.unit_price || 0),
+                reason: 'ED DEKAT',
+                pickup_date: '',
+                deduction_note: '',
+                factory_id: item.factory_id,
+                factory_name: item.factory_name,
+                return_policy: null,
+                is_already_returned: false,
+            }],
+        });
+        setCreateModalOpen(true);
     };
 
     // Debounce cari faktur
@@ -121,13 +290,14 @@ export default function PurchaseReturns({ items, filters, stats, creditors, bran
                         expired_date: it.expired_date || '',
                         max_qty: Number(it.qty_received || it.qty || 1),
                         qty: Number(it.qty_received || it.qty || 1),
-                        unit_price: Number(it.raw_price || 0),
+                        unit_price: Number(it.unit_price || it.raw_price || 0),
                         reason: 'ED DEKAT',
                         pickup_date: '',
                         deduction_note: '',
                         factory_id: it.factory_id,
                         factory_name: it.factory_name,
                         return_policy: it.return_policy,
+                        is_already_returned: !!it.is_already_returned,
                     })),
                 });
                 setInvoiceSearchResults([]);
@@ -145,13 +315,14 @@ export default function PurchaseReturns({ items, filters, stats, creditors, bran
             expired_date: '',
             max_qty: 9999,
             qty: 1,
-            unit_price: med ? med.raw_price : 0,
+            unit_price: med ? (med.raw_price || 0) : 0,
             reason: 'ED DEKAT',
             pickup_date: '',
             deduction_note: '',
             factory_id: med ? med.factory_id : null,
             factory_name: med ? med.factory_name : null,
             return_policy: med ? med.return_policy : null,
+            is_already_returned: false,
         };
         setFormData({
             ...formData,
@@ -173,7 +344,10 @@ export default function PurchaseReturns({ items, filters, stats, creditors, bran
     };
 
     const toggleSelectAll = (checked) => {
-        const updated = formData.items.map(it => ({ ...it, selected: checked }));
+        const updated = formData.items.map(it => {
+            if (it.is_already_returned) return { ...it, selected: false };
+            return { ...it, selected: checked };
+        });
         setFormData({ ...formData, items: updated });
     };
 
@@ -289,30 +463,72 @@ export default function PurchaseReturns({ items, filters, stats, creditors, bran
                     </div>
                 </div>
 
-                {/* Metrics Summary Cards */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {/* TAB NAVIGASI UTAMA */}
+                <div className="flex items-center gap-2 border-b border-slate-200">
+                    <button
+                        type="button"
+                        onClick={() => handleTabSwitch('monitoring')}
+                        className={`inline-flex items-center gap-2 px-5 py-3 text-xs font-bold border-b-2 transition-all cursor-pointer ${currentTab === 'monitoring'
+                            ? 'border-blue-600 text-blue-700 bg-white rounded-t-xl shadow-2xs'
+                            : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'
+                            }`}
+                    >
+                        <Undo2 className="w-4 h-4" />
+                        <span>Monitoring Retur Beli</span>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] bg-slate-100 text-slate-700 font-semibold">
+                            {stats.total_items || 0}
+                        </span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => handleTabSwitch('approaching')}
+                        className={`inline-flex items-center gap-2 px-5 py-3 text-xs font-bold border-b-2 transition-all cursor-pointer ${currentTab === 'approaching'
+                            ? 'border-amber-500 text-amber-800 bg-white rounded-t-xl shadow-2xs'
+                            : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'
+                            }`}
+                    >
+                        <AlertTriangle className="w-4 h-4 text-amber-500" />
+                        <span>Mendekati Masa Retur (Ketentuan PBF)</span>
+                        {(approachingStats?.total_count || 0) > 0 && (
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] bg-amber-100 text-amber-800 font-bold border border-amber-300">
+                                {approachingStats.total_count} Obat
+                            </span>
+                        )}
+                    </button>
+                </div>
+
+                {currentTab === 'monitoring' ? (
+                    <>
+                        {/* Metrics Summary Cards */}
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                     <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
                         <span className="text-xs font-medium text-slate-500">Total Item Diretur</span>
-                        <div className="text-2xl font-bold text-slate-800 mt-1">{stats.total_items} Obat</div>
-                        <div className="text-[11px] text-slate-400 mt-0.5">Nilai: {formatRupiah(stats.total_value)}</div>
+                        <div className="text-xl font-bold text-slate-800 mt-1">{stats.total_items} Obat</div>
+                        <div className="text-[11px] text-slate-400 mt-0.5 truncate">Nilai: {formatRupiah(stats.total_value)}</div>
                     </div>
 
-                    <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-                        <span className="text-xs font-medium text-emerald-600">Sudah Potong Tagihan</span>
-                        <div className="text-2xl font-bold text-emerald-600 mt-1">{stats.sudah_potong} Item</div>
-                        <div className="text-[11px] text-emerald-500 mt-0.5">Faktur telah dikurangi</div>
+                    <div className="bg-white p-4 rounded-xl border border-amber-200/80 shadow-xs bg-amber-50/20">
+                        <span className="text-xs font-semibold text-amber-700">Diajukan Retur</span>
+                        <div className="text-xl font-bold text-amber-700 mt-1">{stats.diajukan || 0} Item</div>
+                        <div className="text-[11px] text-amber-600 mt-0.5">Menunggu konfirmasi</div>
                     </div>
 
-                    <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-                        <span className="text-xs font-medium text-amber-600">Belum Potong Tagihan</span>
-                        <div className="text-2xl font-bold text-amber-600 mt-1">{stats.belum_potong} Item</div>
-                        <div className="text-[11px] text-amber-500 mt-0.5">Menunggu konfirmasi PBF</div>
+                    <div className="bg-white p-4 rounded-xl border border-blue-200/80 shadow-xs bg-blue-50/20">
+                        <span className="text-xs font-semibold text-blue-700">Sudah Dikonfirmasi</span>
+                        <div className="text-xl font-bold text-blue-700 mt-1">{stats.dikonfirmasi || 0} Item</div>
+                        <div className="text-[11px] text-blue-600 mt-0.5">Stok telah dipotong</div>
                     </div>
 
-                    <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-                        <span className="text-xs font-medium text-blue-600">Barang Sudah Diambil</span>
-                        <div className="text-2xl font-bold text-blue-600 mt-1">{stats.sudah_diambil} Item</div>
-                        <div className="text-[11px] text-blue-500 mt-0.5">Oleh kurir / sales PBF</div>
+                    <div className="bg-white p-4 rounded-xl border border-emerald-200/80 shadow-xs bg-emerald-50/20">
+                        <span className="text-xs font-semibold text-emerald-700">Sudah Potong Tagihan</span>
+                        <div className="text-xl font-bold text-emerald-700 mt-1">{stats.sudah_potong || 0} Item</div>
+                        <div className="text-[11px] text-emerald-600 mt-0.5">Faktur telah dikurangi</div>
+                    </div>
+
+                    <div className="bg-white p-4 rounded-xl border border-purple-200/80 shadow-xs bg-purple-50/20 col-span-2 sm:col-span-1">
+                        <span className="text-xs font-semibold text-purple-700">Barang Kembali PMI</span>
+                        <div className="text-xl font-bold text-purple-700 mt-1">{stats.barang_kembali_pmi || 0} Item</div>
+                        <div className="text-[11px] text-purple-600 mt-0.5">Pengembalian PMI</div>
                     </div>
                 </div>
 
@@ -352,13 +568,13 @@ export default function PurchaseReturns({ items, filters, stats, creditors, bran
                                     setStatusFilter(e.target.value);
                                     handleFilterChange(creditorFilter, e.target.value, reasonFilter);
                                 }}
-                                className="text-xs border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="text-xs border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
                             >
-                                <option value="">Semua Status Potong</option>
+                                <option value="">Semua Status Retur</option>
+                                <option value="diajukan">Diajukan Retur</option>
+                                <option value="dikonfirmasi">Sudah Dikonfirmasi</option>
                                 <option value="sudah_potong">Sudah Potong Tagihan</option>
-                                <option value="belum_potong">Belum Potong Tagihan</option>
-                                <option value="sudah_ambil">Barang Sudah Diambil</option>
-                                <option value="belum_ambil">Barang Belum Diambil</option>
+                                <option value="barang_kembali_pmi">Barang Kembali PMI</option>
                             </select>
 
                             <select
@@ -375,6 +591,7 @@ export default function PurchaseReturns({ items, filters, stats, creditors, bran
                                 <option value="DISKON TIDAK SESUAI">DISKON TIDAK SESUAI</option>
                                 <option value="TERDOUBLE">TERDOUBLE</option>
                                 <option value="PESAN YANG INJ">PESAN YANG INJ</option>
+                                <option value="RUSAK">RUSAK</option>
                             </select>
                         </div>
                     </div>
@@ -384,41 +601,49 @@ export default function PurchaseReturns({ items, filters, stats, creditors, bran
                         <table className="w-full text-left text-xs text-slate-600">
                             <thead className="bg-slate-100/70 text-slate-700 font-semibold uppercase text-[11px] tracking-wider border-b border-slate-200">
                                 <tr>
-                                    <th className="py-3 px-3 w-10 text-center">No</th>
-                                    <th className="py-3 px-3 min-w-[200px]">Nama Obat</th>
-                                    <th className="py-3 px-2 text-center w-14">Jumlah</th>
-                                    <th className="py-3 px-2 text-center w-16">Satuan</th>
-                                    <th className="py-3 px-3">Batch</th>
-                                    <th className="py-3 px-3 min-w-[140px]">No Faktur & PBF</th>
-                                    <th className="py-3 px-3 text-center">ED</th>
-                                    <th className="py-3 px-3 text-center min-w-[150px]">Ketentuan Retur</th>
-                                    <th className="py-3 px-3">Tgl Entri / Faktur</th>
-                                    <th className="py-3 px-3">Keterangan</th>
-                                    <th className="py-3 px-3 text-center">Tgl Brg Di Ambil</th>
-                                    <th className="py-3 px-3">Potong Tagihan</th>
-                                    <th className="py-3 px-3 text-center w-20">Aksi</th>
+                                    <th className="py-3 px-2 w-8 text-center">No</th>
+                                    <th className="py-3 px-3 min-w-[180px]">Nama Obat & Pabrik</th>
+                                    <th className="py-3 px-2 text-center w-20">Qty</th>
+                                    <th className="py-3 px-3 text-center min-w-[110px]">Batch & ED</th>
+                                    <th className="py-3 px-3 min-w-[150px]">No Faktur & PBF</th>
+                                    <th className="py-3 px-2 text-center min-w-[120px]">Ketentuan Retur</th>
+                                    <th className="py-3 px-2 text-center whitespace-nowrap">Tgl Faktur</th>
+                                    <th className="py-3 px-3 text-center whitespace-nowrap">Keterangan</th>
+                                    <th className="py-3 px-3 text-center min-w-[155px]">Status Retur</th>
+                                    <th className="py-3 px-3 text-center min-w-[210px] sticky right-0 bg-slate-100 z-10 shadow-[-6px_0_10px_-2px_rgba(0,0,0,0.06)]">Aksi</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                                 {items.data.length === 0 ? (
                                     <tr>
-                                        <td colSpan="13" className="text-center py-12 text-slate-400">
+                                        <td colSpan="10" className="text-center py-12 text-slate-400">
                                             Belum ada data monitoring retur beli. Klik tombol <strong>Input Retur Baru</strong> untuk memulai.
                                         </td>
                                     </tr>
                                 ) : (
                                     items.data.map((item, idx) => {
                                         const p = item.purchase_return;
-                                        const hasDeduction = !!item.deduction_note;
+                                        const hasDeduction = !!item.deduction_note || item.status === 'sudah_potong';
                                         const pbfName = p && p.creditor ? p.creditor.name : (p?.creditor_code || '-');
                                         const policyInfo = item.return_policy_info;
+                                        const isDiajukan = !item.status || item.status === 'diajukan';
+                                        const statusBadge = getStatusBadge(item.status);
+
+                                        const dateToShow = item.status === 'dikonfirmasi'
+                                            ? (item.confirmed_date || item.status_date)
+                                            : item.status === 'sudah_potong'
+                                                ? (item.deduction_date || item.status_date)
+                                                : item.status === 'barang_kembali_pmi'
+                                                    ? (item.pickup_date || item.status_date)
+                                                    : (item.status_date || item.created_at);
+
                                         return (
                                             <tr
                                                 key={item.id}
-                                                className={`transition-colors hover:bg-amber-50/30 ${hasDeduction ? 'bg-emerald-50/40' : ''
+                                                className={`transition-colors hover:bg-amber-50/30 group ${hasDeduction ? 'bg-emerald-50/30' : ''
                                                     }`}
                                             >
-                                                <td className="py-2.5 px-3 text-center text-slate-400 font-mono text-[11px]">
+                                                <td className="py-2.5 px-2 text-center text-slate-400 font-mono text-[11px]">
                                                     {(items.current_page - 1) * items.per_page + idx + 1}
                                                 </td>
                                                 <td className="py-2.5 px-3 font-bold text-slate-800">
@@ -429,27 +654,23 @@ export default function PurchaseReturns({ items, filters, stats, creditors, bran
                                                         </div>
                                                     )}
                                                 </td>
-                                                <td className="py-2.5 px-2 text-center font-bold text-blue-700">
-                                                    {Number(item.qty)}
+                                                <td className="py-2.5 px-2 text-center whitespace-nowrap">
+                                                    <span className="font-extrabold text-blue-700 text-xs">{Number(item.qty)}</span>{' '}
+                                                    <span className="text-[10px] font-semibold text-slate-500 uppercase">{item.unit || 'BOX'}</span>
                                                 </td>
-                                                <td className="py-2.5 px-2 text-center font-semibold text-slate-600 uppercase text-[11px]">
-                                                    {item.unit || 'BOX'}
-                                                </td>
-                                                <td className="py-2.5 px-3 font-mono text-slate-700">
-                                                    {item.batch_number || '-'}
+                                                <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                                                    <div className="font-mono text-slate-700 text-xs font-semibold">{item.batch_number || '-'}</div>
+                                                    <div className="text-[10px] font-medium text-rose-600 mt-0.5">ED: {formatDateDisplay(item.expired_date)}</div>
                                                 </td>
                                                 <td className="py-2.5 px-3">
-                                                    <div className="font-mono font-bold text-slate-800">
+                                                    <div className="font-mono font-bold text-slate-800 text-xs">
                                                         {p ? p.invoice_number : '-'}
                                                     </div>
-                                                    <div className="text-xs font-semibold text-blue-800 mt-0.5 break-words">
+                                                    <div className="text-[11px] font-semibold text-blue-800 mt-0.5 break-words line-clamp-1" title={pbfName}>
                                                         {pbfName}
                                                     </div>
                                                 </td>
-                                                <td className="py-2.5 px-3 text-center font-medium text-rose-600 whitespace-nowrap">
-                                                    {item.expired_date || '-'}
-                                                </td>
-                                                <td className="py-2.5 px-3 text-center">
+                                                <td className="py-2.5 px-2 text-center">
                                                     {policyInfo ? (
                                                         <div className="inline-flex flex-col items-center">
                                                             <span
@@ -459,7 +680,7 @@ export default function PurchaseReturns({ items, filters, stats, creditors, bran
                                                                 {policyInfo.label}
                                                             </span>
                                                             {policyInfo.policy?.notes && (
-                                                                <span className="text-[10px] text-slate-500 mt-0.5 max-w-[140px] truncate" title={policyInfo.policy.notes}>
+                                                                <span className="text-[9px] text-slate-500 mt-0.5 max-w-[120px] truncate" title={policyInfo.policy.notes}>
                                                                     {policyInfo.policy.notes}
                                                                 </span>
                                                             )}
@@ -468,49 +689,78 @@ export default function PurchaseReturns({ items, filters, stats, creditors, bran
                                                         <span className="text-slate-300 text-[11px]">-</span>
                                                     )}
                                                 </td>
-                                                <td className="py-2.5 px-3 text-slate-600 whitespace-nowrap">
-                                                    {p?.invoice_date || '-'}
+                                                <td className="py-2.5 px-2 text-center text-slate-600 whitespace-nowrap text-xs">
+                                                    {formatDateDisplay(p?.invoice_date || item.created_at)}
                                                 </td>
-                                                <td className="py-2.5 px-3">
-                                                    <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 uppercase">
+                                                <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                                                    <span className="inline-block px-2.5 py-1 rounded-md text-[10px] font-bold bg-amber-100/90 text-amber-800 uppercase whitespace-nowrap border border-amber-200 shadow-2xs">
                                                         {item.reason || 'ED DEKAT'}
                                                     </span>
                                                 </td>
                                                 <td className="py-2.5 px-3 text-center whitespace-nowrap">
-                                                    {item.pickup_date ? (
-                                                        <span className="font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">
-                                                            {item.pickup_date}
+                                                    <div className="inline-flex flex-col items-center gap-0.5">
+                                                        {item.status === 'sudah_potong' ? (
+                                                            <span
+                                                                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold border border-emerald-300 bg-emerald-100 text-emerald-800 whitespace-nowrap shadow-2xs"
+                                                                title={item.deduction_note || 'Sudah Potong Tagihan'}
+                                                            >
+                                                                <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
+                                                                <span>Sudah Potong Tagihan</span>
+                                                            </span>
+                                                        ) : (
+                                                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${statusBadge.badgeClass} whitespace-nowrap shadow-2xs`}>
+                                                                <span className={`w-1.5 h-1.5 rounded-full ${statusBadge.dotClass}`} />
+                                                                <span>{statusBadge.label}</span>
+                                                            </span>
+                                                        )}
+                                                        <span className="text-[10px] text-slate-500 font-mono font-semibold">
+                                                            {formatDateDisplay(dateToShow)}
                                                         </span>
-                                                    ) : (
-                                                        <span className="text-slate-300 text-[11px]">-</span>
-                                                    )}
+                                                    </div>
                                                 </td>
-                                                <td className="py-2.5 px-3">
-                                                    {hasDeduction ? (
-                                                        <span className="inline-flex items-center gap-1 font-bold text-emerald-800 bg-emerald-100/90 px-2 py-0.5 rounded text-[11px]">
-                                                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                                                            {item.deduction_note}
-                                                        </span>
-                                                    ) : (
-                                                        <span className="text-slate-400 italic text-[11px]">Belum dipotong</span>
-                                                    )}
-                                                </td>
-                                                <td className="py-2.5 px-3 text-center">
-                                                    <div className="flex items-center justify-center gap-1">
-                                                        <button
-                                                            onClick={() => openEditItemModal(item)}
-                                                            className="p-1 hover:bg-slate-100 text-slate-600 hover:text-blue-600 rounded-lg transition-colors"
-                                                            title="Update Status / Edit"
-                                                        >
-                                                            <Edit2 className="w-3.5 h-3.5" />
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleDeleteItem(item)}
-                                                            className="p-1 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg transition-colors"
-                                                            title="Hapus Item"
-                                                        >
-                                                            <Trash2 className="w-3.5 h-3.5" />
-                                                        </button>
+                                                <td className="py-2.5 px-3 text-center sticky right-0 bg-white group-hover:bg-amber-50/50 shadow-[-6px_0_10px_-2px_rgba(0,0,0,0.06)] z-10 whitespace-nowrap">
+                                                    <div className="flex items-center justify-center gap-1.5">
+                                                        {isDiajukan ? (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => openConfirmModal(item)}
+                                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-lg text-xs font-semibold shadow-2xs hover:shadow-xs transition-all active:scale-[0.98] cursor-pointer shrink-0 border border-emerald-700/30"
+                                                                title="Konfirmasi Retur & Kurangi Stok Obat"
+                                                            >
+                                                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-100 shrink-0" />
+                                                                <span>Konfirmasi Retur</span>
+                                                            </button>
+                                                        ) : (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => openStatusModal(item)}
+                                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white rounded-lg text-xs font-semibold shadow-2xs hover:shadow-xs transition-all active:scale-[0.98] cursor-pointer shrink-0 border border-blue-700/30"
+                                                                title="Ubah Status Retur Beli"
+                                                            >
+                                                                <RotateCcw className="w-3.5 h-3.5 text-blue-100 shrink-0" />
+                                                                <span>Ubah Status</span>
+                                                            </button>
+                                                        )}
+
+                                                        <div className="flex items-center bg-slate-50 border border-slate-200/90 rounded-lg p-0.5 shadow-2xs shrink-0">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => openEditItemModal(item)}
+                                                                className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-white rounded-md transition-all cursor-pointer"
+                                                                title="Edit Rincian"
+                                                            >
+                                                                <Edit2 className="w-3.5 h-3.5" />
+                                                            </button>
+                                                            <div className="w-px h-3.5 bg-slate-200 mx-0.5" />
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleDeleteItem(item)}
+                                                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-white rounded-md transition-all cursor-pointer"
+                                                                title="Hapus Item"
+                                                            >
+                                                                <Trash2 className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        </div>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -546,12 +796,243 @@ export default function PurchaseReturns({ items, filters, stats, creditors, bran
                         </div>
                     )}
                 </div>
-            </div>
+            </>
+        ) : (
+            <>
+                {/* Approaching Metrics Summary Cards */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                    <div className="bg-white p-4 rounded-xl border border-emerald-200/80 shadow-xs bg-emerald-50/20">
+                        <span className="text-xs font-semibold text-emerald-700">Siap Diretur Sekarang</span>
+                        <div className="text-xl font-bold text-emerald-700 mt-1">{approachingStats?.eligible_count || 0} Obat</div>
+                        <div className="text-[11px] text-emerald-600 mt-0.5">Sudah masuk batas retur</div>
+                    </div>
+
+                    <div className="bg-white p-4 rounded-xl border border-amber-200/80 shadow-xs bg-amber-50/20">
+                        <span className="text-xs font-semibold text-amber-700">Mendekati Batas Retur</span>
+                        <div className="text-xl font-bold text-amber-700 mt-1">{approachingStats?.approaching_count || 0} Obat</div>
+                        <div className="text-[11px] text-amber-600 mt-0.5">Dalam 1-2 bulan ke depan</div>
+                    </div>
+
+                    <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+                        <span className="text-xs font-medium text-slate-500">Estimasi Nilai Terancam</span>
+                        <div className="text-xl font-bold text-slate-800 mt-1">{formatRupiah(approachingStats?.total_value_at_risk || 0)}</div>
+                        <div className="text-[11px] text-slate-400 mt-0.5">Potensi kerugian stok ED</div>
+                    </div>
+
+                    <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+                        <span className="text-xs font-medium text-slate-500">Total Stok Fisik</span>
+                        <div className="text-xl font-bold text-blue-700 mt-1">{approachingStats?.total_stock_at_risk || 0} Unit</div>
+                        <div className="text-[11px] text-slate-400 mt-0.5">Stok aktif di apotek</div>
+                    </div>
+
+                    <div className="bg-white p-4 rounded-xl border border-purple-200/80 shadow-xs bg-purple-50/20 col-span-2 sm:col-span-1">
+                        <span className="text-xs font-semibold text-purple-700">Distributor Terkait</span>
+                        <div className="text-xl font-bold text-purple-700 mt-1">{approachingStats?.total_creditors || 0} PBF</div>
+                        <div className="text-[11px] text-purple-600 mt-0.5">Ketentuan retur aktif</div>
+                    </div>
+                </div>
+
+                {/* Approaching Table Container */}
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+                    {/* Filters Bar */}
+                    <div className="p-4 border-b border-slate-200 flex flex-col md:flex-row items-center justify-between gap-3 bg-slate-50/50">
+                        <form onSubmit={handleApproachingSearchSubmit} className="relative w-full md:w-80">
+                            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                            <input
+                                type="text"
+                                placeholder="Cari obat, no batch, pabrik, faktur..."
+                                value={approachingSearch}
+                                onChange={(e) => setApproachingSearch(e.target.value)}
+                                className="w-full pl-9 pr-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
+                            />
+                        </form>
+
+                        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                            <select
+                                value={approachingCreditor}
+                                onChange={(e) => {
+                                    setApproachingCreditor(e.target.value);
+                                    handleApproachingFilterChange(e.target.value, approachingUrgency);
+                                }}
+                                className="text-xs border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                            >
+                                <option value="">Semua PBF</option>
+                                {creditors.map((c) => (
+                                    <option key={c.code} value={c.code}>{c.name}</option>
+                                ))}
+                            </select>
+
+                            <select
+                                value={approachingUrgency}
+                                onChange={(e) => {
+                                    setApproachingUrgency(e.target.value);
+                                    handleApproachingFilterChange(approachingCreditor, e.target.value);
+                                }}
+                                className="text-xs border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                            >
+                                <option value="">Semua Status Urgensi</option>
+                                <option value="eligible">Siap Diretur Sekarang</option>
+                                <option value="approaching">Mendekati Batas Retur (1-2 Bln)</option>
+                                <option value="critical">Bulan Terakhir (Segera Hangus!)</option>
+                            </select>
+
+                            {(approachingSearch || approachingCreditor || approachingUrgency) && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setApproachingSearch('');
+                                        setApproachingCreditor('');
+                                        setApproachingUrgency('');
+                                        handleApproachingFilterChange('', '');
+                                    }}
+                                    className="text-xs text-rose-600 hover:text-rose-700 font-semibold px-2 py-1 cursor-pointer"
+                                >
+                                    Reset Filter
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Table */}
+                    <div className="overflow-x-auto relative">
+                        <table className="w-full text-left text-xs text-slate-600">
+                            <thead className="bg-slate-50 text-slate-700 font-semibold uppercase text-[10px] border-b border-slate-200 tracking-wider">
+                                <tr>
+                                    <th className="py-3 px-2 w-8 text-center">No</th>
+                                    <th className="py-3 px-3 min-w-[180px]">Nama Obat & Pabrik</th>
+                                    <th className="py-3 px-3 min-w-[150px]">PBF / Distributor</th>
+                                    <th className="py-3 px-3 text-center min-w-[110px]">Batch & ED</th>
+                                    <th className="py-3 px-2 text-center w-20">Sisa Stok</th>
+                                    <th className="py-3 px-3 text-center min-w-[130px]">Ketentuan Retur</th>
+                                    <th className="py-3 px-2 text-center whitespace-nowrap">Batas Akhir Retur</th>
+                                    <th className="py-3 px-3 text-center min-w-[150px]">Status Urgensi</th>
+                                    <th className="py-3 px-3 text-right min-w-[110px]">Nilai Terancam</th>
+                                    <th className="py-3 px-3 text-center min-w-[140px] sticky right-0 bg-slate-100 z-10 shadow-[-6px_0_10px_-2px_rgba(0,0,0,0.06)]">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {(!approachingItems?.data || approachingItems.data.length === 0) ? (
+                                    <tr>
+                                        <td colSpan="10" className="text-center py-12 text-slate-400">
+                                            Tidak ada obat yang mendekati batas ketentuan retur saat ini.
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    approachingItems.data.map((item, idx) => (
+                                        <tr
+                                            key={item.batch_id}
+                                            className={`transition-colors hover:bg-amber-50/30 group ${item.urgency_key === 'critical' ? 'bg-rose-50/20' : item.is_eligible ? 'bg-emerald-50/20' : ''
+                                                }`}
+                                        >
+                                            <td className="py-2.5 px-2 text-center text-slate-400 font-mono text-[11px]">
+                                                {((approachingItems.current_page || 1) - 1) * (approachingItems.per_page || 25) + idx + 1}
+                                            </td>
+                                            <td className="py-2.5 px-3 font-bold text-slate-800">
+                                                <div>{item.medicine_name}</div>
+                                                <div className="text-[10px] text-slate-400 font-medium">
+                                                    Pabrik: {item.factory_name}
+                                                </div>
+                                            </td>
+                                            <td className="py-2.5 px-3">
+                                                <div className="text-xs font-semibold text-blue-900 break-words line-clamp-1" title={item.creditor_name}>
+                                                    {item.creditor_name}
+                                                </div>
+                                                <div className="font-mono text-[10px] text-slate-400">
+                                                    Faktur: {item.invoice_number}
+                                                </div>
+                                            </td>
+                                            <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                                                <div className="font-mono text-slate-700 text-xs font-semibold">{item.batch_number}</div>
+                                                <div className="text-[10px] font-semibold text-rose-600 mt-0.5">ED: {item.expired_date_display}</div>
+                                            </td>
+                                            <td className="py-2.5 px-2 text-center whitespace-nowrap">
+                                                <span className="font-extrabold text-blue-700 text-xs">{Number(item.stock)}</span>{' '}
+                                                <span className="text-[10px] font-semibold text-slate-500 uppercase">{item.unit || 'BOX'}</span>
+                                            </td>
+                                            <td className="py-2.5 px-3 text-center">
+                                                <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold border bg-slate-50 border-slate-200 text-slate-700 whitespace-nowrap">
+                                                    H-{item.months_before_ed} Bln sebelum ED
+                                                </span>
+                                                {item.rule_text && (
+                                                    <div className="text-[9px] text-slate-400 mt-0.5 truncate max-w-[130px]" title={item.rule_text}>
+                                                        {item.rule_text}
+                                                    </div>
+                                                )}
+                                            </td>
+                                            <td className="py-2.5 px-2 text-center whitespace-nowrap">
+                                                <div className="font-semibold text-slate-700 text-xs">{item.deadline_display}</div>
+                                                <div className="text-[9px] text-slate-400">
+                                                    {item.diff_months <= 0 ? 'Bulan Ini' : `Sisa ${item.diff_months} bln ke ED`}
+                                                </div>
+                                            </td>
+                                            <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${item.urgency_badge}`}>
+                                                    <span className={`w-1.5 h-1.5 rounded-full ${item.urgency_key === 'critical' ? 'bg-rose-500 animate-ping' : item.is_eligible ? 'bg-emerald-500' : 'bg-blue-500'
+                                                        }`} />
+                                                    {item.urgency_label}
+                                                </span>
+                                            </td>
+                                            <td className="py-2.5 px-3 text-right font-mono font-semibold text-slate-800 text-xs whitespace-nowrap">
+                                                {formatRupiah(item.estimated_value || 0)}
+                                            </td>
+                                            <td className="py-2.5 px-3 text-center sticky right-0 bg-white group-hover:bg-amber-50/50 shadow-[-6px_0_10px_-2px_rgba(0,0,0,0.06)] z-10 whitespace-nowrap">
+                                                {item.active_return_status ? (
+                                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                                        <Check className="w-3 h-3 text-blue-600" />
+                                                        <span>Sedang Diajukan</span>
+                                                    </span>
+                                                ) : (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleApplyReturnFromAlert(item)}
+                                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-lg text-xs font-semibold shadow-2xs hover:shadow-xs transition-all active:scale-[0.98] cursor-pointer shrink-0 border border-emerald-700/30"
+                                                        title="Ajukan retur otomatis untuk obat ini"
+                                                    >
+                                                        <Plus className="w-3.5 h-3.5 text-emerald-100 shrink-0" />
+                                                        <span>Ajukan Retur</span>
+                                                    </button>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* Pagination Approaching Items */}
+                    {approachingItems?.total > approachingItems?.per_page && (
+                        <div className="p-4 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
+                            <div>
+                                Menampilkan {approachingItems.from || 0} - {approachingItems.to || 0} dari {approachingItems.total} item
+                            </div>
+                            <div className="flex items-center gap-1">
+                                {approachingItems.links.map((link, i) => (
+                                    <button
+                                        key={i}
+                                        disabled={!link.url || link.active}
+                                        onClick={() => link.url && router.get(link.url, {}, { preserveState: true })}
+                                        className={`px-3 py-1.5 rounded-lg font-medium transition-all ${link.active
+                                            ? 'bg-amber-600 text-white font-bold'
+                                            : link.url
+                                                ? 'bg-slate-50 hover:bg-slate-100 text-slate-700'
+                                                : 'text-slate-300 cursor-not-allowed'
+                                            }`}
+                                        dangerouslySetInnerHTML={{ __html: link.label }}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </>
+        )}
+    </div>
 
             {/* Modal Input Retur Baru */}
             {createModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-3 sm:p-6">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl h-[90vh] border border-slate-200 flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-2 sm:p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[96vw] xl:max-w-[1700px] h-[94vh] border border-slate-200 flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
                         {/* Modal Header (Fixed at top) */}
                         <div className="p-4 sm:p-5 border-b border-slate-200 flex items-center justify-between bg-slate-50 shrink-0">
                             <div>
@@ -840,9 +1321,11 @@ export default function PurchaseReturns({ items, filters, stats, creditors, bran
                                                             <tr
                                                                 key={idx}
                                                                 className={`transition-colors ${isFromInvoice
-                                                                    ? row.selected
-                                                                        ? 'bg-blue-50/70 font-medium'
-                                                                        : 'bg-white opacity-70 hover:opacity-100 hover:bg-slate-50'
+                                                                    ? row.is_already_returned
+                                                                        ? 'bg-slate-100/90 text-slate-400 opacity-60 cursor-not-allowed'
+                                                                        : row.selected
+                                                                            ? 'bg-blue-50/70 font-medium'
+                                                                            : 'bg-white opacity-70 hover:opacity-100 hover:bg-slate-50'
                                                                     : 'hover:bg-slate-50'
                                                                     }`}
                                                             >
@@ -850,21 +1333,33 @@ export default function PurchaseReturns({ items, filters, stats, creditors, bran
                                                                     <td className="py-2 px-3 text-center">
                                                                         <input
                                                                             type="checkbox"
-                                                                            checked={!!row.selected}
+                                                                            disabled={!!row.is_already_returned}
+                                                                            checked={row.is_already_returned ? false : !!row.selected}
                                                                             onChange={(e) => updateItemRow(idx, 'selected', e.target.checked)}
-                                                                            className="rounded text-blue-600 focus:ring-blue-500 cursor-pointer w-4 h-4"
+                                                                            className={`rounded text-blue-600 focus:ring-blue-500 w-4 h-4 ${row.is_already_returned ? 'cursor-not-allowed opacity-40' : 'cursor-pointer'}`}
                                                                         />
                                                                     </td>
                                                                 )}
                                                                 <td className="py-2 px-3">
                                                                     {isFromInvoice ? (
                                                                         <div>
-                                                                            <div className="font-bold text-slate-800 flex items-center gap-1.5">
-                                                                                <Lock className="w-3 h-3 text-slate-400 shrink-0" />
-                                                                                <span>{row.medicine_name}</span>
+                                                                            <div className="font-bold text-slate-800 flex items-center gap-1.5 flex-wrap">
+                                                                                {row.is_already_returned ? (
+                                                                                    <Lock className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                                                                                ) : (
+                                                                                    <Package className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                                                                )}
+                                                                                <span className={row.is_already_returned ? 'line-through text-slate-500' : ''}>
+                                                                                    {row.medicine_name}
+                                                                                </span>
+                                                                                {row.is_already_returned && (
+                                                                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700 border border-rose-200">
+                                                                                        <Lock className="w-2.5 h-2.5" /> Terkunci (Sudah Diretur)
+                                                                                    </span>
+                                                                                )}
                                                                             </div>
                                                                             {row.factory_name && (
-                                                                                <div className="text-[10px] text-slate-400 font-medium pl-4.5">
+                                                                                <div className="text-[10px] text-slate-400 font-medium pl-5">
                                                                                     Pabrik: {row.factory_name}
                                                                                 </div>
                                                                             )}
@@ -914,7 +1409,7 @@ export default function PurchaseReturns({ items, filters, stats, creditors, bran
                                                                             max={isFromInvoice ? (row.max_qty || 9999) : undefined}
                                                                             step="any"
                                                                             required
-                                                                            disabled={isFromInvoice && !row.selected}
+                                                                            disabled={isFromInvoice && (!row.selected || !!row.is_already_returned)}
                                                                             value={row.qty === '' ? '' : row.qty}
                                                                             onFocus={(e) => e.target.select()}
                                                                             onChange={(e) => {
@@ -931,8 +1426,8 @@ export default function PurchaseReturns({ items, filters, stats, creditors, bran
                                                                                 }
                                                                                 updateItemRow(idx, 'qty', val);
                                                                             }}
-                                                                            className={`w-14 border rounded-lg px-1.5 py-1 text-xs text-center font-bold ${isFromInvoice && !row.selected
-                                                                                ? 'bg-slate-100 text-slate-400 border-slate-200'
+                                                                            className={`w-14 border rounded-lg px-1.5 py-1 text-xs text-center font-bold ${isFromInvoice && (!row.selected || row.is_already_returned)
+                                                                                ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
                                                                                 : 'border-blue-300 text-blue-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500'
                                                                                 }`}
                                                                         />
@@ -982,7 +1477,7 @@ export default function PurchaseReturns({ items, filters, stats, creditors, bran
                                                                 <td className="py-2 px-2">
                                                                     {isFromInvoice ? (
                                                                         <span className="text-slate-700 text-[11px]">
-                                                                            {row.expired_date || '-'}
+                                                                            {formatDateDisplay(row.expired_date)}
                                                                         </span>
                                                                     ) : (
                                                                         <input
@@ -1020,10 +1515,10 @@ export default function PurchaseReturns({ items, filters, stats, creditors, bran
                                                                 </td>
                                                                 <td className="py-2 px-2">
                                                                     <select
-                                                                        disabled={isFromInvoice && !row.selected}
-                                                                        value={row.reason}
+                                                                        disabled={isFromInvoice && (!row.selected || !!row.is_already_returned)}
+                                                                        value={row.reason || 'ED DEKAT'}
                                                                         onChange={(e) => updateItemRow(idx, 'reason', e.target.value)}
-                                                                        className="w-full border border-slate-200 rounded-lg px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                                                                        className={`w-full border border-slate-200 rounded-lg px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 ${isFromInvoice && (!row.selected || row.is_already_returned) ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-white'}`}
                                                                     >
                                                                         <option value="ED DEKAT">ED DEKAT</option>
                                                                         <option value="SALAH PESAN">SALAH PESAN</option>
@@ -1242,6 +1737,230 @@ export default function PurchaseReturns({ items, filters, stats, creditors, bran
                                     className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-xs transition-all"
                                 >
                                     Simpan Perubahan
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+            {/* Modal Konfirmasi Retur (Kurangi Stok) */}
+            {confirmModalOpen && confirmingItem && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+                        <div className="p-5 border-b border-slate-200 flex items-center justify-between bg-amber-50/80">
+                            <div className="flex items-center gap-2.5">
+                                <div className="p-2 bg-amber-100 rounded-xl text-amber-700">
+                                    <AlertTriangle className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-slate-800 text-sm">Konfirmasi Retur Pembelian</h3>
+                                    <p className="text-[11px] text-slate-500">Kurangi stok barang dan catat riwayat stok</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setConfirmModalOpen(false)}
+                                className="p-1 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-700"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleConfirmSubmit} className="p-5 space-y-4 text-xs">
+                            {/* Ringkasan Item */}
+                            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-slate-500">Nama Obat:</span>
+                                    <span className="font-bold text-slate-800 text-right">{confirmingItem.medicine_name}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-slate-500">No Faktur:</span>
+                                    <span className="font-semibold text-slate-700 font-mono">{confirmingItem.purchase_return?.invoice_number || '-'}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-slate-500">PBF / Supplier:</span>
+                                    <span className="font-semibold text-slate-700">{confirmingItem.purchase_return?.creditor?.name || confirmingItem.purchase_return?.creditor_code || '-'}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-slate-500">Jumlah Diretur:</span>
+                                    <span className="font-bold text-blue-700">{confirmingItem.qty} {confirmingItem.unit}</span>
+                                </div>
+                                <div className="flex justify-between items-center pt-1 border-t border-slate-200">
+                                    <span className="text-slate-500">Estimasi Nilai Retur:</span>
+                                    <span className="font-bold text-emerald-700 font-mono">{formatRupiah(confirmingItem.qty * confirmingItem.unit_price)}</span>
+                                </div>
+                            </div>
+
+                            {/* Alert Pengurangan Stok */}
+                            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex gap-2.5 text-amber-900 leading-relaxed">
+                                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                                <div className="text-[11px]">
+                                    <strong className="block font-bold mb-0.5">Pengurangan Stok Barang</strong>
+                                    Konfirmasi ini akan <strong>langsung memotong stok master obat & stok batch</strong> terkait, mencatat ke Kartu Stok (Items Log status 4 Retur Beli), dan <strong>diperbolehkan minus stok</strong> jika fisik barang sudah ditarik.
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block font-bold text-slate-700 mb-1">
+                                    Tanggal Konfirmasi Retur <span className="text-rose-500">*</span>
+                                </label>
+                                <input
+                                    type="date"
+                                    required
+                                    value={confirmForm.confirmed_date}
+                                    onChange={(e) => setConfirmForm({ ...confirmForm, confirmed_date: e.target.value })}
+                                    className="w-full border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                                />
+                                <span className="text-[10px] text-slate-400 mt-1 block">Wajib mencatat tanggal pelaksanaan konfirmasi retur.</span>
+                            </div>
+
+                            <div>
+                                <label className="block font-bold text-slate-700 mb-1">Catatan Konfirmasi (Opsional)</label>
+                                <textarea
+                                    rows="2"
+                                    placeholder="Contoh: Barang fisik sudah diserahkan ke sales PBF..."
+                                    value={confirmForm.notes}
+                                    onChange={(e) => setConfirmForm({ ...confirmForm, notes: e.target.value })}
+                                    className="w-full border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                            </div>
+
+                            <div className="pt-3 border-t border-slate-200 flex items-center justify-end gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setConfirmModalOpen(false)}
+                                    className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-semibold transition-all"
+                                >
+                                    Batal
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold shadow-xs transition-all flex items-center gap-1.5"
+                                >
+                                    <CheckCircle2 className="w-4 h-4" /> Konfirmasi & Kurangi Stok
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal Ubah Status Retur */}
+            {statusModalOpen && statusItem && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+                        <div className="p-5 border-b border-slate-200 flex items-center justify-between bg-blue-50/80">
+                            <div className="flex items-center gap-2.5">
+                                <div className="p-2 bg-blue-100 rounded-xl text-blue-700">
+                                    <ArrowRight className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-slate-800 text-sm">Ubah Status Retur Pembelian</h3>
+                                    <p className="text-[11px] text-slate-500">Pembaruan alur status dan pemotongan tagihan hutang</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setStatusModalOpen(false)}
+                                className="p-1 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-700"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleStatusSubmit} className="p-5 space-y-4 text-xs">
+                            {/* Ringkasan Item */}
+                            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-slate-500">Nama Obat:</span>
+                                    <span className="font-bold text-slate-800 text-right">{statusItem.medicine_name}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-slate-500">No Faktur:</span>
+                                    <span className="font-semibold text-slate-700 font-mono">{statusItem.purchase_return?.invoice_number || '-'}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-slate-500">Status Saat Ini:</span>
+                                    {(() => {
+                                        const badge = getStatusBadge(statusItem.status);
+                                        return (
+                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${badge.badgeClass}`}>
+                                                {badge.label}
+                                            </span>
+                                        );
+                                    })()}
+                                </div>
+                                <div className="flex justify-between items-center pt-1 border-t border-slate-200">
+                                    <span className="text-slate-500">Nilai Retur Obat:</span>
+                                    <span className="font-bold text-emerald-700 font-mono">{formatRupiah(statusItem.qty * statusItem.unit_price)}</span>
+                                </div>
+                            </div>
+
+                            {/* Pilihan Status */}
+                            <div>
+                                <label className="block font-bold text-slate-700 mb-1">
+                                    Pilih Status Baru <span className="text-rose-500">*</span>
+                                </label>
+                                <select
+                                    required
+                                    value={statusForm.status}
+                                    onChange={(e) => setStatusForm({ ...statusForm, status: e.target.value })}
+                                    className="w-full border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-800"
+                                >
+                                    <option value="dikonfirmasi">Sudah Dikonfirmasi</option>
+                                    <option value="sudah_potong">Sudah Potong Tagihan</option>
+                                    <option value="barang_kembali_pmi">Barang Kembali PMI</option>
+                                </select>
+                            </div>
+
+                            {/* Tanggal Perubahan Status (Wajib dicatat sesuai instruksi) */}
+                            <div>
+                                <label className="block font-bold text-slate-700 mb-1">
+                                    Tanggal Perubahan Status <span className="text-rose-500">*</span>
+                                </label>
+                                <input
+                                    type="date"
+                                    required
+                                    value={statusForm.status_date}
+                                    onChange={(e) => setStatusForm({ ...statusForm, status_date: e.target.value })}
+                                    className="w-full border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                                />
+                                <span className="text-[10px] text-slate-400 mt-1 block">Wajib: Setiap pergantian status harus tercatat tanggalnya.</span>
+                            </div>
+
+                            {/* Notifikasi Khusus jika Potong Tagihan */}
+                            {statusForm.status === 'sudah_potong' && (
+                                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-900 leading-relaxed text-[11px] flex gap-2">
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                                    <div>
+                                        <strong className="block font-bold mb-0.5">Pemotongan Hutang Dagang Otomatis</strong>
+                                        Memilih status ini akan langsung memotong sisa tagihan Hutang Dagang pada faktur penerimaan sebesar <strong className="font-mono">{formatRupiah(statusItem.qty * statusItem.unit_price)}</strong> dan menjaga konsistensi data hutang.
+                                    </div>
+                                </div>
+                            )}
+
+                            <div>
+                                <label className="block font-bold text-slate-700 mb-1">Keterangan / Catatan Status (Opsional)</label>
+                                <textarea
+                                    rows="2"
+                                    placeholder="Contoh: No nota retur dari PBF / nomor credit note..."
+                                    value={statusForm.notes}
+                                    onChange={(e) => setStatusForm({ ...statusForm, notes: e.target.value })}
+                                    className="w-full border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                            </div>
+
+                            <div className="pt-3 border-t border-slate-200 flex items-center justify-end gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setStatusModalOpen(false)}
+                                    className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-semibold transition-all"
+                                >
+                                    Batal
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-xs transition-all flex items-center gap-1.5"
+                                >
+                                    <Check className="w-4 h-4" /> Simpan Perubahan Status
                                 </button>
                             </div>
                         </form>

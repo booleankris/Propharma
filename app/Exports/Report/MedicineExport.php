@@ -196,7 +196,7 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
                 }
 
                 $grouped[$key]['qty'] += (float) ($item->quantity ?? 0);
-                $grouped[$key]['total'] += (int) ($item->final_price ?? 0);
+                $grouped[$key]['total'] += (int) round((float) ($item->final_price ?? 0));
             }
         }
 
@@ -289,9 +289,9 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
                 $jnsHarga = !empty($item->cart_type) ? (string) $item->cart_type : '-';
 
                 $qty   = (float) ($item->quantity ?? 0);
-                $bruto = (int) ($item->total_price ?? ($item->raw_total ?? 0));
-                $disc  = (int) ($item->discount ?? 0);
-                $netto = (int) ($item->final_price ?? 0);
+                $bruto = (int) round((float) ($item->total_price ?? ($item->raw_total ?? 0)));
+                $disc  = (int) round((float) ($item->discount ?? 0));
+                $netto = (int) round((float) ($item->final_price ?? 0));
 
                 $itemsList[] = [
                     'nomor'     => $trxCode,

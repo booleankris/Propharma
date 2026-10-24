@@ -115,12 +115,12 @@ class DoctorExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                 ];
             }
 
-            $grouped[$groupKey]['nilai_resep'] += $resepItems->sum(fn ($i) => (int) ($i->final_price ?? 0));
+            $grouped[$groupKey]['nilai_resep'] += $resepItems->sum(fn ($i) => (int) round((float) ($i->final_price ?? 0)));
             $grouped[$groupKey]['lembar']      += 1;
             $grouped[$groupKey]['jumlah_r']    += $resepItems->count();
 
-            if (is_numeric($trx->discount) && (int) $trx->discount > 0) {
-                $potonganTrx += (int) $trx->discount;
+            if (is_numeric($trx->discount) && (float) $trx->discount > 0) {
+                $potonganTrx += (int) round((float) $trx->discount);
             }
         }
 
@@ -205,11 +205,11 @@ class DoctorExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                 }
 
                 $grouped[$key]['qty']   += (float) ($item->quantity ?? 0);
-                $grouped[$key]['total'] += (int) ($item->final_price ?? 0);
+                $grouped[$key]['total'] += (int) round((float) ($item->final_price ?? 0));
             }
 
-            if (is_numeric($trx->discount) && (int) $trx->discount > 0) {
-                $potonganTrx += (int) $trx->discount;
+            if (is_numeric($trx->discount) && (float) $trx->discount > 0) {
+                $potonganTrx += (int) round((float) $trx->discount);
             }
         }
 

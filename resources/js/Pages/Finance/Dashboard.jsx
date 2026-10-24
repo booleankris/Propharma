@@ -19,6 +19,7 @@ import {
     Calendar,
     ArrowRight,
     CircleDollarSign,
+    Undo2,
 } from 'lucide-react';
 
 export default function Dashboard({
@@ -40,6 +41,36 @@ export default function Dashboard({
                     <div><span className="finance-eyebrow">PUSAT KEUANGAN</span><h2>Keuangan dalam satu pandangan</h2><p>Pantau saldo, arus kas, dan tagihan yang perlu ditindaklanjuti.</p></div>
                     <Link href="/finance/kas-bank" className="finance-primary-link"><Landmark size={18} /> Buka buku kas <ArrowRight size={16} /></Link>
                 </div>
+
+                {/* Banner Peringatan Retur Beli */}
+                {stats.returAlert && (stats.returAlert.total_count || 0) > 0 && (
+                    <div className="bg-linear-to-r from-amber-500/10 via-amber-500/5 to-white border-l-4 border-amber-500 bg-white p-4 rounded-2xl border border-slate-200/90 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                        <div className="flex items-center gap-3.5">
+                            <div className="w-11 h-11 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 shadow-2xs">
+                                <Undo2 className="w-5 h-5" />
+                            </div>
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <span className="font-bold text-slate-900 text-sm">Peringatan Ketentuan Retur Beli Distributor</span>
+                                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                                        {stats.returAlert.total_count} Obat Terdeteksi
+                                    </span>
+                                </div>
+                                <p className="text-xs text-slate-600 mt-0.5">
+                                    Ada <strong className="text-emerald-700">{stats.returAlert.eligible_count} obat siap diretur sekarang</strong> dan <strong className="text-amber-700">{stats.returAlert.approaching_count} obat mendekati batas retur</strong> berdasarkan ketentuan ({stats.returAlert.total_creditors} PBF).
+                                </p>
+                            </div>
+                        </div>
+                        <Link
+                            href="/finance/purchase-returns?tab=approaching"
+                            className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white rounded-xl text-xs font-semibold shadow-xs hover:shadow transition-all shrink-0 cursor-pointer"
+                        >
+                            <span>Buka Rekomendasi Retur</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                        </Link>
+                    </div>
+                )}
+
                 {/* 1. TOP EXECUTIVE KPI CARDS */}
                 <div className="grid finance-kpis grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
                     {/* Total Saldo Kas & Bank */}

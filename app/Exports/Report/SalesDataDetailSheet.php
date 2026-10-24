@@ -276,8 +276,8 @@ class SalesDataDetailSheet implements FromArray, WithStyles, WithColumnWidths, W
                     $medName = $item->medicine?->name ?? ($item->medicine_name ?? '-');
                     $price = (int) ($item->item_price ?? 0);
                     $qty = (float) ($item->quantity ?? 0);
-                    $itemDiscount = (int) ($item->discount ?? 0);
-                    $itemTot = (int) ($item->final_price ?? $item->total_price ?? ($price * $qty - $itemDiscount));
+                    $itemDiscount = (int) round((float) ($item->discount ?? 0));
+                    $itemTot = (int) round((float) ($item->final_price ?? $item->total_price ?? ($price * $qty - $itemDiscount)));
 
                     if ($isReturn) {
                         $price = -abs($price);
