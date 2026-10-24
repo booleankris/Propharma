@@ -2720,13 +2720,25 @@
         list.innerHTML = '';
         closeBox();
 
+        if (checkbox && !checkbox.checked) {
+            packageInput?.setAttribute('readonly', true);
+            dosageRInput?.setAttribute('readonly', true);
+            packageInput?.classList.add('readonly');
+            dosageRInput?.classList.add('readonly');
+            if (dosageRInput) dosageRInput.value = '';
+            if (packageInput) packageInput.value = '';
+            racikstatus = 0;
+        }
+
         setTimeout(() => {
             isScanning = false;
 
-            if (currenttransaction == 'RESEP TUNAI' && racikstatus != 0) {
-                dosageRInput.focus();
-            } else if (currenttransaction == 'KREDIT' && racikstatus != 0) {
-                dosageRInput.focus();
+            if ((currenttransaction == 'RESEP TUNAI' || currenttransaction == 'KREDIT') && checkbox && checkbox.checked && racikstatus != 0) {
+                if (packageInput && !packageInput.value) {
+                    packageInput.focus();
+                } else if (dosageRInput) {
+                    dosageRInput.focus();
+                }
             } else {
                 quantity.focus();
             }
@@ -3538,9 +3550,10 @@
         total_item = val;
         let rawAmount = price2 * val;
 
-        if (transaction_type == "KREDIT" && racikstatus === 0) {
+        const isRacik = Number(racikstatus) !== 0;
+        if (transaction_type == "KREDIT" && !isRacik) {
             subtotal = rawAmount + parseInt(service || 0);
-        } else if (transaction_type == "RESEP TUNAI" && racikstatus === 0) {
+        } else if (transaction_type == "RESEP TUNAI" && !isRacik) {
             subtotal = Math.max(1000, Math.ceil(rawAmount / 1000) * 1000) + parseInt(service || 0);
         } else {
             subtotal = Math.max(1000, Math.ceil(rawAmount / 1000) * 1000);
@@ -4041,10 +4054,14 @@
                 het = Number(item.medicine?.het_price) > 0 ? 1 : 0;
                 discount = Number(item.discount) || 0;
 
+                // recipe_status: null = bukan racikan, "0" = racikan terbuka, "1" = racikan selesai
+                const isRacikItem = item.recipe_status !== null && item.recipe_status !== undefined && item.recipe_status !== '';
+                if (item.cart_type == 'UM') transaction_type = 'RESEP TUNAI';
+
                 let rawAmount = price2 * item.quantity;
-                if (item.cart_type == 'UK' && (!item.recipe_status || item.recipe_status == 0)) {
+                if (item.cart_type == 'UK' && !isRacikItem) {
                     subtotal = rawAmount + parseInt(service || 0);
-                } else if (transaction_type == "RESEP TUNAI" && (!item.recipe_status || item.recipe_status == 0)) {
+                } else if (transaction_type == "RESEP TUNAI" && !isRacikItem) {
                     subtotal = Math.max(1000, Math.ceil(rawAmount / 1000) * 1000) + parseInt(service || 0);
                 } else {
                     subtotal = Math.max(1000, Math.ceil(rawAmount / 1000) * 1000);
@@ -4056,30 +4073,28 @@
                 name.value = item.medicine.name || '';
                 unit.value = item.medicine.unit || item.medicine.packaging || '';
                 if (currenttransaction == 'RESEP TUNAI') {
-                    dosage.value = item.medicine.dosage;
+                    dosage.value = item.medicine.dosage || '';
                     if (dosageRInput || packageInput) {
-                        dosageRInput.value = item.dosage_r;
-                        packageInput.value = item.package;
+                        dosageRInput.value = isRacikItem ? (item.dosage_r || '') : '';
+                        packageInput.value = isRacikItem ? (item.package || '') : '';
                     }
                     const dosageR2 = document.getElementById('dosage_r2');
-                    if (item.cart_type == "UM") {
-                        if (checkbox) {
-                            packageInput?.removeAttribute('readonly');
-                            dosageRInput?.removeAttribute('readonly');
-                            packageInput?.classList.remove('readonly');
-                            dosageRInput?.classList.remove('readonly');
-                            if (dosageR2) dosageR2.value = "Ya";
-                            racikstatus = 1;
-                        }
+                    if (isRacikItem) {
+                        if (checkbox) checkbox.checked = true;
+                        packageInput?.removeAttribute('readonly');
+                        dosageRInput?.removeAttribute('readonly');
+                        packageInput?.classList.remove('readonly');
+                        dosageRInput?.classList.remove('readonly');
+                        if (dosageR2) dosageR2.value = "Ya";
+                        racikstatus = 1;
                     } else {
-                        if (checkbox) {
-                            packageInput?.setAttribute('readonly', true);
-                            dosageRInput?.setAttribute('readonly', true);
-                            packageInput?.classList.add('readonly');
-                            dosageRInput?.classList.add('readonly');
-                            if (dosageR2) dosageR2.value = "Tidak";
-                            racikstatus = 0;
-                        }
+                        if (checkbox) checkbox.checked = false;
+                        packageInput?.setAttribute('readonly', true);
+                        dosageRInput?.setAttribute('readonly', true);
+                        packageInput?.classList.add('readonly');
+                        dosageRInput?.classList.add('readonly');
+                        if (dosageR2) dosageR2.value = "Tidak";
+                        racikstatus = 0;
                     }
                 }
                 if (currenttransaction === 'KREDIT' && item.cart_type == 'UK') {

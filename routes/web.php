@@ -248,7 +248,6 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
         Route::resource('creditors', CreditorsController::class)->except(['show']);
         Route::post('creditors/{id}/restore', [CreditorsController::class, 'restore'])->name('creditors.restore');
         Route::resource('debtors', DebtorsController::class)->except(['show']);
-        Route::resource('patients', PatientsController::class)->except(['show']);
         Route::get('doctors/duplicates', [DoctorsController::class, 'getDuplicates'])->name('doctors.duplicates');
         Route::post('doctors/merge-duplicates', [DoctorsController::class, 'mergeDuplicates'])->name('doctors.mergeDuplicates');
         Route::resource('doctors', DoctorsController::class)->except(['show']);
@@ -272,8 +271,14 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
 
         // Master Addition
         Route::get('/medicines/{id}/edit-data', [MedicineController::class, 'editCreditor']);
+    });
 
-        // Master Transaksi Pasien
+    // Data Pasien & Kunjungan Pasien (Dapat diakses juga oleh Koordinator)
+    Route::middleware(['role:HO|operator|Operator|administrator|Koordinator'])->group(function () {
+        Route::patch('patients/{patient}/toggle-status', [PatientsController::class, 'toggleStatus'])->name('patients.toggle-status');
+        Route::resource('patients', PatientsController::class)->except(['show']);
+
+        // Kunjungan / Transaksi Pasien
         Route::prefix('master/patient-transactions')->name('master.patient-transactions.')->group(function () {
             Route::get('/', [PatientTransactionsController::class, 'index'])->name('index');
             Route::get('/search-patients', [PatientTransactionsController::class, 'searchPatients'])->name('search-patients');

@@ -18,7 +18,12 @@ class PatientsController extends Controller
     public function index(Request $request)
     {
         if ($request->ajax()) {
-            $patients = Patients::select('id', 'code', 'name', 'address', 'city', 'phone', 'birth', 'status', 'created_at');
+            $statusFilter = $request->input('status_filter', 'all');
+
+            $patients = Patients::select('id', 'code', 'name', 'address', 'city', 'phone', 'birth', 'status', 'created_at')
+                ->when($statusFilter !== 'all', function ($q) use ($statusFilter) {
+                    $q->where('status', (int) $statusFilter);
+                });
 
             if (!$request->has('order')) {
                 $patients = $patients->orderBy('created_at', 'ASC');
@@ -28,8 +33,8 @@ class PatientsController extends Controller
                 ->addIndexColumn()
                 ->addColumn('status_label', function ($patient) {
                     return $patient->status == 1
-                        ? '<span class="badge bg-success">Active</span>'
-                        : '<span class="badge bg-secondary">Inactive</span>';
+                        ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">Aktif</span>'
+                        : '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">Non-Aktif</span>';
                 })
                 ->addColumn('action', function ($patient) {
                     $btn = '<div class="btn-toolbar" role="toolbar">
@@ -84,6 +89,7 @@ class PatientsController extends Controller
             'city'    => 'nullable|string|max:100',
             'phone'   => 'nullable|string|max:50',
             'birth'   => 'nullable|date',
+            'status'  => 'nullable|in:0,1',
         ]);
 
         $patient = Patients::create([
@@ -93,7 +99,7 @@ class PatientsController extends Controller
             'city'    => $validated['city'] ?? null,
             'phone'   => $validated['phone'] ?? null,
             'birth'   => $validated['birth'] ?? null,
-            'status'  => $request->status ?? 0,
+            'status'  => isset($validated['status']) ? (int) $validated['status'] : 1,
         ]);
 
         if ($request->ajax()) {
@@ -123,6 +129,7 @@ class PatientsController extends Controller
             'city'    => 'nullable|string|max:100',
             'phone'   => 'nullable|string|max:50',
             'birth'   => 'nullable|date',
+            'status'  => 'nullable|in:0,1',
         ]);
 
         $patient->update([
@@ -131,7 +138,7 @@ class PatientsController extends Controller
             'city'    => $validated['city'] ?? null,
             'phone'   => $validated['phone'] ?? null,
             'birth'   => $validated['birth'] ?? null,
-            'status'  => $request->status ?? 0,
+            'status'  => isset($validated['status']) ? (int) $validated['status'] : $patient->status,
         ]);
 
         if ($request->ajax()) {
@@ -144,6 +151,19 @@ class PatientsController extends Controller
 
         return redirect()->route('patients.index')
             ->with('success', 'Data patient berhasil diperbarui.');
+    }
+
+    public function toggleStatus($id)
+    {
+        $patient = Patients::findOrFail($id);
+        $newStatus = ($patient->status == 1) ? 0 : 1;
+        $patient->update(['status' => $newStatus]);
+
+        return response()->json([
+            'success' => true,
+            'status'  => $newStatus,
+            'message' => $newStatus == 1 ? 'Pasien berhasil diaktifkan.' : 'Pasien berhasil dinonaktifkan.',
+        ]);
     }
 
     public function destroy($id)
