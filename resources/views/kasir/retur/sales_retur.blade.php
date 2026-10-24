@@ -586,10 +586,16 @@
                 return;
             }
 
+            const isFallback = (transfer_id === 'fallback');
+            const confirmTitle = isFallback ? 'Konfirmasi Retur (Penyesuaian)' : 'Konfirmasi Retur';
+            const confirmText = isFallback
+                ? `PERHATIAN (PENYESUAIAN NON-BATCH):\nObat "${medicine_name}" pada transaksi ini tidak memiliki batch/stok etalase aktif dan akan diproses sebagai PENYESUAIAN TRANSAKSI.\nObat ini akan dikunci permanen pada transaksi ini.\n\nLanjutkan retur penyesuaian?`
+                : `PERHATIAN:\nObat "${medicine_name}" pada transaksi ini akan dikunci permanen dan TIDAK DAPAT di-retur lagi di transaksi ini.\n\nApakah Anda yakin ingin melanjutkan proses retur?`;
+
             // Peringatan konfirmasi retur dan penguncian
             swal({
-                title: 'Konfirmasi Retur',
-                text: `PERHATIAN:\nObat "${medicine_name}" pada transaksi ini akan dikunci permanen dan TIDAK DAPAT di-retur lagi di transaksi ini.\n\nApakah Anda yakin ingin melanjutkan proses retur?`,
+                title: confirmTitle,
+                text: confirmText,
                 icon: 'warning',
                 buttons: {
                     cancel: {
@@ -847,12 +853,18 @@
                     data.forEach((item) => {
                         const option = document.createElement('option');
                         option.value = item.transfer_id;
-                        option.textContent =
-                            `${item.batch_name} — Exp: ${item.expired_date} (Stok: ${item.counter_stock}) (Etalase: ${item.etalase_name})`;
+                        if (item.is_fallback) {
+                            option.textContent = `⚠️ [PENYESUAIAN] ${item.batch_name} — (${item.etalase_name})`;
+                            option.classList.add('text-amber-600', 'font-semibold');
+                        } else {
+                            option.textContent =
+                                `${item.batch_name} — Exp: ${item.expired_date} (Stok: ${item.counter_stock}) (Etalase: ${item.etalase_name})`;
+                        }
 
                         option.dataset.batchName = item.batch_name;
                         option.dataset.expiredDate = item.expired_date;
                         option.dataset.transferId = item.transfer_id;
+                        option.dataset.isFallback = item.is_fallback ? '1' : '0';
 
                         select.appendChild(option);
                     });

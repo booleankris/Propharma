@@ -199,7 +199,7 @@ class ReturController extends Controller
             'qty_retur' => 'required|numeric|min:1',
             'total_retur' => 'required',
             'old_qty' => 'required',
-            'transfer_id' => 'required|integer',
+            'transfer_id' => 'required',
         ]);
 
         $findcode = MedicineTransactions::findOrFail($request->transaction_id);
@@ -249,19 +249,63 @@ class ReturController extends Controller
             // yang mungkin sedang aktif saat user membuka form retur.
             $pharmacyId = (int) $findcode->pharmacy_id;
             $counterPharmacyId = isWarehousePharmacy($pharmacyId) ? 1 : $pharmacyId;
-            $transfer = MedicineTransferItems::whereKey($request->transfer_id)
-                ->where('status', 1)
-                ->where(function ($q) {
-                    $q->whereNull('source_type')->orWhere('source_type', '!=', 'retur_gudang');
-                })
-                ->whereHas('batches', function ($q) use ($request, $counterPharmacyId) {
-                    $q->where('medicine_id', $request->medicine_id)
-                        ->where('pharmacy_id', $counterPharmacyId);
-                })
-                ->lockForUpdate()
-                ->firstOrFail();
-            $transfer->qty += $request->qty_retur; // add back to counter stock
-            $transfer->save();
+
+            $isFallback = ($request->transfer_id === 'fallback' || $request->transfer_id === '0' || $request->transfer_id === 0);
+            $batchIdForLog = null;
+
+            if (!$isFallback) {
+                $transfer = MedicineTransferItems::whereKey($request->transfer_id)
+                    ->where('status', 1)
+                    ->where(function ($q) {
+                        $q->whereNull('source_type')->orWhere('source_type', '!=', 'retur_gudang');
+                    })
+                    ->whereHas('batches', function ($q) use ($request, $counterPharmacyId) {
+                        $q->where('medicine_id', $request->medicine_id)
+                            ->where('pharmacy_id', $counterPharmacyId);
+                    })
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($transfer) {
+                    $transfer->qty += $request->qty_retur; // add back to counter stock
+                    $transfer->save();
+                    $batchIdForLog = $transfer->batches_id;
+                }
+            } else {
+                // Jika fallback, cari apakah ada transfer item counter (meski stok 0 / minus) untuk dipulihkan stoknya
+                $transfer = MedicineTransferItems::where('status', 1)
+                    ->where(function ($q) {
+                        $q->whereNull('source_type')->orWhere('source_type', '!=', 'retur_gudang');
+                    })
+                    ->whereHas('batches', function ($q) use ($request, $counterPharmacyId) {
+                        $q->where('medicine_id', $request->medicine_id)
+                            ->where('pharmacy_id', $counterPharmacyId);
+                    })
+                    ->orderBy('id', 'desc')
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($transfer) {
+                    $transfer->qty += $request->qty_retur; // kembalikan stok etalase (hilangkan minus)
+                    $transfer->save();
+                    $batchIdForLog = $transfer->batches_id;
+                }
+            }
+
+            if (!$batchIdForLog) {
+                $batchIdForLog = Batches::where('medicine_id', $request->medicine_id)
+                    ->where(function ($q) use ($pharmacyId) {
+                        $q->where('pharmacy_id', $pharmacyId)->orWhereNull('pharmacy_id');
+                    })
+                    ->value('id');
+            }
+
+            if ($batchIdForLog) {
+                $b = Batches::find($batchIdForLog);
+                if ($b && $b->stock < 0) {
+                    $b->increment('stock', $request->qty_retur); // hilangkan minus pada batch jika ada
+                }
+            }
 
             // Create Retur Log (Retur Sales = 3)
             $itemsLog = ItemsLog::create([
@@ -275,7 +319,7 @@ class ReturController extends Controller
                 'total' => $request->total_retur,
                 'date' => $now,
                 'status' => 3,
-                'batches_id' => $transfer->batches_id,
+                'batches_id' => $batchIdForLog,
                 'user_id' => auth()->user()->id,
             ]);
 
@@ -365,7 +409,31 @@ class ReturController extends Controller
             )
             ->get();
 
-        return response()->json($transfers);
+        $results = [];
+        foreach ($transfers as $item) {
+            $results[] = [
+                'transfer_id' => $item->transfer_id,
+                'counter_stock' => $item->counter_stock,
+                'batch_id' => $item->batch_id,
+                'batch_name' => $item->batch_name,
+                'expired_date' => $item->expired_date ? Carbon::parse($item->expired_date)->format('d/m/Y') : '-',
+                'etalase_name' => $item->etalase_name ?: 'Etalase Kasir',
+                'is_fallback' => false,
+            ];
+        }
+
+        // Tambahkan opsi Fallback Non-Batch (Penyesuaian Salah Input / Barang Tanpa Stok)
+        $results[] = [
+            'transfer_id' => 'fallback',
+            'counter_stock' => 0,
+            'batch_id' => null,
+            'batch_name' => 'NON-BATCH (Penyesuaian Salah Input)',
+            'expired_date' => '-',
+            'etalase_name' => 'Retur Finansial',
+            'is_fallback' => true,
+        ];
+
+        return response()->json($results);
     }
 
 
