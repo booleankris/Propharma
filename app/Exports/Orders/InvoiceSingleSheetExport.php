@@ -176,9 +176,9 @@ class InvoiceSingleSheetExport implements FromArray, WithStyles, WithColumnWidth
                     'receiving_details_created_at' => $item->receiving_details_created_at,
                     'creditor_code'                => $item->creditor_code,
                     'creditor_name'                => $item->creditor_name,
-                    'dpp'                          => 0,
-                    'ppn'                          => 0,
-                    'jumlah'                       => 0,
+                    'ppn_type'                     => strtoupper(trim($item->invoice_ppn ?? 'TANPA')),
+                    'subtotal'                     => 0.0,
+                    'discount'                     => 0.0,
                 ];
             }
 
@@ -190,22 +190,35 @@ class InvoiceSingleSheetExport implements FromArray, WithStyles, WithColumnWidth
             $nomDisc      = ($disc <= 100 && $disc > 0) ? ($gross * $disc / 100) : $disc;
             $nomExtraDisc = ($extraDisc <= 100 && $extraDisc > 0) ? ($gross * $extraDisc / 100) : $extraDisc;
 
-            $dpp = max(0, $gross - $nomDisc - $nomExtraDisc);
-            $ppnType = strtoupper(trim($item->invoice_ppn ?? 'TANPA'));
+            $invoices[$key]['subtotal'] += $gross;
+            $invoices[$key]['discount'] += ($nomDisc + $nomExtraDisc);
+        }
+
+        // Kalkulasi DPP, PPN, dan Jumlah persis seperti di cetakan faktur penerimaan (printInvoice)
+        foreach ($invoices as &$inv) {
+            $dpp = round(max(0, $inv['subtotal'] - $inv['discount']));
+            $ppnType = $inv['ppn_type'];
             $ppn = 0;
+            $jumlah = 0;
 
             if ($ppnType === 'EXCLUDE') {
                 $ppn = floor($dpp * self::PPN);
-            } else if ($ppnType === 'INCLUDE') {
-                $ppn = floor($dpp - ($dpp / (1 + self::PPN)));
-                $dpp = $dpp - $ppn;
+                $jumlah = $dpp + $ppn;
+            } elseif ($ppnType === 'INCLUDE') {
+                $jumlah = $dpp;
+                $hna = floor($dpp / (1 + self::PPN));
+                $ppn = $jumlah - $hna;
+                $dpp = $hna;
+            } else { // TANPA
+                $ppn = 0;
+                $jumlah = $dpp;
             }
 
-            $jumlah = $dpp + $ppn;
-            $invoices[$key]['dpp']    += $dpp;
-            $invoices[$key]['ppn']    += $ppn;
-            $invoices[$key]['jumlah'] += $jumlah;
+            $inv['dpp']    = (float) $dpp;
+            $inv['ppn']    = (float) $ppn;
+            $inv['jumlah'] = (float) $jumlah;
         }
+        unset($inv);
 
         uasort($invoices, fn ($a, $b) => [
             mb_strtolower((string) ($a['creditor_name'] ?? '')),
@@ -306,6 +319,7 @@ class InvoiceSingleSheetExport implements FromArray, WithStyles, WithColumnWidth
     {
         $items = $this->baseQuery()
             ->select([
+                'receiving_details.id as receiving_details_id',
                 'order_items.creditor_code',
                 'creditors.name as creditor_name',
                 'receiving_details.invoice_ppn',
@@ -329,16 +343,18 @@ class InvoiceSingleSheetExport implements FromArray, WithStyles, WithColumnWidth
             return $rows;
         }
 
-        $creditorsArr = [];
+        // Group per faktur (receiving_details) terlebih dahulu agar perhitungan DPP & PPN
+        // persis sama dengan lembar cetakan faktur penerimaan (printInvoice).
+        $invoices = [];
         foreach ($items as $item) {
-            $key = $item->creditor_code;
-            if (!isset($creditorsArr[$key])) {
-                $creditorsArr[$key] = [
+            $invKey = (string) $item->receiving_details_id;
+            if (!isset($invoices[$invKey])) {
+                $invoices[$invKey] = [
                     'creditor_code' => $item->creditor_code,
                     'creditor_name' => $item->creditor_name,
-                    'dpp'           => 0,
-                    'ppn'           => 0,
-                    'jumlah'        => 0,
+                    'ppn_type'      => strtoupper(trim($item->invoice_ppn ?? 'TANPA')),
+                    'subtotal'      => 0.0,
+                    'discount'      => 0.0,
                 ];
             }
 
@@ -350,22 +366,49 @@ class InvoiceSingleSheetExport implements FromArray, WithStyles, WithColumnWidth
             $nomDisc      = ($disc <= 100 && $disc > 0) ? ($gross * $disc / 100) : $disc;
             $nomExtraDisc = ($extraDisc <= 100 && $extraDisc > 0) ? ($gross * $extraDisc / 100) : $extraDisc;
 
-            $dpp = max(0, $gross - $nomDisc - $nomExtraDisc);
-            $ppnType = strtoupper(trim($item->invoice_ppn ?? 'TANPA'));
+            $invoices[$invKey]['subtotal'] += $gross;
+            $invoices[$invKey]['discount'] += ($nomDisc + $nomExtraDisc);
+        }
+
+        // Akumulasikan total per kreditur dari hasil faktur yang sudah selaras
+        $creditorsArr = [];
+        foreach ($invoices as $inv) {
+            $cKey = $inv['creditor_code'] ?? 'OTHER';
+            if (!isset($creditorsArr[$cKey])) {
+                $creditorsArr[$cKey] = [
+                    'creditor_code' => $inv['creditor_code'],
+                    'creditor_name' => $inv['creditor_name'],
+                    'dpp'           => 0,
+                    'ppn'           => 0,
+                    'jumlah'        => 0,
+                ];
+            }
+
+            $dpp = round(max(0, $inv['subtotal'] - $inv['discount']));
+            $ppnType = $inv['ppn_type'];
             $ppn = 0;
+            $jumlah = 0;
 
             if ($ppnType === 'EXCLUDE') {
                 $ppn = floor($dpp * self::PPN);
-            } else if ($ppnType === 'INCLUDE') {
-                $ppn = floor($dpp - ($dpp / (1 + self::PPN)));
-                $dpp = $dpp - $ppn;
+                $jumlah = $dpp + $ppn;
+            } elseif ($ppnType === 'INCLUDE') {
+                $jumlah = $dpp;
+                $hna = floor($dpp / (1 + self::PPN));
+                $ppn = $jumlah - $hna;
+                $dpp = $hna;
+            } else { // TANPA
+                $ppn = 0;
+                $jumlah = $dpp;
             }
 
-            $jumlah = $dpp + $ppn;
-            $creditorsArr[$key]['dpp']    += $dpp;
-            $creditorsArr[$key]['ppn']    += $ppn;
-            $creditorsArr[$key]['jumlah'] += $jumlah;
+            $creditorsArr[$cKey]['dpp']    += $dpp;
+            $creditorsArr[$cKey]['ppn']    += $ppn;
+            $creditorsArr[$cKey]['jumlah'] += $jumlah;
         }
+
+        // Urutkan alfabetis nama kreditur
+        uasort($creditorsArr, fn ($a, $b) => strcasecmp((string) ($a['creditor_name'] ?? ''), (string) ($b['creditor_name'] ?? '')));
 
         $rows   = [$tableHeaders];
         $no         = 1;

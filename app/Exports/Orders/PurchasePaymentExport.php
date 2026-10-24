@@ -159,9 +159,9 @@ class PurchasePaymentExport implements FromArray, WithStyles, WithColumnWidths, 
                     'receiving_details_created_at' => $item->receiving_details_created_at,
                     'creditor_code' => $item->creditor_code,
                     'creditor_name' => $item->creditor_name,
-                    'dpp' => 0,
-                    'ppn' => 0,
-                    'jumlah' => 0,
+                    'ppn_type' => strtoupper(trim($item->invoice_ppn ?? 'TANPA')),
+                    'subtotal' => 0.0,
+                    'discount' => 0.0,
                 ];
             }
 
@@ -173,22 +173,34 @@ class PurchasePaymentExport implements FromArray, WithStyles, WithColumnWidths, 
             $nomDisc = ($disc <= 100 && $disc > 0) ? ($gross * $disc / 100) : $disc;
             $nomExtraDisc = ($extraDisc <= 100 && $extraDisc > 0) ? ($gross * $extraDisc / 100) : $extraDisc;
 
-            $dpp = max(0, $gross - $nomDisc - $nomExtraDisc);
-            $ppnType = strtoupper(trim($item->invoice_ppn ?? 'TANPA'));
+            $invoices[$key]['subtotal'] += $gross;
+            $invoices[$key]['discount'] += ($nomDisc + $nomExtraDisc);
+        }
+
+        foreach ($invoices as &$inv) {
+            $dpp = round(max(0, $inv['subtotal'] - $inv['discount']));
+            $ppnType = $inv['ppn_type'];
             $ppn = 0;
+            $jumlah = 0;
 
             if ($ppnType === 'EXCLUDE') {
                 $ppn = floor($dpp * self::PPN);
+                $jumlah = $dpp + $ppn;
             } elseif ($ppnType === 'INCLUDE') {
-                $ppn = floor($dpp - ($dpp / (1 + self::PPN)));
-                $dpp = $dpp - $ppn;
+                $jumlah = $dpp;
+                $hna = floor($dpp / (1 + self::PPN));
+                $ppn = $jumlah - $hna;
+                $dpp = $hna;
+            } else { // TANPA
+                $ppn = 0;
+                $jumlah = $dpp;
             }
 
-            $jumlah = $dpp + $ppn;
-            $invoices[$key]['dpp'] += $dpp;
-            $invoices[$key]['ppn'] += $ppn;
-            $invoices[$key]['jumlah'] += $jumlah;
+            $inv['dpp']    = (float) $dpp;
+            $inv['ppn']    = (float) $ppn;
+            $inv['jumlah'] = (float) $jumlah;
         }
+        unset($inv);
 
         if ($this->reportType === 'Kredit') {
             uasort($invoices, fn ($a, $b) => [
