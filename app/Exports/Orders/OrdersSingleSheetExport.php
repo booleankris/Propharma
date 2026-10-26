@@ -74,6 +74,8 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
             ->join('medicines', 'medicines.id', '=', 'order_items.medicine_id')
             ->join('orders', 'orders.id', '=', 'order_items.order_id')
             ->leftJoin('creditors', 'creditors.code', '=', 'order_items.creditor_code')
+            ->leftJoin('batches', 'batches.id', '=', 'receiving_items.batches_id')
+            ->leftJoin('factories', 'factories.id', '=', 'medicines.factory_id')
             ->whereIn('receiving.pharmacy_id', $targetPharmacyIds)
             ->whereNotNull('receiving_items.batches_id');
         ReceivingDateFilter::apply($query, $this->startDate, $this->endDate);
@@ -98,6 +100,8 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
                 'receiving_items.extra_discount',
                 'receiving_items.total',
                 'receiving_items.raw_price as receiving_raw_price',
+                'receiving_items.batch as receiving_batch',
+                'batches.name as batch_name',
                 'receiving_items.expired_date',
                 'receiving_details.receiving_id',
                 'receiving_details.receiving_details_code',
@@ -117,6 +121,7 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
                 'medicines.name as medicine_name',
                 'medicines.packaging as medicine_packaging',
                 'medicines.unit as medicine_unit',
+                'factories.name as factory_name',
                 'creditors.name as creditor_name',
             ])
             ->orderBy('receiving.updated_at', 'asc')
@@ -138,6 +143,7 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
             'Jenis Bayar',
             'Kode Obat',
             'Nama Obat',
+            'Pabrik',
             'Qty Beli',
             'Kemasan',
             'Utuh',
@@ -148,6 +154,7 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
             'Extra Diskon',
             'Value Extra Disc',
             'Jumlah',
+            'Batch',
             'Expired',
         ];
 
@@ -203,6 +210,10 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
                 ? Carbon::parse($item->expired_date)->format('d/m/Y')
                 : '-';
 
+            $batch = !empty($item->receiving_batch)
+                ? (string) $item->receiving_batch
+                : (!empty($item->batch_name) ? (string) $item->batch_name : '-');
+
             $packaging = $item->medicine_packaging ?: ($item->medicine_unit ?: '-');
 
             $rows[] = [
@@ -220,6 +231,7 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
                 $item->invoice_payment ?? '-',
                 $item->medicine_code ?? '-',
                 $item->medicine_name ?? '-',
+                $item->factory_name ?? '-',
                 (int) ($item->qty_received ?? $item->qty ?? 0),
                 $packaging,
                 $item->order_pack ?? '-',
@@ -230,6 +242,7 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
                 $item->extra_discount ?? 0,
                 round($nomExtraDisc, 2),
                 $jumlah,
+                $batch,
                 $expired,
             ];
 
@@ -261,10 +274,12 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
             '',
             '',
             '',
+            '',
             round($grandNomDisc, 2),
             '',
             round($grandNomExtraDisc, 2),
             $grandTotal,
+            '',
             '',
         ];
 
@@ -306,8 +321,8 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
             ->getAlignment()
             ->setHorizontal(Alignment::HORIZONTAL_LEFT);
 
-        // Right-align & number format: H=DPP, I=PPN, R=HNA, S=HargaPPN, T=Diskon, U=Value Disc, V=ExtraDiskon, W=ValueExtraDisc, X=Jumlah
-        foreach (['H', 'I', 'R', 'S', 'T', 'U', 'V', 'W', 'X'] as $col) {
+        // Right-align & number format: H=DPP, I=PPN, S=HNA, T=HargaPPN, U=Diskon, V=Value Disc, W=ExtraDiskon, X=ValueExtraDisc, Y=Jumlah
+        foreach (['H', 'I', 'S', 'T', 'U', 'V', 'W', 'X', 'Y'] as $col) {
             $sheet
                 ->getStyle("{$col}{$dataStartRow}:{$col}{$lastRow}")
                 ->getAlignment()
@@ -317,6 +332,12 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
                 ->getNumberFormat()
                 ->setFormatCode('#,##0');
         }
+
+        // Text format for Batch (Col Z) so leading zeros or scientific-like strings are preserved
+        $sheet
+            ->getStyle("Z" . ($dataStartRow + 1) . ":Z{$lastRow}")
+            ->getNumberFormat()
+            ->setFormatCode(\PhpOffice\PhpSpreadsheet\Style\NumberFormat::FORMAT_TEXT);
     }
 
     public function columnWidths(): array
@@ -336,17 +357,19 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
             'L' => 14,
             'M' => 15,
             'N' => 35,
-            'O' => 10,
-            'P' => 18,
-            'Q' => 10,
-            'R' => 15,
+            'O' => 25,
+            'P' => 10,
+            'Q' => 18,
+            'R' => 10,
             'S' => 15,
-            'T' => 10,
-            'U' => 15,
-            'V' => 13,
-            'W' => 15,
-            'X' => 18,
-            'Y' => 13,
+            'T' => 15,
+            'U' => 10,
+            'V' => 15,
+            'W' => 13,
+            'X' => 15,
+            'Y' => 18,
+            'Z' => 16,
+            'AA' => 13,
         ];
     }
 }

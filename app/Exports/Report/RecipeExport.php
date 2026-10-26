@@ -5,6 +5,7 @@ namespace App\Exports\Report;
 use App\Models\MedicineTransactions;
 use App\Models\Pharmacies;
 use App\Models\Shifts;
+use App\Models\Retur;
 use App\Support\LiphTransactionScope;
 use Illuminate\Support\Carbon;
 use Maatwebsite\Excel\Concerns\FromArray;
@@ -112,10 +113,11 @@ class RecipeDetailSheet implements FromArray, WithStyles, WithColumnWidths, With
         return array_merge($header, $body);
     }
 
-    private function buildBody(): array
+    public function buildBody(): array
     {
         $query = MedicineTransactions::with([
             'transactions' => fn ($q) => $q->where('status', 1),
+            'returs' => fn ($q) => $q->where('status', 1),
             'doctors',
             'patients',
             'shift_logs.shift',
@@ -134,6 +136,11 @@ class RecipeDetailSheet implements FromArray, WithStyles, WithColumnWidths, With
 
         $transactions = $query->get();
 
+        return $this->buildRows($transactions);
+    }
+
+    public function buildRows($transactions): array
+    {
         $rows   = [];
         $rows[] = ['No.', 'Tanggal', 'No. Resep', 'Layanan', 'Dokter', 'Pasien', 'Netto', 'Shift'];
 
@@ -155,7 +162,43 @@ class RecipeDetailSheet implements FromArray, WithStyles, WithColumnWidths, With
                 $layanan = 'UM';
             }
 
-            $netto     = $resepItems->sum(fn ($i) => (int) ($i->final_price ?? 0));
+            $trxReturs = $trx->returs ?? collect();
+            $retursByMedicine = [];
+            $generalRetur = 0;
+            foreach ($trxReturs as $r) {
+                if ($r->medicine_id) {
+                    $retursByMedicine[$r->medicine_id] = ($retursByMedicine[$r->medicine_id] ?? 0) + (float) $r->total_retur;
+                } else {
+                    $generalRetur += (float) $r->total_retur;
+                }
+            }
+
+            $netto = 0;
+            $hasActiveItem = false;
+            foreach ($resepItems as $item) {
+                $itemPrice = (float) ($item->final_price ?? 0);
+                $medId = $item->medicine_id;
+                $itemRetur = 0;
+                if ($medId && isset($retursByMedicine[$medId]) && $retursByMedicine[$medId] > 0) {
+                    $itemRetur = min($itemPrice, $retursByMedicine[$medId]);
+                    $retursByMedicine[$medId] -= $itemRetur;
+                }
+                $remainingPrice = max(0, $itemPrice - $itemRetur);
+                if ($remainingPrice > 0) {
+                    $hasActiveItem = true;
+                }
+                $netto += $remainingPrice;
+            }
+
+            if ($generalRetur > 0) {
+                $netto = max(0, $netto - $generalRetur);
+            }
+
+            // Jika semua obat diretur atau sisa nominal <= 0, jangan tampilkan di laporan Daftar Resep
+            if ($netto <= 0 || !$hasActiveItem) {
+                continue;
+            }
+
             $shiftName = $trx->shift_logs?->shift?->name ?? '-';
             $tgl       = Carbon::parse($trx->created_at ?? $trx->updated_at ?? $trx->shift_logs?->clock_in)->format('d/m/Y');
 
@@ -166,11 +209,11 @@ class RecipeDetailSheet implements FromArray, WithStyles, WithColumnWidths, With
                 $layanan,
                 $trx->doctors?->name  ?? '-',
                 $trx->patients?->name ?? '-',
-                (int) $netto,
+                (int) round($netto),
                 $shiftName,
             ];
 
-            $grandTotal += (int) $netto;
+            $grandTotal += (int) round($netto);
             if (is_numeric($trx->discount) && (int) $trx->discount > 0) {
                 $potonganTrx += (int) $trx->discount;
             }
@@ -342,14 +385,16 @@ class RecipeMonthlySummarySheet implements FromArray, WithStyles, WithColumnWidt
     /**
      * Klasifikasi 1 lembar resep berdasarkan prioritas golongan tertinggi
      */
-    public static function classifyPrescription($trx): string
+    public static function classifyPrescription($trx, $activeItems = null): string
     {
         $hasNarkotik  = false;
         $hasPsiko     = false;
         $hasPrekursor = false;
         $hasOot       = false;
 
-        foreach ($trx->transactions ?? [] as $cartItem) {
+        $items = $activeItems !== null ? $activeItems : ($trx->transactions ?? []);
+
+        foreach ($items as $cartItem) {
             $med = $cartItem->medicine;
             if (!$med) {
                 continue;
@@ -399,7 +444,10 @@ class RecipeMonthlySummarySheet implements FromArray, WithStyles, WithColumnWidt
         $yearStart = Carbon::create($this->year, 1, 1, 0, 0, 0)->startOfDay();
         $yearEnd   = Carbon::create($this->year, 12, 31, 23, 59, 59)->endOfDay();
 
-        $query = MedicineTransactions::with(['transactions.medicine.category'])
+        $query = MedicineTransactions::with([
+            'transactions.medicine.category',
+            'returs' => fn ($q) => $q->where('status', 1),
+        ])
             ->where('pharmacy_id', $this->pharmacyId)
             ->whereIn('transaction_type', ['RESEP TUNAI', 'KREDIT'])
             ->whereBetween('updated_at', [$yearStart, $yearEnd]);
@@ -418,7 +466,47 @@ class RecipeMonthlySummarySheet implements FromArray, WithStyles, WithColumnWidt
             $month = (int) $date->format('n');
 
             if ($month >= 1 && $month <= 12) {
-                $cat = self::classifyPrescription($trx);
+                $trxReturs = $trx->returs ?? collect();
+                $retursByMedicineQty = [];
+                $retursByMedicineAmount = [];
+                foreach ($trxReturs as $r) {
+                    if ($r->medicine_id) {
+                        $retursByMedicineQty[$r->medicine_id] = ($retursByMedicineQty[$r->medicine_id] ?? 0) + (float) ($r->qty_retur ?: 0);
+                        $retursByMedicineAmount[$r->medicine_id] = ($retursByMedicineAmount[$r->medicine_id] ?? 0) + (float) $r->total_retur;
+                    }
+                }
+
+                $activeItems = collect($trx->transactions)->filter(function ($item) use (&$retursByMedicineQty, &$retursByMedicineAmount) {
+                    $medId = $item->medicine_id;
+                    $itemQty = (float) ($item->qty ?? 1);
+                    $itemPrice = (float) ($item->final_price ?? 0);
+
+                    if ($medId && isset($retursByMedicineQty[$medId]) && $retursByMedicineQty[$medId] > 0) {
+                        if ($retursByMedicineQty[$medId] >= $itemQty) {
+                            $retursByMedicineQty[$medId] -= $itemQty;
+                            return false;
+                        }
+                        $retursByMedicineQty[$medId] = 0;
+                        return true;
+                    }
+
+                    if ($medId && isset($retursByMedicineAmount[$medId]) && $retursByMedicineAmount[$medId] > 0) {
+                        if ($retursByMedicineAmount[$medId] >= $itemPrice) {
+                            $retursByMedicineAmount[$medId] -= $itemPrice;
+                            return false;
+                        }
+                        $retursByMedicineAmount[$medId] = 0;
+                        return true;
+                    }
+
+                    return true;
+                });
+
+                if ($activeItems->isEmpty()) {
+                    continue; // Seluruh lembar resep telah diretur
+                }
+
+                $cat = self::classifyPrescription($trx, $activeItems);
                 $matrix[$cat][$month]++;
             }
         }

@@ -257,7 +257,7 @@
                             @foreach ($chunkItems as $index => $row)
                                 <tr>
                                     <td style="text-align:center;">
-                                        {{ $chunkIndex * 17 + $index + 1 }}
+                                        {{ $chunkIndex * 17 + $loop->iteration }}
                                     </td>
                                     <td>
                                         {{ $row->medicines->name ?? '-' }}
