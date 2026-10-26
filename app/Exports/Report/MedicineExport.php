@@ -167,7 +167,7 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
         return $returns;
     }
 
-    private function buildRecap($transactions, array $returns = []): array
+    protected function buildRecap($transactions, array $returns = []): array
     {
         $grouped = [];
 
@@ -175,17 +175,20 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
             foreach ($trx->transactions ?? [] as $item) {
                 $medicine = $item->medicine;
                 if (!$medicine) {
-                    $key = 'item_' . $item->id;
-                    $name = $item->medicine_name ?? 'Obat (Tanpa Master)';
+                    $key     = 'item_' . $item->id;
+                    $name    = $item->medicine_name ?? 'Obat (Tanpa Master)';
                     $factory = '-';
+                    $medId   = null;
                 } else {
-                    $key = $medicine->id;
-                    $name = $medicine->name ?? '-';
+                    $key     = $medicine->id;
+                    $name    = $medicine->name ?? '-';
                     $factory = $medicine->factory?->name ?? '-';
+                    $medId   = $medicine->id;
                 }
 
                 if (!isset($grouped[$key])) {
                     $grouped[$key] = [
+                        'medicine_id' => $medId,
                         'name'        => $name,
                         'factory'     => $factory,
                         'qty'         => 0,
@@ -204,6 +207,7 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
             $key = $ret['key'];
             if (!isset($grouped[$key])) {
                 $grouped[$key] = [
+                    'medicine_id' => $ret['medicine_id'] ?? null,
                     'name'        => $ret['name'],
                     'factory'     => $ret['factory'],
                     'qty'         => 0,
@@ -216,16 +220,25 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
             $grouped[$key]['total_retur'] += (int) ($ret['total'] ?? 0);
         }
 
+        // Fetch realtime stock matching Smart Order (/createorder) logic
+        $medicineIds = array_values(array_filter(array_column($grouped, 'medicine_id')));
+        $stockMap = $this->resolveStockMap($medicineIds);
+
         // Sort alphabetically by medicine name
         uasort($grouped, fn($a, $b) => strcasecmp($a['name'], $b['name']));
 
         $rows   = [];
-        $rows[] = ['No', 'Nama Obat', 'Pabrik', 'Qty Jual', 'Nilai Jual', 'Qty Retur', 'Nilai Retur', 'Qty Netto', 'Nilai Netto'];
+        $rows[] = ['No', 'Nama Obat', 'Pabrik', 'Qty Jual', 'Nilai Jual', 'Qty Retur', 'Nilai Retur', 'Qty Netto', 'Nilai Netto', 'Sisa Stok'];
 
         $no = 1;
         $grand = array_fill_keys(['qty', 'total', 'qty_retur', 'total_retur'], 0);
+        $grandStock = 0;
 
         foreach ($grouped as $data) {
+            $medId = $data['medicine_id'] ?? null;
+            $stock = $medId ? ($stockMap[$medId] ?? 0) : 0;
+            $grandStock += $stock;
+
             $rows[] = [
                 $no++,
                 $data['name'],
@@ -236,6 +249,7 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
                 $data['total_retur'] ? -(int) $data['total_retur'] : 0,
                 $data['qty'] - $data['qty_retur'],
                 (int) ($data['total'] - $data['total_retur']),
+                $stock,
             ];
 
             foreach ($grand as $k => $v) {
@@ -251,6 +265,7 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
             $grand['total_retur'] ? -(int) $grand['total_retur'] : 0,
             $grand['qty'] - $grand['qty_retur'],
             (int) ($grand['total'] - $grand['total_retur']),
+            $grandStock,
         ];
 
         $potonganTransaksi = (int) $transactions->reject(function ($trx) {
@@ -263,6 +278,7 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
                 '', 'POTONGAN TRANSAKSI (DISKON NOTA)', '',
                 '', '', '', '', '',
                 -$potonganTransaksi,
+                '',
             ];
 
             $rows[] = [
@@ -270,6 +286,7 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
                 '', '', '', '',
                 $grand['qty'] - $grand['qty_retur'],
                 (int) (($grand['total'] - $grand['total_retur']) - $potonganTransaksi),
+                $grandStock,
             ];
         }
 
@@ -473,39 +490,8 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
             $grouped[$key]['total_qty'] -= $ret['qty'];
         }
 
-        // Realtime stock calculation for involved medicines
-        $storageStockMap = [];
-        $counterStockMap = [];
-
-        if (!empty($medicineIds)) {
-            $canSeeWarehouse   = canAccessWarehouseStock($this->pharmacyId);
-            $warehouseId       = getWarehousePharmacyId();
-            $counterPharmacyId = isWarehousePharmacy($this->pharmacyId) ? 1 : $this->pharmacyId;
-
-            if ($canSeeWarehouse) {
-                $storageStockMap = Batches::where('pharmacy_id', $warehouseId)
-                    ->where('stock', '>', 0)
-                    ->whereIn('medicine_id', $medicineIds)
-                    ->groupBy('medicine_id')
-                    ->select('medicine_id', DB::raw('COALESCE(SUM(stock), 0) as total'))
-                    ->pluck('total', 'medicine_id')
-                    ->toArray();
-            }
-
-            $counterStockMap = MedicineTransferItems::join('batches', 'medicine_transfer_items.batches_id', '=', 'batches.id')
-                ->where('batches.pharmacy_id', $counterPharmacyId)
-                ->where('medicine_transfer_items.status', 1)
-                ->where('medicine_transfer_items.qty', '>', 0)
-                ->where(function ($q) {
-                    $q->whereNull('medicine_transfer_items.source_type')
-                      ->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang');
-                })
-                ->whereIn('batches.medicine_id', $medicineIds)
-                ->groupBy('batches.medicine_id')
-                ->select('batches.medicine_id', DB::raw('COALESCE(SUM(medicine_transfer_items.qty), 0) as total'))
-                ->pluck('total', 'medicine_id')
-                ->toArray();
-        }
+        // Realtime stock calculation matching Smart Order (/createorder)
+        $stockMap = $this->resolveStockMap(array_values($medicineIds));
 
         // Sort alphabetically by medicine name
         uasort($grouped, fn($a, $b) => strcasecmp($a['name'], $b['name']));
@@ -526,7 +512,7 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
 
         foreach ($grouped as $data) {
             $medId = $data['id'];
-            $stock = $medId ? ((int) ($storageStockMap[$medId] ?? 0) + (int) ($counterStockMap[$medId] ?? 0)) : 0;
+            $stock = $medId ? ($stockMap[$medId] ?? 0) : 0;
 
             $row = [
                 $no++,
@@ -562,6 +548,56 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
         $rows[] = $summaryRow;
 
         return $rows;
+    }
+
+    /**
+     * Sisa stok realtime per obat menggunakan logika yang sama dengan Smart Order (/createorder).
+     * Yaitu: stok batch di apotek aktif + stok transfer counter yang masih aktif.
+     */
+    protected function resolveStockMap(array $medicineIds): array
+    {
+        $medicineIds = array_values(array_filter(array_unique($medicineIds)));
+        if (empty($medicineIds)) {
+            return [];
+        }
+
+        $pharmacyId = $this->pharmacyId;
+        $user = auth()->user();
+        $isWarehouse = isWarehousePharmacy($pharmacyId) || (int) $pharmacyId === 9 || (int) $pharmacyId === 1;
+        if ($user && ($user->hasRole('Gudang PMI') || $user->hasRole('HO') || $user->hasRole('administrator') || $user->hasRole('Manager') || $user->hasRole('manager') || $user->hasRole('Koordinator'))) {
+            if (!session()->has('ho_pharmacy_id') || in_array((int) session('ho_pharmacy_id'), [1, 9])) {
+                $isWarehouse = true;
+            }
+        }
+
+        $counterPharmacyId = $isWarehouse ? 1 : $pharmacyId;
+
+        $batchStockMap = Batches::where('pharmacy_id', $pharmacyId)
+            ->whereIn('medicine_id', $medicineIds)
+            ->groupBy('medicine_id')
+            ->select('medicine_id', DB::raw('COALESCE(SUM(stock), 0) as total'))
+            ->pluck('total', 'medicine_id')
+            ->toArray();
+
+        $transferStockMap = MedicineTransferItems::join('batches', 'medicine_transfer_items.batches_id', '=', 'batches.id')
+            ->where('batches.pharmacy_id', $counterPharmacyId)
+            ->where('medicine_transfer_items.status', 1)
+            ->where(function ($q) {
+                $q->whereNull('medicine_transfer_items.source_type')
+                  ->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang');
+            })
+            ->whereIn('batches.medicine_id', $medicineIds)
+            ->groupBy('batches.medicine_id')
+            ->select('batches.medicine_id', DB::raw('COALESCE(SUM(medicine_transfer_items.qty), 0) as total'))
+            ->pluck('total', 'medicine_id')
+            ->toArray();
+
+        $stockMap = [];
+        foreach ($medicineIds as $id) {
+            $stockMap[$id] = (int) ($batchStockMap[$id] ?? 0) + (int) ($transferStockMap[$id] ?? 0);
+        }
+
+        return $stockMap;
     }
 
     public function styles(Worksheet $sheet)
@@ -638,12 +674,12 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
                 ->getNumberFormat()
                 ->setFormatCode('#,##0');
         } elseif ($this->selectedType === 'rekap') {
-            // Align Qty & Nilai (jual, retur, netto) right
-            $sheet->getStyle("D{$dataStartRow}:I{$lastRow}")
+            // Align Qty & Nilai (jual, retur, netto) and Sisa Stok right (Columns D to J)
+            $sheet->getStyle("D{$dataStartRow}:J{$lastRow}")
                 ->getAlignment()
                 ->setHorizontal(Alignment::HORIZONTAL_RIGHT);
 
-            $sheet->getStyle("D" . ($dataStartRow + 1) . ":I{$lastRow}")
+            $sheet->getStyle("D" . ($dataStartRow + 1) . ":J{$lastRow}")
                 ->getNumberFormat()
                 ->setFormatCode('#,##0');
 
@@ -712,6 +748,7 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
                 'G' => 16,
                 'H' => 12,
                 'I' => 18,
+                'J' => 14,
             ]
             : [
                 'A' => 6,   // No.

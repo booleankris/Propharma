@@ -658,7 +658,7 @@
                         <th class="text-center">Jam</th>
                         <th>Apotek</th>
                         <th class="text-right">Total</th>
-                        <th class="text-center">Pembayaran</th>
+                        <th class="text-center">Jenis</th>
                         <th class="text-center">Tipe</th>
                     </tr>
                 `;
@@ -676,7 +676,7 @@
                         <th class="text-right">Harga</th>
                         <th class="text-center">Qty</th>
                         <th class="text-right">Total</th>
-                        <th class="text-center">Pembayaran</th>
+                        <th class="text-center">Jenis</th>
                         <th class="text-center">Tipe</th>
                     </tr>
                 `;
@@ -702,9 +702,9 @@
             let html = '';
             rows.forEach(function(r) {
                 const typeClass = getTypeBadgeClass(r.type);
-                const payClass = getPayBadgeClass(r.payment);
                 const totalColor = r.total < 0 ? 'text-rose-600 font-bold' : 'text-gray-900';
                 const qtyColor = r.qty < 0 ? 'text-rose-600 font-bold' : 'text-blue-700';
+                const channelBadgeHtml = r.channel_badge || `<span class="badge-type badge-other">${escapeHtml(r.channel || '-')}</span>`;
 
                 if (mode === 'rekap') {
                     html += `
@@ -718,7 +718,7 @@
                             <td class="text-gray-700 text-xs font-medium">${escapeHtml(r.pharmacy)}</td>
                             <td class="text-right font-extrabold ${totalColor}">${r.total_formatted}</td>
                             <td class="text-center">
-                                <span class="badge-type ${payClass}">${escapeHtml(r.payment)}</span>
+                                ${channelBadgeHtml}
                             </td>
                             <td class="text-center">
                                 <span class="badge-type ${typeClass}">${escapeHtml(r.type)}</span>
@@ -747,7 +747,7 @@
                             <td class="text-center font-bold ${qtyColor}">${r.qty}</td>
                             <td class="text-right font-extrabold ${totalColor}">${r.total_formatted}</td>
                             <td class="text-center">
-                                <span class="badge-type ${payClass}">${escapeHtml(r.payment)}</span>
+                                ${channelBadgeHtml}
                             </td>
                             <td class="text-center">
                                 <span class="badge-type ${typeClass}">${escapeHtml(r.type)}</span>

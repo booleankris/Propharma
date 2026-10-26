@@ -136,7 +136,7 @@ class PatientTransactionsController extends Controller
             $pagination['to'] = min($totalTransactions, $page * $perPage);
 
             $transactions = (clone $baseQuery)
-                ->with(['patients', 'pharmacy'])
+                ->with(['patients', 'pharmacy', 'user.roles', 'transactions.user.roles'])
                 ->orderBy('created_at', 'DESC')
                 ->skip(($page - 1) * $perPage)
                 ->take($perPage)
@@ -151,6 +151,11 @@ class PatientTransactionsController extends Controller
                 $trxDiscount = $isReturn ? 0 : max(0, $rawDiscount);
                 $total = $isReturn ? -abs($subtotal) : ($subtotal - $trxDiscount);
 
+                $cartUsers = $trx->transactions ? $trx->transactions->pluck('user')->filter() : collect();
+                $channelInfo = MedicineTransactions::resolveChannelInfo(null, $trx->user, $cartUsers);
+                $channelBadge = MedicineTransactions::renderChannelBadge(null, $trx->user, $cartUsers);
+                $channelName = $channelInfo['label'] ?? 'Kasir (Offline)';
+
                 $rows[] = [
                     'no' => $no++,
                     'patient_name' => $trx->patients?->name ?? 'Umum / Tanpa Pasien',
@@ -161,7 +166,8 @@ class PatientTransactionsController extends Controller
                     'pharmacy' => $trx->pharmacy?->name ?? '-',
                     'total' => $total,
                     'total_formatted' => ($total < 0 ? '-Rp ' . number_format(abs($total), 0, ',', '.') : 'Rp ' . number_format($total, 0, ',', '.')),
-                    'payment' => $trx->payment_method ?? '-',
+                    'channel' => $channelName,
+                    'channel_badge' => $channelBadge,
                     'type' => $trx->transaction_type ?? '-',
                 ];
             }
@@ -175,7 +181,7 @@ class PatientTransactionsController extends Controller
             $pagination['to'] = min($totalTransactions, $page * $perPage);
 
             $transactions = (clone $baseQuery)
-                ->with(['patients', 'pharmacy', 'transactions.medicine'])
+                ->with(['patients', 'pharmacy', 'user.roles', 'transactions.medicine', 'transactions.user.roles'])
                 ->orderBy('created_at', 'DESC')
                 ->skip(($page - 1) * $perPage)
                 ->take($perPage)
@@ -188,12 +194,16 @@ class PatientTransactionsController extends Controller
                 $pharmacyName = $trx->pharmacy?->name ?? '-';
                 $dateStr = $trx->created_at ? $trx->created_at->format('d/m/Y') : '-';
                 $timeStr = $trx->created_at ? $trx->created_at->format('H:i:s') : '-';
-                $payMethod = $trx->payment_method ?? '-';
                 $trxType = $trx->transaction_type ?? '-';
                 $isReturn = in_array(strtoupper(trim((string) $trxType)), ['RETUR JUAL', 'RETUR KREDIT'], true) || strtoupper(trim((string) ($trx->transaction_code ?? ''))) === 'RT';
 
                 $rawDiscount = is_numeric($trx->discount) ? (float) $trx->discount : 0;
                 $trxDiscount = $isReturn ? 0 : max(0, $rawDiscount);
+
+                $cartUsers = $trx->transactions ? $trx->transactions->pluck('user')->filter() : collect();
+                $channelInfo = MedicineTransactions::resolveChannelInfo(null, $trx->user, $cartUsers);
+                $channelBadge = MedicineTransactions::renderChannelBadge(null, $trx->user, $cartUsers);
+                $channelName = $channelInfo['label'] ?? 'Kasir (Offline)';
 
                 $items = $trx->transactions ?? collect();
 
@@ -218,7 +228,8 @@ class PatientTransactionsController extends Controller
                         'qty' => $qty,
                         'total' => $total,
                         'total_formatted' => ($total < 0 ? '-Rp ' . number_format(abs($total), 0, ',', '.') : 'Rp ' . number_format($total, 0, ',', '.')),
-                        'payment' => $payMethod,
+                        'channel' => $channelName,
+                        'channel_badge' => $channelBadge,
                         'type' => $trxType,
                     ];
                 } else {
@@ -248,7 +259,8 @@ class PatientTransactionsController extends Controller
                             'qty' => $qty,
                             'total' => $itemTot,
                             'total_formatted' => ($itemTot < 0 ? '-Rp ' . number_format(abs($itemTot), 0, ',', '.') : 'Rp ' . number_format($itemTot, 0, ',', '.')),
-                            'payment' => $payMethod,
+                            'channel' => $channelName,
+                            'channel_badge' => $channelBadge,
                             'type' => $trxType,
                         ];
                     }
@@ -268,7 +280,8 @@ class PatientTransactionsController extends Controller
                             'qty' => 0,
                             'total' => -$trxDiscount,
                             'total_formatted' => '-Rp ' . number_format($trxDiscount, 0, ',', '.'),
-                            'payment' => $payMethod,
+                            'channel' => $channelName,
+                            'channel_badge' => $channelBadge,
                             'type' => $trxType,
                         ];
                     }

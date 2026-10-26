@@ -49,7 +49,7 @@ class PatientTransactionsExport implements FromArray, WithStyles, WithColumnWidt
                 'F' => 12,  // Jam
                 'G' => 25,  // Apotek
                 'H' => 18,  // Total
-                'I' => 16,  // Pembayaran
+                'I' => 20,  // Jenis
                 'J' => 18,  // Tipe
             ];
         }
@@ -66,7 +66,7 @@ class PatientTransactionsExport implements FromArray, WithStyles, WithColumnWidt
             'I' => 16,  // Harga
             'J' => 12,  // Qty
             'K' => 18,  // Total
-            'L' => 16,  // Pembayaran
+            'L' => 20,  // Jenis
             'M' => 18,  // Tipe
         ];
     }
@@ -136,13 +136,13 @@ class PatientTransactionsExport implements FromArray, WithStyles, WithColumnWidt
             'Jam',
             'Apotek',
             'Total',
-            'Pembayaran',
+            'Jenis',
             'Tipe'
         ];
 
         $transactions = $this
             ->getBaseQuery()
-            ->with(['patients', 'pharmacy'])
+            ->with(['patients', 'pharmacy', 'user.roles', 'transactions.user.roles'])
             ->get();
 
         $no = 1;
@@ -159,6 +159,10 @@ class PatientTransactionsExport implements FromArray, WithStyles, WithColumnWidt
             $trxDiscount = $isReturn ? 0 : max(0, $rawDiscount);
             $total = $isReturn ? -abs($subtotal) : ($subtotal - $trxDiscount);
 
+            $cartUsers = $trx->transactions ? $trx->transactions->pluck('user')->filter() : collect();
+            $channelInfo = MedicineTransactions::resolveChannelInfo(null, $trx->user, $cartUsers);
+            $channelName = $channelInfo['label'] ?? 'Kasir (Offline)';
+
             $rows[] = [
                 $no++,
                 $patientName,
@@ -168,7 +172,7 @@ class PatientTransactionsExport implements FromArray, WithStyles, WithColumnWidt
                 $trx->created_at ? $trx->created_at->format('H:i:s') : '-',
                 $pharmacyName,
                 $total,
-                $trx->payment_method ?? '-',
+                $channelName,
                 $trx->transaction_type ?? '-',
             ];
 
@@ -195,13 +199,13 @@ class PatientTransactionsExport implements FromArray, WithStyles, WithColumnWidt
             'Harga',
             'Qty',
             'Total',
-            'Pembayaran',
+            'Jenis',
             'Tipe'
         ];
 
         $transactions = $this
             ->getBaseQuery()
-            ->with(['patients', 'pharmacy', 'transactions.medicine'])
+            ->with(['patients', 'pharmacy', 'user.roles', 'transactions.medicine', 'transactions.user.roles'])
             ->get();
 
         $no = 1;
@@ -214,12 +218,15 @@ class PatientTransactionsExport implements FromArray, WithStyles, WithColumnWidt
             $pharmacyName = $trx->pharmacy?->name ?? '-';
             $dateStr = $trx->created_at ? $trx->created_at->format('d/m/Y') : '-';
             $timeStr = $trx->created_at ? $trx->created_at->format('H:i:s') : '-';
-            $payMethod = $trx->payment_method ?? '-';
             $trxType = $trx->transaction_type ?? '-';
             $isReturn = in_array(strtoupper(trim((string) $trxType)), ['RETUR JUAL', 'RETUR KREDIT'], true) || strtoupper(trim((string) ($trx->transaction_code ?? ''))) === 'RT';
 
             $rawDiscount = is_numeric($trx->discount) ? (float) $trx->discount : 0;
             $trxDiscount = $isReturn ? 0 : max(0, $rawDiscount);
+
+            $cartUsers = $trx->transactions ? $trx->transactions->pluck('user')->filter() : collect();
+            $channelInfo = MedicineTransactions::resolveChannelInfo(null, $trx->user, $cartUsers);
+            $channelName = $channelInfo['label'] ?? 'Kasir (Offline)';
 
             $items = $trx->transactions ?? collect();
 
@@ -242,7 +249,7 @@ class PatientTransactionsExport implements FromArray, WithStyles, WithColumnWidt
                     $price,
                     $qty,
                     $total,
-                    $payMethod,
+                    $channelName,
                     $trxType,
                 ];
                 $grandQty += $qty;
@@ -272,7 +279,7 @@ class PatientTransactionsExport implements FromArray, WithStyles, WithColumnWidt
                         $price,
                         $qty,
                         $itemTot,
-                        $payMethod,
+                        $channelName,
                         $trxType,
                     ];
 
@@ -293,7 +300,7 @@ class PatientTransactionsExport implements FromArray, WithStyles, WithColumnWidt
                         0,
                         0,
                         -$trxDiscount,
-                        $payMethod,
+                        $channelName,
                         $trxType,
                     ];
                     $grandTotal -= $trxDiscount;

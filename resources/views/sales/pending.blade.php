@@ -536,7 +536,7 @@
                 },
                 language: {
                     search: '',
-                    searchPlaceholder: 'Cari nomor, nama pasien, kasir...'
+                    searchPlaceholder: 'Cari nomor, pasien, no. telp, kasir...'
                 },
                 columns: [{
                         data: 'DT_RowIndex',

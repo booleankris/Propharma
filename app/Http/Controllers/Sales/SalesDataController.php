@@ -93,12 +93,17 @@ class SalesDataController extends Controller
                 }
             }
 
-            // text search (mencari nomor transaksi, nama pasien, kasir, atau tahun)
+            // text search (mencari nomor transaksi, nama pasien, no telp, kasir, atau tahun)
             if ($search) {
-                $query->where(function ($q) use ($search) {
+                $cleanPhone = preg_replace('/[^0-9]/', '', $search);
+                $query->where(function ($q) use ($search, $cleanPhone) {
                     $q->where('medicine_transactions.transaction_code', 'like', "%{$search}%")
-                        ->orWhereHas('transactions.patients', function ($p) use ($search) {
-                            $p->where('name', 'like', "%{$search}%");
+                        ->orWhereHas('transactions.patients', function ($p) use ($search, $cleanPhone) {
+                            $p->where('name', 'like', "%{$search}%")
+                                ->orWhere('phone', 'like', "%{$search}%");
+                            if (!empty($cleanPhone) && strlen($cleanPhone) >= 3 && $cleanPhone !== $search) {
+                                $p->orWhere('phone', 'like', "%{$cleanPhone}%");
+                            }
                         })
                         ->orWhereHas('transactions.user', function ($u) use ($search) {
                             $u->where('name', 'like', "%{$search}%")
@@ -360,15 +365,20 @@ class SalesDataController extends Controller
 
             // text search only
             if ($search) {
-                $query->where(function ($q) use ($search) {
+                $cleanPhone = preg_replace('/[^0-9]/', '', $search);
+                $query->where(function ($q) use ($search, $cleanPhone) {
                     if (preg_match('/^\d{4}$/', $search)) {
                         $q->whereYear('medicine_cart.updated_at', $search);
                     } else {
                         $q->whereHas('transactions', function ($t) use ($search) {
                             $t->where('transaction_code', 'like', "%{$search}%");
                         })
-                            ->orWhereHas('transactions.patients', function ($p) use ($search) {
-                                $p->where('name', 'like', "%{$search}%");
+                            ->orWhereHas('transactions.patients', function ($p) use ($search, $cleanPhone) {
+                                $p->where('name', 'like', "%{$search}%")
+                                    ->orWhere('phone', 'like', "%{$search}%");
+                                if (!empty($cleanPhone) && strlen($cleanPhone) >= 3 && $cleanPhone !== $search) {
+                                    $p->orWhere('phone', 'like', "%{$cleanPhone}%");
+                                }
                             })
                             ->orWhereHas('transactions.user', function ($u) use ($search) {
                                 $u->where('name', 'like', "%{$search}%")

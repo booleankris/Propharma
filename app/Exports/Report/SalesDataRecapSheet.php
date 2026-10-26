@@ -181,13 +181,18 @@ class SalesDataRecapSheet implements FromArray, WithStyles, WithColumnWidths, Wi
 
         if ($this->search) {
             $s = $this->search;
-            $query->where(function ($q) use ($s) {
+            $cleanPhone = preg_replace('/[^0-9]/', '', $s);
+            $query->where(function ($q) use ($s, $cleanPhone) {
                 if (preg_match('/^\d{4}$/', $s)) {
                     $q->whereYear('updated_at', $s);
                 } else {
                     $q->where('transaction_code', 'like', "%{$s}%")
-                        ->orWhereHas('patients', function ($p) use ($s) {
-                            $p->where('name', 'like', "%{$s}%");
+                        ->orWhereHas('patients', function ($p) use ($s, $cleanPhone) {
+                            $p->where('name', 'like', "%{$s}%")
+                                ->orWhere('phone', 'like', "%{$s}%");
+                            if (!empty($cleanPhone) && strlen($cleanPhone) >= 3 && $cleanPhone !== $s) {
+                                $p->orWhere('phone', 'like', "%{$cleanPhone}%");
+                            }
                         })
                         ->orWhereHas('user', function ($u) use ($s) {
                             $u->where('name', 'like', "%{$s}%")
