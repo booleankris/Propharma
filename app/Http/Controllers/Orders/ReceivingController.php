@@ -1858,9 +1858,12 @@ class ReceivingController extends Controller
                             $transferItem->save();
                         }
                     } elseif ($delta < 0) {
+                        // Batasi hanya oleh stok milik faktur ini (batch gudang / item etalase).
+                        // medicines.stock global TIDAK dipakai sebagai batas: jika sudah minus/tidak sinkron,
+                        // batch akan tersisa stok "hantu" (kasus EJF218: -490 dari 500).
                         $available = $isWarehouse
-                            ? min((float) $sourceBatch->stock, (float) $medicine->stock)
-                            : min((float) $transferItem->qty, (float) $medicine->stock);
+                            ? (float) $sourceBatch->stock
+                            : (float) $transferItem->qty;
                         $stockReversed = min(abs($delta), max(0, $available));
                         if ($stockReversed > 0) {
                             $medicine->decrement('stock', $stockReversed);
@@ -1878,8 +1881,8 @@ class ReceivingController extends Controller
                     // Avoid phantom stock by only moving the still-available inventory from the old batch,
                     // accounting for units that were already consumed or sold from this receipt line.
                     $available = $isWarehouse
-                        ? min((float) ($sourceBatch?->stock ?? 0), (float) $medicine->stock)
-                        : min((float) $transferItem->qty, (float) $medicine->stock);
+                        ? (float) ($sourceBatch?->stock ?? 0)
+                        : (float) $transferItem->qty;
                     $available = max(0, min($oldActualQty, $available));
                     $alreadyConsumed = max(0, $oldActualQty - $available);
                     $stockReversed = $available;
@@ -2043,7 +2046,7 @@ class ReceivingController extends Controller
                 $content = max(1, (int) ($item->stock_unit_factor
                     ?? ($receiptIsPack ? ($medicine->content ?? 1) : 1)));
                 $actualQty = max(0, (float) $item->qty_received * $content);
-                $stockBefore = max(0, (float) $medicine->stock);
+                $stockBefore = (float) $medicine->stock;
                 $batch = $isWarehouse
                     ? Batches::whereKey($item->batches_id)->lockForUpdate()->first()
                     : null;
@@ -2071,10 +2074,12 @@ class ReceivingController extends Controller
                     }
                 }
                 // Reverse only inventory still attributable to this receipt. Sold units stay reflected in prior sales.
+                // Batas = stok batch gudang / item etalase milik faktur ini. medicines.stock global tidak dipakai
+                // sebagai batas agar batch tidak menyisakan stok hantu ketika medicines.stock sudah minus/tidak sinkron.
                 $availableFromReceipt = $isWarehouse
                     ? (float) $batch->stock
                     : (float) $transferItem->qty;
-                $qtyToReverse = min($actualQty, $stockBefore, max(0, $availableFromReceipt));
+                $qtyToReverse = min($actualQty, max(0, $availableFromReceipt));
 
                 if ($qtyToReverse > 0) {
                     $medicine->decrement('stock', $qtyToReverse);

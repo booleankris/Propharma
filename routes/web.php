@@ -611,7 +611,10 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
         Route::post('/piutang/bulk-submit', [\App\Http\Controllers\FinanceController::class, 'bulkSubmitPiutang'])->name('piutang.bulk-submit');
         Route::post('/hutang/{id}/submit', [\App\Http\Controllers\FinanceController::class, 'submitHutang'])->name('hutang.submit');
         Route::post('/piutang/{id}/submit', [\App\Http\Controllers\FinanceController::class, 'submitPiutang'])->name('piutang.submit');
+    });
 
+    // Ketentuan Retur & Input Data Retur (Hanya dapat diakses oleh administrator, General Manager, dan Gudang PMI)
+    Route::prefix('finance')->name('finance.')->middleware(['auth', 'role:administrator|General Manager|Gudang PMI'])->group(function () {
         // Master Ketentuan Retur
         Route::prefix('return-policies')->name('returnPolicies.')->group(function () {
             Route::get('/', [\App\Http\Controllers\Finance\ReturnPolicyController::class, 'index'])->name('index');
@@ -621,7 +624,7 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
             Route::get('/export', [\App\Http\Controllers\Finance\ReturnPolicyController::class, 'export'])->name('export');
         });
 
-        // Monitoring Retur Beli
+        // Monitoring Retur Beli / Input Data Retur
         Route::prefix('purchase-returns')->name('purchaseReturns.')->group(function () {
             Route::get('/', [\App\Http\Controllers\Finance\PurchaseReturnController::class, 'index'])->name('index');
             Route::post('/', [\App\Http\Controllers\Finance\PurchaseReturnController::class, 'store'])->name('store');

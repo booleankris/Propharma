@@ -28,8 +28,10 @@ class PurchaseReturnController extends Controller
         $this->middleware('auth');
         $this->middleware(function ($request, $next) {
             $user = auth()->user();
-            if (!$user || (!$user->hasRole('Finance') && !$user->hasRole('General Manager') && !$user->hasRole('administrator') && !$user->hasRole('HO'))) {
-                abort(403, 'Akses ditolak: Monitoring Retur Beli hanya dapat diakses oleh role Finance, General Manager, dan Administrator.');
+            $allowedRoles = ['administrator', 'General Manager', 'Gudang PMI'];
+            $hasAccess = $user && $user->hasAnyRole($allowedRoles);
+            if (!$hasAccess) {
+                abort(403, 'Akses ditolak: Input Data Retur / Monitoring Retur Beli hanya dapat diakses oleh Administrator, General Manager, dan Gudang PMI.');
             }
             return $next($request);
         });
@@ -228,10 +230,10 @@ class PurchaseReturnController extends Controller
 
     public function index(Request $request)
     {
-        $search = trim($request->input('search', ''));
-        $creditorFilter = $request->input('creditor_code', '');
-        $statusFilter = $request->input('status', '');
-        $reasonFilter = $request->input('reason', '');
+        $search = trim((string) ($request->input('search') ?? ''));
+        $creditorFilter = $request->input('creditor_code');
+        $statusFilter = $request->input('status');
+        $reasonFilter = $request->input('reason');
         $perPage = (int) $request->input('per_page', 25);
 
         // Query item-level rows to match exact format in Excel monitoring
@@ -254,24 +256,45 @@ class PurchaseReturnController extends Controller
             });
         }
 
-        if ($creditorFilter !== '') {
+        if (!empty($creditorFilter)) {
             $itemsQuery->where('purchase_returns.creditor_code', $creditorFilter);
         }
 
-        if ($statusFilter !== '') {
-            if (in_array($statusFilter, ['diajukan', 'dikonfirmasi', 'sudah_potong', 'barang_kembali_pmi'], true)) {
+        if (!empty($statusFilter)) {
+            if (in_array($statusFilter, ['diajukan', 'dikonfirmasi', 'sudah_diambil', 'sudah_potong', 'barang_kembali_pmi'], true)) {
                 $itemsQuery->where('purchase_return_items.status', $statusFilter);
             } elseif ($statusFilter === 'belum_potong') {
                 $itemsQuery->where('purchase_return_items.status', '!=', 'sudah_potong');
             } elseif ($statusFilter === 'sudah_ambil') {
-                $itemsQuery->whereNotNull('purchase_return_items.pickup_date');
+                $itemsQuery->where(function ($q) {
+                    $q->where('purchase_return_items.status', 'sudah_diambil')
+                      ->orWhereNotNull('purchase_return_items.pickup_date');
+                });
             } elseif ($statusFilter === 'belum_ambil') {
-                $itemsQuery->whereNull('purchase_return_items.pickup_date');
+                $itemsQuery->where(function ($q) {
+                    $q->where('purchase_return_items.status', '!=', 'sudah_diambil')
+                      ->whereNull('purchase_return_items.pickup_date');
+                });
             }
         }
 
-        if ($reasonFilter !== '') {
-            $itemsQuery->where('purchase_return_items.reason', $reasonFilter);
+        if (!empty($reasonFilter)) {
+            $reasonAliases = [
+                'ED DEKAT' => ['ED DEKAT', 'ED'],
+                'Barang Rusak' => ['Barang Rusak', 'RUSAK'],
+                'Salah Barang' => ['Salah Barang', 'SALAH KIRIM', 'SALAH BARANG'],
+                'Salah Pesan' => ['Salah Pesan', 'SALAH PESAN'],
+                'Recall' => ['Recall', 'RECALL'],
+                'Retur Pabrik' => ['Retur Pabrik', 'RETUR PABRIK'],
+                'Double' => ['Double', 'TERDOUBLE', 'DOUBLE'],
+                'dlsbnya' => ['dlsbnya', 'OVERSTOCK', 'LAINNYA', 'LAIN-LAIN'],
+            ];
+
+            if (isset($reasonAliases[$reasonFilter])) {
+                $itemsQuery->whereIn('purchase_return_items.reason', $reasonAliases[$reasonFilter]);
+            } else {
+                $itemsQuery->where('purchase_return_items.reason', $reasonFilter);
+            }
         }
 
         $items = $itemsQuery->paginate($perPage)->withQueryString();
@@ -306,6 +329,7 @@ class PurchaseReturnController extends Controller
             $q->where('status', 'diajukan')->orWhereNull('status');
         })->count();
         $dikonfirmasiCount = PurchaseReturnItem::where('status', 'dikonfirmasi')->count();
+        $sudahDiambilCount = PurchaseReturnItem::where('status', 'sudah_diambil')->count();
         $sudahPotongCount = PurchaseReturnItem::where('status', 'sudah_potong')->count();
         $pmiCount = PurchaseReturnItem::where('status', 'barang_kembali_pmi')->count();
 
@@ -328,7 +352,7 @@ class PurchaseReturnController extends Controller
         $pharmacyId = $branchContext['activePharmacy']['id'] ?? null;
         $approachingResult = $alertService->getApproachingReturns($pharmacyId, $approachingFilters, 25);
 
-        return Inertia::render('Finance/PurchaseReturns', [
+        $viewData = [
             'activeTab' => $activeTab,
             'items' => $items,
             'filters' => [
@@ -343,6 +367,7 @@ class PurchaseReturnController extends Controller
                 'total_value' => $totalReturValue,
                 'diajukan' => $diajukanCount,
                 'dikonfirmasi' => $dikonfirmasiCount,
+                'sudah_diambil' => $sudahDiambilCount,
                 'sudah_potong' => $sudahPotongCount,
                 'barang_kembali_pmi' => $pmiCount,
                 'approaching_count' => $approachingResult['stats']['total_count'] ?? 0,
@@ -353,7 +378,13 @@ class PurchaseReturnController extends Controller
             'approachingFilters' => $approachingFilters,
             'creditors' => $creditors,
             'branchContext' => $branchContext,
-        ]);
+        ];
+
+        if ($request->header('X-Inertia')) {
+            return Inertia::render('Finance/PurchaseReturns', $viewData);
+        }
+
+        return view('orders.purchase_returns', $viewData);
     }
 
     /**
@@ -641,6 +672,13 @@ class PurchaseReturnController extends Controller
             }
         });
 
+        if ($request->wantsJson() || $request->ajax() || $request->isJson() || $request->header('Accept') === 'application/json') {
+            return response()->json([
+                'success' => true,
+                'message' => 'Data Retur Pembelian berhasil disimpan dengan status Diajukan Retur.',
+            ]);
+        }
+
         return redirect()->back()->with('success', 'Data Retur Pembelian berhasil disimpan dengan status Diajukan Retur.');
     }
 
@@ -669,6 +707,112 @@ class PurchaseReturnController extends Controller
     }
 
     /**
+     * Potong stok obat dan catat ItemsLog (Kartu Stok) saat retur dikonfirmasi
+     */
+    protected function deductStockForItem(PurchaseReturnItem $item, string $actionDate): void
+    {
+        if ($item->stock_deducted) {
+            return;
+        }
+
+        if ($item->medicine_id) {
+            $med = Medicines::find($item->medicine_id);
+            if ($med) {
+                $qtyBefore = (float) $med->stock;
+                $qtyDeduct = (float) $item->qty;
+
+                // Kurangi stok fisik obat (diperbolehkan minus stok)
+                $med->decrement('stock', $qtyDeduct);
+                $qtyAfter = $qtyBefore - $qtyDeduct;
+
+                // Kurangi stok batch jika ada
+                $batch = null;
+                if (!empty($item->batch_id)) {
+                    $batch = Batches::find($item->batch_id);
+                } elseif (!empty($item->batch_number) && $item->batch_number !== '-') {
+                    $batch = Batches::where('medicine_id', $med->id)
+                        ->where('name', $item->batch_number)
+                        ->first();
+                }
+
+                if ($batch) {
+                    $batch->decrement('stock', $qtyDeduct);
+                }
+
+                // Catat ke kartu stok / ItemsLog (status 4 = Retur Pembelian)
+                ItemsLog::create([
+                    'transaction_code' => $item->purchaseReturn?->return_no ?? ('RET-' . date('ymd')),
+                    'code' => $this->generateItemsLogCode(),
+                    'type' => 'RT',
+                    'medicine_id' => $med->id,
+                    'qty' => $qtyDeduct,
+                    'qty_before' => $qtyBefore,
+                    'qty_after' => $qtyAfter,
+                    'total' => $item->subtotal,
+                    'date' => $actionDate,
+                    'status' => 4,
+                    'batches_id' => $batch?->id ?? null,
+                    'user_id' => auth()->id(),
+                ]);
+            }
+        }
+
+        $item->stock_deducted = true;
+    }
+
+    /**
+     * Kembalikan stok obat jika status retur dibatalkan / dikembalikan ke 'diajukan'
+     */
+    protected function restoreStockForItem(PurchaseReturnItem $item, string $actionDate): void
+    {
+        if (!$item->stock_deducted) {
+            return;
+        }
+
+        if ($item->medicine_id) {
+            $med = Medicines::find($item->medicine_id);
+            if ($med) {
+                $qtyBefore = (float) $med->stock;
+                $qtyRestore = (float) $item->qty;
+
+                $med->increment('stock', $qtyRestore);
+                $qtyAfter = $qtyBefore + $qtyRestore;
+
+                $batch = null;
+                if (!empty($item->batch_id)) {
+                    $batch = Batches::find($item->batch_id);
+                } elseif (!empty($item->batch_number) && $item->batch_number !== '-') {
+                    $batch = Batches::where('medicine_id', $med->id)
+                        ->where('name', $item->batch_number)
+                        ->first();
+                }
+
+                if ($batch) {
+                    $batch->increment('stock', $qtyRestore);
+                }
+
+                ItemsLog::create([
+                    'transaction_code' => ($item->purchaseReturn?->return_no ?? ('RET-' . date('ymd'))) . '-BATAL',
+                    'code' => $this->generateItemsLogCode(),
+                    'type' => 'RT_BATAL',
+                    'medicine_id' => $med->id,
+                    'qty' => $qtyRestore,
+                    'qty_before' => $qtyBefore,
+                    'qty_after' => $qtyAfter,
+                    'total' => $item->subtotal,
+                    'date' => $actionDate,
+                    'status' => 1,
+                    'batches_id' => $batch?->id ?? null,
+                    'user_id' => auth()->id(),
+                ]);
+            }
+        }
+
+        $item->stock_deducted = false;
+        $item->confirmed_date = null;
+    }
+
+    /**
      * Konfirmasi Retur: Ubah status ke 'dikonfirmasi' dan kurangi stok barang (perbolehkan minus stok)
      * NOTE: Wajib mencatat tanggal konfirmasi retur
      */
@@ -683,48 +827,7 @@ class PurchaseReturnController extends Controller
         $confirmedDate = $validated['confirmed_date'];
 
         DB::transaction(function () use ($item, $confirmedDate, $validated) {
-            // Kurangi stok barang jika belum dikurangi
-            if (!$item->stock_deducted) {
-                if ($item->medicine_id) {
-                    $med = Medicines::find($item->medicine_id);
-                    if ($med) {
-                        $qtyBefore = (float) $med->stock;
-                        $qtyDeduct = (float) $item->qty;
-
-                        // Kurangi stok fisik obat (diperbolehkan minus stok)
-                        $med->decrement('stock', $qtyDeduct);
-                        $qtyAfter = $qtyBefore - $qtyDeduct;
-
-                        // Kurangi stok batch jika ada
-                        $batch = null;
-                        if ($item->batch_id) {
-                            $batch = Batches::find($item->batch_id);
-                        } elseif ($item->batch_number && $item->batch_number !== '-') {
-                            $batch = Batches::where('medicine_id', $med->id)->where('name', $item->batch_number)->first();
-                        }
-                        if ($batch) {
-                            $batch->decrement('stock', $qtyDeduct);
-                        }
-
-                        // Catat ke kartu stok / ItemsLog (status 4 = Retur Pembelian)
-                        ItemsLog::create([
-                            'transaction_code' => $item->purchaseReturn?->return_no ?? ('RET-' . date('ymd')),
-                            'code' => $this->generateItemsLogCode(),
-                            'type' => 'RT',
-                            'medicine_id' => $med->id,
-                            'qty' => $qtyDeduct,
-                            'qty_before' => $qtyBefore,
-                            'qty_after' => $qtyAfter,
-                            'total' => $item->subtotal,
-                            'date' => $confirmedDate,
-                            'status' => 4,
-                            'batches_id' => $batch?->id ?? null,
-                            'user_id' => auth()->id(),
-                        ]);
-                    }
-                }
-                $item->stock_deducted = true;
-            }
+            $this->deductStockForItem($item, $confirmedDate);
 
             $item->status = 'dikonfirmasi';
             $item->status_date = $confirmedDate;
@@ -744,11 +847,22 @@ class PurchaseReturnController extends Controller
             }
         });
 
-        return redirect()->back()->with('success', "Retur {$item->medicine_name} berhasil dikonfirmasi. Stok barang telah dikurangi.");
+        $msg = "Retur {$item->medicine_name} berhasil dikonfirmasi. Stok barang telah dikurangi.";
+
+        if ($request->wantsJson() || $request->ajax() || $request->isJson() || $request->header('Accept') === 'application/json') {
+            return response()->json([
+                'success' => true,
+                'message' => $msg,
+                'item' => $item,
+            ]);
+        }
+
+        return redirect()->back()->with('success', $msg);
     }
 
     /**
      * Ubah Status Retur setelah dikonfirmasi:
+     * - 'diajukan' (Kembalikan ke status diajukan & pulihkan stok)
      * - 'dikonfirmasi' (Sudah Dikonfirmasi)
      * - 'sudah_potong' (Sudah Potong Tagihan -> kurangi tagihan hutang dagang pada receiving terkait secara konsisten)
      * - 'barang_kembali_pmi' (Barang Kembali PMI)
@@ -757,7 +871,7 @@ class PurchaseReturnController extends Controller
     public function changeItemStatus(Request $request, $id)
     {
         $validated = $request->validate([
-            'status' => 'required|in:dikonfirmasi,sudah_potong,barang_kembali_pmi',
+            'status' => 'required|in:diajukan,dikonfirmasi,sudah_diambil,sudah_potong,barang_kembali_pmi',
             'status_date' => 'required|date',
             'notes' => 'nullable|string|max:500',
         ]);
@@ -785,7 +899,11 @@ class PurchaseReturnController extends Controller
             }
 
             if ($newStatus === 'sudah_potong') {
+                $this->deductStockForItem($item, $statusDate);
                 $item->deduction_date = $statusDate;
+                if (empty($item->pickup_date)) {
+                    $item->pickup_date = $statusDate;
+                }
                 $formattedDate = Carbon::parse($statusDate)->format('d/m/Y');
                 $item->deduction_note = "SUDAH POTONG TAGIHAN ({$formattedDate})";
 
@@ -817,25 +935,57 @@ class PurchaseReturnController extends Controller
                         $receivingDetail->receiving->update(['status' => 3]);
                     }
                 }
-            } else {
-                // Jika status sebelumnya 'sudah_potong' dan sekarang diubah, hapus potongan tagihannya
+            } elseif ($newStatus === 'sudah_diambil') {
+                // Status Baru: Sudah Diambil oleh PBF
+                $this->deductStockForItem($item, $statusDate);
+                $item->pickup_date = $statusDate; // Tanggal diambil wajib sama dan konsisten dengan tanggal status
+                if (!$item->confirmed_date) {
+                    $item->confirmed_date = $statusDate;
+                }
+
+                // Hapus potongan tagihan jika sebelumnya sudah_potong
                 if ($oldStatus === 'sudah_potong') {
                     FinancePayment::where('reference_number', $refNo)->delete();
                     $item->deduction_date = null;
                     $item->deduction_note = null;
-
-                    if ($receivingDetail && $receivingDetail->receiving && (int)$receivingDetail->receiving->status === 3) {
-                        $ppnType = strtoupper(trim($receivingDetail->invoice_ppn ?? $receivingDetail->creditor?->ppn_type ?? 'TANPA'));
-                        $totalInvoice = ReceivingInvoiceTotals::calculate($receivingDetail->receiving_items, $ppnType)['total'];
-                        $totalPaid = (float) FinancePayment::where('receiving_detail_id', $receivingDetail->id)->sum('amount');
-                        if ($totalPaid < $totalInvoice) {
-                            $receivingDetail->receiving->update(['status' => $totalPaid > 0 ? 2 : 1]);
-                        }
-                    }
                 }
+            } elseif ($newStatus === 'dikonfirmasi') {
+                $this->deductStockForItem($item, $statusDate);
+                $item->confirmed_date = $statusDate;
 
-                if ($newStatus === 'barang_kembali_pmi') {
-                    $item->pickup_date = $statusDate;
+                // Hapus potongan tagihan jika sebelumnya sudah_potong
+                if ($oldStatus === 'sudah_potong') {
+                    FinancePayment::where('reference_number', $refNo)->delete();
+                    $item->deduction_date = null;
+                    $item->deduction_note = null;
+                }
+            } elseif ($newStatus === 'barang_kembali_pmi') {
+                $this->deductStockForItem($item, $statusDate);
+                $item->pickup_date = $statusDate;
+
+                // Hapus potongan tagihan jika sebelumnya sudah_potong
+                if ($oldStatus === 'sudah_potong') {
+                    FinancePayment::where('reference_number', $refNo)->delete();
+                    $item->deduction_date = null;
+                    $item->deduction_note = null;
+                }
+            } elseif ($newStatus === 'diajukan') {
+                // Kembalikan stok dan hapus potongan tagihan serta reset tanggal
+                $this->restoreStockForItem($item, $statusDate);
+                FinancePayment::where('reference_number', $refNo)->delete();
+                $item->pickup_date = null;
+                $item->confirmed_date = null;
+                $item->deduction_date = null;
+                $item->deduction_note = null;
+            }
+
+            // Update status receiving jika pembayaran berubah
+            if ($oldStatus === 'sudah_potong' && $newStatus !== 'sudah_potong' && $receivingDetail && $receivingDetail->receiving && (int)$receivingDetail->receiving->status === 3) {
+                $ppnType = strtoupper(trim($receivingDetail->invoice_ppn ?? $receivingDetail->creditor?->ppn_type ?? 'TANPA'));
+                $totalInvoice = ReceivingInvoiceTotals::calculate($receivingDetail->receiving_items, $ppnType)['total'];
+                $totalPaid = (float) FinancePayment::where('receiving_detail_id', $receivingDetail->id)->sum('amount');
+                if ($totalPaid < $totalInvoice) {
+                    $receivingDetail->receiving->update(['status' => $totalPaid > 0 ? 2 : 1]);
                 }
             }
 
@@ -855,13 +1005,24 @@ class PurchaseReturnController extends Controller
         });
 
         $statusLabels = [
+            'diajukan' => 'Diajukan Retur',
             'dikonfirmasi' => 'Sudah Dikonfirmasi',
+            'sudah_diambil' => 'Sudah Diambil',
             'sudah_potong' => 'Sudah Potong Tagihan',
             'barang_kembali_pmi' => 'Barang Kembali PMI',
         ];
         $label = $statusLabels[$newStatus] ?? $newStatus;
+        $msg = "Status retur {$item->medicine_name} berhasil diubah menjadi: {$label}.";
 
-        return redirect()->back()->with('success', "Status retur {$item->medicine_name} berhasil diubah menjadi: {$label}.");
+        if ($request->wantsJson() || $request->ajax() || $request->isJson() || $request->header('Accept') === 'application/json') {
+            return response()->json([
+                'success' => true,
+                'message' => $msg,
+                'item' => $item,
+            ]);
+        }
+
+        return redirect()->back()->with('success', $msg);
     }
 
     /**
@@ -885,6 +1046,17 @@ class PurchaseReturnController extends Controller
             $validated['subtotal'] = (float)$qty * (float)$unitPrice;
         }
 
+        if (!empty($validated['pickup_date'])) {
+            // Jika tanggal diambil diisi, pastikan status dan tanggal konsisten
+            if (in_array($item->status, ['diajukan', 'dikonfirmasi'])) {
+                $validated['status'] = 'sudah_diambil';
+                $validated['status_date'] = $validated['pickup_date'];
+                $this->deductStockForItem($item, $validated['pickup_date']);
+            } elseif ($item->status === 'sudah_diambil') {
+                $validated['status_date'] = $validated['pickup_date'];
+            }
+        }
+
         $item->update($validated);
 
         // Recalculate total header amount
@@ -894,13 +1066,23 @@ class PurchaseReturnController extends Controller
             $parent->update(['total_amount' => $newTotal]);
         }
 
-        return redirect()->back()->with('success', 'Item retur berhasil diperbarui.');
+        $msg = 'Item retur berhasil diperbarui.';
+
+        if ($request->wantsJson() || $request->ajax() || $request->isJson() || $request->header('Accept') === 'application/json') {
+            return response()->json([
+                'success' => true,
+                'message' => $msg,
+                'item' => $item,
+            ]);
+        }
+
+        return redirect()->back()->with('success', $msg);
     }
 
     /**
      * Hapus item retur
      */
-    public function destroyItem($id)
+    public function destroyItem(Request $request, $id)
     {
         $item = PurchaseReturnItem::findOrFail($id);
         $parent = $item->purchaseReturn;
@@ -915,7 +1097,16 @@ class PurchaseReturnController extends Controller
             }
         }
 
-        return redirect()->back()->with('success', 'Item retur berhasil dihapus.');
+        $msg = 'Item retur berhasil dihapus.';
+
+        if ($request->wantsJson() || $request->ajax() || $request->isJson() || $request->header('Accept') === 'application/json') {
+            return response()->json([
+                'success' => true,
+                'message' => $msg,
+            ]);
+        }
+
+        return redirect()->back()->with('success', $msg);
     }
 
     /**

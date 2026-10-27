@@ -836,19 +836,64 @@
 
 
 
+        let batchRequestSeq = 0;
+
+        function appendFallbackBatchOption(select) {
+            const option = document.createElement('option');
+            option.value = 'fallback';
+            option.textContent = '⚠️ [PENYESUAIAN] NON-BATCH (Penyesuaian Salah Input) — (Retur Finansial)';
+            option.classList.add('text-amber-600', 'font-semibold');
+            option.dataset.batchName = 'NON-BATCH (Penyesuaian Salah Input)';
+            option.dataset.expiredDate = '-';
+            option.dataset.transferId = 'fallback';
+            option.dataset.isFallback = '1';
+            select.appendChild(option);
+        }
+
         function loadBatches(medicine_id, transaction_id) {
             const select = document.getElementById('batch_select');
+            const requestId = ++batchRequestSeq;
+
             select.innerHTML = '<option value="">Memuat batch...</option>';
+            syncBatchFields(); // kosongkan transfer_id lama selama loading
 
-            fetch(`{{ route('returdata.batches') }}?medicine_id=${medicine_id}&transaction_id=${transaction_id}`)
-                .then(res => res.json())
+            if (!medicine_id || !transaction_id) {
+                select.innerHTML = '<option value="">Data obat/transaksi tidak valid</option>';
+                syncBatchFields();
+                return;
+            }
+
+            const url = `{{ route('returdata.batches') }}?medicine_id=${encodeURIComponent(medicine_id)}&transaction_id=${encodeURIComponent(transaction_id)}`;
+
+            fetch(url, {
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    credentials: 'same-origin'
+                })
+                .then(async res => {
+                    if (!res.ok) {
+                        let msg = `HTTP ${res.status}`;
+                        try {
+                            const body = await res.json();
+                            if (body?.message) msg = body.message;
+                        } catch (_) {}
+                        throw new Error(msg);
+                    }
+                    return res.json();
+                })
                 .then(data => {
-                    select.innerHTML = '<option value="">— Pilih batch/etalase —</option>';
+                    // Abaikan respons basi (user sudah klik obat lain)
+                    if (requestId !== batchRequestSeq) return;
 
-                    if (!data.length) {
+                    if (!Array.isArray(data) || !data.length) {
                         select.innerHTML = '<option value="">Tidak ada batch tersedia</option>';
+                        syncBatchFields();
                         return;
                     }
+
+                    select.innerHTML = '<option value="">— Pilih batch/etalase —</option>';
 
                     data.forEach((item) => {
                         const option = document.createElement('option');
@@ -874,8 +919,20 @@
                     syncBatchFields();
                 })
                 .catch(err => {
-                    console.error(err);
-                    select.innerHTML = '<option value="">Gagal memuat batch</option>';
+                    if (requestId !== batchRequestSeq) return;
+                    console.error('Gagal memuat batch:', err);
+
+                    // Jangan blokir kasir: sediakan opsi penyesuaian, tapi TIDAK dipilih otomatis
+                    select.innerHTML = '<option value="">⚠ Gagal memuat batch — pilih penyesuaian di bawah</option>';
+                    appendFallbackBatchOption(select);
+                    select.selectedIndex = 0;
+                    syncBatchFields();
+
+                    iziToast.warning({
+                        title: 'Batch gagal dimuat',
+                        message: 'Data batch tidak dapat dimuat (' + (err?.message || 'error') + '). Anda tetap bisa memilih opsi PENYESUAIAN.',
+                        position: 'topRight'
+                    });
                 });
         }
 

@@ -84,6 +84,12 @@ export default function PurchaseReturns({
                     badgeClass: 'bg-blue-100 text-blue-800 border-blue-200',
                     dotClass: 'bg-blue-500',
                 };
+            case 'sudah_diambil':
+                return {
+                    label: 'Sudah Diambil',
+                    badgeClass: 'bg-cyan-100 text-cyan-800 border-cyan-200',
+                    dotClass: 'bg-cyan-500',
+                };
             case 'sudah_potong':
                 return {
                     label: 'Sudah Potong Tagihan',
@@ -581,6 +587,7 @@ export default function PurchaseReturns({
                                 <option value="">Semua Status Retur</option>
                                 <option value="diajukan">Diajukan Retur</option>
                                 <option value="dikonfirmasi">Sudah Dikonfirmasi</option>
+                                <option value="sudah_diambil">Sudah Diambil</option>
                                 <option value="sudah_potong">Sudah Potong Tagihan</option>
                                 <option value="barang_kembali_pmi">Barang Kembali PMI</option>
                             </select>
@@ -595,11 +602,13 @@ export default function PurchaseReturns({
                             >
                                 <option value="">Semua Keterangan</option>
                                 <option value="ED DEKAT">ED DEKAT</option>
-                                <option value="SALAH PESAN">SALAH PESAN</option>
-                                <option value="DISKON TIDAK SESUAI">DISKON TIDAK SESUAI</option>
-                                <option value="TERDOUBLE">TERDOUBLE</option>
-                                <option value="PESAN YANG INJ">PESAN YANG INJ</option>
-                                <option value="RUSAK">RUSAK</option>
+                                <option value="Barang Rusak">Barang Rusak</option>
+                                <option value="Salah Barang">Salah Barang</option>
+                                <option value="Salah Pesan">Salah Pesan</option>
+                                <option value="Recall">Recall</option>
+                                <option value="Retur Pabrik">Retur Pabrik</option>
+                                <option value="Double">Double</option>
+                                <option value="dlsbnya">dlsbnya</option>
                             </select>
                         </div>
                     </div>
@@ -1529,11 +1538,13 @@ export default function PurchaseReturns({
                                                                         className={`w-full border border-slate-200 rounded-lg px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 ${isFromInvoice && (!row.selected || row.is_already_returned) ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-white'}`}
                                                                     >
                                                                         <option value="ED DEKAT">ED DEKAT</option>
-                                                                        <option value="SALAH PESAN">SALAH PESAN</option>
-                                                                        <option value="DISKON TIDAK SESUAI">DISKON TIDAK SESUAI</option>
-                                                                        <option value="TERDOUBLE">TERDOUBLE</option>
-                                                                        <option value="PESAN YANG INJ">PESAN YANG INJ</option>
-                                                                        <option value="RUSAK">RUSAK</option>
+                                                                        <option value="Barang Rusak">Barang Rusak</option>
+                                                                        <option value="Salah Barang">Salah Barang</option>
+                                                                        <option value="Salah Pesan">Salah Pesan</option>
+                                                                        <option value="Recall">Recall</option>
+                                                                        <option value="Retur Pabrik">Retur Pabrik</option>
+                                                                        <option value="Double">Double</option>
+                                                                        <option value="dlsbnya">dlsbnya</option>
                                                                     </select>
                                                                 </td>
                                                                 <td className="py-2 px-2 text-center">
@@ -1680,11 +1691,13 @@ export default function PurchaseReturns({
                                     className="w-full border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                                 >
                                     <option value="ED DEKAT">ED DEKAT</option>
-                                    <option value="SALAH PESAN">SALAH PESAN</option>
-                                    <option value="DISKON TIDAK SESUAI">DISKON TIDAK SESUAI</option>
-                                    <option value="TERDOUBLE">TERDOUBLE</option>
-                                    <option value="PESAN YANG INJ">PESAN YANG INJ</option>
-                                    <option value="RUSAK">RUSAK</option>
+                                    <option value="Barang Rusak">Barang Rusak</option>
+                                    <option value="Salah Barang">Salah Barang</option>
+                                    <option value="Salah Pesan">Salah Pesan</option>
+                                    <option value="Recall">Recall</option>
+                                    <option value="Retur Pabrik">Retur Pabrik</option>
+                                    <option value="Double">Double</option>
+                                    <option value="dlsbnya">dlsbnya</option>
                                 </select>
                             </div>
 
@@ -1913,7 +1926,9 @@ export default function PurchaseReturns({
                                     onChange={(e) => setStatusForm({ ...statusForm, status: e.target.value })}
                                     className="w-full border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-800"
                                 >
+                                    <option value="diajukan">Diajukan Retur</option>
                                     <option value="dikonfirmasi">Sudah Dikonfirmasi</option>
+                                    <option value="sudah_diambil">Sudah Diambil</option>
                                     <option value="sudah_potong">Sudah Potong Tagihan</option>
                                     <option value="barang_kembali_pmi">Barang Kembali PMI</option>
                                 </select>

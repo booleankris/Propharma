@@ -416,7 +416,7 @@ class ReturController extends Controller
                 'counter_stock' => $item->counter_stock,
                 'batch_id' => $item->batch_id,
                 'batch_name' => $item->batch_name,
-                'expired_date' => $item->expired_date ? Carbon::parse($item->expired_date)->format('d/m/Y') : '-',
+                'expired_date' => $this->formatExpiredDateSafe($item->expired_date),
                 'etalase_name' => $item->etalase_name ?: 'Etalase Kasir',
                 'is_fallback' => false,
             ];
@@ -434,6 +434,24 @@ class ReturController extends Controller
         ];
 
         return response()->json($results);
+    }
+
+    /**
+     * Format tanggal expired tanpa pernah melempar exception.
+     * Data lama ada yang rusak (mis. "2040-01-1107"), jadi jika gagal di-parse
+     * tampilkan nilai mentahnya agar endpoint tidak crash (500).
+     */
+    private function formatExpiredDateSafe($value): string
+    {
+        if (empty($value) || str_starts_with((string) $value, '0000-00-00')) {
+            return '-';
+        }
+
+        try {
+            return Carbon::parse($value)->format('d/m/Y');
+        } catch (\Throwable $e) {
+            return (string) $value;
+        }
     }
 
 

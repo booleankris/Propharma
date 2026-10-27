@@ -21,8 +21,10 @@ class ReturnPolicyController extends Controller
         $this->middleware('auth');
         $this->middleware(function ($request, $next) {
             $user = auth()->user();
-            if (!$user || (!$user->hasRole('Finance') && !$user->hasRole('General Manager') && !$user->hasRole('administrator'))) {
-                abort(403, 'Akses ditolak: Master Ketentuan Retur hanya dapat diakses oleh role Finance, General Manager, dan Administrator.');
+            $allowedRoles = ['administrator', 'General Manager', 'Gudang PMI'];
+            $hasAccess = $user && $user->hasAnyRole($allowedRoles);
+            if (!$hasAccess) {
+                abort(403, 'Akses ditolak: Ketentuan Retur hanya dapat diakses oleh Administrator, General Manager, dan Gudang PMI.');
             }
             return $next($request);
         });
@@ -61,9 +63,9 @@ class ReturnPolicyController extends Controller
 
     public function index(Request $request)
     {
-        $search = trim($request->input('search', ''));
-        $creditorFilter = $request->input('creditor_code', '');
-        $returnableFilter = $request->input('is_returnable', '');
+        $search = trim((string) ($request->input('search') ?? ''));
+        $creditorFilter = $request->input('creditor_code');
+        $returnableFilter = $request->input('is_returnable');
         $perPage = (int) $request->input('per_page', 25);
 
         $query = ReturnPolicy::with(['factory:id,name', 'creditor:code,name'])
@@ -83,12 +85,12 @@ class ReturnPolicyController extends Controller
             });
         }
 
-        if ($creditorFilter !== '') {
+        if (!empty($creditorFilter)) {
             $query->where('creditor_code', $creditorFilter);
         }
 
-        if ($returnableFilter !== '') {
-            $query->where('is_returnable', $returnableFilter === '1');
+        if ($returnableFilter !== null && $returnableFilter !== '') {
+            $query->where('is_returnable', (string)$returnableFilter === '1');
         }
 
         $policies = $query->paginate($perPage)->withQueryString();
@@ -98,32 +100,42 @@ class ReturnPolicyController extends Controller
         $returnableCount = ReturnPolicy::where('is_returnable', true)->count();
         $nonReturnableCount = ReturnPolicy::where('is_returnable', false)->count();
 
+        // Semua PBF (untuk modal Tambah/Edit aturan)
         $creditors = Creditor::select('code', 'name')
             ->whereNotNull('code')
             ->where('code', '!=', '')
             ->orderBy('name')
             ->get();
 
+        // Hanya PBF yang memiliki aturan retur (untuk dropdown filter)
+        $policyCounts = ReturnPolicy::select('creditor_code', DB::raw('COUNT(*) as total'))
+            ->groupBy('creditor_code')
+            ->pluck('total', 'creditor_code');
+
+        $filterCreditors = $creditors
+            ->filter(fn ($c) => isset($policyCounts[$c->code]))
+            ->map(function ($c) use ($policyCounts) {
+                $c->policy_count = (int) $policyCounts[$c->code];
+                return $c;
+            })
+            ->values();
+
         $factories = Factory::select('id', 'name')
             ->orderBy('name')
             ->get();
 
-        return Inertia::render('Finance/ReturnPolicies', [
+        return view('orders.return_policies', [
             'policies' => $policies,
-            'filters' => [
-                'search' => $search,
-                'creditor_code' => $creditorFilter,
-                'is_returnable' => $returnableFilter,
-                'per_page' => $perPage,
-            ],
-            'stats' => [
-                'total' => $totalCount,
-                'returnable' => $returnableCount,
-                'non_returnable' => $nonReturnableCount,
-            ],
+            'search' => $search,
+            'creditorFilter' => $creditorFilter ?? '',
+            'returnableFilter' => $returnableFilter !== null && $returnableFilter !== '' ? (string)$returnableFilter : '',
+            'perPage' => $perPage,
+            'totalCount' => $totalCount,
+            'returnableCount' => $returnableCount,
+            'nonReturnableCount' => $nonReturnableCount,
             'creditors' => $creditors,
+            'filterCreditors' => $filterCreditors,
             'factories' => $factories,
-            'branchContext' => $this->getBranchContext(),
         ]);
     }
 
