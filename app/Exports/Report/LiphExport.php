@@ -75,7 +75,7 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
 
     private function safeSum($collection, $field)
     {
-        return $collection->sum(fn($item) => (int) ($item->{$field} ?? 0));
+        return (int) round($collection->sum(fn($item) => (float) ($item->{$field} ?? 0)));
     }
 
     private function emptyBucket(): array
@@ -230,9 +230,9 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                 }
 
                 $grouped[$group][$label]['lembar'] += 1;
-                $grouped[$group][$label]['potongan_transaksi'] += (int) ($trx->discount ?? 0);
+                $grouped[$group][$label]['potongan_transaksi'] += (int) round((float) ($trx->discount ?? 0));
 
-                $trxNetto = (int) ($trx->subtotal ?? 0);
+                $trxNetto = (int) round((float) ($trx->subtotal ?? 0));
                 if (in_array($label, ['Retur Tunai', 'Retur Kredit'], true)) $trxNetto = -abs($trxNetto);
                 $grouped[$group][$label]['netto'] += $trxNetto;
 
@@ -293,7 +293,7 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
 
                 if ($label === $potonganTransaksiTarget) {
                     $ref['lembar'] += 1;
-                    $ref['potongan_transaksi'] += (int) ($trx->discount ?? 0);
+                    $ref['potongan_transaksi'] += (int) round((float) ($trx->discount ?? 0));
                 }
 
                 unset($ref);

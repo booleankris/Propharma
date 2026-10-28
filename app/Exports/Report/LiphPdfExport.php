@@ -40,7 +40,7 @@ class LiphPdfExport
 
     private function safeSum($collection, $field)
     {
-        return $collection->sum(fn($item) => (int) ($item->{$field} ?? 0));
+        return (int) round($collection->sum(fn($item) => (float) ($item->{$field} ?? 0)));
     }
 
     public function download()
@@ -92,7 +92,7 @@ class LiphPdfExport
             $ref['embalase'] += $this->safeSum($trx->transactions, 'embalase');
             $ref['potongan'] += (int) ($trx->discount ?? 0) + $this->safeSum($trx->transactions, 'discount');
 
-            $netto = (int) ($trx->subtotal ?? 0);
+            $netto = (int) round((float) ($trx->subtotal ?? 0));
             if (in_array($label, ['Retur Tunai', 'Retur Kredit'], true)) $netto = -abs($netto);
             $ref['netto'] += $netto;
         }
