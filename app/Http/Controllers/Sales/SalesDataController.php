@@ -97,7 +97,7 @@ class SalesDataController extends Controller
                 }
             }
 
-            // text search (mencari nomor transaksi, nama pasien, no telp, kasir, atau tahun)
+            // text search (mencari nomor transaksi, nama pasien, no telp, kasir, nama/kode obat, atau tahun)
             if ($search) {
                 $cleanPhone = preg_replace('/[^0-9]/', '', $search);
                 $query->where(function ($q) use ($search, $cleanPhone) {
@@ -116,6 +116,13 @@ class SalesDataController extends Controller
                         ->orWhereHas('user', function ($u) use ($search) {
                             $u->where('name', 'like', "%{$search}%")
                                 ->orWhere('username', 'like', "%{$search}%");
+                        })
+                        ->orWhereHas('transactions.transactions', function ($cartQuery) use ($search) {
+                            $cartQuery->where('status', 1)
+                                ->whereHas('medicine', function ($m) use ($search) {
+                                    $m->where('name', 'like', "%{$search}%")
+                                        ->orWhere('code', 'like', "%{$search}%");
+                                });
                         });
 
                     if (preg_match('/^(19|20)\d{2}$/', $search)) {
@@ -422,6 +429,10 @@ class SalesDataController extends Controller
                             ->orWhereHas('user', function ($u) use ($search) {
                                 $u->where('name', 'like', "%{$search}%")
                                     ->orWhere('username', 'like', "%{$search}%");
+                            })
+                            ->orWhereHas('transactions.transactions.medicine', function ($m) use ($search) {
+                                $m->where('name', 'like', "%{$search}%")
+                                    ->orWhere('code', 'like', "%{$search}%");
                             });
                     }
                 });

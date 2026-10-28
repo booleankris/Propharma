@@ -206,6 +206,13 @@ class SalesDataDetailSheet implements FromArray, WithStyles, WithColumnWidths, W
                         ->orWhereHas('transactions.user', function ($u) use ($s) {
                             $u->where('name', 'like', "%{$s}%")
                                 ->orWhere('username', 'like', "%{$s}%");
+                        })
+                        ->orWhereHas('transactions', function ($cartQuery) use ($s) {
+                            $cartQuery->where('status', 1)
+                                ->whereHas('medicine', function ($m) use ($s) {
+                                    $m->where('name', 'like', "%{$s}%")
+                                        ->orWhere('code', 'like', "%{$s}%");
+                                });
                         });
                 }
             });
