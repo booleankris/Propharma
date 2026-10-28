@@ -148,48 +148,95 @@ class SalesController extends Controller
         // 5. Collect view data───────────────
         $itemInCart = MedicineCart::with('medicine')
             ->where('transaction_id', $trx_id)
-            ->where('user_id', $user_id)
+            ->where('status', 0)
+            ->orderBy('id', 'asc')
             ->get();
 
-        $activeCart = $itemInCart->where('status', '0');
-        $totaltransaction = $activeCart->sum('final_price');
+        $activeCart = $itemInCart;
+        $totaltransaction = (float) $activeCart->sum('final_price');
 
         $total_price = (object)[
-            'total_price' => (float)$activeCart->sum('total_price'),
-            'embalase' => (float)$activeCart->sum('embalase'),
+            'total_price' => (float) $activeCart->sum('total_price'),
+            'embalase' => (float) $activeCart->sum('embalase'),
         ];
 
         $existingpackage = $itemInCart->first(function ($cartItem) {
             return $cartItem->recipe_status == '0' && !empty($cartItem->package);
         });
 
-        $discount_total = $activeCart->sum('discount');
+        $discount_total = (float) $activeCart->sum('discount');
 
         $check_transaction = MedicineTransactions::where('pharmacy_id', $pharmacy_id)
             ->where('status', 0)
             ->count();
 
-        return view('kasir.transaction', compact(
-            'transaction_code',
-            'check_transaction',
-            'type',
-            'trx_id',
-            'transaction',
-            'existingpackage',
-            // 'priceTotal',
-            'total_price',
-            'parameters',
-            'rounding',
-            'itemInCart',
-            'totaltransaction',
-            'discount_total',
-            'ChangeFakturParameters',
-            'parameterRT',
-            'parameterHV',
-            'parameterUP',
-            'service',
-            'ChangeFakturRounding'
-        ));
+        return response()
+            ->view('kasir.transaction', compact(
+                'transaction_code',
+                'check_transaction',
+                'type',
+                'trx_id',
+                'transaction',
+                'existingpackage',
+                // 'priceTotal',
+                'total_price',
+                'parameters',
+                'rounding',
+                'itemInCart',
+                'totaltransaction',
+                'discount_total',
+                'ChangeFakturParameters',
+                'parameterRT',
+                'parameterHV',
+                'parameterUP',
+                'service',
+                'ChangeFakturRounding'
+            ))
+            ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+            ->header('Pragma', 'no-cache')
+            ->header('Expires', 'Sat, 01 Jan 2000 00:00:00 GMT');
+    }
+
+    // Helper: build authoritative cart state + totals from DB ──────────────
+    private function buildCartSyncPayload(int $transactionId): array
+    {
+        $items = MedicineCart::with('medicine')
+            ->where('transaction_id', $transactionId)
+            ->where('status', 0)
+            ->orderBy('id', 'asc')
+            ->get();
+
+        $totalTransaction = (float) $items->sum('final_price');
+        $totalDiscount = (float) $items->sum('discount');
+        $totalBought = (float) $items->sum('total_price') + (float) $items->sum('embalase');
+
+        $cartItems = $items->map(function (MedicineCart $row) {
+            return [
+                'id' => $row->id,
+                'medicine_id' => $row->medicine_id,
+                'name' => $row->medicine->name ?? '-',
+                'unit' => $row->medicine->unit ?? '',
+                'packaging' => $row->medicine->packaging ?? '',
+                'quantity' => (float) $row->quantity,
+                'discount' => (float) $row->discount,
+                'total_price' => (float) $row->total_price,
+                'embalase' => (float) $row->embalase,
+                'service_fee' => (float) ($row->service_fee ?? 0),
+                'final_price' => (float) $row->final_price,
+                'cart_type' => $row->cart_type,
+                'recipe_status' => $row->recipe_status,
+                'recipe_number' => $row->recipe_number,
+            ];
+        })->values()->all();
+
+        return [
+            'total_transaction' => $totalTransaction,
+            'totaltransaction' => $totalTransaction,
+            'total_discount' => $totalDiscount,
+            'totalbought' => $totalBought,
+            'cart_count' => count($cartItems),
+            'cart_items' => $cartItems,
+        ];
     }
 
     // Helper: map DB type string back to route slug ───────────────────────────
@@ -636,16 +683,9 @@ class SalesController extends Controller
             ]);
         });
         $transaction->load('medicine');
+        $syncPayload = $this->buildCartSyncPayload((int) $transaction->transaction_id);
 
-        $activeCart = MedicineCart::where('transaction_id', $transaction->transaction_id)
-            ->where('user_id', auth()->id())
-            ->where('status', '0');
-        $total_transaction = (float) $activeCart->sum('final_price');
-        $total_discount = (float) $activeCart->sum('discount');
-        $totalboughtCalc = (clone $activeCart)->selectRaw('SUM(total_price) as total_price, SUM(embalase) as embalase')->first();
-        $total_raw = (float) ($totalboughtCalc->total_price ?? 0) + (float) ($totalboughtCalc->embalase ?? 0);
-
-        return response()->json([
+        return response()->json(array_merge([
             'id' => $transaction->id,
             'name' => $transaction->medicine->name,
             'unit' => $transaction->medicine->unit,
@@ -658,11 +698,8 @@ class SalesController extends Controller
             'service_fee' => $transaction->service_fee,
             'final_price' => $transaction->final_price,
             'cart_type' => $transaction->cart_type,
-            'total_transaction' => $total_transaction,
-            'total_discount' => $total_discount,
-            'totalbought' => $total_raw,
             'remove_url' => route('sales.removeItem', $transaction->id),
-        ]);
+        ], $syncPayload));
     }
     public function getCartItem($id)
     {
@@ -672,29 +709,14 @@ class SalesController extends Controller
     public function deleteCartItem($id)
     {
         $cart = MedicineCart::findOrFail($id);
+        $transactionId = (int) $cart->transaction_id;
         $cart->delete();
 
-        $total_transaction = MedicineCart::where('transaction_id', $cart->transaction_id)
-            ->where('user_id', auth()->id())
-            ->where('status', '0')
-            ->sum('final_price');
-        $total_discount = MedicineCart::where('transaction_id', $cart->transaction_id)
-            ->where('user_id', auth()->id())
-            ->where('status', '0')
-            ->sum('discount');
-        $totalbought = MedicineCart::where('transaction_id', $cart->transaction_id)
-            ->where('user_id', auth()->id())
-            ->where('status', '0')
-            ->selectRaw('SUM(total_price) as total_price, SUM(embalase) as embalase')->first();
-
-        $total_raw = $totalbought->total_price + $totalbought->embalase;
-        return response()->json([
+        $syncPayload = $this->buildCartSyncPayload($transactionId);
+        return response()->json(array_merge([
             'success' => true,
             'item' => $cart,
-            'total_transaction' => $total_transaction,
-            'total_discount' => $total_discount,
-            'totalbought' => $total_raw,
-        ]);
+        ], $syncPayload));
     }
     private function generatePatientCode()
     {
@@ -965,6 +987,29 @@ class SalesController extends Controller
                     'print_resep_url' => route('salesrecipe.print', $transaction->id),
                     'commands' => $this->buildEscPos($transaction),
                 ]);
+            }
+
+            // ── Cart Integrity & Desync Guard ────────────────────────
+            $cartSync = $this->buildCartSyncPayload((int) $transaction->id);
+            if ($cartSync['cart_count'] === 0) {
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Keranjang transaksi kosong. Tidak dapat melakukan checkout.',
+                    'cart_sync' => $cartSync,
+                ], 422);
+            }
+
+            $dbSubtotal = round((float) $cartSync['total_transaction'], 2);
+            $clientSubtotal = round((float) $validated['totaltransaction'], 2);
+            if (abs($dbSubtotal - $clientSubtotal) > 1) {
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'desync_detected' => true,
+                    'message' => 'Total transaksi tidak sinkron dengan item di database (Rp ' . number_format($dbSubtotal, 0, ',', '.') . '). Tabel keranjang telah disinkronkan ulang, silakan periksa kembali sebelum pembayaran.',
+                    'cart_sync' => $cartSync,
+                ], 409);
             }
 
             $isCreditTransaction = strtoupper((string) ($transaction->transaction_type ?? '')) === 'KREDIT';
@@ -1370,14 +1415,20 @@ class SalesController extends Controller
     }
     public function getTransactionItem(Request $request)
     {
-        $transaction = MedicineCart::with('medicine', 'transactions', 'user')->where('transaction_id', $request->get('transaction_id'))->first();
-        $itemTransaction = MedicineCart::with('medicine', 'transactions', 'user')->where('transaction_id', $request->get('transaction_id'))->get();
-
+        $transactionId = (int) $request->get('transaction_id');
+        $itemTransaction = MedicineCart::with('medicine', 'transactions', 'user')
+            ->where('transaction_id', $transactionId)
+            ->where('status', 0)
+            ->orderBy('id', 'asc')
+            ->get();
+        $transaction = $itemTransaction->first();
+        $syncPayload = $this->buildCartSyncPayload($transactionId);
 
         return response()->json([
             'success' => true,
             'transaction' => $transaction,
             'itemTransaction' => $itemTransaction,
+            'cart_sync' => $syncPayload,
         ]);
     }
 
@@ -1443,27 +1494,15 @@ class SalesController extends Controller
             return $targetItem->fresh();
         });
 
-        $total_transaction = MedicineCart::where('transaction_id', $transactionId)
-            ->where('user_id', auth()->id())
-            ->where('status', '0')
-            ->sum('final_price');
+        $syncPayload = $this->buildCartSyncPayload($transactionId);
 
-        $totalbought = MedicineCart::where('transaction_id', $transactionId)
-            ->where('user_id', auth()->id())
-            ->where('status', '0')
-            ->selectRaw('SUM(total_price) as total_price, SUM(embalase) as embalase')->first();
-
-        $total_raw = $totalbought->total_price + $totalbought->embalase;
-
-        return response()->json([
+        return response()->json(array_merge([
             'success' => true,
             'message' => 'Data embalase berhasil disimpan.',
             'racikStatus' => 1,
             'item_id' => $cartItem->id,
             'finalprice' => $cartItem->final_price,
-            'totaltransaction' => $total_transaction,
-            'totalbought' => $total_raw,
-        ]);
+        ], $syncPayload));
     }
 
     public function updateCart(Request $request)
@@ -1530,33 +1569,12 @@ class SalesController extends Controller
         ]);
 
         $cart->load('medicine');
+        $syncPayload = $this->buildCartSyncPayload((int) $cart->transaction_id);
 
-        $total_transaction = MedicineCart::where('transaction_id', $cart->transaction_id)
-            ->where('user_id', auth()->id())
-            ->where('status', '0')
-            ->sum('final_price');
-
-        $total_discount = MedicineCart::where('transaction_id', $cart->transaction_id)
-            ->where('user_id', auth()->id())
-            ->where('status', '0')
-            ->sum('discount');
-
-
-        $totalbought = MedicineCart::where('transaction_id', $cart->transaction_id)
-            ->where('user_id', auth()->id())
-            ->where('status', '0')
-            ->selectRaw('SUM(total_price) as total_price, SUM(embalase) as embalase')->first();
-
-        $total_raw = $totalbought->total_price + $totalbought->embalase;
-
-
-        return response()->json([
+        return response()->json(array_merge([
             'success' => true,
             'item' => $cart,
-            'total_transaction' => $total_transaction,
-            'total_discount' => $total_discount,
-            'totalbought' => $total_raw,
-        ]);
+        ], $syncPayload));
     }
 
 

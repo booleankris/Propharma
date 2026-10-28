@@ -3856,6 +3856,81 @@
 
     }
 
+    function escapeCartHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function syncCartFromServer(data, expectedCountDelta = null) {
+        if (!data) return;
+
+        const tbody = document.getElementById('carts');
+        const prevRowCount = tbody ? tbody.querySelectorAll('tr.cart-row, tr').length : 0;
+
+        if (data.total_transaction !== undefined) {
+            totaltransaction = parseFloat(data.total_transaction) || 0;
+        } else if (data.totaltransaction !== undefined) {
+            totaltransaction = parseFloat(data.totaltransaction) || 0;
+        }
+
+        if (data.total_discount !== undefined) {
+            total_discount = parseFloat(data.total_discount) || 0;
+        }
+
+        if (data.totalbought !== undefined) {
+            totalbought = parseFloat(data.totalbought) || 0;
+        }
+
+        const effectivePayable = Math.max(0, totaltransaction - (parseFloat(subtotal_discount) || 0));
+        if (cartTotalInput) cartTotalInput.value = formatRupiah(effectivePayable);
+        if (subtotalpreview) subtotalpreview.value = formatRupiah(totaltransaction);
+        if (previewdiscounttotal) previewdiscounttotal.value = formatRupiah(total_discount);
+        if (previewtransactiontotal) previewtransactiontotal.value = formatRupiah(totaltransaction);
+        if (payment_total) payment_total.value = formatRupiah(totalbought);
+
+        if (Array.isArray(data.cart_items) && tbody) {
+            const showEmbalaseCol = (currenttransaction === 'RESEP TUNAI' || currenttransaction === 'KREDIT');
+            tbody.innerHTML = data.cart_items.map((rowItem, idx) => {
+                const isRecipeRow = rowItem.recipe_status !== null && rowItem.recipe_status !== undefined && rowItem.recipe_status !== '';
+                const unitLabel = rowItem.unit || rowItem.packaging || '';
+                const itemEmbalase = parseFloat(rowItem.embalase || rowItem.service_fee || 0);
+                const selectedClass = String(selectedRowId) === String(rowItem.id) ? 'bg-blue-100' : '';
+
+                return `
+                    <tr id="itemincart${rowItem.id}" data-id="${rowItem.id}"
+                        class="cart-row border-b ${isRecipeRow ? 'bg-[#eefff8]' : ''} ${selectedClass} hover:bg-blue-50 transition text-[10px] cursor-pointer">
+                        <td class="px-1 py-1 text-center text-gray-600">${idx + 1}</td>
+                        <td colspan="8" class="leading-normal text-[10px] px-1 py-1 font-semibold text-gray-800">${escapeCartHtml(rowItem.name)}</td>
+                        <td class="px-1 py-1 text-center">${escapeCartHtml(unitLabel)}</td>
+                        <td class="px-1 py-1 text-center">${rowItem.quantity}</td>
+                        <td class="px-1 py-1 text-center">${formatRupiah(rowItem.discount)}</td>
+                        <td class="px-1 py-1 text-center">${formatRupiah(rowItem.total_price)}</td>
+                        ${showEmbalaseCol ? `<td class="px-1 py-1 text-center clEmbalase">${formatRupiah(itemEmbalase)}</td>` : ''}
+                        <td class="px-1 py-1 text-center clFinalprice font-semibold text-blue-600">${formatRupiah(rowItem.final_price)}</td>
+                        <td class="px-1 py-1 text-center font-semibold text-blue-600">${escapeCartHtml(rowItem.cart_type || '')}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            tbody.querySelectorAll('tr.cart-row').forEach(row => attachRowEvents(row));
+
+            if (expectedCountDelta !== null && data.cart_items.length !== (prevRowCount + expectedCountDelta)) {
+                if (typeof iziToast !== 'undefined') {
+                    iziToast.warning({
+                        title: 'Sinkronisasi Keranjang',
+                        message: 'Terdeteksi perubahan item dari sesi/tab lain pada transaksi ini. Tabel Barang Dibeli telah disinkronkan ulang.',
+                        position: 'topRight',
+                        timeout: 5000,
+                    });
+                }
+            }
+        }
+    }
+
     function addToCart(medicine_id, transaction_id, quantity, discount, embalase, cart_type, package, dosage_r, price2,
         raw_total, total_price, final_price, racikstatus) {
 
@@ -3890,75 +3965,36 @@
                     .then(response => {
 
                         const item = response.data.item;
-                        totaltransaction = response.data.total_transaction;
-                        total_discount = response.data.total_discount;
-                        totalbought = response.data.totalbought;
-
                         console.log("Updated cart item:", item);
                         // Reset Inputs and variables value
                         [stock, unit, quantity, price, name, totalprice].forEach(el => el.value = "");
                         discountInput.value = "";
                         discount = "";
+                        selectedRowId = null;
+                        edit_status = 0;
 
                         resetInputs();
                         document.getElementById('productSearch').focus();
                         closeBox();
-                        cartTotalInput.value = formatRupiah(totaltransaction);
-                        if (subtotalpreview) {
 
-                            subtotalpreview.value = formatRupiah(totaltransaction);
-                        }
-                        previewdiscounttotal.value = formatRupiah(total_discount);
-                        previewtransactiontotal.value = formatRupiah(totaltransaction);
-                        payment_total.value = formatRupiah(totalbought);
-
-                        const existingRow = document.getElementById(`itemincart${item.id}`);
-
-                        if (existingRow) {
-                            //   bakcup
-                            existingRow.innerHTML = `
-                            <td class="px-1 py-1 text-center text-gray-600">${existingRow.rowIndex}</td>
-                            <td colspan="8" class="leading-normal text-[10px] px-1 py-1 font-semibold text-gray-800">
-                                ${item.medicine.name}
-                            </td>
-                            <td class="px-1 py-1 text-center">${item.medicine.unit || item.medicine.packaging || ''}</td>
-                            <td class="px-1 py-1 text-center">${item.quantity}</td>
-                            <td class="px-1 py-1 text-center">${formatRupiah(item.discount)}</td>
-                            <td class="px-1 py-1 text-center">${formatRupiah(item.total_price)}</td>
-                            ${(currenttransaction === 'RESEP TUNAI' || currenttransaction === 'KREDIT')
-                                ? `<td class="px-1 py-1 text-center clEmbalase">${formatRupiah(item.embalase)}</td>`
-                                : ''
-                            }
-                            <td class="px-1 py-1 text-center clFinalprice font-semibold text-blue-600">
-                                ${formatRupiah(item.final_price)}
-                            </td>
-                            <td class="px-1 py-1 text-center font-semibold text-blue-600">${item.cart_type}</td>
-                        `;
+                        if (Array.isArray(response.data.cart_items)) {
+                            syncCartFromServer(response.data, 0);
                         } else {
-                            // If not found (failsafe)
-                            console.warn("⚠️ Row not found, inserting new one");
-                            document.getElementById('carts').insertAdjacentHTML('beforeend', `
-                            <tr id="itemincart${item.id}" data-id="${item.id}" class="cart-row border-b hover:bg-blue-50 transition text-[10px] cursor-pointer">
-                                <td class="px-1 py-1 text-center text-gray-600">${document.querySelectorAll('#carts tr').length + 1}</td>
-                                <td colspan="8" class="leading-normal text-[10px] px-1 py-1 font-semibold text-gray-800">${item.medicine.name}</td>
-                                <td class="px-1 py-1 text-center">${item.medicine.unit || item.medicine.packaging || ''}</td>
-                                <td class="px-1 py-1 text-center">${item.quantity}</td>
-                                <td class="px-1 py-1 text-center">${formatRupiah(item.discount)}</td>
-                                <td class="px-1 py-1 text-center">${formatRupiah(item.total_price)}</td>
-                                ${(currenttransaction === 'RESEP TUNAI' || currenttransaction === 'KREDIT')
-                                    ? `<td class="px-1 py-1 text-center clEmbalase">${formatRupiah(item.embalase)}</td>`
-                                    : ''
-                                }
-                                <td class="px-1 py-1 text-center clFinalprice font-semibold text-blue-600">${formatRupiah(item.final_price)}</td>
-                                <td class="px-1 py-1 text-center font-semibold text-blue-600">${item.cart_type}</td>
-                            </tr>
-                        `);
+                            totaltransaction = response.data.total_transaction;
+                            total_discount = response.data.total_discount;
+                            totalbought = response.data.totalbought;
+                            cartTotalInput.value = formatRupiah(totaltransaction);
+                            if (subtotalpreview) {
+                                subtotalpreview.value = formatRupiah(totaltransaction);
+                            }
+                            previewdiscounttotal.value = formatRupiah(total_discount);
+                            previewtransactiontotal.value = formatRupiah(totaltransaction);
+                            payment_total.value = formatRupiah(totalbought);
                         }
+
                         checkbox.checked = false;
                         checkbox.dispatchEvent(new Event('change'));
                         packageInput.value = "";
-                        // Reattach event listeners if needed
-                        attachRowEvents(document.getElementById(`itemincart${item.id}`));
                     })
                     .catch(error => {
                         console.error("Error updating cart:", error.response ? error.response.data : error.message);
@@ -3987,23 +4023,7 @@
 
                 }).then(response => {
                     const item = response.data;
-                    let recipe_row = "";
 
-                    if (response.data.total_transaction !== undefined) {
-                        totaltransaction = parseFloat(response.data.total_transaction);
-                    } else {
-                        totaltransaction += parseFloat(item.final_price ?? total_price);
-                    }
-                    if (response.data.totalbought !== undefined) {
-                        totalbought = parseFloat(response.data.totalbought);
-                    } else {
-                        totalbought = parseFloat(totalbought) + parseFloat(item.final_price ?? grossprice);
-                    }
-                    if (response.data.total_discount !== undefined) {
-                        total_discount = parseFloat(response.data.total_discount);
-                    } else {
-                        total_discount += parseFloat(discount || 0);
-                    }
                     // Reset input fields
                     [stock, unit, quantity, price, name, totalprice].forEach(el => el.value = "");
                     discount = "";
@@ -4012,64 +4032,39 @@
 
                     resetInputs();
 
-
                     discountInput.value = "";
-                    if (racikstatus == 1 && transaction_type != 'UPDS' && transaction_type != 'HV/OTC') {
-                        document.getElementById('productSearch').focus();
-                        closeBox();
+                    document.getElementById('productSearch').focus();
+                    closeBox();
 
-                    } else {
-                        document.getElementById('productSearch').focus();
-                        closeBox();
-
-                    }
                     console.log(item);
 
-                    // UPDATE PREVIEW 
-                    cartTotalInput.value = formatRupiah(totaltransaction);
-                    if (subtotalpreview) {
-                        subtotalpreview.value = formatRupiah(totaltransaction);
-                    }
-
-                    previewdiscounttotal.value = formatRupiah(total_discount);
-
-                    previewtransactiontotal.value = formatRupiah(totaltransaction);
-                    payment_total.value = formatRupiah(totalbought);
-
-
-
-                    if (racikstatus != 0) {
-                        recipe_row = "bg-[#eefff8]";
-                    }
-
-                    const itemEmbalase = parseFloat(item.embalase || item.service_fee || 0);
-                    document.getElementById('carts').insertAdjacentHTML('beforeend', `
-                    <tr id="itemincart${item.id}" data-id="${item.id}" 
-                        class="cart-row border-b ${recipe_row} hover:bg-blue-50 transition text-[10px] cursor-pointer">
-                        <td class="px-1 py-1 text-center text-gray-600">
-                            ${document.querySelectorAll('#carts tr').length + 1}
-                        </td>
-                        <td colspan="8" class="leading-normal text-[10px] px-1 py-1 font-semibold text-gray-800">
-                            ${item.name}
-                        </td>
-                        <td class="px-1 py-1 text-center">${item.unit || item.packaging || ''}</td>
-                        <td class="px-1 py-1 text-center">${item.quantity}</td>
-                        <td class="px-1 py-1 text-center">${formatRupiah(item.discount)}</td>
-                        <td class="px-1 py-1 text-center">${formatRupiah(item.total_price)}</td>
-                        ${(currenttransaction === 'RESEP TUNAI' || currenttransaction === 'KREDIT')
-                            ? `<td class="px-1 py-1 text-center clEmbalase">${formatRupiah(itemEmbalase)}</td>`
-                            : ''
+                    if (Array.isArray(response.data.cart_items)) {
+                        syncCartFromServer(response.data, 1);
+                    } else {
+                        if (response.data.total_transaction !== undefined) {
+                            totaltransaction = parseFloat(response.data.total_transaction);
+                        } else {
+                            totaltransaction += parseFloat(item.final_price ?? total_price);
                         }
-                        <td class="px-1 py-1 text-center clFinalprice font-semibold text-blue-600">
-                            ${formatRupiah(item.final_price)}
-                        </td>
-                        <td class="px-1 py-1 text-center font-semibold text-blue-600">${item.cart_type}</td>
-                    </tr>
-                `);
+                        if (response.data.totalbought !== undefined) {
+                            totalbought = parseFloat(response.data.totalbought);
+                        } else {
+                            totalbought = parseFloat(totalbought) + parseFloat(item.final_price ?? grossprice);
+                        }
+                        if (response.data.total_discount !== undefined) {
+                            total_discount = parseFloat(response.data.total_discount);
+                        } else {
+                            total_discount += parseFloat(discount || 0);
+                        }
+                        cartTotalInput.value = formatRupiah(totaltransaction);
+                        if (subtotalpreview) {
+                            subtotalpreview.value = formatRupiah(totaltransaction);
+                        }
+                        previewdiscounttotal.value = formatRupiah(total_discount);
+                        previewtransactiontotal.value = formatRupiah(totaltransaction);
+                        payment_total.value = formatRupiah(totalbought);
+                    }
 
-                    const newRow = document.getElementById(`itemincart${item.id}`); // safer
-                    console.log('Newly inserted row:', newRow);
-                    attachRowEvents(newRow);
                     discount = 0;
                     console.log('Reseting the discount variable', discount);
                     if (racikstatus == 1) startNewRecipe = false;
@@ -4108,6 +4103,13 @@
             }
 
             if (edit_status != 0) {
+                if (discountInput.value === "") {
+                    final_price = subtotal;
+                    discount = 0;
+                }
+                if (jasa === "") {
+                    jasa = 0;
+                }
                 true_price = final_price + jasa;
                 const pkg = document.getElementById('package')?.value || '';
                 const dose = document.getElementById('dosage_r')?.value || '';
@@ -4209,24 +4211,35 @@
         axios.delete(`/transaction/cartItem/${id}`)
             .then(response => {
                 console.log('Deleted:', response.data);
-                const row = document.querySelector(`#itemincart${id}`);
-                if (row) row.remove();
-                // Renumbering
-                renumberRows();
                 selectedRowId = null;
-
-                // Update Preview
-                cartTotalInput.value = formatRupiah(response.data.total_transaction);
-                if (subtotalpreview) {
-
-                    subtotalpreview.value = formatRupiah(response.data.total_transaction);
+                if (edit_status != 0) {
+                    edit_status = 0;
+                    discount = 0;
+                    [stock, unit, quantity, price, name, totalprice].forEach(el => {
+                        if (el) el.value = "";
+                    });
+                    if (discountInput) discountInput.value = "";
+                    resetInputs();
                 }
-                previewdiscounttotal.value = formatRupiah(response.data.total_discount);
-                previewtransactiontotal.value = formatRupiah(response.data.total_transaction);
-                payment_total.value = formatRupiah(response.data.totalbought);
-                totaltransaction = response.data.total_transaction;
-                totalbought = response.data.totalbought;
-                total_discount = response.data.total_discount;
+
+                if (Array.isArray(response.data.cart_items)) {
+                    syncCartFromServer(response.data, -1);
+                } else {
+                    const row = document.querySelector(`#itemincart${id}`);
+                    if (row) row.remove();
+                    renumberRows();
+
+                    cartTotalInput.value = formatRupiah(response.data.total_transaction);
+                    if (subtotalpreview) {
+                        subtotalpreview.value = formatRupiah(response.data.total_transaction);
+                    }
+                    previewdiscounttotal.value = formatRupiah(response.data.total_discount);
+                    previewtransactiontotal.value = formatRupiah(response.data.total_transaction);
+                    payment_total.value = formatRupiah(response.data.totalbought);
+                    totaltransaction = response.data.total_transaction;
+                    totalbought = response.data.totalbought;
+                    total_discount = response.data.total_discount;
+                }
             })
             .catch(err => console.error('Failed to delete item:', err));
     }
@@ -4619,6 +4632,10 @@
 
             const transaction =
                 response.data.transaction;
+
+            if (response.data.cart_sync) {
+                syncCartFromServer(response.data.cart_sync, 0);
+            }
 
             // FILL HEADER
             document.getElementById('receipt').textContent =
@@ -5790,10 +5807,15 @@
 
                 console.error(err);
 
+                if (err.response?.data?.cart_sync) {
+                    syncCartFromServer(err.response.data.cart_sync, null);
+                }
+
                 iziToast.error({
                     title: 'Gagal',
                     message: err.response?.data?.message || 'Gagal menyimpan transaksi',
-                    position: 'topRight'
+                    position: 'topRight',
+                    timeout: 6000,
                 });
 
                 checkoutProcessing = false;
@@ -6076,13 +6098,6 @@
             racikembalaseprice = item.finalprice;
             startNewRecipe = false;
 
-
-            const recipeRow = document.getElementById(`itemincart${item.item_id}`);
-            if (recipeRow) {
-                recipeRow.querySelector('.clEmbalase')?.replaceChildren(formatRupiah(jasaValue));
-                recipeRow.querySelector('.clFinalprice')?.replaceChildren(formatRupiah(racikembalaseprice));
-            }
-
             if (document.getElementById('jasa')) document.getElementById('jasa').value = "";
             if (document.getElementById('dosage_r2')) document.getElementById('dosage_r2').value = "Tidak";
             if (checkbox) {
@@ -6090,17 +6105,24 @@
                 checkbox.dispatchEvent(new Event('change'));
             }
             document.getElementById('productSearch')?.focus();
-            totaltransaction = response.data.totaltransaction;
-            const roundedtotal = roundUpToNearestThousand(totaltransaction);
-            if (cartTotalInput) cartTotalInput.value = formatRupiah(roundedtotal);
-            if (subtotalpreview) subtotalpreview.value = formatRupiah(roundedtotal);
 
-            console.log('Before:', totaltransaction);
-            console.log('After:', roundUpToNearestThousand(totaltransaction));
+            if (Array.isArray(response.data.cart_items)) {
+                syncCartFromServer(response.data, 0);
+            } else {
+                const recipeRow = document.getElementById(`itemincart${item.item_id}`);
+                if (recipeRow) {
+                    recipeRow.querySelector('.clEmbalase')?.replaceChildren(formatRupiah(jasaValue));
+                    recipeRow.querySelector('.clFinalprice')?.replaceChildren(formatRupiah(racikembalaseprice));
+                }
+                totaltransaction = response.data.totaltransaction;
+                const roundedtotal = roundUpToNearestThousand(totaltransaction);
+                if (cartTotalInput) cartTotalInput.value = formatRupiah(roundedtotal);
+                if (subtotalpreview) subtotalpreview.value = formatRupiah(roundedtotal);
 
-            totalbought = response.data.totalbought;
-            if (previewtransactiontotal) previewtransactiontotal.value = formatRupiah(totaltransaction);
-            if (payment_total) payment_total.value = formatRupiah(totalbought);
+                totalbought = response.data.totalbought;
+                if (previewtransactiontotal) previewtransactiontotal.value = formatRupiah(totaltransaction);
+                if (payment_total) payment_total.value = formatRupiah(totalbought);
+            }
 
 
         }).catch(error => {
@@ -6237,6 +6259,14 @@
 </script>
 
 <script>
+    // [BFCACHE RELOAD GUARD]
+    // Ensure browser Back/Forward never renders a stale cached DOM snapshot
+    window.addEventListener('pageshow', function(event) {
+        if (event.persisted) {
+            window.location.reload();
+        }
+    });
+
     // [ANTI-TAB DUPLICATION SYSTEM]
     // Prevent data bleed when user duplicates a tab (which copies the same URL and transaction ID)
     (function() {

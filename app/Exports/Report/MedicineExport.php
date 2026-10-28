@@ -268,10 +268,10 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
             $grandStock,
         ];
 
-        $potonganTransaksi = (int) $transactions->reject(function ($trx) {
+        $potonganTransaksi = (int) round($transactions->reject(function ($trx) {
             return in_array(strtoupper(trim((string) $trx->transaction_type)), ['RETUR JUAL', 'RETUR KREDIT'], true)
                 || strtoupper(trim((string) $trx->transaction_code)) === 'RT';
-        })->sum(fn ($t) => (int) ($t->discount ?? 0));
+        })->sum(fn ($t) => (float) ($t->discount ?? 0)));
 
         if ($potonganTransaksi > 0) {
             $rows[] = [
@@ -372,10 +372,10 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
 
         $rows[] = ['', 'TOTAL', '', '', $grandQty, (int) $grandBruto, (int) $grandDisc, (int) $grandNetto];
 
-        $potonganTransaksi = (int) $transactions->reject(function ($trx) {
+        $potonganTransaksi = (int) round($transactions->reject(function ($trx) {
             return in_array(strtoupper(trim((string) $trx->transaction_type)), ['RETUR JUAL', 'RETUR KREDIT'], true)
                 || strtoupper(trim((string) $trx->transaction_code)) === 'RT';
-        })->sum(fn ($t) => (int) ($t->discount ?? 0));
+        })->sum(fn ($t) => (float) ($t->discount ?? 0)));
 
         if ($potonganTransaksi > 0) {
             $rows[] = [

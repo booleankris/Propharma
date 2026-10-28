@@ -115,7 +115,7 @@ class DoctorExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                 ];
             }
 
-            $grouped[$groupKey]['nilai_resep'] += $resepItems->sum(fn ($i) => (int) round((float) ($i->final_price ?? 0)));
+            $grouped[$groupKey]['nilai_resep'] += (int) round($resepItems->sum(fn ($i) => (float) ($i->final_price ?? 0)));
             $grouped[$groupKey]['lembar']      += 1;
             $grouped[$groupKey]['jumlah_r']    += $resepItems->count();
 
