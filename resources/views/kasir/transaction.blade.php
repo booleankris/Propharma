@@ -3865,8 +3865,14 @@
             .replace(/'/g, '&#039;');
     }
 
+    let currentCartSignature = @json($initialCartSignature ?? '');
+
     function syncCartFromServer(data, expectedCountDelta = null) {
         if (!data) return;
+
+        if (data.cart_signature) {
+            currentCartSignature = data.cart_signature;
+        }
 
         const tbody = document.getElementById('carts');
         const prevRowCount = tbody ? tbody.querySelectorAll('tr.cart-row, tr').length : 0;
@@ -3928,6 +3934,19 @@
                     });
                 }
             }
+        }
+
+        // Jika perubahan berasal dari aksi di tab ini (expectedCountDelta !== null),
+        // kirimkan sinyal instan ke tab lain di browser yang sama agar real-time sinkron.
+        if (expectedCountDelta !== null && window.__kasirTxChannel) {
+            try {
+                window.__kasirTxChannel.postMessage({
+                    type: 'CART_UPDATED',
+                    tx_id: String(transaction_id),
+                    sender: window.__kasirTabId || '',
+                    cart_sync: data,
+                });
+            } catch (e) {}
         }
     }
 
@@ -6267,74 +6286,196 @@
         }
     });
 
-    // [ANTI-TAB DUPLICATION SYSTEM]
-    // Prevent data bleed when user duplicates a tab (which copies the same URL and transaction ID)
+    // [ANTI-TAB DUPLICATION & MULTI-PC / MULTI-TAB ISOLATION SYSTEM]
+    // Mencegah tabrakan nomor transaksi di berbagai cabang, 5-10 komputer/cabang, dan 1-5 tab/komputer:
+    // 1. Deteksi instan (0ms) saat kasir klik kanan -> "Duplicate Tab" di browser via sessionStorage + beforeunload
+    // 2. Isolasi & sinkronisasi instan antar-tab di browser yang sama via BroadcastChannel
+    // 3. Lease & sinkronisasi lintas komputer / browser di cabang yang sama via Server Heartbeat
     (function() {
-        if (typeof BroadcastChannel === 'undefined') return;
-
-        const myTabId = Math.random().toString(36).substring(2, 10);
         const myTxId = "{{ $trx_id ?? '' }}";
+        const newTxUrl = "{{ route('transaction', ['type' => $type ?? 'resep']) }}";
         if (!myTxId) return;
 
-        const channel = new BroadcastChannel('kasir_tx_isolation');
-        let isEstablished = false;
+        const myTabId = Math.random().toString(36).substring(2, 10) + '_' + Date.now().toString(36);
+        window.__kasirTabId = myTabId;
+        let isRedirecting = false;
 
-        // Become established after 1.5 seconds of living
-        setTimeout(() => {
-            isEstablished = true;
-        }, 1500);
+        function redirectToFreshTransaction(title, message, targetUrl, delayMs) {
+            if (isRedirecting) return;
+            isRedirecting = true;
 
-        channel.onmessage = function(event) {
-            const data = event.data;
-            if (data.tx_id !== myTxId) return;
+            const searchInput = document.getElementById('productSearch');
+            if (searchInput) searchInput.disabled = true;
 
-            if (data.type === 'PING') {
-                // Someone is asking if this ID is in use.
-                // We reply with PONG, and tell them if we are established.
-                channel.postMessage({
-                    type: 'PONG',
-                    tx_id: myTxId,
-                    sender: myTabId,
-                    established: isEstablished
+            if (typeof iziToast !== 'undefined' && title) {
+                iziToast.warning({
+                    title: title,
+                    message: message,
+                    position: 'topRight',
+                    timeout: Math.max(delayMs || 800, 2000),
                 });
-            } else if (data.type === 'PONG') {
-                // We received a PONG. Someone is using this ID.
-                if (data.sender !== myTabId) {
-                    // If they are established, we must leave!
-                    // If neither of us is established (race condition), we use sender string comparison to tie-break.
-                    if (data.established || myTabId < data.sender) {
-                        // They win. We redirect to a new transaction.
-                        iziToast.warning({
-                            title: 'Tab Ganda Terdeteksi',
-                            message: 'Transaksi ini sedang dibuka di tab lain. Membuat transaksi baru...',
-                            position: 'topRight'
-                        });
-                        // Prevent sending more messages
+            }
+
+            setTimeout(() => {
+                window.location.replace(targetUrl || newTxUrl);
+            }, delayMs ?? 600);
+        }
+
+        // ── 1. Deteksi Instan "Duplicate Tab" Browser (sessionStorage clone check) ──
+        try {
+            const ownerKey = 'kasir_tab_owner_' + myTxId;
+            const navKey = 'kasir_tab_navigating_' + myTxId;
+            const existingOwner = sessionStorage.getItem(ownerKey);
+            const lastNavTs = parseInt(sessionStorage.getItem(navKey) || '0', 10);
+            const isNormalReloadOrNav = (Date.now() - lastNavTs) < 4000;
+
+            if (existingOwner && existingOwner !== myTabId && !isNormalReloadOrNav) {
+                // Tab ini adalah hasil "Duplicate Tab" (karena tab asli tidak pernah memicu beforeunload).
+                // Segera beri tab baru ini nomor transaksi sendiri dalam 0ms!
+                sessionStorage.setItem(ownerKey, myTabId);
+                redirectToFreshTransaction(
+                    'Tab Baru Terdeteksi',
+                    'Membuka nomor transaksi baru untuk tab ini agar tidak bertabrakan...',
+                    newTxUrl,
+                    150
+                );
+                return;
+            }
+
+            sessionStorage.setItem(ownerKey, myTabId);
+            sessionStorage.removeItem(navKey);
+
+            window.addEventListener('beforeunload', function() {
+                try {
+                    sessionStorage.setItem(navKey, String(Date.now()));
+                } catch (e) {}
+            });
+        } catch (e) {}
+
+        // ── 2. BroadcastChannel untuk Antar-Tab di Browser yang Sama ──
+        if (typeof BroadcastChannel !== 'undefined') {
+            const channel = new BroadcastChannel('kasir_tx_isolation');
+            window.__kasirTxChannel = channel;
+            let isEstablished = false;
+
+            setTimeout(() => {
+                isEstablished = true;
+            }, 800);
+
+            channel.onmessage = function(event) {
+                const data = event.data;
+                if (!data || String(data.tx_id) !== String(myTxId)) return;
+
+                if (data.type === 'PING') {
+                    channel.postMessage({
+                        type: 'PONG',
+                        tx_id: myTxId,
+                        sender: myTabId,
+                        established: isEstablished
+                    });
+                } else if (data.type === 'PONG') {
+                    if (data.sender !== myTabId && (data.established || myTabId < data.sender)) {
                         channel.onmessage = null;
-                        setTimeout(() => {
-                            window.location.href =
-                                "{{ route('transaction', ['type' => $type ?? 'resep']) }}";
-                        }, 1200);
+                        redirectToFreshTransaction(
+                            'Tab Ganda Terdeteksi',
+                            'Transaksi ini sedang aktif di tab lain. Membuka transaksi baru...',
+                            newTxUrl,
+                            400
+                        );
+                    }
+                } else if (data.type === 'CART_UPDATED' && data.sender !== myTabId) {
+                    if (data.cart_sync && typeof syncCartFromServer === 'function') {
+                        syncCartFromServer(data.cart_sync, null);
                     }
                 }
-            }
-        };
+            };
 
-        // Ping others immediately
-        channel.postMessage({
-            type: 'PING',
-            tx_id: myTxId,
-            sender: myTabId
+            channel.postMessage({ type: 'PING', tx_id: myTxId, sender: myTabId });
+            setTimeout(() => {
+                if (!isRedirecting) {
+                    channel.postMessage({ type: 'PING', tx_id: myTxId, sender: myTabId });
+                }
+            }, 350);
+        }
+
+        // ── 3. Server Heartbeat untuk Isolasi & Sinkronisasi Lintas 5-10 PC / Browser ──
+        let heartbeatBusy = false;
+        let lastSharedWarnAt = 0;
+
+        function runHeartbeat() {
+            if (isRedirecting || heartbeatBusy || (typeof checkoutProcessing !== 'undefined' && checkoutProcessing)) {
+                return;
+            }
+            heartbeatBusy = true;
+
+            axios.post("{{ route('transaction.heartbeat') }}", {
+                transaction_id: myTxId,
+                client_tab_id: myTabId,
+                cart_signature: typeof currentCartSignature !== 'undefined' ? currentCartSignature : ''
+            }).then(res => {
+                const payload = res.data || {};
+                if (payload.action === 'redirect_new' && payload.redirect_url) {
+                    const msg = payload.reason === 'completed_or_missing'
+                        ? 'Transaksi ini telah diselesaikan atau ditutup. Membuka transaksi baru...'
+                        : 'Nomor transaksi ini sedang digunakan di komputer/tab lain. Membuka transaksi baru...';
+                    redirectToFreshTransaction('Dialihkan ke Transaksi Baru', msg, payload.redirect_url, 400);
+                    return;
+                }
+
+                if (payload.cart_sync && typeof syncCartFromServer === 'function') {
+                    syncCartFromServer(payload.cart_sync, null);
+                    if (typeof iziToast !== 'undefined') {
+                        iziToast.info({
+                            title: 'Keranjang Disinkronkan',
+                            message: 'Data keranjang diperbarui otomatis dari aktivitas terbaru.',
+                            position: 'topRight',
+                            timeout: 3500,
+                        });
+                    }
+                } else if (payload.cart_signature && typeof currentCartSignature !== 'undefined') {
+                    currentCartSignature = payload.cart_signature;
+                }
+
+                if (payload.action === 'shared_active' && (Date.now() - lastSharedWarnAt) > 30000) {
+                    lastSharedWarnAt = Date.now();
+                    if (typeof iziToast !== 'undefined') {
+                        iziToast.warning({
+                            title: 'Transaksi Sedang Dibuka Bersama',
+                            message: `Transaksi ini juga sedang dibuka oleh ${payload.holder_name || 'kasir lain'}. Semua perubahan keranjang disinkronkan otomatis.`,
+                            position: 'topRight',
+                            timeout: 5000,
+                        });
+                    }
+                }
+            }).catch(() => {
+                // Abaikan gangguan jaringan sesaat
+            }).finally(() => {
+                heartbeatBusy = false;
+            });
+        }
+
+        setTimeout(runHeartbeat, 250);
+        setInterval(runHeartbeat, 8000);
+        window.addEventListener('focus', runHeartbeat);
+        document.addEventListener('visibilitychange', function() {
+            if (document.visibilityState === 'visible') {
+                runHeartbeat();
+            }
         });
 
-        // Ping again after a short delay in case the other tab was busy
-        setTimeout(() => {
-            channel.postMessage({
-                type: 'PING',
-                tx_id: myTxId,
-                sender: myTabId
+        // ── 4. Konfirmasi Saat Ganti Tipe Transaksi Jika Keranjang Sudah Berisi Obat ──
+        document.querySelectorAll('.trx-chips a.trx-chip').forEach(chip => {
+            chip.addEventListener('click', function(e) {
+                if (this.classList.contains('active')) return;
+                const rowCount = document.querySelectorAll('#carts tr.cart-row').length;
+                if (rowCount > 0) {
+                    const ok = confirm('Perhatian: Mengganti jenis faktur pada transaksi yang sedang berjalan akan mengosongkan ' + rowCount + ' item di keranjang saat ini.\n\n(Tips: Klik "Tambah Transaksi" jika ingin membuka transaksi baru tanpa menghapus keranjang ini).\n\nTetap ganti jenis faktur dan kosongkan keranjang?');
+                    if (!ok) {
+                        e.preventDefault();
+                    }
+                }
             });
-        }, 500);
+        });
     })();
 
     // ── Tandai Sebagai Pengunjung Logic ──
