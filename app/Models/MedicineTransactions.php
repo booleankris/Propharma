@@ -25,11 +25,17 @@ class MedicineTransactions extends Model
         'payment_method',
         'shift_logs_id',
         'transfer_bank_name',
+        'has_doctor_shipping_fee',
+        'doctor_shipping_fee',
+        'doctor_shipping_payment_method',
+        'doctor_shipping_bank_name',
         'is_submitted',
     ];
 
     protected $casts = [
         'is_submitted' => 'boolean',
+        'has_doctor_shipping_fee' => 'boolean',
+        'doctor_shipping_fee' => 'decimal:2',
     ];
     public function transactions()
     {

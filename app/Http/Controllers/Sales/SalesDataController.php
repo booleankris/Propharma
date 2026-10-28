@@ -51,7 +51,11 @@ class SalesDataController extends Controller
                 MAX(medicine_cart.status) as status,
                 SUM(final_price) as final_price,
                 SUM(total_price) as subtotal,
-                MAX(medicine_transactions.discount) as cart_discount
+                MAX(medicine_transactions.discount) as cart_discount,
+                MAX(medicine_transactions.doctor_shipping_fee) as doctor_shipping_fee,
+                MAX(medicine_transactions.doctor_shipping_payment_method) as doctor_shipping_payment_method,
+                MAX(medicine_transactions.doctor_shipping_bank_name) as doctor_shipping_bank_name,
+                MAX(medicine_transactions.has_doctor_shipping_fee) as has_doctor_shipping_fee
             ')
                 ->groupBy('transaction_id')
                 ->orderBy('transaction_code');
@@ -157,6 +161,11 @@ class SalesDataController extends Controller
                 ->addColumn('time', function ($row) {
                     return Carbon::parse($row->updated_at)->format('H:i:s');
                 })
+                ->addColumn('datetime', function ($row) {
+                    $d = Carbon::parse($row->updated_at)->format('d/m/Y');
+                    $t = Carbon::parse($row->updated_at)->format('H:i:s');
+                    return '<div class="leading-tight"><span class="font-medium text-gray-800">' . $d . '</span><span class="block text-[10px] text-gray-400 font-mono">' . $t . '</span></div>';
+                })
                 ->addColumn('kwitansi_printed_at', fn ($row) => $row->transactions?->kwitansi_printed_at)
                 ->addColumn('code', function ($row) {
                     return $row->transactions?->transaction_code ?? '-';
@@ -203,6 +212,32 @@ class SalesDataController extends Controller
                         $row->transactions?->transfer_bank_name
                     );
                 })
+                ->addColumn('doctor_shipping_fee', function ($row) {
+                    $fee = (float) ($row->doctor_shipping_fee ?? $row->transactions?->doctor_shipping_fee ?? 0);
+                    if ($fee > 0) {
+                        $method = $row->doctor_shipping_payment_method ?? $row->transactions?->doctor_shipping_payment_method;
+                        $bank = $row->doctor_shipping_bank_name ?? $row->transactions?->doctor_shipping_bank_name;
+                        $methodLabel = !empty($method) ? \App\Support\PaymentMethod::label($method, $bank) : '';
+
+                        return '<div class="leading-tight">' .
+                            '<span class="font-semibold text-blue-700">Rp ' . number_format($fee, 0, ',', '.') . '</span>' .
+                            ($methodLabel ? '<span class="block text-[10px] text-gray-500 font-medium">(' . e($methodLabel) . ')</span>' : '') .
+                            '</div>';
+                    }
+                    return '<span class="text-gray-300 font-mono">—</span>';
+                })
+                ->addColumn('doctor_shipping_fee_raw', function ($row) {
+                    return (float) ($row->doctor_shipping_fee ?? $row->transactions?->doctor_shipping_fee ?? 0);
+                })
+                ->addColumn('doctor_shipping_payment_method', function ($row) {
+                    $fee = (float) ($row->doctor_shipping_fee ?? $row->transactions?->doctor_shipping_fee ?? 0);
+                    $method = $row->doctor_shipping_payment_method ?? $row->transactions?->doctor_shipping_payment_method;
+                    $bank = $row->doctor_shipping_bank_name ?? $row->transactions?->doctor_shipping_bank_name;
+                    if ($fee > 0 && !empty($method)) {
+                        return \App\Support\PaymentMethod::label($method, $bank);
+                    }
+                    return '<span class="text-gray-300 font-mono">—</span>';
+                })
                 ->addColumn('raw_payment_method', function ($row) {
                     return strtoupper(trim((string) ($row->transactions?->payment_method ?? 'CASH')));
                 })
@@ -212,7 +247,7 @@ class SalesDataController extends Controller
                 ->addColumn('raw_user_id', function ($row) {
                     return $row->transactions?->user_id ?? $row->user_id;
                 })
-                ->rawColumns(['final_price', 'channel'])
+                ->rawColumns(['datetime', 'final_price', 'channel', 'doctor_shipping_fee', 'doctor_shipping_payment_method'])
                 ->make(true);
         }
 

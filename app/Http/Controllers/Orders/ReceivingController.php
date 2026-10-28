@@ -1822,21 +1822,27 @@ class ReceivingController extends Controller
                     DB::rollBack();
                     return response()->json(['success' => false, 'message' => 'Batch sumber tidak ditemukan; stok tidak diubah.'], 409);
                 }
-                $transferItem = $isWarehouse ? null : MedicineTransferItems::where('receiving_items_id', $item->id)
-                    ->lockForUpdate()->first();
-                if (!$isWarehouse && !$transferItem) {
-                    $transferItem = MedicineTransferItems::where('batches_id', $oldBatchId)
-                        ->where('etalases_id', 99)
-                        ->whereNull('receiving_items_id')
-                        ->lockForUpdate()->first();
-                    if ($transferItem) {
-                        $transferItem->update(['receiving_items_id' => $item->id]);
-                    } else {
+                $branchTransferItems = collect();
+                $transferItem = null;
+                if (!$isWarehouse) {
+                    $branchTransferItems = MedicineTransferItems::where('batches_id', $oldBatchId)
+                        ->lockForUpdate()
+                        ->get();
+
+                    if ($branchTransferItems->isEmpty()) {
                         DB::rollBack();
                         return response()->json([
                             'success' => false,
-                            'message' => 'Relasi stok cabang ke item penerimaan tidak ditemukan. Revisi dibatalkan agar tidak mengurangi stok/kartu stok milik transaksi lain.',
+                            'message' => 'Relasi stok cabang ke batch penerimaan tidak ditemukan. Revisi dibatalkan agar tidak mengurangi stok/kartu stok milik transaksi lain.',
                         ], 409);
+                    }
+
+                    $transferItem = $branchTransferItems->firstWhere('receiving_items_id', $item->id)
+                        ?? $branchTransferItems->firstWhere('etalases_id', 99)
+                        ?? $branchTransferItems->first();
+
+                    if ($transferItem && !$transferItem->receiving_items_id) {
+                        $transferItem->update(['receiving_items_id' => $item->id]);
                     }
                 }
                 $sameBatch = $sourceBatch && (int) $sourceBatch->id === (int) $targetBatch->id;
@@ -1858,21 +1864,39 @@ class ReceivingController extends Controller
                             $transferItem->save();
                         }
                     } elseif ($delta < 0) {
-                        // Batasi hanya oleh stok milik faktur ini (batch gudang / item etalase).
+                        // Batasi hanya oleh stok milik faktur ini (batch gudang / total stok batch di seluruh etalase cabang).
                         // medicines.stock global TIDAK dipakai sebagai batas: jika sudah minus/tidak sinkron,
                         // batch akan tersisa stok "hantu" (kasus EJF218: -490 dari 500).
                         $available = $isWarehouse
                             ? (float) $sourceBatch->stock
-                            : (float) $transferItem->qty;
+                            : (float) $branchTransferItems->sum(fn($r) => max(0, (float) $r->qty));
                         $stockReversed = min(abs($delta), max(0, $available));
                         if ($stockReversed > 0) {
                             $medicine->decrement('stock', $stockReversed);
                             if ($isWarehouse) {
                                 $sourceBatch->decrement('stock', $stockReversed);
-                            } elseif ($transferItem) {
-                                $transferItem->decrement('qty', $stockReversed);
-                                $transferItem->original_qty = max(0, (float) ($transferItem->original_qty ?? 0) - $stockReversed);
-                                $transferItem->save();
+                            } else {
+                                $sortedBranchItems = $branchTransferItems->sortBy(function ($row) use ($item) {
+                                    if ((int) $row->receiving_items_id === (int) $item->id) return 1;
+                                    if ((int) $row->etalases_id === 99) return 2;
+                                    return 3;
+                                });
+
+                                $remainingDeduct = $stockReversed;
+                                foreach ($sortedBranchItems as $row) {
+                                    $rowQty = max(0, (float) $row->qty);
+                                    if ($rowQty <= 0) continue;
+
+                                    $deduct = min($remainingDeduct, $rowQty);
+                                    $newQty = $rowQty - $deduct;
+                                    $remainingDeduct -= $deduct;
+
+                                    $row->qty = $newQty;
+                                    $row->original_qty = max(0, (float) ($row->original_qty ?? 0) - $deduct);
+                                    $row->save();
+
+                                    if ($remainingDeduct <= 0) break;
+                                }
                             }
                         }
                     }
@@ -1882,7 +1906,7 @@ class ReceivingController extends Controller
                     // accounting for units that were already consumed or sold from this receipt line.
                     $available = $isWarehouse
                         ? (float) ($sourceBatch?->stock ?? 0)
-                        : (float) $transferItem->qty;
+                        : (float) $branchTransferItems->sum(fn($r) => max(0, (float) $r->qty));
                     $available = max(0, min($oldActualQty, $available));
                     $alreadyConsumed = max(0, $oldActualQty - $available);
                     $stockReversed = $available;
@@ -1891,6 +1915,28 @@ class ReceivingController extends Controller
                         $medicine->decrement('stock', $stockReversed);
                         if ($isWarehouse && $sourceBatch) {
                             $sourceBatch->decrement('stock', $stockReversed);
+                        } elseif (!$isWarehouse) {
+                            $sortedBranchItems = $branchTransferItems->sortBy(function ($row) use ($item) {
+                                if ((int) $row->receiving_items_id === (int) $item->id) return 1;
+                                if ((int) $row->etalases_id === 99) return 2;
+                                return 3;
+                            });
+
+                            $remainingDeduct = $stockReversed;
+                            foreach ($sortedBranchItems as $row) {
+                                $rowQty = max(0, (float) $row->qty);
+                                if ($rowQty <= 0) continue;
+
+                                $deduct = min($remainingDeduct, $rowQty);
+                                $newQty = $rowQty - $deduct;
+                                $remainingDeduct -= $deduct;
+
+                                $row->qty = $newQty;
+                                $row->original_qty = max(0, (float) ($row->original_qty ?? 0) - $deduct);
+                                $row->save();
+
+                                if ($remainingDeduct <= 0) break;
+                            }
                         }
                     }
 
@@ -2055,36 +2101,69 @@ class ReceivingController extends Controller
                     return response()->json(['success' => false, 'message' => 'Batch stok tidak ditemukan; stok tidak diubah.'], 409);
                 }
 
-                $transferItem = !$isWarehouse
-                    ? MedicineTransferItems::where('receiving_items_id', $item->id)->lockForUpdate()->first()
-                    : null;
-                if (!$isWarehouse && !$transferItem) {
-                    $transferItem = MedicineTransferItems::where('batches_id', $item->batches_id)
-                        ->where('etalases_id', 99)
-                        ->whereNull('receiving_items_id')
-                        ->lockForUpdate()->first();
-                    if ($transferItem) {
-                        $transferItem->update(['receiving_items_id' => $item->id]);
-                    } else {
+                $branchTransferItems = collect();
+                if (!$isWarehouse) {
+                    // Di apotek cabang, barang dari faktur ini mungkin masih di Etalase 99,
+                    // atau sudah dimutasi ke etalase lain (misal Etalase Kasir/Depan).
+                    // Kumpulkan semua baris transfer milik batch ini di cabang tersebut:
+                    $branchTransferItems = MedicineTransferItems::where('batches_id', $item->batches_id)
+                        ->lockForUpdate()
+                        ->get();
+
+                    if ($branchTransferItems->isEmpty()) {
                         DB::rollBack();
                         return response()->json([
                             'success' => false,
-                            'message' => 'Relasi stok cabang ke item penerimaan tidak ditemukan. Penghapusan dibatalkan agar stok/kartu stok transaksi lain tidak berubah.',
+                            'message' => 'Relasi stok cabang ke batch penerimaan tidak ditemukan. Penghapusan dibatalkan agar stok/kartu stok transaksi lain tidak berubah.',
                         ], 409);
                     }
+
+                    // Total stok fisik batch yang masih ada di cabang (di seluruh etalase):
+                    $availableFromReceipt = (float) $branchTransferItems->sum(fn($row) => max(0, (float) $row->qty));
+                } else {
+                    $availableFromReceipt = (float) $batch->stock;
                 }
-                // Reverse only inventory still attributable to this receipt. Sold units stay reflected in prior sales.
-                // Batas = stok batch gudang / item etalase milik faktur ini. medicines.stock global tidak dipakai
-                // sebagai batas agar batch tidak menyisakan stok hantu ketika medicines.stock sudah minus/tidak sinkron.
-                $availableFromReceipt = $isWarehouse
-                    ? (float) $batch->stock
-                    : (float) $transferItem->qty;
+
                 $qtyToReverse = min($actualQty, max(0, $availableFromReceipt));
 
                 if ($qtyToReverse > 0) {
                     $medicine->decrement('stock', $qtyToReverse);
                     if ($isWarehouse) {
                         $batch->decrement('stock', $qtyToReverse);
+                    } else {
+                        // Kurangi stok di cabang dengan urutan prioritas:
+                        // 1. Baris yang terhubung langsung ke receiving_items_id faktur ini
+                        // 2. Baris di Etalase 99 (Gudang Penerimaan Cabang)
+                        // 3. Baris di etalase lainnya (Etalase Kasir/Depan, dll.)
+                        $sortedBranchItems = $branchTransferItems->sortBy(function ($row) use ($item) {
+                            if ((int) $row->receiving_items_id === (int) $item->id) {
+                                return 1;
+                            }
+                            if ((int) $row->etalases_id === 99) {
+                                return 2;
+                            }
+                            return 3;
+                        });
+
+                        $remainingDeduct = $qtyToReverse;
+                        foreach ($sortedBranchItems as $row) {
+                            $rowQty = max(0, (float) $row->qty);
+                            if ($rowQty <= 0) {
+                                continue;
+                            }
+
+                            $deduct = min($remainingDeduct, $rowQty);
+                            $newQty = $rowQty - $deduct;
+                            $remainingDeduct -= $deduct;
+
+                            $row->qty = $newQty;
+                            $row->original_qty = max(0, (float) ($row->original_qty ?? 0) - $deduct);
+                            $row->save();
+
+                            if ($remainingDeduct <= 0) {
+                                break;
+                            }
+                        }
                     }
 
                     ItemsLog::create([
@@ -2103,11 +2182,15 @@ class ReceivingController extends Controller
                     ]);
                 }
 
-                if ($transferItem) {
-                    $transferHeaderId = $transferItem->medicine_transfer_id;
-                    $transferItem->delete();
-                    if (!MedicineTransferItems::where('medicine_transfer_id', $transferHeaderId)->exists()) {
-                        MedicineTransfers::whereKey($transferHeaderId)->delete();
+                if (!$isWarehouse) {
+                    // Bersihkan baris transfer penerimaan spesifik milik item faktur ini jika ada
+                    $directTransferItem = $branchTransferItems->firstWhere('receiving_items_id', $item->id);
+                    if ($directTransferItem) {
+                        $transferHeaderId = $directTransferItem->medicine_transfer_id;
+                        $directTransferItem->delete();
+                        if ($transferHeaderId && !MedicineTransferItems::where('medicine_transfer_id', $transferHeaderId)->exists()) {
+                            MedicineTransfers::whereKey($transferHeaderId)->delete();
+                        }
                     }
                 }
             }

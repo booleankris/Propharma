@@ -933,6 +933,10 @@ class SalesController extends Controller
             'bank_name' => 'nullable|string',
             'user_id' => 'nullable|integer|exists:users,id',
             'shift_logs_id' => 'nullable|integer|exists:shift_logs,id',
+            'has_doctor_shipping_fee' => 'nullable',
+            'doctor_shipping_fee' => 'nullable|numeric|min:0',
+            'doctor_shipping_payment_method' => 'nullable|string',
+            'doctor_shipping_bank_name' => 'nullable|string',
         ]);
 
         DB::beginTransaction();
@@ -997,6 +1001,15 @@ class SalesController extends Controller
                 $bankAccount = $matches->first();
             }
 
+            $hasDoctorShippingFee = filter_var($request->input('has_doctor_shipping_fee', false), FILTER_VALIDATE_BOOLEAN);
+            $doctorShippingFee = $hasDoctorShippingFee ? round((float) ($request->input('doctor_shipping_fee', 0)), 2) : 0;
+            $doctorShippingPaymentMethod = ($hasDoctorShippingFee && $doctorShippingFee > 0)
+                ? strtoupper(trim((string) $request->input('doctor_shipping_payment_method', 'CASH')))
+                : null;
+            $doctorShippingBankName = ($hasDoctorShippingFee && $doctorShippingFee > 0 && in_array($doctorShippingPaymentMethod, $nonCashPaymentMethods, true))
+                ? trim((string) $request->input('doctor_shipping_bank_name', ''))
+                : null;
+
             // created_at is intentionally not mass assignable on the model.
             // Set it explicitly at checkout so reports that fall back to the
             // transaction timestamp use the sale time, not when the cart began.
@@ -1013,6 +1026,10 @@ class SalesController extends Controller
                 'debtor_id' => $validated['debtor_id'] ?? null,
                 'payment_method' => $paymentMethod,
                 'transfer_bank_name' => $isUnpaid ? null : ($validated['bank_name'] ?? null),
+                'has_doctor_shipping_fee' => $hasDoctorShippingFee,
+                'doctor_shipping_fee' => $doctorShippingFee,
+                'doctor_shipping_payment_method' => $doctorShippingPaymentMethod,
+                'doctor_shipping_bank_name' => $doctorShippingBankName,
                 'user_id' => $validated['user_id'] ?? null,
                 'shift_logs_id' => $validated['shift_logs_id'] ?? null,
             ]);
@@ -1059,6 +1076,63 @@ class SalesController extends Controller
                     'created_by' => Auth::id(),
                 ]);
                 $bankAccount->increment('balance', $bankAmount);
+                Cache::forget('finance_stats_summary_branch_' . $transaction->pharmacy_id . '_' . $transaction->pharmacy_id);
+            }
+
+            // Penerimaan talangan Jasa Dokter & Ongkir ke kas / rekening bank apotek
+            if ($hasDoctorShippingFee && $doctorShippingFee > 0) {
+                $normalizeBankName = static fn ($value) => preg_replace('/[^A-Z0-9]/', '', strtoupper((string) $value));
+                if ($doctorShippingPaymentMethod === 'CASH') {
+                    $shippingCashAccount = FinanceAccount::where('pharmacy_id', $transaction->pharmacy_id)
+                        ->where('category', 'Kas & Bank')
+                        ->where('account_type', 'kas_apotek')
+                        ->where('is_active', true)
+                        ->lockForUpdate()
+                        ->first();
+
+                    if ($shippingCashAccount) {
+                        FinancePayment::create([
+                            'pharmacy_id' => $transaction->pharmacy_id,
+                            'medicine_transaction_id' => $transaction->id,
+                            'account_id' => $shippingCashAccount->id,
+                            'payment_type' => 'PENJUALAN TUNAI',
+                            'payment_date' => Carbon::now()->toDateString(),
+                            'amount' => $doctorShippingFee,
+                            'reference_number' => $transaction->transaction_code,
+                            'notes' => 'Penerimaan talangan ongkir & jasa dokter (Tunai)',
+                            'created_by' => Auth::id(),
+                        ]);
+                        $shippingCashAccount->increment('balance', $doctorShippingFee);
+                    }
+                } elseif (in_array($doctorShippingPaymentMethod, $nonCashPaymentMethods, true) && !empty($doctorShippingBankName)) {
+                    $shippingBankKey = $normalizeBankName($doctorShippingBankName);
+                    $shippingBankMatches = FinanceAccount::where('pharmacy_id', $transaction->pharmacy_id)
+                        ->where('category', 'Kas & Bank')
+                        ->where('account_type', 'bank')
+                        ->where('is_active', true)
+                        ->lockForUpdate()
+                        ->get()
+                        ->filter(function ($account) use ($normalizeBankName, $shippingBankKey) {
+                            $accountName = $normalizeBankName($account->name);
+                            return $shippingBankKey !== '' && str_contains($accountName, $shippingBankKey);
+                        });
+
+                    if ($shippingBankMatches->count() === 1) {
+                        $shippingBankAccount = $shippingBankMatches->first();
+                        FinancePayment::create([
+                            'pharmacy_id' => $transaction->pharmacy_id,
+                            'medicine_transaction_id' => $transaction->id,
+                            'account_id' => $shippingBankAccount->id,
+                            'payment_type' => 'PENJUALAN NON TUNAI',
+                            'payment_date' => Carbon::now()->toDateString(),
+                            'amount' => $doctorShippingFee,
+                            'reference_number' => $transaction->transaction_code,
+                            'notes' => "Penerimaan talangan ongkir & jasa dokter ({$doctorShippingPaymentMethod} melalui {$doctorShippingBankName})",
+                            'created_by' => Auth::id(),
+                        ]);
+                        $shippingBankAccount->increment('balance', $doctorShippingFee);
+                    }
+                }
                 Cache::forget('finance_stats_summary_branch_' . $transaction->pharmacy_id . '_' . $transaction->pharmacy_id);
             }
 

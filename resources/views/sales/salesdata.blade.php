@@ -171,9 +171,9 @@
         .btn-print {
             display: inline-flex;
             align-items: center;
-            gap: 4px;
+            gap: 3px;
             font-size: 11px;
-            padding: 3px 8px;
+            padding: 3px 6px;
             border-radius: 6px;
             border: 0.5px solid #bfdbfe;
             background: #eff6ff;
@@ -222,10 +222,10 @@
         .btn-kwitansi {
             display: inline-flex;
             align-items: center;
-            gap: 4px;
+            gap: 3px;
             font-size: 11px;
             font-weight: 600;
-            padding: 3px 8px;
+            padding: 3px 6px;
             border-radius: 6px;
             border: 0.5px solid #a7f3d0;
             background: #ecfdf5;
@@ -255,10 +255,10 @@
         .btn-edit-payment {
             display: inline-flex;
             align-items: center;
-            gap: 4px;
+            gap: 3px;
             font-size: 11px;
             font-weight: 600;
-            padding: 3px 8px;
+            padding: 3px 6px;
             border-radius: 6px;
             border: 0.5px solid #fed7aa;
             background: #fff7ed;
@@ -428,10 +428,10 @@
 @section('content')
     <section class="section px-4">
         <div class="section-body">
-            <div class="grid grid-cols-1 lg:grid-cols-5 gap-4">
+            <div class="grid grid-cols-1 lg:grid-cols-10 gap-4">
 
-                {{-- ─── LEFT: Sales Table (3/5) ─────────────────────────────────── --}}
-                <div class="lg:col-span-3 bg-white border border-gray-100 rounded-xl p-5">
+                {{-- ─── LEFT: Sales Table (7/10) ─────────────────────────────────── --}}
+                <div class="lg:col-span-7 bg-white border border-gray-100 rounded-xl p-5">
 
                     <div class="flex items-center justify-between mb-4">
                         <div class="flex items-center justify-between">
@@ -548,14 +548,14 @@
                             <thead>
                                 <tr>
                                     <th>#</th>
-                                    <th>Tanggal</th>
-                                    <th>Jam</th>
+                                    <th>Waktu</th>
                                     <th>Nomor</th>
                                     <th>Jenis</th>
                                     <th>Tipe</th>
                                     <th>Pasien</th>
                                     <th class="col-right">Harga</th>
-                                    <th class="col-right">Pembayaran</th>
+                                    <th>Pembayaran</th>
+                                    <th class="col-right">Jasa / Ongkir</th>
                                     <th></th>
                                 </tr>
                             </thead>
@@ -564,8 +564,8 @@
                     </div>
                 </div>
 
-                {{-- ─── RIGHT: Transaction Detail (2/5) ────────────────────────── --}}
-                <div class="lg:col-span-2 bg-white border border-gray-100 rounded-xl p-5">
+                {{-- ─── RIGHT: Transaction Detail (3/10) ────────────────────────── --}}
+                <div class="lg:col-span-3 bg-white border border-gray-100 rounded-xl p-5">
 
                     <div class="flex items-center justify-between mb-4">
                         <div>
@@ -619,6 +619,10 @@
                         <div class="total-row">
                             <span>Total</span>
                             <span id="detail-total">—</span>
+                        </div>
+                        <div class="total-row hidden" id="detail-shipping-row">
+                            <span>Jasa / Ongkir (<span id="detail-shipping-type" class="font-medium text-blue-600">—</span>)</span>
+                            <span id="detail-shipping-fee" class="font-semibold text-blue-700">—</span>
                         </div>
                         <div class="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-gray-100">
                             <button type="button" id="btn-detail-struk"
@@ -836,11 +840,8 @@
                         className: 'col-mono'
                     },
                     {
-                        data: 'date'
-                    },
-                    {
-                        data: 'time',
-                        className: 'col-mono'
+                        data: 'datetime',
+                        orderable: false
                     },
                     {
                         data: 'code',
@@ -874,6 +875,11 @@
                     },
                     {
                         data: 'payment_method',
+                        defaultContent: '-'
+                    },
+                    {
+                        data: 'doctor_shipping_fee',
+                        className: 'col-price',
                         defaultContent: '-'
                     },
                     {
@@ -981,6 +987,17 @@
                 document.getElementById('detail-channel-badge').innerHTML = data.channel || '';
                 document.getElementById('detail-patient').textContent = data.name || 'Umum / Tanpa Pasien';
                 document.getElementById('detail-creator').textContent = data.creator_name || '-';
+                const feeRaw = Number(data.doctor_shipping_fee_raw || 0);
+                const shipRow = document.getElementById('detail-shipping-row');
+                if (shipRow) {
+                    if (feeRaw > 0) {
+                        shipRow.classList.remove('hidden');
+                        document.getElementById('detail-shipping-fee').innerHTML = data.doctor_shipping_fee;
+                        document.getElementById('detail-shipping-type').innerHTML = data.doctor_shipping_payment_method;
+                    } else {
+                        shipRow.classList.add('hidden');
+                    }
+                }
                 loadItems(data.transaction_id, data.final_price, data.subtotal, data.totaldiscount);
             });
 

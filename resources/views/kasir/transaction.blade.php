@@ -36,6 +36,24 @@
             box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.25) !important;
         }
 
+        .shipping-pay-card {
+            transition: all 0.15s ease-in-out;
+        }
+        input[name="shipping_payment_type"]:checked + .shipping-pay-card {
+            border-color: #2563eb !important;
+            background-color: #eff6ff !important;
+            color: #1d4ed8 !important;
+            font-weight: 700 !important;
+            box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2) !important;
+        }
+        .shipping-bank-chip-btn.is-selected {
+            border-color: #2563eb !important;
+            background-color: #eff6ff !important;
+            color: #1d4ed8 !important;
+            font-weight: 700 !important;
+            box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2) !important;
+        }
+
         .swal-on-top {
             z-index: 999999 !important;
         }
@@ -1312,21 +1330,6 @@
                                 <span class="payment-label text-[12px] font-medium">Transfer</span>
                             </div>
                         </label>
-                        <label class="payment-option flex-1 cursor-pointer">
-                            <input type="radio" name="payment_type" onclick="getPaymentType()" value="BELUM BAYAR"
-                                class="sr-only">
-                            <div
-                                class="payment-card unpaid-card flex flex-col items-center gap-2 py-3 px-2 rounded-xl border text-center">
-                                <div class="payment-icon w-9 h-9 rounded-lg flex items-center justify-center">
-                                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                        stroke-width="1.8">
-                                        <circle cx="12" cy="12" r="9" />
-                                        <path d="M12 7v5l3 2" />
-                                    </svg>
-                                </div>
-                                <span class="payment-label text-[12px] font-medium">Belum Bayar</span>
-                            </div>
-                        </label>
                     </div>
 
                     {{-- Bank / Channel Selector (QRIS, Debit, Transfer) --}}
@@ -1401,6 +1404,107 @@
                     </div>
                 </div>
             @endif
+
+            {{-- Checkbox & Form Jasa Dokter & Ongkir (Talangan) --}}
+            <div class="mt-3.5 pt-3 border-t border-slate-100">
+                <label class="flex items-center justify-between p-2.5 px-3 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-slate-100/70 transition cursor-pointer select-none">
+                    <div class="flex items-center gap-2.5">
+                        <input type="checkbox" id="toggleDoctorShipping" onchange="handleDoctorShippingToggle(this.checked)"
+                            class="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-gray-300 transition cursor-pointer">
+                        <div>
+                            <span class="text-xs font-bold text-slate-800">Jasa Dokter & Ongkir</span>
+                            <span class="block text-[10px] text-slate-500 font-normal">Talangan sementara (tidak menambah total transaksi)</span>
+                        </div>
+                    </div>
+                    <span id="shippingBadgeStatus" class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-200 text-slate-600 uppercase">Nonaktif</span>
+                </label>
+
+                {{-- Collapsible Container --}}
+                <div id="doctorShippingContainer" class="hidden mt-2 p-3 bg-blue-50/40 border border-blue-200/70 rounded-2xl space-y-2.5 transition-all duration-200">
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-700 mb-1">
+                            Biaya Jasa Dokter & Ongkir (Rp)
+                        </label>
+                        <input type="text" id="doctor_shipping_fee_input" oninput="formatDoctorShippingFee(this)" onfocus="this.select()"
+                            placeholder="Rp 0"
+                            class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition"
+                            autocomplete="off" />
+                    </div>
+
+                    {{-- Metode Pembayaran Ongkir --}}
+                    <div>
+                        <div class="flex items-center justify-between mb-1">
+                            <label class="text-[11px] font-bold text-slate-700">Metode Masuk Ongkir / Jasa</label>
+                            <button type="button" id="btnSyncShippingPayment" onclick="resetShippingPaymentSync()"
+                                class="text-[10px] font-medium text-blue-600 hover:text-blue-700 hover:underline flex items-center gap-1">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                                <span>Samakan dg Pembayaran Utama</span>
+                            </button>
+                        </div>
+
+                        <div class="grid grid-cols-4 gap-1.5" id="shippingPaymentTypeGroup">
+                            {{-- Cash --}}
+                            <label class="cursor-pointer">
+                                <input type="radio" name="shipping_payment_type" value="CASH" onchange="onShippingPaymentTypeChange(this.value, true)" class="sr-only">
+                                <div class="shipping-pay-card flex items-center justify-center py-2 px-1 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-700 text-center transition hover:border-blue-400">
+                                    Cash
+                                </div>
+                            </label>
+                            {{-- QRIS --}}
+                            <label class="cursor-pointer">
+                                <input type="radio" name="shipping_payment_type" value="QRIS" onchange="onShippingPaymentTypeChange(this.value, true)" class="sr-only">
+                                <div class="shipping-pay-card flex items-center justify-center py-2 px-1 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-700 text-center transition hover:border-blue-400">
+                                    QRIS
+                                </div>
+                            </label>
+                            {{-- Debit --}}
+                            <label class="cursor-pointer">
+                                <input type="radio" name="shipping_payment_type" value="DEBIT" onchange="onShippingPaymentTypeChange(this.value, true)" class="sr-only">
+                                <div class="shipping-pay-card flex items-center justify-center py-2 px-1 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-700 text-center transition hover:border-blue-400">
+                                    Debit
+                                </div>
+                            </label>
+                            {{-- Transfer --}}
+                            <label class="cursor-pointer">
+                                <input type="radio" name="shipping_payment_type" value="TRANSFER" onchange="onShippingPaymentTypeChange(this.value, true)" class="sr-only">
+                                <div class="shipping-pay-card flex items-center justify-center py-2 px-1 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-700 text-center transition hover:border-blue-400">
+                                    Transfer
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    {{-- Bank Selector untuk Ongkir (QRIS, Debit, Transfer) --}}
+                    <div id="shippingBankWrapper" class="hidden mt-1.5 p-2 bg-white border border-slate-200 rounded-xl transition-all">
+                        <div class="flex items-center justify-between mb-1">
+                            <label class="text-[10px] font-semibold text-slate-700 flex items-center gap-1">
+                                <span id="shippingBankBadge" class="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-blue-100 text-blue-700">Bank</span>
+                                <span>Pilih Bank Tujuan Ongkir:</span>
+                            </label>
+                        </div>
+                        <div class="grid grid-cols-5 gap-1 mb-1.5">
+                            @foreach (['Mandiri', 'BNI', 'BCA', 'BRI', 'BTN'] as $bankItem)
+                                <button type="button"
+                                    class="shipping-bank-chip-btn py-1 px-1 rounded-lg border border-slate-200 bg-slate-50 text-[10px] font-semibold text-slate-700 hover:border-blue-400 hover:bg-blue-50/50 transition text-center"
+                                    data-bank="{{ $bankItem }}" onclick="selectShippingBankChip('{{ $bankItem }}', true)">
+                                    {{ $bankItem }}
+                                </button>
+                            @endforeach
+                        </div>
+                        <select class="w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            id="shipping_bank_name" onchange="syncShippingBankSelect(this.value, true)">
+                            <option value="">-- Pilih Bank --</option>
+                            <option value="Mandiri">Bank Mandiri</option>
+                            <option value="BNI">Bank BNI</option>
+                            <option value="BCA">Bank BCA</option>
+                            <option value="BRI">Bank BRI</option>
+                            <option value="BTN">Bank BTN</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
             <div class="mt-5">
                 <form id="checkoutForm">
                     @csrf
@@ -2049,6 +2153,8 @@
     var discount = "";
     var subtotal_discount = "";
     var paymentType = (currenttransaction === 'KREDIT') ? "KREDIT" : "CASH";
+    var isDoctorShippingManualOverride = false;
+    var shippingPaymentType = 'CASH';
 
     const subtotalpreview = document.getElementById('subtotal');
 
@@ -2997,6 +3103,9 @@
             }
             updateBankChipsVisual(bankName);
             autoFillCashlessAmount();
+            if (typeof syncShippingBankWithMain === 'function') {
+                syncShippingBankWithMain(bankName);
+            }
 
             // Focus nextInput (Bayar) without scrolling
             const nextInput = document.getElementById('pay');
@@ -3011,6 +3120,9 @@
         function syncChipFromSelect(val) {
             updateBankChipsVisual(val);
             autoFillCashlessAmount();
+            if (typeof syncShippingBankWithMain === 'function') {
+                syncShippingBankWithMain(val);
+            }
         }
 
         function autoFillCashlessAmount() {
@@ -3069,17 +3181,8 @@
             pay(document.getElementById('pay').value || '0');
             console.log('Payment type:', paymentType);
 
-            // Auto-focus and select Bayar input when Belum Bayar is chosen so cashier can immediately type nominal
-            if (paymentType === 'BELUM BAYAR') {
-                setTimeout(() => {
-                    const payEl = document.getElementById('pay');
-                    if (payEl) {
-                        payEl.focus({
-                            preventScroll: true
-                        });
-                        if (typeof payEl.select === 'function') payEl.select();
-                    }
-                }, 50);
+            if (typeof syncShippingPaymentWithMain === 'function') {
+                syncShippingPaymentWithMain();
             }
 
             return paymentType;
@@ -3181,21 +3284,146 @@
             });
         }
 
+        // ==========================================
+        // Jasa Dokter & Ongkir (Talangan Sementara)
+        // ==========================================
+
+        function handleDoctorShippingToggle(checked) {
+            const container = document.getElementById('doctorShippingContainer');
+            const badge = document.getElementById('shippingBadgeStatus');
+            const feeInput = document.getElementById('doctor_shipping_fee_input');
+
+            if (checked) {
+                if (container) container.classList.remove('hidden');
+                if (badge) {
+                    badge.textContent = 'Aktif';
+                    badge.className = 'text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 uppercase';
+                }
+                if (!isDoctorShippingManualOverride) {
+                    syncShippingPaymentWithMain();
+                }
+                if (feeInput) feeInput.focus();
+            } else {
+                if (container) container.classList.add('hidden');
+                if (badge) {
+                    badge.textContent = 'Nonaktif';
+                    badge.className = 'text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-200 text-slate-600 uppercase';
+                }
+            }
+        }
+
+        function formatDoctorShippingFee(el) {
+            let raw = el.value.replace(/\D/g, "");
+            el.value = raw ? "Rp. " + parseInt(raw, 10).toLocaleString("id-ID") : "";
+        }
+
+        function onShippingPaymentTypeChange(val, isManual = false) {
+            if (isManual) {
+                isDoctorShippingManualOverride = true;
+            }
+            shippingPaymentType = val;
+
+            const radio = document.querySelector(`input[name="shipping_payment_type"][value="${val}"]`);
+            if (radio) radio.checked = true;
+
+            const bankWrapper = document.getElementById('shippingBankWrapper');
+            const badge = document.getElementById('shippingBankBadge');
+            if (['QRIS', 'DEBIT', 'TRANSFER'].includes(val)) {
+                if (bankWrapper) bankWrapper.classList.remove('hidden');
+                if (badge) {
+                    badge.textContent = val;
+                    badge.className = val === 'QRIS'
+                        ? 'px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-purple-100 text-purple-700'
+                        : (val === 'DEBIT'
+                            ? 'px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-blue-100 text-blue-700'
+                            : 'px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-amber-100 text-amber-700');
+                }
+            } else {
+                if (bankWrapper) bankWrapper.classList.add('hidden');
+                const bankSelect = document.getElementById('shipping_bank_name');
+                if (bankSelect) bankSelect.value = '';
+                updateShippingBankChipsVisual('');
+            }
+        }
+
+        function selectShippingBankChip(bankName, isManual = false) {
+            if (isManual) {
+                isDoctorShippingManualOverride = true;
+            }
+            const bankSelect = document.getElementById('shipping_bank_name');
+            if (bankSelect) bankSelect.value = bankName;
+            updateShippingBankChipsVisual(bankName);
+        }
+
+        function syncShippingBankSelect(val, isManual = false) {
+            if (isManual) {
+                isDoctorShippingManualOverride = true;
+            }
+            updateShippingBankChipsVisual(val);
+        }
+
+        function updateShippingBankChipsVisual(selectedBank) {
+            document.querySelectorAll('.shipping-bank-chip-btn').forEach(btn => {
+                if (selectedBank && btn.dataset.bank === selectedBank) {
+                    btn.classList.add('is-selected');
+                } else {
+                    btn.classList.remove('is-selected');
+                }
+            });
+        }
+
+        function syncShippingPaymentWithMain() {
+            if (isDoctorShippingManualOverride) return;
+
+            const mainPayment = (typeof paymentType !== 'undefined' && ['CASH', 'QRIS', 'DEBIT', 'TRANSFER'].includes(paymentType))
+                ? paymentType
+                : 'CASH';
+
+            onShippingPaymentTypeChange(mainPayment, false);
+
+            if (['QRIS', 'DEBIT', 'TRANSFER'].includes(mainPayment)) {
+                const mainBank = document.getElementById('bank_name')?.value || '';
+                selectShippingBankChip(mainBank, false);
+            }
+        }
+
+        function syncShippingBankWithMain(bankName) {
+            if (isDoctorShippingManualOverride) return;
+            selectShippingBankChip(bankName, false);
+        }
+
+        function resetShippingPaymentSync() {
+            isDoctorShippingManualOverride = false;
+            syncShippingPaymentWithMain();
+            if (typeof iziToast !== 'undefined') {
+                iziToast.info({
+                    title: 'Info',
+                    message: 'Metode ongkir kembali disamakan dengan pembayaran utama.',
+                    position: 'topRight',
+                    timeout: 2000
+                });
+            }
+        }
+
         // Modal level shortcuts (1: CASH, 2: QRIS, 3: DEBIT, 4: TRANSFER)
         const modalPaymentElem = document.getElementById('paymentModal');
         if (modalPaymentElem) {
             modalPaymentElem.addEventListener('keydown', function(e) {
-                const activeId = document.activeElement?.id;
-                if (activeId !== 'patientSearch' && activeId !== 'doctorSearch' && activeId !== 'pay' &&
-                    activeId !== 'discounsubtotal') {
-                    if (['1', '2', '3', '4', '5'].includes(e.key)) {
+                const activeEl = document.activeElement;
+                const activeTag = activeEl?.tagName;
+                const activeType = activeEl?.type;
+                const isTyping = activeTag === 'TEXTAREA' ||
+                    (activeTag === 'INPUT' && !['radio', 'checkbox', 'button', 'submit'].includes(activeType)) ||
+                    activeTag === 'SELECT';
+
+                if (!isTyping) {
+                    if (['1', '2', '3', '4'].includes(e.key)) {
                         e.preventDefault();
                         const map = {
                             '1': 'CASH',
                             '2': 'QRIS',
                             '3': 'DEBIT',
-                            '4': 'TRANSFER',
-                            '5': 'BELUM BAYAR'
+                            '4': 'TRANSFER'
                         };
                         const val = map[e.key];
                         const targetRadio = paymentRadios.find(r => r.value === val);
@@ -3203,20 +3431,9 @@
                             targetRadio.checked = true;
                             paymentType = val;
                             getPaymentType();
-                            if (val === 'BELUM BAYAR') {
-                                setTimeout(() => {
-                                    if (nextInput) {
-                                        nextInput.focus({
-                                            preventScroll: true
-                                        });
-                                        if (typeof nextInput.select === 'function') nextInput.select();
-                                    }
-                                }, 50);
-                            } else {
-                                targetRadio.focus({
-                                    preventScroll: true
-                                });
-                            }
+                            targetRadio.focus({
+                                preventScroll: true
+                            });
                         }
                     }
                 }
@@ -4333,6 +4550,33 @@
             }
         }
 
+        // Check Doctor Shipping Fee validation
+        const toggleDoctorShipping = document.getElementById('toggleDoctorShipping');
+        const isShippingActive = toggleDoctorShipping && toggleDoctorShipping.checked;
+        const rawShippingFee = document.getElementById('doctor_shipping_fee_input')?.value.replace(/\D/g, "") || "0";
+        const doctor_shipping_fee = isShippingActive ? parseInt(rawShippingFee, 10) : 0;
+        const selectedShipRadio = document.querySelector('input[name="shipping_payment_type"]:checked');
+        const activeShipMethod = selectedShipRadio ? selectedShipRadio.value : (typeof shippingPaymentType !== 'undefined' ? shippingPaymentType : 'CASH');
+        const doctor_shipping_payment_method = (isShippingActive && doctor_shipping_fee > 0) ? activeShipMethod : null;
+        const doctor_shipping_bank_name = (isShippingActive && doctor_shipping_fee > 0 && ['QRIS', 'DEBIT', 'TRANSFER'].includes(activeShipMethod))
+            ? (document.getElementById('shipping_bank_name')?.value || '')
+            : null;
+
+        if (isShippingActive && doctor_shipping_fee > 0 && ['QRIS', 'DEBIT', 'TRANSFER'].includes(activeShipMethod) && !doctor_shipping_bank_name) {
+            iziToast.warning({
+                title: 'Peringatan',
+                message: 'Silahkan Pilih Bank / Merchant Terlebih Dahulu untuk Ongkir & Jasa ' + activeShipMethod,
+                position: 'topRight'
+            });
+            const shipBankWrapper = document.getElementById('shippingBankWrapper');
+            if (shipBankWrapper) {
+                shipBankWrapper.classList.remove('hidden');
+                shipBankWrapper.classList.add('ring-2', 'ring-red-400');
+                setTimeout(() => shipBankWrapper.classList.remove('ring-2', 'ring-red-400'), 2000);
+            }
+            return;
+        }
+
         // PREVENT DOUBLE CLICK
         if (checkoutProcessing) {
             return;
@@ -4347,6 +4591,10 @@
             debtor_id,
             patient_id,
             changes,
+            has_doctor_shipping_fee: isShippingActive && doctor_shipping_fee > 0 ? 1 : 0,
+            doctor_shipping_fee,
+            doctor_shipping_payment_method,
+            doctor_shipping_bank_name,
         };
 
         showCheckoutLoading();
@@ -4566,16 +4814,12 @@
         let price = totaltransaction - subtotal_discount;
         value = "Rp. " + bayar.toLocaleString("id-ID");
         payInput.value = value;
-        if (paymentType === 'BELUM BAYAR') {
-            final_price = Math.max(0, bayar - price);
-            document.getElementById('trchange').value = formatRupiah(final_price);
-            activeButton();
-        } else if (bayar < price) {
+        if (bayar < price) {
             document.getElementById('trchange').value = "Pembayaran Kurang";
             resetButton();
             final_price = "";
         } else {
-            activeButton()
+            activeButton();
             final_price = bayar - price;
             document.getElementById('trchange').value = formatRupiah(bayar - price);
         }
@@ -5461,6 +5705,10 @@
                         bank_name,
                         user_id: userbypin,
                         shift_logs_id,
+                        has_doctor_shipping_fee: checkoutPayload.has_doctor_shipping_fee || 0,
+                        doctor_shipping_fee: checkoutPayload.doctor_shipping_fee || 0,
+                        doctor_shipping_payment_method: checkoutPayload.doctor_shipping_payment_method || null,
+                        doctor_shipping_bank_name: checkoutPayload.doctor_shipping_bank_name || null,
                     }
                 );
 
@@ -5956,7 +6204,7 @@
             let price = totaltransaction - subtotal_discount;
             let raw = payInput.value.replace(/\D/g, "");
             let bayar = parseInt(raw) || 0;
-            if (paymentType !== 'BELUM BAYAR' && price > bayar) {
+            if (price > bayar) {
                 alert("Pembayaran Kurang");
             } else {
                 checkoutItem();

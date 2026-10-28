@@ -118,6 +118,8 @@ class SalesDataRecapSheet implements FromArray, WithStyles, WithColumnWidths, Wi
             'Diskon Faktur',
             'Total Netto',
             'Pembayaran',
+            'Jasa / Ongkir',
+            'Tipe Jasa / Ongkir',
         ];
 
         $query = MedicineTransactions::query()
@@ -213,6 +215,7 @@ class SalesDataRecapSheet implements FromArray, WithStyles, WithColumnWidths, Wi
         $grandItemDiscount = 0;
         $grandCartDiscount = 0;
         $grandNetto = 0;
+        $grandShippingFee = 0;
 
         foreach ($transactions as $trx) {
             $date = $trx->updated_at ? $trx->updated_at->format('d/m/Y') : ($trx->created_at ? $trx->created_at->format('d/m/Y') : '-');
@@ -261,6 +264,15 @@ class SalesDataRecapSheet implements FromArray, WithStyles, WithColumnWidths, Wi
                 $trx->transfer_bank_name
             );
 
+            $shippingFee = (float) ($trx->doctor_shipping_fee ?? 0);
+            $shippingMethod = '-';
+            if ($shippingFee > 0 && !empty($trx->doctor_shipping_payment_method)) {
+                $shippingMethod = \App\Support\PaymentMethod::label(
+                    $trx->doctor_shipping_payment_method,
+                    $trx->doctor_shipping_bank_name
+                );
+            }
+
             $rows[] = [
                 $no++,
                 $date,
@@ -275,12 +287,15 @@ class SalesDataRecapSheet implements FromArray, WithStyles, WithColumnWidths, Wi
                 $cartDiscount,
                 $netto,
                 $payMethod,
+                $shippingFee > 0 ? $shippingFee : 0,
+                $shippingMethod,
             ];
 
             $grandSubtotal += $subtotal;
             $grandItemDiscount += $itemDiscount;
             $grandCartDiscount += $cartDiscount;
             $grandNetto += $netto;
+            $grandShippingFee += $shippingFee;
         }
 
         $rows[] = [
@@ -297,6 +312,8 @@ class SalesDataRecapSheet implements FromArray, WithStyles, WithColumnWidths, Wi
             $grandCartDiscount,
             $grandNetto,
             '',
+            $grandShippingFee > 0 ? $grandShippingFee : 0,
+            '',
         ];
 
         return array_merge($header, $rows);
@@ -304,7 +321,7 @@ class SalesDataRecapSheet implements FromArray, WithStyles, WithColumnWidths, Wi
 
     public function styles(Worksheet $sheet)
     {
-        $lastCol = 'M';
+        $lastCol = 'O';
         $lastRow = $sheet->getHighestRow();
         $headerRowIdx = 5;
 
@@ -331,17 +348,20 @@ class SalesDataRecapSheet implements FromArray, WithStyles, WithColumnWidths, Wi
                 $sheet->getRowDimension($i)->setRowHeight(22);
             }
 
-            // Center align No, Tanggal, Jam, Kode, Channel, Tipe, Pembayaran
+            // Center align No, Tanggal, Jam, Kode, Channel, Tipe, Pembayaran, Tipe Jasa
             $sheet->getStyle("A{$headerRowIdx}:A{$lastRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
             $sheet->getStyle("B{$headerRowIdx}:C{$lastRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
             $sheet->getStyle("D{$headerRowIdx}:D{$lastRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
             $sheet->getStyle("E{$headerRowIdx}:F{$lastRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
             $sheet->getStyle("M{$headerRowIdx}:M{$lastRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle("O{$headerRowIdx}:O{$lastRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
-            // Right align Currency columns (I, J, K, L)
+            // Right align Currency columns (I, J, K, L, N)
             $dataStart = $headerRowIdx + 1;
             $sheet->getStyle("I{$dataStart}:L{$lastRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
             $sheet->getStyle("I{$dataStart}:L{$lastRow}")->getNumberFormat()->setFormatCode('#,##0;-#,##0;0');
+            $sheet->getStyle("N{$dataStart}:N{$lastRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+            $sheet->getStyle("N{$dataStart}:N{$lastRow}")->getNumberFormat()->setFormatCode('#,##0;-#,##0;0');
 
             // Total row bold
             $sheet->getStyle("A{$lastRow}:{$lastCol}{$lastRow}")->getFont()->setBold(true);
