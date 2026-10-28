@@ -153,8 +153,8 @@ class MonitoringPenjualanService
                 $type = $this->effectiveItemType($item, $transactionType);
                 if (!$type) continue;
                 $classified[] = ['item' => $item, 'type' => $type];
-                // LIPH sums final_price only and truncates each line to whole rupiah.
-                $amount = (float) (int) ($item->final_price ?? 0);
+                // Sum final_price preserving decimal precision to match LIPH and other reports.
+                $amount = (float) ($item->final_price ?? 0);
                 if (in_array($type, ['returns', 'creditReturns'], true)) $amount = -abs($amount);
 
                 if ($type === 'cashPrescription') $this->add($shift['sales'], 'cashPrescription', $amount);
@@ -193,7 +193,7 @@ class MonitoringPenjualanService
             // LIPH uses subtotal for a finalized transaction with no cart rows.
             if (!$classified) {
                 $fallbackType = $this->effectiveItemType((object) ['cart_type' => null], $transactionType);
-                $fallbackAmount = (float) (int) ($transaction->subtotal ?? 0);
+                $fallbackAmount = (float) ($transaction->subtotal ?? 0);
                 if (in_array($fallbackType, ['returns', 'creditReturns'], true)) $fallbackAmount = -abs($fallbackAmount);
 
                 $fallbackKey = match ($fallbackType) {
@@ -231,8 +231,7 @@ class MonitoringPenjualanService
                 $discountType = $this->effectiveItemType((object) ['cart_type' => null], $transactionType);
             }
 
-            // LIPH treats transaction discounts as whole rupiah.
-            $transactionDiscount = (float) (int) ($transaction->discount ?? 0);
+            $transactionDiscount = (float) ($transaction->discount ?? 0);
             if ($transactionDiscount !== 0.0 && $discountType) {
                 $salesKey = match ($discountType) {
                     'cashPrescription' => 'cashPrescription',

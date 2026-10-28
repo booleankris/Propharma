@@ -193,6 +193,7 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
         ->name('transaction.addToCart');
     Route::post('removecart', [SalesController::class, 'removeItem'])->name('transaction.removeItem');
 
+    Route::post('/transaction/heartbeat', [SalesController::class, 'heartbeat'])->name('transaction.heartbeat');
     Route::get('/transaction/{type}/{id?}', [SalesController::class, 'index'])->name('transaction');
     Route::post('/transaction/checkout', [SalesController::class, 'checkout'])->name('transaction.checkout');
     Route::post('/transaction/mark-visitor', [SalesController::class, 'markVisitor'])->name('transaction.markVisitor');

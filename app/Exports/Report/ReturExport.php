@@ -97,7 +97,7 @@ class ReturExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
 
         foreach ($headers as $rt) {
             $rtTime   = Carbon::parse($rt->created_at ?? $rt->updated_at);
-            $rtAmount = (int) ($rt->subtotal ?? 0);
+            $rtAmount = (int) round((float) ($rt->subtotal ?? 0));
 
             $match = $candidates->first(function ($r) use ($rtTime, $rtAmount, $used, $originCodes) {
                 return !isset($used[$r->id])
@@ -112,13 +112,13 @@ class ReturExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                 $used[$match->id] = true;
                 $medicine = $medicines[$match->medicine_id] ?? null;
                 $qty      = (float) $match->qty_retur;
-                $total    = (int) ($rt->subtotal ?? ($match->total_retur ?? 0));
+                $total    = (int) round((float) ($rt->subtotal ?? ($match->total_retur ?? 0)));
                 $origin   = $originCodes[$match->transaction_id] ?? '-';
                 $nomor    = 'RT/' . $origin;
                 $medName  = $medicine?->name ?? 'Obat Retur (Tanpa Master)';
             } else {
                 $qty     = 0;
-                $total   = (int) ($rt->subtotal ?? 0);
+                $total   = (int) round((float) ($rt->subtotal ?? 0));
                 $origin  = '-';
                 $nomor   = 'RT#' . $rt->id;
                 $medName = '[RETUR TANPA RINCIAN OBAT]';

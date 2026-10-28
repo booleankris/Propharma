@@ -201,11 +201,12 @@ class BankSalesExport implements WithMultipleSheets
                 continue;
             }
 
+            $trxGross = 0;
             foreach ($items as $item) {
-                $qty = (int) ($item->quantity ?? 0);
+                $qty = (float) ($item->quantity ?? 0);
                 $price = (float) ($item->item_price ?? 0);
                 $itemDisc = (float) ($item->discount ?? 0);
-                $final = (int) ($item->final_price ?? ($item->total_price ?? ($qty * $price - $itemDisc)));
+                $final = (float) ($item->final_price ?? ($item->total_price ?? ($qty * $price - $itemDisc)));
                 $effectiveType = $item->cart_type
                     ? (LiphExport::CART_TYPE_ABBR[$item->cart_type] ?? $item->cart_type)
                     : $trx->transaction_type;
@@ -216,11 +217,12 @@ class BankSalesExport implements WithMultipleSheets
                 $signedFinal = $isReturn ? -abs($final) : $final;
 
                 $summary['qty_sum'] += $signedQty;
-                $summary['gross_sum'] += $signedFinal;
-                $summary['net_sum'] += $signedFinal;
+                $trxGross += $signedFinal;
             }
 
-            $summary['net_sum'] -= $trxDiscount;
+            $roundedGross = (int) round($trxGross);
+            $summary['gross_sum'] += $roundedGross;
+            $summary['net_sum'] += ($roundedGross - $trxDiscount);
         }
 
         return $summary;

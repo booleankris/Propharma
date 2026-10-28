@@ -235,10 +235,10 @@ class FactoryExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
 
         // Jika menampilkan seluruh pabrik (tidak difilter 1 pabrik tertentu), tampilkan rekonsiliasi diskon transaksi
         if (empty($this->factoryId)) {
-            $potonganTransaksi = (int) $transactions->reject(function ($trx) {
+            $potonganTransaksi = (int) round($transactions->reject(function ($trx) {
                 return in_array(strtoupper(trim((string) $trx->transaction_type)), ['RETUR JUAL', 'RETUR KREDIT'], true)
                     || strtoupper(trim((string) $trx->transaction_code)) === 'RT';
-            })->sum(fn ($t) => (int) ($t->discount ?? 0));
+            })->sum(fn ($t) => (float) ($t->discount ?? 0)));
 
             if ($potonganTransaksi > 0) {
                 $rows[] = [
@@ -352,10 +352,10 @@ class FactoryExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
         ];
 
         if (empty($this->factoryId)) {
-            $potonganTransaksi = (int) $transactions->reject(function ($trx) {
+            $potonganTransaksi = (int) round($transactions->reject(function ($trx) {
                 return in_array(strtoupper(trim((string) $trx->transaction_type)), ['RETUR JUAL', 'RETUR KREDIT'], true)
                     || strtoupper(trim((string) $trx->transaction_code)) === 'RT';
-            })->sum(fn ($t) => (int) ($t->discount ?? 0));
+            })->sum(fn ($t) => (float) ($t->discount ?? 0)));
 
             if ($potonganTransaksi > 0) {
                 $rows[] = [

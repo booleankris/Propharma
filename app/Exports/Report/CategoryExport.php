@@ -212,10 +212,10 @@ class CategoryExport implements FromArray, WithStyles, WithColumnWidths, WithTit
             (int) ($grand['total'] - $grand['total_retur']),
         ];
 
-        $potonganTransaksi = (int) $transactions->reject(function ($trx) {
+        $potonganTransaksi = (int) round($transactions->reject(function ($trx) {
             return in_array(strtoupper(trim((string) $trx->transaction_type)), ['RETUR JUAL', 'RETUR KREDIT'], true)
                 || strtoupper(trim((string) $trx->transaction_code)) === 'RT';
-        })->sum(fn ($t) => (int) ($t->discount ?? 0));
+        })->sum(fn ($t) => (float) ($t->discount ?? 0)));
 
         if ($potonganTransaksi > 0) {
             $rows[] = [
@@ -319,10 +319,10 @@ class CategoryExport implements FromArray, WithStyles, WithColumnWidths, WithTit
             (int) ($grand['total'] - $grand['total_retur']),
         ];
 
-        $potonganTransaksi = (int) $transactions->reject(function ($trx) {
+        $potonganTransaksi = (int) round($transactions->reject(function ($trx) {
             return in_array(strtoupper(trim((string) $trx->transaction_type)), ['RETUR JUAL', 'RETUR KREDIT'], true)
                 || strtoupper(trim((string) $trx->transaction_code)) === 'RT';
-        })->sum(fn ($t) => (int) ($t->discount ?? 0));
+        })->sum(fn ($t) => (float) ($t->discount ?? 0)));
 
         if ($potonganTransaksi > 0) {
             $rows[] = [

@@ -39,7 +39,7 @@ class SalesController extends Controller
 {
     public function index($type, $id = null)
     {
-        $pharmacy_id = Auth::user()->pharmacy_id;
+        $pharmacy_id = (int) (getActivePharmacyId() ?: Auth::user()->pharmacy_id);
         $user_id = Auth::user()->id;
 
         // 1. Resolve display-type → DB-type + parameter key 
@@ -125,8 +125,22 @@ class SalesController extends Controller
         // update the type and clear the cart (prices differ per type).
 
         if ($transaction->transaction_type !== $dbType) {
-            $transaction->update(['transaction_type' => $dbType, 'transaction_code' => null]);
-            MedicineCart::where('transaction_id', $transaction->id)->delete();
+            DB::transaction(function () use ($transaction, $dbType, $pharmacy_id) {
+                $lockedTx = MedicineTransactions::where('id', $transaction->id)
+                    ->where('pharmacy_id', $pharmacy_id)
+                    ->where('status', 0)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($lockedTx && $lockedTx->transaction_type !== $dbType) {
+                    $lockedTx->update(['transaction_type' => $dbType, 'transaction_code' => null]);
+                    MedicineCart::where('transaction_id', $lockedTx->id)
+                        ->where('status', 0)
+                        ->delete();
+                    $transaction->transaction_type = $dbType;
+                    $transaction->transaction_code = null;
+                }
+            }, 3);
         }
 
         $trx_id = $transaction->id;
@@ -148,48 +162,183 @@ class SalesController extends Controller
         // 5. Collect view data───────────────
         $itemInCart = MedicineCart::with('medicine')
             ->where('transaction_id', $trx_id)
-            ->where('user_id', $user_id)
+            ->where('status', 0)
+            ->orderBy('id', 'asc')
             ->get();
 
-        $activeCart = $itemInCart->where('status', '0');
-        $totaltransaction = $activeCart->sum('final_price');
+        $activeCart = $itemInCart;
+        $totaltransaction = (float) $activeCart->sum('final_price');
 
         $total_price = (object)[
-            'total_price' => (float)$activeCart->sum('total_price'),
-            'embalase' => (float)$activeCart->sum('embalase'),
+            'total_price' => (float) $activeCart->sum('total_price'),
+            'embalase' => (float) $activeCart->sum('embalase'),
         ];
 
         $existingpackage = $itemInCart->first(function ($cartItem) {
             return $cartItem->recipe_status == '0' && !empty($cartItem->package);
         });
 
-        $discount_total = $activeCart->sum('discount');
+        $discount_total = (float) $activeCart->sum('discount');
+        $initialCartSignature = $this->buildCartSyncPayload((int) $trx_id)['cart_signature'] ?? '';
 
         $check_transaction = MedicineTransactions::where('pharmacy_id', $pharmacy_id)
             ->where('status', 0)
             ->count();
 
-        return view('kasir.transaction', compact(
-            'transaction_code',
-            'check_transaction',
-            'type',
-            'trx_id',
-            'transaction',
-            'existingpackage',
-            // 'priceTotal',
-            'total_price',
-            'parameters',
-            'rounding',
-            'itemInCart',
-            'totaltransaction',
-            'discount_total',
-            'ChangeFakturParameters',
-            'parameterRT',
-            'parameterHV',
-            'parameterUP',
-            'service',
-            'ChangeFakturRounding'
-        ));
+        return response()
+            ->view('kasir.transaction', compact(
+                'transaction_code',
+                'check_transaction',
+                'type',
+                'trx_id',
+                'transaction',
+                'existingpackage',
+                // 'priceTotal',
+                'total_price',
+                'parameters',
+                'rounding',
+                'itemInCart',
+                'totaltransaction',
+                'discount_total',
+                'initialCartSignature',
+                'ChangeFakturParameters',
+                'parameterRT',
+                'parameterHV',
+                'parameterUP',
+                'service',
+                'ChangeFakturRounding'
+            ))
+            ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+            ->header('Pragma', 'no-cache')
+            ->header('Expires', 'Sat, 01 Jan 2000 00:00:00 GMT');
+    }
+
+    // Helper: build authoritative cart state + totals from DB ──────────────
+    private function buildCartSyncPayload(int $transactionId): array
+    {
+        $items = MedicineCart::with('medicine')
+            ->where('transaction_id', $transactionId)
+            ->where('status', 0)
+            ->orderBy('id', 'asc')
+            ->get();
+
+        $totalTransaction = (float) $items->sum('final_price');
+        $totalDiscount = (float) $items->sum('discount');
+        $totalBought = (float) $items->sum('total_price') + (float) $items->sum('embalase');
+
+        $cartItems = $items->map(function (MedicineCart $row) {
+            return [
+                'id' => $row->id,
+                'medicine_id' => $row->medicine_id,
+                'name' => $row->medicine->name ?? '-',
+                'unit' => $row->medicine->unit ?? '',
+                'packaging' => $row->medicine->packaging ?? '',
+                'quantity' => (float) $row->quantity,
+                'discount' => (float) $row->discount,
+                'total_price' => (float) $row->total_price,
+                'embalase' => (float) $row->embalase,
+                'service_fee' => (float) ($row->service_fee ?? 0),
+                'final_price' => (float) $row->final_price,
+                'cart_type' => $row->cart_type,
+                'recipe_status' => $row->recipe_status,
+                'recipe_number' => $row->recipe_number,
+            ];
+        })->values()->all();
+
+        $itemFingerprints = $items->map(function (MedicineCart $r) {
+            return "{$r->id}:{$r->medicine_id}:{$r->quantity}:{$r->discount}:{$r->total_price}:{$r->embalase}:{$r->final_price}:{$r->cart_type}:{$r->recipe_status}:{$r->recipe_number}";
+        })->implode('|');
+        $cartSignature = sha1($items->count() . '|' . $totalTransaction . '|' . $totalDiscount . '|' . $totalBought . '|' . $itemFingerprints);
+
+        return [
+            'total_transaction' => $totalTransaction,
+            'totaltransaction' => $totalTransaction,
+            'total_discount' => $totalDiscount,
+            'totalbought' => $totalBought,
+            'cart_count' => count($cartItems),
+            'cart_signature' => $cartSignature,
+            'cart_items' => $cartItems,
+        ];
+    }
+
+    public function heartbeat(Request $request)
+    {
+        $transactionId = (int) $request->input('transaction_id', 0);
+        $clientTabId = trim((string) $request->input('client_tab_id', ''));
+        $clientSignature = trim((string) $request->input('cart_signature', ''));
+        $pharmacyId = (int) (getActivePharmacyId() ?: Auth::user()->pharmacy_id);
+
+        if ($transactionId <= 0 || $clientTabId === '') {
+            return response()->json(['action' => 'noop']);
+        }
+
+        $transaction = MedicineTransactions::where('id', $transactionId)
+            ->where('pharmacy_id', $pharmacyId)
+            ->first();
+
+        if (!$transaction || (int) $transaction->status !== 0) {
+            $fallbackType = $transaction
+                ? $this->dbTypeToRouteType((string) $transaction->transaction_type)
+                : 'resep';
+
+            return response()->json([
+                'action' => 'redirect_new',
+                'reason' => 'completed_or_missing',
+                'redirect_url' => route('transaction', ['type' => $fallbackType]),
+            ]);
+        }
+
+        $typeSlug = $this->dbTypeToRouteType((string) $transaction->transaction_type);
+        $syncPayload = $this->buildCartSyncPayload($transactionId);
+        $leaseKey = "kasir_tx_lease:{$pharmacyId}:{$transactionId}";
+        $nowTs = now()->timestamp;
+        $lease = Cache::get($leaseKey);
+
+        $isHeldByOtherTab = is_array($lease)
+            && !empty($lease['client_tab_id'])
+            && $lease['client_tab_id'] !== $clientTabId
+            && ($nowTs - (int) ($lease['updated_at'] ?? 0)) < 20;
+
+        if ($isHeldByOtherTab) {
+            // Jika keranjang masih kosong, langsung alihkan tab/PC kedua ke nomor transaksi baru agar tidak tabrakan
+            if ($syncPayload['cart_count'] === 0) {
+                return response()->json([
+                    'action' => 'redirect_new',
+                    'reason' => 'active_in_other_tab',
+                    'redirect_url' => route('transaction', ['type' => $typeSlug]),
+                ]);
+            }
+
+            // Jika keranjang sudah ada isinya (misal kasir membuka transaksi pending dari menu Cari),
+            // paksa sinkronisasi data terbaru dan beri info bahwa transaksi juga terbuka di layar lain.
+            $needsSync = ($clientSignature !== $syncPayload['cart_signature']);
+            return response()->json([
+                'action' => 'shared_active',
+                'holder_name' => $lease['user_name'] ?? 'Kasir lain',
+                'cart_signature' => $syncPayload['cart_signature'],
+                'cart_sync' => $needsSync ? $syncPayload : null,
+            ]);
+        }
+
+        Cache::put($leaseKey, [
+            'client_tab_id' => $clientTabId,
+            'user_id' => Auth::id(),
+            'user_name' => Auth::user()->name ?? 'Kasir',
+            'updated_at' => $nowTs,
+        ], 25);
+
+        if ($clientSignature !== '' && $clientSignature !== $syncPayload['cart_signature']) {
+            return response()->json([
+                'action' => 'sync',
+                'cart_signature' => $syncPayload['cart_signature'],
+                'cart_sync' => $syncPayload,
+            ]);
+        }
+
+        return response()->json([
+            'action' => 'ok',
+            'cart_signature' => $syncPayload['cart_signature'],
+        ]);
     }
 
     // Helper: map DB type string back to route slug ───────────────────────────
@@ -212,17 +361,25 @@ class SalesController extends Controller
         $prefix = "{$year}{$month}LOG-";
 
         $lastCode = ItemsLog::where('code', 'like', "{$prefix}%")
-            ->orderBy('code', 'desc')
+            ->orderByRaw('LENGTH(code) DESC, code DESC')
+            ->lockForUpdate()
             ->value('code');
 
         if ($lastCode) {
-            $lastNumber = (int) substr($lastCode, -4);
+            $numericPart = substr((string) $lastCode, strlen($prefix));
+            $lastNumber = (int) preg_replace('/\D/', '', $numericPart);
             $nextNumber = $lastNumber + 1;
         } else {
             $nextNumber = 1;
         }
 
-        return $prefix . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+        $code = $prefix . str_pad((string) $nextNumber, 4, '0', STR_PAD_LEFT);
+        while (ItemsLog::where('code', $code)->exists()) {
+            $nextNumber++;
+            $code = $prefix . str_pad((string) $nextNumber, 4, '0', STR_PAD_LEFT);
+        }
+
+        return $code;
     }
     /**
      * Show the form for creating a new resource.
@@ -492,8 +649,9 @@ class SalesController extends Controller
         try {
             DB::beginTransaction();
 
+            $pharmacyId = (int) (getActivePharmacyId() ?: Auth::user()->pharmacy_id);
             $transaction = MedicineTransactions::create([
-                'pharmacy_id' => getActivePharmacyId(),
+                'pharmacy_id' => $pharmacyId,
                 'user_id' => Auth()->user()->id,
                 'debtor_id' => NULL,
                 'transaction_type' => $typenew,
@@ -515,38 +673,40 @@ class SalesController extends Controller
     }
     public function deleteTransaction(Request $request)
     {
-        $item = MedicineTransactions::findOrFail($request->get('trxid'));
+        $pharmacyId = (int) (getActivePharmacyId() ?: Auth::user()->pharmacy_id);
+        $trxId = (int) $request->get('trxid');
 
-        if ($item) {
-            $item->delete();
-            if ($request->get('trxtype') == "UPDS") {
-                $url = 'upds';
-            } else if ($request->get('trxtype') == "HV/OTC") {
-                $url = 'hv';
-            } else if ($request->get('trxtype') == "RESEP TUNAI") {
-                $url = 'resep';
-            } else if ($request->get('trxtype') == "KREDIT") {
-                $url = 'kredit';
-            }
-            $transaction = MedicineTransactions::where('pharmacy_id', getActivePharmacyId())->where('status', 0)->latest()->first();
+        DB::transaction(function () use ($trxId, $pharmacyId) {
+            $item = MedicineTransactions::where('id', $trxId)
+                ->where('pharmacy_id', $pharmacyId)
+                ->where('status', 0)
+                ->lockForUpdate()
+                ->first();
 
-            if ($transaction) {
-                return redirect()->route('home');
-            } else {
-                return redirect()->route('home');
+            if ($item) {
+                MedicineCart::where('transaction_id', $item->id)
+                    ->where('status', 0)
+                    ->delete();
+                $item->delete();
             }
-        }
+        }, 3);
+
+        Cache::forget("kasir_tx_lease:{$pharmacyId}:{$trxId}");
+
+        return redirect()->route('home');
     }
 
     // Flow 4 Add to Cart
 
     public function addToCart(Request $request)
     {
-        $transaction = DB::transaction(function () use ($request) {
+        $pharmacyId = (int) (getActivePharmacyId() ?: Auth::user()->pharmacy_id);
+
+        $transaction = DB::transaction(function () use ($request, $pharmacyId) {
             // Serialize cart writes on the parent transaction. This prevents two
             // tabs/devices from both selecting the same "next recipe" state.
             $parentTransaction = MedicineTransactions::where('id', $request->get('transaction_id'))
-                ->where('user_id', auth()->id())
+                ->where('pharmacy_id', $pharmacyId)
                 ->where('status', 0)
                 ->lockForUpdate()
                 ->firstOrFail();
@@ -580,7 +740,6 @@ class SalesController extends Controller
             if ($isRecipe) {
                 $startNewRecipe = $request->boolean('start_new_recipe');
                 $latestRecipeItem = MedicineCart::where('transaction_id', $parentTransaction->id)
-                    ->where('user_id', auth()->id())
                     ->where('status', 0)
                     ->whereNotNull('recipe_number')
                     ->latest('id')
@@ -592,7 +751,6 @@ class SalesController extends Controller
                     $recipeNumber = 1;
                 } elseif ($latestRecipeItem && (int) $latestRecipeItem->recipe_status === 1 && $startNewRecipe) {
                     $highestRecipeNumber = MedicineCart::where('transaction_id', $parentTransaction->id)
-                        ->where('user_id', auth()->id())
                         ->where('status', 0)
                         ->whereNotNull('recipe_number')
                         ->pluck('recipe_number')
@@ -634,18 +792,11 @@ class SalesController extends Controller
                 'medicine_type' => $medicineType,
                 'service_fee' => $service,
             ]);
-        });
+        }, 3);
         $transaction->load('medicine');
+        $syncPayload = $this->buildCartSyncPayload((int) $transaction->transaction_id);
 
-        $activeCart = MedicineCart::where('transaction_id', $transaction->transaction_id)
-            ->where('user_id', auth()->id())
-            ->where('status', '0');
-        $total_transaction = (float) $activeCart->sum('final_price');
-        $total_discount = (float) $activeCart->sum('discount');
-        $totalboughtCalc = (clone $activeCart)->selectRaw('SUM(total_price) as total_price, SUM(embalase) as embalase')->first();
-        $total_raw = (float) ($totalboughtCalc->total_price ?? 0) + (float) ($totalboughtCalc->embalase ?? 0);
-
-        return response()->json([
+        return response()->json(array_merge([
             'id' => $transaction->id,
             'name' => $transaction->medicine->name,
             'unit' => $transaction->medicine->unit,
@@ -658,11 +809,8 @@ class SalesController extends Controller
             'service_fee' => $transaction->service_fee,
             'final_price' => $transaction->final_price,
             'cart_type' => $transaction->cart_type,
-            'total_transaction' => $total_transaction,
-            'total_discount' => $total_discount,
-            'totalbought' => $total_raw,
             'remove_url' => route('sales.removeItem', $transaction->id),
-        ]);
+        ], $syncPayload));
     }
     public function getCartItem($id)
     {
@@ -671,30 +819,28 @@ class SalesController extends Controller
     }
     public function deleteCartItem($id)
     {
-        $cart = MedicineCart::findOrFail($id);
-        $cart->delete();
+        $pharmacyId = (int) (getActivePharmacyId() ?: Auth::user()->pharmacy_id);
 
-        $total_transaction = MedicineCart::where('transaction_id', $cart->transaction_id)
-            ->where('user_id', auth()->id())
-            ->where('status', '0')
-            ->sum('final_price');
-        $total_discount = MedicineCart::where('transaction_id', $cart->transaction_id)
-            ->where('user_id', auth()->id())
-            ->where('status', '0')
-            ->sum('discount');
-        $totalbought = MedicineCart::where('transaction_id', $cart->transaction_id)
-            ->where('user_id', auth()->id())
-            ->where('status', '0')
-            ->selectRaw('SUM(total_price) as total_price, SUM(embalase) as embalase')->first();
+        [$cart, $transactionId] = DB::transaction(function () use ($id, $pharmacyId) {
+            $cart = MedicineCart::where('id', $id)->lockForUpdate()->firstOrFail();
+            $transactionId = (int) $cart->transaction_id;
 
-        $total_raw = $totalbought->total_price + $totalbought->embalase;
-        return response()->json([
+            MedicineTransactions::where('id', $transactionId)
+                ->where('pharmacy_id', $pharmacyId)
+                ->where('status', 0)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $cart->delete();
+
+            return [$cart, $transactionId];
+        }, 3);
+
+        $syncPayload = $this->buildCartSyncPayload($transactionId);
+        return response()->json(array_merge([
             'success' => true,
             'item' => $cart,
-            'total_transaction' => $total_transaction,
-            'total_discount' => $total_discount,
-            'totalbought' => $total_raw,
-        ]);
+        ], $syncPayload));
     }
     private function generatePatientCode()
     {
@@ -941,7 +1087,9 @@ class SalesController extends Controller
 
         DB::beginTransaction();
         try {
-            $transaction = MedicineTransactions::findOrFail($validated['transaction_id']);
+            $transaction = MedicineTransactions::where('id', $validated['transaction_id'])
+                ->lockForUpdate()
+                ->firstOrFail();
             $type = $transaction->transaction_type;
             $typeMap = [
                 'RESEP TUNAI' => ['db' => 'RESEP TUNAI', 'param_key' => 'receipt', 'code' => '1'],
@@ -954,7 +1102,7 @@ class SalesController extends Controller
             $meta = $typeMap[$type];
 
             // ── Idempotency ──────────────────────────────────────────
-            if ($transaction->status === 1) {
+            if ((int) $transaction->status === 1) {
                 DB::rollBack();
 
                 $transaction->load('transactions.medicine', 'patients', 'doctors');
@@ -965,6 +1113,29 @@ class SalesController extends Controller
                     'print_resep_url' => route('salesrecipe.print', $transaction->id),
                     'commands' => $this->buildEscPos($transaction),
                 ]);
+            }
+
+            // ── Cart Integrity & Desync Guard ────────────────────────
+            $cartSync = $this->buildCartSyncPayload((int) $transaction->id);
+            if ($cartSync['cart_count'] === 0) {
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Keranjang transaksi kosong. Tidak dapat melakukan checkout.',
+                    'cart_sync' => $cartSync,
+                ], 422);
+            }
+
+            $dbSubtotal = round((float) $cartSync['total_transaction'], 2);
+            $clientSubtotal = round((float) $validated['totaltransaction'], 2);
+            if (abs($dbSubtotal - $clientSubtotal) > 1) {
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'desync_detected' => true,
+                    'message' => 'Total transaksi tidak sinkron dengan item di database (Rp ' . number_format($dbSubtotal, 0, ',', '.') . '). Tabel keranjang telah disinkronkan ulang, silakan periksa kembali sebelum pembayaran.',
+                    'cart_sync' => $cartSync,
+                ], 409);
             }
 
             $isCreditTransaction = strtoupper((string) ($transaction->transaction_type ?? '')) === 'KREDIT';
@@ -1143,13 +1314,20 @@ class SalesController extends Controller
                 ->findOrFail($validated['transaction_id']);
 
             $now = Carbon::now()->format('Y-m-d H:i:s');
+            $pharmacyId = (int) ($transaction->pharmacy_id ?: getActivePharmacyId());
 
-            foreach ($txWithItems->transactions as $cart) {
+            // Urutkan berdasarkan medicine_id ASC agar penguncian baris (lockForUpdate)
+            // antar 5-10 komputer di cabang yang sama selalu konsisten (mencegah AB-BA deadlock).
+            $sortedCartItems = $txWithItems->transactions->sortBy([
+                ['medicine_id', 'asc'],
+                ['id', 'asc'],
+            ]);
+
+            foreach ($sortedCartItems as $cart) {
                 $medicine = $cart->medicine;
                 $medicine_id = $medicine->id;
                 $qty_bought = $cart->quantity;
                 $batchDeductions = [];
-                $pharmacyId = getActivePharmacyId();
                 $counterQtyBefore = (int) MedicineTransferItems::join('batches', 'medicine_transfer_items.batches_id', '=', 'batches.id')
                     ->where('batches.medicine_id', $medicine_id)
                     ->where('batches.pharmacy_id', $pharmacyId)
@@ -1166,7 +1344,7 @@ class SalesController extends Controller
                     // 1. Cari batch counter dengan stok > 0 (FIFO berdasarkan expired date)
                     $transfer = MedicineTransferItems::join('batches', 'medicine_transfer_items.batches_id', '=', 'batches.id')
                         ->where('batches.medicine_id', $medicine_id)
-                        ->where('batches.pharmacy_id', getActivePharmacyId())
+                        ->where('batches.pharmacy_id', $pharmacyId)
                         ->where('medicine_transfer_items.status', 1)
                         ->where(function ($q) {
                             $q->whereNull('medicine_transfer_items.source_type')
@@ -1182,7 +1360,7 @@ class SalesController extends Controller
                         // 2. Tidak ada stok > 0, cari batch counter manapun (izinkan minus)
                         $transfer = MedicineTransferItems::join('batches', 'medicine_transfer_items.batches_id', '=', 'batches.id')
                             ->where('batches.medicine_id', $medicine_id)
-                            ->where('batches.pharmacy_id', getActivePharmacyId())
+                            ->where('batches.pharmacy_id', $pharmacyId)
                             ->where('medicine_transfer_items.status', 1)
                             ->where(function ($q) {
                                 $q->whereNull('medicine_transfer_items.source_type')
@@ -1222,8 +1400,8 @@ class SalesController extends Controller
                     }
                 }
 
-                $medicine->stock -= $cart->quantity;
-                $medicine->save();
+                // Gunakan atomic SQL decrement agar 5-10 PC yang menjual obat sama secara bersamaan tidak saling menimpa stok
+                Medicines::where('id', $medicine_id)->decrement('stock', $cart->quantity);
 
                 $trackedQty = array_sum($batchDeductions);
                 if ($trackedQty < (float) $cart->quantity) {
@@ -1253,6 +1431,7 @@ class SalesController extends Controller
             }
 
             DB::commit();
+            Cache::forget("kasir_tx_lease:{$pharmacyId}:{$transaction->id}");
 
             // Load relations needed for receipt
             $txWithItems->load('patients', 'doctors');
@@ -1370,14 +1549,20 @@ class SalesController extends Controller
     }
     public function getTransactionItem(Request $request)
     {
-        $transaction = MedicineCart::with('medicine', 'transactions', 'user')->where('transaction_id', $request->get('transaction_id'))->first();
-        $itemTransaction = MedicineCart::with('medicine', 'transactions', 'user')->where('transaction_id', $request->get('transaction_id'))->get();
-
+        $transactionId = (int) $request->get('transaction_id');
+        $itemTransaction = MedicineCart::with('medicine', 'transactions', 'user')
+            ->where('transaction_id', $transactionId)
+            ->where('status', 0)
+            ->orderBy('id', 'asc')
+            ->get();
+        $transaction = $itemTransaction->first();
+        $syncPayload = $this->buildCartSyncPayload($transactionId);
 
         return response()->json([
             'success' => true,
             'transaction' => $transaction,
             'itemTransaction' => $itemTransaction,
+            'cart_sync' => $syncPayload,
         ]);
     }
 
@@ -1398,16 +1583,16 @@ class SalesController extends Controller
         ]);
         $transactionId = (int) $validated['transaction_id'];
         $jasaValue = (int) $validated['jasaValue'];
+        $pharmacyId = (int) (getActivePharmacyId() ?: Auth::user()->pharmacy_id);
 
-        $cartItem = DB::transaction(function () use ($transactionId, $jasaValue) {
+        $cartItem = DB::transaction(function () use ($transactionId, $jasaValue, $pharmacyId) {
             $parentTransaction = MedicineTransactions::where('id', $transactionId)
-                ->where('user_id', auth()->id())
+                ->where('pharmacy_id', $pharmacyId)
                 ->where('status', 0)
                 ->lockForUpdate()
                 ->firstOrFail();
 
             $openRecipeItem = MedicineCart::where('transaction_id', $parentTransaction->id)
-                ->where('user_id', auth()->id())
                 ->where('status', 0)
                 ->whereNotNull('recipe_number')
                 ->where('recipe_status', 0)
@@ -1415,7 +1600,6 @@ class SalesController extends Controller
                 ->first();
 
             $targetRecipeItem = $openRecipeItem ?? MedicineCart::where('transaction_id', $parentTransaction->id)
-                ->where('user_id', auth()->id())
                 ->where('status', 0)
                 ->whereNotNull('recipe_number')
                 ->latest('id')
@@ -1427,7 +1611,6 @@ class SalesController extends Controller
 
             $recipeNumber = $targetRecipeItem->recipe_number;
             $recipeItems = MedicineCart::where('transaction_id', $parentTransaction->id)
-                ->where('user_id', auth()->id())
                 ->where('status', 0)
                 ->where('recipe_number', $recipeNumber);
             $targetItem = (clone $recipeItems)->latest('id')->firstOrFail();
@@ -1441,122 +1624,92 @@ class SalesController extends Controller
             $recipeItems->update(['recipe_status' => 1]);
 
             return $targetItem->fresh();
-        });
+        }, 3);
 
-        $total_transaction = MedicineCart::where('transaction_id', $transactionId)
-            ->where('user_id', auth()->id())
-            ->where('status', '0')
-            ->sum('final_price');
+        $syncPayload = $this->buildCartSyncPayload($transactionId);
 
-        $totalbought = MedicineCart::where('transaction_id', $transactionId)
-            ->where('user_id', auth()->id())
-            ->where('status', '0')
-            ->selectRaw('SUM(total_price) as total_price, SUM(embalase) as embalase')->first();
-
-        $total_raw = $totalbought->total_price + $totalbought->embalase;
-
-        return response()->json([
+        return response()->json(array_merge([
             'success' => true,
             'message' => 'Data embalase berhasil disimpan.',
             'racikStatus' => 1,
             'item_id' => $cartItem->id,
             'finalprice' => $cartItem->final_price,
-            'totaltransaction' => $total_transaction,
-            'totalbought' => $total_raw,
-        ]);
+        ], $syncPayload));
     }
 
     public function updateCart(Request $request)
     {
-        $cart = MedicineCart::where('id', $request->id)
-            ->where('user_id', auth()->id())
-            ->first();
+        $pharmacyId = (int) (getActivePharmacyId() ?: Auth::user()->pharmacy_id);
 
-        if (!$cart) {
-            return response()->json(['message' => 'Item transaksi tidak ditemukan.'], 404);
-        }
+        return DB::transaction(function () use ($request, $pharmacyId) {
+            $cart = MedicineCart::where('id', $request->id)
+                ->lockForUpdate()
+                ->first();
 
-        $parentTransaction = MedicineTransactions::where('id', $cart->transaction_id)
-            ->where('user_id', auth()->id())
-            ->where('status', 0)
-            ->first();
-        if (!$parentTransaction) {
-            return response()->json(['message' => 'Transaksi tidak ditemukan atau sudah selesai.'], 422);
-        }
-
-        $cartType = $cart->cart_type;
-        $serviceFee = $cart->service_fee;
-        $embalase = $cart->embalase;
-        if ($parentTransaction->transaction_type === 'KREDIT') {
-            $cartType = $request->input('cart_type', $cart->cart_type);
-            if (!in_array($cartType, ['UK', 'UP', 'HV'], true)) {
-                return response()->json(['message' => 'Jenis item resep kredit tidak valid.'], 422);
+            if (!$cart) {
+                return response()->json(['message' => 'Item transaksi tidak ditemukan.'], 404);
             }
-            $medicineType = [
-                'UK' => 'KREDIT',
-                'UP' => 'UPDS',
-                'HV' => 'HV/OTC',
-            ][$cartType];
-            $serviceFee = $cartType === 'UK' && (int) $request->input('racikstatus', 0) !== 1
-                ? (float) $request->input('service', 0)
-                : 0;
-            $embalase = $cartType === 'UK' ? (float) $request->input('embalase', 0) : 0;
-        }
 
-        if ($request->has('debtor_id') && $request->filled('debtor_id')) {
-            MedicineTransactions::where('id', $cart->transaction_id)
-                ->where('user_id', auth()->id())
-                ->where('transaction_type', 'KREDIT')
-                ->update([
+            $parentTransaction = MedicineTransactions::where('id', $cart->transaction_id)
+                ->where('pharmacy_id', $pharmacyId)
+                ->where('status', 0)
+                ->lockForUpdate()
+                ->first();
+            if (!$parentTransaction) {
+                return response()->json(['message' => 'Transaksi tidak ditemukan atau sudah selesai.'], 422);
+            }
+
+            $cartType = $cart->cart_type;
+            $serviceFee = $cart->service_fee;
+            $embalase = $cart->embalase;
+            $medicineType = $cart->medicine_type;
+            if ($parentTransaction->transaction_type === 'KREDIT') {
+                $cartType = $request->input('cart_type', $cart->cart_type);
+                if (!in_array($cartType, ['UK', 'UP', 'HV'], true)) {
+                    return response()->json(['message' => 'Jenis item resep kredit tidak valid.'], 422);
+                }
+                $medicineType = [
+                    'UK' => 'KREDIT',
+                    'UP' => 'UPDS',
+                    'HV' => 'HV/OTC',
+                ][$cartType];
+                $serviceFee = $cartType === 'UK' && (int) $request->input('racikstatus', 0) !== 1
+                    ? (float) $request->input('service', 0)
+                    : 0;
+                $embalase = $cartType === 'UK' ? (float) $request->input('embalase', 0) : 0;
+            }
+
+            if ($request->has('debtor_id') && $request->filled('debtor_id') && $parentTransaction->transaction_type === 'KREDIT') {
+                $parentTransaction->update([
                     'debtor_id' => $request->get('debtor_id'),
                 ]);
-        }
+            }
 
-        $cart->update([
-            'cart_type' => $cartType,
-            'medicine_type' => $parentTransaction->transaction_type === 'KREDIT'
-                ? $medicineType
-                : $cart->medicine_type,
-            'service_fee' => $serviceFee,
-            'embalase' => $embalase,
-            'quantity' => $request->quantity,
-            'discount' => $request->discount,
-            'package' => $request->package,
-            'dosage_r' => $request->dosage_r,
-            'item_price' => $request->price2,
-            'raw_total' => $request->raw_total,
-            'total_price' => $request->final_price,
-            'final_price' => $request->total_price + $embalase,
-        ]);
+            $cart->update([
+                'cart_type' => $cartType,
+                'medicine_type' => $parentTransaction->transaction_type === 'KREDIT'
+                    ? $medicineType
+                    : $cart->medicine_type,
+                'service_fee' => $serviceFee,
+                'embalase' => $embalase,
+                'quantity' => $request->quantity,
+                'discount' => $request->discount,
+                'package' => $request->package,
+                'dosage_r' => $request->dosage_r,
+                'item_price' => $request->price2,
+                'raw_total' => $request->raw_total,
+                'total_price' => $request->final_price,
+                'final_price' => $request->total_price + $embalase,
+            ]);
 
-        $cart->load('medicine');
+            $cart->load('medicine');
+            $syncPayload = $this->buildCartSyncPayload((int) $cart->transaction_id);
 
-        $total_transaction = MedicineCart::where('transaction_id', $cart->transaction_id)
-            ->where('user_id', auth()->id())
-            ->where('status', '0')
-            ->sum('final_price');
-
-        $total_discount = MedicineCart::where('transaction_id', $cart->transaction_id)
-            ->where('user_id', auth()->id())
-            ->where('status', '0')
-            ->sum('discount');
-
-
-        $totalbought = MedicineCart::where('transaction_id', $cart->transaction_id)
-            ->where('user_id', auth()->id())
-            ->where('status', '0')
-            ->selectRaw('SUM(total_price) as total_price, SUM(embalase) as embalase')->first();
-
-        $total_raw = $totalbought->total_price + $totalbought->embalase;
-
-
-        return response()->json([
-            'success' => true,
-            'item' => $cart,
-            'total_transaction' => $total_transaction,
-            'total_discount' => $total_discount,
-            'totalbought' => $total_raw,
-        ]);
+            return response()->json(array_merge([
+                'success' => true,
+                'item' => $cart,
+            ], $syncPayload));
+        }, 3);
     }
 
 
