@@ -359,30 +359,35 @@ class SalesController extends Controller
             default => 'resep',
         };
     }
-    function generateItemsLogCode()
+    function generateItemsLogCode(&$nextNumberRef = null, ?string &$prefixRef = null)
     {
         $now = Carbon::now();
+        $prefix = "{$now->format('y')}{$now->format('m')}LOG-";
 
-        $year = $now->format('y');
-        $month = $now->format('m');
-        $prefix = "{$year}{$month}LOG-";
+        if ($nextNumberRef === null) {
+            $lastCode = ItemsLog::where('code', 'like', "{$prefix}%")
+                ->orderByRaw('LENGTH(code) DESC, code DESC')
+                ->lockForUpdate()
+                ->value('code');
 
-        $lastCode = ItemsLog::where('code', 'like', "{$prefix}%")
-            ->orderByRaw('LENGTH(code) DESC, code DESC')
-            ->lockForUpdate()
-            ->value('code');
-
-        if ($lastCode) {
-            $numericPart = substr((string) $lastCode, strlen($prefix));
-            $lastNumber = (int) preg_replace('/\D/', '', $numericPart);
-            $nextNumber = $lastNumber + 1;
+            if ($lastCode) {
+                $numericPart = substr((string) $lastCode, strlen($prefix));
+                $lastNumber = (int) preg_replace('/\D/', '', $numericPart);
+                $nextNumber = $lastNumber + 1;
+            } else {
+                $nextNumber = 1;
+            }
+            $nextNumberRef = $nextNumber;
+            $prefixRef = $prefix;
         } else {
-            $nextNumber = 1;
+            $nextNumberRef++;
+            $nextNumber = $nextNumberRef;
         }
 
         $code = $prefix . str_pad((string) $nextNumber, 4, '0', STR_PAD_LEFT);
         while (ItemsLog::where('code', $code)->exists()) {
             $nextNumber++;
+            $nextNumberRef = $nextNumber;
             $code = $prefix . str_pad((string) $nextNumber, 4, '0', STR_PAD_LEFT);
         }
 
@@ -1406,12 +1411,17 @@ class SalesController extends Controller
                 ['id', 'asc'],
             ]);
 
+            $nextLogNumber = null;
+            $logPrefix = null;
+
             foreach ($sortedCartItems as $cart) {
                 $medicine = $cart->medicine;
                 $medicine_id = $medicine->id;
                 $qty_bought = $cart->quantity;
                 $batchDeductions = [];
-                $counterQtyBefore = (int) MedicineTransferItems::join('batches', 'medicine_transfer_items.batches_id', '=', 'batches.id')
+
+                // Ambil transfer item aktif untuk obat ini (FIFO expired_date ASC) sekaligus dalam 1 query
+                $transfers = MedicineTransferItems::join('batches', 'medicine_transfer_items.batches_id', '=', 'batches.id')
                     ->where('batches.medicine_id', $medicine_id)
                     ->where('batches.pharmacy_id', $pharmacyId)
                     ->where('medicine_transfer_items.status', 1)
@@ -1419,67 +1429,44 @@ class SalesController extends Controller
                         $q->whereNull('medicine_transfer_items.source_type')
                             ->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang');
                     })
-                    ->sum('medicine_transfer_items.qty');
+                    ->orderBy('batches.expired_date', 'asc')
+                    ->lockForUpdate()
+                    ->select('medicine_transfer_items.*')
+                    ->get();
 
-                // Debug log removed to prevent disk & log flooding
+                $counterQtyBefore = (int) $transfers->sum('qty');
 
-                while ($qty_bought > 0) {
-                    // 1. Cari batch counter dengan stok > 0 (FIFO berdasarkan expired date)
-                    $transfer = MedicineTransferItems::join('batches', 'medicine_transfer_items.batches_id', '=', 'batches.id')
-                        ->where('batches.medicine_id', $medicine_id)
-                        ->where('batches.pharmacy_id', $pharmacyId)
-                        ->where('medicine_transfer_items.status', 1)
-                        ->where(function ($q) {
-                            $q->whereNull('medicine_transfer_items.source_type')
-                              ->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang');
-                        })
-                        ->where('medicine_transfer_items.qty', '>', 0)
-                        ->orderBy('batches.expired_date', 'asc')
-                        ->lockForUpdate()
-                        ->select('medicine_transfer_items.*')
-                        ->first();
+                // 1. Potong stok counter FIFO dari batch yang ada stok > 0
+                foreach ($transfers as $transfer) {
+                    if ($qty_bought <= 0) break;
+                    if ($transfer->qty <= 0) continue;
 
-                    if (!$transfer) {
-                        // 2. Tidak ada stok > 0, cari batch counter manapun (izinkan minus)
-                        $transfer = MedicineTransferItems::join('batches', 'medicine_transfer_items.batches_id', '=', 'batches.id')
-                            ->where('batches.medicine_id', $medicine_id)
-                            ->where('batches.pharmacy_id', $pharmacyId)
-                            ->where('medicine_transfer_items.status', 1)
-                            ->where(function ($q) {
-                                $q->whereNull('medicine_transfer_items.source_type')
-                                  ->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang');
-                            })
-                            ->orderBy('batches.expired_date', 'desc')
-                            ->lockForUpdate()
-                            ->select('medicine_transfer_items.*')
-                            ->first();
-
-                        if (!$transfer) {
-                            // 3. Tidak ada transfer item sama sekali, skip deduction counter
-                            \Log::warning("Stok counter tidak ditemukan untuk obat: {$medicine->name} (ID: {$medicine_id}). Penjualan tetap diproses dengan stok minus.");
-                            break;
-                        }
-
-                        // Kurangi langsung semua sisa qty ke batch ini (akan jadi minus)
+                    if ($transfer->qty >= $qty_bought) {
                         $deductedQty = (float) $qty_bought;
                         $transfer->qty -= $qty_bought;
                         $transfer->save();
                         $batchDeductions[$transfer->batches_id] = ($batchDeductions[$transfer->batches_id] ?? 0) + $deductedQty;
                         $qty_bought = 0;
                     } else {
-                        if ($transfer->qty >= $qty_bought) {
-                            $deductedQty = (float) $qty_bought;
-                            $transfer->qty -= $qty_bought;
-                            $transfer->save();
-                            $batchDeductions[$transfer->batches_id] = ($batchDeductions[$transfer->batches_id] ?? 0) + $deductedQty;
-                            $qty_bought = 0;
-                        } else {
-                            $deductedQty = (float) $transfer->qty;
-                            $qty_bought -= $deductedQty;
-                            $batchDeductions[$transfer->batches_id] = ($batchDeductions[$transfer->batches_id] ?? 0) + $deductedQty;
-                            $transfer->qty = 0;
-                            $transfer->save();
-                        }
+                        $deductedQty = (float) $transfer->qty;
+                        $qty_bought -= $deductedQty;
+                        $batchDeductions[$transfer->batches_id] = ($batchDeductions[$transfer->batches_id] ?? 0) + $deductedQty;
+                        $transfer->qty = 0;
+                        $transfer->save();
+                    }
+                }
+
+                // 2. Jika stok fisik habis namun sistem mengizinkan minus, potong pada batch terakhir
+                if ($qty_bought > 0) {
+                    $lastTransfer = $transfers->last();
+                    if ($lastTransfer) {
+                        $deductedQty = (float) $qty_bought;
+                        $lastTransfer->qty -= $qty_bought;
+                        $lastTransfer->save();
+                        $batchDeductions[$lastTransfer->batches_id] = ($batchDeductions[$lastTransfer->batches_id] ?? 0) + $deductedQty;
+                        $qty_bought = 0;
+                    } else {
+                        Log::warning("Stok counter tidak ditemukan untuk obat: {$medicine->name} (ID: {$medicine_id}). Penjualan tetap diproses dengan stok minus.");
                     }
                 }
 
@@ -1497,7 +1484,7 @@ class SalesController extends Controller
                     $counterQtyAfter = $runningCounterQty - $deductedQty;
                     ItemsLog::create([
                         'transaction_code' => $txWithItems->transaction_code,
-                        'code' => $this->generateItemsLogCode(),
+                        'code' => $this->generateItemsLogCode($nextLogNumber, $logPrefix),
                         'type' => $cart->cart_type,
                         'medicine_id' => $cart->medicine_id,
                         'qty' => $deductedQty,

@@ -33,24 +33,27 @@ class MedicineTransactionCodeGenerator
                 ->lockForUpdate()
                 ->first();
 
-            // Recover safely from codes created before the sequence table existed.
-            $suffixStart = strlen($prefix) + 1;
-            $largestExisting = (int) (MedicineTransactions::query()
-                ->where('pharmacy_id', $pharmacyId)
-                ->where('transaction_code', 'like', $prefix . '%' . $pharmacyIdPadded)
-                ->whereRaw('LENGTH(transaction_code) > ?', [strlen($prefix) + strlen($pharmacyIdPadded)])
-                ->whereRaw('SUBSTRING(transaction_code, ?, LENGTH(transaction_code) - ? - ?) REGEXP ?', [
-                    $suffixStart,
-                    strlen($prefix),
-                    strlen($pharmacyIdPadded),
-                    '^[0-9]+$',
-                ])
-                ->selectRaw('MAX(CAST(SUBSTRING(transaction_code, ?, LENGTH(transaction_code) - ? - ?) AS UNSIGNED)) AS max_number', [
-                    $suffixStart,
-                    strlen($prefix),
-                    strlen($pharmacyIdPadded),
-                ])
-                ->value('max_number') ?? 0);
+            // Fallback scan hanya dijalankan jika last_number masih 0 (pertama kali sequence dibuat).
+            $largestExisting = 0;
+            if ((int) $sequence->last_number === 0) {
+                $suffixStart = strlen($prefix) + 1;
+                $largestExisting = (int) (MedicineTransactions::query()
+                    ->where('pharmacy_id', $pharmacyId)
+                    ->where('transaction_code', 'like', $prefix . '%' . $pharmacyIdPadded)
+                    ->whereRaw('LENGTH(transaction_code) > ?', [strlen($prefix) + strlen($pharmacyIdPadded)])
+                    ->whereRaw('SUBSTRING(transaction_code, ?, LENGTH(transaction_code) - ? - ?) REGEXP ?', [
+                        $suffixStart,
+                        strlen($prefix),
+                        strlen($pharmacyIdPadded),
+                        '^[0-9]+$',
+                    ])
+                    ->selectRaw('MAX(CAST(SUBSTRING(transaction_code, ?, LENGTH(transaction_code) - ? - ?) AS UNSIGNED)) AS max_number', [
+                        $suffixStart,
+                        strlen($prefix),
+                        strlen($pharmacyIdPadded),
+                    ])
+                    ->value('max_number') ?? 0);
+            }
 
             $nextNumber = max((int) $sequence->last_number, $largestExisting) + 1;
             $code = self::format($prefix, $nextNumber, $pharmacyIdPadded);
