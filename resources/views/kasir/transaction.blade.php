@@ -57,7 +57,7 @@
         }
 
         .swal-on-top {
-            z-index: 999999 !important;
+            z-index: 99999999 !important;
         }
     </style>
     @if ($check_transaction != 0)
@@ -1619,7 +1619,7 @@
             {{-- RESEP TUNAI / KREDIT buttons --}}
             <div id="btnGroupResep" class="hidden flex-col gap-2">
 
-                <button id="btnStrukPelangganResep" data-modal-btn data-mode="pelanggan_resep"
+                <button id="btnPrint" data-modal-btn data-mode="pelanggan"
                     class="modal-print-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 text-left transition-colors">
                     <div
                         class="modal-btn-icon w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 text-gray-500 flex-shrink-0 transition-colors">
@@ -1632,28 +1632,8 @@
                         </svg>
                     </div>
                     <div class="flex-1">
-                        <span class="block text-[13px] font-medium text-gray-700 modal-btn-label">Cetak struk + resep</span>
-                        <span class="block text-[11px] text-gray-400">Print struk pelanggan & salinan resep (2 lembar)</span>
-                    </div>
-                    <span
-                        class="modal-btn-enter text-[11px] text-gray-300 opacity-0 transition-opacity font-mono">↵</span>
-                </button>
-
-                <button id="btnStrukPelanggan" data-modal-btn data-mode="pelanggan"
-                    class="modal-print-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 text-left transition-colors">
-                    <div
-                        class="modal-btn-icon w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100 text-gray-500 flex-shrink-0 transition-colors">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
-                            stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
-                            stroke-linejoin="round">
-                            <polyline points="6 9 6 2 18 2 18 9" />
-                            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
-                            <rect x="6" y="14" width="12" height="8" />
-                        </svg>
-                    </div>
-                    <div class="flex-1">
-                        <span class="block text-[13px] font-medium text-gray-700 modal-btn-label">Cetak struk saja</span>
-                        <span class="block text-[11px] text-gray-400">Print struk pembayaran pelanggan saja (1 lembar)</span>
+                        <span class="block text-[13px] font-medium text-gray-700 modal-btn-label">Cetak struk</span>
+                        <span class="block text-[11px] text-gray-400">Print struk untuk pelanggan</span>
                     </div>
                     <span
                         class="modal-btn-enter text-[11px] text-gray-300 opacity-0 transition-opacity font-mono">↵</span>
@@ -5910,14 +5890,11 @@
                 // SUCCESS
                 if (res.data.success) {
 
-                    // 1. EXECUTE INITIAL PRINT 
-                    if (pinModal._printMode === 'pelanggan_resep') {
-                        // Cetak Struk 1 + Struk 2 (Resep Detail) sekaligus dalam 1 print job
+                    hideCheckoutLoading();
+
+                    // 1. EXECUTE INITIAL PRINT (Dokumen 1: Struk Kasir)
+                    if (pinModal._printMode === 'pelanggan') {
                         await Printer.printReceipt(res.data.commands, res.data.print_url);
-                    } else if (pinModal._printMode === 'pelanggan') {
-                        // Kasir hanya ingin 1 struk (mode single)
-                        const singleUrl = res.data.print_url + (res.data.print_url.includes('?') ? '&' : '?') + 'mode=single';
-                        await Printer.printReceipt(res.data.commands, singleUrl);
                     }
 
                     iziToast.success({
@@ -5926,17 +5903,21 @@
                         position: 'topRight'
                     });
 
-                    // Jika kasir memilih 'pelanggan' (hanya 1 struk) pada resep tunai atau kredit,
-                    // tawarkan cetak struk kedua (Full Receipt) jika diinginkan.
-                    const isResepTx = (currenttransaction === "RESEP TUNAI" || currenttransaction === "KREDIT" || currenttransaction === "RESEP KREDIT");
-                    const trxId = checkoutPayload.transaction_id;
+                    // 2. ASK TO PRINT FULL RECEIPT (Dokumen 2: Salinan Resep / Full Receipt)
+                    const isRecipe = Boolean(
+                        res.data.is_recipe ||
+                        ['RESEP TUNAI', 'KREDIT', 'RESEP KREDIT'].includes(String(res.data.transaction_type || '').toUpperCase().trim()) ||
+                        ['RESEP TUNAI', 'KREDIT', 'RESEP KREDIT'].includes(String(currenttransaction || '').toUpperCase().trim()) ||
+                        ['RESEP TUNAI', 'KREDIT', 'RESEP KREDIT'].includes(String(transaction_type || '').toUpperCase().trim())
+                    );
+                    const trxId = res.data.transaction_id || checkoutPayload.transaction_id;
                     const fullReceiptUrl = res.data.print_resep_url || `/print/fullreceipt/${trxId}`;
 
-                    if (isResepTx && pinModal._printMode === 'pelanggan') {
+                    if (isRecipe) {
                         if (typeof Swal !== 'undefined') {
                             Swal.fire({
                                 title: 'Cetak Full Receipt?',
-                                text: "Apakah Anda ingin mencetak struk kedua / versi full receipt?",
+                                text: "Apakah Anda ingin mencetak versi full receipt?",
                                 icon: 'question',
                                 showCancelButton: true,
                                 confirmButtonColor: '#3085d6',
@@ -5945,10 +5926,16 @@
                                 cancelButtonText: 'Selesai',
                                 customClass: {
                                     container: 'swal-on-top'
+                                },
+                                preConfirm: () => {
+                                    try {
+                                        return window.open(fullReceiptUrl, '_blank');
+                                    } catch (e) {
+                                        return null;
+                                    }
                                 }
                             }).then((result) => {
                                 if (result.isConfirmed) {
-                                    window.open(fullReceiptUrl, '_blank');
                                     setTimeout(() => {
                                         window.location.reload();
                                     }, 1200);
@@ -5958,18 +5945,17 @@
                             });
                         } else {
                             setTimeout(() => {
-                                const printAgain = confirm(
-                                    "Transaksi berhasil! Apakah Anda ingin mencetak Full Receipt?");
+                                const printAgain = confirm("Transaksi berhasil! Apakah Anda ingin mencetak Full Receipt?");
                                 if (printAgain) {
                                     window.open(fullReceiptUrl, '_blank');
                                 }
-                                window.location.reload();
+                                setTimeout(() => window.location.reload(), 1000);
                             }, 500);
                         }
                     } else {
                         setTimeout(() => {
                             window.location.reload();
-                        }, 1200);
+                        }, 500);
                     }
 
                     // 2. ASK TO PRINT FULL RECEIPT

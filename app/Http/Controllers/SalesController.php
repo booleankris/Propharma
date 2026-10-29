@@ -1197,6 +1197,9 @@ class SalesController extends Controller
 
                 return response()->json([
                     'success' => true,
+                    'transaction_id' => $transaction->id,
+                    'transaction_type' => $transaction->transaction_type,
+                    'is_recipe' => in_array($transaction->transaction_type, ['RESEP TUNAI', 'KREDIT', 'RESEP KREDIT'], true),
                     'print_url' => route('sales.print', $transaction->id),
                     'print_resep_url' => route('salesrecipe.print', $transaction->id),
                     'commands' => $this->buildEscPos($transaction),
@@ -1508,6 +1511,9 @@ class SalesController extends Controller
 
             return response()->json([
                 'success' => true,
+                'transaction_id' => $transaction->id,
+                'transaction_type' => $transaction->transaction_type,
+                'is_recipe' => in_array($transaction->transaction_type, ['RESEP TUNAI', 'KREDIT', 'RESEP KREDIT'], true),
                 'print_url' => route('sales.print', $transaction->id),
                 'print_resep_url' => route('salesrecipe.print', $transaction->id),
                 'commands' => $this->buildEscPos($txWithItems),
