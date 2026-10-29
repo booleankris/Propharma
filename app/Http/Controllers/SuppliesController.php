@@ -181,28 +181,9 @@ class SuppliesController extends Controller
                             $b->whereIn('pharmacy_id', $targetPharmacyIds);
                         });
                 })
-                // 4. Penjualan Kasir (Status 1) & Retur Jual (Status 3) -> Wajib difilter berdasarkan cabang transaksi kasir
+                // 4. Status lainnya (Penjualan = 1, Retur Jual = 3, Stock Opname = 5, Adjustment = 6, dll)
                 ->orWhere(function ($sub) use ($targetPharmacyIds) {
-                    $sub->whereIn('status', [1, 3])
-                        ->where(function ($salesQ) use ($targetPharmacyIds) {
-                            $salesQ->whereHas('medicine_transaction', function ($tx) use ($targetPharmacyIds) {
-                                $tx->whereIn('pharmacy_id', $targetPharmacyIds);
-                            })->orWhere(function ($fallbackQ) use ($targetPharmacyIds) {
-                                // Fallback jika tidak ada record medicine_transaction
-                                $fallbackQ->whereDoesntHave('medicine_transaction')
-                                    ->where(function ($q2) use ($targetPharmacyIds) {
-                                        $q2->whereHas('batches', function ($b) use ($targetPharmacyIds) {
-                                            $b->whereIn('pharmacy_id', $targetPharmacyIds);
-                                        })->orWhereHas('users', function ($u) use ($targetPharmacyIds) {
-                                            $u->whereIn('pharmacy_id', $targetPharmacyIds);
-                                        });
-                                    });
-                            });
-                        });
-                })
-                // 5. Status lainnya (Stock Opname = 5, Adjustment = 6, dll)
-                ->orWhere(function ($sub) use ($targetPharmacyIds) {
-                    $sub->whereNotIn('status', [1, 2, 3, 4, 7])
+                    $sub->whereNotIn('status', [2, 4, 7])
                         ->where(function ($otherQ) use ($targetPharmacyIds) {
                             $otherQ->whereHas('batches', function ($b) use ($targetPharmacyIds) {
                                 $b->whereIn('pharmacy_id', $targetPharmacyIds);
