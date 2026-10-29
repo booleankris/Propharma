@@ -3996,7 +3996,7 @@
                 const isRecipeRow = rowItem.recipe_status !== null && rowItem.recipe_status !== undefined &&
                     rowItem.recipe_status !== '';
                 const unitLabel = rowItem.unit || rowItem.packaging || '';
-                const itemEmbalase = parseFloat(rowItem.embalase || rowItem.service_fee || 0);
+                const itemEmbalase = parseFloat(rowItem.embalase || 0);
                 const selectedClass = String(selectedRowId) === String(rowItem.id) ? 'bg-blue-100' : '';
 
                 return `
