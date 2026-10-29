@@ -2089,6 +2089,8 @@
     const faktur = document.getElementById('faktur');
     let checkoutPayload = {};
     let checkoutProcessing = false;
+    let isCheckoutFinished = false;
+    window.__kasirIsCheckoutFinished = false;
 
 
     // Modals JS
@@ -5849,6 +5851,7 @@
             }
 
             closePinModal();
+            checkoutProcessing = true;
             showCheckoutLoading();
 
             try {
@@ -5890,6 +5893,10 @@
                 // SUCCESS
                 if (res.data.success) {
 
+                    isCheckoutFinished = true;
+                    window.__kasirIsCheckoutFinished = true;
+                    checkoutProcessing = true;
+
                     hideCheckoutLoading();
 
                     // 1. EXECUTE INITIAL PRINT (Dokumen 1: Struk Kasir)
@@ -5912,6 +5919,7 @@
                     );
                     const trxId = res.data.transaction_id || checkoutPayload.transaction_id;
                     const fullReceiptUrl = res.data.print_resep_url || `/print/fullreceipt/${trxId}`;
+                    const targetFreshUrl = "{{ route('transaction', ['type' => $type ?? 'resep']) }}";
 
                     if (isRecipe) {
                         if (typeof Swal !== 'undefined') {
@@ -5924,6 +5932,8 @@
                                 cancelButtonColor: '#d33',
                                 confirmButtonText: 'Ya, Cetak',
                                 cancelButtonText: 'Selesai',
+                                allowOutsideClick: false,
+                                allowEscapeKey: false,
                                 customClass: {
                                     container: 'swal-on-top'
                                 },
@@ -5937,10 +5947,10 @@
                             }).then((result) => {
                                 if (result.isConfirmed) {
                                     setTimeout(() => {
-                                        window.location.reload();
+                                        window.location.replace(targetFreshUrl);
                                     }, 1200);
                                 } else {
-                                    window.location.reload();
+                                    window.location.replace(targetFreshUrl);
                                 }
                             });
                         } else {
@@ -5949,12 +5959,12 @@
                                 if (printAgain) {
                                     window.open(fullReceiptUrl, '_blank');
                                 }
-                                setTimeout(() => window.location.reload(), 1000);
+                                setTimeout(() => window.location.replace(targetFreshUrl), 1000);
                             }, 500);
                         }
                     } else {
                         setTimeout(() => {
-                            window.location.reload();
+                            window.location.replace(targetFreshUrl);
                         }, 500);
                     }
 
@@ -6466,7 +6476,7 @@
         };
 
         function redirectToFreshTransaction(title, message, targetUrl, delayMs) {
-            if (isRedirecting) return;
+            if (isRedirecting || isCheckoutFinished || window.__kasirIsCheckoutFinished || (typeof checkoutProcessing !== 'undefined' && checkoutProcessing)) return;
             isRedirecting = true;
 
             const searchInput = document.getElementById('productSearch');
@@ -6593,7 +6603,7 @@
         let lastSharedWarnAt = 0;
 
         function runHeartbeat(force) {
-            if (isRedirecting || heartbeatBusy || (typeof checkoutProcessing !== 'undefined' &&
+            if (isRedirecting || heartbeatBusy || isCheckoutFinished || window.__kasirIsCheckoutFinished || (typeof checkoutProcessing !== 'undefined' &&
                 checkoutProcessing)) {
                 return;
             }
@@ -6609,6 +6619,9 @@
                 client_tab_id: myTabId,
                 cart_signature: typeof currentCartSignature !== 'undefined' ? currentCartSignature : ''
             }).then(res => {
+                if (isRedirecting || isCheckoutFinished || window.__kasirIsCheckoutFinished || (typeof checkoutProcessing !== 'undefined' && checkoutProcessing)) {
+                    return;
+                }
                 const payload = res.data || {};
                 if (payload.action === 'redirect_new' && payload.redirect_url) {
                     const msg = payload.reason === 'completed_or_missing' ?
