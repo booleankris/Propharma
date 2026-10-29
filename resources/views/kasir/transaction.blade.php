@@ -39,13 +39,15 @@
         .shipping-pay-card {
             transition: all 0.15s ease-in-out;
         }
-        input[name="shipping_payment_type"]:checked + .shipping-pay-card {
+
+        input[name="shipping_payment_type"]:checked+.shipping-pay-card {
             border-color: #2563eb !important;
             background-color: #eff6ff !important;
             color: #1d4ed8 !important;
             font-weight: 700 !important;
             box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2) !important;
         }
+
         .shipping-bank-chip-btn.is-selected {
             border-color: #2563eb !important;
             background-color: #eff6ff !important;
@@ -226,8 +228,10 @@
                         Tambah Transaksi
                     </button>
                     @if ($check_transaction != 0)
-                        <button type="button" onclick="openVisitorModal()" class="trx-btn trx-btn-visitor" tabindex="5" title="Simpan sebagai Data Kunjungan dan buka transaksi baru">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <button type="button" onclick="openVisitorModal()" class="trx-btn trx-btn-visitor"
+                            tabindex="5" title="Simpan sebagai Data Kunjungan dan buka transaksi baru">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                                stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
                                 <circle cx="8.5" cy="7" r="4"></circle>
                                 <line x1="20" y1="8" x2="20" y2="14"></line>
@@ -456,7 +460,8 @@
 
                         {{-- F2 - Resep --}}
                         @if ($transaction->transaction_type == 'KREDIT' || $transaction->transaction_type == 'RESEP TUNAI')
-                            <button type="button" onclick="if (typeof checkbox !== 'undefined' && checkbox) { checkbox.checked = !checkbox.checked; checkbox.dispatchEvent(new Event('change')); }"
+                            <button type="button"
+                                onclick="if (typeof checkbox !== 'undefined' && checkbox) { checkbox.checked = !checkbox.checked; checkbox.dispatchEvent(new Event('change')); }"
                                 class="flex items-center gap-2 cursor-pointer border-none bg-transparent p-1 -m-1 rounded-lg hover:bg-slate-100 active:scale-95 transition select-none">
                                 <div
                                     class="py-[5px] bg-[#16a34a] text-white shadow-[0_0_11px_2px_#22c55e] border-none px-[10px] rounded-md font-semibold text-[11px]">
@@ -570,7 +575,8 @@
                                 @if ($transaction->transaction_type == 'KREDIT')
                                     <div id="faktur" class="py-2">
                                         <span
-                                            class="bg-yellow-100 text-yellow-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md dark:bg-yellow-900 dark:text-yellow-300">Resep Kredit</span>
+                                            class="bg-yellow-100 text-yellow-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md dark:bg-yellow-900 dark:text-yellow-300">Resep
+                                            Kredit</span>
                                     </div>
                                 @elseif($transaction->transaction_type == 'RESEP TUNAI')
                                     <div id="faktur" class="py-2">
@@ -910,7 +916,8 @@
         <form id="newPatientForm" method="POST" class="space-y-3">
 
             <div>
-                <label for="patientName" class="block mb-1 text-sm font-medium text-gray-700">Nama <span class="text-red-500">*</span></label>
+                <label for="patientName" class="block mb-1 text-sm font-medium text-gray-700">Nama <span
+                        class="text-red-500">*</span></label>
                 <input id="patientName" type="text" name="name" placeholder="Nama Pasien" required
                     class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300">
             </div>
@@ -960,14 +967,12 @@
             <label class="block text-sm font-medium mb-1">Nama Dokter <span class="text-red-500">*</span></label>
             <input type="text" name="name" id="doctorName"
                 class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                placeholder="Contoh: dr. John Doe"
-                required>
+                placeholder="Contoh: dr. John Doe" required>
 
             <label class="block text-sm font-medium mb-1 mt-3">Spesialis <span class="text-red-500">*</span></label>
             <input type="text" name="specialist" id="doctorSpecialist"
                 class="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                placeholder="Contoh: Umum, Sp.A, Sp.PD (wajib diisi)"
-                required>
+                placeholder="Contoh: Umum, Sp.A, Sp.PD (wajib diisi)" required>
 
             <label class="block text-sm font-medium mb-1 mt-3">Alamat</label>
             <input type="text" name="address" id="doctorAddress"
@@ -1042,12 +1047,14 @@
             </svg>
             <h3 id="confirmPatientTitle" class="text-lg font-bold">Pasien Serupa Ditemukan</h3>
         </div>
-        <p id="confirmPatientDesc" class="text-sm text-gray-600 mb-3">Pasien dengan nama atau nomor telepon mirip sudah ada di sistem. Silakan pilih pasien yang sudah ada atau tetap buat pasien baru:
+        <p id="confirmPatientDesc" class="text-sm text-gray-600 mb-3">Pasien dengan nama atau nomor telepon mirip
+            sudah ada di sistem. Silakan pilih pasien yang sudah ada atau tetap buat pasien baru:
         </p>
 
         <div id="confirmPatientNote"
             class="hidden mb-3 p-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg text-xs leading-relaxed">
-            💡 <b>Pemberitahuan:</b> Jika ini pasien yang berbeda, Anda dapat memilih <i>"Tetap Buat Pasien Baru"</i> atau gunakan pembeda agar mudah dikenali di laporan.
+            💡 <b>Pemberitahuan:</b> Jika ini pasien yang berbeda, Anda dapat memilih <i>"Tetap Buat Pasien Baru"</i>
+            atau gunakan pembeda agar mudah dikenali di laporan.
         </div>
 
         <div id="patientSuggestionsList" class="space-y-2 mb-4 max-h-48 overflow-y-auto"></div>
@@ -1066,7 +1073,8 @@
 </div>
 
 {{-- Modal Tandai Sebagai Pengunjung --}}
-<div id="visitorModal" class="fixed inset-0 bg-black/60 hidden justify-center items-center z-[9999999]" style="z-index: 9999999;" onclick="if(event.target === this) closeVisitorModal()">
+<div id="visitorModal" class="fixed inset-0 bg-black/60 hidden justify-center items-center z-[9999999]"
+    style="z-index: 9999999;" onclick="if(event.target === this) closeVisitorModal()">
     <div class="bg-white p-6 rounded-2xl shadow-2xl w-[480px] max-w-full mx-4 relative">
         <div class="flex items-center text-amber-600 mb-3">
             <div class="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center mr-3 flex-shrink-0">
@@ -1083,18 +1091,22 @@
 
         <div class="my-4 space-y-3">
             <div>
-                <label class="block text-xs font-semibold text-gray-700 mb-1">Nama / Keterangan Pengunjung (Opsional)</label>
+                <label class="block text-xs font-semibold text-gray-700 mb-1">Nama / Keterangan Pengunjung
+                    (Opsional)</label>
                 <input type="text" id="visitorNameInput" placeholder="Contoh: Bpk. Ahmad / Tanya Obat Batuk..."
                     class="w-full text-xs rounded-xl border border-gray-300 px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-amber-400">
                 <p class="text-[11px] text-gray-400 mt-1">Kosongkan jika pengunjung tidak menyebutkan nama.</p>
             </div>
 
             <div class="p-3 bg-amber-50 rounded-xl border border-amber-100 flex items-start gap-2.5">
-                <svg class="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                <svg class="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor"
+                    viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <div class="text-[11px] text-amber-800 leading-relaxed">
-                    Daftar obat saat ini (<b id="visitorItemCount">0</b> item) akan tersimpan di <b>Data Kunjungan</b>. Jika pengunjung kembali, Anda bisa klik <i>"Lanjutkan Transaksi"</i> untuk langsung bayar.
+                    Daftar obat saat ini (<b id="visitorItemCount">0</b> item) akan tersimpan di <b>Data Kunjungan</b>.
+                    Jika pengunjung kembali, Anda bisa klik <i>"Lanjutkan Transaksi"</i> untuk langsung bayar.
                 </div>
             </div>
         </div>
@@ -1107,7 +1119,7 @@
             <button type="button" id="btnConfirmVisitor" onclick="submitMarkAsVisitor()"
                 class="px-5 py-2 text-xs bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-xl shadow-sm transition flex items-center gap-1.5">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                 </svg>
                 Simpan & Buka Kasir Baru
             </button>
@@ -1140,8 +1152,7 @@
                         <div class="flex items-center">
                             <div class="searchdebtors w-full">
                                 <input autofocus required id="patientSearch" type="text"
-                                    value="{{ $transaction->patients->name ?? '' }}"
-                                    placeholder="Ketik ID / Nama…"
+                                    value="{{ $transaction->patients->name ?? '' }}" placeholder="Ketik ID / Nama…"
                                     class="w-full rounded-xl border my-1 border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gray-300"
                                     autocomplete="off" />
                                 <!-- Dropdown -->
@@ -1168,7 +1179,8 @@
                                     Baru
                                 </button>
                             </div>
-                            <input type="hidden" id="selectedPatientId" value="{{ $transaction->patient_id ?? '' }}" />
+                            <input type="hidden" id="selectedPatientId"
+                                value="{{ $transaction->patient_id ?? '' }}" />
                         </div>
                     </div>
                     @if ($transaction->transaction_type == 'KREDIT' || $transaction->transaction_type == 'RESEP TUNAI')
@@ -1407,26 +1419,31 @@
 
             {{-- Checkbox & Form Jasa Dokter & Ongkir (Talangan) --}}
             <div class="mt-3.5 pt-3 border-t border-slate-100">
-                <label class="flex items-center justify-between p-2.5 px-3 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-slate-100/70 transition cursor-pointer select-none">
+                <label
+                    class="flex items-center justify-between p-2.5 px-3 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-slate-100/70 transition cursor-pointer select-none">
                     <div class="flex items-center gap-2.5">
-                        <input type="checkbox" id="toggleDoctorShipping" onchange="handleDoctorShippingToggle(this.checked)"
+                        <input type="checkbox" id="toggleDoctorShipping"
+                            onchange="handleDoctorShippingToggle(this.checked)"
                             class="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-gray-300 transition cursor-pointer">
                         <div>
                             <span class="text-xs font-bold text-slate-800">Jasa Dokter & Ongkir</span>
-                            <span class="block text-[10px] text-slate-500 font-normal">Talangan sementara (tidak menambah total transaksi)</span>
+                            <span class="block text-[10px] text-slate-500 font-normal">Talangan sementara (tidak
+                                menambah total transaksi)</span>
                         </div>
                     </div>
-                    <span id="shippingBadgeStatus" class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-200 text-slate-600 uppercase">Nonaktif</span>
+                    <span id="shippingBadgeStatus"
+                        class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-200 text-slate-600 uppercase">Nonaktif</span>
                 </label>
 
                 {{-- Collapsible Container --}}
-                <div id="doctorShippingContainer" class="hidden mt-2 p-3 bg-blue-50/40 border border-blue-200/70 rounded-2xl space-y-2.5 transition-all duration-200">
+                <div id="doctorShippingContainer"
+                    class="hidden mt-2 p-3 bg-blue-50/40 border border-blue-200/70 rounded-2xl space-y-2.5 transition-all duration-200">
                     <div>
                         <label class="block text-[11px] font-bold text-slate-700 mb-1">
                             Biaya Jasa Dokter & Ongkir (Rp)
                         </label>
-                        <input type="text" id="doctor_shipping_fee_input" oninput="formatDoctorShippingFee(this)" onfocus="this.select()"
-                            placeholder="Rp 0"
+                        <input type="text" id="doctor_shipping_fee_input"
+                            oninput="formatDoctorShippingFee(this)" onfocus="this.select()" placeholder="Rp 0"
                             class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition"
                             autocomplete="off" />
                     </div>
@@ -1435,10 +1452,12 @@
                     <div>
                         <div class="flex items-center justify-between mb-1">
                             <label class="text-[11px] font-bold text-slate-700">Metode Masuk Ongkir / Jasa</label>
-                            <button type="button" id="btnSyncShippingPayment" onclick="resetShippingPaymentSync()"
+                            <button type="button" id="btnSyncShippingPayment"
+                                onclick="resetShippingPaymentSync()"
                                 class="text-[10px] font-medium text-blue-600 hover:text-blue-700 hover:underline flex items-center gap-1">
                                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                                 </svg>
                                 <span>Samakan dg Pembayaran Utama</span>
                             </button>
@@ -1447,29 +1466,37 @@
                         <div class="grid grid-cols-4 gap-1.5" id="shippingPaymentTypeGroup">
                             {{-- Cash --}}
                             <label class="cursor-pointer">
-                                <input type="radio" name="shipping_payment_type" value="CASH" onchange="onShippingPaymentTypeChange(this.value, true)" class="sr-only">
-                                <div class="shipping-pay-card flex items-center justify-center py-2 px-1 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-700 text-center transition hover:border-blue-400">
+                                <input type="radio" name="shipping_payment_type" value="CASH"
+                                    onchange="onShippingPaymentTypeChange(this.value, true)" class="sr-only">
+                                <div
+                                    class="shipping-pay-card flex items-center justify-center py-2 px-1 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-700 text-center transition hover:border-blue-400">
                                     Cash
                                 </div>
                             </label>
                             {{-- QRIS --}}
                             <label class="cursor-pointer">
-                                <input type="radio" name="shipping_payment_type" value="QRIS" onchange="onShippingPaymentTypeChange(this.value, true)" class="sr-only">
-                                <div class="shipping-pay-card flex items-center justify-center py-2 px-1 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-700 text-center transition hover:border-blue-400">
+                                <input type="radio" name="shipping_payment_type" value="QRIS"
+                                    onchange="onShippingPaymentTypeChange(this.value, true)" class="sr-only">
+                                <div
+                                    class="shipping-pay-card flex items-center justify-center py-2 px-1 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-700 text-center transition hover:border-blue-400">
                                     QRIS
                                 </div>
                             </label>
                             {{-- Debit --}}
                             <label class="cursor-pointer">
-                                <input type="radio" name="shipping_payment_type" value="DEBIT" onchange="onShippingPaymentTypeChange(this.value, true)" class="sr-only">
-                                <div class="shipping-pay-card flex items-center justify-center py-2 px-1 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-700 text-center transition hover:border-blue-400">
+                                <input type="radio" name="shipping_payment_type" value="DEBIT"
+                                    onchange="onShippingPaymentTypeChange(this.value, true)" class="sr-only">
+                                <div
+                                    class="shipping-pay-card flex items-center justify-center py-2 px-1 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-700 text-center transition hover:border-blue-400">
                                     Debit
                                 </div>
                             </label>
                             {{-- Transfer --}}
                             <label class="cursor-pointer">
-                                <input type="radio" name="shipping_payment_type" value="TRANSFER" onchange="onShippingPaymentTypeChange(this.value, true)" class="sr-only">
-                                <div class="shipping-pay-card flex items-center justify-center py-2 px-1 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-700 text-center transition hover:border-blue-400">
+                                <input type="radio" name="shipping_payment_type" value="TRANSFER"
+                                    onchange="onShippingPaymentTypeChange(this.value, true)" class="sr-only">
+                                <div
+                                    class="shipping-pay-card flex items-center justify-center py-2 px-1 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-700 text-center transition hover:border-blue-400">
                                     Transfer
                                 </div>
                             </label>
@@ -1477,10 +1504,12 @@
                     </div>
 
                     {{-- Bank Selector untuk Ongkir (QRIS, Debit, Transfer) --}}
-                    <div id="shippingBankWrapper" class="hidden mt-1.5 p-2 bg-white border border-slate-200 rounded-xl transition-all">
+                    <div id="shippingBankWrapper"
+                        class="hidden mt-1.5 p-2 bg-white border border-slate-200 rounded-xl transition-all">
                         <div class="flex items-center justify-between mb-1">
                             <label class="text-[10px] font-semibold text-slate-700 flex items-center gap-1">
-                                <span id="shippingBankBadge" class="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-blue-100 text-blue-700">Bank</span>
+                                <span id="shippingBankBadge"
+                                    class="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-blue-100 text-blue-700">Bank</span>
                                 <span>Pilih Bank Tujuan Ongkir:</span>
                             </label>
                         </div>
@@ -1488,12 +1517,14 @@
                             @foreach (['Mandiri', 'BNI', 'BCA', 'BRI', 'BTN'] as $bankItem)
                                 <button type="button"
                                     class="shipping-bank-chip-btn py-1 px-1 rounded-lg border border-slate-200 bg-slate-50 text-[10px] font-semibold text-slate-700 hover:border-blue-400 hover:bg-blue-50/50 transition text-center"
-                                    data-bank="{{ $bankItem }}" onclick="selectShippingBankChip('{{ $bankItem }}', true)">
+                                    data-bank="{{ $bankItem }}"
+                                    onclick="selectShippingBankChip('{{ $bankItem }}', true)">
                                     {{ $bankItem }}
                                 </button>
                             @endforeach
                         </div>
-                        <select class="w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        <select
+                            class="w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
                             id="shipping_bank_name" onchange="syncShippingBankSelect(this.value, true)">
                             <option value="">-- Pilih Bank --</option>
                             <option value="Mandiri">Bank Mandiri</option>
@@ -1514,8 +1545,9 @@
                     <input type="hidden" name="print_receipt" id="print_receipt">
                     <input type="hidden" required name="patient_id" id="patient_id"
                         value="{{ $transaction->patient_id ?? '' }}" />
-                    <input type="hidden" @if ($transaction->transaction_type == 'RESEP TUNAI') value="{{ $transaction->doctor_id ?? '0' }}" @else value="{{ $transaction->doctor_id ?? '' }}" @endif required
-                        name="doctor_id" id="doctor_id" />
+                    <input type="hidden"
+                        @if ($transaction->transaction_type == 'RESEP TUNAI') value="{{ $transaction->doctor_id ?? '0' }}" @else value="{{ $transaction->doctor_id ?? '' }}" @endif
+                        required name="doctor_id" id="doctor_id" />
                     <input type="hidden" required name="debtor_id" id="debtor_id"
                         value="{{ $transaction->debtor_id ?? '' }}" />
 
@@ -1526,8 +1558,8 @@
                                 Simpan
                             </button>
                         @else
-                            <button type="button" @if ($transaction->transaction_type != 'KREDIT') disabled @endif id="checkout"
-                                onclick="checkoutItem()"
+                            <button type="button" @if ($transaction->transaction_type != 'KREDIT') disabled @endif
+                                id="checkout" onclick="checkoutItem()"
                                 class="w-full mt-3 rounded-lg bg-gray-400 hover:bg-gray-500 text-white font-semibold py-4 transition">
                                 Selesaikan
                             </button>
@@ -1535,7 +1567,8 @@
                         <button type="button" onclick="openVisitorModal()" id="btnMarkVisitorBottom"
                             class="w-full mt-2 rounded-lg border-2 border-amber-500 text-amber-600 hover:bg-amber-500 hover:text-white font-semibold py-3 transition flex items-center justify-center gap-2 text-sm shadow-sm">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                             </svg>
                             Tandai Sebagai Pengunjung
                         </button>
@@ -2851,7 +2884,8 @@
         setTimeout(() => {
             isScanning = false;
 
-            if ((currenttransaction == 'RESEP TUNAI' || currenttransaction == 'KREDIT') && checkbox && checkbox.checked && racikstatus != 0) {
+            if ((currenttransaction == 'RESEP TUNAI' || currenttransaction == 'KREDIT') && checkbox && checkbox
+                .checked && racikstatus != 0) {
                 if (packageInput && !packageInput.value) {
                     packageInput.focus();
                 } else if (dosageRInput) {
@@ -3309,7 +3343,8 @@
                 if (container) container.classList.remove('hidden');
                 if (badge) {
                     badge.textContent = 'Aktif';
-                    badge.className = 'text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 uppercase';
+                    badge.className =
+                        'text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 uppercase';
                 }
                 if (!isDoctorShippingManualOverride) {
                     syncShippingPaymentWithMain();
@@ -3319,7 +3354,8 @@
                 if (container) container.classList.add('hidden');
                 if (badge) {
                     badge.textContent = 'Nonaktif';
-                    badge.className = 'text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-200 text-slate-600 uppercase';
+                    badge.className =
+                        'text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-200 text-slate-600 uppercase';
                 }
             }
         }
@@ -3344,11 +3380,11 @@
                 if (bankWrapper) bankWrapper.classList.remove('hidden');
                 if (badge) {
                     badge.textContent = val;
-                    badge.className = val === 'QRIS'
-                        ? 'px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-purple-100 text-purple-700'
-                        : (val === 'DEBIT'
-                            ? 'px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-blue-100 text-blue-700'
-                            : 'px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-amber-100 text-amber-700');
+                    badge.className = val === 'QRIS' ?
+                        'px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-purple-100 text-purple-700' :
+                        (val === 'DEBIT' ?
+                            'px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-blue-100 text-blue-700' :
+                            'px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-amber-100 text-amber-700');
                 }
             } else {
                 if (bankWrapper) bankWrapper.classList.add('hidden');
@@ -3387,9 +3423,10 @@
         function syncShippingPaymentWithMain() {
             if (isDoctorShippingManualOverride) return;
 
-            const mainPayment = (typeof paymentType !== 'undefined' && ['CASH', 'QRIS', 'DEBIT', 'TRANSFER'].includes(paymentType))
-                ? paymentType
-                : 'CASH';
+            const mainPayment = (typeof paymentType !== 'undefined' && ['CASH', 'QRIS', 'DEBIT', 'TRANSFER'].includes(
+                    paymentType)) ?
+                paymentType :
+                'CASH';
 
             onShippingPaymentTypeChange(mainPayment, false);
 
@@ -3425,7 +3462,8 @@
                 const activeTag = activeEl?.tagName;
                 const activeType = activeEl?.type;
                 const isTyping = activeTag === 'TEXTAREA' ||
-                    (activeTag === 'INPUT' && !['radio', 'checkbox', 'button', 'submit'].includes(activeType)) ||
+                    (activeTag === 'INPUT' && !['radio', 'checkbox', 'button', 'submit'].includes(
+                    activeType)) ||
                     activeTag === 'SELECT';
 
                 if (!isTyping) {
@@ -3892,7 +3930,9 @@
             }
             const hiddenTxInput = document.getElementById('transaction_id');
             if (hiddenTxInput) hiddenTxInput.value = newId;
-            document.querySelectorAll('input[name="trxid"]').forEach(el => { el.value = newId; });
+            document.querySelectorAll('input[name="trxid"]').forEach(el => {
+                el.value = newId;
+            });
             ['kredit', 'resep', 'hv', 'upds'].forEach(slug => {
                 const chipEl = document.getElementById('trx-type-' + slug);
                 if (chipEl) chipEl.href = `/transaction/${slug}/${newId}`;
@@ -3953,7 +3993,8 @@
         if (Array.isArray(data.cart_items) && tbody) {
             const showEmbalaseCol = (currenttransaction === 'RESEP TUNAI' || currenttransaction === 'KREDIT');
             tbody.innerHTML = data.cart_items.map((rowItem, idx) => {
-                const isRecipeRow = rowItem.recipe_status !== null && rowItem.recipe_status !== undefined && rowItem.recipe_status !== '';
+                const isRecipeRow = rowItem.recipe_status !== null && rowItem.recipe_status !== undefined &&
+                    rowItem.recipe_status !== '';
                 const unitLabel = rowItem.unit || rowItem.packaging || '';
                 const itemEmbalase = parseFloat(rowItem.embalase || rowItem.service_fee || 0);
                 const selectedClass = String(selectedRowId) === String(rowItem.id) ? 'bg-blue-100' : '';
@@ -3976,7 +4017,8 @@
 
             tbody.querySelectorAll('tr.cart-row').forEach(row => attachRowEvents(row));
 
-            if (expectedCountDelta !== null && !data.moved_to_transaction_id && data.cart_items.length !== (prevRowCount + expectedCountDelta)) {
+            if (expectedCountDelta !== null && !data.moved_to_transaction_id && data.cart_items.length !== (
+                    prevRowCount + expectedCountDelta)) {
                 if (typeof iziToast !== 'undefined') {
                     iziToast.warning({
                         title: 'Sinkronisasi Keranjang',
@@ -4149,7 +4191,9 @@
                     console.error("Error adding to cart:", error.response ? error.response.data : error
                         .message);
                     if (error.response?.status === 409) {
-                        alert(error.response.data?.message || 'Racikan sudah selesai di sesi lain. Aktifkan ulang mode racikan untuk memulai yang baru.');
+                        alert(error.response.data?.message ||
+                            'Racikan sudah selesai di sesi lain. Aktifkan ulang mode racikan untuk memulai yang baru.'
+                            );
                     }
                 }).finally(releaseSubmitLock);
             }
@@ -4360,7 +4404,8 @@
                 discount = Number(item.discount) || 0;
 
                 // recipe_status: null = bukan racikan, "0" = racikan terbuka, "1" = racikan selesai
-                const isRacikItem = item.recipe_status !== null && item.recipe_status !== undefined && item.recipe_status !== '';
+                const isRacikItem = item.recipe_status !== null && item.recipe_status !== undefined && item
+                    .recipe_status !== '';
                 if (item.cart_type == 'UM') transaction_type = 'RESEP TUNAI';
 
                 let rawAmount = price2 * item.quantity;
@@ -4406,16 +4451,19 @@
                     transaction_type = 'KREDIT';
                     parameters = creditItemParameters;
                     rounding = creditItemRounding;
-                    faktur.innerHTML = `<span class="bg-yellow-100 text-yellow-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md">Resep Kredit</span>`;
+                    faktur.innerHTML =
+                        `<span class="bg-yellow-100 text-yellow-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md">Resep Kredit</span>`;
                 } else if (item.cart_type == "UP") {
                     transaction_type = "UPDS";
                     parameters = {{ $parameterUP }};
-                    if (currenttransaction === 'KREDIT') faktur.innerHTML = `<span class="bg-green-100 text-green-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md">UPDS</span>`;
+                    if (currenttransaction === 'KREDIT') faktur.innerHTML =
+                        `<span class="bg-green-100 text-green-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md">UPDS</span>`;
 
                 } else if (item.cart_type == "HV") {
                     transaction_type = "HV/OTC";
                     parameters = {{ $parameterHV }};
-                    if (currenttransaction === 'KREDIT') faktur.innerHTML = `<span class="bg-blue-100 text-blue-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md">HV/OTC</span>`;
+                    if (currenttransaction === 'KREDIT') faktur.innerHTML =
+                        `<span class="bg-blue-100 text-blue-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md">HV/OTC</span>`;
 
                 }
                 totalprice.value = formatRupiah(item.total_price - item.discount);
@@ -4641,19 +4689,26 @@
         // Check Doctor Shipping Fee validation
         const toggleDoctorShipping = document.getElementById('toggleDoctorShipping');
         const isShippingActive = toggleDoctorShipping && toggleDoctorShipping.checked;
-        const rawShippingFee = document.getElementById('doctor_shipping_fee_input')?.value.replace(/\D/g, "") || "0";
+        const rawShippingFee = document.getElementById('doctor_shipping_fee_input')?.value.replace(/\D/g, "") ||
+        "0";
         const doctor_shipping_fee = isShippingActive ? parseInt(rawShippingFee, 10) : 0;
         const selectedShipRadio = document.querySelector('input[name="shipping_payment_type"]:checked');
-        const activeShipMethod = selectedShipRadio ? selectedShipRadio.value : (typeof shippingPaymentType !== 'undefined' ? shippingPaymentType : 'CASH');
-        const doctor_shipping_payment_method = (isShippingActive && doctor_shipping_fee > 0) ? activeShipMethod : null;
-        const doctor_shipping_bank_name = (isShippingActive && doctor_shipping_fee > 0 && ['QRIS', 'DEBIT', 'TRANSFER'].includes(activeShipMethod))
-            ? (document.getElementById('shipping_bank_name')?.value || '')
-            : null;
+        const activeShipMethod = selectedShipRadio ? selectedShipRadio.value : (typeof shippingPaymentType !==
+            'undefined' ? shippingPaymentType : 'CASH');
+        const doctor_shipping_payment_method = (isShippingActive && doctor_shipping_fee > 0) ? activeShipMethod :
+            null;
+        const doctor_shipping_bank_name = (isShippingActive && doctor_shipping_fee > 0 && ['QRIS', 'DEBIT',
+                'TRANSFER'
+            ].includes(activeShipMethod)) ?
+            (document.getElementById('shipping_bank_name')?.value || '') :
+            null;
 
-        if (isShippingActive && doctor_shipping_fee > 0 && ['QRIS', 'DEBIT', 'TRANSFER'].includes(activeShipMethod) && !doctor_shipping_bank_name) {
+        if (isShippingActive && doctor_shipping_fee > 0 && ['QRIS', 'DEBIT', 'TRANSFER'].includes(
+            activeShipMethod) && !doctor_shipping_bank_name) {
             iziToast.warning({
                 title: 'Peringatan',
-                message: 'Silahkan Pilih Bank / Merchant Terlebih Dahulu untuk Ongkir & Jasa ' + activeShipMethod,
+                message: 'Silahkan Pilih Bank / Merchant Terlebih Dahulu untuk Ongkir & Jasa ' +
+                    activeShipMethod,
                 position: 'topRight'
             });
             const shipBankWrapper = document.getElementById('shippingBankWrapper');
@@ -4988,17 +5043,20 @@
                 parameters = {{ $parameterUP }};
                 rounding = {{ $ChangeFakturRounding }};
                 transaction_type = 'UPDS';
-                faktur.innerHTML = `<span class="bg-green-100 text-green-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md">UPDS</span>`;
+                faktur.innerHTML =
+                    `<span class="bg-green-100 text-green-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md">UPDS</span>`;
             } else if (transaction_type === 'UPDS') {
                 parameters = {{ $parameterHV }};
                 rounding = {{ $ChangeFakturRounding }};
                 transaction_type = 'HV/OTC';
-                faktur.innerHTML = `<span class="bg-blue-100 text-blue-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md">HV/OTC</span>`;
+                faktur.innerHTML =
+                    `<span class="bg-blue-100 text-blue-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md">HV/OTC</span>`;
             } else {
                 parameters = creditItemParameters;
                 rounding = creditItemRounding;
                 transaction_type = 'KREDIT';
-                faktur.innerHTML = `<span class="bg-yellow-100 text-yellow-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md">Resep Kredit</span>`;
+                faktur.innerHTML =
+                    `<span class="bg-yellow-100 text-yellow-800 text-xs font-medium me-2 px-2.5 py-3 rounded-md">Resep Kredit</span>`;
             }
         } else if (currenttransaction == "RESEP TUNAI") {
             if (transaction_type == 'RESEP TUNAI') {
@@ -5313,11 +5371,14 @@
         }
         if (confirmDesc) {
             if (isPhoneMatch) {
-                confirmDesc.innerHTML = `Nomor telepon ini sudah terdaftar untuk pasien <b>"${escapeHtml(patName)}"</b> (${escapeHtml(patCode || 'Kode: -')}).<br><span class="text-xs text-gray-500 mt-1 inline-block">Silakan pilih pasien yang sudah ada atau tetap buat pasien baru:</span>`;
+                confirmDesc.innerHTML =
+                    `Nomor telepon ini sudah terdaftar untuk pasien <b>"${escapeHtml(patName)}"</b> (${escapeHtml(patCode || 'Kode: -')}).<br><span class="text-xs text-gray-500 mt-1 inline-block">Silakan pilih pasien yang sudah ada atau tetap buat pasien baru:</span>`;
             } else if (isExact) {
-                confirmDesc.innerHTML = `Pasien bernama <b>"${escapeHtml(patName)}"</b> sudah pernah terdaftar di sistem dengan kode <b>${escapeHtml(patCode || 'Kode: -')}</b>.<br><span class="text-xs text-emerald-700 font-semibold mt-1 inline-block">ℹ <b>Catatan:</b> Tidak ada data baru yang dibuat di database saat ini.</span>`;
+                confirmDesc.innerHTML =
+                    `Pasien bernama <b>"${escapeHtml(patName)}"</b> sudah pernah terdaftar di sistem dengan kode <b>${escapeHtml(patCode || 'Kode: -')}</b>.<br><span class="text-xs text-emerald-700 font-semibold mt-1 inline-block">ℹ <b>Catatan:</b> Tidak ada data baru yang dibuat di database saat ini.</span>`;
             } else {
-                confirmDesc.innerHTML = "Pasien dengan nama mirip sudah ada di sistem. Silakan pilih pasien yang sudah ada atau tetap buat pasien baru:";
+                confirmDesc.innerHTML =
+                    "Pasien dengan nama mirip sudah ada di sistem. Silakan pilih pasien yang sudah ada atau tetap buat pasien baru:";
             }
         }
         if (confirmNote) {
@@ -6162,9 +6223,9 @@
     }
 
     function sendEmbalase(valEmbalase) {
-        const rawVal = valEmbalase !== undefined && valEmbalase !== null
-            ? String(valEmbalase)
-            : (document.getElementById('jasa')?.value || "0");
+        const rawVal = valEmbalase !== undefined && valEmbalase !== null ?
+            String(valEmbalase) :
+            (document.getElementById('jasa')?.value || "0");
         const cleanedDigits = rawVal.replace(/[^0-9]/g, "");
         const jasaValue = cleanedDigits !== "" ? parseInt(cleanedDigits, 10) : 0;
         axios.post("{{ route('sales.sendembalase') }}", {
@@ -6213,8 +6274,11 @@
         }).catch(error => {
             console.error("Error Updating Embalase:", error.response ? error.response.data : error.message);
             const serverMsg = error.response?.data?.message;
-            const validationErrors = error.response?.data?.errors ? Object.values(error.response.data.errors).flat().join(', ') : '';
-            alert(serverMsg || validationErrors || (error.response ? `Gagal (${error.response.status}): Periksa kembali item racikan yang aktif.` : error.message));
+            const validationErrors = error.response?.data?.errors ? Object.values(error.response.data.errors)
+                .flat().join(', ') : '';
+            alert(serverMsg || validationErrors || (error.response ?
+                `Gagal (${error.response.status}): Periksa kembali item racikan yang aktif.` : error
+                .message));
         });
 
     }
@@ -6484,10 +6548,20 @@
                 }
             };
 
-            channel.postMessage({ type: 'PING', tx_id: myTxId, sender: myTabId, instance: pageInstanceId });
+            channel.postMessage({
+                type: 'PING',
+                tx_id: myTxId,
+                sender: myTabId,
+                instance: pageInstanceId
+            });
             setTimeout(() => {
                 if (!isRedirecting) {
-                    channel.postMessage({ type: 'PING', tx_id: myTxId, sender: myTabId, instance: pageInstanceId });
+                    channel.postMessage({
+                        type: 'PING',
+                        tx_id: myTxId,
+                        sender: myTabId,
+                        instance: pageInstanceId
+                    });
                 }
             }, 250);
         }
@@ -6498,7 +6572,8 @@
         let lastSharedWarnAt = 0;
 
         function runHeartbeat(force) {
-            if (isRedirecting || heartbeatBusy || (typeof checkoutProcessing !== 'undefined' && checkoutProcessing)) {
+            if (isRedirecting || heartbeatBusy || (typeof checkoutProcessing !== 'undefined' &&
+                checkoutProcessing)) {
                 return;
             }
             const now = Date.now();
@@ -6515,10 +6590,11 @@
             }).then(res => {
                 const payload = res.data || {};
                 if (payload.action === 'redirect_new' && payload.redirect_url) {
-                    const msg = payload.reason === 'completed_or_missing'
-                        ? 'Transaksi ini telah diselesaikan atau ditutup. Membuka transaksi baru...'
-                        : 'Nomor transaksi ini sedang digunakan di komputer/tab lain. Membuka transaksi baru...';
-                    redirectToFreshTransaction('Dialihkan ke Transaksi Baru', msg, payload.redirect_url, 400);
+                    const msg = payload.reason === 'completed_or_missing' ?
+                        'Transaksi ini telah diselesaikan atau ditutup. Membuka transaksi baru...' :
+                        'Nomor transaksi ini sedang digunakan di komputer/tab lain. Membuka transaksi baru...';
+                    redirectToFreshTransaction('Dialihkan ke Transaksi Baru', msg, payload.redirect_url,
+                        400);
                     return;
                 }
 
@@ -6617,9 +6693,10 @@
         const patientId = patientIdEl ? patientIdEl.value : '';
 
         btn.disabled = true;
-        btn.innerHTML = `<svg class="animate-spin h-4 w-4 text-white inline mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg> Menyimpan...`;
+        btn.innerHTML =
+            `<svg class="animate-spin h-4 w-4 text-white inline mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg> Menyimpan...`;
 
-        axios.post('{{ route("transaction.markVisitor") }}', {
+        axios.post('{{ route('transaction.markVisitor') }}', {
             transaction_id: '{{ $trx_id }}',
             visitor_name: visitorName,
             patient_id: patientId
@@ -6638,17 +6715,20 @@
                     position: 'topRight'
                 });
                 btn.disabled = false;
-                btn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Simpan & Buka Kasir Baru`;
+                btn.innerHTML =
+                    `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Simpan & Buka Kasir Baru`;
             }
         }).catch(err => {
             console.error('submitMarkAsVisitor error:', err);
             iziToast.error({
                 title: 'Error',
-                message: err.response?.data?.message || 'Terjadi kesalahan sistem saat menyimpan data kunjungan.',
+                message: err.response?.data?.message ||
+                    'Terjadi kesalahan sistem saat menyimpan data kunjungan.',
                 position: 'topRight'
             });
             btn.disabled = false;
-            btn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Simpan & Buka Kasir Baru`;
+            btn.innerHTML =
+                `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Simpan & Buka Kasir Baru`;
         });
     }
 
@@ -6681,10 +6761,12 @@
     $onlineWarningRoleNames = ['Online Shopee', 'Online Grab', 'Digital', 'Online'];
     $userRoleNames = auth()->user()?->getRoleNames() ?? collect();
     $onlineWarningRole = collect($onlineWarningRoleNames)->first(function ($expectedRole) use ($userRoleNames) {
-        return $userRoleNames->contains(fn ($roleName) => strcasecmp(trim($roleName), $expectedRole) === 0);
+        return $userRoleNames->contains(fn($roleName) => strcasecmp(trim($roleName), $expectedRole) === 0);
     });
     if ($onlineWarningRole) {
-        $onlineWarningRole = $userRoleNames->first(fn ($roleName) => strcasecmp(trim($roleName), $onlineWarningRole) === 0);
+        $onlineWarningRole = $userRoleNames->first(
+            fn($roleName) => strcasecmp(trim($roleName), $onlineWarningRole) === 0,
+        );
     }
 @endphp
 @if ($onlineWarningRole)
@@ -6898,18 +6980,52 @@
             font-size: 10.5px;
         }
 
-        @keyframes orw-fade-in { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes orw-fade-out { from { opacity: 1; } to { opacity: 0; } }
-        @keyframes orw-pop-in {
-            from { opacity: 0; transform: translateY(8px) scale(.96); }
-            to { opacity: 1; transform: translateY(0) scale(1); }
+        @keyframes orw-fade-in {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
         }
+
+        @keyframes orw-fade-out {
+            from {
+                opacity: 1;
+            }
+
+            to {
+                opacity: 0;
+            }
+        }
+
+        @keyframes orw-pop-in {
+            from {
+                opacity: 0;
+                transform: translateY(8px) scale(.96);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
         @keyframes orw-pop-out {
-            from { opacity: 1; transform: scale(1); }
-            to { opacity: 0; transform: scale(.96); }
+            from {
+                opacity: 1;
+                transform: scale(1);
+            }
+
+            to {
+                opacity: 0;
+                transform: scale(.96);
+            }
         }
 
         @media (prefers-reduced-motion: reduce) {
+
             .online-role-warning,
             .online-role-warning__dialog {
                 animation: none !important;
@@ -6922,9 +7038,10 @@
         <section class="online-role-warning__dialog" tabindex="-1">
             <div class="online-role-warning__head">
                 <div class="online-role-warning__icon" aria-hidden="true">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                        stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path
+                            d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
                         <line x1="12" y1="9" x2="12" y2="13" />
                         <line x1="12" y1="17" x2="12.01" y2="17" />
                     </svg>
@@ -6937,8 +7054,8 @@
 
             <div class="online-role-warning__account">
                 <div class="online-role-warning__avatar" aria-hidden="true">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                        stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                         <circle cx="12" cy="7" r="4" />
                     </svg>
@@ -6958,9 +7075,11 @@
             <div class="online-role-warning__actions">
                 <form action="{{ route('logout') }}" method="POST">
                     @csrf
-                    <button class="online-role-warning__button online-role-warning__button--logout" id="online-role-warning-logout" type="submit">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <button class="online-role-warning__button online-role-warning__button--logout"
+                        id="online-role-warning-logout" type="submit">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                            stroke-linejoin="round" aria-hidden="true">
                             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
                             <polyline points="16 17 21 12 16 7" />
                             <line x1="21" y1="12" x2="9" y2="12" />
@@ -6968,10 +7087,12 @@
                         Logout
                     </button>
                 </form>
-                <button class="online-role-warning__button online-role-warning__button--continue" id="online-role-warning-continue" type="button">
+                <button class="online-role-warning__button online-role-warning__button--continue"
+                    id="online-role-warning-continue" type="button">
                     Lanjutkan
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                        aria-hidden="true">
                         <line x1="5" y1="12" x2="19" y2="12" />
                         <polyline points="12 5 19 12 12 19" />
                     </svg>
@@ -6985,16 +7106,16 @@
     </div>
 
     <script>
-        (function () {
+        (function() {
             const warning = document.getElementById('online-role-warning');
             const continueButton = document.getElementById('online-role-warning-continue');
             if (!warning || !continueButton) return;
 
-            const close = function () {
+            const close = function() {
                 if (warning.classList.contains('is-closing')) return;
                 warning.classList.add('is-closing');
                 document.removeEventListener('keydown', onKeydown, true);
-                setTimeout(function () {
+                setTimeout(function() {
                     warning.remove();
                     const productSearch = document.getElementById('productSearch');
                     if (productSearch) {
@@ -7004,7 +7125,7 @@
                 }, 180);
             };
 
-            const onKeydown = function (e) {
+            const onKeydown = function(e) {
                 if (e.key === 'Enter' && document.activeElement?.id !== 'online-role-warning-logout') {
                     e.preventDefault();
                     e.stopPropagation();
