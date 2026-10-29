@@ -37,6 +37,12 @@ class MedicineTransferItems extends Model
         });
     }
 
+    public function getFormattedQtyAttribute(): string
+    {
+        $val = (float) ($this->original_qty ?? $this->qty);
+        return rtrim(rtrim(number_format($val, 2, ',', '.'), '0'), ',');
+    }
+
     public function sourceBatch()
     {
         return $this->belongsTo(Batches::class, 'source_batches_id');

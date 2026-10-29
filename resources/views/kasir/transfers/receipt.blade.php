@@ -183,7 +183,7 @@
                 <td class="no-col">{{ $index + 1 }}</td>
                 <td>{{ $item->batches?->medicines?->name ?? ($item->requestedMedicine?->name ?? '—') }}</td>
                 <td class="batch-col">{{ $item->batches?->name ?? ($item->sourceBatch?->name ?? '—') }}</td>
-                <td class="qty-col">{{ $item->original_qty ?? $item->qty }}</td>
+                <td class="qty-col">{{ rtrim(rtrim(number_format((float) ($item->original_qty ?? $item->qty), 2, ',', '.'), '0'), ',') }}</td>
             </tr>
             @endforeach
         </tbody>

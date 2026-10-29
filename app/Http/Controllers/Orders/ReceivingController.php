@@ -1740,10 +1740,10 @@ class ReceivingController extends Controller
             }
 
             $qty = (float) $request->qty_received;
+            $otherReceivedQty = (float) $orderItem->receivingItems()
+                ->where('id', '!=', $item->id)
+                ->sum('qty_received');
             if ($orderItem->note !== 'Item susulan/pengganti saat revisi faktur') {
-                $otherReceivedQty = (float) $orderItem->receivingItems()
-                    ->where('id', '!=', $item->id)
-                    ->sum('qty_received');
                 if ($otherReceivedQty + $qty > (float) $orderItem->quantity + 0.000001) {
                     DB::rollBack();
                     return response()->json([
@@ -1752,6 +1752,9 @@ class ReceivingController extends Controller
                     ], 422);
                 }
             }
+            $computedStatus = ($otherReceivedQty + $qty >= (float) $orderItem->quantity - 0.000001)
+                ? 'Diterima Lengkap'
+                : 'Diterima Kurang';
             $rawPrice = (float) $request->raw_price;
             $discount = (float) $request->discount;
             $extraDiscount = (float) $request->extra_discount;
@@ -1779,6 +1782,7 @@ class ReceivingController extends Controller
                 'stock_unit_factor' => $stockUnitFactor,
                 'batch' => $request->batch,
                 'expired_date' => $request->expired_date,
+                'status' => $computedStatus,
             ];
 
             // Draft receipts have not increased inventory yet; editing them must not touch stock or stock cards.
@@ -1854,13 +1858,26 @@ class ReceivingController extends Controller
                 if ($sameBatch) {
                     $delta = $newActualQty - $oldActualQty;
                     if ($delta > 0) {
-                        $stockAdded = $delta;
-                        $medicine->increment('stock', $stockAdded);
+                        $absorbed = $this->absorbUnreversedDeletedReceipts(
+                            (int) $medicine->id,
+                            (int) $pharmacyId,
+                            (int) $targetBatch->id,
+                            (float) $delta,
+                            (bool) $isWarehouse
+                        );
+                        $stockAdded = max(0, $delta - $absorbed);
+                        if ($stockAdded > 0) {
+                            $medicine->increment('stock', $stockAdded);
+                        }
                         if ($isWarehouse) {
-                            $targetBatch->increment('stock', $stockAdded);
+                            if ($stockAdded > 0) {
+                                $targetBatch->increment('stock', $stockAdded);
+                            }
                         } elseif ($transferItem) {
-                            $transferItem->increment('qty', $stockAdded);
-                            $transferItem->original_qty = max(0, (float) ($transferItem->original_qty ?? 0)) + $stockAdded;
+                            if ($stockAdded > 0) {
+                                $transferItem->increment('qty', $stockAdded);
+                            }
+                            $transferItem->original_qty = max(0, (float) ($transferItem->original_qty ?? 0)) + $delta;
                             $transferItem->save();
                         }
                     } elseif ($delta < 0) {
@@ -1944,7 +1961,24 @@ class ReceivingController extends Controller
                         $transferItem->delete();
                     }
 
-                    $targetStockToAdd = max(0, $newActualQty - $alreadyConsumed);
+                    $extraIncrease = max(0, $newActualQty - $oldActualQty);
+                    $absorbedFromDeleted = $extraIncrease > 0
+                        ? $this->absorbUnreversedDeletedReceipts(
+                            (int) $medicine->id,
+                            (int) $pharmacyId,
+                            (int) $targetBatch->id,
+                            (float) $extraIncrease,
+                            (bool) $isWarehouse
+                        )
+                        : 0.0;
+
+                    if ($oldBatchId && (int) $oldBatchId !== (int) $targetBatch->id) {
+                        MedicineTransferItems::where('status', 0)
+                            ->where('source_batches_id', $oldBatchId)
+                            ->update(['source_batches_id' => $targetBatch->id]);
+                    }
+
+                    $targetStockToAdd = max(0, $newActualQty - $alreadyConsumed - $absorbedFromDeleted);
                     $stockAdded = $targetStockToAdd;
 
                     if ($targetStockToAdd > 0) {
@@ -2125,6 +2159,7 @@ class ReceivingController extends Controller
                 }
 
                 $qtyToReverse = min($actualQty, max(0, $availableFromReceipt));
+                $unreversedQty = max(0, $actualQty - $qtyToReverse);
 
                 if ($qtyToReverse > 0) {
                     $medicine->decrement('stock', $qtyToReverse);
@@ -2165,7 +2200,9 @@ class ReceivingController extends Controller
                             }
                         }
                     }
+                }
 
+                if ($qtyToReverse > 0 || $unreversedQty > 0) {
                     ItemsLog::create([
                         'transaction_code' => 'REV-DEL-' . $item->id,
                         'code' => $this->generateItemsLogCode(),
@@ -2174,7 +2211,7 @@ class ReceivingController extends Controller
                         'qty' => -$qtyToReverse,
                         'qty_before' => $stockBefore,
                         'qty_after' => (float) $medicine->fresh()->stock,
-                        'total' => 0,
+                        'total' => $unreversedQty,
                         'date' => Carbon::now()->format('Y-m-d H:i:s'),
                         'status' => 9,
                         'batches_id' => $item->batches_id,
@@ -2489,17 +2526,29 @@ class ReceivingController extends Controller
                 ]
             );
 
-            $qtyBefore = (float) $medicine->stock;
-            $medicine->increment('stock', $actualQty);
+            $isWarehouse = isWarehousePharmacy($pharmacyId);
+            $absorbedQty = $this->absorbUnreversedDeletedReceipts(
+                (int) $medicineId,
+                (int) $pharmacyId,
+                (int) $batch->id,
+                (float) $actualQty,
+                (bool) $isWarehouse
+            );
+            $effectiveQtyToAdd = max(0, $actualQty - $absorbedQty);
 
-            if (!isWarehousePharmacy($pharmacyId)) {
+            $qtyBefore = (float) $medicine->stock;
+            if ($effectiveQtyToAdd > 0) {
+                $medicine->increment('stock', $effectiveQtyToAdd);
+            }
+
+            if (!$isWarehouse) {
                 $transferHeader = MedicineTransfers::create([
                     'code' => $this->generateTransfersCode(),
                     'status' => 1,
                     'user_id' => auth()->user()->id ?? 1,
                 ]);
-            } else {
-                Batches::where('id', $batch->id)->increment('stock', $actualQty);
+            } elseif ($effectiveQtyToAdd > 0) {
+                Batches::where('id', $batch->id)->increment('stock', $effectiveQtyToAdd);
             }
 
             $receivingItem = ReceivingItems::create([
@@ -2519,32 +2568,34 @@ class ReceivingController extends Controller
                 'batches_id' => $batch->id,
             ]);
 
-            if (!isWarehousePharmacy($pharmacyId) && isset($transferHeader)) {
+            if (!$isWarehouse && isset($transferHeader)) {
                 MedicineTransferItems::create([
                     'medicine_transfer_id' => $transferHeader->id,
                     'batches_id' => $batch->id,
                     'receiving_items_id' => $receivingItem->id,
                     'etalases_id' => 99,
-                    'qty' => $actualQty,
+                    'qty' => $effectiveQtyToAdd,
                     'original_qty' => $actualQty,
                     'status' => 1,
                 ]);
             }
 
-            ItemsLog::create([
-                'transaction_code' => 'REV-ADD-' . $receivingItem->id,
-                'code' => $this->generateItemsLogCode(),
-                'type' => 'RV',
-                'medicine_id' => $medicineId,
-                'qty' => $actualQty,
-                'qty_before' => $qtyBefore,
-                'qty_after' => (float) $medicine->fresh()->stock,
-                'total' => $total,
-                'date' => Carbon::now()->format('Y-m-d H:i:s'),
-                'status' => 8,
-                'batches_id' => $batch->id,
-                'user_id' => auth()->user()->id,
-            ]);
+            if ($effectiveQtyToAdd > 0) {
+                ItemsLog::create([
+                    'transaction_code' => 'REV-ADD-' . $receivingItem->id,
+                    'code' => $this->generateItemsLogCode(),
+                    'type' => 'RV',
+                    'medicine_id' => $medicineId,
+                    'qty' => $effectiveQtyToAdd,
+                    'qty_before' => $qtyBefore,
+                    'qty_after' => (float) $medicine->fresh()->stock,
+                    'total' => $total,
+                    'date' => Carbon::now()->format('Y-m-d H:i:s'),
+                    'status' => 8,
+                    'batches_id' => $batch->id,
+                    'user_id' => auth()->user()->id,
+                ]);
+            }
 
             DB::commit();
 
@@ -2560,6 +2611,90 @@ class ReceivingController extends Controller
                 'message' => 'Gagal menambahkan item: ' . $e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Kompensasi unit yang sudah terpakai (terjual / sedang dimutasi) dari penerimaan yang dihapus sebelumnya,
+     * serta alihkan referensi batch mutasi dan sisa stok kembalian mutasi ke batch pengganti yang baru.
+     */
+    private function absorbUnreversedDeletedReceipts(
+        int $medicineId,
+        int $pharmacyId,
+        int $targetBatchId,
+        float $desiredStockToAdd,
+        bool $isWarehouse
+    ): float {
+        if ($desiredStockToAdd <= 0) {
+            return 0.0;
+        }
+
+        $deletedLogs = ItemsLog::where('medicine_id', $medicineId)
+            ->where('status', 9)
+            ->whereHas('batches', fn($q) => $q->where('pharmacy_id', $pharmacyId))
+            ->whereRaw('CAST(total AS DECIMAL(15,3)) > 0')
+            ->orderBy('id', 'asc')
+            ->lockForUpdate()
+            ->get();
+
+        if ($deletedLogs->isEmpty()) {
+            return 0.0;
+        }
+
+        $remainingDesired = $desiredStockToAdd;
+
+        foreach ($deletedLogs as $delLog) {
+            if ($remainingDesired <= 0) {
+                break;
+            }
+
+            $unreversed = max(0.0, (float) $delLog->total);
+            if ($unreversed <= 0) {
+                continue;
+            }
+
+            $absorb = min($remainingDesired, $unreversed);
+            $remainingDesired -= $absorb;
+            $newUnreversed = max(0.0, $unreversed - $absorb);
+
+            $delLog->update([
+                'total' => $newUnreversed > 0 ? (string) $newUnreversed : '0',
+            ]);
+
+            $oldBatchId = (int) $delLog->batches_id;
+            if ($oldBatchId && $oldBatchId !== $targetBatchId) {
+                // 1. Alihkan mutasi keluar yang masih pending agar jika ditolak kembali ke batch baru
+                MedicineTransferItems::where('status', 0)
+                    ->where('source_batches_id', $oldBatchId)
+                    ->update(['source_batches_id' => $targetBatchId]);
+
+                // 2. Jika batch lama sudah tidak punya item penerimaan aktif, pindahkan sisa stok (misal dari batal mutasi) ke batch baru
+                $hasActiveReceiptsOnOldBatch = ReceivingItems::where('batches_id', $oldBatchId)->exists();
+                if (!$hasActiveReceiptsOnOldBatch) {
+                    if ($isWarehouse) {
+                        $oldBatch = Batches::whereKey($oldBatchId)->lockForUpdate()->first();
+                        if ($oldBatch && (float) $oldBatch->stock > 0) {
+                            $orphanStock = (float) $oldBatch->stock;
+                            $oldBatch->decrement('stock', $orphanStock);
+                            Batches::whereKey($targetBatchId)->increment('stock', $orphanStock);
+                        }
+                    } else {
+                        MedicineTransferItems::where('batches_id', $oldBatchId)
+                            ->where('status', 1)
+                            ->where('qty', '>', 0)
+                            ->update(['batches_id' => $targetBatchId]);
+                    }
+
+                    // Update batch pada log mutasi kembali yang terjadi setelah penghapusan
+                    ItemsLog::where('medicine_id', $medicineId)
+                        ->where('status', 7)
+                        ->where('batches_id', $oldBatchId)
+                        ->where('id', '>', $delLog->id)
+                        ->update(['batches_id' => $targetBatchId]);
+                }
+            }
+        }
+
+        return max(0.0, $desiredStockToAdd - $remainingDesired);
     }
 
     private function revisionDetailBelongsToOrder(Order $order, ReceivingDetails $detail): bool
@@ -3749,11 +3884,21 @@ class ReceivingController extends Controller
                     : (bool) $item->order_items->pack;
                 $content = max(1, (int) ($item->stock_unit_factor
                     ?? ($isPack ? ($medicine->content ?? 1) : 1)));
-                $actualStockQty = $item->qty_received * $content;
+                $desiredStockQty = (float) $item->qty_received * $content;
+                $absorbedQty = $this->absorbUnreversedDeletedReceipts(
+                    (int) $medicineId,
+                    (int) $pharmacyId,
+                    (int) $batch->id,
+                    (float) $desiredStockQty,
+                    (bool) isWarehousePharmacy($pharmacyId)
+                );
+                $actualStockQty = max(0, $desiredStockQty - $absorbedQty);
 
                 $medicine->stock += $actualStockQty;
 
-                $medicineIncrements[$medicineId] = ($medicineIncrements[$medicineId] ?? 0) + $actualStockQty;
+                if ($actualStockQty > 0) {
+                    $medicineIncrements[$medicineId] = ($medicineIncrements[$medicineId] ?? 0) + $actualStockQty;
+                }
                 $receivingItemUpdates[$item->id] = [
                     'batch_id' => $batch->id,
                     'receipt_is_pack' => $isPack,
@@ -3767,30 +3912,32 @@ class ReceivingController extends Controller
                         'receiving_items_id' => $item->id,
                         'etalases_id' => 99,
                         'qty' => $actualStockQty,
-                        'original_qty' => $actualStockQty,
+                        'original_qty' => $desiredStockQty,
                         'status' => 1,
                         'created_at' => now(),
                         'updated_at' => now(),
                     ];
-                } else {
+                } elseif ($actualStockQty > 0) {
                     $batchIncrements[$batch->id] = ($batchIncrements[$batch->id] ?? 0) + $actualStockQty;
                 }
 
-                $itemsLogInserts[] = [
-                    'transaction_code' => $recCode,
-                    'code' => $logPrefix . str_pad($currentLogNum + $index, 4, '0', STR_PAD_LEFT),
-                    'type' => 'OR',
-                    'medicine_id' => $medicineId,
-                    'qty' => $actualStockQty,
-                    'qty_before' => $qtyBefore,
-                    'qty_after' => $medicine->stock,
-                    'total' => $item->order_items->total ?? 0,
-                    'date' => $now,
-                    'status' => 2,
-                    'batches_id' => $batch->id,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ];
+                if ($actualStockQty > 0) {
+                    $itemsLogInserts[] = [
+                        'transaction_code' => $recCode,
+                        'code' => $logPrefix . str_pad($currentLogNum + $index, 4, '0', STR_PAD_LEFT),
+                        'type' => 'OR',
+                        'medicine_id' => $medicineId,
+                        'qty' => $actualStockQty,
+                        'qty_before' => $qtyBefore,
+                        'qty_after' => $medicine->stock,
+                        'total' => $item->order_items->total ?? 0,
+                        'date' => $now,
+                        'status' => 2,
+                        'batches_id' => $batch->id,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ];
+                }
             }
 
             foreach ($medicineIncrements as $medicineId => $qty) {

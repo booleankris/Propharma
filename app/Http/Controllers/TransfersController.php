@@ -31,17 +31,25 @@ class TransfersController extends Controller
         $prefix = "{$year}{$month}LOG-";
 
         $lastCode = ItemsLog::where('code', 'like', "{$prefix}%")
-            ->orderBy('code', 'desc')
+            ->orderByRaw('LENGTH(code) DESC, code DESC')
+            ->lockForUpdate()
             ->value('code');
 
         if ($lastCode) {
-            $lastNumber = (int) substr($lastCode, -4);
+            $numericPart = substr((string) $lastCode, strlen($prefix));
+            $lastNumber = (int) preg_replace('/\D/', '', $numericPart);
             $nextNumber = $lastNumber + 1;
         } else {
             $nextNumber = 1;
         }
 
-        return $prefix . str_pad($nextNumber, 4, '0', STR_PAD_LEFT);
+        $code = $prefix . str_pad((string) $nextNumber, 4, '0', STR_PAD_LEFT);
+        while (ItemsLog::where('code', $code)->exists()) {
+            $nextNumber++;
+            $code = $prefix . str_pad((string) $nextNumber, 4, '0', STR_PAD_LEFT);
+        }
+
+        return $code;
     }
     function generateTransfersCode()
     {
