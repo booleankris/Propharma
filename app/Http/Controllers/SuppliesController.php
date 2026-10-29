@@ -197,17 +197,22 @@ class SuppliesController extends Controller
                 });
             });
 
+            // Tentukan apakah ada filter 1 obat spesifik terlebih dahulu
+            $med = null;
             if ($request->filled('searchMedicine')) {
                 $searchValue = $request->searchMedicine;
+                $med = is_numeric($searchValue)
+                    ? Medicines::find($searchValue)
+                    : Medicines::where('name', $searchValue)->orWhere('code', $searchValue)->first();
 
-                $baseQuery->whereHas('medicines', function ($q) use ($searchValue) {
-                    if (is_numeric($searchValue)) {
-                        $q->where('id', $searchValue);
-                    } else {
+                if ($med) {
+                    $baseQuery->where('medicine_id', $med->id);
+                } else {
+                    $baseQuery->whereHas('medicines', function ($q) use ($searchValue) {
                         $q->where('name', 'like', "%{$searchValue}%")
                             ->orWhere('code', 'like', "%{$searchValue}%");
-                    }
-                });
+                    });
+                }
             }
 
             if ($request->filled('start_date')) {
@@ -218,57 +223,48 @@ class SuppliesController extends Controller
                 $baseQuery->whereDate('date', '<=', $request->end_date);
             }
 
-            // 2. STATS CALCULATION: Calculate all sums 
-            $stats = (clone $baseQuery)->selectRaw("
-                SUM(CASE WHEN status = 1 THEN qty ELSE 0 END) as qty_sold,
-                SUM(CASE WHEN status = 2 THEN qty WHEN status = 8 THEN qty WHEN status = 9 THEN qty ELSE 0 END) as qty_bought,
-                SUM(CASE WHEN status = 3 THEN qty ELSE 0 END) as qty_sold_rt,
-                SUM(CASE WHEN status = 4 THEN qty ELSE 0 END) as qty_bought_rt
-            ")->first();
+            // 2. STATS CALCULATION: Hitung hanya jika ada filter obat atau tanggal untuk mencegah full-table scan
+            $hasFilter = $med || $request->filled('start_date') || $request->filled('end_date');
+            $stats = $hasFilter
+                ? (clone $baseQuery)->selectRaw("
+                    SUM(CASE WHEN status = 1 THEN qty ELSE 0 END) as qty_sold,
+                    SUM(CASE WHEN status = 2 THEN qty WHEN status = 8 THEN qty WHEN status = 9 THEN qty ELSE 0 END) as qty_bought,
+                    SUM(CASE WHEN status = 3 THEN qty ELSE 0 END) as qty_sold_rt,
+                    SUM(CASE WHEN status = 4 THEN qty ELSE 0 END) as qty_bought_rt
+                ")->first()
+                : (object) ['qty_sold' => 0, 'qty_bought' => 0, 'qty_sold_rt' => 0, 'qty_bought_rt' => 0];
 
             $effectiveDateSql = "CASE WHEN (LENGTH(date) <= 10 OR TIME(date) = '00:00:00') AND created_at IS NOT NULL THEN CONCAT(DATE(date), ' ', TIME(created_at)) ELSE date END";
 
-            // 3. BALANCE CALCULATION: Get the very first and very last records for the balances
-            $firstRecord = (clone $baseQuery)->orderByRaw($effectiveDateSql . ' ASC')->orderBy('id', 'asc')->first();
-            $lastRecord = (clone $baseQuery)->orderByRaw($effectiveDateSql . ' DESC')->orderBy('id', 'desc')->first();
+            // 3. BALANCE CALCULATION: Hanya hitung jika ada obat spesifik yang dipilih
+            $firstRecord = null;
+            $lastRecord = null;
+            $balance = 0;
+            $storageStock = 0;
+            $counterStock = 0;
 
-            // 4. TABLE QUERY: Eager load relations nested deep to prevent performance issues
+            if ($med) {
+                $firstRecord = (clone $baseQuery)->orderByRaw($effectiveDateSql . ' ASC')->orderBy('id', 'asc')->first();
+                $lastRecord = (clone $baseQuery)->orderByRaw($effectiveDateSql . ' DESC')->orderBy('id', 'desc')->first();
+
+                $storageStock = $canSeeWarehouse ? $this->calculateRealtimeStock($med->id, $pharmacyId, 'storage') : 0;
+                $counterStock = $this->calculateRealtimeStock($med->id, $pharmacyId, 'counter');
+                $balance = $isWarehouse ? $storageStock : $counterStock;
+            }
+
+            // 4. TABLE QUERY: Eager load relations
             $itemsQuery = (clone $baseQuery)->with([
                 'medicines',
                 'batches',                              // Fetch batches for batch name display
                 'receiving.receiving_details.creditor', // Fetch creditor through receiving details
                 'medicine_transaction.user',            // Fetch cashier user through transactions
                 'users'                                 // Fetch user for creator display
-            ])->whereNotIn('status', [5, 6])
-              ->orderByRaw($effectiveDateSql . ' ASC')
-              ->orderBy('id', 'asc');
-
-            // Tentukan apakah ada filter 1 obat spesifik
-            $med = null;
-            if ($request->filled('searchMedicine')) {
-                $searchValue = $request->searchMedicine;
-                $med = is_numeric($searchValue)
-                    ? Medicines::find($searchValue)
-                    : Medicines::where('name', $searchValue)->orWhere('code', $searchValue)->first();
-            }
-
-            // Balance calculation: Real-time stock if medicine is selected, otherwise last record's qty_after
-            $balance = 0;
-            $storageStock = 0;
-            $counterStock = 0;
+            ])->whereNotIn('status', [5, 6]);
 
             if ($med) {
-                $storageStock = $canSeeWarehouse ? $this->calculateRealtimeStock($med->id, $pharmacyId, 'storage') : 0;
-                $counterStock = $this->calculateRealtimeStock($med->id, $pharmacyId, 'counter');
-                $balance = $isWarehouse ? $storageStock : $counterStock;
-            } else if ($lastRecord) {
-                $storageStock = $canSeeWarehouse ? (int) Batches::where('pharmacy_id', $warehouseId)->sum('stock') : 0;
-                $counterStock = (int) MedicineTransferItems::whereHas('batches', function ($b) use ($pharmacyId) {
-                    $b->where('pharmacy_id', $pharmacyId);
-                })->where('status', 1)->where(function ($q) {
-                    $q->whereNull('source_type')->orWhere('source_type', '!=', 'retur_gudang');
-                })->sum('qty');
-                $balance = $isWarehouse ? $storageStock : $counterStock;
+                $itemsQuery->orderByRaw($effectiveDateSql . ' ASC')->orderBy('id', 'asc');
+            } else {
+                $itemsQuery->orderBy('date', 'desc')->orderBy('id', 'desc');
             }
 
             // Hitung running balance sekuensial HANYA jika ada filter spesifik 1 obat.
