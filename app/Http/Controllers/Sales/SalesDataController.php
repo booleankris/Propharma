@@ -47,11 +47,11 @@ class SalesDataController extends Controller
                 MAX(medicine_cart.user_id) as user_id,
                 MAX(medicine_transactions.transaction_code) as transaction_code,
                 MAX(COALESCE(medicine_transactions.created_at, medicine_transactions.updated_at)) as updated_at,
-                SUM(medicine_cart.discount) as totaldiscount,
+                SUM(ROUND(COALESCE(medicine_cart.discount, 0))) as totaldiscount,
                 MAX(medicine_cart.status) as status,
-                SUM(final_price) as final_price,
-                SUM(total_price) as subtotal,
-                MAX(medicine_transactions.discount) as cart_discount,
+                SUM(ROUND(COALESCE(medicine_cart.final_price, medicine_cart.total_price, (ROUND(COALESCE(medicine_cart.item_price, 0)) * COALESCE(medicine_cart.quantity, 0)) - ROUND(COALESCE(medicine_cart.discount, 0))))) as final_price,
+                SUM(ROUND(COALESCE(medicine_cart.total_price, COALESCE(medicine_cart.item_price, 0) * COALESCE(medicine_cart.quantity, 0)))) as subtotal,
+                MAX(ROUND(COALESCE(medicine_transactions.discount, 0))) as cart_discount,
                 MAX(medicine_transactions.doctor_shipping_fee) as doctor_shipping_fee,
                 MAX(medicine_transactions.doctor_shipping_payment_method) as doctor_shipping_payment_method,
                 MAX(medicine_transactions.doctor_shipping_bank_name) as doctor_shipping_bank_name,
@@ -205,13 +205,14 @@ class SalesDataController extends Controller
                     return $row->transactions?->patients?->name ?? '-';
                 })
                 ->addColumn('final_price', function ($row) {
-                    return 'Rp ' . number_format($row->final_price - $row->transactions?->discount, 0, ',', '.');
+                    $trxDiscount = is_numeric($row->transactions?->discount) ? (int) round((float) $row->transactions->discount) : 0;
+                    return 'Rp ' . number_format((int) round((float) $row->final_price) - $trxDiscount, 0, ',', '.');
                 })
                 ->addColumn('subtotal', function ($row) {
-                    return 'Rp ' . number_format($row->subtotal, 0, ',', '.');
+                    return 'Rp ' . number_format((int) round((float) $row->subtotal), 0, ',', '.');
                 })
                 ->addColumn('totaldiscount', function ($row) {
-                    return 'Rp ' . number_format($row->totaldiscount + $row->cart_discount, 0, ',', '.');
+                    return 'Rp ' . number_format((int) round((float) $row->totaldiscount) + (int) round((float) $row->cart_discount), 0, ',', '.');
                 })
                 ->addColumn('payment_method', function ($row) {
                     return \App\Support\PaymentMethod::label(
@@ -514,13 +515,14 @@ class SalesDataController extends Controller
                     return $row->transactions?->patients?->name ?? '-';
                 })
                 ->addColumn('final_price', function ($row) {
-                    return 'Rp ' . number_format($row->final_price - $row->transactions?->discount, 0, ',', '.');
+                    $trxDiscount = is_numeric($row->transactions?->discount) ? (int) round((float) $row->transactions->discount) : 0;
+                    return 'Rp ' . number_format((int) round((float) $row->final_price) - $trxDiscount, 0, ',', '.');
                 })
                 ->addColumn('subtotal', function ($row) {
-                    return 'Rp ' . number_format($row->subtotal, 0, ',', '.');
+                    return 'Rp ' . number_format((int) round((float) $row->subtotal), 0, ',', '.');
                 })
                 ->addColumn('totaldiscount', function ($row) {
-                    return 'Rp ' . number_format($row->totaldiscount + $row->cart_discount, 0, ',', '.');
+                    return 'Rp ' . number_format((int) round((float) $row->totaldiscount) + (int) round((float) $row->cart_discount), 0, ',', '.');
                 })
                 ->addColumn('payment_method', function ($row) {
                     return \App\Support\PaymentMethod::label(

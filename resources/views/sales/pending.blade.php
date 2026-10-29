@@ -347,8 +347,12 @@
                                     </svg>
                                 </div>
                                 <div>
-                                    <h2 class="text-[15px] font-semibold text-gray-800 leading-tight">Data Kunjungan{{ !empty($restrictedChannelName) ? ' — ' . $restrictedChannelName : '' }}</h2>
-                                    <p class="text-[12px] text-gray-400">Data dan riwayat transaksi yang belum selesai{{ !empty($restrictedChannelName) ? ' (' . $restrictedChannelName . ')' : '' }}</p>
+                                    <h2 class="text-[15px] font-semibold text-gray-800 leading-tight">Data
+                                        Kunjungan{{ !empty($restrictedChannelName) ? ' — ' . $restrictedChannelName : '' }}
+                                    </h2>
+                                    <p class="text-[12px] text-gray-400">Data dan riwayat transaksi yang belum
+                                        selesai{{ !empty($restrictedChannelName) ? ' (' . $restrictedChannelName . ')' : '' }}
+                                    </p>
                                 </div>
                             </div>
                         </div>
@@ -372,7 +376,8 @@
                         <div class="channel-filter-wrap !mb-0">
                             <label>Jenis Transaksi</label>
                             @if (!empty($restrictedChannel))
-                                <select id="channel-filter" disabled class="bg-gray-100 cursor-not-allowed text-gray-700 font-medium">
+                                <select id="channel-filter" disabled
+                                    class="bg-gray-100 cursor-not-allowed text-gray-700 font-medium">
                                     <option value="{{ $restrictedChannel }}" selected>{{ $restrictedChannelName }}</option>
                                 </select>
                             @else
@@ -427,7 +432,8 @@
                     </div>
 
                     <div id="detail-wrap" class="hidden">
-                        <div class="grid grid-cols-2 gap-2 p-2.5 mb-3 bg-gray-50 rounded-lg text-[12px] border border-gray-100">
+                        <div
+                            class="grid grid-cols-2 gap-2 p-2.5 mb-3 bg-gray-50 rounded-lg text-[12px] border border-gray-100">
                             <div>
                                 <span class="text-gray-400 block text-[10px] uppercase font-medium">Pasien:</span>
                                 <span id="detail-patient" class="font-semibold text-gray-800 truncate block">—</span>
@@ -467,8 +473,9 @@
                         <div class="mt-4 pt-3 border-t border-gray-100">
                             <a id="btn-detail-resume" href="#"
                                 class="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm transition-all duration-150">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-                                    <polygon points="5 3 19 12 5 21 5 3"/>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"
+                                    stroke="none">
+                                    <polygon points="5 3 19 12 5 21 5 3" />
                                 </svg>
                                 Lanjutkan Transaksi Ini di Kasir
                             </a>
@@ -615,7 +622,8 @@
                 document.getElementById('detail-patient').textContent = data.name || 'Umum / Tanpa Pasien';
                 document.getElementById('detail-creator').textContent = data.creator_name || '-';
                 const typeSlug = data.type_slug || 'resep';
-                document.getElementById('btn-detail-resume').href = `/transaction/${typeSlug}/${data.transaction_id}`;
+                document.getElementById('btn-detail-resume').href =
+                    `/transaction/${typeSlug}/${data.transaction_id}`;
                 loadItems(data.transaction_id, data.final_price, data.subtotal, data.totaldiscount);
             });
         });

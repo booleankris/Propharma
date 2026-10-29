@@ -80,8 +80,19 @@ class MonitoringPenjualanService
         return $transactionType === 'ONLINE' ? 'onlineDigital' : null;
     }
 
-    private function effectiveItemType($item, string $transactionType): string
+    private function effectiveItemType($item, string $transactionType): ?string
     {
+        $normalizedTrxType = mb_strtoupper(trim($transactionType));
+        if (in_array($normalizedTrxType, ['KREDIT', 'RESEP KREDIT'], true)) {
+            return 'creditPrescription';
+        }
+        if ($normalizedTrxType === 'RETUR KREDIT') {
+            return 'creditReturns';
+        }
+        if (in_array($normalizedTrxType, ['RETUR JUAL', 'RETUR TUNAI'], true)) {
+            return 'returns';
+        }
+
         $type = mb_strtoupper(trim((string) ($item->cart_type ?: $transactionType)));
         return match ($type) {
             'UK', 'KREDIT', 'RESEP KREDIT' => 'creditPrescription',
@@ -91,7 +102,7 @@ class MonitoringPenjualanService
             'ONLINE' => 'nonPrescription',
             'RETUR KREDIT' => 'creditReturns',
             'RETUR JUAL', 'RETUR TUNAI' => 'returns',
-            default => match (mb_strtoupper(trim($transactionType))) {
+            default => match ($normalizedTrxType) {
                 'KREDIT' => 'creditPrescription',
                 'RESEP TUNAI' => 'cashPrescription',
                 'UPDS' => 'upds',
@@ -148,52 +159,68 @@ class MonitoringPenjualanService
             $shift['transactions'][$channelPrefix]++;
             if ($isOnline) $this->add($shift['transactions'], $channel, 1);
 
+            $isReturnTrx = in_array($transactionType, ['RETUR JUAL', 'RETUR KREDIT', 'RETUR TUNAI'], true)
+                || str_starts_with(strtoupper(trim((string) $transaction->transaction_code)), 'RT');
+
             $classified = [];
-            foreach ($items as $item) {
-                $type = $this->effectiveItemType($item, $transactionType);
-                if (!$type) continue;
-                $classified[] = ['item' => $item, 'type' => $type];
-                // Sum final_price preserving decimal precision to match LIPH and other reports.
-                $amount = (float) ($item->final_price ?? 0);
-                if (in_array($type, ['returns', 'creditReturns'], true)) $amount = -abs($amount);
+            if (!$isReturnTrx) {
+                foreach ($items as $item) {
+                    $type = $this->effectiveItemType($item, $transactionType);
+                    if (!$type) continue;
+                    $classified[] = ['item' => $item, 'type' => $type];
+                    // Round per item using the exact same formula as Export Data Penjualan and LIPH.
+                    $qty = (float) ($item->quantity ?? 0);
+                    $price = (int) round((float) ($item->item_price ?? 0));
+                    $disc = (int) round((float) ($item->discount ?? 0));
+                    $amount = (int) round((float) ($item->final_price ?? $item->total_price ?? ($price * $qty - $disc)));
+                    if (in_array($type, ['returns', 'creditReturns'], true)) $amount = -abs($amount);
 
-                if ($type === 'cashPrescription') $this->add($shift['sales'], 'cashPrescription', $amount);
-                elseif ($type === 'upds') $this->add($shift['sales'], 'upds', $amount);
-                elseif ($type === 'hv' || $type === 'nonPrescription') $this->add($shift['sales'], 'hv', $amount);
-                elseif ($type === 'creditPrescription') $this->add($shift['sales'], 'creditPrescription', $amount);
-                elseif ($type === 'creditReturns') $this->add($shift['sales'], 'creditReturns', $amount);
-                elseif ($type === 'returns') $this->add($shift['sales'], 'returns', $amount);
+                    if ($type === 'cashPrescription') $this->add($shift['sales'], 'cashPrescription', $amount);
+                    elseif ($type === 'upds') $this->add($shift['sales'], 'upds', $amount);
+                    elseif ($type === 'hv' || $type === 'nonPrescription') $this->add($shift['sales'], 'hv', $amount);
+                    elseif ($type === 'creditPrescription') $this->add($shift['sales'], 'creditPrescription', $amount);
+                    elseif ($type === 'creditReturns') $this->add($shift['sales'], 'creditReturns', $amount);
+                    elseif ($type === 'returns') $this->add($shift['sales'], 'returns', $amount);
 
-                $isPrescription = in_array($type, ['cashPrescription', 'creditPrescription', 'creditReturns'], true);
-                if ($isOnline) {
-                    if ($channel === 'onlineWhatsapp') {
-                        $channelTypeKey = 'onlineWhatsapp' . ($isPrescription ? 'Prescription' : 'NonPrescription');
+                    $isPrescription = in_array($type, ['cashPrescription', 'creditPrescription', 'creditReturns'], true);
+                    if ($isOnline) {
+                        if ($channel === 'onlineWhatsapp') {
+                            $channelTypeKey = 'onlineWhatsapp' . ($isPrescription ? 'Prescription' : 'NonPrescription');
+                            $this->add($shift['sales'], $channelTypeKey, $amount);
+                            $this->add($shift['items'], $channelTypeKey, 1);
+                        } else {
+                            $this->add($shift['sales'], $channel, $amount);
+                            $this->add($shift['items'], $channel, 1);
+                        }
+                        $this->add($shift['sales'], 'onlineTotal', $amount);
+                    } else {
+                        $channelTypeKey = 'offline' . ($isPrescription ? 'Prescription' : 'NonPrescription');
                         $this->add($shift['sales'], $channelTypeKey, $amount);
                         $this->add($shift['items'], $channelTypeKey, 1);
-                    } else {
-                        $this->add($shift['sales'], $channel, $amount);
-                        $this->add($shift['items'], $channel, 1);
+                        $this->add($shift['sales'], 'offlineTotal', $amount);
+                        if ($type === 'returns') $this->add($shift['sales'], 'offlineReturns', $amount);
                     }
-                    $this->add($shift['sales'], 'onlineTotal', $amount);
-                } else {
-                    $channelTypeKey = 'offline' . ($isPrescription ? 'Prescription' : 'NonPrescription');
-                    $this->add($shift['sales'], $channelTypeKey, $amount);
-                    $this->add($shift['items'], $channelTypeKey, 1);
-                    $this->add($shift['sales'], 'offlineTotal', $amount);
-                    if ($type === 'returns') $this->add($shift['sales'], 'offlineReturns', $amount);
+                    if ($type === 'returns') $this->add($shift['items'], 'returns', 1);
+                    elseif ($type === 'creditReturns') $this->add($shift['items'], 'creditReturns', 1);
+                    elseif ($type === 'cashPrescription') $this->add($shift['items'], 'cashPrescription', 1);
+                    elseif ($type === 'upds') $this->add($shift['items'], 'upds', 1);
+                    elseif ($type === 'hv' || $type === 'nonPrescription') $this->add($shift['items'], 'hv', 1);
+                    elseif ($type === 'creditPrescription') $this->add($shift['items'], 'creditPrescription', 1);
                 }
-                if ($type === 'returns') $this->add($shift['items'], 'returns', 1);
-                elseif ($type === 'creditReturns') $this->add($shift['items'], 'creditReturns', 1);
-                elseif ($type === 'cashPrescription') $this->add($shift['items'], 'cashPrescription', 1);
-                elseif ($type === 'upds') $this->add($shift['items'], 'upds', 1);
-                elseif ($type === 'hv' || $type === 'nonPrescription') $this->add($shift['items'], 'hv', 1);
-                elseif ($type === 'creditPrescription') $this->add($shift['items'], 'creditPrescription', 1);
             }
 
-            // LIPH uses subtotal for a finalized transaction with no cart rows.
+            // LIPH and Export Data Penjualan use subtotal for return headers and finalized transactions with no cart rows.
             if (!$classified) {
                 $fallbackType = $this->effectiveItemType((object) ['cart_type' => null], $transactionType);
-                $fallbackAmount = (float) ($transaction->subtotal ?? 0);
+                $fallbackAmount = is_numeric($transaction->subtotal) ? (int) round((float) $transaction->subtotal) : 0;
+                if ($isReturnTrx && $fallbackAmount === 0 && $items->isNotEmpty()) {
+                    $fallbackAmount = (int) $items->sum(function ($item) {
+                        $qty = (float) ($item->quantity ?? 0);
+                        $price = (int) round((float) ($item->item_price ?? 0));
+                        $disc = (int) round((float) ($item->discount ?? 0));
+                        return (int) round((float) ($item->final_price ?? $item->total_price ?? ($price * $qty - $disc)));
+                    });
+                }
                 if (in_array($fallbackType, ['returns', 'creditReturns'], true)) $fallbackAmount = -abs($fallbackAmount);
 
                 $fallbackKey = match ($fallbackType) {
@@ -231,8 +258,8 @@ class MonitoringPenjualanService
                 $discountType = $this->effectiveItemType((object) ['cart_type' => null], $transactionType);
             }
 
-            $transactionDiscount = (float) ($transaction->discount ?? 0);
-            if ($transactionDiscount !== 0.0 && $discountType) {
+            $transactionDiscount = is_numeric($transaction->discount) ? (int) round((float) $transaction->discount) : 0;
+            if ($transactionDiscount !== 0 && $discountType && !in_array($discountType, ['returns', 'creditReturns'], true)) {
                 $salesKey = match ($discountType) {
                     'cashPrescription' => 'cashPrescription',
                     'upds' => 'upds',

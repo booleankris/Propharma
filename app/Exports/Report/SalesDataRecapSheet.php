@@ -245,24 +245,32 @@ class SalesDataRecapSheet implements FromArray, WithStyles, WithColumnWidths, Wi
 
             $patientName = $trx->patients?->name ?? 'Umum / Tanpa Pasien';
 
-            $isReturn = in_array(strtoupper(trim((string) $trx->transaction_type)), ['RETUR JUAL', 'RETUR KREDIT'], true) || strtoupper(trim((string) ($trx->transaction_code ?? ''))) === 'RT';
+            $isReturn = in_array(strtoupper(trim((string) $trx->transaction_type)), ['RETUR JUAL', 'RETUR KREDIT'], true)
+                || str_starts_with(strtoupper(trim((string) ($trx->transaction_code ?? ''))), 'RT');
             $items = $trx->transactions->where('status', 1);
 
             $rawSubtotal = $items->isNotEmpty()
-                ? (int) round($items->sum(fn ($i) => (float) ($i->total_price ?? ($i->item_price * $i->quantity))))
+                ? (int) $items->sum(fn ($i) => (int) round((float) ($i->total_price ?? (((float) ($i->item_price ?? 0)) * ((float) ($i->quantity ?? 0))))))
                 : (is_numeric($trx->subtotal) ? (int) round((float) $trx->subtotal) : 0);
-            $itemDiscount = (int) round($items->sum(fn ($i) => (float) ($i->discount ?? 0)));
+            $itemDiscount = (int) $items->sum(fn ($i) => (int) round((float) ($i->discount ?? 0)));
             $cartDiscount = is_numeric($trx->discount) ? (int) round((float) $trx->discount) : 0;
 
             if ($isReturn) {
-                $subtotal = -abs($rawSubtotal);
+                $returnHeaderSubtotal = is_numeric($trx->subtotal) ? (int) round((float) $trx->subtotal) : 0;
+                $returnBase = $returnHeaderSubtotal !== 0 ? $returnHeaderSubtotal : $rawSubtotal;
+                $subtotal = -abs($returnBase);
                 $itemDiscount = 0;
                 $cartDiscount = 0;
-                $netto = -abs($rawSubtotal);
+                $netto = -abs($returnBase);
             } else {
                 $subtotal = $rawSubtotal;
                 $netto = $items->isNotEmpty()
-                    ? ((int) round($items->sum(fn ($i) => (float) ($i->final_price ?? ($i->total_price - $i->discount)))) - $cartDiscount)
+                    ? ((int) $items->sum(function ($i) {
+                        $qty = (float) ($i->quantity ?? 0);
+                        $price = (int) round((float) ($i->item_price ?? 0));
+                        $disc = (int) round((float) ($i->discount ?? 0));
+                        return (int) round((float) ($i->final_price ?? $i->total_price ?? ($price * $qty - $disc)));
+                    }) - $cartDiscount)
                     : ($subtotal - $cartDiscount);
             }
 

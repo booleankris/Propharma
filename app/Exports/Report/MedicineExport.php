@@ -122,7 +122,7 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
 
         foreach ($headers as $rt) {
             $rtTime   = Carbon::parse($rt->created_at ?? $rt->updated_at);
-            $rtAmount = (int) ($rt->subtotal ?? 0);
+            $rtAmount = (int) round((float) ($rt->subtotal ?? 0));
 
             $match = $candidates->first(function ($r) use ($rtTime, $rtAmount, $used, $originCodes) {
                 return !isset($used[$r->id])
@@ -144,7 +144,7 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
                     'unit'        => $medicine?->unit ?? '-',
                     'factory'     => $medicine?->factory?->name ?? '-',
                     'qty'         => (float) $match->qty_retur,
-                    'total'       => (int) ($rt->subtotal ?? ($match->total_retur ?? 0)),
+                    'total'       => (int) round((float) ($rt->subtotal ?? ($match->total_retur ?? 0))),
                     'nomor'       => 'RT/' . ($originCodes[$match->transaction_id] ?? '-'),
                     'date'        => $date,
                 ];
@@ -157,7 +157,7 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
                     'unit'        => '-',
                     'factory'     => '-',
                     'qty'         => 0,
-                    'total'       => (int) ($rt->subtotal ?? 0),
+                    'total'       => (int) round((float) ($rt->subtotal ?? 0)),
                     'nomor'       => 'RT#' . $rt->id,
                     'date'        => $date,
                 ];
@@ -172,7 +172,31 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
         $grouped = [];
 
         foreach ($transactions as $trx) {
-            foreach ($trx->transactions ?? [] as $item) {
+            $isReturn = in_array(strtoupper(trim((string) $trx->transaction_type)), ['RETUR JUAL', 'RETUR KREDIT'], true)
+                || str_starts_with(strtoupper(trim((string) $trx->transaction_code)), 'RT');
+            if ($isReturn) {
+                continue;
+            }
+
+            $items = $trx->transactions ?? collect();
+            if ($items->isEmpty()) {
+                $fallbackTotal = is_numeric($trx->subtotal) ? (int) round((float) $trx->subtotal) : 0;
+                if ($fallbackTotal !== 0) {
+                    $key = 'trx_empty_' . $trx->id;
+                    $grouped[$key] = [
+                        'medicine_id' => null,
+                        'name'        => '[TRANSAKSI TANPA RINCIAN ITEM]',
+                        'factory'     => '-',
+                        'qty'         => 0,
+                        'total'       => $fallbackTotal,
+                        'qty_retur'   => 0,
+                        'total_retur' => 0,
+                    ];
+                }
+                continue;
+            }
+
+            foreach ($items as $item) {
                 $medicine = $item->medicine;
                 if (!$medicine) {
                     $key     = 'item_' . $item->id;
@@ -198,8 +222,13 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
                     ];
                 }
 
-                $grouped[$key]['qty'] += (float) ($item->quantity ?? 0);
-                $grouped[$key]['total'] += (int) round((float) ($item->final_price ?? 0));
+                $qty   = (float) ($item->quantity ?? 0);
+                $price = (int) round((float) ($item->item_price ?? 0));
+                $disc  = (int) round((float) ($item->discount ?? 0));
+                $tot   = (int) round((float) ($item->final_price ?? $item->total_price ?? ($price * $qty - $disc)));
+
+                $grouped[$key]['qty'] += $qty;
+                $grouped[$key]['total'] += $tot;
             }
         }
 
@@ -268,10 +297,10 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
             $grandStock,
         ];
 
-        $potonganTransaksi = (int) round($transactions->reject(function ($trx) {
+        $potonganTransaksi = (int) $transactions->reject(function ($trx) {
             return in_array(strtoupper(trim((string) $trx->transaction_type)), ['RETUR JUAL', 'RETUR KREDIT'], true)
-                || strtoupper(trim((string) $trx->transaction_code)) === 'RT';
-        })->sum(fn ($t) => (float) ($t->discount ?? 0)));
+                || str_starts_with(strtoupper(trim((string) $trx->transaction_code)), 'RT');
+        })->sum(fn ($t) => is_numeric($t->discount) ? (int) round((float) $t->discount) : 0);
 
         if ($potonganTransaksi > 0) {
             $rows[] = [
@@ -298,7 +327,30 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
         $itemsList = [];
 
         foreach ($transactions as $trx) {
-            foreach ($trx->transactions ?? [] as $item) {
+            $isReturn = in_array(strtoupper(trim((string) $trx->transaction_type)), ['RETUR JUAL', 'RETUR KREDIT'], true)
+                || str_starts_with(strtoupper(trim((string) $trx->transaction_code)), 'RT');
+            if ($isReturn) {
+                continue;
+            }
+
+            $items = $trx->transactions ?? collect();
+            if ($items->isEmpty()) {
+                $fallbackTotal = is_numeric($trx->subtotal) ? (int) round((float) $trx->subtotal) : 0;
+                if ($fallbackTotal !== 0) {
+                    $itemsList[] = [
+                        'nomor'     => $trx->transaction_code ?? '-',
+                        'jns_harga' => '-',
+                        'name'      => '[TRANSAKSI TANPA RINCIAN ITEM]',
+                        'qty'       => 0,
+                        'bruto'     => $fallbackTotal,
+                        'disc'      => 0,
+                        'netto'     => $fallbackTotal,
+                    ];
+                }
+                continue;
+            }
+
+            foreach ($items as $item) {
                 $medicine = $item->medicine;
                 $medName  = $medicine?->name ?? ($item->medicine_name ?? '-');
 
@@ -306,9 +358,10 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
                 $jnsHarga = !empty($item->cart_type) ? (string) $item->cart_type : '-';
 
                 $qty   = (float) ($item->quantity ?? 0);
-                $bruto = (int) round((float) ($item->total_price ?? ($item->raw_total ?? 0)));
+                $price = (int) round((float) ($item->item_price ?? 0));
+                $bruto = (int) round((float) ($item->total_price ?? ($item->raw_total ?? ($price * $qty))));
                 $disc  = (int) round((float) ($item->discount ?? 0));
-                $netto = (int) round((float) ($item->final_price ?? 0));
+                $netto = (int) round((float) ($item->final_price ?? $item->total_price ?? ($price * $qty - $disc)));
 
                 $itemsList[] = [
                     'nomor'     => $trxCode,
@@ -372,10 +425,10 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
 
         $rows[] = ['', 'TOTAL', '', '', $grandQty, (int) $grandBruto, (int) $grandDisc, (int) $grandNetto];
 
-        $potonganTransaksi = (int) round($transactions->reject(function ($trx) {
+        $potonganTransaksi = (int) $transactions->reject(function ($trx) {
             return in_array(strtoupper(trim((string) $trx->transaction_type)), ['RETUR JUAL', 'RETUR KREDIT'], true)
-                || strtoupper(trim((string) $trx->transaction_code)) === 'RT';
-        })->sum(fn ($t) => (float) ($t->discount ?? 0)));
+                || str_starts_with(strtoupper(trim((string) $trx->transaction_code)), 'RT');
+        })->sum(fn ($t) => is_numeric($t->discount) ? (int) round((float) $t->discount) : 0);
 
         if ($potonganTransaksi > 0) {
             $rows[] = [
@@ -423,6 +476,12 @@ class MedicineExport implements FromArray, WithStyles, WithColumnWidths, WithTit
         $medicineIds = [];
 
         foreach ($transactions as $trx) {
+            $isReturn = in_array(strtoupper(trim((string) $trx->transaction_type)), ['RETUR JUAL', 'RETUR KREDIT'], true)
+                || str_starts_with(strtoupper(trim((string) $trx->transaction_code)), 'RT');
+            if ($isReturn) {
+                continue;
+            }
+
             $trxDate = Carbon::parse($trx->created_at ?? $trx->updated_at ?? $trx->shift_logs?->clock_in);
             $monthKey = $trxDate->format('Y-m');
 

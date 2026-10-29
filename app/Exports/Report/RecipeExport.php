@@ -166,18 +166,22 @@ class RecipeDetailSheet implements FromArray, WithStyles, WithColumnWidths, With
             $retursByMedicine = [];
             $generalRetur = 0;
             foreach ($trxReturs as $r) {
+                $returAmount = (int) round((float) ($r->total_retur ?? 0));
                 if ($r->medicine_id) {
-                    $retursByMedicine[$r->medicine_id] = ($retursByMedicine[$r->medicine_id] ?? 0) + (float) $r->total_retur;
+                    $retursByMedicine[$r->medicine_id] = ($retursByMedicine[$r->medicine_id] ?? 0) + $returAmount;
                 } else {
-                    $generalRetur += (float) $r->total_retur;
+                    $generalRetur += $returAmount;
                 }
             }
 
             $netto = 0;
             $hasActiveItem = false;
             foreach ($resepItems as $item) {
-                $itemPrice = (float) ($item->final_price ?? 0);
-                $medId = $item->medicine_id;
+                $qty       = (float) ($item->quantity ?? 0);
+                $price     = (int) round((float) ($item->item_price ?? 0));
+                $disc      = (int) round((float) ($item->discount ?? 0));
+                $itemPrice = (int) round((float) ($item->final_price ?? $item->total_price ?? ($price * $qty - $disc)));
+                $medId     = $item->medicine_id;
                 $itemRetur = 0;
                 if ($medId && isset($retursByMedicine[$medId]) && $retursByMedicine[$medId] > 0) {
                     $itemRetur = min($itemPrice, $retursByMedicine[$medId]);
@@ -214,8 +218,9 @@ class RecipeDetailSheet implements FromArray, WithStyles, WithColumnWidths, With
             ];
 
             $grandTotal += (int) round($netto);
-            if (is_numeric($trx->discount) && (int) $trx->discount > 0) {
-                $potonganTrx += (int) $trx->discount;
+            $trxDisc = is_numeric($trx->discount) ? (int) round((float) $trx->discount) : 0;
+            if ($trxDisc > 0) {
+                $potonganTrx += $trxDisc;
             }
         }
 
@@ -445,14 +450,15 @@ class RecipeMonthlySummarySheet implements FromArray, WithStyles, WithColumnWidt
         $yearEnd   = Carbon::create($this->year, 12, 31, 23, 59, 59)->endOfDay();
 
         $query = MedicineTransactions::with([
+            'transactions' => fn ($q) => $q->where('status', 1),
             'transactions.medicine.category',
             'returs' => fn ($q) => $q->where('status', 1),
         ])
             ->where('pharmacy_id', $this->pharmacyId)
-            ->whereIn('transaction_type', ['RESEP TUNAI', 'KREDIT'])
-            ->whereBetween('updated_at', [$yearStart, $yearEnd]);
+            ->whereIn('transaction_type', ['RESEP TUNAI', 'KREDIT']);
 
         LiphTransactionScope::applySalesStatus($query);
+        LiphTransactionScope::applyPeriod($query, $yearStart, $yearEnd);
         $transactions = $query->get();
 
         $categories = ['NARKOTIK', 'PSIKOTROPIKA', 'PREKURSOR', 'OOT', 'UMUM'];
@@ -462,7 +468,7 @@ class RecipeMonthlySummarySheet implements FromArray, WithStyles, WithColumnWidt
         }
 
         foreach ($transactions as $trx) {
-            $date  = Carbon::parse($trx->updated_at ?? $trx->created_at);
+            $date  = Carbon::parse($trx->created_at ?? $trx->updated_at);
             $month = (int) $date->format('n');
 
             if ($month >= 1 && $month <= 12) {
@@ -472,14 +478,16 @@ class RecipeMonthlySummarySheet implements FromArray, WithStyles, WithColumnWidt
                 foreach ($trxReturs as $r) {
                     if ($r->medicine_id) {
                         $retursByMedicineQty[$r->medicine_id] = ($retursByMedicineQty[$r->medicine_id] ?? 0) + (float) ($r->qty_retur ?: 0);
-                        $retursByMedicineAmount[$r->medicine_id] = ($retursByMedicineAmount[$r->medicine_id] ?? 0) + (float) $r->total_retur;
+                        $retursByMedicineAmount[$r->medicine_id] = ($retursByMedicineAmount[$r->medicine_id] ?? 0) + (int) round((float) ($r->total_retur ?? 0));
                     }
                 }
 
                 $activeItems = collect($trx->transactions)->filter(function ($item) use (&$retursByMedicineQty, &$retursByMedicineAmount) {
                     $medId = $item->medicine_id;
-                    $itemQty = (float) ($item->qty ?? 1);
-                    $itemPrice = (float) ($item->final_price ?? 0);
+                    $itemQty = (float) ($item->quantity ?? $item->qty ?? 1);
+                    $price = (int) round((float) ($item->item_price ?? 0));
+                    $disc = (int) round((float) ($item->discount ?? 0));
+                    $itemPrice = (int) round((float) ($item->final_price ?? $item->total_price ?? ($price * $itemQty - $disc)));
 
                     if ($medId && isset($retursByMedicineQty[$medId]) && $retursByMedicineQty[$medId] > 0) {
                         if ($retursByMedicineQty[$medId] >= $itemQty) {

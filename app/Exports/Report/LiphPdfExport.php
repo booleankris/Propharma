@@ -29,6 +29,13 @@ class LiphPdfExport
     const KREDIT_ORDER = ['Resep Kredit', 'Retur Kredit'];
     const TUNAI_ORDER = ['Obat Bebas', 'Retur Tunai', 'Resep Tunai', 'UPDS'];
 
+    const CART_TYPE_ABBR = [
+        'UK' => 'KREDIT',
+        'UM' => 'RESEP TUNAI',
+        'UP' => 'UPDS',
+        'HV' => 'HV/OTC',
+    ];
+
     public function __construct($pharmacyId, $startDate, $endDate, $pharmacyName = '', $pharmacyAddress = '')
     {
         $this->pharmacyId      = $pharmacyId;
@@ -40,7 +47,17 @@ class LiphPdfExport
 
     private function safeSum($collection, $field)
     {
-        return (int) round($collection->sum(fn($item) => (float) ($item->{$field} ?? 0)));
+        return (int) $collection->sum(fn($item) => (int) round((float) ($item->{$field} ?? 0)));
+    }
+
+    private function safeItemNettoSum($collection): int
+    {
+        return (int) $collection->sum(function ($item) {
+            $qty = (float) ($item->quantity ?? 0);
+            $price = (int) round((float) ($item->item_price ?? 0));
+            $disc = (int) round((float) ($item->discount ?? 0));
+            return (int) round((float) ($item->final_price ?? $item->total_price ?? ($price * $qty - $disc)));
+        });
     }
 
     public function download()
@@ -53,7 +70,7 @@ class LiphPdfExport
 
     private function buildData(): array
     {
-        $query = MedicineTransactions::with('transactions')
+        $query = MedicineTransactions::with(['transactions' => fn($q) => $q->where('status', 1)])
             ->where('pharmacy_id', $this->pharmacyId)
             ->whereIn('transaction_type', array_keys(self::TYPE_MAP));
 
@@ -65,36 +82,77 @@ class LiphPdfExport
         $grouped = [];
 
         foreach ($transactions as $trx) {
-            $map = self::TYPE_MAP[$trx->transaction_type] ?? null;
-            if (!$map) continue;
+            $originalMap = self::TYPE_MAP[$trx->transaction_type] ?? null;
+            if (!$originalMap) continue;
 
-            [$group, $label] = $map;
+            [, $originalLabel] = $originalMap;
+            $items = $trx->transactions->where('status', 1);
+            $isReturnTrx = in_array($originalLabel, ['Retur Tunai', 'Retur Kredit'], true);
 
-            if (!isset($grouped[$group][$label])) {
-                $grouped[$group][$label] = [
-                    'lembar' => 0,
-                    'r' => 0,
-                    'jasa' => 0,
-                    'embalase' => 0,
-                    'potongan' => 0,
-                    'netto' => 0,
-                ];
+            if ($items->isEmpty() || $isReturnTrx) {
+                [$group, $label] = $originalMap;
+                if (!isset($grouped[$group][$label])) {
+                    $grouped[$group][$label] = ['lembar' => 0, 'r' => 0, 'jasa' => 0, 'embalase' => 0, 'potongan' => 0, 'netto' => 0];
+                }
+                $ref = &$grouped[$group][$label];
+                if ($isReturnTrx) {
+                    $ref['r'] -= max(1, $items->count());
+                    $trxSubtotal = is_numeric($trx->subtotal) ? (int) round((float) $trx->subtotal) : 0;
+                    $returnBase = $trxSubtotal !== 0 ? $trxSubtotal : $this->safeItemNettoSum($items);
+                    $ref['netto'] += -abs($returnBase);
+                } else {
+                    $trxDiscount = is_numeric($trx->discount) ? (int) round((float) $trx->discount) : 0;
+                    $ref['lembar']++;
+                    $ref['potongan'] += $trxDiscount;
+                    $ref['netto'] += (int) round((float) ($trx->subtotal ?? 0)) - $trxDiscount;
+                }
+                unset($ref);
+                continue;
             }
 
-            $ref = &$grouped[$group][$label];
-            if (in_array($label, ['Retur Tunai', 'Retur Kredit'], true)) {
-                $ref['r'] -= max(1, $trx->transactions->count());
-            } else {
-                $ref['lembar']++;
-                $ref['r'] += $trx->transactions->count();
+            $byLabel = [];
+            foreach ($items as $item) {
+                if ($trx->transaction_type === 'KREDIT') {
+                    $effectiveType = 'KREDIT';
+                } elseif ($item->cart_type) {
+                    $effectiveType = self::CART_TYPE_ABBR[$item->cart_type] ?? $item->cart_type;
+                } else {
+                    $effectiveType = $trx->transaction_type;
+                }
+                $map = self::TYPE_MAP[$effectiveType] ?? $originalMap;
+                [$grp, $lbl] = $map;
+                $byLabel[$lbl]['group'] = $grp;
+                $byLabel[$lbl]['items'][] = $item;
             }
-            $ref['jasa']     += $this->safeSum($trx->transactions, 'service_fee');
-            $ref['embalase'] += $this->safeSum($trx->transactions, 'embalase');
-            $ref['potongan'] += (int) ($trx->discount ?? 0) + $this->safeSum($trx->transactions, 'discount');
 
-            $netto = (int) round((float) ($trx->subtotal ?? 0));
-            if (in_array($label, ['Retur Tunai', 'Retur Kredit'], true)) $netto = -abs($netto);
-            $ref['netto'] += $netto;
+            $potonganTransaksiTarget = isset($byLabel[$originalLabel]) ? $originalLabel : array_key_first($byLabel);
+
+            foreach ($byLabel as $label => $bucket) {
+                $group = $bucket['group'];
+                $groupItems = collect($bucket['items']);
+
+                if (!isset($grouped[$group][$label])) {
+                    $grouped[$group][$label] = ['lembar' => 0, 'r' => 0, 'jasa' => 0, 'embalase' => 0, 'potongan' => 0, 'netto' => 0];
+                }
+
+                $ref = &$grouped[$group][$label];
+                $ref['r']        += $groupItems->count();
+                $ref['jasa']     += $this->safeSum($groupItems, 'embalase');
+                $ref['embalase'] += $this->safeSum($groupItems, 'service_fee');
+                $ref['potongan'] += $this->safeSum($groupItems, 'discount');
+
+                $trxDiscount = ($label === $potonganTransaksiTarget && is_numeric($trx->discount))
+                    ? (int) round((float) $trx->discount)
+                    : 0;
+                if ($label === $potonganTransaksiTarget) {
+                    $ref['lembar']++;
+                    $ref['potongan'] += $trxDiscount;
+                }
+
+                $itemNetto = $this->safeItemNettoSum($groupItems) - $trxDiscount;
+                $ref['netto'] += $itemNetto;
+                unset($ref);
+            }
         }
 
         // Build kredit

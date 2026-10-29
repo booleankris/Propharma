@@ -2004,10 +2004,16 @@
         }
     };
     // WHEN PAGE LOADED
-    let page = 1;
-    let loading = false;
-    let lastPage = false;
-    let search = '';
+    let masterPage = 1;
+    let masterLoading = false;
+    let masterLastPage = false;
+    let masterSearch = '';
+
+    let trxPage = 1;
+    let trxLoading = false;
+    let trxLastPage = false;
+    let trxSearch = '';
+
     let isScanning = false;
 
     function back() {
@@ -2019,24 +2025,30 @@
         });
 
         const scrollBox = document.getElementById('medicineScroll');
+        if (scrollBox) {
+            scrollBox.addEventListener('scroll', () => {
+                if (!masterModal || masterModal.classList.contains('hidden')) return;
+                if (
+                    scrollBox.scrollTop + scrollBox.clientHeight >=
+                    scrollBox.scrollHeight - 50
+                ) {
+                    loadData();
+                }
+            });
+        }
 
-        scrollBox.addEventListener('scroll', () => {
-            if (
-                scrollBox.scrollTop + scrollBox.clientHeight >=
-                scrollBox.scrollHeight - 50
-            ) {
-                loadData();
-            }
-        });
         const transactionScroll = document.getElementById('transactionScroll');
-        transactionScroll.addEventListener('scroll', () => {
-            if (
-                transactionScroll.scrollTop + scroll.clientHeight >=
-                transactionScroll.scrollHeight - 50
-            ) {
-                loadTransactionData();
-            }
-        });
+        if (transactionScroll) {
+            transactionScroll.addEventListener('scroll', () => {
+                if (!transactionModal || transactionModal.classList.contains('hidden')) return;
+                if (
+                    transactionScroll.scrollTop + transactionScroll.clientHeight >=
+                    transactionScroll.scrollHeight - 50
+                ) {
+                    loadTransactionData();
+                }
+            });
+        }
     });
 
     // Global Variable
@@ -3870,6 +3882,26 @@
     function syncCartFromServer(data, expectedCountDelta = null) {
         if (!data) return;
 
+        // Jika server otomatis memisahkan transaksi ini ke ID baru karena ID lama
+        // sudah terpakai di tab/PC lain, perbarui ID transaksi aktif & URL tab ini secara mulus.
+        if (data.moved_to_transaction_id && String(data.moved_to_transaction_id) !== String(transaction_id)) {
+            const newId = data.moved_to_transaction_id;
+            transaction_id = newId;
+            if (typeof window.__kasirSetActiveTxId === 'function') {
+                window.__kasirSetActiveTxId(newId);
+            }
+            const hiddenTxInput = document.getElementById('transaction_id');
+            if (hiddenTxInput) hiddenTxInput.value = newId;
+            document.querySelectorAll('input[name="trxid"]').forEach(el => { el.value = newId; });
+            ['kredit', 'resep', 'hv', 'upds'].forEach(slug => {
+                const chipEl = document.getElementById('trx-type-' + slug);
+                if (chipEl) chipEl.href = `/transaction/${slug}/${newId}`;
+            });
+            if (data.moved_to_url && window.history && typeof window.history.replaceState === 'function') {
+                window.history.replaceState(null, '', data.moved_to_url);
+            }
+        }
+
         if (data.cart_signature) {
             currentCartSignature = data.cart_signature;
         }
@@ -3877,18 +3909,38 @@
         const tbody = document.getElementById('carts');
         const prevRowCount = tbody ? tbody.querySelectorAll('tr.cart-row, tr').length : 0;
 
-        if (data.total_transaction !== undefined) {
-            totaltransaction = parseFloat(data.total_transaction) || 0;
-        } else if (data.totaltransaction !== undefined) {
-            totaltransaction = parseFloat(data.totaltransaction) || 0;
-        }
+        if (Array.isArray(data.cart_items)) {
+            // Hitung langsung dari daftar item yang dirender ke tabel agar Jumlah, Total Diskon,
+            // dan Total Beli dijamin 100% identik dengan baris pada tabel Barang Dibeli.
+            let sumBought = 0;
+            let sumDiscount = 0;
+            let sumFinal = 0;
+            data.cart_items.forEach(rowItem => {
+                const rowSub = parseFloat(rowItem.total_price) || 0;
+                const rowEmb = parseFloat(rowItem.embalase) || 0;
+                const rowDisc = parseFloat(rowItem.discount) || 0;
+                const rowFin = parseFloat(rowItem.final_price) || 0;
+                sumBought += (rowSub + rowEmb);
+                sumDiscount += rowDisc;
+                sumFinal += rowFin;
+            });
+            totalbought = sumBought;
+            total_discount = sumDiscount;
+            totaltransaction = sumFinal;
+        } else {
+            if (data.total_transaction !== undefined) {
+                totaltransaction = parseFloat(data.total_transaction) || 0;
+            } else if (data.totaltransaction !== undefined) {
+                totaltransaction = parseFloat(data.totaltransaction) || 0;
+            }
 
-        if (data.total_discount !== undefined) {
-            total_discount = parseFloat(data.total_discount) || 0;
-        }
+            if (data.total_discount !== undefined) {
+                total_discount = parseFloat(data.total_discount) || 0;
+            }
 
-        if (data.totalbought !== undefined) {
-            totalbought = parseFloat(data.totalbought) || 0;
+            if (data.totalbought !== undefined) {
+                totalbought = parseFloat(data.totalbought) || 0;
+            }
         }
 
         const effectivePayable = Math.max(0, totaltransaction - (parseFloat(subtotal_discount) || 0));
@@ -3924,7 +3976,7 @@
 
             tbody.querySelectorAll('tr.cart-row').forEach(row => attachRowEvents(row));
 
-            if (expectedCountDelta !== null && data.cart_items.length !== (prevRowCount + expectedCountDelta)) {
+            if (expectedCountDelta !== null && !data.moved_to_transaction_id && data.cart_items.length !== (prevRowCount + expectedCountDelta)) {
                 if (typeof iziToast !== 'undefined') {
                     iziToast.warning({
                         title: 'Sinkronisasi Keranjang',
@@ -3944,6 +3996,7 @@
                     type: 'CART_UPDATED',
                     tx_id: String(transaction_id),
                     sender: window.__kasirTabId || '',
+                    instance: window.__kasirPageInstanceId || '',
                     cart_sync: data,
                 });
             } catch (e) {}
@@ -4020,6 +4073,7 @@
                     })
                     .finally(releaseSubmitLock);
             } else {
+                const currentDomCartCount = document.querySelectorAll('#carts tr.cart-row').length;
                 return axios.post("{{ route('transaction.addToCart') }}", {
                     medicine_id,
                     transaction_id,
@@ -4038,7 +4092,9 @@
                     racikstatus,
                     start_new_recipe: startNewRecipe,
                     medicine_type,
-                    service
+                    service,
+                    client_tab_id: window.__kasirTabId || '',
+                    client_cart_count: currentDomCartCount
 
                 }).then(response => {
                     const item = response.data;
@@ -4882,6 +4938,9 @@
 
             if (isHidden) {
                 // Open modal
+                if (typeof window.__runKasirSyncCheck === 'function') {
+                    window.__runKasirSyncCheck();
+                }
                 modal.classList.remove('hidden');
                 modal.classList.add('flex');
                 inputpatient.focus();
@@ -5510,6 +5569,9 @@
 
     // Payment
     document.getElementById('openModalPayment').addEventListener('click', () => {
+        if (typeof window.__runKasirSyncCheck === 'function') {
+            window.__runKasirSyncCheck();
+        }
         document.getElementById('paymentModal').classList.remove('hidden');
         document.getElementById('paymentModal').classList.add('flex');
         inputpatient.focus();
@@ -5549,8 +5611,8 @@
     });
 
     function resetTransaction() {
-        page = 1;
-        lastPage = false;
+        trxPage = 1;
+        trxLastPage = false;
         document.getElementById('transactionTable').innerHTML = '';
     }
 
@@ -5577,26 +5639,34 @@
     });
 
     function loadData() {
-        if (loading || lastPage) return;
+        if (!masterModal || masterModal.classList.contains('hidden')) return;
+        if (masterLoading || masterLastPage) return;
 
-        loading = true;
-        document.getElementById('loader').style.display = 'block';
+        masterLoading = true;
+        const loaderEl = document.getElementById('loader');
+        if (loaderEl) loaderEl.style.display = 'block';
 
         axios.get('/transactions/getmedicinemaster', {
             params: {
-                page,
-                search
+                page: masterPage,
+                search: masterSearch
             }
         }).then(res => {
-            const data = res.data.data;
+            const data = res.data?.data ?? [];
 
-            if (data.length === 0) lastPage = true;
+            if (data.length === 0 || !res.data?.next_page_url) {
+                masterLastPage = true;
+            }
 
-            appendRows(data);
-            page++;
-
-            loading = false;
-            document.getElementById('loader').style.display = 'none';
+            if (data.length > 0) {
+                appendRows(data);
+                masterPage++;
+            }
+        }).catch(() => {
+            // Prevent lock-up on network error
+        }).finally(() => {
+            masterLoading = false;
+            if (loaderEl) loaderEl.style.display = 'none';
         });
     }
 
@@ -5880,28 +5950,33 @@
 
     // Transaction Data
     function loadTransactionData() {
-        if (loading || lastPage) return;
+        if (!transactionModal || transactionModal.classList.contains('hidden')) return;
+        if (trxLoading || trxLastPage) return;
 
-        loading = true;
-        document.getElementById('loader').classList.remove('hidden');
+        trxLoading = true;
+        const loaderEl = document.getElementById('loader');
+        if (loaderEl) loaderEl.classList.remove('hidden');
 
         axios.get('/transactions/gettransactiondata', {
             params: {
-                page,
-                search
+                page: trxPage,
+                search: trxSearch
             }
         }).then(res => {
-            const data = res.data.data ?? [];
+            const data = res.data?.data ?? [];
 
-            if (!data.length) {
-                lastPage = true;
-            } else {
-                appendTransactionRows(data);
-                page++;
+            if (!data.length || !res.data?.next_page_url) {
+                trxLastPage = true;
             }
-
-            loading = false;
-            document.getElementById('loader').classList.add('hidden');
+            if (data.length > 0) {
+                appendTransactionRows(data);
+                trxPage++;
+            }
+        }).catch(() => {
+            // Prevent lock-up on network error
+        }).finally(() => {
+            trxLoading = false;
+            if (loaderEl) loaderEl.classList.add('hidden');
         });
     }
 
@@ -6022,24 +6097,15 @@
     }
 
 
-    window.addEventListener('scroll', () => {
-        if (
-            window.innerHeight + window.scrollY >=
-            document.body.offsetHeight - 200
-        ) {
-            loadData();
-        }
-    });
-
     let timer;
     let searchTimer;
 
     function onSearch(val) {
         clearTimeout(timer);
         timer = setTimeout(() => {
-            search = val;
-            page = 1;
-            lastPage = false;
+            masterSearch = val;
+            masterPage = 1;
+            masterLastPage = false;
             document.getElementById('masterTable').innerHTML = '';
             loadData();
         }, 400);
@@ -6048,7 +6114,7 @@
     function onTransactionSearch(value) {
         clearTimeout(searchTimer);
         searchTimer = setTimeout(() => {
-            search = value;
+            trxSearch = value;
             resetTransaction();
             loadTransactionData();
         }, 400);
@@ -6292,13 +6358,27 @@
     // 2. Isolasi & sinkronisasi instan antar-tab di browser yang sama via BroadcastChannel
     // 3. Lease & sinkronisasi lintas komputer / browser di cabang yang sama via Server Heartbeat
     (function() {
-        const myTxId = "{{ $trx_id ?? '' }}";
+        let myTxId = "{{ $trx_id ?? '' }}";
         const newTxUrl = "{{ route('transaction', ['type' => $type ?? 'resep']) }}";
         if (!myTxId) return;
 
-        const myTabId = Math.random().toString(36).substring(2, 10) + '_' + Date.now().toString(36);
-        window.__kasirTabId = myTabId;
+        let ownerKey = 'kasir_tab_owner_' + myTxId;
+        const freshTabId = Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 10);
+        const pageInstanceId = freshTabId;
+        let myTabId = freshTabId;
         let isRedirecting = false;
+
+        window.__kasirSetActiveTxId = function(newId) {
+            if (!newId) return;
+            try {
+                sessionStorage.removeItem(ownerKey);
+            } catch (e) {}
+            myTxId = String(newId);
+            ownerKey = 'kasir_tab_owner_' + myTxId;
+            try {
+                sessionStorage.setItem(ownerKey, 'active:' + myTabId);
+            } catch (e) {}
+        };
 
         function redirectToFreshTransaction(title, message, targetUrl, delayMs) {
             if (isRedirecting) return;
@@ -6321,38 +6401,48 @@
             }, delayMs ?? 600);
         }
 
-        // ── 1. Deteksi Instan "Duplicate Tab" Browser (sessionStorage clone check) ──
+        // ── 1. Deteksi "Duplicate Tab" (0ms) SEKALIGUS Pertahankan Tab ID Saat Ganti Faktor / Reload ──
+        // Saat tab melakukan navigasi normal (ganti faktor Resep Credit/Tunai/HV/UPDS atau reload F5),
+        // event beforeunload mengubah status sessionStorage menjadi 'navigating:<tabId>'.
+        // Sedangkan saat kasir klik kanan -> "Duplicate Tab" di Chrome, tab asli masih terbuka sehingga
+        // sessionStorage yang ter-copy ke tab duplikat berstatus 'active:<tabId>'.
         try {
-            const ownerKey = 'kasir_tab_owner_' + myTxId;
-            const navKey = 'kasir_tab_navigating_' + myTxId;
             const existingOwner = sessionStorage.getItem(ownerKey);
-            const lastNavTs = parseInt(sessionStorage.getItem(navKey) || '0', 10);
-            const isNormalReloadOrNav = (Date.now() - lastNavTs) < 4000;
-
-            if (existingOwner && existingOwner !== myTabId && !isNormalReloadOrNav) {
-                // Tab ini adalah hasil "Duplicate Tab" (karena tab asli tidak pernah memicu beforeunload).
-                // Segera beri tab baru ini nomor transaksi sendiri dalam 0ms!
-                sessionStorage.setItem(ownerKey, myTabId);
-                redirectToFreshTransaction(
-                    'Tab Baru Terdeteksi',
-                    'Membuka nomor transaksi baru untuk tab ini agar tidak bertabrakan...',
-                    newTxUrl,
-                    150
-                );
-                return;
+            if (existingOwner) {
+                if (existingOwner.startsWith('navigating:')) {
+                    myTabId = existingOwner.slice('navigating:'.length) || freshTabId;
+                    sessionStorage.setItem(ownerKey, 'active:' + myTabId);
+                } else if (existingOwner.startsWith('active:')) {
+                    // Tab ini adalah hasil "Duplicate Tab" dari tab yang masih aktif!
+                    sessionStorage.removeItem(ownerKey);
+                    redirectToFreshTransaction(
+                        'Tab Duplikat Terdeteksi',
+                        'Membuka nomor transaksi baru agar tidak bertabrakan dengan tab sebelumnya...',
+                        newTxUrl,
+                        150
+                    );
+                    return;
+                } else {
+                    myTabId = existingOwner;
+                    sessionStorage.setItem(ownerKey, 'active:' + myTabId);
+                }
+            } else {
+                sessionStorage.setItem(ownerKey, 'active:' + myTabId);
             }
 
-            sessionStorage.setItem(ownerKey, myTabId);
-            sessionStorage.removeItem(navKey);
-
             window.addEventListener('beforeunload', function() {
-                try {
-                    sessionStorage.setItem(navKey, String(Date.now()));
-                } catch (e) {}
+                if (!isRedirecting) {
+                    try {
+                        sessionStorage.setItem(ownerKey, 'navigating:' + myTabId);
+                    } catch (e) {}
+                }
             });
         } catch (e) {}
 
-        // ── 2. BroadcastChannel untuk Antar-Tab di Browser yang Sama ──
+        window.__kasirTabId = myTabId;
+        window.__kasirPageInstanceId = pageInstanceId;
+
+        // ── 2. BroadcastChannel untuk Deteksi Tab Ganda ("Duplicate Tab") & Sinkronisasi di Browser yang Sama ──
         if (typeof BroadcastChannel !== 'undefined') {
             const channel = new BroadcastChannel('kasir_tx_isolation');
             window.__kasirTxChannel = channel;
@@ -6360,53 +6450,63 @@
 
             setTimeout(() => {
                 isEstablished = true;
-            }, 800);
+            }, 600);
 
             channel.onmessage = function(event) {
                 const data = event.data;
                 if (!data || String(data.tx_id) !== String(myTxId)) return;
 
-                if (data.type === 'PING') {
+                if (data.type === 'PING' && data.instance !== pageInstanceId) {
                     channel.postMessage({
                         type: 'PONG',
                         tx_id: myTxId,
                         sender: myTabId,
+                        instance: pageInstanceId,
                         established: isEstablished
                     });
-                } else if (data.type === 'PONG') {
-                    if (data.sender !== myTabId && (data.established || myTabId < data.sender)) {
+                } else if (data.type === 'PONG' && data.instance !== pageInstanceId) {
+                    if (data.established || pageInstanceId > data.instance) {
                         channel.onmessage = null;
+                        try {
+                            sessionStorage.removeItem(ownerKey);
+                        } catch (e) {}
                         redirectToFreshTransaction(
                             'Tab Ganda Terdeteksi',
                             'Transaksi ini sedang aktif di tab lain. Membuka transaksi baru...',
                             newTxUrl,
-                            400
+                            200
                         );
                     }
-                } else if (data.type === 'CART_UPDATED' && data.sender !== myTabId) {
+                } else if (data.type === 'CART_UPDATED' && data.instance !== pageInstanceId) {
                     if (data.cart_sync && typeof syncCartFromServer === 'function') {
                         syncCartFromServer(data.cart_sync, null);
                     }
                 }
             };
 
-            channel.postMessage({ type: 'PING', tx_id: myTxId, sender: myTabId });
+            channel.postMessage({ type: 'PING', tx_id: myTxId, sender: myTabId, instance: pageInstanceId });
             setTimeout(() => {
                 if (!isRedirecting) {
-                    channel.postMessage({ type: 'PING', tx_id: myTxId, sender: myTabId });
+                    channel.postMessage({ type: 'PING', tx_id: myTxId, sender: myTabId, instance: pageInstanceId });
                 }
-            }, 350);
+            }, 250);
         }
 
-        // ── 3. Server Heartbeat untuk Isolasi & Sinkronisasi Lintas 5-10 PC / Browser ──
+        // ── 3. Sinkronisasi Lintas PC Berbasis Event (Tanpa Polling setInterval) ──
         let heartbeatBusy = false;
+        let lastHeartbeatAt = 0;
         let lastSharedWarnAt = 0;
 
-        function runHeartbeat() {
+        function runHeartbeat(force) {
             if (isRedirecting || heartbeatBusy || (typeof checkoutProcessing !== 'undefined' && checkoutProcessing)) {
                 return;
             }
+            const now = Date.now();
+            if (!force && (now - lastHeartbeatAt) < 2000) {
+                return;
+            }
             heartbeatBusy = true;
+            lastHeartbeatAt = now;
 
             axios.post("{{ route('transaction.heartbeat') }}", {
                 transaction_id: myTxId,
@@ -6454,25 +6554,19 @@
             });
         }
 
-        setTimeout(runHeartbeat, 250);
-        setInterval(runHeartbeat, 8000);
-        window.addEventListener('focus', runHeartbeat);
+        window.__runKasirSyncCheck = () => runHeartbeat(true);
+        setTimeout(() => runHeartbeat(true), 250);
+        window.addEventListener('focus', () => runHeartbeat(false));
         document.addEventListener('visibilitychange', function() {
             if (document.visibilityState === 'visible') {
-                runHeartbeat();
+                runHeartbeat(false);
             }
         });
 
-        // ── 4. Konfirmasi Saat Ganti Tipe Transaksi Jika Keranjang Sudah Berisi Obat ──
         document.querySelectorAll('.trx-chips a.trx-chip').forEach(chip => {
             chip.addEventListener('click', function(e) {
-                if (this.classList.contains('active')) return;
-                const rowCount = document.querySelectorAll('#carts tr.cart-row').length;
-                if (rowCount > 0) {
-                    const ok = confirm('Perhatian: Mengganti jenis faktur pada transaksi yang sedang berjalan akan mengosongkan ' + rowCount + ' item di keranjang saat ini.\n\n(Tips: Klik "Tambah Transaksi" jika ingin membuka transaksi baru tanpa menghapus keranjang ini).\n\nTetap ganti jenis faktur dan kosongkan keranjang?');
-                    if (!ok) {
-                        e.preventDefault();
-                    }
+                if (this.classList.contains('active')) {
+                    e.preventDefault();
                 }
             });
         });

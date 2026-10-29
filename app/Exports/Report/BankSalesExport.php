@@ -185,28 +185,39 @@ class BankSalesExport implements WithMultipleSheets
         $summary = ['struk_count' => $transactions->count(), 'qty_sum' => 0, 'gross_sum' => 0, 'discount_sum' => 0, 'net_sum' => 0];
 
         foreach ($transactions as $trx) {
-            $trxDiscount = (int) ($trx->discount ?? 0);
-            $summary['discount_sum'] += $trxDiscount;
             $items = $trx->transactions;
             $originalMap = LiphExport::TYPE_MAP[$trx->transaction_type] ?? null;
             $originalLabel = $originalMap[1] ?? '';
+            $isReturnTrx = in_array($originalLabel, ['Retur Tunai', 'Retur Kredit'], true)
+                || in_array(strtoupper(trim((string) $trx->transaction_type)), ['RETUR JUAL', 'RETUR KREDIT'], true)
+                || str_starts_with(strtoupper(trim((string) ($trx->transaction_code ?? ''))), 'RT');
 
-            if ($items->isEmpty()) {
-                $subtotal = (int) ($trx->subtotal ?? 0);
-                $isReturn = in_array($originalLabel, ['Retur Tunai', 'Retur Kredit'], true);
-                $signedSubtotal = $isReturn ? -abs($subtotal) : $subtotal;
+            $trxDiscount = (!$isReturnTrx && is_numeric($trx->discount)) ? (int) round((float) $trx->discount) : 0;
+            $summary['discount_sum'] += $trxDiscount;
+
+            if ($items->isEmpty() || $isReturnTrx) {
+                $subtotal = is_numeric($trx->subtotal) ? (int) round((float) $trx->subtotal) : 0;
+                if ($isReturnTrx && $subtotal === 0 && $items->isNotEmpty()) {
+                    $subtotal = (int) $items->sum(function ($item) {
+                        $qty = (float) ($item->quantity ?? 0);
+                        $price = (int) round((float) ($item->item_price ?? 0));
+                        $itemDisc = (int) round((float) ($item->discount ?? 0));
+                        return (int) round((float) ($item->final_price ?? ($item->total_price ?? ($qty * $price - $itemDisc))));
+                    });
+                }
+                $signedSubtotal = $isReturnTrx ? -abs($subtotal) : $subtotal;
                 $summary['gross_sum'] += $signedSubtotal;
                 $summary['net_sum'] += $signedSubtotal - $trxDiscount;
-                $summary['qty_sum'] += ($isReturn ? -1 : 1);
+                $summary['qty_sum'] += ($isReturnTrx ? -max(1, (float) $items->sum('quantity')) : 1);
                 continue;
             }
 
             $trxGross = 0;
             foreach ($items as $item) {
                 $qty = (float) ($item->quantity ?? 0);
-                $price = (float) ($item->item_price ?? 0);
-                $itemDisc = (float) ($item->discount ?? 0);
-                $final = (float) ($item->final_price ?? ($item->total_price ?? ($qty * $price - $itemDisc)));
+                $price = (int) round((float) ($item->item_price ?? 0));
+                $itemDisc = (int) round((float) ($item->discount ?? 0));
+                $final = (int) round((float) ($item->final_price ?? ($item->total_price ?? ($qty * $price - $itemDisc))));
                 $effectiveType = $item->cart_type
                     ? (LiphExport::CART_TYPE_ABBR[$item->cart_type] ?? $item->cart_type)
                     : $trx->transaction_type;
@@ -220,7 +231,7 @@ class BankSalesExport implements WithMultipleSheets
                 $trxGross += $signedFinal;
             }
 
-            $roundedGross = (int) round($trxGross);
+            $roundedGross = (int) $trxGross;
             $summary['gross_sum'] += $roundedGross;
             $summary['net_sum'] += ($roundedGross - $trxDiscount);
         }

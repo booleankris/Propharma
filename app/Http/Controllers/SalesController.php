@@ -133,7 +133,12 @@ class SalesController extends Controller
                     ->first();
 
                 if ($lockedTx && $lockedTx->transaction_type !== $dbType) {
-                    $lockedTx->update(['transaction_type' => $dbType, 'transaction_code' => null]);
+                    $lockedTx->update([
+                        'transaction_type' => $dbType,
+                        'transaction_code' => null,
+                        'subtotal' => null,
+                        'discount' => null,
+                    ]);
                     MedicineCart::where('transaction_id', $lockedTx->id)
                         ->where('status', 0)
                         ->delete();
@@ -141,6 +146,8 @@ class SalesController extends Controller
                     $transaction->transaction_code = null;
                 }
             }, 3);
+
+            Cache::forget("kasir_tx_lease:{$pharmacy_id}:{$transaction->id}");
         }
 
         $trx_id = $transaction->id;
@@ -297,7 +304,7 @@ class SalesController extends Controller
         $isHeldByOtherTab = is_array($lease)
             && !empty($lease['client_tab_id'])
             && $lease['client_tab_id'] !== $clientTabId
-            && ($nowTs - (int) ($lease['updated_at'] ?? 0)) < 20;
+            && ($nowTs - (int) ($lease['updated_at'] ?? 0)) < 300;
 
         if ($isHeldByOtherTab) {
             // Jika keranjang masih kosong, langsung alihkan tab/PC kedua ke nomor transaksi baru agar tidak tabrakan
@@ -325,7 +332,7 @@ class SalesController extends Controller
             'user_id' => Auth::id(),
             'user_name' => Auth::user()->name ?? 'Kasir',
             'updated_at' => $nowTs,
-        ], 25);
+        ], 600);
 
         if ($clientSignature !== '' && $clientSignature !== $syncPayload['cart_signature']) {
             return response()->json([
@@ -701,19 +708,65 @@ class SalesController extends Controller
     public function addToCart(Request $request)
     {
         $pharmacyId = (int) (getActivePharmacyId() ?: Auth::user()->pharmacy_id);
+        $clientTabId = trim((string) $request->input('client_tab_id', ''));
+        $clientCartCount = $request->has('client_cart_count') ? (int) $request->input('client_cart_count') : null;
+        $movedToNewTransaction = false;
 
-        $transaction = DB::transaction(function () use ($request, $pharmacyId) {
+        $transaction = DB::transaction(function () use ($request, $pharmacyId, $clientTabId, $clientCartCount, &$movedToNewTransaction) {
             // Serialize cart writes on the parent transaction. This prevents two
             // tabs/devices from both selecting the same "next recipe" state.
-            $parentTransaction = MedicineTransactions::where('id', $request->get('transaction_id'))
+            $requestedTxId = (int) $request->get('transaction_id');
+            $parentTransaction = MedicineTransactions::where('id', $requestedTxId)
                 ->where('pharmacy_id', $pharmacyId)
-                ->where('status', 0)
                 ->lockForUpdate()
-                ->firstOrFail();
+                ->first();
+
+            $fallbackType = $parentTransaction?->transaction_type
+                ?: (in_array($request->get('medicine_type'), ['RESEP TUNAI', 'KREDIT', 'UPDS', 'HV/OTC'], true)
+                    ? $request->get('medicine_type')
+                    : 'RESEP TUNAI');
+
+            $shouldForkNewTransaction = false;
+            if (!$parentTransaction || (int) $parentTransaction->status !== 0) {
+                // Transaksi sudah selesai/dihapus di tab/PC lain -> buatkan transaksi baru otomatis
+                $shouldForkNewTransaction = true;
+            } elseif ($clientCartCount === 0) {
+                // Layar kasir di tab/PC ini sebelumnya kosong (0 item).
+                // Cek apakah transaksi ini ternyata sudah dipakai / diisi item oleh tab/PC lain:
+                $dbCartCount = MedicineCart::where('transaction_id', $parentTransaction->id)
+                    ->where('status', 0)
+                    ->count();
+                $leaseKey = "kasir_tx_lease:{$pharmacyId}:{$parentTransaction->id}";
+                $lease = Cache::get($leaseKey);
+                $nowTs = now()->timestamp;
+                $isHeldByOtherTab = is_array($lease)
+                    && !empty($lease['client_tab_id'])
+                    && $clientTabId !== ''
+                    && $lease['client_tab_id'] !== $clientTabId
+                    && ($nowTs - (int) ($lease['updated_at'] ?? 0)) < 300;
+
+                if ($dbCartCount > 0 || $isHeldByOtherTab) {
+                    $shouldForkNewTransaction = true;
+                }
+            }
+
+            if ($shouldForkNewTransaction) {
+                $parentTransaction = MedicineTransactions::create([
+                    'pharmacy_id' => $pharmacyId,
+                    'user_id' => auth()->id(),
+                    'debtor_id' => $request->filled('debtor_id') ? $request->get('debtor_id') : ($parentTransaction?->debtor_id ?? null),
+                    'transaction_type' => $fallbackType,
+                    'transaction_code' => null,
+                    'subtotal' => null,
+                    'discount' => null,
+                    'status' => 0,
+                ]);
+                $movedToNewTransaction = true;
+            }
 
             $cartType = $request->get('cart_type');
             $medicineType = $request->get('medicine_type');
-            $embalase = $request->get('embalase');
+            $embalase = (float) ($request->get('embalase') ?: 0);
             if ($parentTransaction->transaction_type === 'KREDIT') {
                 if (!in_array($cartType, ['UK', 'UP', 'HV'], true)) {
                     abort(422, 'Jenis item resep kredit tidak valid.');
@@ -772,20 +825,25 @@ class SalesController extends Controller
                 $parentTransaction->update(['debtor_id' => $request->get('debtor_id')]);
             }
 
+            $itemSubtotal = round((float) $request->get('final_price', 0), 2);
+            $itemDiscount = round((float) $request->get('discount', 0), 2);
+            $itemEmbalase = round((float) $embalase, 2);
+            $itemFinalPrice = max(0, $itemSubtotal - $itemDiscount) + $itemEmbalase;
+
             return MedicineCart::create([
                 'user_id' => auth()->id(),
                 'medicine_id' => $request->get('medicine_id'),
                 'transaction_id' => $parentTransaction->id,
                 'quantity' => $request->get('quantity'),
-                'discount' => $request->get('discount'),
-                'embalase' => $embalase,
+                'discount' => $itemDiscount,
+                'embalase' => $itemEmbalase,
                 'cart_type' => $cartType,
                 'package' => $request->get('package'),
                 'dosage_r' => $request->get('dosage_r'),
                 'item_price' => $request->get('price2'),
                 'raw_total' => $request->get('raw_total'),
-                'total_price' => $request->get('final_price'),
-                'final_price' => $request->get('total_price'),
+                'total_price' => $itemSubtotal,
+                'final_price' => $itemFinalPrice,
                 'status' => 0,
                 'recipe_status' => $recipeStatus,
                 'recipe_number' => $recipeNumber,
@@ -793,8 +851,31 @@ class SalesController extends Controller
                 'service_fee' => $service,
             ]);
         }, 3);
-        $transaction->load('medicine');
-        $syncPayload = $this->buildCartSyncPayload((int) $transaction->transaction_id);
+
+        $transaction->load('medicine', 'transactions');
+        $activeTxId = (int) $transaction->transaction_id;
+
+        if ($clientTabId !== '') {
+            $leaseKey = "kasir_tx_lease:{$pharmacyId}:{$activeTxId}";
+            $existingLease = Cache::get($leaseKey);
+            $nowTs = now()->timestamp;
+            $heldByOther = is_array($existingLease)
+                && !empty($existingLease['client_tab_id'])
+                && $existingLease['client_tab_id'] !== $clientTabId
+                && ($nowTs - (int) ($existingLease['updated_at'] ?? 0)) < 300;
+
+            if (!$heldByOther || $movedToNewTransaction) {
+                Cache::put($leaseKey, [
+                    'client_tab_id' => $clientTabId,
+                    'user_id' => Auth::id(),
+                    'user_name' => Auth::user()->name ?? 'Kasir',
+                    'updated_at' => $nowTs,
+                ], 600);
+            }
+        }
+
+        $syncPayload = $this->buildCartSyncPayload($activeTxId);
+        $routeType = $this->dbTypeToRouteType((string) ($transaction->transactions?->transaction_type ?? 'RESEP TUNAI'));
 
         return response()->json(array_merge([
             'id' => $transaction->id,
@@ -810,6 +891,8 @@ class SalesController extends Controller
             'final_price' => $transaction->final_price,
             'cart_type' => $transaction->cart_type,
             'remove_url' => route('sales.removeItem', $transaction->id),
+            'moved_to_transaction_id' => $movedToNewTransaction ? $activeTxId : null,
+            'moved_to_url' => $movedToNewTransaction ? route('transaction', ['type' => $routeType, 'id' => $activeTxId]) : null,
         ], $syncPayload));
     }
     public function getCartItem($id)
@@ -1676,7 +1759,9 @@ class SalesController extends Controller
                 $serviceFee = $cartType === 'UK' && (int) $request->input('racikstatus', 0) !== 1
                     ? (float) $request->input('service', 0)
                     : 0;
-                $embalase = $cartType === 'UK' ? (float) $request->input('embalase', 0) : 0;
+                $embalase = $cartType === 'UK'
+                    ? (float) ($request->input('embalase') ?: $cart->embalase)
+                    : 0;
             }
 
             if ($request->has('debtor_id') && $request->filled('debtor_id') && $parentTransaction->transaction_type === 'KREDIT') {
@@ -1685,21 +1770,26 @@ class SalesController extends Controller
                 ]);
             }
 
+            $itemSubtotal = round((float) $request->final_price, 2);
+            $itemDiscount = round((float) $request->discount, 2);
+            $itemEmbalase = round((float) $embalase, 2);
+            $itemFinalPrice = max(0, $itemSubtotal - $itemDiscount) + $itemEmbalase;
+
             $cart->update([
                 'cart_type' => $cartType,
                 'medicine_type' => $parentTransaction->transaction_type === 'KREDIT'
                     ? $medicineType
                     : $cart->medicine_type,
                 'service_fee' => $serviceFee,
-                'embalase' => $embalase,
+                'embalase' => $itemEmbalase,
                 'quantity' => $request->quantity,
-                'discount' => $request->discount,
+                'discount' => $itemDiscount,
                 'package' => $request->package,
                 'dosage_r' => $request->dosage_r,
                 'item_price' => $request->price2,
                 'raw_total' => $request->raw_total,
-                'total_price' => $request->final_price,
-                'final_price' => $request->total_price + $embalase,
+                'total_price' => $itemSubtotal,
+                'final_price' => $itemFinalPrice,
             ]);
 
             $cart->load('medicine');

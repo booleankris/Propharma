@@ -115,12 +115,18 @@ class DoctorExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                 ];
             }
 
-            $grouped[$groupKey]['nilai_resep'] += (int) round($resepItems->sum(fn ($i) => (float) ($i->final_price ?? 0)));
+            $grouped[$groupKey]['nilai_resep'] += (int) $resepItems->sum(function ($i) {
+                $qty   = (float) ($i->quantity ?? 0);
+                $price = (int) round((float) ($i->item_price ?? 0));
+                $disc  = (int) round((float) ($i->discount ?? 0));
+                return (int) round((float) ($i->final_price ?? $i->total_price ?? ($price * $qty - $disc)));
+            });
             $grouped[$groupKey]['lembar']      += 1;
             $grouped[$groupKey]['jumlah_r']    += $resepItems->count();
 
-            if (is_numeric($trx->discount) && (float) $trx->discount > 0) {
-                $potonganTrx += (int) round((float) $trx->discount);
+            $trxDisc = is_numeric($trx->discount) ? (int) round((float) $trx->discount) : 0;
+            if ($trxDisc > 0) {
+                $potonganTrx += $trxDisc;
             }
         }
 
@@ -204,12 +210,18 @@ class DoctorExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                     ];
                 }
 
-                $grouped[$key]['qty']   += (float) ($item->quantity ?? 0);
-                $grouped[$key]['total'] += (int) round((float) ($item->final_price ?? 0));
+                $qty   = (float) ($item->quantity ?? 0);
+                $price = (int) round((float) ($item->item_price ?? 0));
+                $disc  = (int) round((float) ($item->discount ?? 0));
+                $tot   = (int) round((float) ($item->final_price ?? $item->total_price ?? ($price * $qty - $disc)));
+
+                $grouped[$key]['qty']   += $qty;
+                $grouped[$key]['total'] += $tot;
             }
 
-            if (is_numeric($trx->discount) && (float) $trx->discount > 0) {
-                $potonganTrx += (int) round((float) $trx->discount);
+            $trxDisc = is_numeric($trx->discount) ? (int) round((float) $trx->discount) : 0;
+            if ($trxDisc > 0) {
+                $potonganTrx += $trxDisc;
             }
         }
 

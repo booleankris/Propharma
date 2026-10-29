@@ -117,7 +117,7 @@ class FactoryExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
 
         foreach ($headers as $rt) {
             $rtTime   = Carbon::parse($rt->created_at ?? $rt->updated_at);
-            $rtAmount = (int) ($rt->subtotal ?? 0);
+            $rtAmount = (int) round((float) ($rt->subtotal ?? 0));
 
             $match = $candidates->first(function ($r) use ($rtTime, $rtAmount, $used, $originCodes) {
                 return !isset($used[$r->id])
@@ -134,7 +134,7 @@ class FactoryExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
                     'factory'    => $medicine?->factory?->name ?? 'LAINNYA',
                     'name'       => $medicine?->name ?? 'Obat Retur (Tanpa Master)',
                     'qty'        => (float) $match->qty_retur,
-                    'total'      => (int) ($rt->subtotal ?? ($match->total_retur ?? 0)),
+                    'total'      => (int) round((float) ($rt->subtotal ?? ($match->total_retur ?? 0))),
                 ];
             } else {
                 $returns[] = [
@@ -142,7 +142,7 @@ class FactoryExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
                     'factory'    => '[RETUR TANPA RINCIAN OBAT]',
                     'name'       => '[RETUR TANPA RINCIAN OBAT]',
                     'qty'        => 0,
-                    'total'      => (int) ($rt->subtotal ?? 0),
+                    'total'      => (int) round((float) ($rt->subtotal ?? 0)),
                 ];
             }
         }
@@ -155,7 +155,34 @@ class FactoryExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
         $grouped = [];
 
         foreach ($transactions as $trx) {
-            foreach ($trx->transactions ?? [] as $item) {
+            $isReturn = in_array(strtoupper(trim((string) $trx->transaction_type)), ['RETUR JUAL', 'RETUR KREDIT'], true)
+                || str_starts_with(strtoupper(trim((string) $trx->transaction_code)), 'RT');
+            if ($isReturn) {
+                continue;
+            }
+
+            $items = $trx->transactions ?? collect();
+            if ($items->isEmpty()) {
+                if (empty($this->factoryId)) {
+                    $fallbackTotal = is_numeric($trx->subtotal) ? (int) round((float) $trx->subtotal) : 0;
+                    if ($fallbackTotal !== 0) {
+                        $factory = 'LAINNYA';
+                        if (!isset($grouped[$factory])) {
+                            $grouped[$factory] = [
+                                'name'        => $factory,
+                                'qty'         => 0,
+                                'total'       => 0,
+                                'qty_retur'   => 0,
+                                'total_retur' => 0,
+                            ];
+                        }
+                        $grouped[$factory]['total'] += $fallbackTotal;
+                    }
+                }
+                continue;
+            }
+
+            foreach ($items as $item) {
                 $medicine = $item->medicine;
                 if ($this->factoryId && ($medicine?->factory_id != $this->factoryId)) {
                     continue;
@@ -173,8 +200,13 @@ class FactoryExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
                     ];
                 }
 
-                $grouped[$factory]['qty']   += (float) ($item->quantity ?? 0);
-                $grouped[$factory]['total'] += (int) round((float) ($item->final_price ?? 0));
+                $qty   = (float) ($item->quantity ?? 0);
+                $price = (int) round((float) ($item->item_price ?? 0));
+                $disc  = (int) round((float) ($item->discount ?? 0));
+                $tot   = (int) round((float) ($item->final_price ?? $item->total_price ?? ($price * $qty - $disc)));
+
+                $grouped[$factory]['qty']   += $qty;
+                $grouped[$factory]['total'] += $tot;
             }
         }
 
@@ -235,10 +267,10 @@ class FactoryExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
 
         // Jika menampilkan seluruh pabrik (tidak difilter 1 pabrik tertentu), tampilkan rekonsiliasi diskon transaksi
         if (empty($this->factoryId)) {
-            $potonganTransaksi = (int) round($transactions->reject(function ($trx) {
+            $potonganTransaksi = (int) $transactions->reject(function ($trx) {
                 return in_array(strtoupper(trim((string) $trx->transaction_type)), ['RETUR JUAL', 'RETUR KREDIT'], true)
-                    || strtoupper(trim((string) $trx->transaction_code)) === 'RT';
-            })->sum(fn ($t) => (float) ($t->discount ?? 0)));
+                    || str_starts_with(strtoupper(trim((string) $trx->transaction_code)), 'RT');
+            })->sum(fn ($t) => is_numeric($t->discount) ? (int) round((float) $t->discount) : 0);
 
             if ($potonganTransaksi > 0) {
                 $rows[] = [
@@ -264,7 +296,33 @@ class FactoryExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
         $grouped = [];
 
         foreach ($transactions as $trx) {
-            foreach ($trx->transactions ?? [] as $item) {
+            $isReturn = in_array(strtoupper(trim((string) $trx->transaction_type)), ['RETUR JUAL', 'RETUR KREDIT'], true)
+                || str_starts_with(strtoupper(trim((string) $trx->transaction_code)), 'RT');
+            if ($isReturn) {
+                continue;
+            }
+
+            $items = $trx->transactions ?? collect();
+            if ($items->isEmpty()) {
+                if (empty($this->factoryId)) {
+                    $fallbackTotal = is_numeric($trx->subtotal) ? (int) round((float) $trx->subtotal) : 0;
+                    if ($fallbackTotal !== 0) {
+                        $factory = 'LAINNYA';
+                        $key = $factory . '###trx_empty_' . $trx->id;
+                        $grouped[$key] = [
+                            'factory'     => $factory,
+                            'name'        => '[TRANSAKSI TANPA RINCIAN ITEM]',
+                            'qty'         => 0,
+                            'total'       => $fallbackTotal,
+                            'qty_retur'   => 0,
+                            'total_retur' => 0,
+                        ];
+                    }
+                }
+                continue;
+            }
+
+            foreach ($items as $item) {
                 $medicine = $item->medicine;
                 if ($this->factoryId && ($medicine?->factory_id != $this->factoryId)) {
                     continue;
@@ -285,8 +343,13 @@ class FactoryExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
                     ];
                 }
 
-                $grouped[$key]['qty']   += (float) ($item->quantity ?? 0);
-                $grouped[$key]['total'] += (int) round((float) ($item->final_price ?? 0));
+                $qty   = (float) ($item->quantity ?? 0);
+                $price = (int) round((float) ($item->item_price ?? 0));
+                $disc  = (int) round((float) ($item->discount ?? 0));
+                $tot   = (int) round((float) ($item->final_price ?? $item->total_price ?? ($price * $qty - $disc)));
+
+                $grouped[$key]['qty']   += $qty;
+                $grouped[$key]['total'] += $tot;
             }
         }
 
@@ -352,10 +415,10 @@ class FactoryExport implements FromArray, WithStyles, WithColumnWidths, WithTitl
         ];
 
         if (empty($this->factoryId)) {
-            $potonganTransaksi = (int) round($transactions->reject(function ($trx) {
+            $potonganTransaksi = (int) $transactions->reject(function ($trx) {
                 return in_array(strtoupper(trim((string) $trx->transaction_type)), ['RETUR JUAL', 'RETUR KREDIT'], true)
-                    || strtoupper(trim((string) $trx->transaction_code)) === 'RT';
-            })->sum(fn ($t) => (float) ($t->discount ?? 0)));
+                    || str_starts_with(strtoupper(trim((string) $trx->transaction_code)), 'RT');
+            })->sum(fn ($t) => is_numeric($t->discount) ? (int) round((float) $t->discount) : 0);
 
             if ($potonganTransaksi > 0) {
                 $rows[] = [

@@ -196,7 +196,7 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
                 $this->shift
             );
 
-            $transactions = $query->orderBy('updated_at', 'asc')->get()
+            $transactions = $query->orderByRaw('COALESCE(created_at, updated_at) ASC')->get()
                 ->filter(fn ($trx) => BankSalesExport::resolveCategory($trx) === $this->bankName);
         }
 
@@ -210,7 +210,7 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
         $totalTrxDiscount = 0;
 
         foreach ($transactions as $trx) {
-            $dateCol = $trx->updated_at ?? $trx->created_at;
+            $dateCol = $trx->created_at ?? $trx->updated_at;
             $tgl = $dateCol ? $dateCol->format('d/m/Y H:i') : '-';
             $code = $trx->transaction_code ?? '-';
             $type = $trx->transaction_type ?? '-';
@@ -223,14 +223,14 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
             $originalLabel = $originalMap[1] ?? '';
             $isReturnTrx = in_array($originalLabel, ['Retur Tunai', 'Retur Kredit'], true)
                 || in_array(strtoupper(trim((string) $trx->transaction_type)), ['RETUR JUAL', 'RETUR KREDIT'], true)
-                || strtoupper(trim((string) ($trx->transaction_code ?? ''))) === 'RT';
+                || str_starts_with(strtoupper(trim((string) ($trx->transaction_code ?? ''))), 'RT');
 
-            $trxDiscount = (int) ($trx->discount ?? 0);
+            $trxDiscount = (!$isReturnTrx && is_numeric($trx->discount)) ? (int) round((float) $trx->discount) : 0;
             $items = $trx->transactions;
 
             if ($items->isEmpty()) {
                 // If no cart items found, still show transaction total
-                $subtotal = (int) ($trx->subtotal ?? 0);
+                $subtotal = is_numeric($trx->subtotal) ? (int) round((float) $trx->subtotal) : 0;
                 $signedSubtotal = $isReturnTrx ? -abs($subtotal) : $subtotal;
                 $qty = $isReturnTrx ? -1 : 1;
 
@@ -280,9 +280,10 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
                 $medicine = $item->medicine;
                 $medCode  = $medicine->code ?? '-';
                 $medName  = $medicine->name ?? 'Obat Tidak Ditemukan';
-                $qty      = (int) ($item->quantity ?? 0);
-                $itemDiscount = (int) ($item->discount ?? 0);
-                $final    = (int) ($item->final_price ?? ($item->total_price ?? ($qty * ($item->item_price ?? 0) - $itemDiscount)));
+                $qty      = (float) ($item->quantity ?? 0);
+                $price    = (int) round((float) ($item->item_price ?? 0));
+                $itemDiscount = (int) round((float) ($item->discount ?? 0));
+                $final    = (int) round((float) ($item->final_price ?? ($item->total_price ?? ($qty * $price - $itemDiscount))));
 
                 $effectiveType = $item->cart_type
                     ? (LiphExport::CART_TYPE_ABBR[$item->cart_type] ?? $item->cart_type)
@@ -292,7 +293,7 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
 
                 $unitPrice = ($qty > 0)
                     ? (int) round(($item->total_price ?? ($final + $itemDiscount)) / $qty)
-                    : (int) ($item->item_price ?? 0);
+                    : $price;
 
                 if ($isReturn) {
                     $qty = -abs($qty);

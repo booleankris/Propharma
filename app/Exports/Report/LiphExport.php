@@ -75,7 +75,17 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
 
     private function safeSum($collection, $field)
     {
-        return (int) round($collection->sum(fn($item) => (float) ($item->{$field} ?? 0)));
+        return (int) $collection->sum(fn($item) => (int) round((float) ($item->{$field} ?? 0)));
+    }
+
+    private function safeItemNettoSum($collection): int
+    {
+        return (int) $collection->sum(function ($item) {
+            $qty = (float) ($item->quantity ?? 0);
+            $price = (int) round((float) ($item->item_price ?? 0));
+            $disc = (int) round((float) ($item->discount ?? 0));
+            return (int) round((float) ($item->final_price ?? $item->total_price ?? ($price * $qty - $disc)));
+        });
     }
 
     private function emptyBucket(): array
@@ -220,8 +230,10 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
             $items = $trx->transactions->where('status', 1);
             $totalItems = $items->count();
 
-            if ($totalItems === 0) {
-                // No cart items at all — count the Lembar under the
+            $isReturnTrx = in_array($originalLabel, ['Retur Tunai', 'Retur Kredit'], true);
+
+            if ($totalItems === 0 || $isReturnTrx) {
+                // No cart items at all (or return transaction header) — count under the
                 // original type only, nothing to split.
                 [$group, $label] = $originalMap;
 
@@ -230,10 +242,17 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                 }
 
                 $grouped[$group][$label]['lembar'] += 1;
-                $grouped[$group][$label]['potongan_transaksi'] += (int) round((float) ($trx->discount ?? 0));
+                if (!$isReturnTrx) {
+                    $grouped[$group][$label]['potongan_transaksi'] += is_numeric($trx->discount) ? (int) round((float) $trx->discount) : 0;
+                }
 
-                $trxNetto = (int) round((float) ($trx->subtotal ?? 0));
-                if (in_array($label, ['Retur Tunai', 'Retur Kredit'], true)) $trxNetto = -abs($trxNetto);
+                $trxSubtotal = is_numeric($trx->subtotal) ? (int) round((float) $trx->subtotal) : 0;
+                if ($isReturnTrx) {
+                    $returnBase = $trxSubtotal !== 0 ? $trxSubtotal : $this->safeItemNettoSum($items);
+                    $trxNetto = -abs($returnBase);
+                } else {
+                    $trxNetto = $trxSubtotal;
+                }
                 $grouped[$group][$label]['netto'] += $trxNetto;
 
                 continue;
@@ -287,13 +306,13 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                 $ref['embalase'] += $this->safeSum($groupItems, 'service_fee');
                 $ref['potongan'] += $this->safeSum($groupItems, 'discount');
 
-                $itemNetto = $this->safeSum($groupItems, 'final_price');
+                $itemNetto = $this->safeItemNettoSum($groupItems);
                 if (in_array($label, ['Retur Tunai', 'Retur Kredit'], true)) $itemNetto = -abs($itemNetto);
                 $ref['netto'] += $itemNetto;
 
                 if ($label === $potonganTransaksiTarget) {
                     $ref['lembar'] += 1;
-                    $ref['potongan_transaksi'] += (int) round((float) ($trx->discount ?? 0));
+                    $ref['potongan_transaksi'] += is_numeric($trx->discount) ? (int) round((float) $trx->discount) : 0;
                 }
 
                 unset($ref);
