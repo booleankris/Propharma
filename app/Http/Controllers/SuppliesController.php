@@ -310,16 +310,22 @@ class SuppliesController extends Controller
 
             // 5. RETURN DATATABLES RESPONSE
             return DataTables::eloquent($itemsQuery)
-                ->order(function ($q) use ($request, $effectiveDateSql) {
+                ->order(function ($q) use ($request, $effectiveDateSql, $med) {
+                    if (!$med) {
+                        // Saat belum memilih obat spesifik, gunakan index date + id agar super cepat (<0.3s)
+                        $q->orderBy('items_log.date', 'desc')->orderBy('items_log.id', 'desc');
+                        return;
+                    }
+
                     if ($request->has('order') && is_array($request->order)) {
                         $colIdx = $request->order[0]['column'] ?? null;
                         $orderDir = strtolower($request->order[0]['dir'] ?? 'asc') === 'desc' ? 'DESC' : 'ASC';
                         if ((int) $colIdx === 1) {
-                            $q->orderByRaw($effectiveDateSql . ' ' . $orderDir)->orderBy('id', $orderDir);
+                            $q->orderByRaw($effectiveDateSql . ' ' . $orderDir)->orderBy('items_log.id', $orderDir);
                             return;
                         }
                     }
-                    $q->orderByRaw($effectiveDateSql . ' ASC')->orderBy('id', 'asc');
+                    $q->orderByRaw($effectiveDateSql . ' ASC')->orderBy('items_log.id', 'asc');
                 })
                 ->addIndexColumn()
                 ->addColumn('date', function ($row) {
