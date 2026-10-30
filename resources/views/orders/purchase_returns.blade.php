@@ -607,10 +607,10 @@
 {{-- ═══════════════════════════════════════════════════════════════
      MODAL 1: INPUT RETUR BARU
 ═══════════════════════════════════════════════════════════════ --}}
-<div id="createReturnModal" class="fixed inset-0 z-[10000] hidden items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
-    <div class="relative w-full max-w-6xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden my-6">
+<div id="createReturnModal" class="fixed inset-0 z-[10000] hidden items-center justify-center p-3 sm:p-5 bg-slate-900/60 backdrop-blur-xs">
+    <div class="relative w-full max-w-6xl h-[92vh] max-h-[92vh] bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col">
         {{-- Modal Header --}}
-        <div class="px-6 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex items-center justify-between">
+        <div class="px-6 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex items-center justify-between shrink-0">
             <div class="flex items-center gap-3">
                 <div class="w-10 h-10 rounded-2xl bg-white/15 flex items-center justify-center">
                     <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -627,125 +627,129 @@
             </button>
         </div>
 
-        <form id="createReturnForm" onsubmit="submitCreateReturnForm(event)" class="p-6 space-y-4">
+        <form id="createReturnForm" onsubmit="submitCreateReturnForm(event)" class="flex flex-col flex-1 min-h-0 overflow-hidden">
             @csrf
-            {{-- Tabs Source Type --}}
-            <div class="flex items-center gap-2 p-1.5 bg-slate-100 rounded-2xl w-fit">
-                <button type="button" onclick="setEntrySource('invoice')" id="sourceBtn-invoice"
-                        class="px-4 py-2 rounded-xl text-xs font-bold transition-all bg-white text-blue-700 shadow-xs">
-                    Dari Faktur Penerimaan
-                </button>
-                <button type="button" onclick="setEntrySource('manual')" id="sourceBtn-manual"
-                        class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 transition-all">
-                    Input Obat Manual
-                </button>
-            </div>
 
-            {{-- Source 1: Faktur Search --}}
-            <div id="sectionInvoiceSearch" class="space-y-2">
-                <label class="block text-xs font-bold text-slate-700">Cari Faktur Penerimaan (Nomor Faktur atau Distributor)</label>
-                <div class="relative">
-                    <input type="text" id="invoiceSearchInput" placeholder="Ketik nomor faktur atau nama distributor (min. 2 huruf)..."
-                           onkeyup="onSearchInvoiceKeyUp(this.value)"
-                           class="w-full h-11 pl-4 pr-10 text-xs rounded-2xl border border-slate-300 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 font-medium bg-slate-50/50 focus:bg-white">
-                    <span id="invoiceSearchSpinner" class="hidden absolute right-3.5 top-1/2 -translate-y-1/2 text-blue-600 text-xs font-semibold">
-                        Memuat...
-                    </span>
+            {{-- Scrollable Modal Body --}}
+            <div class="p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
+                {{-- Tabs Source Type --}}
+                <div class="flex items-center gap-2 p-1.5 bg-slate-100 rounded-2xl w-fit">
+                    <button type="button" onclick="setEntrySource('invoice')" id="sourceBtn-invoice"
+                            class="px-4 py-2 rounded-xl text-xs font-bold transition-all bg-white text-blue-700 shadow-xs">
+                        Dari Faktur Penerimaan
+                    </button>
+                    <button type="button" onclick="setEntrySource('manual')" id="sourceBtn-manual"
+                            class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 transition-all">
+                        Input Obat Manual
+                    </button>
                 </div>
-                {{-- Dropdown Invoice Search Results --}}
-                <div id="invoiceResultsList" class="hidden max-h-52 overflow-y-auto divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white shadow-xl text-xs">
-                </div>
-            </div>
 
-            {{-- General Info Form --}}
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 p-3.5 bg-slate-50/70 rounded-2xl border border-slate-200">
-                <div>
-                    <label class="block text-[11px] font-bold text-slate-600 mb-1">Nomor Faktur / Referensi *</label>
-                    <input type="text" name="invoice_number" id="form_invoice_number" required
-                           class="w-full h-10 text-xs rounded-xl border border-slate-300 px-3 font-semibold focus:ring-2 focus:ring-blue-100 bg-white">
+                {{-- Source 1: Faktur Search --}}
+                <div id="sectionInvoiceSearch" class="space-y-2">
+                    <label class="block text-xs font-bold text-slate-700">Cari Faktur Penerimaan (Nomor Faktur atau Distributor)</label>
+                    <div class="relative">
+                        <input type="text" id="invoiceSearchInput" placeholder="Ketik nomor faktur atau nama distributor (min. 2 huruf)..."
+                               onkeyup="onSearchInvoiceKeyUp(this.value)"
+                               class="w-full h-11 pl-4 pr-10 text-xs rounded-2xl border border-slate-300 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 font-medium bg-slate-50/50 focus:bg-white">
+                        <span id="invoiceSearchSpinner" class="hidden absolute right-3.5 top-1/2 -translate-y-1/2 text-blue-600 text-xs font-semibold">
+                            Memuat...
+                        </span>
+                        {{-- Dropdown Invoice Search Results (Floating) --}}
+                        <div id="invoiceResultsList" class="hidden absolute left-0 right-0 top-full mt-1.5 z-30 max-h-56 overflow-y-auto divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white shadow-2xl text-xs">
+                        </div>
+                    </div>
                 </div>
-                <div>
-                    <label class="block text-[11px] font-bold text-slate-600 mb-1">Distributor (PBF) *</label>
-                    <select name="creditor_code" id="form_creditor_code" required class="w-full h-10 text-xs rounded-xl border border-slate-300 px-3 font-medium bg-white">
-                        <option value="">— Pilih Distributor —</option>
-                        @foreach($creditors as $c)
-                            <option value="{{ $c->code }}">{{ $c->name }} ({{ $c->code }})</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-[11px] font-bold text-slate-600 mb-1">Tanggal Faktur</label>
-                    <input type="date" name="invoice_date" id="form_invoice_date" value="{{ date('Y-m-d') }}"
-                           class="w-full h-10 text-xs rounded-xl border border-slate-300 px-3 font-medium bg-white">
-                </div>
-            </div>
 
-            {{-- Manual Medicine Search if manual mode --}}
-            <div id="sectionManualMedSearch" class="hidden space-y-2 p-3.5 bg-blue-50/40 rounded-2xl border border-blue-200">
-                <label class="block text-xs font-bold text-slate-700">+ Tambah Obat Manual ke Daftar Retur</label>
-                <div class="relative">
-                    <input type="text" id="medSearchInput" placeholder="Ketik nama obat atau barcode untuk dicari..."
-                           onkeyup="onSearchMedKeyUp(this.value)"
-                           class="w-full h-10 pl-3 pr-10 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-100 font-medium bg-white">
-                </div>
-                <div id="medResultsList" class="hidden max-h-48 overflow-y-auto divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white shadow-xl text-xs">
-                </div>
-            </div>
-
-            {{-- Items List to Return --}}
-            <div class="space-y-2">
-                <div class="flex items-center justify-between">
+                {{-- General Info Form --}}
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3 p-3.5 bg-slate-50/70 rounded-2xl border border-slate-200">
                     <div>
-                        <span class="text-xs font-bold text-slate-800">Daftar Obat yang Diretur</span>
-                        <p class="text-[11px] text-slate-400">Centang obat yang ingin diajukan, sesuaikan satuan retur dan jumlahnya</p>
+                        <label class="block text-[11px] font-bold text-slate-600 mb-1">Nomor Faktur / Referensi *</label>
+                        <input type="text" name="invoice_number" id="form_invoice_number" required
+                               class="w-full h-10 text-xs rounded-xl border border-slate-300 px-3 font-semibold focus:ring-2 focus:ring-blue-100 bg-white">
                     </div>
-                    <div id="selectedItemsCounter" class="text-xs font-semibold text-slate-600">
-                        0 Item Dipilih
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-600 mb-1">Distributor (PBF) *</label>
+                        <select name="creditor_code" id="form_creditor_code" required class="w-full h-10 text-xs rounded-xl border border-slate-300 px-3 font-medium bg-white">
+                            <option value="">— Pilih Distributor —</option>
+                            @foreach($creditors as $c)
+                                <option value="{{ $c->code }}">{{ $c->name }} ({{ $c->code }})</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-600 mb-1">Tanggal Faktur</label>
+                        <input type="date" name="invoice_date" id="form_invoice_date" value="{{ date('Y-m-d') }}"
+                               class="w-full h-10 text-xs rounded-xl border border-slate-300 px-3 font-medium bg-white">
                     </div>
                 </div>
-                <div class="border border-slate-200 rounded-2xl overflow-hidden max-h-[380px] overflow-y-auto shadow-2xs">
-                    <table class="w-full text-left text-xs border-collapse">
-                        <thead class="bg-slate-100 text-[11px] font-bold text-slate-600 border-b border-slate-200 sticky top-0 z-10 shadow-2xs">
-                            <tr>
-                                <th class="p-2.5 w-10 text-center">
-                                    <input type="checkbox" id="selectAllModalItems" onchange="toggleSelectAllItems(this.checked)" title="Pilih Semua" class="rounded text-blue-600 focus:ring-blue-500 cursor-pointer">
-                                </th>
-                                <th class="p-2.5 min-w-[190px]">NAMA OBAT</th>
-                                <th class="p-2.5 w-32 text-center">KETENTUAN RETUR</th>
-                                <th class="p-2.5 w-28">BATCH & ED</th>
-                                <th class="p-2.5 text-center w-36">SATUAN RETUR</th>
-                                <th class="p-2.5 text-center w-32">QTY RETUR</th>
-                                <th class="p-2.5 w-28 text-right">HARGA SATUAN</th>
-                                <th class="p-2.5 w-32">ALASAN</th>
-                                <th class="p-2.5 w-10 text-center"></th>
-                            </tr>
-                        </thead>
-                        <tbody id="returnItemsTableBody" class="divide-y divide-slate-100">
-                            <tr>
-                                <td colspan="9" class="py-12 text-center text-slate-400 font-medium">
-                                    Belum ada item dipilih. Cari faktur atau tambah obat manual di atas.
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+
+                {{-- Manual Medicine Search if manual mode --}}
+                <div id="sectionManualMedSearch" class="hidden space-y-2 p-3.5 bg-blue-50/40 rounded-2xl border border-blue-200">
+                    <label class="block text-xs font-bold text-slate-700">+ Tambah Obat Manual ke Daftar Retur</label>
+                    <div class="relative">
+                        <input type="text" id="medSearchInput" placeholder="Ketik nama obat atau barcode untuk dicari..."
+                               onkeyup="onSearchMedKeyUp(this.value)"
+                               class="w-full h-10 pl-3 pr-10 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-100 font-medium bg-white">
+                        <div id="medResultsList" class="hidden absolute left-0 right-0 top-full mt-1.5 z-30 max-h-48 overflow-y-auto divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white shadow-2xl text-xs">
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Items List to Return --}}
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <span class="text-xs font-bold text-slate-800">Daftar Obat yang Diretur</span>
+                            <p class="text-[11px] text-slate-400">Centang obat yang ingin diajukan, sesuaikan satuan retur dan jumlahnya</p>
+                        </div>
+                        <div id="selectedItemsCounter" class="text-xs font-semibold text-slate-600">
+                            0 Item Dipilih
+                        </div>
+                    </div>
+                    <div class="border border-slate-200 rounded-2xl overflow-hidden max-h-[340px] overflow-y-auto shadow-2xs">
+                        <table class="w-full text-left text-xs border-collapse">
+                            <thead class="bg-slate-100 text-[11px] font-bold text-slate-600 border-b border-slate-200 sticky top-0 z-10 shadow-2xs">
+                                <tr>
+                                    <th class="p-2.5 w-10 text-center">
+                                        <input type="checkbox" id="selectAllModalItems" onchange="toggleSelectAllItems(this.checked)" title="Pilih Semua" class="rounded text-blue-600 focus:ring-blue-500 cursor-pointer">
+                                    </th>
+                                    <th class="p-2.5 min-w-[190px]">NAMA OBAT</th>
+                                    <th class="p-2.5 w-32 text-center">KETENTUAN RETUR</th>
+                                    <th class="p-2.5 w-28">BATCH & ED</th>
+                                    <th class="p-2.5 text-center w-36">SATUAN RETUR</th>
+                                    <th class="p-2.5 text-center w-32">QTY RETUR</th>
+                                    <th class="p-2.5 w-28 text-right">HARGA SATUAN</th>
+                                    <th class="p-2.5 w-32">ALASAN</th>
+                                    <th class="p-2.5 w-10 text-center"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="returnItemsTableBody" class="divide-y divide-slate-100">
+                                <tr>
+                                    <td colspan="9" class="py-12 text-center text-slate-400 font-medium">
+                                        Belum ada item dipilih. Cari faktur atau tambah obat manual di atas.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                {{-- Notes --}}
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-600 mb-1">Catatan Pengajuan Retur</label>
+                    <input type="text" name="notes" id="form_notes" placeholder="Contoh: Barang retur ED dekat sesuai kesepakatan sales..."
+                           class="w-full h-10 text-xs rounded-xl border border-slate-300 px-3 font-medium">
                 </div>
             </div>
 
-            {{-- Notes --}}
-            <div>
-                <label class="block text-[11px] font-bold text-slate-600 mb-1">Catatan Pengajuan Retur</label>
-                <input type="text" name="notes" id="form_notes" placeholder="Contoh: Barang retur ED dekat sesuai kesepakatan sales..."
-                       class="w-full h-10 text-xs rounded-xl border border-slate-300 px-3 font-medium">
-            </div>
-
-            {{-- Form Footer Actions --}}
-            <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+            {{-- Form Footer Actions: Fixed at bottom --}}
+            <div class="px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2.5 shrink-0">
                 <button type="button" onclick="closeCreateReturnModal()"
-                        class="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-all">
+                        class="px-5 py-2.5 rounded-xl text-xs font-semibold text-slate-600 bg-white hover:bg-slate-100 border border-slate-200 shadow-2xs transition-all">
                     Batal
                 </button>
                 <button type="submit" id="btnSubmitCreateReturn"
-                        class="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-md shadow-blue-500/20 transition-all">
+                        class="px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-md shadow-blue-500/20 transition-all">
                     Simpan Pengajuan Retur
                 </button>
             </div>
@@ -757,12 +761,12 @@
      MODAL 2: UBAH STATUS RETUR
 ═══════════════════════════════════════════════════════════════ --}}
 <div id="changeStatusModal" class="fixed inset-0 z-[10000] hidden items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-    <div class="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden">
-        <div class="px-5 py-4 bg-blue-600 text-white flex items-center justify-between">
+    <div class="relative w-full max-w-md max-h-[90vh] bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col">
+        <div class="px-5 py-4 bg-blue-600 text-white flex items-center justify-between shrink-0">
             <h3 class="text-sm font-bold">Ubah Status Item Retur</h3>
             <button type="button" onclick="closeChangeStatusModal()" class="text-white hover:text-slate-200">✕</button>
         </div>
-        <form id="changeStatusForm" onsubmit="submitChangeStatus(event)" class="p-5 space-y-3.5 text-xs">
+        <form id="changeStatusForm" onsubmit="submitChangeStatus(event)" class="p-5 space-y-3.5 text-xs overflow-y-auto flex-1">
             @csrf
             <input type="hidden" id="status_item_id">
             
@@ -792,7 +796,7 @@
                 <input type="text" id="status_notes" placeholder="No CN / bukti potong / nama sales..." class="w-full h-10 rounded-xl border border-slate-300 px-3">
             </div>
 
-            <div class="pt-2 flex justify-end gap-2">
+            <div class="pt-2 flex justify-end gap-2 shrink-0">
                 <button type="button" onclick="closeChangeStatusModal()" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold">
                     Batal
                 </button>
@@ -808,12 +812,12 @@
      MODAL 3: KONFIRMASI RETUR (QUICK CUT STOCK)
 ═══════════════════════════════════════════════════════════════ --}}
 <div id="confirmItemModal" class="fixed inset-0 z-[10000] hidden items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-    <div class="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden">
-        <div class="px-5 py-4 bg-emerald-600 text-white flex items-center justify-between">
+    <div class="relative w-full max-w-md max-h-[90vh] bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col">
+        <div class="px-5 py-4 bg-emerald-600 text-white flex items-center justify-between shrink-0">
             <h3 class="text-sm font-bold">Konfirmasi Pengambilan & Potong Stok</h3>
             <button type="button" onclick="closeConfirmItemModal()" class="text-white hover:text-slate-200">✕</button>
         </div>
-        <form id="confirmItemForm" onsubmit="submitConfirmItem(event)" class="p-5 space-y-3.5 text-xs">
+        <form id="confirmItemForm" onsubmit="submitConfirmItem(event)" class="p-5 space-y-3.5 text-xs overflow-y-auto flex-1">
             @csrf
             <input type="hidden" id="confirm_item_id">
             
@@ -836,7 +840,7 @@
                 <input type="text" id="confirm_notes" placeholder="Nama sales penjemput barang..." class="w-full h-10 rounded-xl border border-slate-300 px-3">
             </div>
 
-            <div class="pt-2 flex justify-end gap-2">
+            <div class="pt-2 flex justify-end gap-2 shrink-0">
                 <button type="button" onclick="closeConfirmItemModal()" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold">
                     Batal
                 </button>
@@ -852,12 +856,12 @@
      MODAL 4: EDIT RINCIAN ITEM
 ═══════════════════════════════════════════════════════════════ --}}
 <div id="editItemModal" class="fixed inset-0 z-[10000] hidden items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-    <div class="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden">
-        <div class="px-5 py-4 bg-slate-800 text-white flex items-center justify-between">
+    <div class="relative w-full max-w-md max-h-[90vh] bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col">
+        <div class="px-5 py-4 bg-slate-800 text-white flex items-center justify-between shrink-0">
             <h3 class="text-sm font-bold">Edit Rincian Item Retur</h3>
             <button type="button" onclick="closeEditItemModal()" class="text-white hover:text-slate-200">✕</button>
         </div>
-        <form id="editItemForm" onsubmit="submitEditItem(event)" class="p-5 space-y-3.5 text-xs">
+        <form id="editItemForm" onsubmit="submitEditItem(event)" class="p-5 space-y-3.5 text-xs overflow-y-auto flex-1">
             @csrf
             <input type="hidden" id="edit_item_id">
 
@@ -905,7 +909,7 @@
                 <input type="text" id="edit_deduction_note" placeholder="Nomor nota kredit / bukti potong..." class="w-full h-10 rounded-xl border border-slate-300 px-3">
             </div>
 
-            <div class="pt-2 flex justify-end gap-2">
+            <div class="pt-2 flex justify-end gap-2 shrink-0">
                 <button type="button" onclick="closeEditItemModal()" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold">
                     Batal
                 </button>
@@ -1737,6 +1741,20 @@
                 return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
             });
         }
+
+        document.addEventListener('click', function(e) {
+            const invInput = document.getElementById('invoiceSearchInput');
+            const invList = document.getElementById('invoiceResultsList');
+            if (invList && !invList.contains(e.target) && e.target !== invInput) {
+                invList.classList.add('hidden');
+            }
+
+            const medInput = document.getElementById('medSearchInput');
+            const medList = document.getElementById('medResultsList');
+            if (medList && !medList.contains(e.target) && e.target !== medInput) {
+                medList.classList.add('hidden');
+            }
+        });
 
         $(document).ready(function() {
             $('#monitoringCreditorCode').select2({
