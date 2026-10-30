@@ -381,7 +381,7 @@
                                         <div class="flex items-center justify-center gap-1.5 flex-wrap">
                                             {{-- Ubah Status Button --}}
                                             <button type="button"
-                                                    onclick="openChangeStatusModal({{ json_encode($it) }})"
+                                                    onclick="openChangeStatusModalById({{ $it->id }})"
                                                     class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-600 hover:text-white border border-blue-200 transition-all">
                                                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -392,7 +392,7 @@
                                             {{-- Konfirmasi Quick Button if Diajukan --}}
                                             @if($st === 'diajukan')
                                                 <button type="button"
-                                                        onclick="openConfirmItemModal({{ json_encode($it) }})"
+                                                        onclick="openConfirmItemModalById({{ $it->id }})"
                                                         class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-600 hover:text-white border border-emerald-200 transition-all"
                                                         title="Konfirmasi & Potong Stok Sekarang">
                                                     <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
@@ -404,7 +404,7 @@
 
                                             {{-- Edit Item Modal Button --}}
                                             <button type="button"
-                                                    onclick="openEditItemModal({{ json_encode($it) }})"
+                                                    onclick="openEditItemModalById({{ $it->id }})"
                                                     class="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-all"
                                                     title="Edit Rincian">
                                                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -558,22 +558,31 @@
                                         </div>
                                     </td>
                                     <td class="py-3 px-4 text-center">
-                                        <span class="font-black text-sm text-slate-800">{{ (float)($ap['stock'] ?? 0) }}</span>
-                                        <span class="text-xs text-slate-400">{{ $ap['unit'] ?? 'BOX' }}</span>
+                                        @if(!empty($ap['stock_display']))
+                                            <div class="font-bold text-xs text-slate-800">{{ $ap['stock_display'] }}</div>
+                                        @else
+                                            <span class="font-black text-sm text-slate-800">{{ (float)($ap['stock'] ?? 0) }}</span>
+                                            <span class="text-xs font-semibold text-slate-500">{{ $ap['unit'] ?? 'PCS' }}</span>
+                                        @endif
+                                        @if(!empty($ap['estimated_value']) && $ap['estimated_value'] > 0)
+                                            <div class="text-[10px] text-slate-400 mt-0.5">
+                                                Est: Rp {{ number_format($ap['estimated_value'], 0, ',', '.') }}
+                                            </div>
+                                        @endif
                                     </td>
                                     <td class="py-3 px-4 text-[11px]">
                                         <div class="font-bold text-slate-700">{{ $ap['creditor_name'] ?? $ap['creditor_code'] }}</div>
                                         <div class="text-slate-500 mt-0.5">{{ $ap['rule_text'] ?? '-' }}</div>
                                     </td>
                                     <td class="py-3 px-4 text-center">
-                                        <span class="inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold border {{ $ap['badge_class'] ?? 'bg-slate-100 text-slate-700 border-slate-200' }}">
-                                            {{ $ap['eligibility_label'] ?? 'Mendekati' }}
+                                        <span class="inline-flex px-2.5 py-1 rounded-full text-[10px] font-bold border {{ $ap['urgency_badge'] ?? 'bg-slate-100 text-slate-700 border-slate-200' }}">
+                                            {{ $ap['urgency_label'] ?? 'Mendekati' }}
                                         </span>
                                     </td>
                                     <td class="py-3 px-4 text-center">
                                         <button type="button"
-                                                onclick="applyReturnFromAlert({{ json_encode($ap) }})"
-                                                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow-sm transition-all">
+                                                onclick="applyReturnFromAlertByIndex({{ $aIdx }})"
+                                                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-sm shadow-blue-500/20 transition-all">
                                             <span>+ Buat Retur</span>
                                         </button>
                                     </td>
@@ -599,9 +608,9 @@
      MODAL 1: INPUT RETUR BARU
 ═══════════════════════════════════════════════════════════════ --}}
 <div id="createReturnModal" class="fixed inset-0 z-[10000] hidden items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
-    <div class="relative w-full max-w-4xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden my-8">
+    <div class="relative w-full max-w-6xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden my-6">
         {{-- Modal Header --}}
-        <div class="px-6 py-4.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex items-center justify-between">
+        <div class="px-6 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex items-center justify-between">
             <div class="flex items-center gap-3">
                 <div class="w-10 h-10 rounded-2xl bg-white/15 flex items-center justify-center">
                     <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -610,7 +619,7 @@
                 </div>
                 <div>
                     <h2 class="text-base font-bold">Input Pengajuan Retur Pembelian</h2>
-                    <p class="text-xs text-blue-100">Pilih dari faktur penerimaan atau input manual obat yang ingin diretur</p>
+                    <p class="text-xs text-blue-100">Pilih obat dari faktur penerimaan atau input manual obat yang ingin diretur</p>
                 </div>
             </div>
             <button type="button" onclick="closeCreateReturnModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-all">
@@ -633,31 +642,31 @@
             </div>
 
             {{-- Source 1: Faktur Search --}}
-            <div id="sectionInvoiceSearch" class="space-y-3">
-                <label class="block text-xs font-bold text-slate-700">Cari Faktur / Penerimaan BPBA</label>
+            <div id="sectionInvoiceSearch" class="space-y-2">
+                <label class="block text-xs font-bold text-slate-700">Cari Faktur Penerimaan (Nomor Faktur atau Distributor)</label>
                 <div class="relative">
-                    <input type="text" id="invoiceSearchInput" placeholder="Ketik nomor faktur atau nama distributor..."
+                    <input type="text" id="invoiceSearchInput" placeholder="Ketik nomor faktur atau nama distributor (min. 2 huruf)..."
                            onkeyup="onSearchInvoiceKeyUp(this.value)"
-                           class="w-full h-11 pl-4 pr-10 text-xs rounded-2xl border border-slate-300 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 font-medium">
-                    <span id="invoiceSearchSpinner" class="hidden absolute right-3.5 top-1/2 -translate-y-1/2 text-blue-600 text-xs">
+                           class="w-full h-11 pl-4 pr-10 text-xs rounded-2xl border border-slate-300 focus:ring-2 focus:ring-blue-100 focus:border-blue-500 font-medium bg-slate-50/50 focus:bg-white">
+                    <span id="invoiceSearchSpinner" class="hidden absolute right-3.5 top-1/2 -translate-y-1/2 text-blue-600 text-xs font-semibold">
                         Memuat...
                     </span>
                 </div>
                 {{-- Dropdown Invoice Search Results --}}
-                <div id="invoiceResultsList" class="hidden max-h-48 overflow-y-auto divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white shadow-lg text-xs">
+                <div id="invoiceResultsList" class="hidden max-h-52 overflow-y-auto divide-y divide-slate-100 rounded-2xl border border-slate-200 bg-white shadow-xl text-xs">
                 </div>
             </div>
 
             {{-- General Info Form --}}
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 p-3.5 bg-slate-50/70 rounded-2xl border border-slate-200">
                 <div>
                     <label class="block text-[11px] font-bold text-slate-600 mb-1">Nomor Faktur / Referensi *</label>
                     <input type="text" name="invoice_number" id="form_invoice_number" required
-                           class="w-full h-10 text-xs rounded-xl border border-slate-300 px-3 font-semibold focus:ring-2 focus:ring-blue-100">
+                           class="w-full h-10 text-xs rounded-xl border border-slate-300 px-3 font-semibold focus:ring-2 focus:ring-blue-100 bg-white">
                 </div>
                 <div>
                     <label class="block text-[11px] font-bold text-slate-600 mb-1">Distributor (PBF) *</label>
-                    <select name="creditor_code" id="form_creditor_code" required class="w-full h-10 text-xs rounded-xl border border-slate-300 px-3 font-medium">
+                    <select name="creditor_code" id="form_creditor_code" required class="w-full h-10 text-xs rounded-xl border border-slate-300 px-3 font-medium bg-white">
                         <option value="">— Pilih Distributor —</option>
                         @foreach($creditors as $c)
                             <option value="{{ $c->code }}">{{ $c->name }} ({{ $c->code }})</option>
@@ -667,45 +676,53 @@
                 <div>
                     <label class="block text-[11px] font-bold text-slate-600 mb-1">Tanggal Faktur</label>
                     <input type="date" name="invoice_date" id="form_invoice_date" value="{{ date('Y-m-d') }}"
-                           class="w-full h-10 text-xs rounded-xl border border-slate-300 px-3 font-medium">
+                           class="w-full h-10 text-xs rounded-xl border border-slate-300 px-3 font-medium bg-white">
                 </div>
             </div>
 
             {{-- Manual Medicine Search if manual mode --}}
-            <div id="sectionManualMedSearch" class="hidden space-y-2 p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
-                <label class="block text-xs font-bold text-slate-700">+ Tambah Obat ke Daftar Retur</label>
+            <div id="sectionManualMedSearch" class="hidden space-y-2 p-3.5 bg-blue-50/40 rounded-2xl border border-blue-200">
+                <label class="block text-xs font-bold text-slate-700">+ Tambah Obat Manual ke Daftar Retur</label>
                 <div class="relative">
-                    <input type="text" id="medSearchInput" placeholder="Ketik nama obat untuk dicari..."
+                    <input type="text" id="medSearchInput" placeholder="Ketik nama obat atau barcode untuk dicari..."
                            onkeyup="onSearchMedKeyUp(this.value)"
-                           class="w-full h-10 pl-3 pr-10 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-100 font-medium">
+                           class="w-full h-10 pl-3 pr-10 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-100 font-medium bg-white">
                 </div>
-                <div id="medResultsList" class="hidden max-h-40 overflow-y-auto divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white shadow-md text-xs">
+                <div id="medResultsList" class="hidden max-h-48 overflow-y-auto divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white shadow-xl text-xs">
                 </div>
             </div>
 
             {{-- Items List to Return --}}
             <div class="space-y-2">
                 <div class="flex items-center justify-between">
-                    <span class="text-xs font-bold text-slate-700">Daftar Item yang Diretur</span>
-                    <span id="selectedItemsCounter" class="text-[11px] font-semibold text-blue-600">0 Item Dipilih</span>
+                    <div>
+                        <span class="text-xs font-bold text-slate-800">Daftar Obat yang Diretur</span>
+                        <p class="text-[11px] text-slate-400">Centang obat yang ingin diajukan, sesuaikan satuan retur dan jumlahnya</p>
+                    </div>
+                    <div id="selectedItemsCounter" class="text-xs font-semibold text-slate-600">
+                        0 Item Dipilih
+                    </div>
                 </div>
-                <div class="border border-slate-200 rounded-2xl overflow-hidden max-h-60 overflow-y-auto">
+                <div class="border border-slate-200 rounded-2xl overflow-hidden max-h-[380px] overflow-y-auto shadow-2xs">
                     <table class="w-full text-left text-xs border-collapse">
-                        <thead class="bg-slate-50 text-[11px] font-bold text-slate-500 border-b border-slate-200">
+                        <thead class="bg-slate-100 text-[11px] font-bold text-slate-600 border-b border-slate-200 sticky top-0 z-10 shadow-2xs">
                             <tr>
-                                <th class="p-2.5 w-8 text-center">PILIH</th>
-                                <th class="p-2.5 min-w-[170px]">NAMA OBAT</th>
-                                <th class="p-2.5">BATCH & ED</th>
-                                <th class="p-2.5 text-center w-32">SATUAN RETUR</th>
-                                <th class="p-2.5 text-center w-28">QTY RETUR</th>
-                                <th class="p-2.5">HARGA SATUAN</th>
-                                <th class="p-2.5">ALASAN</th>
+                                <th class="p-2.5 w-10 text-center">
+                                    <input type="checkbox" id="selectAllModalItems" onchange="toggleSelectAllItems(this.checked)" title="Pilih Semua" class="rounded text-blue-600 focus:ring-blue-500 cursor-pointer">
+                                </th>
+                                <th class="p-2.5 min-w-[190px]">NAMA OBAT</th>
+                                <th class="p-2.5 w-32 text-center">KETENTUAN RETUR</th>
+                                <th class="p-2.5 w-28">BATCH & ED</th>
+                                <th class="p-2.5 text-center w-36">SATUAN RETUR</th>
+                                <th class="p-2.5 text-center w-32">QTY RETUR</th>
+                                <th class="p-2.5 w-28 text-right">HARGA SATUAN</th>
+                                <th class="p-2.5 w-32">ALASAN</th>
                                 <th class="p-2.5 w-10 text-center"></th>
                             </tr>
                         </thead>
                         <tbody id="returnItemsTableBody" class="divide-y divide-slate-100">
                             <tr>
-                                <td colspan="8" class="py-8 text-center text-slate-400">
+                                <td colspan="9" class="py-12 text-center text-slate-400 font-medium">
                                     Belum ada item dipilih. Cari faktur atau tambah obat manual di atas.
                                 </td>
                             </tr>
@@ -840,18 +857,27 @@
             <h3 class="text-sm font-bold">Edit Rincian Item Retur</h3>
             <button type="button" onclick="closeEditItemModal()" class="text-white hover:text-slate-200">✕</button>
         </div>
-        <form id="editItemForm" onsubmit="submitEditItem(event)" class="p-5 space-y-3 text-xs">
+        <form id="editItemForm" onsubmit="submitEditItem(event)" class="p-5 space-y-3.5 text-xs">
             @csrf
             <input type="hidden" id="edit_item_id">
 
-            <div class="grid grid-cols-2 gap-2.5">
+            {{-- Medicine info banner --}}
+            <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200">
+                <div id="edit_medicine_name" class="font-bold text-slate-800 text-sm"></div>
+                <div id="edit_batch_info" class="text-[11px] text-slate-500 mt-0.5"></div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
                 <div>
                     <label class="block font-bold text-slate-700 mb-1">Qty Retur</label>
-                    <input type="number" step="any" min="0.01" id="edit_qty" required class="w-full h-10 rounded-xl border border-slate-300 px-3">
+                    <div class="flex items-center gap-1.5">
+                        <input type="number" step="any" min="0.01" id="edit_qty" required class="w-full h-10 rounded-xl border border-slate-300 px-3 font-bold text-blue-700">
+                        <span id="edit_unit_label" class="text-xs font-semibold text-slate-500">PCS</span>
+                    </div>
                 </div>
                 <div>
                     <label class="block font-bold text-slate-700 mb-1">Harga Satuan (Rp)</label>
-                    <input type="number" step="any" min="0" id="edit_unit_price" required class="w-full h-10 rounded-xl border border-slate-300 px-3">
+                    <input type="number" step="any" min="0" id="edit_unit_price" required class="w-full h-10 rounded-xl border border-slate-300 px-3 font-semibold">
                 </div>
             </div>
 
@@ -896,6 +922,26 @@
     <script src="{{ asset('templates/library/izitoast/dist/js/iziToast.min.js') }}"></script>
     <script src="{{ asset('templates/library/select2/dist/js/select2.min.js') }}"></script>
     <script>
+        function formatRupiah(num) {
+            const n = Math.round(Number(num) || 0);
+            return 'Rp ' + n.toLocaleString('id-ID');
+        }
+
+        function formatDateDisplay(dStr) {
+            if (!dStr) return '-';
+            try {
+                const parts = dStr.split('T')[0].split('-');
+                if (parts.length === 3) {
+                    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+                }
+                const dt = new Date(dStr);
+                if (isNaN(dt.getTime())) return dStr;
+                return dt.toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            } catch (e) {
+                return dStr;
+            }
+        }
+
         // Tab switching
         window.switchMainTab = function(tabName) {
             document.getElementById('tabContent-monitoring').classList.toggle('hidden', tabName !== 'monitoring');
@@ -998,6 +1044,36 @@
             }
         };
 
+        // Data stores
+        window.monitoringItems = @json($items->items());
+        window.approachingAlertItems = @json($approachingItems);
+        window.lastInvoiceSearchResults = [];
+        window.lastMedSearchResults = [];
+
+        window.findMonitoringItem = function(id) {
+            return (window.monitoringItems || []).find(x => x.id == id) || null;
+        };
+
+        window.openChangeStatusModalById = function(id) {
+            const it = window.findMonitoringItem(id);
+            if (it) openChangeStatusModal(it);
+        };
+
+        window.openConfirmItemModalById = function(id) {
+            const it = window.findMonitoringItem(id);
+            if (it) openConfirmItemModal(it);
+        };
+
+        window.openEditItemModalById = function(id) {
+            const it = window.findMonitoringItem(id);
+            if (it) openEditItemModal(it);
+        };
+
+        window.applyReturnFromAlertByIndex = function(idx) {
+            const ap = (window.approachingAlertItems || [])[idx];
+            if (ap) applyReturnFromAlert(ap);
+        };
+
         // Invoice search
         let invSearchTimer = null;
         window.onSearchInvoiceKeyUp = function(q) {
@@ -1012,19 +1088,20 @@
                     .then(res => res.json())
                     .then(results => {
                         document.getElementById('invoiceSearchSpinner').classList.add('hidden');
+                        window.lastInvoiceSearchResults = results || [];
                         const list = document.getElementById('invoiceResultsList');
                         if (!results || results.length === 0) {
-                            list.innerHTML = '<div class="p-3 text-slate-400 text-center">Faktur tidak ditemukan.</div>';
+                            list.innerHTML = '<div class="p-3 text-slate-400 text-center font-medium">Faktur tidak ditemukan.</div>';
                         } else {
-                            list.innerHTML = results.map(r => `
-                                <div onclick="selectInvoiceRow(${r.id}, '${escapeHtml(r.invoice_number)}', '${r.invoice_date || ''}', '${r.creditor_code || ''}')"
-                                     class="p-2.5 hover:bg-blue-50 cursor-pointer flex items-center justify-between">
+                            list.innerHTML = results.map((r, idx) => `
+                                <div onclick="selectInvoiceRowByIndex(${idx})"
+                                     class="p-3 hover:bg-blue-50 cursor-pointer flex items-center justify-between transition-colors">
                                     <div>
-                                        <div class="font-bold text-slate-800">${escapeHtml(r.invoice_number)}</div>
-                                        <div class="text-[11px] text-slate-500">${escapeHtml(r.creditor_name || r.creditor_code)}</div>
+                                        <div class="font-bold text-slate-800 text-xs">${escapeHtml(r.invoice_number)}</div>
+                                        <div class="text-[11px] text-slate-500 mt-0.5">${escapeHtml(r.creditor_name || r.creditor_code)} • Tgl: ${r.invoice_date ? formatDateDisplay(r.invoice_date) : '-'}</div>
                                     </div>
-                                    <span class="text-[10px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-200">
-                                        Pilih Faktur
+                                    <span class="text-[10px] font-bold text-blue-700 bg-blue-100 hover:bg-blue-200 px-2.5 py-1 rounded-xl transition-all">
+                                        Pilih Faktur →
                                     </span>
                                 </div>
                             `).join('');
@@ -1037,15 +1114,17 @@
             }, 300);
         };
 
-        window.selectInvoiceRow = function(id, invNum, invDate, credCode) {
+        window.selectInvoiceRowByIndex = function(idx) {
+            const r = window.lastInvoiceSearchResults[idx];
+            if (!r) return;
             document.getElementById('invoiceResultsList').classList.add('hidden');
-            document.getElementById('invoiceSearchInput').value = invNum;
-            document.getElementById('form_invoice_number').value = invNum;
-            if (invDate) document.getElementById('form_invoice_date').value = invDate.split('T')[0];
-            if (credCode) document.getElementById('form_creditor_code').value = credCode;
+            document.getElementById('invoiceSearchInput').value = r.invoice_number;
+            document.getElementById('form_invoice_number').value = r.invoice_number;
+            if (r.invoice_date) document.getElementById('form_invoice_date').value = r.invoice_date.split('T')[0];
+            if (r.creditor_code) document.getElementById('form_creditor_code').value = r.creditor_code;
 
             // Fetch items in invoice
-            fetch("{{ url('/finance/purchase-returns/invoice-items') }}/" + id)
+            fetch("{{ url('/finance/purchase-returns/invoice-items') }}/" + r.id)
                 .then(res => res.json())
                 .then(data => {
                     returnItemsData = (data.items || []).map(it => ({
@@ -1108,6 +1187,16 @@
             renderReturnItemsTable();
         };
 
+        // Toggle Select All Items
+        window.toggleSelectAllItems = function(checked) {
+            returnItemsData.forEach(it => {
+                if (!it.is_already_returned) {
+                    it.selected = checked;
+                }
+            });
+            renderReturnItemsTable();
+        };
+
         // Manual med search
         let medSearchTimer = null;
         window.onSearchMedKeyUp = function(q) {
@@ -1117,21 +1206,23 @@
                 return;
             }
             medSearchTimer = setTimeout(() => {
-                fetch("{{ route('finance.purchaseReturns.searchMedicines') }}?query=" + encodeURIComponent(q))
+                const credCode = document.getElementById('form_creditor_code').value || '';
+                fetch("{{ route('finance.purchaseReturns.searchMedicines') }}?query=" + encodeURIComponent(q) + "&creditor_code=" + encodeURIComponent(credCode))
                     .then(res => res.json())
                     .then(results => {
+                        window.lastMedSearchResults = results || [];
                         const list = document.getElementById('medResultsList');
                         if (!results || results.length === 0) {
-                            list.innerHTML = '<div class="p-3 text-slate-400 text-center">Obat tidak ditemukan.</div>';
+                            list.innerHTML = '<div class="p-3 text-slate-400 text-center font-medium">Obat tidak ditemukan.</div>';
                         } else {
-                            list.innerHTML = results.map(m => `
-                                <div onclick="addManualMedRow(${escapeHtml(JSON.stringify(m).replace(/"/g, '&quot;'))})"
-                                     class="p-2.5 hover:bg-blue-50 cursor-pointer flex items-center justify-between">
+                            list.innerHTML = results.map((m, idx) => `
+                                <div onclick="addManualMedRowByIndex(${idx})"
+                                     class="p-2.5 hover:bg-blue-50 cursor-pointer flex items-center justify-between transition-colors">
                                     <div>
-                                        <div class="font-bold text-slate-800">${escapeHtml(m.name)}</div>
-                                        <div class="text-[11px] text-slate-500">Pabrik: ${escapeHtml(m.factory_name || '-')} | Satuan: ${escapeHtml(m.unit || 'PCS')}</div>
+                                        <div class="font-bold text-slate-800 text-xs">${escapeHtml(m.name)}</div>
+                                        <div class="text-[11px] text-slate-500 mt-0.5">Pabrik: ${escapeHtml(m.factory_name || '-')} • Satuan: ${escapeHtml(m.unit || 'PCS')} • ${formatRupiah(m.raw_price)}</div>
                                     </div>
-                                    <span class="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200">
+                                    <span class="text-[10px] font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 px-2.5 py-1 rounded-xl transition-all">
                                         + Tambah
                                     </span>
                                 </div>
@@ -1142,7 +1233,9 @@
             }, 300);
         };
 
-        window.addManualMedRow = function(m) {
+        window.addManualMedRowByIndex = function(idx) {
+            const m = window.lastMedSearchResults[idx];
+            if (!m) return;
             document.getElementById('medResultsList').classList.add('hidden');
             document.getElementById('medSearchInput').value = '';
             
@@ -1177,6 +1270,7 @@
                 factory_id: m.factory_id || null,
                 factory_name: m.factory_name || null,
                 return_policy: null,
+                is_already_returned: false,
             });
             renderReturnItemsTable();
         };
@@ -1186,89 +1280,141 @@
             const counter = document.getElementById('selectedItemsCounter');
             
             if (returnItemsData.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="8" class="py-8 text-center text-slate-400">Belum ada item dipilih. Cari faktur atau tambah obat manual di atas.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="9" class="py-12 text-center text-slate-400 font-medium">Belum ada item dipilih. Cari faktur atau tambah obat manual di atas.</td></tr>`;
                 counter.innerText = '0 Item Dipilih';
                 return;
             }
 
-            const selectedCount = returnItemsData.filter(i => i.selected).length;
-            counter.innerText = `${selectedCount} Item Dipilih`;
+            const selectedItems = returnItemsData.filter(i => i.selected);
+            const selectedCount = selectedItems.length;
+            let totalEstimated = 0;
+            selectedItems.forEach(i => {
+                totalEstimated += (Number(i.qty) || 0) * (Number(i.unit_price) || 0);
+            });
 
-            tbody.innerHTML = returnItemsData.map((it, idx) => `
-                <tr class="hover:bg-slate-50/70 ${it.is_already_returned ? 'bg-slate-100 opacity-60' : ''}">
-                    <td class="p-2.5 text-center">
-                        <input type="checkbox" ${it.selected ? 'checked' : ''} ${it.is_already_returned ? 'disabled' : ''}
-                               onchange="toggleItemSelect(${idx}, this.checked)" class="rounded text-blue-600 focus:ring-blue-500">
-                    </td>
-                    <td class="p-2.5">
-                        <div class="font-bold text-slate-800 flex items-center gap-1">
-                            ${escapeHtml(it.medicine_name)}
-                            ${it.is_already_returned ? '<span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-rose-100 text-rose-700">Sudah Diretur</span>' : ''}
-                        </div>
-                        <div class="text-[10px] text-slate-400">Pabrik: ${escapeHtml(it.factory_name || '-')}</div>
-                    </td>
-                    <td class="p-2.5">
-                        <input type="text" value="${escapeHtml(it.batch_number)}" placeholder="No Batch" onchange="updateItemField(${idx}, 'batch_number', this.value)" class="h-8 text-xs w-28 rounded-lg border border-slate-300 px-2 font-medium">
-                        <input type="date" value="${it.expired_date ? it.expired_date.split('T')[0] : ''}" onchange="updateItemField(${idx}, 'expired_date', this.value)" class="h-8 text-xs w-32 rounded-lg border border-slate-300 px-2 mt-1">
-                    </td>
-                    <td class="p-2.5 text-center">
-                        ${it.has_pack ? `
-                            <div class="inline-flex p-0.5 bg-slate-100 rounded-lg border border-slate-200">
-                                <button type="button" onclick="switchItemReturType(${idx}, 'packaging')"
-                                        class="px-2 py-0.5 text-[10px] font-bold rounded-md transition-all ${it.retur_type === 'packaging' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}">
-                                    ${escapeHtml(it.packaging || 'BOX')}
-                                </button>
-                                <button type="button" onclick="switchItemReturType(${idx}, 'unit')"
-                                        class="px-2 py-0.5 text-[10px] font-bold rounded-md transition-all ${it.retur_type === 'unit' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}">
-                                    ${escapeHtml(it.stock_unit || 'PCS')}
-                                </button>
+            counter.innerHTML = `<span class="font-bold text-blue-700">${selectedCount} Item Dipilih</span> <span class="text-slate-400 font-normal">• Est. Nilai:</span> <span class="font-bold text-slate-800">${formatRupiah(totalEstimated)}</span>`;
+
+            const isInvoiceMode = (currentSource === 'invoice');
+
+            tbody.innerHTML = returnItemsData.map((it, idx) => {
+                const isLocked = Boolean(it.is_already_returned);
+                const policy = it.return_policy;
+                const rowBg = isLocked 
+                    ? 'bg-slate-100/90 text-slate-400 opacity-60' 
+                    : (it.selected ? 'bg-blue-50/50 hover:bg-blue-50/80' : 'bg-white hover:bg-slate-50/70');
+
+                return `
+                    <tr class="transition-colors ${rowBg}">
+                        <td class="p-2.5 text-center">
+                            <input type="checkbox" ${it.selected ? 'checked' : ''} ${isLocked ? 'disabled' : ''}
+                                   onchange="toggleItemSelect(${idx}, this.checked)"
+                                   class="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 ${isLocked ? 'cursor-not-allowed opacity-40' : 'cursor-pointer'}">
+                        </td>
+                        <td class="p-2.5">
+                            <div class="font-bold text-slate-800 flex items-center gap-1.5 flex-wrap">
+                                ${isLocked ? '<span class="text-rose-500 font-bold">🔒</span>' : ''}
+                                <span class="${isLocked ? 'line-through text-slate-500' : ''}">${escapeHtml(it.medicine_name)}</span>
+                                ${isLocked ? '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-100 text-rose-700 border border-rose-200">Sudah Diretur</span>' : ''}
                             </div>
-                            <div class="text-[9px] text-slate-400 mt-1">
-                                Isi @${it.content} ${escapeHtml(it.stock_unit || 'PCS')}
+                            ${it.factory_name ? `<div class="text-[10px] text-slate-400 font-medium mt-0.5">Pabrik: ${escapeHtml(it.factory_name)}</div>` : ''}
+                        </td>
+                        <td class="p-2.5 text-center">
+                            ${policy ? `
+                                <div class="inline-flex flex-col items-center">
+                                    <span class="inline-block px-2 py-0.5 rounded text-[10px] font-bold border ${policy.badge || 'bg-slate-100 text-slate-700 border-slate-200'}" title="${escapeHtml(policy.message || '')}">
+                                        ${escapeHtml(policy.label || 'Aturan Retur')}
+                                    </span>
+                                    ${policy.policy && policy.policy.notes ? `
+                                        <span class="text-[9px] text-slate-400 mt-0.5 max-w-[130px] truncate block" title="${escapeHtml(policy.policy.notes)}">
+                                            ${escapeHtml(policy.policy.notes)}
+                                        </span>
+                                    ` : ''}
+                                </div>
+                            ` : `<span class="text-slate-300 text-[10px]">-</span>`}
+                        </td>
+                        <td class="p-2.5">
+                            ${isInvoiceMode ? `
+                                <div class="font-mono text-slate-700 font-semibold text-[11px]">${escapeHtml(it.batch_number || '-')}</div>
+                                <div class="text-[10px] text-rose-600 font-bold mt-0.5">ED: ${it.expired_date ? formatDateDisplay(it.expired_date) : '-'}</div>
+                            ` : `
+                                <input type="text" value="${escapeHtml(it.batch_number)}" placeholder="No Batch"
+                                       onchange="updateItemField(${idx}, 'batch_number', this.value)"
+                                       class="h-7 text-xs w-28 rounded-lg border border-slate-300 px-2 font-mono">
+                                <input type="date" value="${it.expired_date ? it.expired_date.split('T')[0] : ''}"
+                                       onchange="updateItemField(${idx}, 'expired_date', this.value)"
+                                       class="h-7 text-xs w-28 rounded-lg border border-slate-300 px-2 mt-1 block">
+                            `}
+                        </td>
+                        <td class="p-2.5 text-center">
+                            ${it.has_pack ? `
+                                <div class="inline-flex p-0.5 bg-slate-100 rounded-xl border border-slate-200 shadow-2xs">
+                                    <button type="button" onclick="switchItemReturType(${idx}, 'packaging')"
+                                            class="px-2 py-1 text-[10px] font-bold rounded-lg transition-all ${it.retur_type === 'packaging' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900 bg-transparent'}">
+                                        ${escapeHtml(it.packaging || 'BOX')}
+                                    </button>
+                                    <button type="button" onclick="switchItemReturType(${idx}, 'unit')"
+                                            class="px-2 py-1 text-[10px] font-bold rounded-lg transition-all ${it.retur_type === 'unit' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900 bg-transparent'}">
+                                        ${escapeHtml(it.stock_unit || 'PCS')}
+                                    </button>
+                                </div>
+                                <div class="text-[9px] text-slate-400 font-medium mt-1">
+                                    Isi @${it.content} ${escapeHtml(it.stock_unit || 'PCS')}
+                                </div>
+                            ` : `
+                                <span class="inline-block px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                                    ${escapeHtml(it.unit || 'PCS')}
+                                </span>
+                            `}
+                        </td>
+                        <td class="p-2.5 text-center">
+                            <div class="flex items-center justify-center gap-1">
+                                <input type="number" step="any" min="0.01" value="${it.qty}"
+                                       ${isLocked ? 'disabled' : ''}
+                                       onchange="updateItemField(${idx}, 'qty', this.value)"
+                                       class="h-8 text-xs w-16 text-center rounded-lg border ${it.selected ? 'border-blue-400 bg-white font-bold text-blue-700 ring-1 ring-blue-100' : 'border-slate-300 bg-slate-50 text-slate-500'}">
+                                <span class="text-[11px] font-semibold text-slate-600">${escapeHtml(it.unit || 'PCS')}</span>
+                                ${isInvoiceMode && it.max_qty ? `<span class="text-[10px] text-slate-400 font-medium">/ ${it.max_qty}</span>` : ''}
                             </div>
-                        ` : `
-                            <span class="inline-block px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                                ${escapeHtml(it.unit || 'PCS')}
-                            </span>
-                        `}
-                    </td>
-                    <td class="p-2.5 text-center">
-                        <div class="flex items-center justify-center gap-1">
-                            <input type="number" step="any" min="0.01" value="${it.qty}" onchange="updateItemField(${idx}, 'qty', this.value)" class="h-8 text-xs w-16 text-center rounded-lg border border-slate-300 font-bold text-blue-600">
-                            <span class="text-[11px] font-semibold text-slate-500">${escapeHtml(it.unit || 'PCS')}</span>
-                        </div>
-                        <div class="text-[9px] text-slate-400 mt-0.5">
-                            Stok: ${it.retur_type === 'packaging' && it.has_pack
-                                ? `${it.current_stock_pack} ${escapeHtml(it.packaging)} (${it.current_stock_unit} ${escapeHtml(it.stock_unit)})`
-                                : `${it.current_stock_unit} ${escapeHtml(it.stock_unit || 'PCS')}`}
-                        </div>
-                    </td>
-                    <td class="p-2.5">
-                        <div class="flex items-center gap-1">
-                            <span class="text-xs text-slate-400">Rp</span>
-                            <input type="number" step="any" min="0" value="${it.unit_price}" onchange="updateItemField(${idx}, 'unit_price', this.value)" class="h-8 text-xs w-24 rounded-lg border border-slate-300 px-2 font-medium">
-                        </div>
-                        <div class="text-[9px] text-slate-400 mt-0.5">Per ${escapeHtml(it.unit || 'PCS')}</div>
-                    </td>
-                    <td class="p-2.5">
-                        <select onchange="updateItemField(${idx}, 'reason', this.value)" class="h-8 text-xs rounded-lg border border-slate-300 px-2 font-medium">
-                            <option value="ED DEKAT" ${it.reason === 'ED DEKAT' ? 'selected' : ''}>ED DEKAT</option>
-                            <option value="Barang Rusak" ${it.reason === 'Barang Rusak' ? 'selected' : ''}>Barang Rusak</option>
-                            <option value="Salah Barang" ${it.reason === 'Salah Barang' ? 'selected' : ''}>Salah Barang</option>
-                            <option value="Salah Pesan" ${it.reason === 'Salah Pesan' ? 'selected' : ''}>Salah Pesan</option>
-                            <option value="Recall" ${it.reason === 'Recall' ? 'selected' : ''}>Recall</option>
-                            <option value="Retur Pabrik" ${it.reason === 'Retur Pabrik' ? 'selected' : ''}>Retur Pabrik</option>
-                            <option value="Double" ${it.reason === 'Double' ? 'selected' : ''}>Double</option>
-                            <option value="dlsbnya" ${it.reason === 'dlsbnya' ? 'selected' : ''}>dlsbnya</option>
-                        </select>
-                    </td>
-                    <td class="p-2.5 text-center">
-                        <button type="button" onclick="removeReturnItemRow(${idx})" class="text-rose-500 hover:text-rose-700 font-bold text-xs p-1">
-                            ✕
-                        </button>
-                    </td>
-                </tr>
-            `).join('');
+                            <div class="text-[9px] text-slate-400 font-medium mt-1">
+                                Stok: ${it.retur_type === 'packaging' && it.has_pack
+                                    ? `${it.current_stock_pack} ${escapeHtml(it.packaging)} (${it.current_stock_unit} ${escapeHtml(it.stock_unit)})`
+                                    : `${it.current_stock_unit} ${escapeHtml(it.stock_unit || 'PCS')}`}
+                            </div>
+                        </td>
+                        <td class="p-2.5 text-right">
+                            <div class="flex items-center justify-end gap-1">
+                                <span class="text-xs text-slate-400 font-medium">Rp</span>
+                                <input type="number" step="any" min="0" value="${it.unit_price}"
+                                       ${isInvoiceMode ? 'readonly' : ''}
+                                       onchange="updateItemField(${idx}, 'unit_price', this.value)"
+                                       class="h-8 text-xs w-24 text-right rounded-lg border ${isInvoiceMode ? 'border-slate-200 bg-slate-50 text-slate-700 font-semibold cursor-not-allowed' : 'border-slate-300 bg-white font-medium'} px-2">
+                            </div>
+                            <div class="text-[9px] text-slate-400 mt-1">Per ${escapeHtml(it.unit || 'PCS')}</div>
+                        </td>
+                        <td class="p-2.5">
+                            <select onchange="updateItemField(${idx}, 'reason', this.value)"
+                                    ${isLocked ? 'disabled' : ''}
+                                    class="h-8 text-xs rounded-lg border border-slate-300 px-2 font-medium bg-white w-full">
+                                <option value="ED DEKAT" ${it.reason === 'ED DEKAT' ? 'selected' : ''}>ED DEKAT</option>
+                                <option value="Barang Rusak" ${it.reason === 'Barang Rusak' ? 'selected' : ''}>Barang Rusak</option>
+                                <option value="Salah Barang" ${it.reason === 'Salah Barang' ? 'selected' : ''}>Salah Barang</option>
+                                <option value="Salah Pesan" ${it.reason === 'Salah Pesan' ? 'selected' : ''}>Salah Pesan</option>
+                                <option value="Recall" ${it.reason === 'Recall' ? 'selected' : ''}>Recall</option>
+                                <option value="Retur Pabrik" ${it.reason === 'Retur Pabrik' ? 'selected' : ''}>Retur Pabrik</option>
+                                <option value="Double" ${it.reason === 'Double' ? 'selected' : ''}>Double</option>
+                                <option value="dlsbnya" ${it.reason === 'dlsbnya' ? 'selected' : ''}>dlsbnya</option>
+                            </select>
+                        </td>
+                        <td class="p-2.5 text-center">
+                            <button type="button" onclick="removeReturnItemRow(${idx})"
+                                    class="w-7 h-7 rounded-lg text-rose-500 hover:text-white hover:bg-rose-600 transition-all font-bold text-xs flex items-center justify-center mx-auto"
+                                    title="Hapus baris ini">
+                                ✕
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
         };
 
         window.toggleItemSelect = function(idx, val) {
@@ -1450,8 +1596,8 @@
         // Modal Konfirmasi (Quick Cut Stock)
         window.openConfirmItemModal = function(it) {
             document.getElementById('confirm_item_id').value = it.id;
-            document.getElementById('confirm_medicine_name').innerText = it.medicine_name;
-            document.getElementById('confirm_qty_info').innerText = `Qty: ${it.qty} ${it.unit || 'BOX'} | Batch: ${it.batch_number || '-'}`;
+            document.getElementById('confirm_medicine_name').innerText = it.medicine_name || '-';
+            document.getElementById('confirm_qty_info').innerText = `Qty: ${it.qty} ${it.unit || 'PCS'} | Batch: ${it.batch_number || '-'}`;
             document.getElementById('confirm_date').value = new Date().toISOString().split('T')[0];
             document.getElementById('confirm_notes').value = '';
 
@@ -1501,6 +1647,13 @@
         // Modal Edit Item
         window.openEditItemModal = function(it) {
             document.getElementById('edit_item_id').value = it.id;
+            const medNameEl = document.getElementById('edit_medicine_name');
+            if (medNameEl) medNameEl.innerText = it.medicine_name || '-';
+            const batchInfoEl = document.getElementById('edit_batch_info');
+            if (batchInfoEl) batchInfoEl.innerText = `Batch: ${it.batch_number || '-'} | ED: ${it.formatted_expired_date || (it.expired_date ? formatDateDisplay(it.expired_date) : '-')}`;
+            const unitLabelEl = document.getElementById('edit_unit_label');
+            if (unitLabelEl) unitLabelEl.innerText = it.unit || 'PCS';
+
             document.getElementById('edit_qty').value = it.qty;
             document.getElementById('edit_unit_price').value = it.unit_price;
             document.getElementById('edit_reason').value = it.reason || 'ED DEKAT';
