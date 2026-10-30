@@ -655,6 +655,7 @@ class PurchaseReturnController extends Controller
             'received_date' => 'nullable|date',
             'creditor_code' => 'required|exists:creditors,code',
             'receiving_id' => 'nullable|integer',
+            'source' => 'nullable|string|in:invoice,manual',
             'notes' => 'nullable|string|max:500',
             'items' => 'required|array|min:1',
             'items.*.medicine_id' => 'nullable|integer',
@@ -699,6 +700,19 @@ class PurchaseReturnController extends Controller
             }
         }
 
+        // Cek apakah retur ini berasal dari penerimaan (faktur penerimaan) vs manual
+        $source = $validated['source'] ?? null;
+        $receivingId = $validated['receiving_id'] ?? null;
+        $isFromReceiving = false;
+        if ($source === 'invoice') {
+            $isFromReceiving = true;
+        } elseif ($source === 'manual') {
+            $isFromReceiving = false;
+        } else {
+            // Fallback jika flag source tidak dikirim secara eksplisit
+            $isFromReceiving = !empty($receivingId);
+        }
+
         $activePharmacyId = function_exists('getActivePharmacyId') ? getActivePharmacyId() : 1;
         $yearMonth = date('ym');
         $latest = PurchaseReturn::where('return_no', 'LIKE', "RET-{$yearMonth}/%")->count();
@@ -706,7 +720,12 @@ class PurchaseReturnController extends Controller
         $returnNo = "RET-{$yearMonth}/{$nextSeq}";
         $todayDate = now()->toDateString();
 
-        DB::transaction(function () use ($validated, $activePharmacyId, $returnNo, $todayDate) {
+        // Jika retur dari penerimaan: langsung 'dikonfirmasi' & potong stok
+        // Jika retur manual (bukan dari penerimaan): 'diajukan' & belum terpotong
+        $initialStatus = $isFromReceiving ? 'dikonfirmasi' : 'diajukan';
+        $confirmedDate = $isFromReceiving ? $todayDate : null;
+
+        DB::transaction(function () use ($validated, $activePharmacyId, $returnNo, $todayDate, $isFromReceiving, $initialStatus, $confirmedDate) {
             $totalAmount = 0;
             foreach ($validated['items'] as $it) {
                 $subtotal = (float)$it['qty'] * (float)$it['unit_price'];
@@ -723,10 +742,11 @@ class PurchaseReturnController extends Controller
                 'user_id' => auth()->id(),
                 'receiving_id' => $validated['receiving_id'] ?? null,
                 'total_amount' => $totalAmount,
-                'status' => 'diajukan',
+                'status' => $initialStatus,
                 'status_date' => $todayDate,
+                'confirmed_date' => $confirmedDate,
                 'notes' => $validated['notes'] ?? null,
-                'is_manual' => empty($validated['receiving_id']),
+                'is_manual' => !$isFromReceiving,
             ]);
 
             foreach ($validated['items'] as $it) {
@@ -737,7 +757,7 @@ class PurchaseReturnController extends Controller
                     $factor = 1;
                 }
 
-                PurchaseReturnItem::create([
+                $returnItem = PurchaseReturnItem::create([
                     'purchase_return_id' => $purchaseReturn->id,
                     'medicine_id' => $it['medicine_id'] ?? null,
                     'batch_id' => $it['batch_id'] ?? null,
@@ -750,24 +770,36 @@ class PurchaseReturnController extends Controller
                     'qty' => $it['qty'],
                     'unit_price' => $it['unit_price'],
                     'subtotal' => $subtotal,
-                    'status' => 'diajukan',
+                    'status' => $initialStatus,
                     'status_date' => $todayDate,
+                    'confirmed_date' => $confirmedDate,
                     'stock_deducted' => false,
                     'reason' => $it['reason'] ?? 'ED DEKAT',
                     'pickup_date' => $it['pickup_date'] ?? null,
                     'deduction_note' => $it['deduction_note'] ?? null,
                 ]);
+
+                // Jika retur berasal dari penerimaan: langsung potong stok sekarang
+                if ($isFromReceiving) {
+                    $returnItem->setRelation('purchaseReturn', $purchaseReturn);
+                    $this->deductStockForItem($returnItem, $todayDate);
+                    $returnItem->save();
+                }
             }
         });
+
+        $successMsg = $isFromReceiving
+            ? 'Data Retur Pembelian dari faktur berhasil disimpan dan stok otomatis dipotong.'
+            : 'Data Pengajuan Retur Manual berhasil disimpan dengan status Diajukan Retur (Stok belum dipotong).';
 
         if ($request->wantsJson() || $request->ajax() || $request->isJson() || $request->header('Accept') === 'application/json') {
             return response()->json([
                 'success' => true,
-                'message' => 'Data Retur Pembelian berhasil disimpan dengan status Diajukan Retur.',
+                'message' => $successMsg,
             ]);
         }
 
-        return redirect()->back()->with('success', 'Data Retur Pembelian berhasil disimpan dengan status Diajukan Retur.');
+        return redirect()->back()->with('success', $successMsg);
     }
 
     /**

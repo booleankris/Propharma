@@ -461,6 +461,8 @@ export default function PurchaseReturns({
 
         const payload = {
             ...formData,
+            source: entryType,
+            receiving_id: entryType === 'invoice' ? formData.receiving_id : null,
             items: itemsToSubmit,
         };
 
