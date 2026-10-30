@@ -86,36 +86,84 @@ class ReturController extends Controller
         $transaction = MedicineTransactions::where('transaction_code', $transactionCode)->first();
         $transactionId = $transaction ? $transaction->id : null;
 
-        // Ambil ID obat-obat yang sudah pernah diretur pada transaksi ini SAJA
-        $returnedFromLog = ItemsLog::where('transaction_code', $transactionCode)
+        // Ambil data retur yang sudah pernah dilakukan pada transaksi ini
+        // 1. Dari tabel Retur
+        $returData = [];
+        if ($transactionId) {
+            $returRows = Retur::where('transaction_id', $transactionId)
+                ->selectRaw('medicine_id, SUM(qty_retur) as total_qty, SUM(total_retur) as total_amount')
+                ->groupBy('medicine_id')
+                ->get();
+            foreach ($returRows as $r) {
+                $returData[$r->medicine_id] = [
+                    'qty' => (float) $r->total_qty,
+                    'amount' => (float) $r->total_amount,
+                ];
+            }
+        }
+
+        // 2. Dari tabel ItemsLog (status 3 = Retur Sales atau type = 'RT')
+        $logRows = ItemsLog::where('transaction_code', $transactionCode)
             ->where(function ($q) {
                 $q->where('status', 3)->orWhere('type', 'RT');
             })
-            ->pluck('medicine_id')
-            ->toArray();
+            ->selectRaw('medicine_id, SUM(qty) as total_qty, SUM(total) as total_amount')
+            ->groupBy('medicine_id')
+            ->get();
 
-        $returnedFromRetur = $transactionId
-            ? Retur::where('transaction_id', $transactionId)->pluck('medicine_id')->toArray()
-            : [];
+        $logData = [];
+        foreach ($logRows as $l) {
+            $logData[$l->medicine_id] = [
+                'qty' => (float) $l->total_qty,
+                'amount' => (float) $l->total_amount,
+            ];
+        }
 
-        $returnedMedicineIds = array_unique(array_merge($returnedFromLog, $returnedFromRetur));
+        // Tracking alokasi retur untuk cart items per medicine_id
+        $allocatedReturnQty = [];
+        $allocatedReturnAmount = [];
 
         $transactionCart = MedicineCart::with(['medicine', 'transactions'])
             ->whereHas('transactions', function ($q) use ($transactionCode) {
                 $q->where('transaction_code', $transactionCode);
             })
             ->get()
-            ->map(function ($item) use ($returnedMedicineIds) {
-                $isLocked = in_array($item->medicine_id, $returnedMedicineIds);
+            ->map(function ($item) use ($returData, $logData, &$allocatedReturnQty, &$allocatedReturnAmount) {
+                $medId = $item->medicine_id;
+                $totalReturQty = max($returData[$medId]['qty'] ?? 0, $logData[$medId]['qty'] ?? 0);
+                $totalReturAmount = max($returData[$medId]['amount'] ?? 0, $logData[$medId]['amount'] ?? 0);
+
+                $alreadyAllocatedQty = $allocatedReturnQty[$medId] ?? 0;
+                $alreadyAllocatedAmount = $allocatedReturnAmount[$medId] ?? 0;
+
+                $unallocatedQty = max(0, $totalReturQty - $alreadyAllocatedQty);
+                $unallocatedAmount = max(0, $totalReturAmount - $alreadyAllocatedAmount);
+
+                $purchasedQty = (float) $item->quantity;
+                $rowReturnedQty = min($purchasedQty, $unallocatedQty);
+                $remainingQty = max(0, $purchasedQty - $rowReturnedQty);
+
+                $originalFinalPrice = (float) $item->final_price;
+                $rowReturnedAmount = min($originalFinalPrice, $unallocatedAmount);
+                $remainingPrice = max(0, $originalFinalPrice - $rowReturnedAmount);
+
+                $allocatedReturnQty[$medId] = $alreadyAllocatedQty + $rowReturnedQty;
+                $allocatedReturnAmount[$medId] = $alreadyAllocatedAmount + $rowReturnedAmount;
+
+                $isLocked = ($remainingQty <= 0);
+
                 return [
                     'id' => $item->id,
                     'medicine_id' => $item->medicine_id,
                     'transaction_id' => $item->transaction_id ?? null,
                     'quantity' => $item->quantity,
+                    'returned_qty' => $rowReturnedQty,
+                    'remaining_qty' => $remainingQty,
                     'final_price' => $item->final_price,
+                    'remaining_price' => $remainingPrice,
                     'item_price' => $item->item_price ?? 0,
                     'is_locked' => $isLocked,
-                    'is_returned' => $isLocked,
+                    'is_returned' => ($rowReturnedQty > 0),
                     'medicine' => [
                         'id' => $item->medicine->id ?? null,
                         'code' => $item->medicine->code ?? '',
@@ -196,7 +244,7 @@ class ReturController extends Controller
             'transaction_id' => 'required|integer',
             'medicine_id' => 'required|integer',
             'cart_id' => 'required|integer',
-            'qty_retur' => 'required|numeric|min:1',
+            'qty_retur' => 'required|numeric|gt:0',
             'total_retur' => 'required',
             'old_qty' => 'required',
             'transfer_id' => 'required',
@@ -209,29 +257,38 @@ class ReturController extends Controller
             ->where('medicine_id', $request->medicine_id)
             ->firstOrFail();
 
-        if ((float) $request->qty_retur > (float) $cartItem->quantity) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Qty retur tidak boleh melebihi qty yang dibeli (' . $cartItem->quantity . ').',
-            ], 422);
-        }
+        // Hitung total quantity yang sudah pernah diretur untuk obat ini pada transaksi ini
+        $returQtySum = (float) Retur::where('transaction_id', $findcode->id)
+            ->where('medicine_id', $request->medicine_id)
+            ->sum('qty_retur');
 
-        // Validasi lock: Cek apakah obat ini pada transaksi ini sudah pernah di-retur
-        $alreadyReturnedInLog = ItemsLog::where('transaction_code', $findcode->transaction_code)
+        $logQtySum = (float) ItemsLog::where('transaction_code', $findcode->transaction_code)
             ->where('medicine_id', $request->medicine_id)
             ->where(function ($q) {
                 $q->where('status', 3)->orWhere('type', 'RT');
             })
-            ->exists();
+            ->sum('qty');
 
-        $alreadyReturnedInRetur = Retur::where('transaction_id', $request->transaction_id)
+        $totalAlreadyReturned = max($returQtySum, $logQtySum);
+
+        // Hitung total quantity yang dibeli untuk obat ini pada transaksi ini
+        $totalPurchased = (float) MedicineCart::where('transaction_id', $findcode->id)
             ->where('medicine_id', $request->medicine_id)
-            ->exists();
+            ->sum('quantity');
 
-        if ($alreadyReturnedInLog || $alreadyReturnedInRetur) {
+        $remainingQty = max(0, $totalPurchased - $totalAlreadyReturned);
+
+        if ($remainingQty <= 0) {
             return response()->json([
                 'success' => false,
-                'message' => 'Obat ini pada transaksi ini sudah pernah di-retur dan telah dikunci. Tidak dapat diretur kembali.',
+                'message' => 'Seluruh quantity obat ini pada transaksi ini sudah diretur dan telah dikunci. Tidak dapat diretur kembali.',
+            ], 422);
+        }
+
+        if ((float) $request->qty_retur > $remainingQty) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Qty retur (' . $request->qty_retur . ') melebihi sisa quantity yang dapat diretur (Maksimal: ' . $remainingQty . ').',
             ], 422);
         }
 
@@ -361,9 +418,14 @@ class ReturController extends Controller
 
             DB::commit();
 
+            $newRemainingQty = max(0, $remainingQty - (float) $request->qty_retur);
             return response()->json([
                 'success' => true,
-                'message' => 'Retur berhasil disimpan.',
+                'message' => $newRemainingQty <= 0
+                    ? 'Retur berhasil disimpan. Seluruh quantity obat ini telah selesai diretur dan dikunci.'
+                    : 'Retur berhasil disimpan. Sisa quantity yang dapat diretur: ' . $newRemainingQty . '.',
+                'remaining_qty' => $newRemainingQty,
+                'is_locked' => ($newRemainingQty <= 0),
                 'retur_code' => $this->generateReturCode(), // next retur code
             ]);
         } catch (\Throwable $e) {

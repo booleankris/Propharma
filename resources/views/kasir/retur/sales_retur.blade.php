@@ -175,6 +175,20 @@
             border-radius: 9999px;
             white-space: nowrap;
         }
+
+        .badge-partial {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 7px;
+            font-size: 10px;
+            font-weight: 600;
+            color: #b45309;
+            background-color: #fef3c7;
+            border: 1px solid #fde68a;
+            border-radius: 9999px;
+            white-space: nowrap;
+        }
     </style>
 @endsection
 
@@ -186,13 +200,13 @@
                 {{-- LEFT: Form Panel --}}
                 <div class="bg-white border border-gray-100 rounded-xl p-6">
 
-                    {{-- Warning Banner --}}
-                    <div class="flex items-start gap-2.5 p-3 mb-4 rounded-xl bg-amber-50 border border-amber-200/80 text-amber-900 text-[12px] leading-relaxed">
-                        <svg class="w-4 h-4 text-amber-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    {{-- Info Banner --}}
+                    <div class="flex items-start gap-2.5 p-3 mb-4 rounded-xl bg-blue-50 border border-blue-200/80 text-blue-900 text-[12px] leading-relaxed">
+                        <svg class="w-4 h-4 text-blue-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                         <div>
-                            <span class="font-semibold text-amber-950">Perhatian:</span> Obat yang telah di-retur akan <strong>dikunci otomatis</strong> pada transaksi ini dan <strong>tidak dapat diretur kembali</strong>.
+                            <span class="font-semibold text-blue-950">Aturan Retur:</span> Item obat dapat diretur berkali-kali selama tidak melebihi sisa quantity yang dibeli. Item akan <strong>dikunci otomatis</strong> jika seluruh quantity-nya telah selesai diretur.
                         </div>
                     </div>
 
@@ -293,6 +307,7 @@
                             <input id="qty" type="number" placeholder="0" data-nav-enter="batch_select"
                                 oninput="calculateReturTotal()"
                                 class="nav-input w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400">
+                            <p id="qty_max_hint" class="text-[11px] text-gray-400 mt-1"></p>
                         </div>
                         <div>
                             <label class="block text-[12px] font-medium text-gray-500 mb-1">Harga resep</label>
@@ -341,11 +356,25 @@
                 {{-- RIGHT: Item Table --}}
                 <div class="bg-white border border-gray-100 rounded-xl p-6">
                     <div class="flex items-center justify-between mb-4">
-                        <p class="text-[11px] font-medium text-gray-400 uppercase tracking-widest">Item retur</p>
+                        <div class="flex items-center gap-2">
+                            <p class="text-[11px] font-medium text-gray-400 uppercase tracking-widest">Item retur</p>
+                            <span id="transStatusBadge" class="hidden text-[10px] font-semibold bg-red-100 text-red-700 border border-red-200 px-2 py-0.5 rounded-full">
+                                Seluruh Item Telah Diretur
+                            </span>
+                        </div>
                         <span id="itemCount"
                             class="text-[11px] font-medium bg-blue-50 text-blue-700 px-2.5 py-0.5 rounded-full">0
                             item</span>
                     </div>
+
+                    {{-- Alert banner saat semua item selesai diretur --}}
+                    <div id="allLockedBanner" class="hidden mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-800 text-[12px] flex items-center gap-2">
+                        <svg class="w-4 h-4 text-red-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                        <span>Semua item pada transaksi ini telah diretur penuh. Transaksi ini telah dikunci untuk retur.</span>
+                    </div>
+
                     <table id="medicineTable" class="w-full text-[13px] border-collapse">
                         <thead>
                             <tr class="border-b border-gray-100">
@@ -472,22 +501,43 @@
 
         // ─── Calculate retur total ────────────────────────────────────────────────────
         function calculateReturTotal() {
-            const oldQty = parseFloat(document.getElementById('old_qty').value) || 0;
-            let returQty = Math.round(parseFloat(document.getElementById('qty').value) || 0);
+            const maxQty = parseFloat(document.getElementById('old_qty').value) || 0;
+            let returQty = parseFloat(document.getElementById('qty').value) || 0;
 
-            if (returQty > oldQty) {
-                returQty = oldQty;
-                document.getElementById('qty').value = returQty;
-            } else {
-                document.getElementById('qty').value = returQty;
+            if (returQty < 0) {
+                returQty = 0;
+                document.getElementById('qty').value = 0;
+            } else if (returQty > maxQty) {
+                returQty = maxQty;
+                document.getElementById('qty').value = maxQty;
+                iziToast.warning({
+                    title: 'Batas Qty',
+                    message: 'Qty retur tidak boleh melebihi sisa yang dapat diretur (' + maxQty + ').',
+                    position: 'topRight'
+                });
             }
+
+            const remainingPrice = parseFloat(
+                (document.getElementById('price').value || '0').replace(/[^\d.-]/g, '')
+            ) || 0;
 
             const itemPrice = parseFloat(
                 (document.getElementById('item_price').value || '0').replace(/[^\d.-]/g, '')
             ) || 0;
 
-            document.getElementById('total_retur').value = $('#price').val() - Math.ceil(((oldQty - returQty) * itemPrice) /
-                1000) * 1000;
+            let total = 0;
+            if (returQty >= maxQty && maxQty > 0) {
+                total = remainingPrice;
+            } else if (itemPrice > 0) {
+                total = remainingPrice - Math.ceil(((maxQty - returQty) * itemPrice) / 1000) * 1000;
+                if (total <= 0) {
+                    total = Math.round(returQty * itemPrice);
+                }
+            } else if (maxQty > 0) {
+                total = Math.round((returQty / maxQty) * remainingPrice);
+            }
+
+            document.getElementById('total_retur').value = Math.max(0, Math.round(total));
         }
 
         // ─── Enter key navigation ─────────────────────────────────────────────────────
@@ -533,7 +583,8 @@
             $('#unit').val('');
             $('#item_price').val('');
             $('#price').val('');
-            $('#qty').val('');
+            $('#qty').val('').removeAttr('max').attr('placeholder', '0');
+            $('#qty_max_hint').html('');
             $('#total_retur').val('');
             $('#batch').val('');
             $('#expired_date').val('');
@@ -566,7 +617,7 @@
                 return;
             }
 
-            if (!qty_retur || qty_retur <= 0) {
+            if (!qty_retur || parseFloat(qty_retur) <= 0) {
                 iziToast.warning({
                     title: 'Peringatan',
                     message: 'Qty retur harus diisi dan lebih besar dari 0.',
@@ -586,11 +637,27 @@
                 return;
             }
 
+            const maxAllowedQty = parseFloat(old_qty) || 0;
+            const willBeLocked = (parseFloat(qty_retur) >= maxAllowedQty);
+            const remainingAfterRetur = Math.max(0, maxAllowedQty - parseFloat(qty_retur));
+
             const isFallback = (transfer_id === 'fallback');
             const confirmTitle = isFallback ? 'Konfirmasi Retur (Penyesuaian)' : 'Konfirmasi Retur';
-            const confirmText = isFallback
-                ? `PERHATIAN (PENYESUAIAN NON-BATCH):\nObat "${medicine_name}" pada transaksi ini tidak memiliki batch/stok etalase aktif dan akan diproses sebagai PENYESUAIAN TRANSAKSI.\nObat ini akan dikunci permanen pada transaksi ini.\n\nLanjutkan retur penyesuaian?`
-                : `PERHATIAN:\nObat "${medicine_name}" pada transaksi ini akan dikunci permanen dan TIDAK DAPAT di-retur lagi di transaksi ini.\n\nApakah Anda yakin ingin melanjutkan proses retur?`;
+            let confirmText = '';
+
+            if (isFallback) {
+                confirmText = `PERHATIAN (PENYESUAIAN NON-BATCH):\nObat "${medicine_name}" diproses sebagai penyesuaian transaksi sebanyak ${qty_retur} item.\n` +
+                    (willBeLocked
+                        ? `Seluruh sisa quantity obat ini akan habis diretur dan akan DIKUNCI.`
+                        : `Sisa ${remainingAfterRetur} item masih dapat diretur kembali nanti jika diperlukan.`) +
+                    `\n\nLanjutkan proses retur?`;
+            } else {
+                confirmText = `Konfirmasi retur obat "${medicine_name}" sebanyak ${qty_retur} item.\n` +
+                    (willBeLocked
+                        ? `Seluruh sisa quantity obat ini akan habis diretur dan akan DIKUNCI pada transaksi ini.`
+                        : `Sisa ${remainingAfterRetur} item masih dapat diretur kembali nanti jika diperlukan.`) +
+                    `\n\nApakah Anda yakin ingin memproses retur ini?`;
+            }
 
             // Peringatan konfirmasi retur dan penguncian
             swal({
@@ -606,14 +673,14 @@
                         closeModal: true,
                     },
                     confirm: {
-                        text: 'Ya, Retur & Kunci',
+                        text: willBeLocked ? 'Ya, Retur & Kunci' : 'Ya, Proses Retur',
                         value: true,
                         visible: true,
-                        className: 'btn btn-danger',
+                        className: willBeLocked ? 'btn btn-danger' : 'btn btn-primary',
                         closeModal: true
                     }
                 },
-                dangerMode: true,
+                dangerMode: willBeLocked,
             }).then(function(confirmed) {
                 if (!confirmed) return;
 
@@ -763,11 +830,21 @@
                                 return `
                                     <div class="flex items-center justify-between gap-2">
                                         <span class="text-gray-400 line-through select-none">${data || '—'}</span>
-                                        <span class="badge-locked" title="Obat ini sudah pernah di-retur pada transaksi ini dan terkunci">
+                                        <span class="badge-locked" title="Seluruh quantity obat ini sudah diretur penuh dan dikunci">
                                             <svg class="w-3 h-3 text-red-500 shrink-0" viewBox="0 0 20 20" fill="currentColor">
                                                 <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd" />
                                             </svg>
-                                            Sudah Diretur
+                                            Sudah Diretur Penuh
+                                        </span>
+                                    </div>
+                                `;
+                            }
+                            if (row.returned_qty > 0) {
+                                return `
+                                    <div class="flex items-center justify-between gap-2">
+                                        <span class="font-medium text-gray-800">${data || '—'}</span>
+                                        <span class="badge-partial" title="Sebagian quantity obat ini sudah diretur">
+                                            Diretur ${row.returned_qty}
                                         </span>
                                     </div>
                                 `;
@@ -778,12 +855,27 @@
                     {
                         data: 'quantity',
                         className: 'text-end',
-                        render: (d, t, r) => r.is_locked ? `<span class="text-gray-400">${d}</span>` : d
+                        render: function(d, t, r) {
+                            if (r.is_locked) {
+                                return `<span class="text-gray-400 font-medium">0 / ${d}</span>`;
+                            }
+                            if (r.returned_qty > 0) {
+                                return `<span class="font-bold text-blue-600">${r.remaining_qty}</span> <span class="text-[11px] text-gray-400">/ ${d}</span>`;
+                            }
+                            return `<span class="font-medium text-gray-800">${d}</span>`;
+                        }
                     },
                     {
                         data: 'final_price',
                         className: 'text-end',
-                        render: (d, t, r) => r.is_locked ? `<span class="text-gray-400">${d}</span>` : d
+                        render: function(d, t, r) {
+                            if (r.is_locked) {
+                                return `<span class="text-gray-400">Rp 0</span>`;
+                            }
+                            const val = (r.returned_qty > 0) ? r.remaining_price : r.final_price;
+                            const formatted = new Intl.NumberFormat('id-ID').format(Math.round(val || 0));
+                            return `<span class="font-medium text-gray-800">Rp ${formatted}</span>`;
+                        }
                     },
                 ],
 
@@ -794,8 +886,24 @@
                 },
 
                 drawCallback: function() {
-                    const count = this.api().rows().count();
+                    const api = this.api();
+                    const rows = api.rows().data().toArray();
+                    const count = rows.length;
                     document.getElementById('itemCount').textContent = count + ' item';
+
+                    const allLocked = count > 0 && rows.every(r => r.is_locked);
+                    const banner = document.getElementById('allLockedBanner');
+                    const badge = document.getElementById('transStatusBadge');
+
+                    if (allLocked) {
+                        banner?.classList.remove('hidden');
+                        badge?.classList.remove('hidden');
+                        $('#submitBtn').prop('disabled', true).addClass('opacity-50 cursor-not-allowed');
+                    } else {
+                        banner?.classList.add('hidden');
+                        badge?.classList.add('hidden');
+                        $('#submitBtn').prop('disabled', false).removeClass('opacity-50 cursor-not-allowed');
+                    }
                 }
             });
 
@@ -805,10 +913,18 @@
                 $('#medicine_name').val(data.medicine.name);
                 $('#transaction_id').val(data.transaction_id);
                 $('#unit').val(data.medicine.unit);
-                $('#price').val(data.final_price);
+                $('#price').val(data.remaining_price);
                 $('#item_price').val(data.item_price);
-                $('#old_qty').val(data.quantity);
+                $('#old_qty').val(data.remaining_qty);
                 $('#cart_id').val(data.id);
+
+                // Set input qty limits & hint
+                $('#qty').val('').attr('max', data.remaining_qty).attr('placeholder', 'Maks: ' + data.remaining_qty);
+                if (data.returned_qty > 0) {
+                    $('#qty_max_hint').html('<span class="text-amber-600 font-medium">Sisa dapat diretur: ' + data.remaining_qty + ' ' + (data.medicine.unit || '') + ' (Sudah diretur: ' + data.returned_qty + ')</span>');
+                } else {
+                    $('#qty_max_hint').html('<span class="text-gray-500">Maksimal retur: ' + data.remaining_qty + ' ' + (data.medicine.unit || '') + '</span>');
+                }
 
                 // Load batches
                 loadBatches(data.medicine.id, data.transaction_id);
@@ -822,7 +938,7 @@
                 if (data.is_locked) {
                     iziToast.warning({
                         title: 'Terkunci',
-                        message: 'Obat "' + (data.medicine?.name || 'ini') + '" pada transaksi ini sudah pernah di-retur dan tidak dapat di-retur kembali.',
+                        message: 'Seluruh quantity obat "' + (data.medicine?.name || 'ini') + '" pada transaksi ini sudah diretur dan telah dikunci.',
                         position: 'topRight'
                     });
                     return;
