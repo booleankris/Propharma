@@ -79,7 +79,7 @@ class OrdersExport implements FromArray, ShouldAutoSize, WithStyles, WithTitle, 
             ["No. Pesanan / SP : {$orderCode}  |  Tanggal: {$orderDate}"],
             ["Waktu Cetak    : {$downloadTime}  |  Total: {$this->dataRowCount} Item Obat"],
             [''], // Baris kosong pemisah
-            // Baris 6: HEADER TABEL (9 Kolom)
+            // Baris 6: HEADER TABEL (10 Kolom)
             [
                 'NO',
                 'NAMA OBAT',
@@ -90,6 +90,7 @@ class OrdersExport implements FromArray, ShouldAutoSize, WithStyles, WithTitle, 
                 'KREDITUR',
                 'DISKON',
                 'SISA',
+                'KETERANGAN',
             ],
         ];
 
@@ -118,7 +119,7 @@ class OrdersExport implements FromArray, ShouldAutoSize, WithStyles, WithTitle, 
         }
 
         if ($items->isEmpty()) {
-            $rows[] = ['-', 'Tidak ada item obat dalam pemesanan ini.', 0, '-', 0, 0, '-', '-', 0];
+            $rows[] = ['-', 'Tidak ada item obat dalam pemesanan ini.', 0, '-', 0, 0, '-', '-', 0, '-'];
         } else {
             foreach ($items as $item) {
                 $isPack = (int) ($item->pack ?? 0) === 1;
@@ -165,6 +166,9 @@ class OrdersExport implements FromArray, ShouldAutoSize, WithStyles, WithTitle, 
                 // Sisa stok riil etalase cabang dari medicine_transfer_items
                 $sisaStock = isset($counterStocks[$item->medicine_id]) ? (int) $counterStocks[$item->medicine_id] : 0;
 
+                $note = trim((string) ($item->note ?? ''));
+                $keterangan = $note !== '' ? $note : '-';
+
                 $rows[] = [
                     $no++,
                     (string) ($item->medicines?->name ?? '-'),
@@ -175,6 +179,7 @@ class OrdersExport implements FromArray, ShouldAutoSize, WithStyles, WithTitle, 
                     $creditorName,
                     $discFormatted,
                     $sisaStock,
+                    $keterangan,
                 ];
             }
         }
@@ -185,9 +190,9 @@ class OrdersExport implements FromArray, ShouldAutoSize, WithStyles, WithTitle, 
 
         $this->summaryRowStart = count($rows) + 1;
 
-        $rows[] = ['', '', '', 'SUBTOTAL HNA', '', $subtotalHna, '', '', ''];
-        $rows[] = ['', '', '', 'PPN (11%)', '', $ppn, '', '', ''];
-        $rows[] = ['', '', '', 'TOTAL PEMESANAN', '', $grandTotal, '', '', ''];
+        $rows[] = ['', '', '', 'SUBTOTAL HNA', '', $subtotalHna, '', '', '', ''];
+        $rows[] = ['', '', '', 'PPN (11%)', '', $ppn, '', '', '', ''];
+        $rows[] = ['', '', '', 'TOTAL PEMESANAN', '', $grandTotal, '', '', '', ''];
 
         return $rows;
     }
@@ -199,10 +204,10 @@ class OrdersExport implements FromArray, ShouldAutoSize, WithStyles, WithTitle, 
         $lastDataRow = $headerRow + $totalDataRows;
 
         // 1. Title & Header Info Styling
-        $sheet->mergeCells('A1:I1');
-        $sheet->mergeCells('A2:I2');
-        $sheet->mergeCells('A3:I3');
-        $sheet->mergeCells('A4:I4');
+        $sheet->mergeCells('A1:J1');
+        $sheet->mergeCells('A2:J2');
+        $sheet->mergeCells('A3:J3');
+        $sheet->mergeCells('A4:J4');
 
         $sheet->getStyle('A1')->applyFromArray([
             'font' => [
@@ -232,7 +237,7 @@ class OrdersExport implements FromArray, ShouldAutoSize, WithStyles, WithTitle, 
         ]);
 
         // 2. Table Column Header Styling (Baris 6)
-        $sheet->getStyle("A{$headerRow}:I{$headerRow}")->applyFromArray([
+        $sheet->getStyle("A{$headerRow}:J{$headerRow}")->applyFromArray([
             'font' => [
                 'bold' => true,
                 'color' => ['rgb' => 'FFFFFF'],
@@ -257,7 +262,7 @@ class OrdersExport implements FromArray, ShouldAutoSize, WithStyles, WithTitle, 
 
         // 3. Data Rows Styling
         $firstDataRow = $headerRow + 1;
-        $sheet->getStyle("A{$firstDataRow}:I{$lastDataRow}")->applyFromArray([
+        $sheet->getStyle("A{$firstDataRow}:J{$lastDataRow}")->applyFromArray([
             'borders' => [
                 'allBorders' => [
                     'borderStyle' => Border::BORDER_THIN,
@@ -278,12 +283,13 @@ class OrdersExport implements FromArray, ShouldAutoSize, WithStyles, WithTitle, 
         $sheet->getStyle("G{$firstDataRow}:G{$lastDataRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
         $sheet->getStyle("H{$firstDataRow}:H{$lastDataRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
         $sheet->getStyle("I{$firstDataRow}:I{$lastDataRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+        $sheet->getStyle("J{$firstDataRow}:J{$lastDataRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
 
         // Zebra striping untuk baris data
         for ($r = $firstDataRow; $r <= $lastDataRow; $r++) {
             $sheet->getRowDimension($r)->setRowHeight(20);
             if ($r % 2 === 0) {
-                $sheet->getStyle("A{$r}:I{$r}")->getFill()->applyFromArray([
+                $sheet->getStyle("A{$r}:J{$r}")->getFill()->applyFromArray([
                     'fillType' => Fill::FILL_SOLID,
                     'startColor' => ['rgb' => 'F8FAFC'], // Slate 50
                 ]);
