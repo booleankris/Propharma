@@ -167,21 +167,62 @@ class PurchaseReturnAlertService
             $batchKey = ($med->id ?: '') . '_' . strtoupper(trim($b->name ?: ''));
             $activeReturnStatus = $activeReturnKeys[$batchKey] ?? null;
 
-            $unitPrice = (float) ($ri?->raw_price ?: $med->raw_price ?: 0);
-            $stock = (float) $b->stock;
-            $estimatedValue = $stock * $unitPrice;
+            $stockUnit = $med->unit ?: 'PCS';
+            $content = (int) ($med->content ?: 1);
+            if ($content < 1) $content = 1;
+            $packaging = $med->packaging ?: ($content > 1 ? 'BOX' : $stockUnit);
+
+            $isPack = false;
+            $factor = 1;
+            if ($ri) {
+                $isPack = $ri->receipt_is_pack !== null ? (bool) $ri->receipt_is_pack : false;
+                $factor = (int) ($ri->stock_unit_factor ?: ($isPack && $content > 1 ? $content : 1));
+                if ($factor < 1) $factor = 1;
+            } else {
+                $isPack = ($content > 1 && !empty($med->packaging));
+                $factor = $isPack ? $content : 1;
+            }
+
+            $stock = (float) $b->stock; // Always stored in basic unit (e.g. TAB / BTL)
+            $rawPrice = (float) ($ri?->raw_price ?: $med->raw_price ?: 0);
+
+            if ($isPack && $factor > 1) {
+                $packPrice = $rawPrice;
+                $pricePerUnit = round($rawPrice / $factor, 4);
+                $estimatedValue = $stock * $pricePerUnit;
+                $stockPack = round($stock / $factor, 2);
+                $stockDisplay = "{$stock} {$stockUnit} (" . (float)$stockPack . " {$packaging})";
+                $defaultUnit = $packaging;
+                $defaultUnitPrice = $packPrice;
+            } else {
+                $pricePerUnit = $rawPrice;
+                $packPrice = round($rawPrice * $factor, 2);
+                $estimatedValue = $stock * $pricePerUnit;
+                $stockPack = $stock;
+                $stockDisplay = "{$stock} {$stockUnit}";
+                $defaultUnit = $stockUnit;
+                $defaultUnitPrice = $pricePerUnit;
+            }
 
             $items->push([
                 'batch_id' => $b->id,
                 'batch_number' => $b->name,
                 'medicine_id' => $med->id,
                 'medicine_name' => $med->name,
-                'unit' => $med->packaging ?: 'BOX',
+                'unit' => $defaultUnit,
+                'retur_type' => ($isPack && $factor > 1) ? 'packaging' : 'unit',
+                'stock_unit_factor' => ($isPack && $factor > 1) ? $factor : 1,
+                'packaging' => $packaging,
+                'stock_unit' => $stockUnit,
+                'content' => $factor,
+                'has_pack' => ($factor > 1),
                 'factory_id' => $factoryId,
                 'factory_name' => $factoryName ?: '-',
                 'creditor_code' => $creditorCode,
                 'creditor_name' => $creditorName ?: '-',
                 'stock' => $stock,
+                'stock_pack' => $stockPack,
+                'stock_display' => $stockDisplay,
                 'expired_date' => $b->expired_date,
                 'expired_date_display' => Carbon::parse($b->expired_date)->format('d/m/Y'),
                 'months_before_ed' => $monthsBefore,
@@ -197,7 +238,9 @@ class PurchaseReturnAlertService
                 'invoice_number' => $rd?->invoice_number ?: '-',
                 'invoice_date' => $rd?->invoice_date ?: null,
                 'receiving_id' => $rd?->id ?: null,
-                'unit_price' => $unitPrice,
+                'unit_price' => $defaultUnitPrice,
+                'price_per_unit' => $pricePerUnit,
+                'pack_price' => $packPrice,
                 'estimated_value' => $estimatedValue,
                 'active_return_status' => $activeReturnStatus,
             ]);

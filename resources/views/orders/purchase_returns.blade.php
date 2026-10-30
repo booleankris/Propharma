@@ -331,8 +331,13 @@
                                     </td>
                                     <td class="py-3 px-4 text-center">
                                         <div class="font-black text-blue-600 text-sm">
-                                            {{ (float)$it->qty }} <span class="text-xs font-semibold text-slate-500">{{ $it->unit ?? 'BOX' }}</span>
+                                            {{ (float)$it->qty }} <span class="text-xs font-semibold text-slate-500">{{ $it->unit ?? 'PCS' }}</span>
                                         </div>
+                                        @if($it->retur_type === 'packaging' && (int)$it->stock_unit_factor > 1)
+                                            <div class="text-[10px] text-slate-400 font-medium">
+                                                ({{ (float)($it->qty * $it->stock_unit_factor) }} {{ $it->medicine?->unit ?? 'TAB' }})
+                                            </div>
+                                        @endif
                                         @if($it->unit_price > 0)
                                             <div class="text-[10px] text-slate-400 mt-0.5">
                                                 @ Rp {{ number_format($it->unit_price, 0, ',', '.') }}
@@ -689,9 +694,10 @@
                         <thead class="bg-slate-50 text-[11px] font-bold text-slate-500 border-b border-slate-200">
                             <tr>
                                 <th class="p-2.5 w-8 text-center">PILIH</th>
-                                <th class="p-2.5 min-w-[180px]">NAMA OBAT</th>
+                                <th class="p-2.5 min-w-[170px]">NAMA OBAT</th>
                                 <th class="p-2.5">BATCH & ED</th>
-                                <th class="p-2.5 text-center w-20">QTY</th>
+                                <th class="p-2.5 text-center w-32">SATUAN RETUR</th>
+                                <th class="p-2.5 text-center w-28">QTY RETUR</th>
                                 <th class="p-2.5">HARGA SATUAN</th>
                                 <th class="p-2.5">ALASAN</th>
                                 <th class="p-2.5 w-10 text-center"></th>
@@ -699,7 +705,7 @@
                         </thead>
                         <tbody id="returnItemsTableBody" class="divide-y divide-slate-100">
                             <tr>
-                                <td colspan="7" class="py-8 text-center text-slate-400">
+                                <td colspan="8" class="py-8 text-center text-slate-400">
                                     Belum ada item dipilih. Cari faktur atau tambah obat manual di atas.
                                 </td>
                             </tr>
@@ -1043,22 +1049,63 @@
                 .then(res => res.json())
                 .then(data => {
                     returnItemsData = (data.items || []).map(it => ({
-                        selected: true,
+                        selected: !it.is_already_returned,
                         medicine_id: it.medicine_id,
+                        batch_id: it.batch_id || null,
                         medicine_name: it.medicine_name,
-                        unit: it.unit || 'BOX',
+                        unit: it.unit || 'PCS',
+                        retur_type: it.retur_type || 'unit',
+                        stock_unit_factor: it.stock_unit_factor || 1,
+                        packaging: it.packaging || 'BOX',
+                        stock_unit: it.stock_unit || 'PCS',
+                        content: it.content || 1,
+                        has_pack: Boolean(it.has_pack),
+                        pack_price: Number(it.pack_price || 0),
+                        price_per_unit: Number(it.price_per_unit || 0),
+                        qty_received_pack: Number(it.qty_received_pack || 0),
+                        qty_received_unit: Number(it.qty_received_unit || 0),
+                        current_stock_pack: Number(it.current_stock_pack || 0),
+                        current_stock_unit: Number(it.current_stock_unit || 0),
                         batch_number: it.batch || '-',
                         expired_date: it.expired_date || '',
-                        max_qty: Number(it.qty_received || it.qty || 1),
-                        qty: Number(it.qty_received || it.qty || 1),
+                        max_qty: Number(it.qty || 1),
+                        qty: Number(it.qty || 1),
                         unit_price: Number(it.unit_price || it.raw_price || 0),
                         reason: 'ED DEKAT',
                         factory_id: it.factory_id || null,
                         factory_name: it.factory_name || null,
                         return_policy: it.return_policy || null,
+                        is_already_returned: Boolean(it.is_already_returned),
                     }));
                     renderReturnItemsTable();
                 });
+        };
+
+        // Ganti satuan retur: Kemasan (BOX) vs Eceran (Satuan Stok)
+        window.switchItemReturType = function(idx, targetType) {
+            const it = returnItemsData[idx];
+            if (!it || it.retur_type === targetType) return;
+
+            if (targetType === 'packaging') {
+                it.retur_type = 'packaging';
+                it.unit = it.packaging || 'BOX';
+                it.stock_unit_factor = it.content || 1;
+                it.unit_price = it.pack_price;
+                if (it.content > 1) {
+                    it.qty = Math.round((Number(it.qty) / it.content) * 100) / 100;
+                    if (it.max_qty) it.max_qty = it.qty_received_pack || Math.round((Number(it.max_qty) / it.content) * 100) / 100;
+                }
+            } else {
+                it.retur_type = 'unit';
+                it.unit = it.stock_unit || 'PCS';
+                it.stock_unit_factor = 1;
+                it.unit_price = it.price_per_unit;
+                if (it.content > 1) {
+                    it.qty = Math.round(Number(it.qty) * it.content);
+                    if (it.max_qty) it.max_qty = it.qty_received_unit || Math.round(Number(it.max_qty) * it.content);
+                }
+            }
+            renderReturnItemsTable();
         };
 
         // Manual med search
@@ -1078,11 +1125,11 @@
                             list.innerHTML = '<div class="p-3 text-slate-400 text-center">Obat tidak ditemukan.</div>';
                         } else {
                             list.innerHTML = results.map(m => `
-                                <div onclick="addManualMedRow(${m.id}, '${escapeHtml(m.name)}', '${m.unit || 'BOX'}', ${m.raw_price || 0}, ${m.factory_id || 'null'}, '${escapeHtml(m.factory_name || '')}')"
+                                <div onclick="addManualMedRow(${escapeHtml(JSON.stringify(m).replace(/"/g, '&quot;'))})"
                                      class="p-2.5 hover:bg-blue-50 cursor-pointer flex items-center justify-between">
                                     <div>
                                         <div class="font-bold text-slate-800">${escapeHtml(m.name)}</div>
-                                        <div class="text-[11px] text-slate-500">Pabrik: ${escapeHtml(m.factory_name || '-')} | Satuan: ${m.unit || 'BOX'}</div>
+                                        <div class="text-[11px] text-slate-500">Pabrik: ${escapeHtml(m.factory_name || '-')} | Satuan: ${escapeHtml(m.unit || 'PCS')}</div>
                                     </div>
                                     <span class="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200">
                                         + Tambah
@@ -1095,22 +1142,40 @@
             }, 300);
         };
 
-        window.addManualMedRow = function(id, name, unit, price, factoryId, factoryName) {
+        window.addManualMedRow = function(m) {
             document.getElementById('medResultsList').classList.add('hidden');
             document.getElementById('medSearchInput').value = '';
+            
+            const hasPack = Boolean(m.has_pack);
+            const content = Number(m.content || 1);
+            const packaging = m.packaging || (content > 1 ? 'BOX' : (m.unit || 'PCS'));
+            const stockUnit = m.stock_unit || (content > 1 ? 'PCS' : (m.unit || 'PCS'));
+            const returType = hasPack ? 'packaging' : 'unit';
+
             returnItemsData.push({
                 selected: true,
-                medicine_id: id,
-                medicine_name: name,
-                unit: unit || 'BOX',
+                medicine_id: m.id,
+                batch_id: null,
+                medicine_name: m.name,
+                unit: returType === 'packaging' ? packaging : stockUnit,
+                retur_type: returType,
+                stock_unit_factor: returType === 'packaging' ? content : 1,
+                packaging: packaging,
+                stock_unit: stockUnit,
+                content: content,
+                has_pack: hasPack,
+                pack_price: Number(m.pack_price || m.raw_price || 0),
+                price_per_unit: Number(m.price_per_unit || (content > 1 ? (m.raw_price / content) : m.raw_price) || 0),
+                current_stock_pack: Number(m.current_stock_pack || 0),
+                current_stock_unit: Number(m.current_stock_unit || m.stock || 0),
                 batch_number: '',
                 expired_date: '',
                 max_qty: 9999,
                 qty: 1,
-                unit_price: price || 0,
+                unit_price: returType === 'packaging' ? Number(m.pack_price || m.raw_price || 0) : Number(m.price_per_unit || 0),
                 reason: 'ED DEKAT',
-                factory_id: factoryId,
-                factory_name: factoryName,
+                factory_id: m.factory_id || null,
+                factory_name: m.factory_name || null,
                 return_policy: null,
             });
             renderReturnItemsTable();
@@ -1121,7 +1186,7 @@
             const counter = document.getElementById('selectedItemsCounter');
             
             if (returnItemsData.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="7" class="py-8 text-center text-slate-400">Belum ada item dipilih. Cari faktur atau tambah obat manual di atas.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="8" class="py-8 text-center text-slate-400">Belum ada item dipilih. Cari faktur atau tambah obat manual di atas.</td></tr>`;
                 counter.innerText = '0 Item Dipilih';
                 return;
             }
@@ -1130,12 +1195,16 @@
             counter.innerText = `${selectedCount} Item Dipilih`;
 
             tbody.innerHTML = returnItemsData.map((it, idx) => `
-                <tr class="hover:bg-slate-50/70">
+                <tr class="hover:bg-slate-50/70 ${it.is_already_returned ? 'bg-slate-100 opacity-60' : ''}">
                     <td class="p-2.5 text-center">
-                        <input type="checkbox" ${it.selected ? 'checked' : ''} onchange="toggleItemSelect(${idx}, this.checked)" class="rounded text-blue-600 focus:ring-blue-500">
+                        <input type="checkbox" ${it.selected ? 'checked' : ''} ${it.is_already_returned ? 'disabled' : ''}
+                               onchange="toggleItemSelect(${idx}, this.checked)" class="rounded text-blue-600 focus:ring-blue-500">
                     </td>
                     <td class="p-2.5">
-                        <div class="font-bold text-slate-800">${escapeHtml(it.medicine_name)}</div>
+                        <div class="font-bold text-slate-800 flex items-center gap-1">
+                            ${escapeHtml(it.medicine_name)}
+                            ${it.is_already_returned ? '<span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-rose-100 text-rose-700">Sudah Diretur</span>' : ''}
+                        </div>
                         <div class="text-[10px] text-slate-400">Pabrik: ${escapeHtml(it.factory_name || '-')}</div>
                     </td>
                     <td class="p-2.5">
@@ -1143,11 +1212,43 @@
                         <input type="date" value="${it.expired_date ? it.expired_date.split('T')[0] : ''}" onchange="updateItemField(${idx}, 'expired_date', this.value)" class="h-8 text-xs w-32 rounded-lg border border-slate-300 px-2 mt-1">
                     </td>
                     <td class="p-2.5 text-center">
-                        <input type="number" step="any" min="0.01" value="${it.qty}" onchange="updateItemField(${idx}, 'qty', this.value)" class="h-8 text-xs w-16 text-center rounded-lg border border-slate-300 font-bold text-blue-600">
-                        <div class="text-[10px] text-slate-400 mt-0.5">${it.unit || 'BOX'}</div>
+                        ${it.has_pack ? `
+                            <div class="inline-flex p-0.5 bg-slate-100 rounded-lg border border-slate-200">
+                                <button type="button" onclick="switchItemReturType(${idx}, 'packaging')"
+                                        class="px-2 py-0.5 text-[10px] font-bold rounded-md transition-all ${it.retur_type === 'packaging' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}">
+                                    ${escapeHtml(it.packaging || 'BOX')}
+                                </button>
+                                <button type="button" onclick="switchItemReturType(${idx}, 'unit')"
+                                        class="px-2 py-0.5 text-[10px] font-bold rounded-md transition-all ${it.retur_type === 'unit' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}">
+                                    ${escapeHtml(it.stock_unit || 'PCS')}
+                                </button>
+                            </div>
+                            <div class="text-[9px] text-slate-400 mt-1">
+                                Isi @${it.content} ${escapeHtml(it.stock_unit || 'PCS')}
+                            </div>
+                        ` : `
+                            <span class="inline-block px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                                ${escapeHtml(it.unit || 'PCS')}
+                            </span>
+                        `}
+                    </td>
+                    <td class="p-2.5 text-center">
+                        <div class="flex items-center justify-center gap-1">
+                            <input type="number" step="any" min="0.01" value="${it.qty}" onchange="updateItemField(${idx}, 'qty', this.value)" class="h-8 text-xs w-16 text-center rounded-lg border border-slate-300 font-bold text-blue-600">
+                            <span class="text-[11px] font-semibold text-slate-500">${escapeHtml(it.unit || 'PCS')}</span>
+                        </div>
+                        <div class="text-[9px] text-slate-400 mt-0.5">
+                            Stok: ${it.retur_type === 'packaging' && it.has_pack
+                                ? `${it.current_stock_pack} ${escapeHtml(it.packaging)} (${it.current_stock_unit} ${escapeHtml(it.stock_unit)})`
+                                : `${it.current_stock_unit} ${escapeHtml(it.stock_unit || 'PCS')}`}
+                        </div>
                     </td>
                     <td class="p-2.5">
-                        <input type="number" step="any" min="0" value="${it.unit_price}" onchange="updateItemField(${idx}, 'unit_price', this.value)" class="h-8 text-xs w-24 rounded-lg border border-slate-300 px-2 font-medium">
+                        <div class="flex items-center gap-1">
+                            <span class="text-xs text-slate-400">Rp</span>
+                            <input type="number" step="any" min="0" value="${it.unit_price}" onchange="updateItemField(${idx}, 'unit_price', this.value)" class="h-8 text-xs w-24 rounded-lg border border-slate-300 px-2 font-medium">
+                        </div>
+                        <div class="text-[9px] text-slate-400 mt-0.5">Per ${escapeHtml(it.unit || 'PCS')}</div>
                     </td>
                     <td class="p-2.5">
                         <select onchange="updateItemField(${idx}, 'reason', this.value)" class="h-8 text-xs rounded-lg border border-slate-300 px-2 font-medium">
@@ -1242,15 +1343,32 @@
             if (ap.creditor_code) document.getElementById('form_creditor_code').value = ap.creditor_code;
             document.getElementById('form_notes').value = `Pengajuan retur ED sesuai ketentuan: ${ap.rule_text || ''}`;
             
+            const hasPack = Boolean(ap.has_pack);
+            const content = Number(ap.content || 1);
+            const packaging = ap.packaging || (content > 1 ? 'BOX' : (ap.unit || 'PCS'));
+            const stockUnit = ap.stock_unit || (content > 1 ? 'PCS' : (ap.unit || 'PCS'));
+            const returType = ap.retur_type || (hasPack ? 'packaging' : 'unit');
+
             returnItemsData = [{
                 selected: true,
                 medicine_id: ap.medicine_id,
+                batch_id: ap.batch_id || null,
                 medicine_name: ap.medicine_name,
-                unit: ap.unit || 'BOX',
+                unit: returType === 'packaging' ? packaging : stockUnit,
+                retur_type: returType,
+                stock_unit_factor: returType === 'packaging' ? content : 1,
+                packaging: packaging,
+                stock_unit: stockUnit,
+                content: content,
+                has_pack: hasPack,
+                pack_price: Number(ap.pack_price || 0),
+                price_per_unit: Number(ap.price_per_unit || 0),
+                current_stock_pack: Number(ap.stock_pack || 0),
+                current_stock_unit: Number(ap.stock || 0),
                 batch_number: ap.batch_number || '',
                 expired_date: ap.expired_date || '',
-                max_qty: Number(ap.stock || 9999),
-                qty: Number(ap.stock || 1),
+                max_qty: returType === 'packaging' ? Number(ap.stock_pack || 1) : Number(ap.stock || 1),
+                qty: returType === 'packaging' ? Number(ap.stock_pack || 1) : Number(ap.stock || 1),
                 unit_price: Number(ap.unit_price || 0),
                 reason: 'ED DEKAT',
                 factory_id: ap.factory_id,

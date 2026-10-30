@@ -452,11 +452,16 @@ class PurchaseReturnController extends Controller
                 'receiving_items.discount',
                 'receiving_items.extra_discount',
                 'receiving_items.total',
+                'receiving_items.receipt_is_pack',
+                'receiving_items.stock_unit_factor',
+                'order_items.pack as oi_pack',
                 'batches.id as batch_id',
                 'batches.stock as current_stock',
                 DB::raw('COALESCE(mb.id, mo.id) as medicine_id'),
                 DB::raw('COALESCE(mb.name, mo.name) as medicine_name'),
-                DB::raw('COALESCE(mb.packaging, mo.packaging, "BOX") as unit'),
+                DB::raw('COALESCE(mb.packaging, mo.packaging) as packaging'),
+                DB::raw('COALESCE(mb.unit, mo.unit, "PCS") as stock_unit'),
+                DB::raw('COALESCE(NULLIF(mb.content, ""), NULLIF(mo.content, ""), 1) as content'),
                 DB::raw('COALESCE(mb.factory_id, mo.factory_id) as factory_id'),
                 DB::raw('COALESCE(fb.name, fo.name) as factory_name')
             )
@@ -484,25 +489,72 @@ class PurchaseReturnController extends Controller
             $isAlreadyReturned = ($it->medicine_id && in_array($it->medicine_id, $returnedMedicineIds))
                 || in_array(strtoupper(trim($it->medicine_name)), $returnedMedicineNames);
 
-            // Hitung harga satuan konsisten dengan penerimaan (termasuk diskon / PPN baris penerimaan)
+            // Tentukan satuan stok eceran dan kemasan utuh
+            $stockUnit = $it->stock_unit ?: 'PCS';
+            $content = (int) ($it->stock_unit_factor ?: $it->content ?: 1);
+            if ($content < 1) $content = 1;
+            $packaging = $it->packaging ?: ($content > 1 ? 'BOX' : $stockUnit);
+            $hasPack = ($content > 1 && !empty($packaging));
+
+            // Cek apakah saat penerimaan diterima dalam bentuk kemasan (pack)
+            $isReceivedPack = $it->receipt_is_pack !== null ? (bool) $it->receipt_is_pack : (bool) $it->oi_pack;
+
+            // Hitung harga satuan faktur penerimaan (total baris dibagi qty baris)
             $qtyReceived = (float) ($it->qty_received ?: $it->qty ?: 1);
             $lineAmounts = ReceivingInvoiceTotals::lineAmounts($it, $receivingDetail->invoice_ppn);
             $consistentUnitPrice = $qtyReceived > 0 ? round($lineAmounts['total'] / $qtyReceived, 2) : (float) $it->raw_price;
+
+            // Konversi harga & qty untuk Kemasan vs Eceran
+            if ($isReceivedPack && $content > 1) {
+                $packPrice = $consistentUnitPrice;
+                $pricePerUnit = round($packPrice / $content, 4);
+                $qtyReceivedPack = $qtyReceived;
+                $qtyReceivedUnit = round($qtyReceived * $content, 2);
+                $defaultReturType = 'packaging';
+                $defaultUnit = $packaging;
+                $defaultPrice = $packPrice;
+                $defaultQty = $qtyReceivedPack;
+            } else {
+                $pricePerUnit = $consistentUnitPrice;
+                $packPrice = round($pricePerUnit * $content, 2);
+                $qtyReceivedUnit = $qtyReceived;
+                $qtyReceivedPack = $content > 1 ? round($qtyReceived / $content, 2) : $qtyReceived;
+                $defaultReturType = 'unit';
+                $defaultUnit = $stockUnit;
+                $defaultPrice = $pricePerUnit;
+                $defaultQty = $qtyReceivedUnit;
+            }
+
+            // Stok batch saat ini (stok fisik selalu dalam satuan eceran/stockUnit)
+            $currentStockUnit = (float) ($it->current_stock ?? 0);
+            $currentStockPack = $content > 1 ? round($currentStockUnit / $content, 2) : $currentStockUnit;
 
             return [
                 'ri_id' => $it->ri_id,
                 'batch' => $it->batch,
                 'expired_date' => $it->expired_date,
                 'qty_received' => $it->qty_received,
-                'qty' => $it->qty,
+                'qty' => $defaultQty,
                 'raw_price' => $it->raw_price,
-                'unit_price' => $consistentUnitPrice,
+                'unit_price' => $defaultPrice,
                 'total' => $lineAmounts['total'],
                 'batch_id' => $it->batch_id,
-                'current_stock' => $it->current_stock,
+                'current_stock' => $currentStockUnit,
+                'current_stock_unit' => $currentStockUnit,
+                'current_stock_pack' => $currentStockPack,
                 'medicine_id' => $it->medicine_id,
                 'medicine_name' => $it->medicine_name,
-                'unit' => $it->unit,
+                'unit' => $defaultUnit,
+                'retur_type' => $defaultReturType,
+                'stock_unit_factor' => $defaultReturType === 'packaging' ? $content : 1,
+                'packaging' => $packaging,
+                'stock_unit' => $stockUnit,
+                'content' => $content,
+                'has_pack' => $hasPack,
+                'pack_price' => $packPrice,
+                'price_per_unit' => $pricePerUnit,
+                'qty_received_pack' => $qtyReceivedPack,
+                'qty_received_unit' => $qtyReceivedUnit,
                 'factory_id' => $it->factory_id,
                 'factory_name' => $it->factory_name,
                 'return_policy' => $evaluation,
@@ -551,14 +603,38 @@ class PurchaseReturnController extends Controller
             $policy = $creditorCode ? $this->findReturnPolicy($creditorCode, $m->factory_id, $factoryName, $policies) : null;
             $evaluation = $this->evaluateReturnEligibility($policy, null);
 
+            $stockUnit = $m->unit ?: 'PCS';
+            $content = (int) ($m->content ?: 1);
+            if ($content < 1) $content = 1;
+            $packaging = $m->packaging ?: ($content > 1 ? 'BOX' : $stockUnit);
+            $hasPack = ($content > 1);
+
+            $rawPrice = (float) $m->raw_price;
+            $packPrice = $rawPrice;
+            $pricePerUnit = $hasPack ? round($packPrice / $content, 4) : $packPrice;
+
+            $currentStockUnit = (float) ($m->stock ?? 0);
+            $currentStockPack = $hasPack ? round($currentStockUnit / $content, 2) : $currentStockUnit;
+
             return [
                 'id' => $m->id,
                 'code' => $m->code,
                 'name' => $m->name,
-                'unit' => $m->packaging ?: 'BOX',
+                'unit' => $hasPack ? $packaging : $stockUnit,
+                'retur_type' => $hasPack ? 'packaging' : 'unit',
+                'stock_unit_factor' => $hasPack ? $content : 1,
+                'packaging' => $packaging,
+                'stock_unit' => $stockUnit,
+                'content' => $content,
+                'has_pack' => $hasPack,
+                'raw_price' => $rawPrice,
+                'pack_price' => $packPrice,
+                'price_per_unit' => $pricePerUnit,
+                'current_stock' => $currentStockUnit,
+                'current_stock_unit' => $currentStockUnit,
+                'current_stock_pack' => $currentStockPack,
                 'factory_id' => $m->factory_id,
                 'factory_name' => $factoryName,
-                'raw_price' => (float) $m->raw_price,
                 'return_policy' => $evaluation,
             ];
         });
@@ -582,8 +658,11 @@ class PurchaseReturnController extends Controller
             'notes' => 'nullable|string|max:500',
             'items' => 'required|array|min:1',
             'items.*.medicine_id' => 'nullable|integer',
+            'items.*.batch_id' => 'nullable|integer',
             'items.*.medicine_name' => 'required|string|max:255',
             'items.*.unit' => 'nullable|string|max:50',
+            'items.*.retur_type' => 'nullable|string|in:packaging,unit',
+            'items.*.stock_unit_factor' => 'nullable|integer|min:1',
             'items.*.batch_number' => 'nullable|string|max:100',
             'items.*.expired_date' => 'nullable|date',
             'items.*.qty' => 'required|numeric|min:0.01',
@@ -652,11 +731,20 @@ class PurchaseReturnController extends Controller
 
             foreach ($validated['items'] as $it) {
                 $subtotal = (float)$it['qty'] * (float)$it['unit_price'];
+                $returType = $it['retur_type'] ?? 'unit';
+                $factor = (int) ($it['stock_unit_factor'] ?? 1);
+                if ($returType === 'unit') {
+                    $factor = 1;
+                }
+
                 PurchaseReturnItem::create([
                     'purchase_return_id' => $purchaseReturn->id,
                     'medicine_id' => $it['medicine_id'] ?? null,
+                    'batch_id' => $it['batch_id'] ?? null,
                     'medicine_name' => $it['medicine_name'],
-                    'unit' => $it['unit'] ?? 'BOX',
+                    'unit' => $it['unit'] ?? 'PCS',
+                    'retur_type' => $returType,
+                    'stock_unit_factor' => max(1, $factor),
                     'batch_number' => $it['batch_number'] ?? '-',
                     'expired_date' => $it['expired_date'] ?? null,
                     'qty' => $it['qty'],
@@ -718,8 +806,12 @@ class PurchaseReturnController extends Controller
         if ($item->medicine_id) {
             $med = Medicines::find($item->medicine_id);
             if ($med) {
+                // Konversi qty retur ke satuan stok fisik dasar (jika retur kemasan utuh, kalikan stock_unit_factor)
+                $factor = ($item->retur_type === 'packaging' && (int)$item->stock_unit_factor > 1)
+                    ? (int)$item->stock_unit_factor
+                    : 1;
+                $qtyDeduct = (float) $item->qty * $factor;
                 $qtyBefore = (float) $med->stock;
-                $qtyDeduct = (float) $item->qty;
 
                 // Kurangi stok fisik obat (diperbolehkan minus stok)
                 $med->decrement('stock', $qtyDeduct);
@@ -772,8 +864,12 @@ class PurchaseReturnController extends Controller
         if ($item->medicine_id) {
             $med = Medicines::find($item->medicine_id);
             if ($med) {
+                // Konversi qty retur ke satuan stok fisik dasar
+                $factor = ($item->retur_type === 'packaging' && (int)$item->stock_unit_factor > 1)
+                    ? (int)$item->stock_unit_factor
+                    : 1;
+                $qtyRestore = (float) $item->qty * $factor;
                 $qtyBefore = (float) $med->stock;
-                $qtyRestore = (float) $item->qty;
 
                 $med->increment('stock', $qtyRestore);
                 $qtyAfter = $qtyBefore + $qtyRestore;

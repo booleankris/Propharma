@@ -221,6 +221,12 @@ export default function PurchaseReturns({
 
     const handleApplyReturnFromAlert = (item) => {
         setEntryType('manual');
+        const hasPack = Boolean(item.has_pack);
+        const content = Number(item.content || 1);
+        const packaging = item.packaging || (content > 1 ? 'BOX' : (item.unit || 'PCS'));
+        const stockUnit = item.stock_unit || (content > 1 ? 'PCS' : (item.unit || 'PCS'));
+        const returType = item.retur_type || (hasPack ? 'packaging' : 'unit');
+
         setFormData({
             invoice_number: item.invoice_number && item.invoice_number !== '-' ? item.invoice_number : '',
             invoice_date: item.invoice_date || new Date().toISOString().split('T')[0],
@@ -231,12 +237,23 @@ export default function PurchaseReturns({
             items: [{
                 selected: true,
                 medicine_id: item.medicine_id,
+                batch_id: item.batch_id || null,
                 medicine_name: item.medicine_name,
-                unit: item.unit || 'BOX',
+                unit: returType === 'packaging' ? packaging : stockUnit,
+                retur_type: returType,
+                stock_unit_factor: returType === 'packaging' ? content : 1,
+                packaging: packaging,
+                stock_unit: stockUnit,
+                content: content,
+                has_pack: hasPack,
+                pack_price: Number(item.pack_price || 0),
+                price_per_unit: Number(item.price_per_unit || 0),
+                current_stock_pack: Number(item.stock_pack || 0),
+                current_stock_unit: Number(item.stock || 0),
                 batch_number: item.batch_number || '',
                 expired_date: item.expired_date || '',
-                max_qty: Number(item.stock || 9999),
-                qty: Number(item.stock || 1),
+                max_qty: returType === 'packaging' ? Number(item.stock_pack || 1) : Number(item.stock || 1),
+                qty: returType === 'packaging' ? Number(item.stock_pack || 1) : Number(item.stock || 1),
                 unit_price: Number(item.unit_price || 0),
                 reason: 'ED DEKAT',
                 pickup_date: '',
@@ -296,14 +313,27 @@ export default function PurchaseReturns({
                     creditor_code: inv.creditor_code,
                     receiving_id: inv.id,
                     items: (data.items || []).map(it => ({
-                        selected: false, // User selects which items to return
+                        selected: !it.is_already_returned, // Default selected if not returned
                         medicine_id: it.medicine_id,
+                        batch_id: it.batch_id || null,
                         medicine_name: it.medicine_name,
-                        unit: it.unit || 'BOX',
+                        unit: it.unit || 'PCS',
+                        retur_type: it.retur_type || 'unit',
+                        stock_unit_factor: it.stock_unit_factor || 1,
+                        packaging: it.packaging || 'BOX',
+                        stock_unit: it.stock_unit || 'PCS',
+                        content: it.content || 1,
+                        has_pack: Boolean(it.has_pack),
+                        pack_price: Number(it.pack_price || 0),
+                        price_per_unit: Number(it.price_per_unit || 0),
+                        qty_received_pack: Number(it.qty_received_pack || 0),
+                        qty_received_unit: Number(it.qty_received_unit || 0),
+                        current_stock_pack: Number(it.current_stock_pack || 0),
+                        current_stock_unit: Number(it.current_stock_unit || 0),
                         batch_number: it.batch || '-',
                         expired_date: it.expired_date || '',
-                        max_qty: Number(it.qty_received || it.qty || 1),
-                        qty: Number(it.qty_received || it.qty || 1),
+                        max_qty: Number(it.qty || 1),
+                        qty: Number(it.qty || 1),
                         unit_price: Number(it.unit_price || it.raw_price || 0),
                         reason: 'ED DEKAT',
                         pickup_date: '',
@@ -320,16 +350,33 @@ export default function PurchaseReturns({
     };
 
     const addManualItemRow = (med = null) => {
+        const hasPack = med ? Boolean(med.has_pack) : false;
+        const content = med ? Number(med.content || 1) : 1;
+        const packaging = med ? (med.packaging || (content > 1 ? 'BOX' : (med.unit || 'PCS'))) : 'BOX';
+        const stockUnit = med ? (med.stock_unit || (content > 1 ? 'PCS' : (med.unit || 'PCS'))) : 'PCS';
+        const returType = hasPack ? 'packaging' : 'unit';
+
         const newItem = {
             selected: true,
             medicine_id: med ? med.id : null,
+            batch_id: null,
             medicine_name: med ? med.name : '',
-            unit: med ? (med.unit || 'BOX') : 'BOX',
+            unit: returType === 'packaging' ? packaging : stockUnit,
+            retur_type: returType,
+            stock_unit_factor: returType === 'packaging' ? content : 1,
+            packaging: packaging,
+            stock_unit: stockUnit,
+            content: content,
+            has_pack: hasPack,
+            pack_price: med ? Number(med.pack_price || med.raw_price || 0) : 0,
+            price_per_unit: med ? Number(med.price_per_unit || (content > 1 ? (med.raw_price / content) : med.raw_price) || 0) : 0,
+            current_stock_pack: med ? Number(med.current_stock_pack || 0) : 0,
+            current_stock_unit: med ? Number(med.current_stock_unit || med.stock || 0) : 0,
             batch_number: '',
             expired_date: '',
             max_qty: 9999,
             qty: 1,
-            unit_price: med ? (med.raw_price || 0) : 0,
+            unit_price: returType === 'packaging' ? (med ? Number(med.pack_price || med.raw_price || 0) : 0) : (med ? Number(med.price_per_unit || 0) : 0),
             reason: 'ED DEKAT',
             pickup_date: '',
             deduction_note: '',
@@ -344,6 +391,37 @@ export default function PurchaseReturns({
         });
         setMedSearchQuery('');
         setMedSearchResults([]);
+    };
+
+    const switchItemReturType = (index, targetType) => {
+        const updated = [...formData.items];
+        const it = updated[index];
+        if (!it || it.retur_type === targetType) return;
+
+        if (targetType === 'packaging') {
+            it.retur_type = 'packaging';
+            it.unit = it.packaging || 'BOX';
+            it.stock_unit_factor = it.content || 1;
+            it.unit_price = it.pack_price;
+            if (it.content > 1) {
+                it.qty = Math.round((Number(it.qty) / it.content) * 100) / 100;
+                if (it.max_qty && it.max_qty !== 9999) {
+                    it.max_qty = it.qty_received_pack || Math.round((Number(it.max_qty) / it.content) * 100) / 100;
+                }
+            }
+        } else {
+            it.retur_type = 'unit';
+            it.unit = it.stock_unit || 'PCS';
+            it.stock_unit_factor = 1;
+            it.unit_price = it.price_per_unit;
+            if (it.content > 1) {
+                it.qty = Math.round(Number(it.qty) * it.content);
+                if (it.max_qty && it.max_qty !== 9999) {
+                    it.max_qty = it.qty_received_unit || Math.round(Number(it.max_qty) * it.content);
+                }
+            }
+        }
+        setFormData({ ...formData, items: updated });
     };
 
     const updateItemRow = (index, field, value) => {
@@ -673,7 +751,12 @@ export default function PurchaseReturns({
                                                 </td>
                                                 <td className="py-2.5 px-2 text-center whitespace-nowrap">
                                                     <span className="font-extrabold text-blue-700 text-xs">{Number(item.qty)}</span>{' '}
-                                                    <span className="text-[10px] font-semibold text-slate-500 uppercase">{item.unit || 'BOX'}</span>
+                                                    <span className="text-[10px] font-semibold text-slate-500 uppercase">{item.unit || 'PCS'}</span>
+                                                    {item.retur_type === 'packaging' && Number(item.stock_unit_factor) > 1 && (
+                                                        <div className="text-[10px] text-slate-400 font-medium">
+                                                            ({Number(item.qty) * Number(item.stock_unit_factor)} {item.medicine?.unit || 'TAB'})
+                                                        </div>
+                                                    )}
                                                 </td>
                                                 <td className="py-2.5 px-3 text-center whitespace-nowrap">
                                                     <div className="font-mono text-slate-700 text-xs font-semibold">{item.batch_number || '-'}</div>
@@ -1299,15 +1382,15 @@ export default function PurchaseReturns({
                                                         </th>
                                                     )}
                                                     <th className="py-2.5 px-3">Nama Obat</th>
-                                                    <th className="py-2.5 px-2 w-36 text-center">Ketentuan Retur</th>
-                                                    <th className="py-2.5 px-2 w-24 text-center">
+                                                    <th className="py-2.5 px-2 w-32 text-center">Ketentuan Retur</th>
+                                                    <th className="py-2.5 px-2 w-28 text-center">Satuan Retur</th>
+                                                    <th className="py-2.5 px-2 w-28 text-center">
                                                         {entryType === 'invoice' ? 'Qty Retur / Faktur' : 'Jumlah'}
                                                     </th>
-                                                    <th className="py-2.5 px-2 w-16 text-center">Satuan</th>
-                                                    <th className="py-2.5 px-2 w-28">Batch</th>
-                                                    <th className="py-2.5 px-2 w-28">Expired Date</th>
-                                                    <th className="py-2.5 px-2 w-24 text-right">Harga Beli</th>
-                                                    <th className="py-2.5 px-2 w-32">Keterangan</th>
+                                                    <th className="py-2.5 px-2 w-24">Batch</th>
+                                                    <th className="py-2.5 px-2 w-24">Expired Date</th>
+                                                    <th className="py-2.5 px-2 w-28 text-right">Harga Beli</th>
+                                                    <th className="py-2.5 px-2 w-28">Keterangan</th>
                                                     <th className="py-2.5 px-2 w-10"></th>
                                                 </tr>
                                             </thead>
@@ -1419,10 +1502,61 @@ export default function PurchaseReturns({
                                                                     )}
                                                                 </td>
                                                                 <td className="py-2 px-2 text-center">
+                                                                    {row.has_pack ? (
+                                                                        <div>
+                                                                            <div className="inline-flex p-0.5 bg-slate-100 rounded-lg border border-slate-200 shadow-2xs">
+                                                                                <button
+                                                                                    type="button"
+                                                                                    disabled={isFromInvoice && (!row.selected || !!row.is_already_returned)}
+                                                                                    onClick={() => switchItemReturType(idx, 'packaging')}
+                                                                                    className={`px-1.5 py-0.5 text-[10px] font-bold rounded-md transition-all ${row.retur_type === 'packaging'
+                                                                                        ? 'bg-blue-600 text-white shadow-xs'
+                                                                                        : 'text-slate-600 hover:text-slate-900'
+                                                                                    }`}
+                                                                                >
+                                                                                    {row.packaging || 'BOX'}
+                                                                                </button>
+                                                                                <button
+                                                                                    type="button"
+                                                                                    disabled={isFromInvoice && (!row.selected || !!row.is_already_returned)}
+                                                                                    onClick={() => switchItemReturType(idx, 'unit')}
+                                                                                    className={`px-1.5 py-0.5 text-[10px] font-bold rounded-md transition-all ${row.retur_type === 'unit'
+                                                                                        ? 'bg-blue-600 text-white shadow-xs'
+                                                                                        : 'text-slate-600 hover:text-slate-900'
+                                                                                    }`}
+                                                                                >
+                                                                                    {row.stock_unit || 'PCS'}
+                                                                                </button>
+                                                                            </div>
+                                                                            <div className="text-[9px] text-slate-400 mt-0.5">
+                                                                                Isi @{row.content} {row.stock_unit || 'PCS'}
+                                                                            </div>
+                                                                        </div>
+                                                                    ) : isFromInvoice ? (
+                                                                        <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                                                                            {row.unit || 'PCS'}
+                                                                        </span>
+                                                                    ) : (
+                                                                        <select
+                                                                            value={row.unit}
+                                                                            onChange={(e) => updateItemRow(idx, 'unit', e.target.value)}
+                                                                            className="w-full border border-slate-200 rounded-lg px-1 py-1 text-xs text-center uppercase focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                                                        >
+                                                                            <option value="BOX">BOX</option>
+                                                                            <option value="BTL">BTL</option>
+                                                                            <option value="TUBE">TUBE</option>
+                                                                            <option value="PCS">PCS</option>
+                                                                            <option value="STRIP">STRIP</option>
+                                                                            <option value="AMP">AMP</option>
+                                                                            <option value="VIAL">VIAL</option>
+                                                                        </select>
+                                                                    )}
+                                                                </td>
+                                                                <td className="py-2 px-2 text-center">
                                                                     <div className="flex items-center justify-center gap-1">
                                                                         <input
                                                                             type="number"
-                                                                            min="0.1"
+                                                                            min="0.01"
                                                                             max={isFromInvoice ? (row.max_qty || 9999) : undefined}
                                                                             step="any"
                                                                             required
@@ -1448,33 +1582,20 @@ export default function PurchaseReturns({
                                                                                 : 'border-blue-300 text-blue-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500'
                                                                                 }`}
                                                                         />
+                                                                        <span className="text-[10px] font-semibold text-slate-500">
+                                                                            {row.unit || 'PCS'}
+                                                                        </span>
                                                                         {isFromInvoice && (
-                                                                            <span className="text-[11px] text-slate-400 font-normal">
+                                                                            <span className="text-[10px] text-slate-400 font-normal">
                                                                                 / {row.max_qty}
                                                                             </span>
                                                                         )}
                                                                     </div>
-                                                                </td>
-                                                                <td className="py-2 px-2 text-center">
-                                                                    {isFromInvoice ? (
-                                                                        <span className="font-semibold text-slate-700 uppercase text-[11px]">
-                                                                            {row.unit || 'BOX'}
-                                                                        </span>
-                                                                    ) : (
-                                                                        <select
-                                                                            value={row.unit}
-                                                                            onChange={(e) => updateItemRow(idx, 'unit', e.target.value)}
-                                                                            className="w-full border border-slate-200 rounded-lg px-1 py-1 text-xs text-center uppercase focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                                                        >
-                                                                            <option value="BOX">BOX</option>
-                                                                            <option value="BTL">BTL</option>
-                                                                            <option value="TUBE">TUBE</option>
-                                                                            <option value="PCS">PCS</option>
-                                                                            <option value="STRIP">STRIP</option>
-                                                                            <option value="AMP">AMP</option>
-                                                                            <option value="VIAL">VIAL</option>
-                                                                        </select>
-                                                                    )}
+                                                                    <div className="text-[9px] text-slate-400 mt-0.5">
+                                                                        Stok: {row.retur_type === 'packaging' && row.has_pack
+                                                                            ? `${row.current_stock_pack} ${row.packaging} (${row.current_stock_unit} ${row.stock_unit})`
+                                                                            : `${row.current_stock_unit} ${row.stock_unit || 'PCS'}`}
+                                                                    </div>
                                                                 </td>
                                                                 <td className="py-2 px-2">
                                                                     {isFromInvoice ? (
@@ -1507,9 +1628,12 @@ export default function PurchaseReturns({
                                                                 </td>
                                                                 <td className="py-2 px-2 text-right">
                                                                     {isFromInvoice ? (
-                                                                        <span className="font-mono text-slate-800 font-semibold text-[11px]">
-                                                                            {formatRupiah(row.unit_price)}
-                                                                        </span>
+                                                                        <div>
+                                                                            <span className="font-mono text-slate-800 font-semibold text-[11px]">
+                                                                                {formatRupiah(row.unit_price)}
+                                                                            </span>
+                                                                            <div className="text-[9px] text-slate-400">Per {row.unit || 'PCS'}</div>
+                                                                        </div>
                                                                     ) : (
                                                                         <input
                                                                             type="number"
