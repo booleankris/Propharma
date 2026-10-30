@@ -321,6 +321,16 @@ class ReportedMedicineController extends Controller
             ? (int) $request->pharmacy_id
             : (int) (auth()->user()?->pharmacy_id ?: getActivePharmacyId());
 
+        $year = (int) $request->input('year', now()->year);
+        $month = (int) $request->input('month', now()->month);
+
+        if ($month < 1 || $month > 12) {
+            $month = (int) now()->month;
+        }
+        if ($year < 2000 || $year > 2100) {
+            $year = (int) now()->year;
+        }
+
         $startDate = Carbon::createFromDate($year, $month, 1)->startOfMonth();
         $endDate = Carbon::createFromDate($year, $month, 1)->endOfMonth();
 
