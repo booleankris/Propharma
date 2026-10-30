@@ -430,22 +430,29 @@
                                     class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
                                     placeholder="QTY Tolak" onkeyup="counttotal()">
                             </div>
-                            <div class="w-full sm:w-40">
+                            <div class="w-full sm:w-44">
                                 <div class="py-1 text-[13px] font-bold">Alasan Penolakan</div>
                                 <select
                                     class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
-                                    name="reason" id="reason">
+                                    name="reason" id="reason" onchange="handleReasonChange(this.value)">
                                     <option selected value="">-- Pilih Alasan --</option>
                                     <option value="Stok Kurang">Stok Kurang</option>
-                                    <option value="⁠Kosong Distributor">⁠Kosong Distributor</option>
+                                    <option value="Kosong Distributor">Kosong Distributor</option>
                                     <option value="Tidak Ada / Habis">Tidak Ada / Habis</option>
                                     <option value="Belum pernah tersedia">Belum pernah tersedia</option>
                                     <option value="Harga">Harga</option>
                                     <option value="Pelayanan">Pelayanan</option>
                                     <option value="Hanya Bertanya">Hanya Bertanya</option>
                                     <option value="Wajib Resep">Wajib Resep</option>
+                                    <option value="Dekat ED">Dekat ED</option>
                                     <option value="Lain-lain">Lain-lain</option>
                                 </select>
+                            </div>
+                            <div id="custom_reason_container" class="hidden w-full sm:w-56">
+                                <div class="py-1 text-[13px] font-bold">Ketik Alasan Lainnya</div>
+                                <input id="custom_reason" type="text"
+                                    class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
+                                    placeholder="Ketik alasan penolakan...">
                             </div>
                             <div class="w-full sm:w-40">
                                 <div class="py-1 text-[13px] font-bold">Hrg HNA</div>
@@ -718,8 +725,31 @@
         document.getElementById('reason').addEventListener('keydown', function(e) {
             if (e.key !== 'Enter') return;
             e.preventDefault();
+            if (document.getElementById('reason').value === 'Lain-lain') {
+                const customInput = document.getElementById('custom_reason');
+                if (customInput) customInput.focus();
+            } else {
+                addItem();
+            }
+        });
+        document.getElementById('custom_reason')?.addEventListener('keydown', function(e) {
+            if (e.key !== 'Enter') return;
+            e.preventDefault();
             addItem();
         });
+
+        function handleReasonChange(val) {
+            const container = document.getElementById('custom_reason_container');
+            const customInput = document.getElementById('custom_reason');
+            if (!container || !customInput) return;
+            if (val === 'Lain-lain') {
+                container.classList.remove('hidden');
+                setTimeout(() => customInput.focus(), 50);
+            } else {
+                container.classList.add('hidden');
+                customInput.value = '';
+            }
+        }
 
 
         function empyCreditorOption() {
@@ -944,6 +974,10 @@
             document.getElementById('total').value = '';
             document.getElementById('item_price').value = '';
             document.getElementById('reason').value = '';
+            const customInput = document.getElementById('custom_reason');
+            if (customInput) customInput.value = '';
+            const customContainer = document.getElementById('custom_reason_container');
+            if (customContainer) customContainer.classList.add('hidden');
 
             itemcode = '';
             itemprice = '';
@@ -1055,7 +1089,33 @@
             document.getElementById('item_price').value = formatRupiah(row.raw_price || 0);
             document.getElementById('qty').value = row.quantity ?? '';
             document.getElementById('total').value = formatRupiah(row.raw_total || 0);
-            document.getElementById('reason').value = row.reason ?? '';
+
+            const rVal = (row.reason ?? '').trim();
+            const reasonSelect = document.getElementById('reason');
+            const customContainer = document.getElementById('custom_reason_container');
+            const customInput = document.getElementById('custom_reason');
+
+            let optionFound = false;
+            for (let i = 0; i < reasonSelect.options.length; i++) {
+                if (reasonSelect.options[i].value && reasonSelect.options[i].value.trim() === rVal) {
+                    reasonSelect.selectedIndex = i;
+                    optionFound = true;
+                    break;
+                }
+            }
+
+            if (!optionFound && rVal !== '') {
+                reasonSelect.value = 'Lain-lain';
+                if (customContainer) customContainer.classList.remove('hidden');
+                if (customInput) customInput.value = rVal;
+            } else if (rVal === 'Lain-lain') {
+                reasonSelect.value = 'Lain-lain';
+                if (customContainer) customContainer.classList.remove('hidden');
+                if (customInput) customInput.value = '';
+            } else {
+                if (customContainer) customContainer.classList.add('hidden');
+                if (customInput) customInput.value = '';
+            }
 
             document.getElementById('medicine_name').scrollIntoView({
                 block: 'center',
@@ -1111,6 +1171,31 @@
         }
 
         function addItem() {
+            let reasonVal = document.getElementById('reason').value;
+            if (reasonVal === 'Lain-lain') {
+                const customReason = (document.getElementById('custom_reason')?.value ?? '').trim();
+                if (!customReason) {
+                    iziToast.warning({
+                        title: 'Peringatan',
+                        message: 'Silakan ketik alasan penolakan pada kolom yang tersedia.',
+                        position: 'topRight'
+                    });
+                    document.getElementById('custom_reason')?.focus();
+                    return;
+                }
+                reasonVal = customReason;
+            }
+
+            if (!reasonVal) {
+                iziToast.warning({
+                    title: 'Peringatan',
+                    message: 'Silakan pilih atau ketik alasan penolakan.',
+                    position: 'topRight'
+                });
+                document.getElementById('reason').focus();
+                return;
+            }
+
             const payload = {
                 code: rejection_code,
                 date: date,
@@ -1119,7 +1204,7 @@
                 quantity: itemqty,
                 unit: document.getElementById('unit').value,
                 total: itemtotal || 0, // raw number now, not formatted string
-                reason: document.getElementById('reason').value,
+                reason: reasonVal,
             };
 
             const url = editingId ?
