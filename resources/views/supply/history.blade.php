@@ -107,18 +107,16 @@
         }
 
         .dropdown-table {
-            width: 100%;
             position: absolute;
-            z-index: 999999;
-            top: 52px;
-            background: #ffffff;
-            border-radius: 10px;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, .12);
-            border: 1px solid #e5e7eb;
-            max-height: 320px;
-            overflow-y: auto;
-            display: none;
             z-index: 9999;
+            top: 48px;
+            background: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, .12);
+            border: 1px solid #e2e8f0;
+            display: none;
+            overflow: hidden;
+            width: 100%;
         }
 
         .dropdown-table tbody tr.active {
@@ -129,39 +127,36 @@
             width: 100%;
             border-collapse: separate;
             border-spacing: 0;
-            font-size: 14px;
+            font-size: 13px;
         }
 
         .dropdown-table thead th {
             position: sticky;
             top: 0;
-            background: #f9fafb;
-            color: #374151;
-            font-weight: 600;
-            padding: 10px 12px;
-            border-bottom: 1px solid #e5e7eb;
+            background: #f8fafc;
+            color: #475569;
+            font-weight: 700;
+            padding: 9px 12px;
+            border-bottom: 1px solid #cbd5e1;
             text-transform: uppercase;
-            font-size: 12px;
+            font-size: 11px;
             letter-spacing: .04em;
+            z-index: 20;
         }
 
         .dropdown-table tbody tr {
-            transition: background-color .15s ease, transform .05s ease;
+            transition: background-color .15s ease;
             cursor: pointer;
         }
 
         .dropdown-table tbody tr:hover {
-            background-color: #f3f4f6;
-        }
-
-        .dropdown-table tbody tr:active {
-            transform: scale(0.995);
+            background-color: #f8fafc;
         }
 
         .dropdown-table td {
-            padding: 10px 12px;
+            padding: 9px 12px;
             border-bottom: 1px solid #f1f5f9;
-            color: #111827;
+            color: #1e293b;
             vertical-align: middle;
         }
 
@@ -169,26 +164,10 @@
             border-bottom: none;
         }
 
-        .dropdown-table td:first-child {
-            width: 40px;
-            color: #6b7280;
-            font-size: 13px;
-        }
-
-        .dropdown-table td:nth-child(4) {
-            font-weight: 600;
-            color: #16a34a;
-        }
-
-        .dropdown-table td:last-child {
-            color: #6b7280;
-            font-size: 13px;
-        }
-
         .dropdown-table .empty-row {
             text-align: center;
             padding: 16px;
-            color: #9ca3af;
+            color: #94a3b8;
             font-style: italic;
         }
     </style>
@@ -231,22 +210,19 @@
                                         autocomplete="off">
 
                                     <div id="searchDropdown"
-                                        class="dropdown-table absolute left-0 right-0 z-50 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg"
+                                        class="dropdown-table absolute left-0 z-50 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden w-full min-w-full sm:min-w-[480px]"
                                         style="display:none;">
-                                        <table class="table table-sm table-bordered mb-0 w-full text-[13px]">
-                                            <thead>
-                                                <tr>
-                                                    <th>#</th>
-                                                    <th>Code</th>
-                                                    <th>Name Pelanggan</th>
-                                                    <th>Total</th>
-                                                </tr>
-                                            </thead>
-                                        </table>
-
-                                        <div id="tableScroll" style="max-height: 250px; overflow-y: auto;"
+                                        <div id="tableScroll" style="max-height: 280px; overflow-y: auto;"
                                             onscroll="handleScroll()">
-                                            <table class="table table-sm table-bordered mb-0 w-full text-[13px]">
+                                            <table class="table table-sm table-hover mb-0 w-full text-[13px] border-collapse">
+                                                <thead>
+                                                    <tr>
+                                                        <th style="width: 44px; text-align: center;">#</th>
+                                                        <th style="width: 120px;">Kode</th>
+                                                        <th>Nama Obat</th>
+                                                        <th style="width: 110px; text-align: right;">Stok Etalase</th>
+                                                    </tr>
+                                                </thead>
                                                 <tbody id="searchResults"></tbody>
                                             </table>
                                         </div>
@@ -626,7 +602,7 @@
 
             loading = true;
 
-            fetch(`{{ route('sales.searchmedicine') }}?search=${encodeURIComponent(thisKeyword)}&page=${thisPage}`, {
+            fetch(`{{ route('supplies.searchMedicine') }}?search=${encodeURIComponent(thisKeyword)}&page=${thisPage}`, {
                     signal: searchAbortController.signal
                 })
                 .then(res => res.json())
@@ -636,10 +612,10 @@
 
                     const tbody = document.getElementById('searchResults');
 
-                    if (thisPage === 1 && res.data.length === 0) {
+                    if (thisPage === 1 && (!res.data || res.data.length === 0)) {
                         tbody.innerHTML = `
                         <tr>
-                            <td colspan="4" class="empty-row">No data found</td>
+                            <td colspan="4" class="empty-row text-center py-4 text-slate-400 italic">Obat tidak ditemukan</td>
                         </tr>`;
                         hasMore = false;
                         document.getElementById('searchDropdown').style.display = 'block';
@@ -651,11 +627,16 @@
                         tr.tabIndex = 0;
                         tr.dataset.item = JSON.stringify(item);
                         tr._itemData = item;
+
+                        const stockVal = item.total_stock !== undefined ? item.total_stock : (item.total ?? 0);
+                        const formattedStock = Number(stockVal).toLocaleString('id-ID');
+                        const stockClass = Number(stockVal) > 0 ? 'text-emerald-600 font-bold' : 'text-slate-400 font-medium';
+
                         tr.innerHTML = `
-                            <td>${((thisPage - 1) * res.per_page) + index + 1}</td>
-                            <td>${item.code ?? '-'}</td>
-                            <td>${item.name ?? '-'}</td>
-                            <td>${item.total ?? '-'}</td>
+                            <td style="width: 44px; text-align: center;" class="text-slate-400 text-xs">${((thisPage - 1) * res.per_page) + index + 1}</td>
+                            <td style="width: 120px;" class="font-mono text-slate-600 text-xs">${item.code ?? '-'}</td>
+                            <td class="font-semibold text-slate-800">${item.name ?? '-'}</td>
+                            <td style="width: 110px; text-align: right;" class="${stockClass}">${formattedStock}</td>
                         `;
                         tbody.appendChild(tr);
                     });

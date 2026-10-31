@@ -365,19 +365,17 @@
                                     placeholder="Cari Obat..." oninput="searchMedicineData(this.value)" autocomplete="off">
 
                                 <div id="searchDropdown" class="dropdown-table" style="display:none;">
-                                    <table class="table table-sm table-bordered mb-0">
-                                        <thead>
-                                            <tr>
-                                                <th>#</th>
-                                                <th>Code</th>
-                                                <th>Name Pelanggan</th>
-                                                <th>Total</th>
-                                            </tr>
-                                        </thead>
-                                    </table>
                                     <div id="tableScroll" style="max-height: 250px; overflow-y: auto;"
                                         onscroll="handleScroll()">
                                         <table class="table table-sm table-bordered mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th style="width: 40px; text-align: center;">#</th>
+                                                    <th style="width: 110px;">Kode</th>
+                                                    <th>Nama Obat</th>
+                                                    <th style="width: 100px; text-align: right;">Stok Etalase</th>
+                                                </tr>
+                                            </thead>
                                             <tbody id="searchResults"></tbody>
                                         </table>
                                     </div>
@@ -815,9 +813,14 @@
                         tr.tabIndex = 0;
                         tr.dataset.item = JSON.stringify(item);
                         tr._itemData = item;
+                        const stockVal = item.total_stock !== undefined ? item.total_stock : (item.total ?? 0);
+                        const formattedStock = Number(stockVal).toLocaleString('id-ID');
+                        const stockClass = Number(stockVal) > 0 ? 'text-emerald-600 font-bold' : 'text-slate-400 font-medium';
                         tr.innerHTML = `
-                            <td>${((page - 1) * res.per_page) + index + 1}</td>
+                            <td style="width: 40px; text-align: center;">${((page - 1) * res.per_page) + index + 1}</td>
+                            <td style="width: 110px;">${item.code ?? '-'}</td>
                             <td>${item.name ?? ''}</td>
+                            <td style="width: 100px; text-align: right;" class="${stockClass}">${formattedStock}</td>
                         `;
                         tbody.appendChild(tr);
                     });

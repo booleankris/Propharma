@@ -338,6 +338,7 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
     // Supplies
     Route::get('/supplies', [SuppliesController::class, 'supplies'])->name('supplies.index');
     Route::get('/getsupplies', [SuppliesController::class, 'getSupplies'])->name('supplies.getSupplies');
+    Route::get('/supplies/search-medicine', [SuppliesController::class, 'searchMedicine'])->name('supplies.searchMedicine');
     // Stock Data
     Route::get('/stock-data', [SuppliesController::class, 'stockData'])->name('supplies.stockData');
     Route::get('/stock-data/get', [SuppliesController::class, 'getStockData'])->name('supplies.getStockData');

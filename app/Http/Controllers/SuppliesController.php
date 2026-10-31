@@ -133,6 +133,64 @@ class SuppliesController extends Controller
     {
         return view('supply.history');
     }
+
+    /**
+     * Search medicine autocomplete untuk Kartu Stock (/supplies)
+     * Mengembalikan data obat dan total stok etalase sesuai cabang aktif
+     */
+    public function searchMedicine(Request $request)
+    {
+        $search = trim((string) $request->input('search', ''));
+        $activePharmacyId = getActivePharmacyId();
+        $isWarehouse = isWarehousePharmacy($activePharmacyId);
+        // Jika farmasi adalah Gudang (id 9), stok etalase/pelayanan diambil dari SAHABAT PMI (id 1)
+        $counterPharmacyId = $isWarehouse ? 1 : $activePharmacyId;
+
+        $query = Medicines::query()
+            ->where('medicines.status', 1)
+            ->where(function ($q) use ($search) {
+                $q->where('medicines.name', 'LIKE', "%{$search}%")
+                    ->orWhere('medicines.code', 'LIKE', "%{$search}%")
+                    ->orWhere('medicines.barcode', 'LIKE', "%{$search}%");
+            })
+            ->select(['medicines.id', 'medicines.code', 'medicines.name', 'medicines.unit'])
+            ->orderBy('medicines.name', 'asc')
+            ->paginate(10);
+
+        $medIds = $query->pluck('id')->filter()->all();
+
+        $stockMap = [];
+        if (!empty($medIds)) {
+            $stockMap = MedicineTransferItems::join('batches', 'batches.id', '=', 'medicine_transfer_items.batches_id')
+                ->where('batches.pharmacy_id', $counterPharmacyId)
+                ->where('medicine_transfer_items.status', 1)
+                ->where(function ($q) {
+                    $q->whereNull('medicine_transfer_items.source_type')
+                        ->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang');
+                })
+                ->whereIn('batches.medicine_id', $medIds)
+                ->groupBy('batches.medicine_id')
+                ->selectRaw('batches.medicine_id, SUM(medicine_transfer_items.qty) as total_qty')
+                ->pluck('total_qty', 'medicine_id')
+                ->all();
+        }
+
+        $query->getCollection()->transform(function ($item) use ($stockMap) {
+            $rawQty = (float) ($stockMap[$item->id] ?? 0);
+            $formattedTotal = ($rawQty == (int) $rawQty) ? (int) $rawQty : round($rawQty, 2);
+
+            return [
+                'id'          => $item->id,
+                'code'        => $item->code,
+                'name'        => $item->name,
+                'unit'        => $item->unit,
+                'total'       => $formattedTotal,
+                'total_stock' => $formattedTotal,
+            ];
+        });
+
+        return response()->json($query);
+    }
     public function getSupplies(Request $request)
     {
 

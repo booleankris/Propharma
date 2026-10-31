@@ -3,9 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\Medicines;
+use App\Models\MedicineTransferItems;
+use App\Models\Batches;
 use App\Models\Reject;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use DataTables;
 use App\Models\ExportJob;
 use App\Jobs\ProcessRejectSalesExport;
@@ -70,13 +73,33 @@ class RejectController extends Controller
             'factory',
             'creditor'
         ])
-
-
             ->where('medicines.name', 'LIKE', "%{$search}%")
             ->orWhere('medicines.code', 'LIKE', "%{$search}%")
             ->paginate(10);
 
-        $data->getCollection()->transform(function ($item) {
+        $activePharmacyId = getActivePharmacyId();
+        $counterPharmacyId = isWarehousePharmacy($activePharmacyId) ? 1 : $activePharmacyId;
+        $medIds = $data->getCollection()->pluck('id')->filter()->all();
+        $stockMap = [];
+        if (!empty($medIds)) {
+            $stockMap = MedicineTransferItems::join('batches', 'batches.id', '=', 'medicine_transfer_items.batches_id')
+                ->where('batches.pharmacy_id', $counterPharmacyId)
+                ->where('medicine_transfer_items.status', 1)
+                ->where(function ($q) {
+                    $q->whereNull('medicine_transfer_items.source_type')
+                        ->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang');
+                })
+                ->whereIn('batches.medicine_id', $medIds)
+                ->groupBy('batches.medicine_id')
+                ->selectRaw('batches.medicine_id, SUM(medicine_transfer_items.qty) as total_qty')
+                ->pluck('total_qty', 'medicine_id')
+                ->all();
+        }
+
+        $data->getCollection()->transform(function ($item) use ($stockMap) {
+            $rawQty = (float) ($stockMap[$item->id] ?? 0);
+            $formattedTotal = ($rawQty == (int) $rawQty) ? (int) $rawQty : round($rawQty, 2);
+
             return [
                 'id'           => $item->id,
                 'code'         => $item->code,
@@ -86,6 +109,8 @@ class RejectController extends Controller
                 'unit'         => $item->unit,
                 'content'      => $item->content,
                 'raw_price'    => $item->raw_price,
+                'total'        => $formattedTotal,
+                'total_stock'  => $formattedTotal,
             ];
         });
         return response()->json($data);
