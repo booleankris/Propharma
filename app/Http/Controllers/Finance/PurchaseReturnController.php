@@ -322,16 +322,24 @@ class PurchaseReturnController extends Controller
             return $item;
         });
 
-        // Metrik Monitoring
-        $totalItemsCount = PurchaseReturnItem::count();
-        $totalReturValue = (float) PurchaseReturnItem::sum('subtotal');
-        $diajukanCount = PurchaseReturnItem::where(function ($q) {
-            $q->where('status', 'diajukan')->orWhereNull('status');
-        })->count();
-        $dikonfirmasiCount = PurchaseReturnItem::where('status', 'dikonfirmasi')->count();
-        $sudahDiambilCount = PurchaseReturnItem::where('status', 'sudah_diambil')->count();
-        $sudahPotongCount = PurchaseReturnItem::where('status', 'sudah_potong')->count();
-        $pmiCount = PurchaseReturnItem::where('status', 'barang_kembali_pmi')->count();
+        // Metrik Monitoring (Dioptimalkan dalam 1 query agregasi tunggal untuk efisiensi jutaan data)
+        $metrics = PurchaseReturnItem::selectRaw('
+            COUNT(*) as total_items,
+            COALESCE(SUM(subtotal), 0) as total_value,
+            COUNT(CASE WHEN status = "diajukan" OR status IS NULL THEN 1 END) as diajukan_count,
+            COUNT(CASE WHEN status = "dikonfirmasi" THEN 1 END) as dikonfirmasi_count,
+            COUNT(CASE WHEN status = "sudah_diambil" THEN 1 END) as sudah_diambil_count,
+            COUNT(CASE WHEN status = "sudah_potong" THEN 1 END) as sudah_potong_count,
+            COUNT(CASE WHEN status = "barang_kembali_pmi" THEN 1 END) as pmi_count
+        ')->first();
+
+        $totalItemsCount = (int) ($metrics->total_items ?? 0);
+        $totalReturValue = (float) ($metrics->total_value ?? 0);
+        $diajukanCount = (int) ($metrics->diajukan_count ?? 0);
+        $dikonfirmasiCount = (int) ($metrics->dikonfirmasi_count ?? 0);
+        $sudahDiambilCount = (int) ($metrics->sudah_diambil_count ?? 0);
+        $sudahPotongCount = (int) ($metrics->sudah_potong_count ?? 0);
+        $pmiCount = (int) ($metrics->pmi_count ?? 0);
 
         $creditors = Creditor::select('code', 'name')
             ->whereNotNull('code')
@@ -1257,11 +1265,76 @@ class PurchaseReturnController extends Controller
      */
     public function export(Request $request)
     {
-        $items = PurchaseReturnItem::with(['purchaseReturn.creditor', 'medicine.factory'])
+        ini_set('memory_limit', '512M');
+        set_time_limit(300);
+
+        $search = trim((string) ($request->input('search') ?? ''));
+        $creditorFilter = $request->input('creditor_code');
+        $statusFilter = $request->input('status');
+        $reasonFilter = $request->input('reason');
+
+        $itemsQuery = PurchaseReturnItem::with(['purchaseReturn.creditor', 'medicine.factory'])
             ->join('purchase_returns', 'purchase_return_items.purchase_return_id', '=', 'purchase_returns.id')
             ->select('purchase_return_items.*')
             ->orderBy('purchase_returns.created_at', 'desc')
-            ->get();
+            ->orderBy('purchase_return_items.id', 'desc');
+
+        if ($search !== '') {
+            $itemsQuery->where(function ($q) use ($search) {
+                $q->where('purchase_return_items.medicine_name', 'LIKE', "%{$search}%")
+                    ->orWhere('purchase_return_items.batch_number', 'LIKE', "%{$search}%")
+                    ->orWhere('purchase_returns.invoice_number', 'LIKE', "%{$search}%")
+                    ->orWhere('purchase_returns.return_no', 'LIKE', "%{$search}%")
+                    ->orWhereHas('purchaseReturn.creditor', function ($cq) use ($search) {
+                        $cq->where('name', 'LIKE', "%{$search}%")
+                            ->orWhere('code', 'LIKE', "%{$search}%");
+                    });
+            });
+        }
+
+        if (!empty($creditorFilter)) {
+            $itemsQuery->where('purchase_returns.creditor_code', $creditorFilter);
+        }
+
+        if (!empty($statusFilter)) {
+            if (in_array($statusFilter, ['diajukan', 'dikonfirmasi', 'sudah_diambil', 'sudah_potong', 'barang_kembali_pmi'], true)) {
+                $itemsQuery->where('purchase_return_items.status', $statusFilter);
+            } elseif ($statusFilter === 'belum_potong') {
+                $itemsQuery->where('purchase_return_items.status', '!=', 'sudah_potong');
+            } elseif ($statusFilter === 'sudah_ambil') {
+                $itemsQuery->where(function ($q) {
+                    $q->where('purchase_return_items.status', 'sudah_diambil')
+                      ->orWhereNotNull('purchase_return_items.pickup_date');
+                });
+            } elseif ($statusFilter === 'belum_ambil') {
+                $itemsQuery->where(function ($q) {
+                    $q->where('purchase_return_items.status', '!=', 'sudah_diambil')
+                      ->whereNull('purchase_return_items.pickup_date');
+                });
+            }
+        }
+
+        if (!empty($reasonFilter)) {
+            $reasonAliases = [
+                'ED DEKAT' => ['ED DEKAT', 'ED'],
+                'Barang Rusak' => ['Barang Rusak', 'RUSAK'],
+                'Salah Barang' => ['Salah Barang', 'SALAH KIRIM', 'SALAH BARANG'],
+                'Salah Pesan' => ['Salah Pesan', 'SALAH PESAN'],
+                'Recall' => ['Recall', 'RECALL'],
+                'Retur Pabrik' => ['Retur Pabrik', 'RETUR PABRIK'],
+                'Double' => ['Double', 'TERDOUBLE', 'DOUBLE'],
+                'dlsbnya' => ['dlsbnya', 'OVERSTOCK', 'LAINNYA', 'LAIN-LAIN'],
+            ];
+
+            if (isset($reasonAliases[$reasonFilter])) {
+                $itemsQuery->whereIn('purchase_return_items.reason', $reasonAliases[$reasonFilter]);
+            } else {
+                $itemsQuery->where('purchase_return_items.reason', $reasonFilter);
+            }
+        }
+
+        // Ambil data dengan batasan maksimal 10.000 baris untuk direct excel stream
+        $items = $itemsQuery->limit(10000)->get();
 
         $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
         $sheet = $spreadsheet->getActiveSheet();

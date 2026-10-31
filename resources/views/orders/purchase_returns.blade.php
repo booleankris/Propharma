@@ -601,6 +601,18 @@
                         </tbody>
                     </table>
                 </div>
+
+                {{-- Pagination Links for Approaching Tab --}}
+                @if($approachingItems->hasPages())
+                    <div class="px-5 py-4 border-t border-slate-100 flex items-center justify-between">
+                        <div class="text-xs text-slate-500 font-medium">
+                            Menampilkan {{ $approachingItems->firstItem() }} - {{ $approachingItems->lastItem() }} dari {{ $approachingItems->total() }} batch
+                        </div>
+                        <div>
+                            {{ $approachingItems->appends(array_merge(request()->query(), ['tab' => 'approaching']))->links() }}
+                        </div>
+                    </div>
+                @endif
             </div>
 
         </div>
