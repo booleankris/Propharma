@@ -766,7 +766,7 @@
                 </button>
                 <button type="submit" id="btnSubmitCreateReturn"
                         class="px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-md shadow-blue-500/20 transition-all">
-                    Simpan Pengajuan Retur
+                    Simpan & Konfirmasi Retur
                 </button>
             </div>
         </form>
@@ -1492,9 +1492,9 @@
             .then(res => res.json())
             .then(data => {
                 btn.disabled = false;
-                btn.innerText = 'Simpan Pengajuan Retur';
+                btn.innerText = 'Simpan & Konfirmasi Retur';
                 if (data.success !== false) {
-                    iziToast.success({ title: 'Berhasil', message: 'Pengajuan retur berhasil disimpan.' });
+                    iziToast.success({ title: 'Berhasil', message: 'Data retur pembelian berhasil disimpan dan langsung dikonfirmasi.' });
                     closeCreateReturnModal();
                     setTimeout(() => window.location.reload(), 600);
                 } else {
@@ -1503,7 +1503,7 @@
             })
             .catch(err => {
                 btn.disabled = false;
-                btn.innerText = 'Simpan Pengajuan Retur';
+                btn.innerText = 'Simpan & Konfirmasi Retur';
                 iziToast.error({ title: 'Error', message: 'Terjadi kesalahan sistem saat menyimpan.' });
             });
         };

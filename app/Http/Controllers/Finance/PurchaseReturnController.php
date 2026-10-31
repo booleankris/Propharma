@@ -653,8 +653,7 @@ class PurchaseReturnController extends Controller
     /**
      * Simpan input retur pembelian baru (Bisa custom/manual atau dari faktur sistem)
      * Mengunci 1 faktur 1 obat hanya bisa dikembalikan 1 kali
-     * Retur dari faktur maupun manual langsung mengurangi stok saat disimpan.
-     * Retur manual tetap berstatus 'diajukan' sampai dikonfirmasi.
+     * Retur langsung berstatus 'dikonfirmasi' dan stok otomatis dipotong saat disimpan.
      */
     public function store(Request $request)
     {
@@ -729,9 +728,9 @@ class PurchaseReturnController extends Controller
         $returnNo = "RET-{$yearMonth}/{$nextSeq}";
         $todayDate = now()->toDateString();
 
-        // Status awal berbeda menurut sumber, tetapi stok langsung dipotong untuk keduanya.
-        $initialStatus = $isFromReceiving ? 'dikonfirmasi' : 'diajukan';
-        $confirmedDate = $isFromReceiving ? $todayDate : null;
+        // Setiap retur pembelian yang diinput langsung berstatus 'dikonfirmasi', tanggal konfirmasi terisi hari ini, dan stok langsung dipotong
+        $initialStatus = 'dikonfirmasi';
+        $confirmedDate = $todayDate;
 
         DB::transaction(function () use ($validated, $activePharmacyId, $returnNo, $todayDate, $isFromReceiving, $initialStatus, $confirmedDate) {
             $totalAmount = 0;
@@ -795,9 +794,7 @@ class PurchaseReturnController extends Controller
             }
         });
 
-        $successMsg = $isFromReceiving
-            ? 'Data Retur Pembelian dari faktur berhasil disimpan dan stok otomatis dipotong.'
-            : 'Pengajuan Retur Manual berhasil disimpan. Stok langsung dipotong dan status menunggu konfirmasi.';
+        $successMsg = 'Data Retur Pembelian berhasil disimpan dan langsung dikonfirmasi (stok telah dipotong).';
 
         if ($request->wantsJson() || $request->ajax() || $request->isJson() || $request->header('Accept') === 'application/json') {
             return response()->json([
