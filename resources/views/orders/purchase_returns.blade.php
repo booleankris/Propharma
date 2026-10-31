@@ -88,7 +88,7 @@
                     </svg>
                     Export Excel
                 </a>
-                @hasanyrole('administrator|General Manager|Gudang PMI')
+                @hasanyrole('administrator|General Manager|Gudang PMI|Koordinator|koordinator')
                 <button type="button" onclick="openCreateReturnModal()"
                         class="inline-flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 rounded-xl shadow-md shadow-blue-500/25 transition-all">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2">

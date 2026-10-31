@@ -2256,7 +2256,7 @@
                     Penerimaan</span>
             </a>
 
-            @hasanyrole('administrator|General Manager|Gudang PMI')
+            @hasanyrole('administrator|General Manager|Gudang PMI|Koordinator|koordinator')
             <a href="{{ route('finance.purchaseReturns.index') }}"
                 class="group flex items-center gap-3 p-3.5 rounded-2xl bg-amber-50 hover:bg-amber-500 border border-amber-100 hover:border-amber-500 transition-all duration-200 hover:-translate-y-0.5">
                 <div

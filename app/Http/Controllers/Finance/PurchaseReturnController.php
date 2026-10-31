@@ -28,10 +28,10 @@ class PurchaseReturnController extends Controller
         $this->middleware('auth');
         $this->middleware(function ($request, $next) {
             $user = auth()->user();
-            $allowedRoles = ['administrator', 'General Manager', 'Gudang PMI'];
+            $allowedRoles = ['administrator', 'General Manager', 'Gudang PMI', 'Koordinator', 'koordinator'];
             $hasAccess = $user && $user->hasAnyRole($allowedRoles);
             if (!$hasAccess) {
-                abort(403, 'Akses ditolak: Input Data Retur / Monitoring Retur Beli hanya dapat diakses oleh Administrator, General Manager, dan Gudang PMI.');
+                abort(403, 'Akses ditolak: Input Data Retur / Monitoring Retur Beli hanya dapat diakses oleh Administrator, General Manager, Gudang PMI, dan Koordinator.');
             }
             return $next($request);
         });
@@ -46,7 +46,7 @@ class PurchaseReturnController extends Controller
         }
 
         $user = auth()->user();
-        $isHoOrAdmin = $user && ($user->hasRole('HO') || $user->hasRole('administrator') || $user->hasRole('General Manager'));
+        $isHoOrAdmin = $user && ($user->hasRole('HO') || $user->hasRole('administrator') || $user->hasRole('General Manager') || $user->hasRole('Koordinator') || $user->hasRole('koordinator'));
 
         $branches = [];
         if ($isHoOrAdmin) {
