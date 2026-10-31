@@ -39,8 +39,14 @@ class Medicines extends Model
         'etalase',
         'location',
         'type',
-        'strip'
+        'strip',
+        'notes'
     ];
+
+    public function getKeteranganAttribute()
+    {
+        return $this->notes;
+    }
     public function factory()
     {
         return $this->belongsTo(Factory::class, 'factory_id');

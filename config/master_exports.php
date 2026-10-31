@@ -43,6 +43,7 @@ return [
             'Sediaan' => 'medicines.preparations',
             'Whole' => 'medicines.whole',
             'Tipe' => 'medicines.type',
+            'Keterangan' => 'medicines.notes',
             'Etalase' => 'etalases.name',
             'Lokasi' => 'locations.name',
             'Status' => 'medicines.status',

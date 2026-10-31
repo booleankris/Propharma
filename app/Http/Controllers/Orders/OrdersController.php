@@ -607,6 +607,8 @@ class OrdersController extends Controller
                 'unit' => $item->unit,
                 'content' => $item->content,
                 'raw_price' => $item->raw_price,
+                'notes' => $item->notes,
+                'keterangan' => $item->notes,
             ];
         });
         return response()->json($data);

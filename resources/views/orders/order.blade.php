@@ -375,9 +375,9 @@
                                 <label
                                     class="block mb-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Keterangan
                                     (Opsional)</label>
-                                <input id="note" type="text" name="note"
-                                    class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                                    placeholder="Catatan untuk item ini...">
+                                <textarea id="note" name="note" rows="2"
+                                    class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-mono leading-relaxed"
+                                    placeholder="Catatan untuk item ini..."></textarea>
                             </div>
 
                             {{-- Pill editor (hidden by default) --}}
@@ -849,7 +849,12 @@
                     {
                         data: 'note',
                         name: 'note',
-                        defaultContent: '-'
+                        defaultContent: '-',
+                        render: function(data) {
+                            if (!data || data === '-') return '<span class="text-slate-300">-</span>';
+                            const escaped = $('<div>').text(data).html();
+                            return `<div class="whitespace-pre-line font-mono text-[11px] leading-tight text-slate-700">${escaped}</div>`;
+                        }
                     },
                     {
                         data: 'item_total',
@@ -970,9 +975,10 @@
         });
 
         document.getElementById('note').addEventListener('keydown', function(e) {
-            if (e.key !== 'Enter') return;
-            e.preventDefault();
-            submit_data();
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                submit_data();
+            }
         });
 
         function empyCreditorOption() {
@@ -1239,6 +1245,9 @@
             currentMedicineId = medicineId;
             axios.get(`/orders/${medicineId}/creditors`)
                 .then(res => {
+                    if (res.data && res.data.medicine && res.data.medicine.notes && !document.getElementById('note').value) {
+                        document.getElementById('note').value = res.data.medicine.notes;
+                    }
                     medicineCreditors = res.data.creditors;
                     renderPills();
                     renderCreditorSelect(preselectedCode);
@@ -1519,6 +1528,9 @@
             document.getElementById('searchDropdown').style.display = 'none';
             document.getElementById('searchInput').value = "";
             document.getElementById('creditor').value = "";
+
+            // Auto-fill keterangan obat dari master obat jika ada
+            document.getElementById('note').value = item.notes ?? item.keterangan ?? '';
 
             updateBoxPriceInfo();
             counttotal();

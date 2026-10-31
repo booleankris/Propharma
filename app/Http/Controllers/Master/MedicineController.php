@@ -45,6 +45,7 @@ class MedicineController extends Controller
                 ->addColumn('location_name',    fn($row) => $row->locations?->name)
                 ->addColumn('etalase_name',     fn($row) => $row->etalases?->name)
                 ->addColumn('creditor_name',    fn($row) => $row->creditor?->name)
+                ->addColumn('notes',            fn($row) => $row->notes)
                 ->addColumn('status_label', function ($row) {
                     return $row->status
                         ? '<span class="badge-active">Active</span>'
@@ -64,6 +65,7 @@ class MedicineController extends Controller
                                         ->orWhere('medicines.barcode', 'like', "%{$token}%")
                                         ->orWhere('medicines.dosage', 'like', "%{$token}%")
                                         ->orWhere('medicines.generic', 'like', "%{$token}%")
+                                        ->orWhere('medicines.notes', 'like', "%{$token}%")
                                         ->orWhereHas('composition', fn($cq) => $cq->where('name', 'like', "%{$token}%"))
                                         ->orWhereHas('factory', fn($fq) => $fq->where('name', 'like', "%{$token}%"))
                                         ->orWhereHas('category', fn($catq) => $catq->where('name', 'like', "%{$token}%"));
@@ -111,6 +113,7 @@ class MedicineController extends Controller
             'precursor'            => 'nullable|boolean',
             'receipt'              => 'nullable|boolean',
             'type'                 => 'required|string|max:255',
+            'notes'                => 'nullable|string',
             'status'               => 'nullable|boolean',
         ]);
 
@@ -153,6 +156,7 @@ class MedicineController extends Controller
             'etalase'              => $request->input('etalase'),
             'location'             => $request->input('location'),
             'type'                 => $request->type,
+            'notes'                => $request->input('notes'),
             'status'               => $request->has('status') ? (int) $request->status : 1,
         ]);
 
@@ -200,6 +204,7 @@ class MedicineController extends Controller
             'precursor'            => 'nullable|boolean',
             'receipt'              => 'nullable|boolean',
             'type'                 => 'required|string|max:255',
+            'notes'                => 'nullable|string',
             'status'               => 'nullable|boolean',
         ]);
 
@@ -245,6 +250,7 @@ class MedicineController extends Controller
             'etalase'              => $request->input('etalase'),
             'location'             => $request->input('location'),
             'type'                 => $request->type,
+            'notes'                => $request->input('notes'),
             'status'               => $request->has('status') ? (int) $request->status : 1,
         ]);
         // Add Medicine Price History

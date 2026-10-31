@@ -260,6 +260,7 @@
                                     <th class="px-3 py-2.5">Kode</th>
                                     <th class="px-3 py-2.5">Nama</th>
                                     <th class="px-3 py-2.5">Kategori</th>
+                                    <th class="px-3 py-2.5">Keterangan</th>
                                     <th class="px-3 py-2.5 text-center">Status</th>
                                 </tr>
                             </thead>
@@ -532,6 +533,17 @@
                                         <option value="OBAT-OBAT TERTENTU (OOT)">Obat Tertentu</option>
                                     </select>
                                 </div>
+                            </div>
+
+                            {{-- Keterangan Pemesanan --}}
+                            <div class="pt-1">
+                                <label class="block text-xs font-bold text-gray-700 mb-1 flex items-center justify-between">
+                                    <span>Keterangan Pemesanan</span>
+                                    <span class="text-[10px] text-gray-400 font-normal">Aturan diskon / min. order untuk SP</span>
+                                </label>
+                                <textarea id="notes" name="notes" rows="3"
+                                    class="w-full rounded-lg border border-gray-300 px-3.5 py-2 text-xs font-mono text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-blue-400 focus:border-blue-500 transition-all leading-relaxed"
+                                    placeholder="Contoh:&#10;1 -netto&#10;2 - 10box 5%&#10;min. 20box 11%"></textarea>
                             </div>
                         </div>
 
@@ -1160,7 +1172,7 @@
         function populateForm(row) {
             // Plain inputs
             ['code', 'name', 'barcode', 'component', 'content', 'dosage',
-                'minimal_stock', 'strip', 'stock', 'preparations'
+                'minimal_stock', 'strip', 'stock', 'preparations', 'notes'
             ].forEach(key => {
                 const el = document.getElementById(key);
                 if (el) el.value = row[key] ?? '';
@@ -1655,6 +1667,16 @@
                     },
                     {
                         data: 'category_name'
+                    },
+                    {
+                        data: 'notes',
+                        name: 'notes',
+                        defaultContent: '-',
+                        render: function(data) {
+                            if (!data || data === '-') return '<span class="text-slate-300">-</span>';
+                            const escaped = $('<div>').text(data).html();
+                            return `<div class="whitespace-pre-line font-mono text-[11px] leading-snug text-slate-700 max-w-[200px]">${escaped}</div>`;
+                        }
                     },
                     {
                         data: 'status_label',
