@@ -96,6 +96,18 @@ class TransfersController extends Controller
             ) > 0');
         }
 
+        // Show stock that expires first at the top. Missing/blank EDs remain searchable,
+        // but follow all batches with a usable expiration date.
+        $query
+            ->orderByRaw("CASE WHEN expired_date IS NULL OR TRIM(expired_date) = '' OR expired_date = '0000-00-00' THEN 1 ELSE 0 END ASC")
+            ->orderByRaw("CASE
+                WHEN expired_date REGEXP '^[0-9]{4}-[0-9]{2}-[0-9]{2}' THEN STR_TO_DATE(expired_date, '%Y-%m-%d')
+                WHEN expired_date REGEXP '^[0-9]{2}/[0-9]{2}/[0-9]{4}' THEN STR_TO_DATE(expired_date, '%d/%m/%Y')
+                WHEN expired_date REGEXP '^[0-9]{2}-[0-9]{2}-[0-9]{4}' THEN STR_TO_DATE(expired_date, '%d-%m-%Y')
+                ELSE NULL
+            END ASC")
+            ->orderBy('id');
+
         $data = $query->paginate(20);
 
         // Transform

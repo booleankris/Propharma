@@ -395,7 +395,7 @@
                                                 <button type="button"
                                                         onclick="openConfirmItemModalById({{ $it->id }})"
                                                         class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-600 hover:text-white border border-emerald-200 transition-all shrink-0"
-                                                        title="Konfirmasi & Potong Stok Sekarang">
+                                                        title="Konfirmasi retur; stok sudah dipotong saat pengajuan disimpan">
                                                     <svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                                                         <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
                                                     </svg>
@@ -818,7 +818,7 @@
 <div id="confirmItemModal" class="fixed inset-0 z-[10000] hidden items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
     <div class="relative w-full max-w-md max-h-[90vh] bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col">
         <div class="px-5 py-4 bg-emerald-600 text-white flex items-center justify-between shrink-0">
-            <h3 class="text-sm font-bold">Konfirmasi Pengambilan & Potong Stok</h3>
+            <h3 class="text-sm font-bold">Konfirmasi Retur</h3>
             <button type="button" onclick="closeConfirmItemModal()" class="text-white hover:text-slate-200">✕</button>
         </div>
         <form id="confirmItemForm" onsubmit="submitConfirmItem(event)" class="p-5 space-y-3.5 text-xs overflow-y-auto flex-1">
@@ -831,7 +831,7 @@
             </div>
 
             <p class="text-slate-600 text-xs">
-                Tindakan ini akan memotong stok batch obat di kartu stok secara permanen dan mencatat pengurangan saldo.
+                Stok sudah dipotong saat pengajuan retur disimpan. Konfirmasi ini hanya memperbarui status dan tidak memotong stok lagi.
             </p>
 
             <div>

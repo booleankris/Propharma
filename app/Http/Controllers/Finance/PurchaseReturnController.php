@@ -645,7 +645,8 @@ class PurchaseReturnController extends Controller
     /**
      * Simpan input retur pembelian baru (Bisa custom/manual atau dari faktur sistem)
      * Mengunci 1 faktur 1 obat hanya bisa dikembalikan 1 kali
-     * Status default: 'diajukan' (Diajukan Retur)
+     * Retur dari faktur maupun manual langsung mengurangi stok saat disimpan.
+     * Retur manual tetap berstatus 'diajukan' sampai dikonfirmasi.
      */
     public function store(Request $request)
     {
@@ -720,8 +721,7 @@ class PurchaseReturnController extends Controller
         $returnNo = "RET-{$yearMonth}/{$nextSeq}";
         $todayDate = now()->toDateString();
 
-        // Jika retur dari penerimaan: langsung 'dikonfirmasi' & potong stok
-        // Jika retur manual (bukan dari penerimaan): 'diajukan' & belum terpotong
+        // Status awal berbeda menurut sumber, tetapi stok langsung dipotong untuk keduanya.
         $initialStatus = $isFromReceiving ? 'dikonfirmasi' : 'diajukan';
         $confirmedDate = $isFromReceiving ? $todayDate : null;
 
@@ -779,18 +779,17 @@ class PurchaseReturnController extends Controller
                     'deduction_note' => $it['deduction_note'] ?? null,
                 ]);
 
-                // Jika retur berasal dari penerimaan: langsung potong stok sekarang
-                if ($isFromReceiving) {
-                    $returnItem->setRelation('purchaseReturn', $purchaseReturn);
-                    $this->deductStockForItem($returnItem, $todayDate);
-                    $returnItem->save();
-                }
+                // Pengajuan manual juga langsung mengurangi stok agar barang tidak
+                // tetap tersedia untuk dijual selama menunggu proses retur ke PBF.
+                $returnItem->setRelation('purchaseReturn', $purchaseReturn);
+                $this->deductStockForItem($returnItem, $todayDate);
+                $returnItem->save();
             }
         });
 
         $successMsg = $isFromReceiving
             ? 'Data Retur Pembelian dari faktur berhasil disimpan dan stok otomatis dipotong.'
-            : 'Data Pengajuan Retur Manual berhasil disimpan dengan status Diajukan Retur (Stok belum dipotong).';
+            : 'Pengajuan Retur Manual berhasil disimpan. Stok langsung dipotong dan status menunggu konfirmasi.';
 
         if ($request->wantsJson() || $request->ajax() || $request->isJson() || $request->header('Accept') === 'application/json') {
             return response()->json([
@@ -929,7 +928,9 @@ class PurchaseReturnController extends Controller
                     'qty_after' => $qtyAfter,
                     'total' => $item->subtotal,
                     'date' => $actionDate,
-                    'status' => 1,
+                    // Status 6 memakai delta qty_after - qty_before pada kartu stok,
+                    // sehingga pemulihan stok tercatat sebagai penambahan.
+                    'status' => 6,
                     'batches_id' => $batch?->id ?? null,
                     'user_id' => auth()->id(),
                 ]);
@@ -1098,8 +1099,11 @@ class PurchaseReturnController extends Controller
                     $item->deduction_note = null;
                 }
             } elseif ($newStatus === 'diajukan') {
-                // Kembalikan stok dan hapus potongan tagihan serta reset tanggal
-                $this->restoreStockForItem($item, $statusDate);
+                // Retur manual yang kembali ke status menunggu tetap menahan stok;
+                // retur dari faktur mengikuti perilaku lama dan memulihkan stok.
+                if (!$p?->is_manual) {
+                    $this->restoreStockForItem($item, $statusDate);
+                }
                 FinancePayment::where('reference_number', $refNo)->delete();
                 $item->pickup_date = null;
                 $item->confirmed_date = null;
@@ -1212,18 +1216,29 @@ class PurchaseReturnController extends Controller
      */
     public function destroyItem(Request $request, $id)
     {
-        $item = PurchaseReturnItem::findOrFail($id);
+        $item = PurchaseReturnItem::with('purchaseReturn')->findOrFail($id);
         $parent = $item->purchaseReturn;
 
-        $item->delete();
-
-        if ($parent) {
-            if ($parent->items()->count() === 0) {
-                $parent->delete();
-            } else {
-                $parent->update(['total_amount' => $parent->items()->sum('subtotal')]);
-            }
+        if ($item->status === 'sudah_potong') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Retur yang sudah dipotong ke tagihan tidak dapat dihapus. Ubah status potong tagihan terlebih dahulu.',
+            ], 422);
         }
+
+        DB::transaction(function () use ($item, $parent) {
+            // Penghapusan membatalkan retur, jadi pulihkan stok yang pernah dipotong.
+            $this->restoreStockForItem($item, now()->toDateString());
+            $item->delete();
+
+            if ($parent) {
+                if ($parent->items()->count() === 0) {
+                    $parent->delete();
+                } else {
+                    $parent->update(['total_amount' => $parent->items()->sum('subtotal')]);
+                }
+            }
+        });
 
         $msg = 'Item retur berhasil dihapus.';
 
