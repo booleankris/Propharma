@@ -463,31 +463,36 @@
                     <div class="bg-white p-4 rounded-xl border border-blue-100 space-y-2">
                         <span class="text-[11px] font-bold tracking-wider uppercase text-gray-400">Data Referensi Obat
                             (Otomatis)</span>
-                        <div class="grid grid-cols-1 md:grid-cols-6 gap-3">
-                            <div>
+                        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
+                            <div class="col-span-1">
                                 <label class="block text-[11px] text-gray-500 mb-1">Kode Obat</label>
                                 <input id="medicine_code" type="text" readonly placeholder="-"
                                     class="w-full rounded-lg bg-gray-100 border border-gray-200 px-3 py-2 text-xs text-gray-600 font-mono">
                             </div>
-                            <div class="md:col-span-2">
+                            <div class="col-span-2 sm:col-span-2 lg:col-span-2">
                                 <label class="block text-[11px] text-gray-500 mb-1">Nama Obat</label>
                                 <input id="medicine_name" type="text" readonly placeholder="Pilih obat dari daftar..."
                                     class="w-full rounded-lg bg-gray-100 border border-gray-200 px-3 py-2 text-xs text-gray-700 font-medium">
                             </div>
-                            <div>
+                            <div class="col-span-1">
                                 <label class="block text-[11px] text-gray-500 mb-1">Satuan Diterima</label>
                                 <input id="unit" type="text" readonly placeholder="-"
                                     class="w-full rounded-lg bg-gray-100 border border-gray-200 px-3 py-2 text-xs font-semibold text-blue-800">
                             </div>
-                            <div>
+                            <div class="col-span-1">
                                 <label class="block text-[11px] text-gray-500 mb-1">Isi Obat</label>
                                 <input id="content" type="text" readonly placeholder="-"
                                     class="w-full rounded-lg bg-gray-100 border border-gray-200 px-3 py-2 text-xs text-gray-600">
                             </div>
-                            <div>
+                            <div class="col-span-1">
                                 <label class="block text-[11px] text-gray-500 mb-1">QTY Beli</label>
                                 <input id="qty" type="number" readonly name="qty" placeholder="0" oninput="counttotal()"
                                     class="w-full rounded-lg bg-gray-100 border border-gray-200 px-3 py-2 text-xs text-gray-700 font-bold">
+                            </div>
+                            <div class="col-span-1">
+                                <label class="block text-[11px] text-gray-500 mb-1">HET (Harga Tertinggi)</label>
+                                <input id="medicine_het" type="text" readonly placeholder="Rp 0"
+                                    class="w-full rounded-lg bg-gray-100 border border-gray-200 px-3 py-2 text-xs font-semibold text-emerald-700 cursor-not-allowed">
                             </div>
                         </div>
                     </div>
@@ -517,8 +522,10 @@
 
                         <!-- Hrg HNA -->
                         <div>
-                            <label for="item_price" class="block text-xs font-semibold text-blue-900 mb-1">Harga HNA <span id="box_price_info" class="text-[10px] text-blue-600 font-normal"></span> <span
-                                    class="text-red-500">*</span></label>
+                            <label for="item_price" class="block text-xs font-semibold text-blue-900 mb-1 flex items-center justify-between">
+                                <span>Harga HNA <span id="box_price_info" class="text-[10px] text-blue-600 font-normal"></span> <span class="text-red-500">*</span></span>
+                                <span id="het_price_badge" class="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 hidden"></span>
+                            </label>
                             <input id="item_price" type="text" placeholder="Rp 0"
                                 class="w-full rounded-xl border border-blue-400 bg-white px-3.5 py-2.5 text-xs text-gray-900 font-bold focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                         </div>
@@ -961,6 +968,14 @@
             $('#total_price').val('');
             $('#qty_received').val('');
 
+            const hetInput = document.getElementById('medicine_het');
+            if (hetInput) hetInput.value = '';
+            const hetBadge = document.getElementById('het_price_badge');
+            if (hetBadge) {
+                hetBadge.textContent = '';
+                hetBadge.classList.add('hidden');
+            }
+
             $('#items').val(null).trigger('change');
             $('#location').val(null).trigger('change');
             $('#invoice_due').val('');
@@ -1111,7 +1126,15 @@
                 },
                 columns: [{
                     data: 'medicines.name',
-                    defaultContent: '-'
+                    defaultContent: '-',
+                    render: function (data, type, row) {
+                        const name = data || '-';
+                        const het = parseFloat(row.het_price ?? row.medicines?.het_price) || 0;
+                        if (het > 0) {
+                            return `<div><div class="font-medium text-gray-900">${name}</div><div class="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded mt-0.5">HET: ${formatRupiah(het)}</div></div>`;
+                        }
+                        return `<span class="font-medium text-gray-900">${name}</span>`;
+                    }
                 },
                 {
                     data: 'quantity',
@@ -1264,6 +1287,22 @@
             document.getElementById('medicine_name').value = data.medicines?.name ?? '';
             document.getElementById('content').value = data.medicines?.content ?? '';
             document.getElementById('medicine_code').value = data.medicines?.code ?? '';
+
+            const hetVal = parseFloat(data.het_price ?? data.medicines?.het_price) || 0;
+            const hetInput = document.getElementById('medicine_het');
+            if (hetInput) {
+                hetInput.value = hetVal > 0 ? formatRupiah(hetVal) : '-';
+            }
+            const hetBadge = document.getElementById('het_price_badge');
+            if (hetBadge) {
+                if (hetVal > 0) {
+                    hetBadge.textContent = `HET: ${formatRupiah(hetVal)}`;
+                    hetBadge.classList.remove('hidden');
+                } else {
+                    hetBadge.textContent = '';
+                    hetBadge.classList.add('hidden');
+                }
+            }
 
             document.getElementById('qty').value = data.quantity ?? 0;
             document.getElementById('qty_received').value = data.receiving_items?.qty_received ?? '';
