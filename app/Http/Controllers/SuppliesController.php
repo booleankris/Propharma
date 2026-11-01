@@ -1017,11 +1017,12 @@ class SuppliesController extends Controller
         @ini_set('memory_limit', '512M');
         @set_time_limit(180);
 
-        $pharmacy = Pharmacies::find(getActivePharmacyId());
+        $pharmacyId = $request->get('pharmacy_id') ?: getActivePharmacyId();
+        $pharmacy = Pharmacies::find($pharmacyId);
         $branch = $pharmacy ? preg_replace('/[^A-Za-z0-9_]/', '_', $pharmacy->name) : 'Gudang_PMI';
         $fileName = 'Data_Stok_' . $branch . '_' . date('Ymd_His') . '.xlsx';
 
-        return Excel::download(new StockDataExport($request), $fileName);
+        return Excel::download(new StockDataExport($request, $pharmacyId), $fileName);
     }
 
     public function exportStockData(Request $request)

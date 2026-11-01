@@ -28,11 +28,12 @@ class MasterDataExportController extends Controller
             @set_time_limit(180);
 
             $status = $request->get('status', '1');
-            $pharmacy = Pharmacies::find(getActivePharmacyId());
+            $pharmacyId = $request->get('pharmacy_id') ?: getActivePharmacyId();
+            $pharmacy = Pharmacies::find($pharmacyId);
             $branch = $pharmacy ? preg_replace('/[^A-Za-z0-9_]/', '_', $pharmacy->name) : 'Apotek';
             $filename = sprintf('Master_Obat_%s_%s.xlsx', $branch, now()->format('Ymd_His'));
 
-            $download = Excel::download(new MasterMedicinesExport($status), $filename);
+            $download = Excel::download(new MasterMedicinesExport($status, $pharmacyId), $filename);
 
             if ($token = $request->get('download_token')) {
                 $download->headers->setCookie(cookie('download_token', $token, 2, '/', null, false, false));

@@ -240,8 +240,8 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
 
     // ================================================================== Add Data =========================================================================
 
-    // Master Data (Role HO & Operator)
-    Route::middleware(['role:HO|operator|Operator|administrator'])->group(function () {
+    // Master Data (Role HO, Operator, Koordinator & General Manager)
+    Route::middleware(['role:HO|operator|Operator|administrator|Koordinator|koordinator|General Manager'])->group(function () {
         Route::get('/master-data/{type}/export', MasterDataExportController::class)
             ->whereIn('type', array_keys(config('master_exports')))
             ->name('master-data.export');
@@ -274,8 +274,8 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
         Route::get('/medicines/{id}/edit-data', [MedicineController::class, 'editCreditor']);
     });
 
-    // Data Pasien & Kunjungan Pasien (Dapat diakses juga oleh Koordinator)
-    Route::middleware(['role:HO|operator|Operator|administrator|Koordinator'])->group(function () {
+    // Data Pasien & Kunjungan Pasien (Dapat diakses juga oleh Koordinator & General Manager)
+    Route::middleware(['role:HO|operator|Operator|administrator|Koordinator|koordinator|General Manager'])->group(function () {
         Route::patch('patients/{patient}/toggle-status', [PatientsController::class, 'toggleStatus'])->name('patients.toggle-status');
         Route::resource('patients', PatientsController::class)->except(['show']);
 

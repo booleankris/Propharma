@@ -1065,7 +1065,7 @@
             </a>
         @endrole
 
-        @hasanyrole('HO|operator|Operator|administrator')
+        @hasanyrole('HO|operator|Operator|administrator|Koordinator|koordinator|General Manager')
             <div class="nav-section-title">Master Data</div>
 
             <a onclick="openModal('masterModal')" class="nav-item" style="cursor:pointer;">
@@ -1866,7 +1866,7 @@
     </div>
 </div>
 
-@hasanyrole('HO|operator|Operator|administrator')
+@hasanyrole('HO|operator|Operator|administrator|Koordinator|koordinator|General Manager')
     {{-- Master Modal --}}
     <div id="masterModal"
         class="modal-hide modal-transition fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
@@ -2855,7 +2855,7 @@
                 Filter Export
             </div>
             <div class="flex flex-wrap items-center gap-2 w-full md:w-auto">
-                @if (auth()->user()->hasRole('General Manager'))
+                @if (auth()->user()->hasAnyRole(['General Manager', 'Koordinator', 'koordinator', 'HO', 'administrator']))
                     @php
                         $exportPharmacies = \App\Models\Pharmacies::whereNotIn('id', [6, 8])
                             ->orderBy('id', 'asc')
@@ -2910,6 +2910,7 @@
                     </div>
                     <div class="flex items-center gap-2">
                         <a href="{{ route('master-data.export', ['type' => 'medicines', 'status' => 1]) }}"
+                            onclick="const pid = document.getElementById('export_center_pharmacy_id')?.value; if(pid) this.href = '{{ route('master-data.export', ['type' => 'medicines', 'status' => 1]) }}&pharmacy_id=' + pid;"
                             class="flex-1 inline-flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-colors">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-download">
                                 <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
@@ -2951,6 +2952,7 @@
                     </div>
                     <div class="flex items-center gap-2">
                         <a href="{{ route('supplies.printstockdata', ['status' => 1]) }}"
+                            onclick="const pid = document.getElementById('export_center_pharmacy_id')?.value; if(pid) this.href = '{{ route('supplies.printstockdata', ['status' => 1]) }}&pharmacy_id=' + pid;"
                             class="flex-1 inline-flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-colors">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-download">
                                 <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
@@ -3030,7 +3032,7 @@
                     @endif
 
                     <!-- Card Monitoring ED -->
-                    @if (auth()->user()->hasRole('General Manager') || auth()->user()->hasRole('HO') || isWarehousePharmacy())
+                    @if (auth()->user()->hasRole('General Manager') || auth()->user()->hasRole('HO') || isWarehousePharmacy() || auth()->user()->hasAnyRole(['Koordinator', 'koordinator', 'manager', 'Manager']))
                         <div
                             class="bg-gradient-to-br from-teal-50/60 to-emerald-50/60 border border-teal-200/80 rounded-2xl p-4 flex flex-col justify-between hover:shadow-md transition-all">
                             <div>
