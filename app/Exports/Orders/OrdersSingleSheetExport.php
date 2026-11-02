@@ -132,20 +132,10 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
     {
         return $this->purchaseItems($targetPharmacyIds)->map(function ($item) {
             $amounts = $this->calculateAmounts($item);
-            $type = strtoupper(trim($item->invoice_ppn ?? 'TANPA'));
-            $gross = max(0, $amounts['qty'] * $amounts['rawPrice']);
-            $grossTotal = $gross;
-            if ($type === 'EXCLUDE') {
-                $grossTotal += floor($gross * self::PPN);
-            } elseif ($type === 'INCLUDE') {
-                $grossTotal = $gross;
-            }
-
             return [
                 'date' => ReceivingDateFilter::format($item->receiving_date, $item->receiving_details_created_at),
                 'payment' => strtoupper(trim((string) ($item->invoice_payment ?? ''))),
-                'gross_total' => $grossTotal,
-                'net_total' => $amounts['jumlah'],
+                'total' => $amounts['jumlah'],
                 'ppn' => $amounts['ppn'],
             ];
         })->all();

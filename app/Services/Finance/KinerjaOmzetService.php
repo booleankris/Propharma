@@ -164,9 +164,28 @@ class KinerjaOmzetService
                 'KREDIT' => 'pbf', 'KONSINYASI' => 'consignment', 'TUNAI' => 'cash', default => null,
             };
             if (!$kind) continue;
-            $days[$date]['purchases'][$kind] += $purchaseRow['gross_total'];
-            $days[$date]['purchases']['discountOff'] += max(0, $purchaseRow['gross_total'] - $purchaseRow['net_total']);
+            $days[$date]['purchases'][$kind] += $purchaseRow['total'];
             $days[$date]['purchases']['ppn'] += $purchaseRow['ppn'];
+        }
+
+        $discountOffByDate = DB::table('finance_payments as fp')
+            ->join('finance_accounts as fa', 'fa.id', '=', 'fp.expense_account_id')
+            ->where('fp.payment_type', 'BIAYA')
+            ->where('fa.code', '6-60002')
+            ->whereIn('fp.pharmacy_id', $pharmacyIds)
+            ->where(function ($query) use ($pharmacyIds) {
+                $query->whereIn('fa.pharmacy_id', $pharmacyIds)
+                    ->orWhereNull('fa.pharmacy_id');
+            })
+            ->whereBetween('fp.payment_date', [$startDate, $endDate])
+            ->selectRaw('DATE(fp.payment_date) as expense_date, SUM(fp.amount) as amount')
+            ->groupByRaw('DATE(fp.payment_date)')
+            ->get();
+        foreach ($discountOffByDate as $expense) {
+            $date = (string) $expense->expense_date;
+            if (isset($days[$date])) {
+                $days[$date]['purchases']['discountOff'] += (float) $expense->amount;
+            }
         }
 
         $returnInvoiceMeta = DB::table('receiving_items as ri')

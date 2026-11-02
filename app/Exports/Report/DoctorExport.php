@@ -65,7 +65,7 @@ class DoctorExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
             'shift_logs',
         ])
             ->where('pharmacy_id', $this->pharmacyId)
-            ->whereIn('transaction_type', ['RESEP TUNAI', 'KREDIT']);
+            ->whereIn('transaction_type', ['RESEP TUNAI', 'KREDIT', 'RESEP KREDIT']);
 
         LiphTransactionScope::applySalesStatus($query);
         LiphTransactionScope::applyPeriod(
@@ -100,10 +100,10 @@ class DoctorExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
             if ($docName === '') $docName = 'TANPA DOKTER';
             $groupKey = strtoupper($docName);
 
-            $resepItems = $trx->transactions->filter(function ($item) use ($trx) {
-                $ct = $item->cart_type ?: $trx->transaction_type;
-                return in_array($ct, ['UM', 'UK', 'RESEP TUNAI', 'KREDIT'], true);
-            });
+            // The report follows transaction_type (resep tunai/kredit), not
+            // cart_type: every item in a resep transaction belongs to the
+            // doctor, including items invoiced as HV/UPDS.
+            $resepItems = $trx->transactions;
             if ($resepItems->isEmpty()) continue;
 
             if (!isset($grouped[$groupKey])) {
@@ -189,10 +189,8 @@ class DoctorExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
             if ($docName === '') $docName = 'TANPA DOKTER';
             $groupDoc = strtoupper($docName);
 
-            $resepItems = $trx->transactions->filter(function ($item) use ($trx) {
-                $ct = $item->cart_type ?: $trx->transaction_type;
-                return in_array($ct, ['UM', 'UK', 'RESEP TUNAI', 'KREDIT'], true);
-            });
+            // All items of a resep transaction count, regardless of cart_type.
+            $resepItems = $trx->transactions;
             if ($resepItems->isEmpty()) continue;
 
             foreach ($resepItems as $item) {
