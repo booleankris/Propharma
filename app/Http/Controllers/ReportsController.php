@@ -541,7 +541,7 @@ class ReportsController extends Controller
 
     public function exportSalesRetur(Request $request)
     {
-        $pharmacyId = getActivePharmacyId();
+        $pharmacyId = $request->filled('pharmacy_id') ? (int) $request->pharmacy_id : getActivePharmacyId();
         $startDate = $request->start_date ?? now()->startOfMonth()->toDateString();
         $endDate = $request->end_date ?? now()->toDateString();
 
@@ -561,7 +561,7 @@ class ReportsController extends Controller
 
     public function exportPurchaseRetur(Request $request)
     {
-        $pharmacyId = getActivePharmacyId();
+        $pharmacyId = $request->filled('pharmacy_id') ? (int) $request->pharmacy_id : getActivePharmacyId();
         $startDate = $request->start_date ?? now()->startOfMonth()->toDateString();
         $endDate = $request->end_date ?? now()->toDateString();
 
@@ -581,7 +581,7 @@ class ReportsController extends Controller
 
     public function exportExpiryDates(Request $request)
     {
-        $pharmacyId = getActivePharmacyId();
+        $pharmacyId = $request->filled('pharmacy_id') ? (int) $request->pharmacy_id : getActivePharmacyId();
 
         $job = ExportJob::create([
             'type'     => 'expiry_dates',
@@ -599,7 +599,7 @@ class ReportsController extends Controller
 
     public function exportRejects(Request $request)
     {
-        $pharmacyId = getActivePharmacyId();
+        $pharmacyId = $request->filled('pharmacy_id') ? (int) $request->pharmacy_id : getActivePharmacyId();
         $startDate = $request->start_date ?? now()->startOfMonth()->toDateString();
         $endDate = $request->end_date ?? now()->toDateString();
 

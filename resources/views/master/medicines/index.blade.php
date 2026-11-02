@@ -806,36 +806,41 @@
                 modalEl.classList.add('flex');
             }
 
+            if (window.iziToast) {
+                iziToast.info({
+                    title: 'Export Master Obat',
+                    message: 'Sedang menyusun data Excel Master Obat (.xlsx). Unduhan segera dimulai...',
+                    position: 'topRight',
+                    timeout: 4000
+                });
+            }
+
             // Build URL
             const url = "{{ route('master-data.export', ['type' => 'medicines']) }}?status=" + encodeURIComponent(
                 statusVal) + "&download_token=" + encodeURIComponent(token);
 
-            // Trigger download via hidden iframe
-            let iframe = document.getElementById('exportDownloadFrame');
-            if (!iframe) {
-                iframe = document.createElement('iframe');
-                iframe.id = 'exportDownloadFrame';
-                iframe.style.display = 'none';
-                document.body.appendChild(iframe);
-            }
-            iframe.src = url;
+            // Direct top-level navigation: safe for Brave Shields and Chromium download managers
+            window.location.href = url;
+
+            let finished = false;
 
             // Watch for download completion via cookie
             const checkInterval = setInterval(() => {
                 if (document.cookie.split(';').some(c => c.trim().startsWith('download_token=' + token))) {
                     clearInterval(checkInterval);
                     clearTimeout(fallbackTimeout);
-                    finishExportMaster();
+                    if (!finished) finishExportMaster();
                 }
             }, 300);
 
-            // Fallback timeout after 12 seconds in case cookies disabled
+            // Auto-finish after 3.5 seconds
             const fallbackTimeout = setTimeout(() => {
                 clearInterval(checkInterval);
-                finishExportMaster();
-            }, 12000);
+                if (!finished) finishExportMaster();
+            }, 3500);
 
             function finishExportMaster() {
+                finished = true;
                 // Delete tracking cookie
                 document.cookie = 'download_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
 
@@ -852,12 +857,14 @@
                     btnText.innerText = 'Export Excel (.xlsx)';
                 }
 
-                iziToast.success({
-                    title: 'Export Berhasil',
-                    message: 'File Master Obat (.xlsx) berhasil diunduh secara lengkap.',
-                    position: 'topRight',
-                    timeout: 4000
-                });
+                if (window.iziToast) {
+                    iziToast.success({
+                        title: 'Export Berhasil',
+                        message: 'File Master Obat (.xlsx) sedang diunduh oleh browser.',
+                        position: 'topRight',
+                        timeout: 4000
+                    });
+                }
             }
         }
 

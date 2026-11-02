@@ -240,11 +240,13 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
 
     // ================================================================== Add Data =========================================================================
 
+    // Export Master Data (Dapat diakses oleh semua role termasuk Koordinator & Kasir)
+    Route::get('/master-data/{type}/export', MasterDataExportController::class)
+        ->whereIn('type', array_keys(config('master_exports')))
+        ->name('master-data.export');
+
     // Master Data (Role HO, Operator, Koordinator & General Manager)
     Route::middleware(['role:HO|operator|Operator|administrator|Koordinator|koordinator|General Manager'])->group(function () {
-        Route::get('/master-data/{type}/export', MasterDataExportController::class)
-            ->whereIn('type', array_keys(config('master_exports')))
-            ->name('master-data.export');
 
         Route::resource('creditors', CreditorsController::class)->except(['show']);
         Route::post('creditors/{id}/restore', [CreditorsController::class, 'restore'])->name('creditors.restore');

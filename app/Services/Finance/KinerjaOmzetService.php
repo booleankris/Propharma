@@ -7,6 +7,7 @@ use App\Models\MedicineTransactions;
 use App\Models\Receiving;
 use App\Support\FinanceShift;
 use App\Support\LiphTransactionScope;
+use App\Support\ReceivingInvoiceTotals;
 use Carbon\CarbonPeriod;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -18,7 +19,7 @@ class KinerjaOmzetService
         return [
             'date' => $date,
             'sales' => ['cash' => ['morning' => 0, 'evening' => 0], 'bank' => ['morning' => 0, 'evening' => 0], 'credit' => ['morning' => [], 'evening' => []], 'returns' => ['morning' => 0, 'evening' => 0]],
-            'purchases' => ['pbf' => 0, 'consignment' => 0, 'return' => 0, 'cash' => 0, 'ppn' => 0],
+            'purchases' => ['pbf' => 0, 'consignment' => 0, 'return' => 0, 'discountOff' => 0, 'cash' => 0, 'ppn' => 0],
         ];
     }
 
@@ -27,22 +28,24 @@ class KinerjaOmzetService
         return (float) str_replace(',', '.', (string) ($value ?? 0));
     }
 
-    private function addPurchase(array &$day, string $kind, float $amount, string $ppnType): void
+    private function addPurchase(array &$day, string $kind, object $item, string $ppnType): void
     {
         $type = mb_strtoupper(trim($ppnType));
-        $sign = $amount < 0 ? -1 : 1;
-        $absolute = abs($amount);
-        $dpp = match ($type) {
-            'EXCLUDE', 'INCLUDE' => $sign * floor($absolute / 1.11),
-            default => $amount,
-        };
-        $ppn = in_array($type, ['EXCLUDE', 'INCLUDE'], true) ? $amount - $dpp : 0;
-        // receiving_items.total is already saved with invoice tax included when applicable.
-        $day['purchases'][$kind] += $amount;
-        $day['purchases']['ppn'] += $ppn;
+        $line = ReceivingInvoiceTotals::lineAmounts($item, $type);
+        $amount = is_numeric($item->total ?? null) ? (float) $item->total : (float) $line['total'];
+        $rawPrice = $this->number($item->raw_price ?? $item->order_items?->price ?? 0);
+        $qty = $this->number($item->qty_received ?? $item->qty ?? 0);
+        $gross = max(0, $rawPrice * $qty);
+        $grossTotal = $type === 'EXCLUDE' ? $gross + round($gross * 0.11) : $gross;
+
+        // Tampilkan pembelian sebelum diskon; total menghitung diskon sekali
+        // sebagai kolom tersendiri agar sama dengan susunan lembar kerja.
+        $day['purchases'][$kind] += $grossTotal;
+        $day['purchases']['discountOff'] += max(0, $grossTotal - $amount);
+        $day['purchases']['ppn'] += (float) $line['ppn'];
     }
 
-    private function subtractPurchaseReturn(array &$day, string $kind, float $amount, string $ppnType): void
+    private function subtractPurchaseReturn(array &$day, float $amount, string $ppnType): void
     {
         $type = mb_strtoupper(trim($ppnType));
         $sign = $amount < 0 ? -1 : 1;
@@ -59,7 +62,6 @@ class KinerjaOmzetService
             $ppn = 0;
             $gross = $amount;
         }
-        $day['purchases'][$kind] -= $gross;
         $day['purchases']['return'] += $gross;
         $day['purchases']['ppn'] -= $ppn;
     }
@@ -104,10 +106,24 @@ class KinerjaOmzetService
             $shift = FinanceShift::key($effectiveAt);
             $type = mb_strtoupper(trim((string) $transaction->transaction_type));
             $payment = mb_strtoupper(trim((string) $transaction->payment_method));
+            $isReturn = in_array($type, ['RETUR JUAL', 'RETUR KREDIT'], true);
             $items = $transaction->transactions;
-            $amount = $items->sum(fn ($item) => $this->number($item->final_price ?? $item->total_price));
-            if ($items->isEmpty()) $amount = max(0, $this->number($transaction->subtotal) - $this->number($transaction->discount));
-            elseif (!in_array($type, ['RETUR JUAL', 'RETUR KREDIT'], true)) $amount = max(0, $amount - $this->number($transaction->discount));
+            $itemNetto = (int) $items->sum(function ($item) {
+                $qty = (float) ($item->quantity ?? 0);
+                $price = (int) round((float) ($item->item_price ?? 0));
+                $disc = (int) round((float) ($item->discount ?? 0));
+                return (int) round((float) ($item->final_price ?? $item->total_price ?? ($price * $qty - $disc)));
+            });
+            $subtotal = is_numeric($transaction->subtotal) ? (int) round((float) $transaction->subtotal) : 0;
+            $discount = is_numeric($transaction->discount) ? (int) round((float) $transaction->discount) : 0;
+
+            if ($isReturn) {
+                $amount = $subtotal !== 0 ? abs($subtotal) : abs($itemNetto);
+            } elseif ($items->isEmpty()) {
+                $amount = max(0, $subtotal - $discount);
+            } else {
+                $amount = max(0, $itemNetto - $discount);
+            }
 
             if ($type === 'RETUR KREDIT') {
                 $debtorId = (int) $transaction->debtor_id;
@@ -152,6 +168,7 @@ class KinerjaOmzetService
 
         $receivings = Receiving::query()->with([
             'receiving_details.receiving_items' => fn ($query) => $query->whereNotNull('batches_id'),
+            'receiving_details.receiving_items.order_items',
             'receiving_details.creditor',
         ])
             ->whereIn('pharmacy_id', $pharmacyIds)->whereIn('status', [1, 2, 3])
@@ -160,12 +177,16 @@ class KinerjaOmzetService
             $date = \Carbon\Carbon::parse($receiving->date)->toDateString();
             if (!isset($days[$date])) continue;
             foreach ($receiving->receiving_details as $detail) {
-                $amount = $detail->receiving_items->sum(fn ($item) => $this->number($item->total));
                 $payment = mb_strtoupper(trim((string) $detail->invoice_payment));
                 $kind = match ($payment) {
                     'KREDIT' => 'pbf', 'KONSINYASI' => 'consignment', 'TUNAI' => 'cash', default => null,
                 };
-                if ($kind) $this->addPurchase($days[$date], $kind, $amount, (string) ($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA'));
+                if ($kind) {
+                    $ppnType = (string) ($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA');
+                    foreach ($detail->receiving_items as $item) {
+                        $this->addPurchase($days[$date], $kind, $item, $ppnType);
+                    }
+                }
             }
         }
 
@@ -193,12 +214,13 @@ class KinerjaOmzetService
             };
             if ($kind) {
                 $amount = (float) $return->amount;
-                $this->subtractPurchaseReturn($days[$date], $kind, $amount, $return->invoice_ppn);
+                $this->subtractPurchaseReturn($days[$date], $amount, $return->invoice_ppn);
             }
         }
 
         $debtorRows = $debtors->map(fn ($debtor) => ['id' => (int) $debtor->id, 'name' => (string) $debtor->name])->values()->all();
         foreach ($extraDebtors as $id => $name) $debtorRows[] = ['id' => (int) $id, 'name' => $name];
+        $purchaseRunningTotal = 0.0;
         foreach ($days as &$day) {
             $day['sales']['cashBankTotal'] = $day['sales']['cash']['morning'] + $day['sales']['cash']['evening'] + $day['sales']['bank']['morning'] + $day['sales']['bank']['evening'];
             $debtorSales = array_sum($day['sales']['credit']['morning']) + array_sum($day['sales']['credit']['evening']);
@@ -210,9 +232,11 @@ class KinerjaOmzetService
             $day['sales']['total'] = $day['sales']['cashBankTotal'] + $day['sales']['creditTotal'];
             $day['sales']['exVat'] = $day['sales']['cashBankExVat'] + $day['sales']['creditExVat'];
             $day['sales']['ppn'] = $day['sales']['cashBankPpn'] + $day['sales']['creditPpn'];
-            // Purchase return amounts are already subtracted from their tender category above.
-            $day['purchases']['total'] = $day['purchases']['pbf'] + $day['purchases']['consignment'] + $day['purchases']['cash'];
+            $day['purchases']['total'] = $day['purchases']['pbf'] + $day['purchases']['cash'] + $day['purchases']['consignment']
+                - $day['purchases']['return'] - $day['purchases']['discountOff'];
             $day['purchases']['exVat'] = $day['purchases']['total'] - $day['purchases']['ppn'];
+            $purchaseRunningTotal += $day['purchases']['total'];
+            $day['purchases']['sd'] = $purchaseRunningTotal;
         }
         unset($day);
 

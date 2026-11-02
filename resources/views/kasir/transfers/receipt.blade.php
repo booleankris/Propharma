@@ -81,7 +81,11 @@
         }
 
         .batch-col {
-            width: 140px;
+            width: 120px;
+        }
+
+        .ed-col {
+            width: 105px;
         }
 
         .qty-col {
@@ -174,6 +178,7 @@
                 <th class="no-col">No</th>
                 <th>Item</th>
                 <th class="batch-col">Batch</th>
+                <th class="ed-col">ED</th>
                 <th class="qty-col">Quantity</th>
             </tr>
         </thead>
@@ -183,6 +188,7 @@
                 <td class="no-col">{{ $index + 1 }}</td>
                 <td>{{ $item->batches?->medicines?->name ?? ($item->requestedMedicine?->name ?? '—') }}</td>
                 <td class="batch-col">{{ $item->batches?->name ?? ($item->sourceBatch?->name ?? '—') }}</td>
+                <td class="ed-col">{{ safeDateFormat($item->sourceBatch?->expired_date ?? $item->batches?->expired_date) }}</td>
                 <td class="qty-col">{{ rtrim(rtrim(number_format((float) ($item->original_qty ?? $item->qty), 2, ',', '.'), '0'), ',') }}</td>
             </tr>
             @endforeach

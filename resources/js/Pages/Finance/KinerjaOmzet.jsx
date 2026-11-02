@@ -5,20 +5,24 @@ const numeric = (value) => Number(value || 0);
 const money = (value) => formatRupiah(numeric(value));
 
 export default function KinerjaOmzet({ days = [], debtors = [] }) {
-    const totals = useMemo(() => days.reduce((sum, day) => {
-        sum.cashMorning += numeric(day.sales?.cash?.morning);
-        sum.cashEvening += numeric(day.sales?.cash?.evening);
-        sum.bankMorning += numeric(day.sales?.bank?.morning);
-        sum.bankEvening += numeric(day.sales?.bank?.evening);
-        for (const key of ['cashBankTotal', 'cashBankPpn', 'cashBankExVat', 'creditTotal', 'creditPpn', 'creditExVat', 'total', 'ppn', 'exVat']) {
-            sum[`sales_${key}`] = (sum[`sales_${key}`] || 0) + numeric(day.sales?.[key]);
-        }
-        sum.salesReturns += numeric(day.sales?.returns?.morning) + numeric(day.sales?.returns?.evening);
-        for (const debtor of debtors) sum[`debtor_${debtor.id}`] = (sum[`debtor_${debtor.id}`] || 0) + numeric(day.sales?.credit?.morning?.[debtor.id]) + numeric(day.sales?.credit?.evening?.[debtor.id]);
-        for (const key of ['pbf', 'consignment', 'return', 'cash', 'total', 'ppn', 'exVat']) sum[`purchase_${key}`] = (sum[`purchase_${key}`] || 0) + numeric(day.purchases?.[key]);
-        sum.margin += numeric(day.sales?.exVat) - numeric(day.purchases?.exVat);
-        return sum;
-    }, { cashMorning: 0, cashEvening: 0, bankMorning: 0, bankEvening: 0, salesReturns: 0, margin: 0 }), [days, debtors]);
+    const totals = useMemo(() => {
+        const result = days.reduce((sum, day) => {
+            sum.cashMorning += numeric(day.sales?.cash?.morning);
+            sum.cashEvening += numeric(day.sales?.cash?.evening);
+            sum.bankMorning += numeric(day.sales?.bank?.morning);
+            sum.bankEvening += numeric(day.sales?.bank?.evening);
+            for (const key of ['cashBankTotal', 'cashBankPpn', 'cashBankExVat', 'creditTotal', 'creditPpn', 'creditExVat', 'total', 'ppn', 'exVat']) {
+                sum[`sales_${key}`] = (sum[`sales_${key}`] || 0) + numeric(day.sales?.[key]);
+            }
+            sum.salesReturns += numeric(day.sales?.returns?.morning) + numeric(day.sales?.returns?.evening);
+            for (const debtor of debtors) sum[`debtor_${debtor.id}`] = (sum[`debtor_${debtor.id}`] || 0) + numeric(day.sales?.credit?.morning?.[debtor.id]) + numeric(day.sales?.credit?.evening?.[debtor.id]);
+            for (const key of ['pbf', 'cash', 'consignment', 'return', 'discountOff', 'total', 'ppn', 'exVat']) sum[`purchase_${key}`] = (sum[`purchase_${key}`] || 0) + numeric(day.purchases?.[key]);
+            sum.margin += numeric(day.sales?.exVat) - numeric(day.purchases?.exVat);
+            return sum;
+        }, { cashMorning: 0, cashEvening: 0, bankMorning: 0, bankEvening: 0, salesReturns: 0, margin: 0 });
+        result.purchase_sd = numeric(days[days.length - 1]?.purchases?.sd);
+        return result;
+    }, [days, debtors]);
 
     const cell = 'border border-slate-400 px-2 py-2 text-right tabular-nums whitespace-nowrap';
     const header = 'border border-slate-500 px-2 py-2 text-center font-bold text-slate-900';
@@ -40,15 +44,15 @@ export default function KinerjaOmzet({ days = [], debtors = [] }) {
                         <th colSpan="9" className={`${header} bg-blue-200`}>PEMBELIAN</th>
                     </tr>
                     <tr className="bg-emerald-50">
-                        <th colSpan="2" className={header}>TUNAI</th><th colSpan="2" className={header}>BANK</th>
-                        <th rowSpan="2" className={header}>JUMLAH OMS</th>
+                        <th colSpan="2" className={header}>CASH</th><th colSpan="2" className={header}>BANK</th>
+                        <th rowSpan="2" className={`${header} bg-emerald-200`}>TOTAL OMSET TUNAI</th>
                         <th colSpan={creditCount} className={header}>KREDIT</th>
-                        <th rowSpan="2" className={header}>PBF</th><th rowSpan="2" className={header}>KONSINYASI</th><th rowSpan="2" className={`${header} bg-yellow-100`}>RETUR PEMBELIAN</th><th rowSpan="2" className={header}>CASH</th><th rowSpan="2" className={header}>JUMLAH BELI</th><th rowSpan="2" className={header}>PPN FAKTUR</th><th rowSpan="2" className={header}>BELI EXC PPN</th><th rowSpan="2" className={header}>MARGIN EXC PPN</th><th rowSpan="2" className={header}>HPP %</th>
+                        <th rowSpan="2" className={header}>KREDIT</th><th rowSpan="2" className={header}>CASH</th><th rowSpan="2" className={header}>KONSINYASI</th><th rowSpan="2" className={`${header} bg-yellow-100`}>RETUR PEMBELIAN</th><th rowSpan="2" className={header}>DISKON OFF</th><th rowSpan="2" className={`${header} bg-blue-100`}>TOTAL PEMBELIAN</th><th rowSpan="2" className={header}>S/D</th><th rowSpan="2" className={header}>HPP %</th><th rowSpan="2" className={header}>MARGIN</th>
                     </tr>
                     <tr className="bg-emerald-50">
-                        <th className={header}>PAGI</th><th className={header}>SORE</th><th className={header}>PAGI</th><th className={header}>SORE</th>
+                        <th className={header}>PAGI</th><th className={header}>MALAM</th><th className={header}>PAGI</th><th className={header}>MALAM</th>
                         {debtors.map((debtor) => <th key={debtor.id} className={`${header} min-w-[128px]`}>{debtor.name}</th>)}
-                        <th className={header}>TOTAL KREDIT</th>
+                        <th className={`${header} bg-emerald-200`}>TOTAL OMSET KREDIT</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -61,19 +65,19 @@ export default function KinerjaOmzet({ days = [], debtors = [] }) {
                             <td className={`${cell} bg-emerald-200 font-semibold`}>{money(day.sales?.cashBankTotal)}</td>
                             {debtors.map((debtor) => <td key={debtor.id} className={cell}>{money(numeric(day.sales?.credit?.morning?.[debtor.id]) + numeric(day.sales?.credit?.evening?.[debtor.id]))}</td>)}
                             <td className={`${cell} bg-emerald-200 font-semibold`}>{money(day.sales?.creditTotal)}</td>
-                            <td className={cell}>{money(day.purchases?.pbf)}</td><td className={cell}>{money(day.purchases?.consignment)}</td><td className={`${cell} bg-yellow-100`}>{money(day.purchases?.return)}</td><td className={cell}>{money(day.purchases?.cash)}</td>
-                            <td className={`${cell} bg-blue-100 font-semibold`}>{money(day.purchases?.total)}</td><td className={cell}>{money(day.purchases?.ppn)}</td><td className={cell}>{money(day.purchases?.exVat)}</td>
-                            <td className={`${cell} bg-blue-100 font-semibold`}>{money(numeric(day.sales?.exVat) - numeric(day.purchases?.exVat))}</td><td className={cell}>{dailyHpp.toFixed(1)}%</td>
+                            <td className={cell}>{money(day.purchases?.pbf)}</td><td className={cell}>{money(day.purchases?.cash)}</td><td className={cell}>{money(day.purchases?.consignment)}</td><td className={`${cell} bg-yellow-100`}>{money(day.purchases?.return)}</td><td className={cell}>{money(day.purchases?.discountOff)}</td>
+                            <td className={`${cell} bg-blue-100 font-semibold`}>{money(day.purchases?.total)}</td><td className={cell}>{money(day.purchases?.sd)}</td>
+                            <td className={cell}>{dailyHpp.toFixed(1)}%</td><td className={`${cell} bg-blue-100 font-semibold`}>{money(numeric(day.sales?.exVat) - numeric(day.purchases?.exVat))}</td>
                         </tr>;
                     })}
                     <tr className="bg-yellow-200 font-bold">
                         <th className={`${cell} sticky left-0 z-10 bg-yellow-200 text-left`}>TOTAL</th>
                         <td className={cell}>{money(totals.cashMorning)}</td><td className={cell}>{money(totals.cashEvening)}</td><td className={cell}>{money(totals.bankMorning)}</td><td className={cell}>{money(totals.bankEvening)}</td>
-                        <td className={cell}>{money(totals.sales_cashBankTotal)}</td>
+                        <td className={`${cell} bg-emerald-300 font-bold`}>{money(totals.sales_cashBankTotal)}</td>
                         {debtors.map((debtor) => <td key={debtor.id} className={cell}>{money(totals[`debtor_${debtor.id}`])}</td>)}
-                        <td className={cell}>{money(totals.sales_creditTotal)}</td>
-                        {['pbf', 'consignment', 'return', 'cash', 'total', 'ppn', 'exVat'].map((key) => <td key={key} className={cell}>{money(totals[`purchase_${key}`])}</td>)}
-                        <td className={cell}>{money(totals.margin)}</td><td className={cell}>{hpp.toFixed(1)}%</td>
+                        <td className={`${cell} bg-emerald-300 font-bold`}>{money(totals.sales_creditTotal)}</td>
+                        {['pbf', 'cash', 'consignment', 'return', 'discountOff', 'total'].map((key) => <td key={key} className={cell}>{money(totals[`purchase_${key}`])}</td>)}
+                        <td className={cell}>{money(totals.purchase_sd)}</td><td className={cell}>{hpp.toFixed(1)}%</td><td className={cell}>{money(totals.margin)}</td>
                     </tr>
                 </tbody>
             </table>

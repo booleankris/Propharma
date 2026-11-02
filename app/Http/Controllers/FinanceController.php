@@ -2797,10 +2797,14 @@ class FinanceController extends Controller
             ->when($isCashBank, fn ($query) => $query->where('pharmacy_id', $pharmacyId), fn ($query) => $query->whereNull('pharmacy_id'))
             ->exists();
         if ($duplicateCode) {
-            return back()->withErrors(['code' => 'Kode akun sudah digunakan pada cabang ini.']);
+            return redirect()->route('finance.accounts')
+                ->withErrors(['code' => 'Kode akun sudah digunakan pada cabang ini.'])
+                ->withInput();
         }
         if ($accountType === 'kas_apotek' && $this->branchKasBankAccountsQuery()->where('account_type', 'kas_apotek')->exists()) {
-            return back()->withErrors(['account_type' => 'Cabang ini sudah memiliki akun Kas Apotek.']);
+            return redirect()->route('finance.accounts')
+                ->withErrors(['account_type' => 'Cabang ini sudah memiliki akun Kas Apotek.'])
+                ->withInput();
         }
 
         FinanceAccount::create([
@@ -2816,7 +2820,8 @@ class FinanceController extends Controller
         ]);
 
         $this->clearStatsCache();
-        return back()->with('success', "Akun baru '{$validated['name']}' dengan kode {$code} berhasil ditambahkan.");
+        return redirect()->route('finance.accounts')
+            ->with('success', "Akun baru '{$validated['name']}' dengan kode {$code} berhasil ditambahkan.");
     }
 
     /**

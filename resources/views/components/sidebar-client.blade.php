@@ -2909,9 +2909,8 @@
                         <p class="text-[11px] text-slate-500 leading-relaxed mb-4">Export seluruh database obat (kode, barcode, nama, kategori, harga dasar, HNA, harga jual, stok) lengkap dan rapi.</p>
                     </div>
                     <div class="flex items-center gap-2">
-                        <a href="{{ route('master-data.export', ['type' => 'medicines', 'status' => 1]) }}"
-                            onclick="const pid = document.getElementById('export_center_pharmacy_id')?.value; if(pid) this.href = '{{ route('master-data.export', ['type' => 'medicines', 'status' => 1]) }}&pharmacy_id=' + pid;"
-                            class="flex-1 inline-flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-colors">
+                        <button type="button" onclick="exportMasterMedicinesCenter(this)"
+                            class="flex-1 inline-flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold shadow-xs transition-all cursor-pointer">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-download">
                                 <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
                                 <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2"/>
@@ -2919,7 +2918,7 @@
                                 <path d="M12 4l0 12"/>
                             </svg>
                             Export Excel (.xlsx)
-                        </a>
+                        </button>
                         <a href="{{ route('medicines.index') }}" title="Buka Halaman Master Obat"
                             class="inline-flex items-center justify-center p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition-colors">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -2951,9 +2950,8 @@
                         <p class="text-[11px] text-slate-500 leading-relaxed mb-4">Export posisi stok fisik seluruh obat di gudang logistik dan unit pelayanan apotek.</p>
                     </div>
                     <div class="flex items-center gap-2">
-                        <a href="{{ route('supplies.printstockdata', ['status' => 1]) }}"
-                            onclick="const pid = document.getElementById('export_center_pharmacy_id')?.value; if(pid) this.href = '{{ route('supplies.printstockdata', ['status' => 1]) }}&pharmacy_id=' + pid;"
-                            class="flex-1 inline-flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-colors">
+                        <button type="button" onclick="exportStockGudangCenter(this)"
+                            class="flex-1 inline-flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold shadow-xs transition-all cursor-pointer">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-download">
                                 <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
                                 <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2"/>
@@ -2961,7 +2959,7 @@
                                 <path d="M12 4l0 12"/>
                             </svg>
                             Export Stok Gudang
-                        </a>
+                        </button>
                         <a href="{{ route('supplies.stockData') }}" title="Buka Data Stok"
                             class="inline-flex items-center justify-center p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition-colors">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -3399,6 +3397,136 @@
                 console.error("Polling export error:", e);
             }
         }, 1500);
+    }
+
+    function exportMasterMedicinesCenter(btn) {
+        const pid = document.getElementById('export_center_pharmacy_id')?.value;
+        let url = "{{ route('master-data.export', ['type' => 'medicines', 'status' => 1]) }}";
+        if (pid) {
+            url += '&pharmacy_id=' + encodeURIComponent(pid);
+        }
+
+        const progressContainer = document.getElementById('exportCenterProgress');
+        const progressBar = document.getElementById('exportProgressBar');
+        const progressText = document.getElementById('exportProgressText');
+        const progressStatus = document.getElementById('exportProgressStatus');
+
+        if (progressContainer) {
+            progressContainer.classList.remove('hidden');
+            if (progressBar) progressBar.style.width = '35%';
+            if (progressText) progressText.innerText = '35%';
+            if (progressStatus) progressStatus.innerText = 'Menyiapkan database Master Data Obat (.xlsx)...';
+        }
+
+        if (window.iziToast) {
+            iziToast.info({
+                title: 'Export Master Obat',
+                message: 'Sedang menyusun file Excel Master Obat (.xlsx). Unduhan akan otomatis dimulai...',
+                position: 'topRight',
+                timeout: 5000
+            });
+        }
+
+        const originalHtml = btn ? btn.innerHTML : '';
+        if (btn) {
+            btn.disabled = true;
+            btn.classList.add('opacity-75', 'cursor-not-allowed');
+            btn.innerHTML = `<svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline-block" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Menyiapkan...`;
+        }
+
+        // Direct top-level navigation triggers native browser download safely
+        window.location.href = url;
+
+        setTimeout(() => {
+            if (progressBar) progressBar.style.width = '100%';
+            if (progressText) progressText.innerText = '100%';
+            if (progressStatus) progressStatus.innerText = 'Selesai! File sedang diunduh oleh browser.';
+
+            if (window.iziToast) {
+                iziToast.success({
+                    title: 'Export Dimulai',
+                    message: 'File Master Obat (.xlsx) sedang diunduh.',
+                    position: 'topRight',
+                    timeout: 4000
+                });
+            }
+
+            setTimeout(() => {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.classList.remove('opacity-75', 'cursor-not-allowed');
+                    btn.innerHTML = originalHtml;
+                }
+                if (progressContainer) {
+                    progressContainer.classList.add('hidden');
+                }
+            }, 2000);
+        }, 3500);
+    }
+
+    function exportStockGudangCenter(btn) {
+        const pid = document.getElementById('export_center_pharmacy_id')?.value;
+        let url = "{{ route('supplies.printstockdata', ['status' => 1]) }}";
+        if (pid) {
+            url += '&pharmacy_id=' + encodeURIComponent(pid);
+        }
+
+        const progressContainer = document.getElementById('exportCenterProgress');
+        const progressBar = document.getElementById('exportProgressBar');
+        const progressText = document.getElementById('exportProgressText');
+        const progressStatus = document.getElementById('exportProgressStatus');
+
+        if (progressContainer) {
+            progressContainer.classList.remove('hidden');
+            if (progressBar) progressBar.style.width = '35%';
+            if (progressText) progressText.innerText = '35%';
+            if (progressStatus) progressStatus.innerText = 'Menyiapkan Rekap Saldo Stok Obat (.xlsx)...';
+        }
+
+        if (window.iziToast) {
+            iziToast.info({
+                title: 'Export Rekap Stok',
+                message: 'Sedang menyusun data stok logistik & apotek ke Excel (.xlsx)...',
+                position: 'topRight',
+                timeout: 5000
+            });
+        }
+
+        const originalHtml = btn ? btn.innerHTML : '';
+        if (btn) {
+            btn.disabled = true;
+            btn.classList.add('opacity-75', 'cursor-not-allowed');
+            btn.innerHTML = `<svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline-block" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Menyiapkan...`;
+        }
+
+        // Direct top-level navigation triggers native browser download safely
+        window.location.href = url;
+
+        setTimeout(() => {
+            if (progressBar) progressBar.style.width = '100%';
+            if (progressText) progressText.innerText = '100%';
+            if (progressStatus) progressStatus.innerText = 'Selesai! File sedang diunduh oleh browser.';
+
+            if (window.iziToast) {
+                iziToast.success({
+                    title: 'Export Dimulai',
+                    message: 'File Rekap Stok Obat sedang diunduh.',
+                    position: 'topRight',
+                    timeout: 4000
+                });
+            }
+
+            setTimeout(() => {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.classList.remove('opacity-75', 'cursor-not-allowed');
+                    btn.innerHTML = originalHtml;
+                }
+                if (progressContainer) {
+                    progressContainer.classList.add('hidden');
+                }
+            }, 2000);
+        }, 3500);
     }
 </script>
 
