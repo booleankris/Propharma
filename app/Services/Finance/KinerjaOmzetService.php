@@ -4,10 +4,9 @@ namespace App\Services\Finance;
 
 use App\Models\Debtors;
 use App\Models\MedicineTransactions;
-use App\Models\Receiving;
+use App\Exports\Orders\OrdersSingleSheetExport;
 use App\Support\FinanceShift;
 use App\Support\LiphTransactionScope;
-use App\Support\ReceivingInvoiceTotals;
 use Carbon\CarbonPeriod;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -21,28 +20,6 @@ class KinerjaOmzetService
             'sales' => ['cash' => ['morning' => 0, 'evening' => 0], 'bank' => ['morning' => 0, 'evening' => 0], 'credit' => ['morning' => [], 'evening' => []], 'returns' => ['morning' => 0, 'evening' => 0]],
             'purchases' => ['pbf' => 0, 'consignment' => 0, 'return' => 0, 'discountOff' => 0, 'cash' => 0, 'ppn' => 0],
         ];
-    }
-
-    private function number($value): float
-    {
-        return (float) str_replace(',', '.', (string) ($value ?? 0));
-    }
-
-    private function addPurchase(array &$day, string $kind, object $item, string $ppnType): void
-    {
-        $type = mb_strtoupper(trim($ppnType));
-        $line = ReceivingInvoiceTotals::lineAmounts($item, $type);
-        $amount = is_numeric($item->total ?? null) ? (float) $item->total : (float) $line['total'];
-        $rawPrice = $this->number($item->raw_price ?? $item->order_items?->price ?? 0);
-        $qty = $this->number($item->qty_received ?? $item->qty ?? 0);
-        $gross = max(0, $rawPrice * $qty);
-        $grossTotal = $type === 'EXCLUDE' ? $gross + round($gross * 0.11) : $gross;
-
-        // Tampilkan pembelian sebelum diskon; total menghitung diskon sekali
-        // sebagai kolom tersendiri agar sama dengan susunan lembar kerja.
-        $day['purchases'][$kind] += $grossTotal;
-        $day['purchases']['discountOff'] += max(0, $grossTotal - $amount);
-        $day['purchases']['ppn'] += (float) $line['ppn'];
     }
 
     private function subtractPurchaseReturn(array &$day, float $amount, string $ppnType): void
@@ -166,28 +143,30 @@ class KinerjaOmzetService
             }
         }
 
-        $receivings = Receiving::query()->with([
-            'receiving_details.receiving_items' => fn ($query) => $query->whereNotNull('batches_id'),
-            'receiving_details.receiving_items.order_items',
-            'receiving_details.creditor',
-        ])
-            ->whereIn('pharmacy_id', $pharmacyIds)->whereIn('status', [1, 2, 3])
-            ->whereDate('date', '>=', $startDate)->whereDate('date', '<=', $endDate)->get();
-        foreach ($receivings as $receiving) {
-            $date = \Carbon\Carbon::parse($receiving->date)->toDateString();
-            if (!isset($days[$date])) continue;
-            foreach ($receiving->receiving_details as $detail) {
-                $payment = mb_strtoupper(trim((string) $detail->invoice_payment));
-                $kind = match ($payment) {
-                    'KREDIT' => 'pbf', 'KONSINYASI' => 'consignment', 'TUNAI' => 'cash', default => null,
-                };
-                if ($kind) {
-                    $ppnType = (string) ($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA');
-                    foreach ($detail->receiving_items as $item) {
-                        $this->addPurchase($days[$date], $kind, $item, $ppnType);
-                    }
-                }
+        $purchasePharmacyIds = count($pharmacyIds) === 1 && in_array((int) $pharmacyIds[0], [1, 6, 9], true)
+            ? [9, 1]
+            : $pharmacyIds;
+        $purchaseStart = Carbon::parse($startDate)->startOfDay();
+        $purchaseEnd = Carbon::parse($endDate)->endOfDay();
+        $purchaseExport = new OrdersSingleSheetExport(
+            $purchasePharmacyIds[0] ?? (int) ($pharmacyIds[0] ?? 0),
+            $purchaseStart,
+            $purchaseEnd
+        );
+        foreach ($purchaseExport->financeRows($purchasePharmacyIds) as $purchaseRow) {
+            try {
+                $date = Carbon::createFromFormat('d/m/Y', $purchaseRow['date'])->toDateString();
+            } catch (\Throwable $e) {
+                continue;
             }
+            if (!isset($days[$date])) continue;
+            $kind = match ($purchaseRow['payment']) {
+                'KREDIT' => 'pbf', 'KONSINYASI' => 'consignment', 'TUNAI' => 'cash', default => null,
+            };
+            if (!$kind) continue;
+            $days[$date]['purchases'][$kind] += $purchaseRow['gross_total'];
+            $days[$date]['purchases']['discountOff'] += max(0, $purchaseRow['gross_total'] - $purchaseRow['net_total']);
+            $days[$date]['purchases']['ppn'] += $purchaseRow['ppn'];
         }
 
         $returnInvoiceMeta = DB::table('receiving_items as ri')
@@ -202,7 +181,7 @@ class KinerjaOmzetService
             ->joinSub($returnInvoiceMeta, 'rd', function ($join) {
                 $join->on('rd.receiving_id', '=', 'r.id')->on('rd.batches_id', '=', 'il.batches_id');
             })
-            ->where('il.status', 4)->whereIn('r.pharmacy_id', $pharmacyIds)->whereIn('r.status', [1, 2, 3])
+            ->where('il.status', 4)->whereIn('r.pharmacy_id', $purchasePharmacyIds)->whereIn('r.status', [1, 2, 3])
             ->whereDate('il.date', '>=', $startDate)->whereDate('il.date', '<=', $endDate)
             ->selectRaw('DATE(il.date) as return_date, UPPER(TRIM(COALESCE(rd.invoice_payment, ""))) as invoice_payment, UPPER(TRIM(COALESCE(rd.invoice_ppn, "TANPA"))) as invoice_ppn, SUM(CAST(COALESCE(NULLIF(il.total, ""), "0") AS DECIMAL(15,2))) as amount')
             ->groupByRaw('DATE(il.date), UPPER(TRIM(COALESCE(rd.invoice_payment, ""))), UPPER(TRIM(COALESCE(rd.invoice_ppn, "TANPA")))')->get();

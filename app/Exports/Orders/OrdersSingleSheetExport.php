@@ -67,6 +67,93 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
             ? [9, 1]
             : [(int) $this->pharmacyId];
 
+        $items = $this->purchaseItems($targetPharmacyIds);
+
+        $tableHeaders = [
+            'ID', 'No Terima', 'Tgl Terima', 'Nama Kreditur', 'Kode Kreditur', 'No Faktur', 'Tgl Faktur',
+            'DPP', 'PPN', 'Jatuh Tempo', 'Waktu Kredit', 'Jenis Bayar', 'Kode Obat', 'Nama Obat', 'Pabrik',
+            'Qty Beli', 'Kemasan', 'Utuh', 'HNA', 'Harga PPN', 'Diskon', 'Value Disc', 'Extra Diskon',
+            'Value Extra Disc', 'Jumlah', 'Batch', 'Expired',
+        ];
+
+        if ($items->isEmpty()) {
+            $rows = [$tableHeaders];
+            $emptyRow = array_fill(0, count($tableHeaders), '');
+            $emptyRow[0] = 'Tidak ada data untuk periode yang dipilih.';
+            $rows[] = $emptyRow;
+            return $rows;
+        }
+
+        $rows = [$tableHeaders];
+        $grandDpp = $grandPpn = $grandNomDisc = $grandNomExtraDisc = $grandTotal = 0;
+
+        foreach ($items as $item) {
+            $amounts = $this->calculateAmounts($item);
+            $qty = $amounts['qty'];
+            $rawPrice = $amounts['rawPrice'];
+            $nomDisc = $amounts['nomDisc'];
+            $nomExtraDisc = $amounts['nomExtraDisc'];
+            $dpp = $amounts['dpp'];
+            $ppn = $amounts['ppn'];
+            $jumlah = $amounts['jumlah'];
+            $hargaPpn = round($rawPrice * (1 + self::PPN));
+
+            $tglTerima = ReceivingDateFilter::format($item->receiving_date, $item->receiving_details_created_at);
+            $tglFaktur = $item->invoice_date ? Carbon::parse($item->invoice_date)->format('d/m/Y') : '-';
+            $jatuhTempo = $item->invoice_due ? Carbon::parse($item->invoice_due)->format('d/m/Y') : '-';
+            $expired = $item->expired_date ? Carbon::parse($item->expired_date)->format('d/m/Y') : '-';
+            $batch = !empty($item->receiving_batch) ? (string) $item->receiving_batch : (!empty($item->batch_name) ? (string) $item->batch_name : '-');
+            $packaging = $item->medicine_packaging ?: ($item->medicine_unit ?: '-');
+
+            $rows[] = [
+                $item->id, $item->receiving_details_code ?? '-', $tglTerima, $item->creditor_name ?? '-',
+                $item->creditor_code ?? '-', $item->invoice_number ?? '-', $tglFaktur, $dpp, $ppn, $jatuhTempo,
+                $item->invoice_times ?? '-', $item->invoice_payment ?? '-', $item->medicine_code ?? '-',
+                $item->medicine_name ?? '-', $item->factory_name ?? '-', (int) $qty, $packaging,
+                $item->order_pack ?? '-', $rawPrice, $hargaPpn, $item->discount ?? 0, round($nomDisc, 2),
+                $item->extra_discount ?? 0, round($nomExtraDisc, 2), $jumlah, $batch, $expired,
+            ];
+            $grandDpp += $dpp;
+            $grandPpn += $ppn;
+            $grandNomDisc += $nomDisc;
+            $grandNomExtraDisc += $nomExtraDisc;
+            $grandTotal += $jumlah;
+        }
+
+        $rows[] = ['', '', '', '', '', '', 'TOTAL', $grandDpp, $grandPpn, '', '', '', '', '', '', '', '', '', '', '', '', round($grandNomDisc, 2), '', round($grandNomExtraDisc, 2), $grandTotal, '', ''];
+        return $rows;
+    }
+
+    /**
+     * Purchase aggregates for Kinerja Omzet, calculated from the exact item
+     * query and amount rules used to build this export.
+     */
+    public function financeRows(array $targetPharmacyIds): array
+    {
+        return $this->purchaseItems($targetPharmacyIds)->map(function ($item) {
+            $amounts = $this->calculateAmounts($item);
+            $type = strtoupper(trim($item->invoice_ppn ?? 'TANPA'));
+            $gross = max(0, $amounts['qty'] * $amounts['rawPrice']);
+            $grossTotal = $gross;
+            if ($type === 'EXCLUDE') {
+                $grossTotal += floor($gross * self::PPN);
+            } elseif ($type === 'INCLUDE') {
+                $grossTotal = $gross;
+            }
+
+            return [
+                'date' => ReceivingDateFilter::format($item->receiving_date, $item->receiving_details_created_at),
+                'payment' => strtoupper(trim((string) ($item->invoice_payment ?? ''))),
+                'gross_total' => $grossTotal,
+                'net_total' => $amounts['jumlah'],
+                'ppn' => $amounts['ppn'],
+            ];
+        })->all();
+    }
+
+    private function purchaseItems(array $targetPharmacyIds)
+    {
+
         $query = DB::table('receiving_items')
             ->join('receiving_details', 'receiving_details.id', '=', 'receiving_items.receiving_details_id')
             ->join('receiving', 'receiving.id', '=', 'receiving_details.receiving_id')
@@ -92,7 +179,7 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
             }
         }
 
-        $items = $query->select([
+        return $query->select([
                 'receiving_items.id',
                 'receiving_items.qty_received',
                 'receiving_items.qty',
@@ -127,163 +214,27 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
             ->orderBy('receiving.updated_at', 'asc')
             ->orderBy('receiving_items.id', 'asc')
             ->get();
+    }
 
-        $tableHeaders = [
-            'ID',
-            'No Terima',
-            'Tgl Terima',
-            'Nama Kreditur',
-            'Kode Kreditur',
-            'No Faktur',
-            'Tgl Faktur',
-            'DPP',
-            'PPN',
-            'Jatuh Tempo',
-            'Waktu Kredit',
-            'Jenis Bayar',
-            'Kode Obat',
-            'Nama Obat',
-            'Pabrik',
-            'Qty Beli',
-            'Kemasan',
-            'Utuh',
-            'HNA',
-            'Harga PPN',
-            'Diskon',
-            'Value Disc',
-            'Extra Diskon',
-            'Value Extra Disc',
-            'Jumlah',
-            'Batch',
-            'Expired',
-        ];
-
-        if ($items->isEmpty()) {
-            $rows = [$tableHeaders];
-            $emptyRow = array_fill(0, count($tableHeaders), '');
-            $emptyRow[0] = 'Tidak ada data untuk periode yang dipilih.';
-            $rows[] = $emptyRow;
-            return $rows;
+    private function calculateAmounts(object $item): array
+    {
+        $qty = (float) ($item->qty_received ?? $item->qty ?? 0);
+        $rawPrice = (float) ($item->receiving_raw_price ?? $item->order_items_price ?? 0);
+        $gross = $qty * $rawPrice;
+        $disc = (float) ($item->discount ?? 0);
+        $extraDisc = (float) ($item->extra_discount ?? 0);
+        $nomDisc = ($disc <= 100 && $disc > 0) ? ($gross * $disc / 100) : $disc;
+        $nomExtraDisc = ($extraDisc <= 100 && $extraDisc > 0) ? ($gross * $extraDisc / 100) : $extraDisc;
+        $dpp = max(0, $gross - $nomDisc - $nomExtraDisc);
+        $ppn = 0;
+        $ppnType = strtoupper(trim($item->invoice_ppn ?? 'TANPA'));
+        if ($ppnType === 'EXCLUDE') {
+            $ppn = floor($dpp * self::PPN);
+        } elseif ($ppnType === 'INCLUDE') {
+            $ppn = floor($dpp - ($dpp / (1 + self::PPN)));
+            $dpp -= $ppn;
         }
-
-        $rows = [$tableHeaders];
-
-        $grandDpp = 0;
-        $grandPpn = 0;
-        $grandNomDisc = 0;
-        $grandNomExtraDisc = 0;
-        $grandTotal = 0;
-
-        foreach ($items as $item) {
-            $qty        = (float) ($item->qty_received ?? $item->qty ?? 0);
-            $rawPrice   = (float) ($item->receiving_raw_price ?? $item->order_items_price ?? 0);
-            $gross      = $qty * $rawPrice;
-
-            $disc       = (float) ($item->discount ?? 0);
-            $extraDisc  = (float) ($item->extra_discount ?? 0);
-
-            $nomDisc      = ($disc <= 100 && $disc > 0) ? ($gross * $disc / 100) : $disc;
-            $nomExtraDisc = ($extraDisc <= 100 && $extraDisc > 0) ? ($gross * $extraDisc / 100) : $extraDisc;
-
-            $dpp = max(0, $gross - $nomDisc - $nomExtraDisc);
-
-            $ppnType = strtoupper(trim($item->invoice_ppn ?? 'TANPA'));
-            $ppn = 0;
-            if ($ppnType === 'EXCLUDE') {
-                $ppn = floor($dpp * self::PPN);
-            } else if ($ppnType === 'INCLUDE') {
-                $ppn = floor($dpp - ($dpp / (1 + self::PPN)));
-                $dpp = $dpp - $ppn;
-            }
-
-            $jumlah = $dpp + $ppn;
-            $hargaPpn = round($rawPrice * (1 + self::PPN));
-
-            $tglTerima = ReceivingDateFilter::format($item->receiving_date, $item->receiving_details_created_at);
-            $tglFaktur = $item->invoice_date
-                ? Carbon::parse($item->invoice_date)->format('d/m/Y')
-                : '-';
-            $jatuhTempo = $item->invoice_due
-                ? Carbon::parse($item->invoice_due)->format('d/m/Y')
-                : '-';
-            $expired = $item->expired_date
-                ? Carbon::parse($item->expired_date)->format('d/m/Y')
-                : '-';
-
-            $batch = !empty($item->receiving_batch)
-                ? (string) $item->receiving_batch
-                : (!empty($item->batch_name) ? (string) $item->batch_name : '-');
-
-            $packaging = $item->medicine_packaging ?: ($item->medicine_unit ?: '-');
-
-            $rows[] = [
-                $item->id,
-                $item->receiving_details_code ?? '-',
-                $tglTerima,
-                $item->creditor_name ?? '-',
-                $item->creditor_code ?? '-',
-                $item->invoice_number ?? '-',
-                $tglFaktur,
-                $dpp,
-                $ppn,
-                $jatuhTempo,
-                $item->invoice_times ?? '-',
-                $item->invoice_payment ?? '-',
-                $item->medicine_code ?? '-',
-                $item->medicine_name ?? '-',
-                $item->factory_name ?? '-',
-                (int) ($item->qty_received ?? $item->qty ?? 0),
-                $packaging,
-                $item->order_pack ?? '-',
-                $rawPrice,
-                $hargaPpn,
-                $item->discount ?? 0,
-                round($nomDisc, 2),
-                $item->extra_discount ?? 0,
-                round($nomExtraDisc, 2),
-                $jumlah,
-                $batch,
-                $expired,
-            ];
-
-            $grandDpp += $dpp;
-            $grandPpn += $ppn;
-            $grandNomDisc += $nomDisc;
-            $grandNomExtraDisc += $nomExtraDisc;
-            $grandTotal += $jumlah;
-        }
-
-        $rows[] = [
-            '',
-            '',
-            '',
-            '',
-            '',
-            '',
-            'TOTAL',
-            $grandDpp,
-            $grandPpn,
-            '',
-            '',
-            '',
-            '',
-            '',
-            '',
-            '',
-            '',
-            '',
-            '',
-            '',
-            '',
-            round($grandNomDisc, 2),
-            '',
-            round($grandNomExtraDisc, 2),
-            $grandTotal,
-            '',
-            '',
-        ];
-
-        return $rows;
+        return compact('qty', 'rawPrice', 'nomDisc', 'nomExtraDisc', 'dpp', 'ppn') + ['jumlah' => $dpp + $ppn];
     }
 
     public function styles(Worksheet $sheet)
