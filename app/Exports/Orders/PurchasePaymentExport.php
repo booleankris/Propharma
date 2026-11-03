@@ -74,18 +74,18 @@ class PurchasePaymentExport implements FromArray, WithStyles, WithColumnWidths, 
         // Filter by Report Type
         if ($this->reportType === 'Konsinyasi') {
             $query->where('receiving_details.invoice_payment', 'KONSINYASI');
-            ReceivingDateFilter::apply($query, $this->startDate, $this->endDate);
+            ReceivingDateFilter::applyToReceiptDetails($query, $this->startDate, $this->endDate);
         } elseif ($this->reportType === 'Tunai') {
             $query->where('receiving_details.invoice_payment', 'TUNAI');
-            ReceivingDateFilter::apply($query, $this->startDate, $this->endDate);
+            ReceivingDateFilter::applyToReceiptDetails($query, $this->startDate, $this->endDate);
         } elseif ($this->reportType === 'Kredit') {
             $query->where('receiving_details.invoice_payment', 'KREDIT');
-            ReceivingDateFilter::apply($query, $this->startDate, $this->endDate);
+            ReceivingDateFilter::applyToReceiptDetails($query, $this->startDate, $this->endDate);
         } elseif ($this->reportType === 'Jatuh Tempo') {
             $query->where('receiving_details.invoice_payment', '!=', 'TUNAI');
-            ReceivingDateFilter::apply($query, $this->startDate, $this->endDate);
+            ReceivingDateFilter::applyToReceiptDetails($query, $this->startDate, $this->endDate);
         } else {
-            ReceivingDateFilter::apply($query, $this->startDate, $this->endDate);
+            ReceivingDateFilter::applyToReceiptDetails($query, $this->startDate, $this->endDate);
         }
 
         // Filter by Creditor / PBF (if selected)
@@ -105,6 +105,7 @@ class PurchasePaymentExport implements FromArray, WithStyles, WithColumnWidths, 
     {
         $items = $this->baseQuery()
             ->select([
+                'receiving_details.id as receiving_details_id',
                 'receiving_details.invoice_number',
                 'receiving_details.invoice_date',
                 'receiving_details.invoice_due',
@@ -145,7 +146,7 @@ class PurchasePaymentExport implements FromArray, WithStyles, WithColumnWidths, 
 
         $invoices = [];
         foreach ($items as $item) {
-            $key = ($item->invoice_number ?? 'NONUM') . '_' . $item->receiving_id;
+            $key = (string) $item->receiving_details_id;
             if (!isset($invoices[$key])) {
                 $invoices[$key] = [
                     'invoice_number' => $item->invoice_number,

@@ -148,14 +148,14 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
             ->join('receiving_details', 'receiving_details.id', '=', 'receiving_items.receiving_details_id')
             ->join('receiving', 'receiving.id', '=', 'receiving_details.receiving_id')
             ->join('order_items', 'order_items.id', '=', 'receiving_items.order_items_id')
-            ->join('medicines', 'medicines.id', '=', 'order_items.medicine_id')
+            ->leftJoin('medicines', 'medicines.id', '=', 'order_items.medicine_id')
             ->join('orders', 'orders.id', '=', 'order_items.order_id')
             ->leftJoin('creditors', 'creditors.code', '=', 'order_items.creditor_code')
             ->leftJoin('batches', 'batches.id', '=', 'receiving_items.batches_id')
             ->leftJoin('factories', 'factories.id', '=', 'medicines.factory_id')
             ->whereIn('receiving.pharmacy_id', $targetPharmacyIds)
             ->whereNotNull('receiving_items.batches_id');
-        ReceivingDateFilter::apply($query, $this->startDate, $this->endDate);
+        ReceivingDateFilter::applyToReceiptDetails($query, $this->startDate, $this->endDate);
 
         if ($this->paymentType !== null) {
             if ($this->paymentType === 'OTHER') {

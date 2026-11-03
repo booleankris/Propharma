@@ -51,7 +51,7 @@ class OrdersExport implements WithMultipleSheets
         $paymentQuery = DB::table('receiving_details')
             ->join('receiving', 'receiving.id', '=', 'receiving_details.receiving_id')
             ->whereIn('receiving.pharmacy_id', $targetPharmacyIds);
-        ReceivingDateFilter::apply($paymentQuery, $this->startDate, $this->endDate);
+        ReceivingDateFilter::applyToReceiptDetails($paymentQuery, $this->startDate, $this->endDate);
         $distinctPayments = $paymentQuery
             ->whereNotNull('receiving_details.invoice_payment')
             ->where('receiving_details.invoice_payment', '!=', '')
@@ -82,7 +82,7 @@ class OrdersExport implements WithMultipleSheets
         $nullPaymentQuery = DB::table('receiving_details')
             ->join('receiving', 'receiving.id', '=', 'receiving_details.receiving_id')
             ->whereIn('receiving.pharmacy_id', $targetPharmacyIds);
-        ReceivingDateFilter::apply($nullPaymentQuery, $this->startDate, $this->endDate);
+        ReceivingDateFilter::applyToReceiptDetails($nullPaymentQuery, $this->startDate, $this->endDate);
         $hasNullPayment = $nullPaymentQuery->where(function ($q) {
                 $q->whereNull('receiving_details.invoice_payment')
                   ->orWhere('receiving_details.invoice_payment', '');
