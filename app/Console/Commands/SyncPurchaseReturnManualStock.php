@@ -54,11 +54,8 @@ class SyncPurchaseReturnManualStock extends Command
                     $q->where('pharmacy_id', $pharmacyFilter);
                 }
             })
-            ->whereIn('status', ['dikonfirmasi', 'sudah_diambil', 'sudah_potong', 'barang_kembali_pmi'])
             ->where(function ($q) {
-                // Cari item retur manual yang belum punya batch_id atau belum terpotong
-                $q->whereNull('batch_id')
-                  ->orWhere('stock_deducted', false)
+                $q->whereIn('status', ['dikonfirmasi', 'sudah_diambil', 'sudah_potong', 'barang_kembali_pmi'])
                   ->orWhereHas('purchaseReturn', fn($pr) => $pr->where('is_manual', true));
             })
             ->orderBy('id', 'asc');
@@ -85,11 +82,49 @@ class SyncPurchaseReturnManualStock extends Command
             }
 
             $pharmacyId = (int) ($p->pharmacy_id ?: 9);
-            $factor = ($item->retur_type === 'packaging' && (int)$item->stock_unit_factor > 1)
-                ? (int)$item->stock_unit_factor
-                : 1;
+            $factor = $this->resolveStockFactor($item, $med);
             $qtyDeduct = (float) $item->qty * $factor;
             $actionDate = $item->confirmed_date ? $item->confirmed_date->toDateString() : ($item->status_date ? $item->status_date->toDateString() : now()->toDateString());
+
+            // Tangani status 'barang_kembali_pmi': barang fisik kembali ke PMI, stok harus dipulihkan jika pernah terpotong
+            if ($item->status === 'barang_kembali_pmi') {
+                if ($item->stock_deducted) {
+                    $batch = Batches::find($item->batch_id) ?: $this->findOrResolveBatch($item, $med, $pharmacyId);
+                    $qtyToRestore = $qtyDeduct;
+                    $this->warn("Barang Kembali PMI [Item ID: {$item->id}] {$med->name}: Memulihkan stok {$qtyToRestore} {$med->unit}.");
+                    if (!$isDryRun) {
+                        DB::transaction(function () use ($item, $p, $med, $batch, $qtyToRestore, $actionDate) {
+                            $qtyBefore = (float) $med->stock;
+                            $med->increment('stock', $qtyToRestore);
+                            $qtyAfter = $qtyBefore + $qtyToRestore;
+                            $batch->increment('stock', $qtyToRestore);
+
+                            ItemsLog::create([
+                                'transaction_code' => $p->return_no . '-BATAL',
+                                'code' => $this->generateLogCode(),
+                                'type' => 'RT_BATAL',
+                                'medicine_id' => $med->id,
+                                'qty' => $qtyToRestore,
+                                'qty_before' => $qtyBefore,
+                                'qty_after' => $qtyAfter,
+                                'total' => $item->subtotal,
+                                'date' => $actionDate,
+                                'status' => 6,
+                                'batches_id' => $batch->id,
+                                'user_id' => $p->user_id ?: 1,
+                            ]);
+
+                            $item->stock_deducted = false;
+                            $item->save();
+                        });
+                        $this->info("✓ BERHASIL: Stok {$med->name} telah dipulihkan ke batch [{$batch->name}].");
+                    }
+                    $processedCount++;
+                } else {
+                    $skippedCount++;
+                }
+                continue;
+            }
 
             // Periksa apakah item ini sudah memiliki ItemsLog dengan batches_id yang valid
             $existingLogWithBatch = ItemsLog::where('transaction_code', $p->return_no)
@@ -98,15 +133,55 @@ class SyncPurchaseReturnManualStock extends Command
                 ->whereNotNull('batches_id')
                 ->first();
 
+            // Cek apakah item sudah pernah dipotong dan apakah qty yang dipotong sudah sesuai dengan faktor kemasan
             if ($item->batch_id && $item->stock_deducted && $existingLogWithBatch) {
-                // Item ini sudah memiliki batch dan log yang valid, lewati
-                $skippedCount++;
+                $previouslyDeducted = (float) $existingLogWithBatch->qty;
+                if (abs($previouslyDeducted - $qtyDeduct) < 0.001) {
+                    // Item ini sudah memiliki batch dan log yang valid dengan qty yang benar, lewati
+                    $skippedCount++;
+                    continue;
+                }
+
+                // Terdapat selisih pemotongan (misal sebelumnya dipotong 1 bukannya 30/100 box)
+                $delta = $qtyDeduct - $previouslyDeducted;
+                $batch = Batches::find($item->batch_id) ?: $this->findOrResolveBatch($item, $med, $pharmacyId);
+
+                $this->warn("KOREKSI KEMASAN [Item ID: {$item->id}] {$med->name}:");
+                $this->line("Sebelumnya dipotong {$previouslyDeducted}, seharusnya {$qtyDeduct} ({$item->qty} {$item->unit} @ {$factor} isi). Selisih: {$delta}");
+
+                if (!$isDryRun) {
+                    DB::transaction(function () use ($item, $med, $batch, $delta, $qtyDeduct, $existingLogWithBatch, $factor) {
+                        if ($delta > 0) {
+                            $med->decrement('stock', $delta);
+                            $batch->decrement('stock', $delta);
+                        } elseif ($delta < 0) {
+                            $med->increment('stock', abs($delta));
+                            $batch->increment('stock', abs($delta));
+                        }
+
+                        $existingLogWithBatch->update([
+                            'qty' => $qtyDeduct,
+                            'batches_id' => $batch->id,
+                        ]);
+
+                        $item->stock_unit_factor = $factor;
+                        $item->retur_type = ($factor > 1) ? 'packaging' : 'unit';
+                        $item->batch_id = $batch->id;
+                        $item->stock_deducted = true;
+                        $item->save();
+                    });
+                    $this->info("✓ BERHASIL: Koreksi selisih {$delta} untuk batch [{$batch->name}] berhasil diterapkan.");
+                } else {
+                    $this->info("[SIMULASI] Akan mengoreksi selisih pemotongan sebanyak {$delta}.");
+                }
+
+                $processedCount++;
                 continue;
             }
 
             $this->line("------------------------------------------------------------------");
             $this->info("Memproses [Item ID: {$item->id}] No: {$p->return_no} | Cabang ID: {$pharmacyId}");
-            $this->line("Obat: {$med->name} | Qty Retur: {$item->qty} {$item->unit} ({$qtyDeduct} satuan dasar)");
+            $this->line("Obat: {$med->name} | Qty Retur: {$item->qty} {$item->unit} ({$qtyDeduct} satuan dasar @ factor {$factor})");
 
             // Cari batch yang tepat untuk dipotong di cabang ini
             $batch = $this->findOrResolveBatch($item, $med, $pharmacyId);
@@ -120,7 +195,7 @@ class SyncPurchaseReturnManualStock extends Command
             $this->line("Batch Dialokasikan: [ID: {$batch->id}] {$batch->name} (Stok Saat Ini: {$batch->stock})");
 
             if (!$isDryRun) {
-                DB::transaction(function () use ($item, $p, $med, $batch, $qtyDeduct, $actionDate, $pharmacyId) {
+                DB::transaction(function () use ($item, $p, $med, $batch, $qtyDeduct, $actionDate, $pharmacyId, $factor) {
                     $qtyBefore = (float) $med->stock;
 
                     // 1. Potong stok batch
@@ -165,6 +240,8 @@ class SyncPurchaseReturnManualStock extends Command
 
                     // 4. Update data item retur
                     $item->batch_id = $batch->id;
+                    $item->retur_type = ($factor > 1) ? 'packaging' : 'unit';
+                    $item->stock_unit_factor = $factor;
                     if (empty($item->batch_number) || $item->batch_number === '-') {
                         $item->batch_number = $batch->name;
                     }
@@ -191,6 +268,40 @@ class SyncPurchaseReturnManualStock extends Command
         $this->info("==================================================================");
 
         return 0;
+    }
+
+    /**
+     * Resolusi faktor konversi kemasan ke satuan stok fisik dasar.
+     */
+    protected function resolveStockFactor(PurchaseReturnItem $item, Medicines $med): int
+    {
+        if ($item->retur_type === 'packaging' && (int)$item->stock_unit_factor > 1) {
+            return (int) $item->stock_unit_factor;
+        }
+
+        $content = (int) ($med->content ?: 1);
+        if ($content <= 1) {
+            return 1;
+        }
+
+        $itUnit = strtoupper(trim((string) ($item->unit ?? '')));
+        $medPack = strtoupper(trim((string) ($med->packaging ?? '')));
+        $medUnit = strtoupper(trim((string) ($med->unit ?? '')));
+
+        if (!empty($itUnit)) {
+            if ($itUnit === $medPack || in_array($itUnit, ['BOX', 'DUS', 'PACK', 'KEMASAN'])) {
+                return $content;
+            }
+            if (!empty($medUnit) && $itUnit !== $medUnit && !in_array($itUnit, ['TAB', 'KAPS', 'CAP', 'PCS', 'BTL', 'VIAL', 'AMP', 'TUBE', 'POT', 'SACHET', 'STRIP'])) {
+                return $content;
+            }
+        }
+
+        if ($item->retur_type === 'packaging') {
+            return $content;
+        }
+
+        return 1;
     }
 
     /**

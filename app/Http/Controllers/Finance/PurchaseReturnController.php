@@ -778,10 +778,27 @@ class PurchaseReturnController extends Controller
 
             foreach ($validated['items'] as $it) {
                 $subtotal = (float)$it['qty'] * (float)$it['unit_price'];
+                $med = !empty($it['medicine_id']) ? Medicines::find($it['medicine_id']) : null;
+                $content = (int) ($med?->content ?: 1);
+                $itUnit = strtoupper(trim((string) ($it['unit'] ?? '')));
+                $medPack = strtoupper(trim((string) ($med?->packaging ?? '')));
+                $medUnit = strtoupper(trim((string) ($med?->unit ?? '')));
+
                 $returType = $it['retur_type'] ?? 'unit';
                 $factor = (int) ($it['stock_unit_factor'] ?? 1);
-                if ($returType === 'unit') {
-                    $factor = 1;
+
+                if ($returType === 'packaging' && $factor <= 1 && $content > 1) {
+                    $factor = $content;
+                } elseif ($returType === 'unit' && $content > 1) {
+                    if ($itUnit === $medPack || in_array($itUnit, ['BOX', 'DUS', 'PACK', 'KEMASAN'])) {
+                        $returType = 'packaging';
+                        $factor = $content;
+                    } elseif (!empty($itUnit) && $itUnit !== $medUnit && !in_array($itUnit, ['TAB', 'KAPS', 'CAP', 'PCS', 'BTL', 'VIAL', 'AMP', 'TUBE', 'POT', 'SACHET', 'STRIP'])) {
+                        $returType = 'packaging';
+                        $factor = $content;
+                    } else {
+                        $factor = 1;
+                    }
                 }
 
                 $returnItem = PurchaseReturnItem::create([
@@ -851,6 +868,46 @@ class PurchaseReturnController extends Controller
     }
 
     /**
+     * Resolusi faktor konversi kemasan ke satuan stok fisik dasar.
+     * Mengonversi kemasan (misal BOX, DUS, PACK) ke jumlah tablet/pcs/eceran sesuai isi (@content).
+     */
+    protected function resolveStockFactor(PurchaseReturnItem $item, ?Medicines $med = null): int
+    {
+        if ($item->retur_type === 'packaging' && (int)$item->stock_unit_factor > 1) {
+            return (int) $item->stock_unit_factor;
+        }
+
+        $med = $med ?: ($item->medicine ?: Medicines::find($item->medicine_id));
+        if (!$med) {
+            return max(1, (int) ($item->stock_unit_factor ?: 1));
+        }
+
+        $content = (int) ($med->content ?: 1);
+        if ($content <= 1) {
+            return 1;
+        }
+
+        $itUnit = strtoupper(trim((string) ($item->unit ?? '')));
+        $medPack = strtoupper(trim((string) ($med->packaging ?? '')));
+        $medUnit = strtoupper(trim((string) ($med->unit ?? '')));
+
+        if (!empty($itUnit)) {
+            if ($itUnit === $medPack || in_array($itUnit, ['BOX', 'DUS', 'PACK', 'KEMASAN'])) {
+                return $content;
+            }
+            if (!empty($medUnit) && $itUnit !== $medUnit && !in_array($itUnit, ['TAB', 'KAPS', 'CAP', 'PCS', 'BTL', 'VIAL', 'AMP', 'TUBE', 'POT', 'SACHET', 'STRIP'])) {
+                return $content;
+            }
+        }
+
+        if ($item->retur_type === 'packaging') {
+            return $content;
+        }
+
+        return 1;
+    }
+
+    /**
      * Potong stok obat dan catat ItemsLog (Kartu Stok) saat retur dikonfirmasi.
      * Dijamin memotong stok batch fisik di cabang terkait (auto-fallback FIFO jika batch tidak ditentukan).
      */
@@ -863,12 +920,15 @@ class PurchaseReturnController extends Controller
         if ($item->medicine_id) {
             $med = Medicines::find($item->medicine_id);
             if ($med) {
-                // Konversi qty retur ke satuan stok fisik dasar (jika retur kemasan utuh, kalikan stock_unit_factor)
-                $factor = ($item->retur_type === 'packaging' && (int)$item->stock_unit_factor > 1)
-                    ? (int)$item->stock_unit_factor
-                    : 1;
+                // Konversi qty retur ke satuan stok fisik dasar (jika kemasan box/pack, kalikan isi content)
+                $factor = $this->resolveStockFactor($item, $med);
                 $qtyDeduct = (float) $item->qty * $factor;
                 $qtyBefore = (float) $med->stock;
+
+                if ($factor > 1) {
+                    $item->retur_type = 'packaging';
+                    $item->stock_unit_factor = $factor;
+                }
 
                 // Kurangi stok fisik obat (diperbolehkan minus stok)
                 $med->decrement('stock', $qtyDeduct);
@@ -913,7 +973,7 @@ class PurchaseReturnController extends Controller
     }
 
     /**
-     * Kembalikan stok obat jika status retur dibatalkan / dikembalikan ke 'diajukan'
+     * Kembalikan stok obat jika status retur dibatalkan / barang kembali ke PMI
      */
     protected function restoreStockForItem(PurchaseReturnItem $item, string $actionDate): void
     {
@@ -924,12 +984,15 @@ class PurchaseReturnController extends Controller
         if ($item->medicine_id) {
             $med = Medicines::find($item->medicine_id);
             if ($med) {
-                // Konversi qty retur ke satuan stok fisik dasar
-                $factor = ($item->retur_type === 'packaging' && (int)$item->stock_unit_factor > 1)
-                    ? (int)$item->stock_unit_factor
-                    : 1;
+                // Konversi qty retur ke satuan stok fisik dasar (jika kemasan box/pack, kalikan isi content)
+                $factor = $this->resolveStockFactor($item, $med);
                 $qtyRestore = (float) $item->qty * $factor;
                 $qtyBefore = (float) $med->stock;
+
+                if ($factor > 1) {
+                    $item->retur_type = 'packaging';
+                    $item->stock_unit_factor = $factor;
+                }
 
                 $med->increment('stock', $qtyRestore);
                 $qtyAfter = $qtyBefore + $qtyRestore;
@@ -1180,7 +1243,9 @@ class PurchaseReturnController extends Controller
                     $item->deduction_note = null;
                 }
             } elseif ($newStatus === 'barang_kembali_pmi') {
-                $this->deductStockForItem($item, $statusDate);
+                // Barang kembali ke PMI (misal retur ditolak / dikembalikan oleh PBF ke gudang/apotek PMI)
+                // Stok fisik yang sebelumnya dipotong saat retur harus DIKEMBALIKAN (RESTORE) ke stok fisik PMI.
+                $this->restoreStockForItem($item, $statusDate);
                 $item->pickup_date = $statusDate;
 
                 // Hapus potongan tagihan jika sebelumnya sudah_potong
