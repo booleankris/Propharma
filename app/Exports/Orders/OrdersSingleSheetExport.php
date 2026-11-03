@@ -72,8 +72,8 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
         $tableHeaders = [
             'ID', 'No Terima', 'Tgl Terima', 'Nama Kreditur', 'Kode Kreditur', 'No Faktur', 'Tgl Faktur',
             'DPP', 'PPN', 'Jatuh Tempo', 'Waktu Kredit', 'Jenis Bayar', 'Kode Obat', 'Nama Obat', 'Pabrik',
-            'Qty Beli', 'Kemasan', 'Utuh', 'HNA', 'Harga PPN', 'Diskon', 'Value Disc', 'Extra Diskon',
-            'Value Extra Disc', 'Jumlah', 'Batch', 'Expired',
+            'Qty Beli', 'Kemasan', 'Utuh', 'HNA', 'Jumlah HNA', 'Harga PPN', 'Diskon', 'Value Disc', 'Extra Diskon',
+            'Value Extra Disc', '% Disc Pembelian', 'Jumlah', 'Batch', 'Expired',
         ];
 
         if ($items->isEmpty()) {
@@ -85,14 +85,16 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
         }
 
         $rows = [$tableHeaders];
-        $grandDpp = $grandPpn = $grandNomDisc = $grandNomExtraDisc = $grandTotal = 0;
+        $grandDpp = $grandPpn = $grandGross = $grandNomDisc = $grandNomExtraDisc = $grandTotal = 0;
 
         foreach ($items as $item) {
             $amounts = $this->calculateAmounts($item);
             $qty = $amounts['qty'];
             $rawPrice = $amounts['rawPrice'];
+            $gross = $amounts['gross'];
             $nomDisc = $amounts['nomDisc'];
             $nomExtraDisc = $amounts['nomExtraDisc'];
+            $persenDisc = $amounts['persenDisc'];
             $dpp = $amounts['dpp'];
             $ppn = $amounts['ppn'];
             $jumlah = $amounts['jumlah'];
@@ -110,17 +112,26 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
                 $item->creditor_code ?? '-', $item->invoice_number ?? '-', $tglFaktur, $dpp, $ppn, $jatuhTempo,
                 $item->invoice_times ?? '-', $item->invoice_payment ?? '-', $item->medicine_code ?? '-',
                 $item->medicine_name ?? '-', $item->factory_name ?? '-', (int) $qty, $packaging,
-                $item->order_pack ?? '-', $rawPrice, $hargaPpn, $item->discount ?? 0, round($nomDisc, 2),
-                $item->extra_discount ?? 0, round($nomExtraDisc, 2), $jumlah, $batch, $expired,
+                $item->order_pack ?? '-', $rawPrice, $gross, $hargaPpn, $item->discount ?? 0, round($nomDisc, 2),
+                $item->extra_discount ?? 0, round($nomExtraDisc, 2), $persenDisc, $jumlah, $batch, $expired,
             ];
             $grandDpp += $dpp;
             $grandPpn += $ppn;
+            $grandGross += $gross;
             $grandNomDisc += $nomDisc;
             $grandNomExtraDisc += $nomExtraDisc;
             $grandTotal += $jumlah;
         }
 
-        $rows[] = ['', '', '', '', '', '', 'TOTAL', $grandDpp, $grandPpn, '', '', '', '', '', '', '', '', '', '', '', '', round($grandNomDisc, 2), '', round($grandNomExtraDisc, 2), $grandTotal, '', ''];
+        $grandPersenDisc = $grandGross > 0 ? round((($grandNomDisc + $grandNomExtraDisc) / $grandGross) * 100, 2) : 0;
+
+        $rows[] = [
+            '', '', '', '', '', '', 'TOTAL',
+            $grandDpp, $grandPpn, '', '', '', '', '', '',
+            '', '', '', '', $grandGross, '',
+            '', round($grandNomDisc, 2), '', round($grandNomExtraDisc, 2),
+            $grandPersenDisc, $grandTotal, '', ''
+        ];
         return $rows;
     }
 
@@ -215,6 +226,8 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
         $extraDisc = (float) ($item->extra_discount ?? 0);
         $nomDisc = ($disc <= 100 && $disc > 0) ? ($gross * $disc / 100) : $disc;
         $nomExtraDisc = ($extraDisc <= 100 && $extraDisc > 0) ? ($gross * $extraDisc / 100) : $extraDisc;
+        $totalDisc = $nomDisc + $nomExtraDisc;
+        $persenDisc = $gross > 0 ? round(($totalDisc / $gross) * 100, 2) : 0;
         $dpp = max(0, $gross - $nomDisc - $nomExtraDisc);
         $ppn = 0;
         $ppnType = strtoupper(trim($item->invoice_ppn ?? 'TANPA'));
@@ -224,7 +237,7 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
             $ppn = floor($dpp - ($dpp / (1 + self::PPN)));
             $dpp -= $ppn;
         }
-        return compact('qty', 'rawPrice', 'nomDisc', 'nomExtraDisc', 'dpp', 'ppn') + ['jumlah' => $dpp + $ppn];
+        return compact('qty', 'rawPrice', 'gross', 'nomDisc', 'nomExtraDisc', 'totalDisc', 'persenDisc', 'dpp', 'ppn') + ['jumlah' => $dpp + $ppn];
     }
 
     public function styles(Worksheet $sheet)
@@ -262,8 +275,9 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
             ->getAlignment()
             ->setHorizontal(Alignment::HORIZONTAL_LEFT);
 
-        // Right-align & number format: H=DPP, I=PPN, S=HNA, T=HargaPPN, U=Diskon, V=Value Disc, W=ExtraDiskon, X=ValueExtraDisc, Y=Jumlah
-        foreach (['H', 'I', 'S', 'T', 'U', 'V', 'W', 'X', 'Y'] as $col) {
+        // Right-align & number format: 
+        // H=DPP, I=PPN, S=HNA, T=Jumlah HNA, U=Harga PPN, V=Diskon, W=Value Disc, X=Extra Diskon, Y=Value Extra Disc, AA=Jumlah
+        foreach (['H', 'I', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'AA'] as $col) {
             $sheet
                 ->getStyle("{$col}{$dataStartRow}:{$col}{$lastRow}")
                 ->getAlignment()
@@ -274,9 +288,19 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
                 ->setFormatCode('#,##0');
         }
 
-        // Text format for Batch (Col Z) so leading zeros or scientific-like strings are preserved
+        // Percentage format for Persentase Diskon (Col Z)
+        $sheet
+            ->getStyle("Z{$dataStartRow}:Z{$lastRow}")
+            ->getAlignment()
+            ->setHorizontal(Alignment::HORIZONTAL_RIGHT);
         $sheet
             ->getStyle("Z" . ($dataStartRow + 1) . ":Z{$lastRow}")
+            ->getNumberFormat()
+            ->setFormatCode('0.00"%"');
+
+        // Text format for Batch (Col AB) so leading zeros or scientific-like strings are preserved
+        $sheet
+            ->getStyle("AB" . ($dataStartRow + 1) . ":AB{$lastRow}")
             ->getNumberFormat()
             ->setFormatCode(\PhpOffice\PhpSpreadsheet\Style\NumberFormat::FORMAT_TEXT);
     }
@@ -303,14 +327,16 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
             'Q' => 18,
             'R' => 10,
             'S' => 15,
-            'T' => 15,
-            'U' => 10,
-            'V' => 15,
-            'W' => 13,
-            'X' => 15,
-            'Y' => 18,
-            'Z' => 16,
-            'AA' => 13,
+            'T' => 18,
+            'U' => 15,
+            'V' => 10,
+            'W' => 15,
+            'X' => 13,
+            'Y' => 15,
+            'Z' => 18,
+            'AA' => 18,
+            'AB' => 16,
+            'AC' => 13,
         ];
     }
 }
