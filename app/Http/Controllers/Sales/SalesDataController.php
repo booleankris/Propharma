@@ -29,6 +29,7 @@ class SalesDataController extends Controller
         if ($request->ajax()) {
 
             $search   = trim((string) $request->input('search.value'));
+            $searchScope = $request->input('search_scope', 'all');
             $dateFrom = $request->input('date_from');
             $dateTo   = $request->input('date_to');
             // Jika user dibatasi role online (Online, Online Shopee, Online Grab, Digital), kunci channel ke role mereka
@@ -100,32 +101,51 @@ class SalesDataController extends Controller
             // text search (mencari nomor transaksi, nama pasien, no telp, kasir, nama/kode obat, atau tahun)
             if ($search) {
                 $cleanPhone = preg_replace('/[^0-9]/', '', $search);
-                $query->where(function ($q) use ($search, $cleanPhone) {
-                    $q->where('medicine_transactions.transaction_code', 'like', "%{$search}%")
-                        ->orWhereHas('transactions.patients', function ($p) use ($search, $cleanPhone) {
-                            $p->where('name', 'like', "%{$search}%")
-                                ->orWhere('phone', 'like', "%{$search}%");
-                            if (!empty($cleanPhone) && strlen($cleanPhone) >= 3 && $cleanPhone !== $search) {
-                                $p->orWhere('phone', 'like', "%{$cleanPhone}%");
-                            }
-                        })
-                        ->orWhereHas('transactions.user', function ($u) use ($search) {
-                            $u->where('name', 'like', "%{$search}%")
-                                ->orWhere('username', 'like', "%{$search}%");
-                        })
-                        ->orWhereHas('user', function ($u) use ($search) {
-                            $u->where('name', 'like', "%{$search}%")
-                                ->orWhere('username', 'like', "%{$search}%");
-                        })
-                        ->orWhereHas('transactions.transactions', function ($cartQuery) use ($search) {
-                            $cartQuery->where('status', 1)
-                                ->whereHas('medicine', function ($m) use ($search) {
-                                    $m->where('name', 'like', "%{$search}%")
-                                        ->orWhere('code', 'like', "%{$search}%");
-                                });
+                $query->where(function ($q) use ($search, $cleanPhone, $searchScope) {
+                    if ($searchScope === 'patient') {
+                        $q->whereHas('transactions.patients', function ($p) use ($search) {
+                            $p->where('name', 'like', "%{$search}%");
                         });
+                    } elseif ($searchScope === 'cashier') {
+                        $q->where(function ($cashierQuery) use ($search) {
+                            $cashierQuery->whereHas('transactions.user', function ($u) use ($search) {
+                                $u->where('name', 'like', "%{$search}%")
+                                    ->orWhere('username', 'like', "%{$search}%");
+                            })->orWhereHas('user', function ($u) use ($search) {
+                                $u->where('name', 'like', "%{$search}%")
+                                    ->orWhere('username', 'like', "%{$search}%");
+                            })->orWhereHas('transactions.transactions.user', function ($u) use ($search) {
+                                $u->where('name', 'like', "%{$search}%")
+                                    ->orWhere('username', 'like', "%{$search}%");
+                            });
+                        });
+                    } else {
+                        $q->where('medicine_transactions.transaction_code', 'like', "%{$search}%")
+                            ->orWhereHas('transactions.patients', function ($p) use ($search, $cleanPhone) {
+                                $p->where('name', 'like', "%{$search}%")
+                                    ->orWhere('phone', 'like', "%{$search}%");
+                                if (!empty($cleanPhone) && strlen($cleanPhone) >= 3 && $cleanPhone !== $search) {
+                                    $p->orWhere('phone', 'like', "%{$cleanPhone}%");
+                                }
+                            })
+                            ->orWhereHas('transactions.user', function ($u) use ($search) {
+                                $u->where('name', 'like', "%{$search}%")
+                                    ->orWhere('username', 'like', "%{$search}%");
+                            })
+                            ->orWhereHas('user', function ($u) use ($search) {
+                                $u->where('name', 'like', "%{$search}%")
+                                    ->orWhere('username', 'like', "%{$search}%");
+                            })
+                            ->orWhereHas('transactions.transactions', function ($cartQuery) use ($search) {
+                                $cartQuery->where('status', 1)
+                                    ->whereHas('medicine', function ($m) use ($search) {
+                                        $m->where('name', 'like', "%{$search}%")
+                                            ->orWhere('code', 'like', "%{$search}%");
+                                    });
+                            });
+                    }
 
-                    if (preg_match('/^(19|20)\d{2}$/', $search)) {
+                    if ($searchScope === 'all' && preg_match('/^(19|20)\d{2}$/', $search)) {
                         $q->orWhereYear('medicine_transactions.updated_at', $search)
                           ->orWhereYear('medicine_transactions.created_at', $search);
                     }

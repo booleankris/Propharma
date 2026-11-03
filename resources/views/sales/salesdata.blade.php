@@ -59,21 +59,26 @@
         .dataTables_wrapper .dataTables_filter {
             float: none !important;
             margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 8px;
         }
 
         .dataTables_wrapper .dataTables_filter label {
             font-size: 13px;
             color: #6b7280;
+            margin: 0;
         }
 
         .dataTables_wrapper .dataTables_filter input {
-            margin-left: 8px;
+            margin-left: 0;
             padding: 6px 10px;
             font-size: 12px;
             border-radius: 8px;
             border: 0.5px solid #d1d5db;
             outline: none;
-            width: 200px;
+            width: 220px;
         }
 
         .dataTables_wrapper .dataTables_filter input:focus {
@@ -397,6 +402,34 @@
             box-shadow: 0 0 0 3px rgba(59, 130, 246, .12);
         }
 
+        .sales-search-scope {
+            height: 34px;
+            min-width: 185px;
+            padding: 0 28px 0 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            background: #fff;
+            color: #374151;
+            font-size: 12px;
+        }
+        .sales-search-scope:focus {
+            border-color: #3b82f6;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, .12);
+        }
+        @media (max-width: 640px) {
+            .dataTables_wrapper .dataTables_filter {
+                justify-content: flex-start;
+                flex-wrap: wrap;
+            }
+            .dataTables_wrapper .dataTables_filter input {
+                width: min(220px, 48vw);
+            }
+            .sales-search-scope {
+                min-width: 165px;
+            }
+        }
+
         .code-copy-wrap {
             display: inline-flex;
             align-items: center;
@@ -498,6 +531,11 @@
                                     </select>
                                 @endif
                             </div>
+                            <select id="sales-search-scope" class="sales-search-scope hidden" aria-label="Cari berdasarkan">
+                                <option value="all">Semua kolom</option>
+                                <option value="patient">Nama pasien / pembeli</option>
+                                <option value="cashier">Nama kasir</option>
+                            </select>
                         </div>
 
                         {{-- Export Dropdown --}}
@@ -827,6 +865,7 @@
                         d.date_from = parts[0] ?? '';
                         d.date_to = parts[1] ?? '';
                         d.channel = '{{ $restrictedChannel ?? '' }}' || $('#channel-filter').val();
+                        d.search_scope = $('#sales-search-scope').val() || 'all';
                     }
                 },
                 language: {
@@ -927,8 +966,24 @@
                 ],
             });
 
+            // Letakkan pilihan cakupan berdampingan dengan kolom pencarian DataTables.
+            $('#sales-search-scope').prependTo($('.dataTables_filter')).removeClass('hidden').attr({
+                'aria-label': 'Cari berdasarkan',
+                'title': 'Batasi pencarian berdasarkan kolom',
+            });
+
             // ── Channel filter change ─────────────────────────────────────────
             $('#channel-filter').on('change', function() {
+                tableData.ajax.reload();
+            });
+
+            $('#sales-search-scope').on('change', function() {
+                const placeholders = {
+                    all: 'Cari nomor, pasien, no. telp, kasir, obat...',
+                    patient: 'Cari nama pasien / pembeli...',
+                    cashier: 'Cari nama kasir...',
+                };
+                $('.dataTables_filter input').attr('placeholder', placeholders[this.value] || placeholders.all);
                 tableData.ajax.reload();
             });
 
