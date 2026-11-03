@@ -161,3 +161,4 @@ class FixAnomalousPurchaseReturnStock extends Command
         return 0;
     }
 }
+
