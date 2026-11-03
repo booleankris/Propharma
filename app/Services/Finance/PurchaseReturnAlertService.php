@@ -87,6 +87,33 @@ class PurchaseReturnAlertService
 
         $batches = $batchesQuery->get();
 
+        // 1b. Batch tanpa faktur penerimaan (mis. batch hasil Stok Opname "OPN-...")
+        // tetap butuh referensi faktur untuk retur. Gunakan faktur pembelian
+        // terakhir untuk obat yang sama sebagai referensi default.
+        $medIdsWithoutReceipt = $batches
+            ->filter(fn ($b) => $b->receivingItems->isEmpty())
+            ->pluck('medicine_id')
+            ->filter()
+            ->unique()
+            ->values();
+
+        $latestReceiptByMedicine = collect();
+        if ($medIdsWithoutReceipt->isNotEmpty()) {
+            $latestReceiptByMedicine = \App\Models\ReceivingItems::query()
+                ->whereNotNull('batches_id')
+                ->whereHas('order_items', fn ($q) => $q->whereIn('medicine_id', $medIdsWithoutReceipt))
+                ->when($pharmacyId, fn ($q) => $q->whereHas('receiving_details.receiving', fn ($r) => $r->where('pharmacy_id', $pharmacyId)))
+                ->with([
+                    'order_items:id,medicine_id',
+                    'receiving_details' => fn ($rd) => $rd->with('creditor:id,code,name'),
+                ])
+                ->orderByDesc('id')
+                ->get()
+                ->filter(fn ($ri) => $ri->order_items && $ri->receiving_details)
+                ->unique(fn ($ri) => $ri->order_items->medicine_id)
+                ->keyBy(fn ($ri) => $ri->order_items->medicine_id);
+        }
+
         // 2. Pre-load Master Ketentuan Retur
         $policies = ReturnPolicy::all();
 
@@ -109,6 +136,14 @@ class PurchaseReturnAlertService
 
             $ri = $b->receivingItems->first();
             $rd = $ri ? $ri->receiving_details : null;
+            $invoiceSource = $rd ? 'batch' : null;
+
+            // Fallback referensi faktur: pembelian terakhir obat ini (hanya untuk
+            // data faktur/PBF; satuan & harga tetap dihitung dari batch/master).
+            if (!$rd && $latestReceiptByMedicine->has($med->id)) {
+                $rd = $latestReceiptByMedicine->get($med->id)->receiving_details;
+                $invoiceSource = 'latest_purchase';
+            }
 
             // Prioritas PBF: dari receiving_details, fallback ke master obat creditor
             $creditorCode = $rd?->creditor_code ?: $med->creditor?->code;
@@ -238,6 +273,7 @@ class PurchaseReturnAlertService
                 'invoice_number' => $rd?->invoice_number ?: '-',
                 'invoice_date' => $rd?->invoice_date ?: null,
                 'receiving_id' => $rd?->id ?: null,
+                'invoice_source' => $invoiceSource,
                 'unit_price' => $defaultUnitPrice,
                 'price_per_unit' => $pricePerUnit,
                 'pack_price' => $packPrice,

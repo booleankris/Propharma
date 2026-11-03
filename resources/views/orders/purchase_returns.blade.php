@@ -1071,7 +1071,7 @@
 
         // Data stores
         window.monitoringItems = @json($items->items());
-        window.approachingAlertItems = @json($approachingItems);
+        window.approachingAlertItems = @json($approachingItems->items());
         window.lastInvoiceSearchResults = [];
         window.lastMedSearchResults = [];
 
@@ -1095,7 +1095,10 @@
         };
 
         window.applyReturnFromAlertByIndex = function(idx) {
-            const ap = (window.approachingAlertItems || [])[idx];
+            const list = Array.isArray(window.approachingAlertItems)
+                ? window.approachingAlertItems
+                : (window.approachingAlertItems?.data || []);
+            const ap = list[idx];
             if (ap) applyReturnFromAlert(ap);
         };
 
@@ -1514,6 +1517,7 @@
             if (ap.receiving_id) {
                 selectedReceivingId = ap.receiving_id;
                 setEntrySource('invoice');
+                document.getElementById('invoiceSearchInput').value = ap.invoice_number && ap.invoice_number !== '-' ? ap.invoice_number : '';
             } else {
                 selectedReceivingId = null;
                 setEntrySource('manual');
@@ -1522,6 +1526,14 @@
             if (ap.invoice_date) document.getElementById('form_invoice_date').value = ap.invoice_date.split('T')[0];
             if (ap.creditor_code) document.getElementById('form_creditor_code').value = ap.creditor_code;
             document.getElementById('form_notes').value = `Pengajuan retur ED sesuai ketentuan: ${ap.rule_text || ''}`;
+            if (ap.invoice_source === 'latest_purchase') {
+                iziToast.info({
+                    title: 'Info',
+                    message: `Batch ${ap.batch_number || ''} tidak punya faktur penerimaan (mis. hasil stok opname). Faktur diisi dari pembelian terakhir obat ini, silakan cek kembali.`,
+                    position: 'topRight',
+                    timeout: 7000,
+                });
+            }
             
             const hasPack = Boolean(ap.has_pack);
             const content = Number(ap.content || 1);

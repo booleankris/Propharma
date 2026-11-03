@@ -199,8 +199,30 @@
                                     @foreach ($rd->receiving_items as $ri)
                                         @php
                                             $ri->medicine_name = $ri->order_items->medicines->name ?? '-';
+                                            $revisionEditPayload = [
+                                                'id' => $ri->id,
+                                                'batch' => $ri->batch,
+                                                'expired_date' => $ri->expired_date,
+                                                'qty_received' => $ri->qty_received,
+                                                'raw_price' => $ri->raw_price,
+                                                'discount' => $ri->discount,
+                                                'extra_discount' => $ri->extra_discount,
+                                                'status' => $ri->status,
+                                                'total' => $ri->total,
+                                                'receiving_details_id' => $ri->receiving_details_id,
+                                                'receipt_is_pack' => $ri->receipt_is_pack,
+                                                'stock_unit_factor' => $ri->stock_unit_factor,
+                                                'order_items' => [
+                                                    'pack' => $ri->order_items->pack ?? false,
+                                                    'medicines' => [
+                                                        'content' => $ri->order_items->medicines->content ?? 1,
+                                                        'unit' => $ri->order_items->medicines->unit ?? '',
+                                                        'packaging' => $ri->order_items->medicines->packaging ?? '',
+                                                    ],
+                                                ],
+                                            ];
                                         @endphp
-                                        <tr data-item='@json($ri)' data-revision-detail-item data-detail-id="{{ $rd->id }}"
+                                        <tr data-item='@json($revisionEditPayload)' data-revision-detail-item data-detail-id="{{ $rd->id }}"
                                             data-medicine-name="{{ $ri->medicine_name }}" data-pbf-code="{{ $ri->order_items->creditor_code ?? ($rd->creditor_code ?? '') }}">
                                             <td class="px-4 py-3 font-medium text-gray-800">{{ $ri->medicine_name }}</td>
                                             <td class="px-3 py-3 text-center font-mono">{{ $ri->batch ?? '-' }}</td>
@@ -260,8 +282,30 @@
                                 @foreach ($orphanedItems as $ri)
                                     @php
                                         $ri->medicine_name = $ri->order_items->medicines->name ?? '-';
+                                        $revisionEditPayload = [
+                                            'id' => $ri->id,
+                                            'batch' => $ri->batch,
+                                            'expired_date' => $ri->expired_date,
+                                            'qty_received' => $ri->qty_received,
+                                            'raw_price' => $ri->raw_price,
+                                            'discount' => $ri->discount,
+                                            'extra_discount' => $ri->extra_discount,
+                                            'status' => $ri->status,
+                                            'total' => $ri->total,
+                                            'receiving_details_id' => $ri->receiving_details_id,
+                                            'receipt_is_pack' => $ri->receipt_is_pack,
+                                            'stock_unit_factor' => $ri->stock_unit_factor,
+                                            'order_items' => [
+                                                'pack' => $ri->order_items->pack ?? false,
+                                                'medicines' => [
+                                                    'content' => $ri->order_items->medicines->content ?? 1,
+                                                    'unit' => $ri->order_items->medicines->unit ?? '',
+                                                    'packaging' => $ri->order_items->medicines->packaging ?? '',
+                                                ],
+                                            ],
+                                        ];
                                     @endphp
-                                    <tr data-item='@json($ri)' data-revision-orphan-item
+                                    <tr data-item='@json($revisionEditPayload)' data-revision-orphan-item
                                         data-medicine-name="{{ $ri->medicine_name }}" data-pbf-code="{{ $ri->order_items->creditor_code ?? '' }}">
                                         <td class="px-4 py-3 font-medium text-gray-800">{{ $ri->medicine_name }}</td>
                                         <td class="px-3 py-3 text-center font-mono">{{ $ri->batch ?? '-' }}</td>

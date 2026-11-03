@@ -7,7 +7,6 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <link href="/src/style.css" rel="stylesheet">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <link href="{{ asset('templates/library/select2/dist/css/select2.min.css') }}" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />

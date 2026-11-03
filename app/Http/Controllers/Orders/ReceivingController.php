@@ -855,14 +855,14 @@ class ReceivingController extends Controller
             $query->where(function ($q) use ($request) {
                 $q->whereHas('receiving_details', function ($rd) use ($request) {
                     $rd->whereDate('invoice_date', '>=', $request->start_date);
-                })->orWhereDate('created_at', '>=', $request->start_date);
+                })->orWhereDate('receiving_items.created_at', '>=', $request->start_date);
             });
         }
         if ($request->filled('end_date')) {
             $query->where(function ($q) use ($request) {
                 $q->whereHas('receiving_details', function ($rd) use ($request) {
                     $rd->whereDate('invoice_date', '<=', $request->end_date);
-                })->orWhereDate('created_at', '<=', $request->end_date);
+                })->orWhereDate('receiving_items.created_at', '<=', $request->end_date);
             });
         }
 
