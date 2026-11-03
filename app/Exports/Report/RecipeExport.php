@@ -123,7 +123,7 @@ class RecipeDetailSheet implements FromArray, WithStyles, WithColumnWidths, With
             'shift_logs.shift',
         ])
             ->where('pharmacy_id', $this->pharmacyId)
-            ->whereIn('transaction_type', ['RESEP TUNAI', 'KREDIT']);
+            ->whereIn('transaction_type', ['RESEP TUNAI', 'KREDIT', 'RESEP KREDIT']);
 
         LiphTransactionScope::applySalesStatus($query);
         LiphTransactionScope::applyPeriod(
@@ -149,57 +149,34 @@ class RecipeDetailSheet implements FromArray, WithStyles, WithColumnWidths, With
         $potonganTrx = 0;
 
         foreach ($transactions as $trx) {
-            $resepItems = $trx->transactions->filter(function ($item) use ($trx) {
-                $ct = $item->cart_type ?: $trx->transaction_type;
-                return in_array($ct, ['UM', 'UK', 'RESEP TUNAI', 'KREDIT'], true);
-            });
-            if ($resepItems->isEmpty()) continue;
+            $isKredit = in_array($trx->transaction_type, ['KREDIT', 'RESEP KREDIT'], true);
 
-            $layanan = '-';
-            if ($trx->transaction_type === 'KREDIT') {
+            if ($isKredit) {
+                // Selaras dengan LIPH: semua item di transaksi kredit dihitung masuk Resep Kredit
+                $resepItems = $trx->transactions;
                 $layanan = 'UK';
-            } elseif ($trx->transaction_type === 'RESEP TUNAI') {
+            } else {
+                // Resep Tunai: selaras dengan LIPH, ambil item yang bertipe resep tunai (bukan HV dan bukan UP)
+                $resepItems = $trx->transactions->filter(function ($item) {
+                    $ct = strtoupper(trim((string) ($item->cart_type ?? '')));
+                    return !in_array($ct, ['HV', 'UP', 'UPDS', 'OBAT BEBAS'], true);
+                });
                 $layanan = 'UM';
             }
 
-            $trxReturs = $trx->returs ?? collect();
-            $retursByMedicine = [];
-            $generalRetur = 0;
-            foreach ($trxReturs as $r) {
-                $returAmount = (int) round((float) ($r->total_retur ?? 0));
-                if ($r->medicine_id) {
-                    $retursByMedicine[$r->medicine_id] = ($retursByMedicine[$r->medicine_id] ?? 0) + $returAmount;
-                } else {
-                    $generalRetur += $returAmount;
-                }
-            }
+            if ($resepItems->isEmpty()) continue;
 
-            $netto = 0;
-            $hasActiveItem = false;
-            foreach ($resepItems as $item) {
-                $qty       = (float) ($item->quantity ?? 0);
-                $price     = (int) round((float) ($item->item_price ?? 0));
-                $disc      = (int) round((float) ($item->discount ?? 0));
-                $itemPrice = (int) round((float) ($item->final_price ?? $item->total_price ?? ($price * $qty - $disc)));
-                $medId     = $item->medicine_id;
-                $itemRetur = 0;
-                if ($medId && isset($retursByMedicine[$medId]) && $retursByMedicine[$medId] > 0) {
-                    $itemRetur = min($itemPrice, $retursByMedicine[$medId]);
-                    $retursByMedicine[$medId] -= $itemRetur;
-                }
-                $remainingPrice = max(0, $itemPrice - $itemRetur);
-                if ($remainingPrice > 0) {
-                    $hasActiveItem = true;
-                }
-                $netto += $remainingPrice;
-            }
+            // Hitung netto item (selaras persis dengan safeItemNettoSum pada LIPH)
+            // Catatan: Retur di LIPH dicatat pada baris terpisah (Retur Tunai / Retur Kredit)
+            // dan tidak memotong langsung kolom Netto Resep.
+            $netto = (int) $resepItems->sum(function ($item) {
+                $qty   = (float) ($item->quantity ?? 0);
+                $price = (int) round((float) ($item->item_price ?? 0));
+                $disc  = (int) round((float) ($item->discount ?? 0));
+                return (int) round((float) ($item->final_price ?? $item->total_price ?? ($price * $qty - $disc)));
+            });
 
-            if ($generalRetur > 0) {
-                $netto = max(0, $netto - $generalRetur);
-            }
-
-            // Jika semua obat diretur atau sisa nominal <= 0, jangan tampilkan di laporan Daftar Resep
-            if ($netto <= 0 || !$hasActiveItem) {
+            if ($netto <= 0) {
                 continue;
             }
 
@@ -213,11 +190,11 @@ class RecipeDetailSheet implements FromArray, WithStyles, WithColumnWidths, With
                 $layanan,
                 $trx->doctors?->name  ?? '-',
                 $trx->patients?->name ?? '-',
-                (int) round($netto),
+                (int) $netto,
                 $shiftName,
             ];
 
-            $grandTotal += (int) round($netto);
+            $grandTotal += (int) $netto;
             $trxDisc = is_numeric($trx->discount) ? (int) round((float) $trx->discount) : 0;
             if ($trxDisc > 0) {
                 $potonganTrx += $trxDisc;
@@ -455,7 +432,7 @@ class RecipeMonthlySummarySheet implements FromArray, WithStyles, WithColumnWidt
             'returs' => fn ($q) => $q->where('status', 1),
         ])
             ->where('pharmacy_id', $this->pharmacyId)
-            ->whereIn('transaction_type', ['RESEP TUNAI', 'KREDIT']);
+            ->whereIn('transaction_type', ['RESEP TUNAI', 'KREDIT', 'RESEP KREDIT']);
 
         LiphTransactionScope::applySalesStatus($query);
         LiphTransactionScope::applyPeriod($query, $yearStart, $yearEnd);

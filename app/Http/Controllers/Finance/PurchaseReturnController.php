@@ -605,8 +605,9 @@ class PurchaseReturnController extends Controller
             ->get();
 
         $policies = $creditorCode ? ReturnPolicy::where('creditor_code', $creditorCode)->get() : collect();
+        $targetPharmacyId = function_exists('getActivePharmacyId') ? getActivePharmacyId() : 9;
 
-        $results = $medicines->map(function ($m) use ($creditorCode, $policies) {
+        $results = $medicines->map(function ($m) use ($creditorCode, $policies, $targetPharmacyId) {
             $factoryName = $m->factory ? $m->factory->name : null;
             $policy = $creditorCode ? $this->findReturnPolicy($creditorCode, $m->factory_id, $factoryName, $policies) : null;
             $evaluation = $this->evaluateReturnEligibility($policy, null);
@@ -623,6 +624,24 @@ class PurchaseReturnController extends Controller
 
             $currentStockUnit = (float) ($m->stock ?? 0);
             $currentStockPack = $hasPack ? round($currentStockUnit / $content, 2) : $currentStockUnit;
+
+            // Ambil batch obat yang tersedia di cabang ini dengan stok > 0
+            $availableBatches = Batches::where('medicine_id', $m->id)
+                ->where(function ($q) use ($targetPharmacyId) {
+                    $q->where('pharmacy_id', $targetPharmacyId)
+                      ->orWhereNull('pharmacy_id');
+                })
+                ->where('stock', '>', 0)
+                ->orderBy('expired_date', 'asc')
+                ->get(['id', 'name', 'expired_date', 'stock'])
+                ->map(fn($b) => [
+                    'id' => $b->id,
+                    'name' => $b->name,
+                    'expired_date' => $b->expired_date ? Carbon::parse($b->expired_date)->format('Y-m-d') : null,
+                    'stock' => (float) $b->stock,
+                ])
+                ->values()
+                ->all();
 
             return [
                 'id' => $m->id,
@@ -644,6 +663,7 @@ class PurchaseReturnController extends Controller
                 'factory_id' => $m->factory_id,
                 'factory_name' => $factoryName,
                 'return_policy' => $evaluation,
+                'available_batches' => $availableBatches,
             ];
         });
 
@@ -831,7 +851,8 @@ class PurchaseReturnController extends Controller
     }
 
     /**
-     * Potong stok obat dan catat ItemsLog (Kartu Stok) saat retur dikonfirmasi
+     * Potong stok obat dan catat ItemsLog (Kartu Stok) saat retur dikonfirmasi.
+     * Dijamin memotong stok batch fisik di cabang terkait (auto-fallback FIFO jika batch tidak ditentukan).
      */
     protected function deductStockForItem(PurchaseReturnItem $item, string $actionDate): void
     {
@@ -853,18 +874,21 @@ class PurchaseReturnController extends Controller
                 $med->decrement('stock', $qtyDeduct);
                 $qtyAfter = $qtyBefore - $qtyDeduct;
 
-                // Kurangi stok batch jika ada
-                $batch = null;
-                if (!empty($item->batch_id)) {
-                    $batch = Batches::find($item->batch_id);
-                } elseif (!empty($item->batch_number) && $item->batch_number !== '-') {
-                    $batch = Batches::where('medicine_id', $med->id)
-                        ->where('name', $item->batch_number)
-                        ->first();
-                }
+                // Tentukan pharmacy_id target retur (default Gudang PMI jika tidak ada)
+                $pharmacyId = (int) ($item->purchaseReturn?->pharmacy_id ?: (function_exists('getActivePharmacyId') ? getActivePharmacyId() : 9));
+
+                // Cari atau resolve batch yang wajib dipotong
+                $batch = $this->resolveBatchForItem($item, $med, $pharmacyId);
 
                 if ($batch) {
                     $batch->decrement('stock', $qtyDeduct);
+                    $item->batch_id = $batch->id;
+                    if (empty($item->batch_number) || $item->batch_number === '-') {
+                        $item->batch_number = $batch->name;
+                    }
+                    if (empty($item->expired_date) && $batch->expired_date) {
+                        $item->expired_date = $batch->expired_date;
+                    }
                 }
 
                 // Catat ke kartu stok / ItemsLog (status 4 = Retur Pembelian)
@@ -880,7 +904,7 @@ class PurchaseReturnController extends Controller
                     'date' => $actionDate,
                     'status' => 4,
                     'batches_id' => $batch?->id ?? null,
-                    'user_id' => auth()->id(),
+                    'user_id' => auth()->id() ?: 1,
                 ]);
             }
         }
@@ -910,14 +934,8 @@ class PurchaseReturnController extends Controller
                 $med->increment('stock', $qtyRestore);
                 $qtyAfter = $qtyBefore + $qtyRestore;
 
-                $batch = null;
-                if (!empty($item->batch_id)) {
-                    $batch = Batches::find($item->batch_id);
-                } elseif (!empty($item->batch_number) && $item->batch_number !== '-') {
-                    $batch = Batches::where('medicine_id', $med->id)
-                        ->where('name', $item->batch_number)
-                        ->first();
-                }
+                $pharmacyId = (int) ($item->purchaseReturn?->pharmacy_id ?: (function_exists('getActivePharmacyId') ? getActivePharmacyId() : 9));
+                $batch = $this->resolveBatchForItem($item, $med, $pharmacyId);
 
                 if ($batch) {
                     $batch->increment('stock', $qtyRestore);
@@ -933,17 +951,85 @@ class PurchaseReturnController extends Controller
                     'qty_after' => $qtyAfter,
                     'total' => $item->subtotal,
                     'date' => $actionDate,
-                    // Status 6 memakai delta qty_after - qty_before pada kartu stok,
-                    // sehingga pemulihan stok tercatat sebagai penambahan.
+                    // Status 6 memakai delta qty_after - qty_before pada kartu stok
                     'status' => 6,
                     'batches_id' => $batch?->id ?? null,
-                    'user_id' => auth()->id(),
+                    'user_id' => auth()->id() ?: 1,
                 ]);
             }
         }
 
         $item->stock_deducted = false;
         $item->confirmed_date = null;
+    }
+
+    /**
+     * Cari atau tentukan batch yang tepat untuk item retur di cabang terkait.
+     * 1. Berdasarkan batch_id langsung jika ada
+     * 2. Berdasarkan nomor batch di cabang ini (atau cabang lain sebagai fallback)
+     * 3. AUTO-FALLBACK: Batch dengan stok > 0 di cabang ini (prioritas ED terdekat / FIFO)
+     * 4. AUTO-FALLBACK: Batch terbaru di cabang ini
+     * 5. AUTO-FALLBACK: Buat batch default jika sama sekali belum ada
+     */
+    protected function resolveBatchForItem(PurchaseReturnItem $item, Medicines $med, int $pharmacyId): Batches
+    {
+        $batch = null;
+
+        // 1. Berdasarkan batch_id langsung jika ada
+        if (!empty($item->batch_id)) {
+            $batch = Batches::find($item->batch_id);
+        }
+
+        // 2. Berdasarkan nomor batch di farmasi cabang ini
+        if (!$batch && !empty($item->batch_number) && $item->batch_number !== '-') {
+            $batchName = trim($item->batch_number);
+            $batch = Batches::where('medicine_id', $med->id)
+                ->where('pharmacy_id', $pharmacyId)
+                ->where(function ($q) use ($batchName) {
+                    $q->where('name', $batchName)
+                      ->orWhereRaw('TRIM(name) = ?', [$batchName]);
+                })
+                ->first();
+
+            // Fallback cari batch dengan nama sama di farmasi manapun
+            if (!$batch) {
+                $batch = Batches::where('medicine_id', $med->id)
+                    ->where('name', $batchName)
+                    ->first();
+            }
+        }
+
+        // 3. AUTO-FALLBACK: Ambil batch yang punya stok > 0 di farmasi ini (prioritas FIFO / ED terdekat)
+        if (!$batch) {
+            $batch = Batches::where('medicine_id', $med->id)
+                ->where('pharmacy_id', $pharmacyId)
+                ->where('stock', '>', 0)
+                ->orderBy('expired_date', 'asc')
+                ->orderBy('created_at', 'asc')
+                ->first();
+        }
+
+        // 4. Jika semua batch stoknya 0 / minus, ambil batch terbaru yang ada di farmasi ini
+        if (!$batch) {
+            $batch = Batches::where('medicine_id', $med->id)
+                ->where('pharmacy_id', $pharmacyId)
+                ->orderBy('created_at', 'desc')
+                ->first();
+        }
+
+        // 5. Jika sama sekali belum pernah ada batch untuk obat ini di farmasi ini, buat batch default
+        if (!$batch) {
+            $batch = Batches::create([
+                'medicine_id' => $med->id,
+                'pharmacy_id' => $pharmacyId,
+                'name' => (!empty($item->batch_number) && $item->batch_number !== '-') ? trim($item->batch_number) : ('RET-' . date('ymd')),
+                'expired_date' => $item->expired_date ?: now()->addYears(2)->toDateString(),
+                'stock' => 0,
+                'status' => 1,
+            ]);
+        }
+
+        return $batch;
     }
 
     /**

@@ -1274,10 +1274,13 @@
             const stockUnit = m.stock_unit || (content > 1 ? 'PCS' : (m.unit || 'PCS'));
             const returType = hasPack ? 'packaging' : 'unit';
 
+            const availBatches = Array.isArray(m.available_batches) ? m.available_batches : [];
+            const defaultBatch = availBatches.length > 0 ? availBatches[0] : null;
+
             returnItemsData.push({
                 selected: true,
                 medicine_id: m.id,
-                batch_id: null,
+                batch_id: defaultBatch ? defaultBatch.id : null,
                 medicine_name: m.name,
                 unit: returType === 'packaging' ? packaging : stockUnit,
                 retur_type: returType,
@@ -1290,8 +1293,9 @@
                 price_per_unit: Number(m.price_per_unit || (content > 1 ? (m.raw_price / content) : m.raw_price) || 0),
                 current_stock_pack: Number(m.current_stock_pack || 0),
                 current_stock_unit: Number(m.current_stock_unit || m.stock || 0),
-                batch_number: '',
-                expired_date: '',
+                batch_number: defaultBatch ? defaultBatch.name : '',
+                expired_date: defaultBatch ? (defaultBatch.expired_date || '') : '',
+                available_batches: availBatches,
                 max_qty: 9999,
                 qty: 1,
                 unit_price: returType === 'packaging' ? Number(m.pack_price || m.raw_price || 0) : Number(m.price_per_unit || 0),
@@ -1301,6 +1305,26 @@
                 return_policy: null,
                 is_already_returned: false,
             });
+            renderReturnItemsTable();
+        };
+
+        window.onSelectManualBatch = function(idx, val) {
+            const it = returnItemsData[idx];
+            if (!it) return;
+            if (val === 'custom') {
+                it.batch_id = null;
+                it.batch_number = '';
+                it.expired_date = '';
+            } else if (val) {
+                const b = (it.available_batches || []).find(x => String(x.id) === String(val));
+                if (b) {
+                    it.batch_id = b.id;
+                    it.batch_number = b.name;
+                    it.expired_date = b.expired_date || '';
+                }
+            } else {
+                it.batch_id = null;
+            }
             renderReturnItemsTable();
         };
 
@@ -1366,12 +1390,23 @@
                                 <div class="font-mono text-slate-700 font-semibold text-[11px]">${escapeHtml(it.batch_number || '-')}</div>
                                 <div class="text-[10px] text-rose-600 font-bold mt-0.5">ED: ${it.expired_date ? formatDateDisplay(it.expired_date) : '-'}</div>
                             ` : `
-                                <input type="text" value="${escapeHtml(it.batch_number)}" placeholder="No Batch"
-                                       onchange="updateItemField(${idx}, 'batch_number', this.value)"
-                                       class="h-7 text-xs w-28 rounded-lg border border-slate-300 px-2 font-mono">
-                                <input type="date" value="${it.expired_date ? it.expired_date.split('T')[0] : ''}"
-                                       onchange="updateItemField(${idx}, 'expired_date', this.value)"
-                                       class="h-7 text-xs w-28 rounded-lg border border-slate-300 px-2 mt-1 block">
+                                ${it.available_batches && it.available_batches.length > 0 ? `
+                                    <select onchange="onSelectManualBatch(${idx}, this.value)" class="h-7 text-xs w-32 rounded-lg border border-slate-300 px-1 font-mono bg-white block mb-1">
+                                        <option value="">— Pilih Batch —</option>
+                                        ${it.available_batches.map(b => `<option value="${b.id}" ${String(it.batch_id) === String(b.id) ? 'selected' : ''}>${escapeHtml(b.name)} (${b.stock})</option>`).join('')}
+                                        <option value="custom" ${(!it.batch_id && it.batch_number) ? 'selected' : ''}>+ Ketik Manual</option>
+                                    </select>
+                                ` : ''}
+                                ${(!it.available_batches || it.available_batches.length === 0 || !it.batch_id) ? `
+                                    <input type="text" value="${escapeHtml(it.batch_number)}" placeholder="No Batch"
+                                           onchange="updateItemField(${idx}, 'batch_number', this.value)"
+                                           class="h-7 text-xs w-28 rounded-lg border border-slate-300 px-2 font-mono">
+                                    <input type="date" value="${it.expired_date ? it.expired_date.split('T')[0] : ''}"
+                                           onchange="updateItemField(${idx}, 'expired_date', this.value)"
+                                           class="h-7 text-xs w-28 rounded-lg border border-slate-300 px-2 mt-1 block">
+                                ` : `
+                                    <div class="text-[10px] text-rose-600 font-bold mt-0.5">ED: ${it.expired_date ? formatDateDisplay(it.expired_date) : '-'}</div>
+                                `}
                             `}
                         </td>
                         <td class="p-2.5 text-center">
