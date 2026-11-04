@@ -392,30 +392,6 @@
                 </div>
             </div>
 
-            <!-- PENGINGAT SOP PERUBAHAN HARGA -->
-            <div class="bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/10 border-2 border-amber-400 p-4 rounded-2xl shadow-sm">
-                <div class="flex items-start gap-3.5">
-                    <div class="shrink-0 w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-md">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
-                        </svg>
-                    </div>
-                    <div class="flex-1">
-                        <div class="flex flex-wrap items-center gap-2">
-                            <h3 class="text-xs sm:text-sm font-extrabold text-amber-950 uppercase tracking-wide flex items-center gap-2">
-                                <span>Peringatan SOP Penerimaan: Wajib Lapor Jika Harga Berubah / Update</span>
-                            </h3>
-                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black bg-red-600 text-white uppercase tracking-wider animate-pulse">
-                                Wajib Lapor
-                            </span>
-                        </div>
-                        <p class="mt-1 text-xs text-amber-900 leading-relaxed font-medium">
-                            Apabila terdapat <strong class="text-red-700 font-bold">perubahan atau selisih harga (HNA / Diskon / PPN)</strong> pada faktur fisik yang Anda terima dibandingkan dengan harga di SP/Master Obat, petugas penerima <span class="bg-amber-200/90 px-1.5 py-0.5 rounded font-bold text-red-900 underline decoration-red-500 decoration-2">WAJIB SEGERA MELAPORKAN</span> ke Apoteker / Tim Pembelian agar penyesuaian harga jual, margin, dan data sistem dapat langsung diperbarui!
-                        </p>
-                    </div>
-                </div>
-            </div>
-
             <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 space-y-4">
 
                 <!-- Baris Tombol Aksi & Pencarian Obat -->
@@ -552,21 +528,6 @@
                             </label>
                             <input id="item_price" type="text" placeholder="Rp 0"
                                 class="w-full rounded-xl border border-blue-400 bg-white px-3.5 py-2.5 text-xs text-gray-900 font-bold focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                            
-                            <!-- Dynamic Price Change Alert Badge -->
-                            <div id="price_change_badge" class="hidden mt-1.5 p-2 rounded-xl bg-amber-50 border border-amber-300 shadow-xs">
-                                <div class="flex items-center gap-1 font-bold text-amber-900 text-[10px]">
-                                    <svg class="w-3.5 h-3.5 text-amber-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                                    <span id="price_change_status">Harga Update!</span>
-                                    <span id="price_diff_badge" class="ml-auto text-[9px] font-black px-1.5 py-0.5 rounded bg-amber-200 text-amber-900 border border-amber-300"></span>
-                                </div>
-                                <div class="mt-0.5 text-[9px] text-gray-600 leading-tight">
-                                    Master: <span id="price_orig_val" class="font-semibold text-gray-800"></span> ➔ Input: <span id="price_curr_val" class="font-bold text-amber-900"></span>
-                                </div>
-                                <div class="mt-1 text-[9px] font-bold text-red-700 bg-red-100/70 p-1 rounded border border-red-200 leading-tight">
-                                    ⚠️ WAJIB lapor ke Apoteker / Pengadaan!
-                                </div>
-                            </div>
                         </div>
 
                         <!-- Batch -->
@@ -865,49 +826,6 @@
 
             updateBoxPriceInfo();
             counttotalreceived();
-            checkPriceChange();
-        }
-
-        function checkPriceChange() {
-            const badge = document.getElementById('price_change_badge');
-            if (!badge) return;
-
-            const baseMasterPrice = parseFloat(itemrawprice) || 0;
-            if (baseMasterPrice <= 0) {
-                badge.classList.add('hidden');
-                return;
-            }
-
-            const isPack = typeof pack !== 'undefined' && pack.checked;
-            const expectedPrice = (isPack && itemcontent > 1) ? (baseMasterPrice * itemcontent) : baseMasterPrice;
-            const currentPrice = parseFloat(itemprice) || 0;
-
-            if (currentPrice > 0 && Math.abs(currentPrice - expectedPrice) > 1) {
-                const diff = currentPrice - expectedPrice;
-                const isHigher = diff > 0;
-                const diffText = (isHigher ? '+' : '-') + formatRupiah(Math.abs(diff));
-
-                const statusEl = document.getElementById('price_change_status');
-                if (statusEl) statusEl.textContent = isHigher ? 'Harga NAIK!' : 'Harga TURUN!';
-
-                const diffBadge = document.getElementById('price_diff_badge');
-                if (diffBadge) {
-                    diffBadge.textContent = diffText;
-                    diffBadge.className = isHigher 
-                        ? 'ml-auto text-[9px] font-black px-1.5 py-0.5 rounded bg-red-100 text-red-800 border border-red-300'
-                        : 'ml-auto text-[9px] font-black px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-300';
-                }
-
-                const origEl = document.getElementById('price_orig_val');
-                if (origEl) origEl.textContent = formatRupiah(expectedPrice);
-
-                const currEl = document.getElementById('price_curr_val');
-                if (currEl) currEl.textContent = formatRupiah(currentPrice);
-
-                badge.classList.remove('hidden');
-            } else {
-                badge.classList.add('hidden');
-            }
         }
         // Setting Initial Transaction Value
         $('#d_price').val(formatRupiah(d_price));
@@ -940,7 +858,6 @@
             itemprice = parseFloat(rawVal) || 0;
             this.value = formatRupiah(rawVal);
             counttotalreceived();
-            checkPriceChange();
         });
         itemPriceInput.addEventListener('keydown', function (e) {
             if (e.key === 'Enter') {
@@ -1058,9 +975,6 @@
                 hetBadge.textContent = '';
                 hetBadge.classList.add('hidden');
             }
-
-            const priceBadge = document.getElementById('price_change_badge');
-            if (priceBadge) priceBadge.classList.add('hidden');
 
             $('#items').val(null).trigger('change');
             $('#location').val(null).trigger('change');
@@ -1435,7 +1349,6 @@
                 }
                 updateBoxPriceInfo();
                 counttotalreceived();
-                checkPriceChange();
             } else {
                 updatePackAndUnitUI();
             }
@@ -1466,7 +1379,6 @@
             updateBoxPriceInfo();
             // Recalculate gross total and update visual total
             counttotalreceived();
-            checkPriceChange();
             document.getElementById('qty_received').focus();
         });
         document.getElementById('qty').addEventListener('keydown', function (e) {
@@ -1899,14 +1811,6 @@
 
             console.log('Sending receiving_items_id:', payload.receiving_items_id);
 
-            let priceHasChanged = false;
-            const baseMasterPrice = parseFloat(itemrawprice) || 0;
-            const expectedPrice = (pack && pack.checked && itemcontent > 1) ? (baseMasterPrice * itemcontent) : baseMasterPrice;
-            const currentPrice = parseFloat(itemprice) || 0;
-            if (baseMasterPrice > 0 && currentPrice > 0 && Math.abs(currentPrice - expectedPrice) > 1) {
-                priceHasChanged = true;
-            }
-
             axios.post("{{ route('receiving.addreceivingitem') }}", payload, {
                 headers: {
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
@@ -1919,15 +1823,6 @@
                             message: res.message ?? 'Item Berhasil Disimpan!',
                             position: 'topRight'
                         });
-
-                        if (priceHasChanged) {
-                            iziToast.warning({
-                                title: '📢 PENGINGAT: HARGA UPDATE!',
-                                message: 'Item disimpan dengan harga yang berbeda dari Master/SP. <b>Petugas WAJIB MELAPORKAN perubahan harga ini ke Apoteker / Tim Pengadaan!</b>',
-                                position: 'topCenter',
-                                timeout: 7000
-                            });
-                        }
 
                         let item = res.data.summary;
                         $('#d_price').val(formatRupiah(item.price_item));
