@@ -505,6 +505,19 @@ class RecipeMonthlySummarySheet implements FromArray, WithStyles, WithColumnWidt
             $month = (int) $date->format('n');
 
             if ($month >= 1 && $month <= 12) {
+                $isKredit = in_array($trx->transaction_type, ['KREDIT', 'RESEP KREDIT'], true);
+                $rawItems = collect($trx->transactions);
+                if (!$isKredit) {
+                    $rawItems = $rawItems->filter(function ($item) {
+                        $ct = strtoupper(trim((string) ($item->cart_type ?? '')));
+                        return !in_array($ct, ['HV', 'UP', 'UPDS', 'OBAT BEBAS'], true);
+                    });
+                }
+
+                if ($rawItems->isEmpty()) {
+                    continue;
+                }
+
                 $trxReturs = $trx->returs ?? collect();
                 $retursByMedicineQty = [];
                 $retursByMedicineAmount = [];
@@ -515,28 +528,30 @@ class RecipeMonthlySummarySheet implements FromArray, WithStyles, WithColumnWidt
                     }
                 }
 
-                $activeItems = collect($trx->transactions)->filter(function ($item) use (&$retursByMedicineQty, &$retursByMedicineAmount) {
+                $activeItems = $rawItems->filter(function ($item) use (&$retursByMedicineQty, &$retursByMedicineAmount) {
                     $medId = $item->medicine_id;
                     $itemQty = (float) ($item->quantity ?? $item->qty ?? 1);
                     $price = (int) round((float) ($item->item_price ?? 0));
                     $disc = (int) round((float) ($item->discount ?? 0));
                     $itemPrice = (int) round((float) ($item->final_price ?? $item->total_price ?? ($price * $itemQty - $disc)));
 
-                    if ($medId && isset($retursByMedicineQty[$medId]) && $retursByMedicineQty[$medId] > 0) {
-                        if ($retursByMedicineQty[$medId] >= $itemQty) {
-                            $retursByMedicineQty[$medId] -= $itemQty;
-                            return false;
-                        }
-                        $retursByMedicineQty[$medId] = 0;
-                        return true;
-                    }
-
+                    // Prioritas cek nominal retur
                     if ($medId && isset($retursByMedicineAmount[$medId]) && $retursByMedicineAmount[$medId] > 0) {
                         if ($retursByMedicineAmount[$medId] >= $itemPrice) {
                             $retursByMedicineAmount[$medId] -= $itemPrice;
                             return false;
                         }
                         $retursByMedicineAmount[$medId] = 0;
+                        return true;
+                    }
+
+                    // Fallback kuantitas retur
+                    if ($medId && isset($retursByMedicineQty[$medId]) && $retursByMedicineQty[$medId] > 0) {
+                        if ($retursByMedicineQty[$medId] >= $itemQty) {
+                            $retursByMedicineQty[$medId] -= $itemQty;
+                            return false;
+                        }
+                        $retursByMedicineQty[$medId] = 0;
                         return true;
                     }
 

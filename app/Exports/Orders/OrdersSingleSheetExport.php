@@ -260,6 +260,11 @@ class OrdersSingleSheetExport implements FromArray, WithStyles, WithColumnWidths
             ->setBold(true);
 
         $sheet
+            ->getStyle("A{$lastRow}:{$lastCol}{$lastRow}")
+            ->getFont()
+            ->setBold(true);
+
+        $sheet
             ->getStyle("A{$dataStartRow}:{$lastCol}{$lastRow}")
             ->getBorders()
             ->getAllBorders()
