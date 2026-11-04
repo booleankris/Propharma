@@ -392,30 +392,6 @@
                 </div>
             </div>
 
-            <!-- PENGINGAT SOP PERUBAHAN HARGA -->
-            <div class="bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/10 border-2 border-amber-400 p-4 rounded-2xl shadow-sm">
-                <div class="flex items-start gap-3.5">
-                    <div class="shrink-0 w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-md">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
-                        </svg>
-                    </div>
-                    <div class="flex-1">
-                        <div class="flex flex-wrap items-center gap-2">
-                            <h3 class="text-xs sm:text-sm font-extrabold text-amber-950 uppercase tracking-wide flex items-center gap-2">
-                                <span>Peringatan SOP Penerimaan: Wajib Lapor Jika Harga Berubah / Update</span>
-                            </h3>
-                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black bg-red-600 text-white uppercase tracking-wider animate-pulse">
-                                Wajib Lapor
-                            </span>
-                        </div>
-                        <p class="mt-1 text-xs text-amber-900 leading-relaxed font-medium">
-                            Apabila terdapat <strong class="text-red-700 font-bold">perubahan atau selisih harga (HNA / Diskon / PPN)</strong> pada faktur fisik yang Anda terima dibandingkan dengan harga di SP/Master Obat, petugas penerima <span class="bg-amber-200/90 px-1.5 py-0.5 rounded font-bold text-red-900 underline decoration-red-500 decoration-2">WAJIB SEGERA MELAPORKAN</span> ke Apoteker / Tim Pembelian agar penyesuaian harga jual, margin, dan data sistem dapat langsung diperbarui!
-                        </p>
-                    </div>
-                </div>
-            </div>
-
             <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 space-y-4">
 
                 <!-- Baris Tombol Aksi & Pencarian Obat -->
@@ -517,6 +493,30 @@
                                 <label class="block text-[11px] text-gray-500 mb-1">HET (Harga Tertinggi)</label>
                                 <input id="medicine_het" type="text" readonly placeholder="Rp 0"
                                     class="w-full rounded-lg bg-gray-100 border border-gray-200 px-3 py-2 text-xs font-semibold text-emerald-700 cursor-not-allowed">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PENGINGAT SOP PERUBAHAN HARGA -->
+                    <div class="bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/10 border-2 border-amber-400 p-3.5 rounded-xl shadow-xs">
+                        <div class="flex items-start gap-3">
+                            <div class="shrink-0 w-8 h-8 rounded-lg bg-amber-500 text-white flex items-center justify-center shadow-xs">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+                                </svg>
+                            </div>
+                            <div class="flex-1">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <h3 class="text-xs font-extrabold text-amber-950 uppercase tracking-wide flex items-center gap-1.5">
+                                        <span>Pengingat SOP: Wajib Lapor Jika Ada Perubahan Harga (HNA / Diskon / PPN)</span>
+                                    </h3>
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black bg-red-600 text-white uppercase tracking-wider animate-pulse">
+                                        Wajib Lapor
+                                    </span>
+                                </div>
+                                <p class="mt-0.5 text-[11px] text-amber-900 leading-relaxed font-medium">
+                                    Jika terdapat <strong class="text-red-700 font-bold">perubahan atau selisih harga</strong> pada faktur fisik yang Anda terima dibandingkan dengan harga di SP/Master Obat, petugas penerima <span class="bg-amber-200/90 px-1 py-0.5 rounded font-bold text-red-900 underline decoration-red-500">WAJIB SEGERA MELAPORKAN</span> ke Apoteker / Tim Pembelian agar penyesuaian harga jual & master data dapat langsung diperbarui!
+                                </p>
                             </div>
                         </div>
                     </div>
