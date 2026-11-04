@@ -166,19 +166,75 @@ class RecipeDetailSheet implements FromArray, WithStyles, WithColumnWidths, With
 
             if ($resepItems->isEmpty()) continue;
 
-            // Hitung netto item (selaras persis dengan safeItemNettoSum pada LIPH)
-            // Catatan: Retur di LIPH dicatat pada baris terpisah (Retur Tunai / Retur Kredit)
-            // dan tidak memotong langsung kolom Netto Resep.
-            $netto = (int) $resepItems->sum(function ($item) {
-                $qty   = (float) ($item->quantity ?? 0);
-                $price = (int) round((float) ($item->item_price ?? 0));
-                $disc  = (int) round((float) ($item->discount ?? 0));
-                return (int) round((float) ($item->final_price ?? $item->total_price ?? ($price * $qty - $disc)));
-            });
+            // Hitung netto item setelah memperhitungkan retur (selaras dengan Sheet 2 Rekap Lembar Resep)
+            $trxReturs = $trx->returs ?? collect();
+            $retursByMedicineQty = [];
+            $retursByMedicineAmount = [];
+            foreach ($trxReturs as $r) {
+                $medId = $r->medicine_id;
+                if ($medId) {
+                    $retursByMedicineQty[$medId] = ($retursByMedicineQty[$medId] ?? 0) + (float) ($r->qty_retur ?: 0);
+                    $retursByMedicineAmount[$medId] = ($retursByMedicineAmount[$medId] ?? 0) + (int) round((float) ($r->total_retur ?? 0));
+                }
+            }
 
-            if ($netto <= 0) {
+            $totalReturTrx = (int) round((float) $trxReturs->sum('total_retur'));
+
+            $activeResepNetto = 0;
+            $hasActiveResepItem = false;
+
+            foreach ($resepItems as $item) {
+                $medId     = $item->medicine_id;
+                $origQty   = (float) ($item->quantity ?? 0);
+                $qty       = $origQty;
+                $price     = (int) round((float) ($item->item_price ?? 0));
+                $disc      = (int) round((float) ($item->discount ?? 0));
+                $itemPrice = (int) round((float) ($item->final_price ?? $item->total_price ?? ($price * $qty - $disc)));
+
+                if ($qty <= 0 && $itemPrice <= 0) {
+                    continue;
+                }
+
+                // Potong retur per medicine:
+                // Prioritaskan pengurangan nominal rupiah (total_retur) yang presisi
+                if ($medId && isset($retursByMedicineAmount[$medId]) && $retursByMedicineAmount[$medId] > 0) {
+                    if ($retursByMedicineAmount[$medId] >= $itemPrice) {
+                        $retursByMedicineAmount[$medId] -= $itemPrice;
+                        continue; // Seluruh nilai item ini telah diretur
+                    }
+                    $itemPrice -= $retursByMedicineAmount[$medId];
+                    $retursByMedicineAmount[$medId] = 0;
+                } elseif ($medId && isset($retursByMedicineQty[$medId]) && $retursByMedicineQty[$medId] > 0) {
+                    // Fallback jika hanya tercatat kuantitas retur
+                    if ($retursByMedicineQty[$medId] >= $qty) {
+                        $retursByMedicineQty[$medId] -= $qty;
+                        continue; // Seluruh kuantitas item ini telah diretur
+                    }
+                    $qty -= $retursByMedicineQty[$medId];
+                    $retursByMedicineQty[$medId] = 0;
+                    $itemPrice = max(0, (int) round(($itemPrice / max(1, $origQty)) * $qty));
+                }
+
+                if ($itemPrice > 0) {
+                    $activeResepNetto += $itemPrice;
+                    $hasActiveResepItem = true;
+                }
+            }
+
+            // Jika seluruh lembar resep telah diretur (tidak ada item aktif tersisa atau netto 0)
+            if (!$hasActiveResepItem || $activeResepNetto <= 0) {
                 continue;
             }
+
+            // Jika ada retur transaksi yang belum teralokasi per medicine, potong dari netto
+            if ($totalReturTrx > 0 && empty($retursByMedicineQty) && empty($retursByMedicineAmount)) {
+                $activeResepNetto = max(0, $activeResepNetto - $totalReturTrx);
+                if ($activeResepNetto <= 0) {
+                    continue;
+                }
+            }
+
+            $netto = $activeResepNetto;
 
             $shiftName = $trx->shift_logs?->shift?->name ?? '-';
             $tgl       = Carbon::parse($trx->created_at ?? $trx->updated_at ?? $trx->shift_logs?->clock_in)->format('d/m/Y');
