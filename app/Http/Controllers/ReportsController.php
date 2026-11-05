@@ -248,31 +248,51 @@ class ReportsController extends Controller
             'end_date.after_or_equal' => 'Tanggal akhir tidak boleh lebih awal dari tanggal mulai.',
         ]);
 
+        $restrictedRole = function_exists('getRestrictedOnlineRole') ? getRestrictedOnlineRole() : null;
+
         return match ($report) {
-            'LIPH' => $request->shiftType === 'online'
+            'LIPH' => $restrictedRole
                 ? [
-                    new LiphOnlineExport(
-                        $pharmacy->id,
-                        $request->start_date,
-                        $request->end_date,
-                        $pharmacy->name,
-                        $pharmacy->address,
-                        $request->shift,
-                    ),
-                    'LIPH_Online_' . $pharmacy->name . '_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx',
-                ]
-                : [
                     new LiphExport(
                         $pharmacy->id,
                         $request->start_date,
                         $request->end_date,
                         $pharmacy->name,
                         $pharmacy->address,
-                        $request->shift,
-                        $request->shiftType ?? 'semua',
+                        ($request->shiftType ?? 'semua') === 'semua' ? null : $request->shift,
+                        'online',
+                        $restrictedRole,
+                        match ($restrictedRole) {
+                            'Online' => 'Online (WA)',
+                            default => $restrictedRole,
+                        }
                     ),
-                    'LIPH_' . $pharmacy->name . '_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx',
-                ],
+                    'LIPH_' . str_replace(' ', '_', $restrictedRole) . '_' . $pharmacy->name . '_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx',
+                ]
+                : ($request->shiftType === 'online'
+                    ? [
+                        new LiphOnlineExport(
+                            $pharmacy->id,
+                            $request->start_date,
+                            $request->end_date,
+                            $pharmacy->name,
+                            $pharmacy->address,
+                            $request->shift,
+                        ),
+                        'LIPH_Online_' . $pharmacy->name . '_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx',
+                    ]
+                    : [
+                        new LiphExport(
+                            $pharmacy->id,
+                            $request->start_date,
+                            $request->end_date,
+                            $pharmacy->name,
+                            $pharmacy->address,
+                            $request->shift,
+                            $request->shiftType ?? 'semua',
+                        ),
+                        'LIPH_' . $pharmacy->name . '_' . $request->start_date . '_sd_' . $request->end_date . '.xlsx',
+                    ]),
             'Bank', 'Penjualan Bank', 'Pembayaran' => [
                 new BankSalesExport(
                     $pharmacy->id,

@@ -313,7 +313,10 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
     Route::get('/reject', [RejectController::class, 'reject'])->name('sales.reject');
     Route::get('/getreject', [RejectController::class, 'getReject'])->name('sales.getreject');
     Route::get('/reject/follow-up', [RejectController::class, 'followUpIndex'])->name('sales.reject.follow-up');
+    Route::get('/reject/follow-up/export', [RejectController::class, 'exportFollowUp'])->name('sales.reject.follow-up.export');
     Route::put('/reject/{id}/follow-up', [RejectController::class, 'updateFollowUp'])->name('sales.reject.follow-up.update');
+    Route::post('/reject/follow-up/options', [RejectController::class, 'storeFollowUpOption'])->name('sales.reject.follow-up.options.store');
+    Route::delete('/reject/follow-up/options/{id}', [RejectController::class, 'deleteFollowUpOption'])->name('sales.reject.follow-up.options.delete');
     Route::get('/reject/export', [RejectController::class, 'exportReject'])->name('sales.reject.export');
     Route::get('/reject/export/status/{id}', [RejectController::class, 'exportStatus'])->name('sales.reject.export.status');
     Route::get('reject/searchmedicine', [RejectController::class, 'searchMedicine'])->name('sales.searchmedicine');

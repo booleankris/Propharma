@@ -289,8 +289,17 @@
                 <div id="searchWrapper" class="flex gap-5" style="position: relative; width: 100%;">
                     <div class="w-11/12">
                         <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
-                            <h1 class="text-2xl font-semibold tracking-tight font-poppins text-[#1c1c1c]">Penolakan Barang
-                            </h1>
+                            <div class="flex flex-wrap items-center gap-3">
+                                <h1 class="text-2xl font-semibold tracking-tight font-poppins text-[#1c1c1c]">Penolakan Barang
+                                </h1>
+                                <a href="{{ route('sales.reject.follow-up') }}"
+                                    class="inline-flex items-center gap-1.5 rounded-lg bg-violet-50 border border-violet-200 px-3.5 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-600 hover:text-white transition-all shadow-xs">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2m-4 0a2 2 0 002 2h2a2 2 0 002-2m-6 8h6m-6 4h6m-9-4h.01M9 17h.01" />
+                                    </svg>
+                                    <span>Tindak Lanjut Penolakan</span>
+                                </a>
+                            </div>
 
                             @php
                                 $canExportReject = auth()->check() && (!auth()->user()->hasRole('Kasir') || auth()->user()->hasAnyRole(['administrator', 'General Manager', 'Manager', 'manager', 'Koordinator', 'HO', 'operator']));
@@ -422,11 +431,21 @@
                         </div>
 
                         <div class="flex flex-wrap items-center gap-3 py-2 w-full">
-                            <div class="w-full sm:w-40">
+                            <div class="w-full sm:w-36">
                                 <div class="py-1 text-[13px] font-bold">QTY Tolak</div>
                                 <input id="qty" type="number" name="qty"
                                     class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
                                     placeholder="QTY Tolak" onkeyup="counttotal()">
+                            </div>
+                            <div class="w-full sm:w-40">
+                                <div class="py-1 text-[13px] font-bold">Lokasi</div>
+                                <select
+                                    class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
+                                    name="location" id="location">
+                                    <option selected value="">-- Pilih Lokasi --</option>
+                                    <option value="Offline">Offline</option>
+                                    <option value="Online">Online</option>
+                                </select>
                             </div>
                             <div class="w-full sm:w-44">
                                 <div class="py-1 text-[13px] font-bold">Alasan Penolakan</div>
@@ -451,6 +470,12 @@
                                 <input id="custom_reason" type="text"
                                     class="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-[13px] focus:ring-2 focus:ring-blue-200"
                                     placeholder="Ketik alasan penolakan...">
+                            </div>
+                            <div class="w-full sm:w-56">
+                                <div class="py-1 text-[13px] font-bold">Keterangan</div>
+                                <input id="follow_up_note" name="follow_up_note" type="text"
+                                    class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-200"
+                                    placeholder="Contoh: UPDS / R/ Dr. ..." autocomplete="off">
                             </div>
                             <div class="w-full sm:w-40">
                                 <div class="py-1 text-[13px] font-bold">Hrg HNA</div>
@@ -542,9 +567,12 @@
                                     <th>Kode Penolakan</th>
                                     <th>Tanggal</th>
                                     <th>Nama Item</th>
+                                    <th>Satuan</th>
                                     <th>Jumlah Ditolak</th>
+                                    <th>Lokasi</th>
                                     <th>Total</th>
                                     <th>Alasan</th>
+                                    <th>Keterangan</th>
                                     <th>Aksi</th>
                                 </tr>
                             </thead>
@@ -642,11 +670,29 @@
                         }
                     },
                     {
-                        data: 'quantity',
-                        name: 'quantity',
+                        data: 'unit',
+                        name: 'unit',
+                        defaultContent: '-',
                         render: function(data, type, row) {
-                            const unitStr = row.unit || (row.medicines ? row.medicines.unit : '');
-                            return data + (unitStr ? ' ' + unitStr : '');
+                            const unitStr = data || (row.medicines ? row.medicines.unit : '');
+                            return unitStr && String(unitStr).trim() !== '' ? unitStr : '-';
+                        }
+                    },
+                    {
+                        data: 'quantity',
+                        name: 'quantity'
+                    },
+                    {
+                        data: 'location',
+                        name: 'location',
+                        defaultContent: '-',
+                        render: function(data) {
+                            if (!data || String(data).trim() === '') return '-';
+                            const isOnline = String(data).toLowerCase() === 'online';
+                            const cls = isOnline
+                                ? 'bg-sky-50 text-sky-700 border-sky-200'
+                                : 'bg-slate-100 text-slate-700 border-slate-200';
+                            return `<span class="inline-block px-2 py-0.5 rounded-md text-[11px] font-semibold border ${cls}">${data}</span>`;
                         }
                     },
                     {
@@ -659,6 +705,14 @@
                     {
                         data: 'reason',
                         name: 'reason'
+                    },
+                    {
+                        data: 'follow_up_note',
+                        name: 'follow_up_note',
+                        defaultContent: '-',
+                        render: function(data) {
+                            return data && String(data).trim() !== '' ? data : '-';
+                        }
                     },
                     {
                         data: 'action',
@@ -718,6 +772,13 @@
         document.getElementById('qty').addEventListener('keydown', function(e) {
             if (e.key !== 'Enter') return;
             e.preventDefault();
+            const locSelect = document.getElementById('location');
+            if (locSelect) locSelect.focus();
+            else document.getElementById('reason').focus();
+        });
+        document.getElementById('location')?.addEventListener('keydown', function(e) {
+            if (e.key !== 'Enter') return;
+            e.preventDefault();
             document.getElementById('reason').focus();
         });
         document.getElementById('reason').addEventListener('keydown', function(e) {
@@ -727,10 +788,19 @@
                 const customInput = document.getElementById('custom_reason');
                 if (customInput) customInput.focus();
             } else {
-                addItem();
+                const noteInput = document.getElementById('follow_up_note');
+                if (noteInput) noteInput.focus();
+                else addItem();
             }
         });
         document.getElementById('custom_reason')?.addEventListener('keydown', function(e) {
+            if (e.key !== 'Enter') return;
+            e.preventDefault();
+            const noteInput = document.getElementById('follow_up_note');
+            if (noteInput) noteInput.focus();
+            else addItem();
+        });
+        document.getElementById('follow_up_note')?.addEventListener('keydown', function(e) {
             if (e.key !== 'Enter') return;
             e.preventDefault();
             addItem();
@@ -977,10 +1047,14 @@
             document.getElementById('total').value = '';
             document.getElementById('item_price').value = '';
             document.getElementById('reason').value = '';
+            const locationSelect = document.getElementById('location');
+            if (locationSelect) locationSelect.value = '';
             const customInput = document.getElementById('custom_reason');
             if (customInput) customInput.value = '';
             const customContainer = document.getElementById('custom_reason_container');
             if (customContainer) customContainer.classList.add('hidden');
+            const noteInput = document.getElementById('follow_up_note');
+            if (noteInput) noteInput.value = '';
 
             itemcode = '';
             itemprice = '';
@@ -1092,6 +1166,10 @@
             document.getElementById('item_price').value = formatRupiah(row.raw_price || 0);
             document.getElementById('qty').value = row.quantity ?? '';
             document.getElementById('total').value = formatRupiah(row.raw_total || 0);
+            const locationSelect = document.getElementById('location');
+            if (locationSelect) locationSelect.value = row.location ?? '';
+            const noteInput = document.getElementById('follow_up_note');
+            if (noteInput) noteInput.value = row.follow_up_note ?? '';
 
             const rVal = (row.reason ?? '').trim();
             const reasonSelect = document.getElementById('reason');
@@ -1206,8 +1284,10 @@
                 medicine_name: document.getElementById('medicine_name').value,
                 quantity: itemqty,
                 unit: document.getElementById('unit').value,
+                location: document.getElementById('location')?.value || null,
                 total: itemtotal || 0, // raw number now, not formatted string
                 reason: reasonVal,
+                follow_up_note: document.getElementById('follow_up_note')?.value.trim() || null,
             };
 
             const url = editingId ?

@@ -33,6 +33,30 @@ class LiphTransactionScope
         });
     }
 
+    public static function applyOnlineScope(Builder $query, $roleName = null): Builder
+    {
+        $roleName = $roleName ?? ['Online', 'Online Grab', 'Online Shopee', 'Digital'];
+
+        $applyRoleFilter = function ($q) use ($roleName) {
+            if (is_array($roleName)) {
+                $q->whereHas('roles', function ($rq) use ($roleName) {
+                    $rq->whereIn('name', $roleName);
+                });
+            } elseif ($roleName === 'semua' || $roleName === 'all' || $roleName === 'Semua Online') {
+                $q->whereHas('roles', function ($rq) {
+                    $rq->whereIn('name', ['Online', 'Online Grab', 'Online Shopee', 'Digital']);
+                });
+            } else {
+                $q->role($roleName);
+            }
+        };
+
+        return $query->where(function (Builder $sub) use ($applyRoleFilter) {
+            $sub->whereHas('user', $applyRoleFilter)
+                ->orWhereHas('transactions.user', $applyRoleFilter);
+        });
+    }
+
     public static function applyPeriod(
         Builder $query,
         Carbon $start,
@@ -53,6 +77,14 @@ class LiphTransactionScope
                     ->where('updated_at', '>=', $start)->where('updated_at', '<', $until);
             });
         });
+
+        // Khusus user dengan role Online, Online Shopee, Online Grab, atau Digital:
+        // tampilkan hanya transaksi milik mereka (konsisten dengan Data Penjualan).
+        // Selain user/role tersebut, tampilkan semua transaksi tanpa mengubah perhitungan kasir offline.
+        $restrictedRole = function_exists('getRestrictedOnlineRole') ? getRestrictedOnlineRole() : null;
+        if ($restrictedRole !== null) {
+            self::applyOnlineScope($query, $restrictedRole);
+        }
 
         if (in_array($shiftType, ['shift', 'online'], true) && !empty($shift)) {
             $shiftObj = is_numeric($shift) ? \App\Models\Shifts::find($shift) : null;

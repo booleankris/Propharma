@@ -160,30 +160,13 @@ class LiphExport implements FromArray, WithStyles, WithColumnWidths, WithTitle
                 'transactions' => fn($q) => $q->where('status', 1),
                 'transactions.user',
                 'user',
-                'shift_logs'
+                'shift_logs.user'
             ])
                 ->where('pharmacy_id', $this->pharmacyId)
                 ->tap(fn (Builder $query) => $this->applySalesStatusScope($query))
                 ->tap(fn (Builder $query) => $this->applyReportPeriod($query))
                 ->whereIn('transaction_type', array_keys(self::TYPE_MAP))
-                ->where(function ($query) use ($roleName) {
-                    $applyRoleFilter = function ($q) use ($roleName) {
-                        if (is_array($roleName)) {
-                            $q->whereHas('roles', function ($rq) use ($roleName) {
-                                $rq->whereIn('name', $roleName);
-                            });
-                        } elseif ($roleName === 'semua' || $roleName === 'all' || $roleName === 'Semua Online') {
-                            $q->whereHas('roles', function ($rq) {
-                                $rq->whereIn('name', ['Online', 'Online Grab', 'Online Shopee', 'Digital']);
-                            });
-                        } else {
-                            $q->role($roleName);
-                        }
-                    };
-
-                    $query->whereHas('user', $applyRoleFilter)
-                        ->orWhereHas('transactions.user', $applyRoleFilter);
-                })
+                ->tap(fn (Builder $query) => LiphTransactionScope::applyOnlineScope($query, $roleName))
                 ->get();
 
             $grouped = $this->groupTransactions($transactions);

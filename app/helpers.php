@@ -15,7 +15,10 @@ if (!function_exists('activeShift')) {
         $shiftLogId = session('active_shift_log_id');
 
         if ($shiftLogId) {
-            return ShiftLogs::find($shiftLogId);
+            $shift = ShiftLogs::find($shiftLogId);
+            if ($shift && (!Auth::check() || (int) $shift->user_id === (int) Auth::id())) {
+                return $shift;
+            }
         }
 
         if (Auth::check()) {

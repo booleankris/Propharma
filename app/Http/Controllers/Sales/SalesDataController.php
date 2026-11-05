@@ -152,9 +152,8 @@ class SalesDataController extends Controller
                 });
             }
 
-            // If search is active (e.g. user searching for transaction_code or patient), bypass date restriction
-            // so transactions from any past date can be immediately found.
-            if (!$search && ($dateFrom || $dateTo)) {
+            // Keep the selected period active during text searches so results stay scoped to the visible date filter.
+            if ($dateFrom || $dateTo) {
                 // If only one date was sent, treat it as a single-day filter
                 if ($dateFrom && !$dateTo) {
                     $dateTo = $dateFrom;

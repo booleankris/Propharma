@@ -19,6 +19,7 @@ class Reject extends Model
         'unit',
         'total',
         'reason',
+        'location',
         'source_type',
         'doctor_name',
         'stock_status',

@@ -371,13 +371,28 @@
                                 </select>
                             </div>
 
-                            <div>
-                                <label
-                                    class="block mb-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Keterangan
-                                    (Opsional)</label>
-                                <textarea id="note" name="note" rows="2"
-                                    class="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-mono leading-relaxed"
-                                    placeholder="Catatan untuk item ini..."></textarea>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                    <label
+                                        class="block mb-1.5 text-xs font-semibold text-amber-700 uppercase tracking-wider flex items-center gap-1.5">
+                                        <span class="inline-block w-2 h-2 rounded-full bg-amber-500"></span>
+                                        Keterangan Barang (Master)
+                                    </label>
+                                    <textarea id="medicine_notes" readonly rows="2"
+                                        class="w-full rounded-lg border border-amber-200 bg-amber-50/50 px-3 py-2 text-xs text-amber-900 cursor-not-allowed leading-relaxed font-mono"
+                                        placeholder="Tidak ada keterangan pada master barang..."></textarea>
+                                </div>
+
+                                <div>
+                                    <label
+                                        class="block mb-1.5 text-xs font-semibold text-blue-700 uppercase tracking-wider flex items-center gap-1.5">
+                                        <span class="inline-block w-2 h-2 rounded-full bg-blue-500"></span>
+                                        Keterangan Pesanan (Opsional)
+                                    </label>
+                                    <textarea id="note" name="note" rows="2"
+                                        class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-mono leading-relaxed"
+                                        placeholder="Ketik catatan khusus untuk pesanan ini..."></textarea>
+                                </div>
                             </div>
 
                             {{-- Pill editor (hidden by default) --}}
@@ -850,10 +865,38 @@
                         data: 'note',
                         name: 'note',
                         defaultContent: '-',
-                        render: function(data) {
-                            if (!data || data === '-') return '<span class="text-slate-300">-</span>';
-                            const escaped = $('<div>').text(data).html();
-                            return `<div class="whitespace-pre-line font-mono text-[11px] leading-tight text-slate-700">${escaped}</div>`;
+                        render: function(data, type, row) {
+                            const orderNote = (data && String(data).trim() !== '' && data !== '-') ? String(data).trim() : null;
+                            const medNote = (row.medicines && row.medicines.notes && String(row.medicines.notes).trim() !== '') ? String(row.medicines.notes).trim() : null;
+
+                            if (!orderNote && !medNote) {
+                                return '<span class="text-slate-300">-</span>';
+                            }
+
+                            let html = '<div class="flex flex-col gap-1 min-w-[150px] py-0.5">';
+
+                            if (medNote) {
+                                const escapedMed = $('<div>').text(medNote).html();
+                                html += `
+                                    <div class="flex items-start gap-1.5">
+                                        <span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-50 text-amber-800 border border-amber-200 shrink-0 uppercase tracking-wide">Barang</span>
+                                        <span class="text-[11px] leading-tight text-slate-600 font-mono whitespace-pre-line">${escapedMed}</span>
+                                    </div>
+                                `;
+                            }
+
+                            if (orderNote) {
+                                const escapedOrder = $('<div>').text(orderNote).html();
+                                html += `
+                                    <div class="flex items-start gap-1.5">
+                                        <span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-50 text-blue-700 border border-blue-200 shrink-0 uppercase tracking-wide">Pesanan</span>
+                                        <span class="text-[11px] leading-tight text-slate-800 font-semibold font-mono whitespace-pre-line">${escapedOrder}</span>
+                                    </div>
+                                `;
+                            }
+
+                            html += '</div>';
+                            return html;
                         }
                     },
                     {
@@ -923,6 +966,7 @@
             document.getElementById('item_price').value = formatRupiah(itemrawprice);
             document.getElementById('qty').value = data.quantity;
             document.getElementById('medicine_code').value = data.medicines?.code ?? '';
+            document.getElementById('medicine_notes').value = data.medicines?.notes ?? '';
             document.getElementById('note').value = data.note ?? '';
             loadMedicineCreditors(data.medicine_id, data.creditor_code);
 
@@ -1245,8 +1289,8 @@
             currentMedicineId = medicineId;
             axios.get(`/orders/${medicineId}/creditors`)
                 .then(res => {
-                    if (res.data && res.data.medicine && res.data.medicine.notes && !document.getElementById('note').value) {
-                        document.getElementById('note').value = res.data.medicine.notes;
+                    if (res.data && res.data.medicine && res.data.medicine.notes) {
+                        document.getElementById('medicine_notes').value = res.data.medicine.notes;
                     }
                     medicineCreditors = res.data.creditors;
                     renderPills();
@@ -1529,8 +1573,9 @@
             document.getElementById('searchInput').value = "";
             document.getElementById('creditor').value = "";
 
-            // Auto-fill keterangan obat dari master obat jika ada
-            document.getElementById('note').value = item.notes ?? item.keterangan ?? '';
+            // Auto-fill keterangan barang dari master obat
+            document.getElementById('medicine_notes').value = item.notes ?? item.keterangan ?? '';
+            document.getElementById('note').value = '';
 
             updateBoxPriceInfo();
             counttotal();
@@ -1596,6 +1641,7 @@
             document.getElementById('content').value = '';
             document.getElementById('item_price').value = '';
             document.getElementById('total_price').value = '';
+            document.getElementById('medicine_notes').value = '';
             document.getElementById('note').value = '';
             const isActive = document.getElementById('is_active');
             pack.checked = false;
