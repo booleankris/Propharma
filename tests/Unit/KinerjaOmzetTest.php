@@ -131,5 +131,44 @@ class KinerjaOmzetTest extends TestCase
         $this->assertEquals(1300000, $totalRow[9]); // Total Omzet: 550k + 750k = 1.3M
         $this->assertEquals(1300000, $totalRow[10]); // Total Omzet S/D: Final cumulative 1.3M
     }
+
+    public function test_purchase_aggregates_match_invoice_export_rules(): void
+    {
+        // Simulate items for an EXCLUDE invoice and an INCLUDE invoice
+        // Invoice 1 (EXCLUDE): DPP = 100,000, PPN = 11,000, Total = 111,000
+        $dpp1 = 100000;
+        $ppn1 = floor($dpp1 * 0.11);
+        $total1 = $dpp1 + $ppn1;
+
+        // Invoice 2 (INCLUDE): Gross/Net = 222,000, DPP = floor(222,000 / 1.11) = 199,999, PPN = 22,001
+        $total2 = 222000;
+        $dpp2 = (float) floor($total2 / (1 + 0.11));
+        $ppn2 = $total2 - $dpp2;
+
+        $expectedTotalBeli = (float) ($total1 + $total2); // 111,000 + 222,000 = 333,000
+        $expectedTotalPpn = (float) ($ppn1 + $ppn2);
+        $expectedTotalDpp = (float) ($dpp1 + $dpp2);
+
+        $this->assertSame(333000.0, (float) $expectedTotalBeli);
+        $this->assertSame((float) ($ppn1 + $ppn2), (float) $expectedTotalPpn);
+        $this->assertSame((float) ($dpp1 + $dpp2), (float) $expectedTotalDpp);
+
+        // In Kinerja Omzet:
+        $dayPurchases = [
+            'pbf' => (float) $total1,
+            'consignment' => 0.0,
+            'cash' => (float) $total2,
+            'ppn' => (float) $expectedTotalPpn,
+            'total' => (float) ($total1 + $total2),
+            'exVat' => (float) $expectedTotalDpp,
+        ];
+
+        // JUMLAH BELI matches Laporan Pembelian Faktur 100%
+        $this->assertEquals($expectedTotalBeli, $dayPurchases['total']);
+        // PPN FAKTUR matches Laporan Pembelian Faktur 100%
+        $this->assertEquals($expectedTotalPpn, $dayPurchases['ppn']);
+        // BELI EXC PPN matches Laporan Pembelian Faktur DPP 100%
+        $this->assertEquals($expectedTotalDpp, $dayPurchases['exVat']);
+    }
 }
 

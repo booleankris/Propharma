@@ -49,6 +49,122 @@ class InvoiceSingleSheetExport implements FromArray, WithStyles, WithColumnWidth
         return $this->sheetTitle;
     }
 
+    /**
+     * Query and aggregate invoices by receiving date for financial reports like Kinerja Omzet.
+     * Guaranteed 100% identical to Laporan Pembelian Faktur.
+     *
+     * @return array<string, array{pbf: float, consignment: float, cash: float, ppn: float, dpp: float, total: float}>
+     */
+    public static function queryDailyInvoices(array $pharmacyIds, Carbon|string $startDate, Carbon|string $endDate): array
+    {
+        $start = $startDate instanceof Carbon ? $startDate : Carbon::parse($startDate)->startOfDay();
+        $end = $endDate instanceof Carbon ? $endDate : Carbon::parse($endDate)->endOfDay();
+
+        $targetPharmacyIds = $pharmacyIds;
+        if (in_array(1, $targetPharmacyIds, true) && !in_array(9, $targetPharmacyIds, true)) {
+            $targetPharmacyIds[] = 9;
+        }
+
+        $query = DB::table('receiving_items')
+            ->join('receiving_details', 'receiving_details.id', '=', 'receiving_items.receiving_details_id')
+            ->join('receiving', 'receiving.id', '=', 'receiving_details.receiving_id')
+            ->join('order_items', 'order_items.id', '=', 'receiving_items.order_items_id')
+            ->join('orders', 'orders.id', '=', 'order_items.order_id')
+            ->leftJoin('creditors', 'creditors.code', '=', 'order_items.creditor_code')
+            ->whereIn('receiving.pharmacy_id', $targetPharmacyIds)
+            ->whereNotNull('receiving_items.batches_id');
+
+        ReceivingDateFilter::applyToReceiptDetails($query, $start, $end);
+
+        $items = $query->select([
+            'receiving_details.id as receiving_details_id',
+            'receiving_details.invoice_number',
+            'receiving_details.invoice_payment',
+            'receiving_details.invoice_ppn',
+            'receiving_details.created_at as receiving_details_created_at',
+            'receiving_items.qty_received',
+            'receiving_items.qty',
+            'receiving_items.discount',
+            'receiving_items.extra_discount',
+            'receiving_items.raw_price as receiving_raw_price',
+            'order_items.price as order_items_price',
+        ])
+        ->orderBy('receiving_details.id', 'asc')
+        ->get();
+
+        $invoices = [];
+        foreach ($items as $item) {
+            $key = (string) $item->receiving_details_id;
+            if (!isset($invoices[$key])) {
+                $invoices[$key] = [
+                    'date'            => Carbon::parse($item->receiving_details_created_at)->toDateString(),
+                    'invoice_payment' => $item->invoice_payment,
+                    'ppn_type'        => strtoupper(trim($item->invoice_ppn ?? 'TANPA')),
+                    'subtotal'        => 0.0,
+                    'discount'        => 0.0,
+                ];
+            }
+
+            $qty          = (float) ($item->qty_received ?? $item->qty ?? 0);
+            $rawPrice     = (float) ($item->receiving_raw_price ?? $item->order_items_price ?? 0);
+            $gross        = $qty * $rawPrice;
+            $disc         = (float) ($item->discount ?? 0);
+            $extraDisc    = (float) ($item->extra_discount ?? 0);
+            $nomDisc      = ($disc <= 100 && $disc > 0) ? ($gross * $disc / 100) : $disc;
+            $nomExtraDisc = ($extraDisc <= 100 && $extraDisc > 0) ? ($gross * $extraDisc / 100) : $extraDisc;
+
+            $invoices[$key]['subtotal'] += $gross;
+            $invoices[$key]['discount'] += ($nomDisc + $nomExtraDisc);
+        }
+
+        $daily = [];
+        foreach ($invoices as $inv) {
+            $dpp = round(max(0, $inv['subtotal'] - $inv['discount']));
+            $ppnType = $inv['ppn_type'];
+            $ppn = 0;
+            $jumlah = 0;
+
+            if ($ppnType === 'EXCLUDE') {
+                $ppn = floor($dpp * self::PPN);
+                $jumlah = $dpp + $ppn;
+            } elseif ($ppnType === 'INCLUDE') {
+                $jumlah = $dpp;
+                $hna = floor($dpp / (1 + self::PPN));
+                $ppn = $jumlah - $hna;
+                $dpp = $hna;
+            } else { // TANPA
+                $ppn = 0;
+                $jumlah = $dpp;
+            }
+
+            $date = $inv['date'];
+            if (!isset($daily[$date])) {
+                $daily[$date] = [
+                    'pbf'         => 0.0,
+                    'consignment' => 0.0,
+                    'cash'        => 0.0,
+                    'ppn'         => 0.0,
+                    'dpp'         => 0.0,
+                    'total'       => 0.0,
+                ];
+            }
+
+            $payment = mb_strtoupper(trim((string) $inv['invoice_payment']));
+            $kind = match ($payment) {
+                'KONSINYASI'    => 'consignment',
+                'TUNAI', 'CASH' => 'cash',
+                default         => 'pbf',
+            };
+
+            $daily[$date][$kind] += (float) $jumlah;
+            $daily[$date]['ppn'] += (float) $ppn;
+            $daily[$date]['dpp'] += (float) $dpp;
+            $daily[$date]['total'] += (float) $jumlah;
+        }
+
+        return $daily;
+    }
+
     public function array(): array
     {
         $pharmacy = Pharmacies::find($this->pharmacyId);

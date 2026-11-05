@@ -78,9 +78,7 @@ class KinerjaOmzetService
             $ppn = 0;
             $gross = $amount;
         }
-        $day['purchases'][$kind] -= $gross;
         $day['purchases']['return'] += $gross;
-        $day['purchases']['ppn'] -= $ppn;
     }
 
     /**
@@ -149,69 +147,16 @@ class KinerjaOmzetService
             $purchasePharmacyIds[] = 9;
         }
 
-        $details = \App\Models\ReceivingDetails::query()
-            ->with([
-                'receiving:id,pharmacy_id,status,date,created_at',
-                'creditor:code,ppn_type',
-                'receiving_items:id,receiving_details_id,total,raw_price,qty_received,qty',
-            ])
-            ->whereHas('receiving', fn($query) => $query->whereIn('pharmacy_id', $purchasePharmacyIds)->whereIn('status', [1, 2, 3]))
-            ->where(function ($q) use ($startDate, $endDate) {
-                $q->whereBetween(DB::raw('DATE(receiving_details.created_at)'), [$startDate, $endDate])
-                    ->orWhereHas('receiving', function ($rq) use ($startDate, $endDate) {
-                        $rq->whereRaw("COALESCE(STR_TO_DATE(NULLIF(date, ''), '%d/%m/%Y'), STR_TO_DATE(NULLIF(date, ''), '%Y-%m-%d'), DATE(created_at)) BETWEEN ? AND ?", [$startDate, $endDate]);
-                    });
-            })
-            ->get();
-
-        foreach ($details as $detail) {
-            $rawDate = trim((string) ($detail->receiving?->date ?: ''));
-            $date = null;
-            if (preg_match('/^\d{2}\/\d{2}\/\d{4}$/', $rawDate)) {
-                $parsed = \Carbon\Carbon::createFromFormat('d/m/Y', $rawDate)->toDateString();
-                if (isset($days[$parsed])) {
-                    $date = $parsed;
-                }
-            } elseif (!empty($rawDate)) {
-                try {
-                    $parsed = \Carbon\Carbon::parse($rawDate)->toDateString();
-                    if (isset($days[$parsed])) {
-                        $date = $parsed;
-                    }
-                } catch (\Throwable $e) {}
+        $dailyInvoices = \App\Exports\Orders\InvoiceSingleSheetExport::queryDailyInvoices($purchasePharmacyIds, $startDate, $endDate);
+        foreach ($dailyInvoices as $date => $invSummary) {
+            if (isset($days[$date])) {
+                $days[$date]['purchases']['pbf'] = (float) $invSummary['pbf'];
+                $days[$date]['purchases']['consignment'] = (float) $invSummary['consignment'];
+                $days[$date]['purchases']['cash'] = (float) $invSummary['cash'];
+                $days[$date]['purchases']['ppn'] = (float) $invSummary['ppn'];
+                $days[$date]['purchases']['total'] = (float) $invSummary['total'];
+                $days[$date]['purchases']['exVat'] = (float) $invSummary['dpp'];
             }
-
-            if (!$date) {
-                $detailDt = \Carbon\Carbon::parse($detail->created_at)->toDateString();
-                if (isset($days[$detailDt])) {
-                    $date = $detailDt;
-                } else {
-                    $rcvDt = \Carbon\Carbon::parse($detail->receiving?->created_at)->toDateString();
-                    $date = isset($days[$rcvDt]) ? $rcvDt : null;
-                }
-            }
-
-            if (!$date || !isset($days[$date])) {
-                continue;
-            }
-
-            $amount = 0.0;
-            foreach ($detail->receiving_items as $item) {
-                $lineTotal = (float) ($item->total ?? 0);
-                if ($lineTotal <= 0) {
-                    $lineTotal = (float) ($item->raw_price ?? 0) * (float) ($item->qty_received ?? $item->qty ?? 0);
-                }
-                $amount += $lineTotal;
-            }
-
-            $payment = mb_strtoupper(trim((string) $detail->invoice_payment));
-            $kind = match ($payment) {
-                'KONSINYASI' => 'consignment',
-                'TUNAI', 'CASH' => 'cash',
-                default => 'pbf',
-            };
-
-            $this->addPurchase($days[$date], $kind, $amount, (string) ($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA'));
         }
 
         $returnInvoiceMeta = DB::table('receiving_items as ri')
