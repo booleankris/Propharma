@@ -105,8 +105,8 @@ class NeracaReportService
         });
 
         // 2. Piutang Dagang (Penjualan Kredit yang belum lunas)
-        $piutangAwal = $this->receivableBalanceAtDate($pharmacyId, $dayBeforeStart);
-        $piutangAkhir = $this->receivableBalanceAtDate($pharmacyId, $periodEnd);
+        $piutangAwal = $this->receivableBalanceAtDate($pharmacyIds, $dayBeforeStart);
+        $piutangAkhir = $this->receivableBalanceAtDate($pharmacyIds, $periodEnd);
         $piutangDagangRow = [
             'label' => 'PIUTANG DAGANG',
             'awal' => $piutangAwal,
@@ -123,8 +123,8 @@ class NeracaReportService
         ];
 
         // 4. Hutang Dagang (Pembelian Kredit yang belum lunas)
-        $hutangAwal = $this->payableBalanceAtDate($pharmacyId, $dayBeforeStart);
-        $hutangAkhir = $this->payableBalanceAtDate($pharmacyId, $periodEnd);
+        $hutangAwal = $this->payableBalanceAtDate($pharmacyIds, $dayBeforeStart);
+        $hutangAkhir = $this->payableBalanceAtDate($pharmacyIds, $periodEnd);
         // Note: For liability, SELISIH in template is AWAL - AKHIR (or -(AKHIR - AWAL))
         // because increasing liability decreases net worth/profit.
         $hutangDagangRow = [
@@ -258,14 +258,14 @@ class NeracaReportService
         return $balance;
     }
 
-    private function receivableBalanceAtDate(int $pharmacyId, string $asOfDate): float
+    private function receivableBalanceAtDate(array $pharmacyIds, string $asOfDate): float
     {
         $transactions = MedicineTransactions::query()
             ->with(['transactions' => fn ($query) => $query->where('status', 1)])
             ->withSum(['payments as finance_paid' => fn ($query) => $query
                 ->where('payment_type', 'PIUTANG')
                 ->whereDate('payment_date', '<=', $asOfDate)], 'amount')
-            ->where('pharmacy_id', $pharmacyId)
+            ->whereIn('pharmacy_id', $pharmacyIds)
             ->whereIn('transaction_type', ['KREDIT', 'RESEP KREDIT', 'RETUR KREDIT'])
             ->where(function ($period) use ($asOfDate) {
                 $period->where('created_at', '<', FinanceShift::endExclusive($asOfDate))
@@ -312,8 +312,13 @@ class NeracaReportService
         return (float) array_sum($balancesByDebtor);
     }
 
-    private function payableBalanceAtDate(int $pharmacyId, string $asOfDate): float
+    private function payableBalanceAtDate(array $pharmacyIds, string $asOfDate): float
     {
+        // PMI (Apotek ID 1): Pemesanan dan pembelian dari supplier dicatat di Gudang PMI (ID 9).
+        if (in_array(1, $pharmacyIds, true) && !in_array(9, $pharmacyIds, true)) {
+            $pharmacyIds[] = 9;
+        }
+
         $details = ReceivingDetails::query()
             ->with([
                 'receiving:id,pharmacy_id,status,date,created_at',
@@ -322,14 +327,11 @@ class NeracaReportService
                 'payments' => fn ($query) => $query->whereDate('payment_date', '<=', $asOfDate),
             ])
             ->whereRaw('UPPER(TRIM(COALESCE(invoice_payment, ""))) = ?', ['KREDIT'])
-            ->whereHas('receiving', function ($query) use ($pharmacyId, $asOfDate) {
-                $query->where('pharmacy_id', $pharmacyId)
+            ->whereHas('receiving', function ($query) use ($pharmacyIds, $asOfDate) {
+                $query->whereIn('pharmacy_id', $pharmacyIds)
                     ->whereIn('status', [1, 2, 3])
                     ->where(function ($date) use ($asOfDate) {
-                        $date->whereDate('date', '<=', $asOfDate)
-                            ->orWhere(function ($legacy) use ($asOfDate) {
-                                $legacy->whereNull('date')->whereDate('created_at', '<=', $asOfDate);
-                            });
+                        $date->whereRaw("COALESCE(STR_TO_DATE(NULLIF(date, ''), '%d/%m/%Y'), STR_TO_DATE(NULLIF(date, ''), '%Y-%m-%d'), DATE(created_at)) <= ?", [$asOfDate]);
                     });
             })
             ->get();

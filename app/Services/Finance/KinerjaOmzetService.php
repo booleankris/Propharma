@@ -180,18 +180,27 @@ class KinerjaOmzetService
             }
         }
 
+        $purchasePharmacyIds = $pharmacyIds;
+        if (in_array(1, $purchasePharmacyIds, true) && !in_array(9, $purchasePharmacyIds, true)) {
+            $purchasePharmacyIds[] = 9;
+        }
+
         $receivings = Receiving::query()
             ->with([
                 'receiving_details.receiving_items' => fn($query) => $query->whereNotNull('batches_id'),
                 'receiving_details.creditor',
             ])
-            ->whereIn('pharmacy_id', $pharmacyIds)
+            ->whereIn('pharmacy_id', $purchasePharmacyIds)
             ->whereIn('status', [1, 2, 3])
-            ->whereDate('date', '>=', $startDate)
-            ->whereDate('date', '<=', $endDate)
+            ->whereRaw("COALESCE(STR_TO_DATE(NULLIF(date, ''), '%d/%m/%Y'), STR_TO_DATE(NULLIF(date, ''), '%Y-%m-%d'), DATE(created_at)) BETWEEN ? AND ?", [$startDate, $endDate])
             ->get();
         foreach ($receivings as $receiving) {
-            $date = \Carbon\Carbon::parse($receiving->date)->toDateString();
+            $rawDate = trim((string) $receiving->date);
+            if (preg_match('/^\d{2}\/\d{2}\/\d{4}$/', $rawDate)) {
+                $date = \Carbon\Carbon::createFromFormat('d/m/Y', $rawDate)->toDateString();
+            } else {
+                $date = \Carbon\Carbon::parse($rawDate ?: $receiving->created_at)->toDateString();
+            }
             if (!isset($days[$date]))
                 continue;
             foreach ($receiving->receiving_details as $detail) {
@@ -221,12 +230,11 @@ class KinerjaOmzetService
                 $join->on('rd.receiving_id', '=', 'r.id')->on('rd.batches_id', '=', 'il.batches_id');
             })
             ->where('il.status', 4)
-            ->whereIn('r.pharmacy_id', $pharmacyIds)
+            ->whereIn('r.pharmacy_id', $purchasePharmacyIds)
             ->whereIn('r.status', [1, 2, 3])
-            ->whereDate('il.date', '>=', $startDate)
-            ->whereDate('il.date', '<=', $endDate)
-            ->selectRaw('DATE(il.date) as return_date, UPPER(TRIM(COALESCE(rd.invoice_payment, ""))) as invoice_payment, UPPER(TRIM(COALESCE(rd.invoice_ppn, "TANPA"))) as invoice_ppn, SUM(CAST(COALESCE(NULLIF(il.total, ""), "0") AS DECIMAL(15,2))) as amount')
-            ->groupByRaw('DATE(il.date), UPPER(TRIM(COALESCE(rd.invoice_payment, ""))), UPPER(TRIM(COALESCE(rd.invoice_ppn, "TANPA")))')
+            ->whereRaw("COALESCE(STR_TO_DATE(NULLIF(il.date, ''), '%Y-%m-%d'), STR_TO_DATE(NULLIF(il.date, ''), '%d/%m/%Y'), DATE(il.created_at)) BETWEEN ? AND ?", [$startDate, $endDate])
+            ->selectRaw('DATE(COALESCE(STR_TO_DATE(NULLIF(il.date, ""), "%Y-%m-%d"), STR_TO_DATE(NULLIF(il.date, ""), "%d/%m/%Y"), il.created_at)) as return_date, UPPER(TRIM(COALESCE(rd.invoice_payment, ""))) as invoice_payment, UPPER(TRIM(COALESCE(rd.invoice_ppn, "TANPA"))) as invoice_ppn, SUM(CAST(COALESCE(NULLIF(il.total, ""), "0") AS DECIMAL(15,2))) as amount')
+            ->groupByRaw('return_date, UPPER(TRIM(COALESCE(rd.invoice_payment, ""))), UPPER(TRIM(COALESCE(rd.invoice_ppn, "TANPA")))')
             ->get();
         foreach ($returns as $return) {
             $date = (string) $return->return_date;

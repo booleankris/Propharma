@@ -857,11 +857,16 @@ class FinanceController extends Controller
 
     /**
      * Helper: Ambil target pharmacy ID untuk filter data transaksi cabang.
+     * Untuk PMI (Apotek ID 1 & Gudang ID 9), pemesanan dan pembelian dari supplier dicatat
+     * di Gudang PMI (ID 9), sehingga sertakan [1, 9] agar seluruh pembelian & hutang masuk.
      */
     protected function getTargetPharmacyIds(): array
     {
-        $activeId = getActivePharmacyId();
-        return [$activeId > 0 ? (int) $activeId : 1];
+        $activeId = (int) getActivePharmacyId();
+        if ($activeId <= 0 || $activeId === 1 || $activeId === 9) {
+            return [1, 9];
+        }
+        return [$activeId];
     }
 
     /** Ringkasan posisi dana saat ini dan pergerakan keluar pada periode terpilih. */
