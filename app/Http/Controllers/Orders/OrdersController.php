@@ -1038,68 +1038,84 @@ class OrdersController extends Controller
 
     public function exportSmartMedicines(Request $request)
     {
-        [$query, $salesPharmacyId, $order, $dateFrom, $dateTo, $search, $sort, $pharmacyId] = $this->buildSmartMedicinesQuery($request);
+        [, $salesPharmacyId, $order, , , $search, $sort, $pharmacyId] = $this->buildSmartMedicinesQuery($request);
 
         $pharmacy = Pharmacies::find($pharmacyId);
-        $allRows = $query->get();
+        $periodFrom = now()->subMonths(6)->startOfDay();
+        $periodTo = now();
 
-        $medicineIds = $allRows->pluck('medicine_id')->filter()->unique()->values()->all();
-        $salesAggMap = [];
+        $batchStock = \App\Models\Batches::selectRaw('COALESCE(SUM(batches.stock), 0)')
+            ->whereColumn('batches.medicine_id', 'medicines.id')
+            ->where('batches.pharmacy_id', $pharmacyId);
+        $transferStock = \App\Models\MedicineTransferItems::selectRaw('COALESCE(SUM(medicine_transfer_items.qty), 0)')
+            ->join('batches', 'batches.id', '=', 'medicine_transfer_items.batches_id')
+            ->whereColumn('batches.medicine_id', 'medicines.id')
+            ->where('batches.pharmacy_id', $salesPharmacyId)
+            ->where('medicine_transfer_items.status', 1)
+            ->where(function ($q) {
+                $q->whereNull('medicine_transfer_items.source_type')
+                    ->orWhere('medicine_transfer_items.source_type', '!=', 'retur_gudang');
+            });
 
-        if (!empty($medicineIds)) {
-            $oneMonthAgo = now()->subDays(30)->toDateTimeString();
-            $threeMonthsAgo = now()->subDays(90)->toDateTimeString();
+        $allRows = MedicineCart::query()
+            ->join('medicine_transactions', 'medicine_transactions.id', '=', 'medicine_cart.transaction_id')
+            ->join('medicines', 'medicines.id', '=', 'medicine_cart.medicine_id')
+            ->leftJoin('factories', 'factories.id', '=', 'medicines.factory_id')
+            ->where('medicine_transactions.pharmacy_id', $salesPharmacyId)
+            ->where('medicine_transactions.status', 1)
+            ->where('medicine_cart.status', 1)
+            ->whereBetween('medicine_transactions.created_at', [$periodFrom, $periodTo])
+            ->when($search, fn ($q) => $q->where(function ($sub) use ($search) {
+                $sub->where('medicines.name', 'like', "%{$search}%")
+                    ->orWhere('medicines.code', 'like', "%{$search}%");
+            }))
+            ->select([
+                'medicines.factory_id',
+                'factories.name as factory_name',
+                'medicines.id as medicine_id',
+                'medicines.code',
+                'medicines.name',
+                'medicines.packaging',
+                'medicines.raw_price',
+                'medicines.minimal_stock',
+            ])
+            ->selectRaw('SUM(medicine_cart.quantity) as sold_6_months')
+            ->selectSub($batchStock, 'batch_stock')
+            ->selectSub($transferStock, 'transfer_stock')
+            ->groupBy('medicines.factory_id', 'factories.name', 'medicines.id', 'medicines.code', 'medicines.name', 'medicines.packaging', 'medicines.raw_price', 'medicines.minimal_stock')
+            ->when($sort === 'sold_desc', fn ($q) => $q->orderByDesc('sold_6_months')->orderBy('medicines.name'))
+            ->when($sort !== 'sold_desc', fn ($q) => $q->orderBy('factories.name')->orderBy('medicines.name'))
+            ->get();
 
-            foreach (array_chunk($medicineIds, 1000) as $chunkIds) {
-                $salesAggChunk = MedicineCart::select('medicine_cart.medicine_id')
-                    ->selectRaw('COALESCE(SUM(CASE WHEN medicine_transactions.created_at >= ? THEN medicine_cart.quantity ELSE 0 END), 0) as sold_1_month', [$oneMonthAgo])
-                    ->selectRaw('COALESCE(SUM(medicine_cart.quantity), 0) as sold_3_months')
-                    ->join('medicine_transactions', 'medicine_transactions.id', '=', 'medicine_cart.transaction_id')
-                    ->where('medicine_transactions.pharmacy_id', $salesPharmacyId)
-                    ->where('medicine_transactions.status', 1)
-                    ->where('medicine_transactions.created_at', '>=', $threeMonthsAgo)
-                    ->whereIn('medicine_cart.medicine_id', $chunkIds)
-                    ->groupBy('medicine_cart.medicine_id')
-                    ->get();
-
-                foreach ($salesAggChunk as $agg) {
-                    $salesAggMap[$agg->medicine_id] = $agg;
-                }
-            }
-        }
-
-        $exportItems = $allRows->map(function ($row) use ($salesAggMap) {
-            $totalStocks = (int) ($row->batch_stock ?? 0) + (int) ($row->transfer_stock ?? 0);
-            $medId = $row->medicine_id;
-            $sold1Month = isset($salesAggMap[$medId]) ? (int) $salesAggMap[$medId]->sold_1_month : 0;
-            $sold3Months = isset($salesAggMap[$medId]) ? (int) $salesAggMap[$medId]->sold_3_months : 0;
-
-            return [
-                'medicine_id' => $row->medicine_id,
-                'code' => $row->code,
-                'name' => $row->name,
-                'packaging' => $row->packaging,
-                'raw_price' => $row->raw_price,
-                'total_sold' => (int) $row->total_sold,
-                'min_stock' => $row->minimal_stock,
-                'stocks' => $totalStocks,
-                'sold_1_month' => $sold1Month,
-                'sold_3_months' => $sold3Months,
-            ];
-        })->all();
+        $factorySheets = $allRows->groupBy(fn ($row) => $row->factory_id ?: 'none')
+            ->map(function ($items) {
+                return [
+                    'title' => $items->first()->factory_name ?: 'Tanpa Pabrik',
+                    'items' => $items->values()->map(fn ($row) => [
+                        'medicine_id' => $row->medicine_id,
+                        'code' => $row->code,
+                        'name' => $row->name,
+                        'packaging' => $row->packaging,
+                        'raw_price' => $row->raw_price,
+                        'min_stock' => $row->minimal_stock,
+                        'stocks' => (int) ($row->batch_stock ?? 0) + (int) ($row->transfer_stock ?? 0),
+                        'sold_6_months' => (int) $row->sold_6_months,
+                    ])->all(),
+                ];
+            })
+            ->values()
+            ->all();
 
         $filters = [
-            'date_from' => $dateFrom,
-            'date_to' => $dateTo,
+            'period_from' => $periodFrom,
+            'period_to' => $periodTo,
             'search' => $search,
-            'sort' => $sort,
             'pharmacy_name' => $pharmacy?->name ?? 'Apotek',
             'order_code' => $order?->code ?? '-',
         ];
 
-        $filename = 'SMART_ORDER_' . ($order?->code ? $order->code . '_' : '') . $dateFrom . '_sd_' . $dateTo . '.xlsx';
-
-        return Excel::download(new SmartOrderExport($exportItems, $filters), $filename);
+        $filename = 'SMART_ORDER_' . ($order?->code ? $order->code . '_' : '') . '6_BULAN.xlsx';
+        return Excel::download(new SmartOrderExport($factorySheets, $filters), $filename);
     }
 
     public function addItemsBulk(Request $request)

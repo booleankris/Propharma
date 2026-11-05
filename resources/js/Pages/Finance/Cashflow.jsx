@@ -8,6 +8,7 @@ import KinerjaOmzet from './KinerjaOmzet';
 import TradeDailyCashflow from './TradeDailyCashflow';
 import KeuanganDaily from './KeuanganDaily';
 import RekapCashflow from './RekapCashflow';
+import Neraca from './Neraca';
 
 const banks = [
     { key: 'BNI', label: 'BNI' },
@@ -96,7 +97,7 @@ function CustomSelect({ value, onChange, options, icon: Icon, className = "" }) 
     );
 }
 
-export default function Cashflow({ days = [], monitoringDays = [], kinerjaDays = [], kinerjaDebtors = [], piutangDagang = {}, hutangDagang = {}, keuanganDays = [], saldoAwalKas = 0, setorAccounts = [], recapCashflow = {}, filters = {} }) {
+export default function Cashflow({ days = [], monitoringDays = [], kinerjaDays = [], kinerjaDebtors = [], neracaData = {}, piutangDagang = {}, hutangDagang = {}, keuanganDays = [], saldoAwalKas = 0, setorAccounts = [], recapCashflow = {}, filters = {} }) {
     const [month, setMonth] = useState(String(filters.month || new Date().getMonth() + 1));
     const [year, setYear] = useState(String(filters.year || new Date().getFullYear()));
     const [activeTab, setActiveTab] = useState('rekap');
@@ -130,7 +131,9 @@ export default function Cashflow({ days = [], monitoringDays = [], kinerjaDays =
         router.get('/finance/cashflow', { month, year }, { preserveState: true, preserveScroll: true });
     };
 
-    const exportUrl = ['piutang', 'hutang'].includes(activeTab)
+    const exportUrl = activeTab === 'neraca'
+        ? `/finance/cashflow/neraca-export?month=${encodeURIComponent(month)}&year=${encodeURIComponent(year)}`
+        : ['piutang', 'hutang'].includes(activeTab)
         ? `/finance/cashflow/trade-export?type=${activeTab}&month=${encodeURIComponent(month)}&year=${encodeURIComponent(year)}`
         : `${activeTab === 'sheet' ? '/finance/cashflow/export' : activeTab === 'monitoring' ? '/finance/cashflow/monitoring-export' : '/finance/cashflow/kinerja-export'}?month=${encodeURIComponent(month)}&year=${encodeURIComponent(year)}`;
 
@@ -145,8 +148,8 @@ export default function Cashflow({ days = [], monitoringDays = [], kinerjaDays =
                         <span className="rounded-xl bg-blue-100 p-2.5 text-blue-700"><ArrowDownUp className="h-5 w-5" /></span>
                         <div>
                             <div className="text-xs font-bold uppercase tracking-wider text-blue-700">Cashflow</div>
-                            <h2 className="mt-1 text-xl font-bold text-slate-900">{activeTab === 'rekap' ? 'Rekap posisi keuangan cabang' : activeTab === 'sheet' ? 'Omzet per tanggal dan shift' : activeTab === 'monitoring' ? 'Monitoring target penjualan' : activeTab === 'kinerja' ? 'Kinerja omzet' : activeTab === 'piutang' ? 'Piutang dagang per hari' : activeTab === 'hutang' ? 'Hutang dagang per hari' : 'Keuangan harian'}</h2>
-                            <p className="mt-1 max-w-3xl text-sm text-slate-600">{activeTab === 'rekap' ? 'Lihat saldo kas dan bank aktual cabang, piutang yang belum tertagih, hutang supplier, dan pengeluaran periode.' : activeTab === 'sheet' ? 'Rincian dikelompokkan menurut Cash, EDC, Transfer/QRIS, diskon, netto LIPH, dan total setoran. Hari kerja mengikuti batas operasional.' : activeTab === 'monitoring' ? 'Laporan harian mengikuti format Excel dan tanggal operasional.' : activeTab === 'kinerja' ? 'Penjualan dibagi menurut jam transaksi ke shift Pagi/Sore, terlepas dari waktu login kasir.' : activeTab === 'piutang' ? 'Penjualan kredit dan retur dikelompokkan berdasarkan tanggal operasional transaksi.' : activeTab === 'hutang' ? 'Pembelian kredit dikelompokkan berdasarkan tanggal operasional pencatatan penerimaan.' : 'Ringkasan pemasukan dan pengeluaran kas harian; penjualan tunai mengikuti tanggal operasional.'}</p>
+                            <h2 className="mt-1 text-xl font-bold text-slate-900">{activeTab === 'rekap' ? 'Rekap posisi keuangan cabang' : activeTab === 'neraca' ? 'Neraca (Balance Sheet)' : activeTab === 'sheet' ? 'Omzet per tanggal dan shift' : activeTab === 'monitoring' ? 'Monitoring target penjualan' : activeTab === 'kinerja' ? 'Kinerja omzet' : activeTab === 'piutang' ? 'Piutang dagang per hari' : activeTab === 'hutang' ? 'Hutang dagang per hari' : 'Keuangan harian'}</h2>
+                            <p className="mt-1 max-w-3xl text-sm text-slate-600">{activeTab === 'rekap' ? 'Lihat saldo kas dan bank aktual cabang, piutang yang belum tertagih, hutang supplier, dan pengeluaran periode.' : activeTab === 'neraca' ? 'Posisi saldo kas, bank, piutang, hutang dagang, dan valuasi persediaan stok barang.' : activeTab === 'sheet' ? 'Rincian dikelompokkan menurut Cash, EDC, Transfer/QRIS, diskon, netto LIPH, dan total setoran. Hari kerja mengikuti batas operasional.' : activeTab === 'monitoring' ? 'Laporan harian mengikuti format Excel dan tanggal operasional.' : activeTab === 'kinerja' ? 'Penjualan dibagi menurut jam transaksi ke shift Pagi/Sore, terlepas dari waktu login kasir.' : activeTab === 'piutang' ? 'Penjualan kredit dan retur dikelompokkan berdasarkan tanggal operasional transaksi.' : activeTab === 'hutang' ? 'Pembelian kredit dikelompokkan berdasarkan tanggal operasional pencatatan penerimaan.' : 'Ringkasan pemasukan dan pengeluaran kas harian; penjualan tunai mengikuti tanggal operasional.'}</p>
                             <p className="mt-1 text-xs font-medium text-blue-700">Hari operasional: 07.30 sampai sebelum 07.30 esok hari · Pagi 07.30–15.30 · Sore 15.31–07.29.</p>
                         </div>
                     </div>
@@ -186,6 +189,7 @@ export default function Cashflow({ days = [], monitoringDays = [], kinerjaDays =
                 <div role="tablist" aria-label="Laporan cashflow" className="flex w-fit flex-wrap gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
                     {[
                         { key: 'rekap', label: 'Rekap Cashflow' },
+                        { key: 'neraca', label: 'Neraca' },
                         { key: 'sheet', label: 'Lembar Omzet Harian' },
                         { key: 'monitoring', label: 'Monitoring Penjualan' },
                         { key: 'kinerja', label: 'Kinerja Omzet' },
@@ -197,7 +201,7 @@ export default function Cashflow({ days = [], monitoringDays = [], kinerjaDays =
                     </button>)}
                 </div>
 
-                {activeTab === 'rekap' ? <RekapCashflow recap={recapCashflow} monthLabel={`${monthOptions.find((option) => String(option.value) === String(month))?.label || ''} ${year}`} /> : activeTab === 'keuangan' ? <KeuanganDaily days={keuanganDays} saldoAwal={saldoAwalKas} setorAccounts={setorAccounts} /> : activeTab === 'monitoring' ? <MonitoringPenjualan days={monitoringDays} /> : activeTab === 'kinerja' ? <KinerjaOmzet days={kinerjaDays} debtors={kinerjaDebtors} /> : activeTab === 'piutang' ? <TradeDailyCashflow
+                {activeTab === 'rekap' ? <RekapCashflow recap={recapCashflow} monthLabel={`${monthOptions.find((option) => String(option.value) === String(month))?.label || ''} ${year}`} /> : activeTab === 'neraca' ? <Neraca data={neracaData} monthLabel={`${monthOptions.find((option) => String(option.value) === String(month))?.label || ''} ${year}`} /> : activeTab === 'keuangan' ? <KeuanganDaily days={keuanganDays} saldoAwal={saldoAwalKas} setorAccounts={setorAccounts} /> : activeTab === 'monitoring' ? <MonitoringPenjualan days={monitoringDays} /> : activeTab === 'kinerja' ? <KinerjaOmzet days={kinerjaDays} debtors={kinerjaDebtors} /> : activeTab === 'piutang' ? <TradeDailyCashflow
                     title="Piutang Dagang"
                     description="Penjualan kredit dan retur dikelompokkan berdasarkan tanggal operasional transaksi."
                     report={piutangDagang}

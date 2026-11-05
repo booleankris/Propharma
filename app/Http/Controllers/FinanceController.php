@@ -9,6 +9,7 @@ use App\Exports\Finance\CashflowTradeExport;
 use App\Exports\Finance\HutangExport;
 use App\Exports\Finance\KinerjaOmzetExport;
 use App\Exports\Finance\MonitoringPenjualanExport;
+use App\Exports\Finance\NeracaExport;
 use App\Exports\Finance\PiutangExport;
 use App\Models\Creditor;
 use App\Models\Debtors;
@@ -24,6 +25,7 @@ use App\Services\Finance\CashflowReportService;
 use App\Services\Finance\CashflowTradeReportService;
 use App\Services\Finance\KinerjaOmzetService;
 use App\Services\Finance\MonitoringPenjualanService;
+use App\Services\Finance\NeracaReportService;
 use App\Services\Finance\KeuanganReportService;
 use App\Services\ConsignmentService;
 use App\Support\FinanceShift;
@@ -180,7 +182,7 @@ class FinanceController extends Controller
      * Ringkasan omzet kasir per hari dan shift. Data bersumber dari transaksi
      * selesai; metode yang belum dikonfirmasi pemetaan akuntansinya tetap terpisah.
      */
-    public function cashflow(Request $request, CashflowReportService $cashflowReport, MonitoringPenjualanService $monitoringPenjualan, KinerjaOmzetService $kinerjaOmzet, CashflowTradeReportService $tradeReport, KeuanganReportService $keuanganReport)
+    public function cashflow(Request $request, CashflowReportService $cashflowReport, MonitoringPenjualanService $monitoringPenjualan, KinerjaOmzetService $kinerjaOmzet, CashflowTradeReportService $tradeReport, KeuanganReportService $keuanganReport, NeracaReportService $neracaReport)
     {
         if ($request->filled('pharmacy_id') && auth()->check() && (auth()->user()->hasRole('HO') || auth()->user()->hasRole('administrator') || auth()->user()->hasRole('General Manager'))) {
             session(['ho_pharmacy_id' => (int) $request->pharmacy_id]);
@@ -211,6 +213,7 @@ class FinanceController extends Controller
             return Excel::download(new CashflowExport($reportDays), $fileName);
         }
         $kinerjaDays = $kinerjaOmzet->build($pharmacyIds, $startDate, $endDate);
+        $neracaData = $neracaReport->build($pharmacyIds, $startDate, $endDate);
         $drawerAccount = $this->branchKasBankAccountsQuery()->where('account_type', 'kas_apotek')->first();
         $openingBalance = $drawerAccount
             ? FinancePayment::where('payment_type', 'SALDO AWAL')->where('account_id', $drawerAccount->id)->first()
@@ -222,6 +225,7 @@ class FinanceController extends Controller
             'monitoringDays' => $monitoringPenjualan->build($pharmacyIds, $startDate, $endDate),
             'kinerjaDays' => $kinerjaDays['days'],
             'kinerjaDebtors' => $kinerjaDays['debtors'],
+            'neracaData' => $neracaData,
             'piutangDagang' => $tradeReport->receivables($pharmacyIds, $startDate, $endDate),
             'hutangDagang' => $tradeReport->payables($pharmacyIds, $startDate, $endDate),
             'keuanganDays' => $keuanganReport->build($pharmacyIds, $startDate, $endDate, $drawerAccount?->id, $openingBalance),
@@ -275,10 +279,10 @@ class FinanceController extends Controller
         return back()->with('success', 'Setoran kas ke rekening berhasil dicatat.');
     }
 
-    public function exportCashflow(Request $request, CashflowReportService $cashflowReport, MonitoringPenjualanService $monitoringPenjualan, KinerjaOmzetService $kinerjaOmzet, CashflowTradeReportService $tradeReport, KeuanganReportService $keuanganReport)
+    public function exportCashflow(Request $request, CashflowReportService $cashflowReport, MonitoringPenjualanService $monitoringPenjualan, KinerjaOmzetService $kinerjaOmzet, CashflowTradeReportService $tradeReport, KeuanganReportService $keuanganReport, NeracaReportService $neracaReport)
     {
         $request->merge(['download_xlsx' => true]);
-        return $this->cashflow($request, $cashflowReport, $monitoringPenjualan, $kinerjaOmzet, $tradeReport, $keuanganReport);
+        return $this->cashflow($request, $cashflowReport, $monitoringPenjualan, $kinerjaOmzet, $tradeReport, $keuanganReport, $neracaReport);
     }
 
     public function exportCashflowTrade(Request $request, CashflowTradeReportService $tradeReport)
@@ -302,6 +306,26 @@ class FinanceController extends Controller
         return Excel::download(
             new CashflowTradeExport($report, strtoupper($label), $label, "Periode: {$period}"),
             sprintf('cashflow-%s_%04d-%02d.xlsx', $validated['type'], $year, $month)
+        );
+    }
+
+    public function exportNeraca(Request $request, NeracaReportService $neracaReport)
+    {
+        $validated = $request->validate([
+            'month' => 'required|integer|min:1|max:12',
+            'year' => 'required|integer|min:2000|max:2100',
+        ]);
+        $month = (int) $validated['month'];
+        $year = (int) $validated['year'];
+        $start = \Carbon\Carbon::createFromDate($year, $month, 1)->startOfMonth();
+        $end = $start->copy()->endOfMonth();
+        $pharmacyIds = $this->getTargetPharmacyIds();
+        $data = $neracaReport->build($pharmacyIds, $start->toDateString(), $end->toDateString());
+        $activePharmacy = Pharmacies::find(getActivePharmacyId()) ?? Pharmacies::find(1);
+
+        return Excel::download(
+            new NeracaExport($data, $activePharmacy),
+            sprintf('neraca_%04d-%02d.xlsx', $year, $month)
         );
     }
 

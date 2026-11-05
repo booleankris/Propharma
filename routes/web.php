@@ -579,6 +579,7 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
         Route::get('/cashflow/monitoring-export', [\App\Http\Controllers\FinanceController::class, 'exportMonitoringPenjualan'])->name('cashflow.monitoring-export');
         Route::get('/cashflow/kinerja-export', [\App\Http\Controllers\FinanceController::class, 'exportKinerjaOmzet'])->name('cashflow.kinerja-export');
         Route::get('/cashflow/trade-export', [\App\Http\Controllers\FinanceController::class, 'exportCashflowTrade'])->name('cashflow.trade-export');
+        Route::get('/cashflow/neraca-export', [\App\Http\Controllers\FinanceController::class, 'exportNeraca'])->name('cashflow.neraca-export');
         Route::post('/setoran', [\App\Http\Controllers\FinanceController::class, 'storeSetoran'])->name('setoran.store');
         Route::get('/konsinyasi', [\App\Http\Controllers\FinanceController::class, 'konsinyasi'])->name('konsinyasi');
         Route::get('/piutang', [\App\Http\Controllers\FinanceController::class, 'piutang'])->name('piutang');

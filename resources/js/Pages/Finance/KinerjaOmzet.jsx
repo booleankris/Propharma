@@ -18,9 +18,14 @@ export default function KinerjaOmzet({ days = [], debtors = [] }) {
             for (const debtor of debtors) sum[`debtor_${debtor.id}`] = (sum[`debtor_${debtor.id}`] || 0) + numeric(day.sales?.credit?.morning?.[debtor.id]) + numeric(day.sales?.credit?.evening?.[debtor.id]);
             for (const key of ['pbf', 'cash', 'consignment', 'return', 'discountOff', 'total', 'ppn', 'exVat']) sum[`purchase_${key}`] = (sum[`purchase_${key}`] || 0) + numeric(day.purchases?.[key]);
             sum.margin += numeric(day.sales?.exVat) - numeric(day.purchases?.exVat);
+            sum.other_income += numeric(day.other_income);
+            sum.expense += numeric(day.expense);
             return sum;
-        }, { cashMorning: 0, cashEvening: 0, bankMorning: 0, bankEvening: 0, salesReturns: 0, margin: 0 });
+        }, { cashMorning: 0, cashEvening: 0, bankMorning: 0, bankEvening: 0, salesReturns: 0, margin: 0, other_income: 0, expense: 0 });
         result.purchase_sd = numeric(days[days.length - 1]?.purchases?.sd);
+        result.other_income_sd = numeric(days[days.length - 1]?.other_income_sd);
+        result.expense_sd = numeric(days[days.length - 1]?.expense_sd);
+        result.profit_loss_sd = numeric(days[days.length - 1]?.profit_loss_sd);
         return result;
     }, [days, debtors]);
 
@@ -42,12 +47,19 @@ export default function KinerjaOmzet({ days = [], debtors = [] }) {
                         <th rowSpan="3" className={`${header} sticky left-0 z-30 min-w-[108px] bg-slate-300`}>TANGGAL</th>
                         <th colSpan={6 + debtors.length} className={`${header} bg-emerald-200`}>PENJUALAN</th>
                         <th colSpan="9" className={`${header} bg-blue-200`}>PEMBELIAN</th>
+                        <th colSpan="6" className={`${header} bg-slate-200`}>LABA RUGI &amp; BIAYA</th>
                     </tr>
                     <tr className="bg-emerald-50">
                         <th colSpan="2" className={header}>CASH</th><th colSpan="2" className={header}>BANK</th>
                         <th rowSpan="2" className={`${header} bg-emerald-200`}>TOTAL OMSET TUNAI</th>
                         <th colSpan={creditCount} className={header}>KREDIT</th>
-                        <th rowSpan="2" className={header}>KREDIT</th><th rowSpan="2" className={header}>CASH</th><th rowSpan="2" className={header}>KONSINYASI</th><th rowSpan="2" className={`${header} bg-yellow-100`}>RETUR PEMBELIAN</th><th rowSpan="2" className={header}>DISKON OFF</th><th rowSpan="2" className={`${header} bg-blue-100`}>TOTAL PEMBELIAN</th><th rowSpan="2" className={header}>S/D</th><th rowSpan="2" className={header}>HPP %</th><th rowSpan="2" className={header}>MARGIN</th>
+                        <th rowSpan="2" className={header}>PBF</th><th rowSpan="2" className={header}>KONSINYASI</th><th rowSpan="2" className={`${header} bg-yellow-100`}>RETUR PEMBELIAN</th><th rowSpan="2" className={header}>CASH</th><th rowSpan="2" className={header}>JUMLAH BELI</th><th rowSpan="2" className={header}>PPN FAKTUR</th><th rowSpan="2" className={header}>BELI EXC PPN</th><th rowSpan="2" className={header}>MARGIN EXC PPN</th><th rowSpan="2" className={header}>HPP %</th>
+                        <th rowSpan="2" className={`${header} min-w-[130px]`}>PENDAPATAN LAIN-LAIN</th>
+                        <th rowSpan="2" className={`${header} min-w-[130px] bg-cyan-100`}>PENDAPATAN LAIN-LAIN S/D</th>
+                        <th rowSpan="2" className={`${header} min-w-[110px]`}>BIAYA</th>
+                        <th rowSpan="2" className={`${header} min-w-[90px]`}>SAVING</th>
+                        <th rowSpan="2" className={`${header} min-w-[110px] bg-cyan-100`}>BIAYA S/D</th>
+                        <th rowSpan="2" className={`${header} min-w-[120px] bg-cyan-100 text-slate-900`}>R/L S/D</th>
                     </tr>
                     <tr className="bg-emerald-50">
                         <th className={header}>PAGI</th><th className={header}>MALAM</th><th className={header}>PAGI</th><th className={header}>MALAM</th>
@@ -65,9 +77,15 @@ export default function KinerjaOmzet({ days = [], debtors = [] }) {
                             <td className={`${cell} bg-emerald-200 font-semibold`}>{money(day.sales?.cashBankTotal)}</td>
                             {debtors.map((debtor) => <td key={debtor.id} className={cell}>{money(numeric(day.sales?.credit?.morning?.[debtor.id]) + numeric(day.sales?.credit?.evening?.[debtor.id]))}</td>)}
                             <td className={`${cell} bg-emerald-200 font-semibold`}>{money(day.sales?.creditTotal)}</td>
-                            <td className={cell}>{money(day.purchases?.pbf)}</td><td className={cell}>{money(day.purchases?.cash)}</td><td className={cell}>{money(day.purchases?.consignment)}</td><td className={`${cell} bg-yellow-100`}>{money(day.purchases?.return)}</td><td className={cell}>{money(day.purchases?.discountOff)}</td>
-                            <td className={`${cell} bg-blue-100 font-semibold`}>{money(day.purchases?.total)}</td><td className={cell}>{money(day.purchases?.sd)}</td>
-                            <td className={cell}>{dailyHpp.toFixed(1)}%</td><td className={`${cell} bg-blue-100 font-semibold`}>{money(numeric(day.sales?.exVat) - numeric(day.purchases?.exVat))}</td>
+                            <td className={cell}>{money(day.purchases?.pbf)}</td><td className={cell}>{money(day.purchases?.consignment)}</td><td className={`${cell} bg-yellow-100`}>{money(day.purchases?.return)}</td><td className={cell}>{money(day.purchases?.cash)}</td>
+                            <td className={`${cell} bg-blue-100 font-semibold`}>{money(day.purchases?.total)}</td><td className={cell}>{money(day.purchases?.ppn)}</td><td className={cell}>{money(day.purchases?.exVat)}</td>
+                            <td className={`${cell} bg-blue-100 font-semibold`}>{money(numeric(day.sales?.exVat) - numeric(day.purchases?.exVat))}</td><td className={cell}>{dailyHpp.toFixed(1)}%</td>
+                            <td className={cell}>{money(day.other_income)}</td>
+                            <td className={`${cell} bg-cyan-50/70 font-semibold text-slate-700`}>{money(day.other_income_sd)}</td>
+                            <td className={cell}>{money(day.expense)}</td>
+                            <td className={cell}>{money(day.saving || 0)}</td>
+                            <td className={`${cell} bg-cyan-50/70 font-semibold text-slate-700`}>{money(day.expense_sd)}</td>
+                            <td className={`${cell} bg-cyan-100/80 font-bold ${numeric(day.profit_loss_sd) < 0 ? 'text-rose-600' : 'text-slate-900'}`}>{money(day.profit_loss_sd)}</td>
                         </tr>;
                     })}
                     <tr className="bg-yellow-200 font-bold">
@@ -76,8 +94,14 @@ export default function KinerjaOmzet({ days = [], debtors = [] }) {
                         <td className={`${cell} bg-emerald-300 font-bold`}>{money(totals.sales_cashBankTotal)}</td>
                         {debtors.map((debtor) => <td key={debtor.id} className={cell}>{money(totals[`debtor_${debtor.id}`])}</td>)}
                         <td className={`${cell} bg-emerald-300 font-bold`}>{money(totals.sales_creditTotal)}</td>
-                        {['pbf', 'cash', 'consignment', 'return', 'discountOff', 'total'].map((key) => <td key={key} className={cell}>{money(totals[`purchase_${key}`])}</td>)}
-                        <td className={cell}>{money(totals.purchase_sd)}</td><td className={cell}>{hpp.toFixed(1)}%</td><td className={cell}>{money(totals.margin)}</td>
+                        {['pbf', 'consignment', 'return', 'cash', 'total', 'ppn', 'exVat'].map((key) => <td key={key} className={cell}>{money(totals[`purchase_${key}`])}</td>)}
+                        <td className={cell}>{money(totals.margin)}</td><td className={cell}>{hpp.toFixed(1)}%</td>
+                        <td className={cell}>{money(totals.other_income)}</td>
+                        <td className={`${cell} bg-cyan-100 font-bold text-slate-800`}>{money(totals.other_income_sd)}</td>
+                        <td className={cell}>{money(totals.expense)}</td>
+                        <td className={cell}>{money(0)}</td>
+                        <td className={`${cell} bg-cyan-100 font-bold text-slate-800`}>{money(totals.expense_sd)}</td>
+                        <td className={`${cell} bg-cyan-200 font-bold ${numeric(totals.profit_loss_sd) < 0 ? 'text-rose-600' : 'text-slate-900'}`}>{money(totals.profit_loss_sd)}</td>
                     </tr>
                 </tbody>
             </table>
