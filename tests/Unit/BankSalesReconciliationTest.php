@@ -273,4 +273,162 @@ class BankSalesReconciliationTest extends TestCase
         $this->assertSame($totalKasRow[6] + $totalBankRow[6], $totalKeseluruhanRow[6]);
         $this->assertSame(2085000, $totalKeseluruhanRow[6]); // 1,450,000 + 635,000
     }
+
+    public function test_kinerja_omzet_calculation_matches_bank_sales_export_cash_and_bank(): void
+    {
+        // Sample transactions simulating Shift 2 on 2026-11-05
+        $trxCash = (object) [
+            'id' => 201,
+            'transaction_code' => 'TRX201',
+            'transaction_type' => 'HV/OTC',
+            'payment_method' => 'cash',
+            'transfer_bank_name' => null,
+            'subtotal' => 16140000,
+            'discount' => 0,
+            'created_at' => \Illuminate\Support\Carbon::parse('2026-11-05 10:00:00'),
+            'updated_at' => \Illuminate\Support\Carbon::parse('2026-11-05 10:00:00'),
+            'transactions' => collect([
+                (object) [
+                    'quantity' => 10,
+                    'item_price' => 1614000,
+                    'discount' => 0,
+                    'final_price' => 16140000,
+                    'status' => 1,
+                    'cart_type' => null,
+                ]
+            ]),
+        ];
+
+        $trxQris = (object) [
+            'id' => 202,
+            'transaction_code' => 'TRX202',
+            'transaction_type' => 'UPDS',
+            'payment_method' => 'qris',
+            'transfer_bank_name' => 'BNI',
+            'subtotal' => 28585000,
+            'discount' => 66000,
+            'created_at' => \Illuminate\Support\Carbon::parse('2026-11-05 11:00:00'),
+            'updated_at' => \Illuminate\Support\Carbon::parse('2026-11-05 11:00:00'),
+            'transactions' => collect([
+                (object) [
+                    'quantity' => 5,
+                    'item_price' => 5717000,
+                    'discount' => 0,
+                    'final_price' => 28585000,
+                    'status' => 1,
+                    'cart_type' => null,
+                ]
+            ]),
+        ];
+
+        $trxTransfer = (object) [
+            'id' => 203,
+            'transaction_code' => 'TRX203',
+            'transaction_type' => 'RESEP TUNAI',
+            'payment_method' => 'transfer',
+            'transfer_bank_name' => 'BNI',
+            'subtotal' => 11989000,
+            'discount' => 4000,
+            'created_at' => \Illuminate\Support\Carbon::parse('2026-11-05 12:00:00'),
+            'updated_at' => \Illuminate\Support\Carbon::parse('2026-11-05 12:00:00'),
+            'transactions' => collect([
+                (object) [
+                    'quantity' => 2,
+                    'item_price' => 5994500,
+                    'discount' => 0,
+                    'final_price' => 11989000,
+                    'status' => 1,
+                    'cart_type' => null,
+                ]
+            ]),
+        ];
+
+        $trxKredit = (object) [
+            'id' => 204,
+            'transaction_code' => 'TRX204',
+            'transaction_type' => 'RESEP KREDIT',
+            'debtor_id' => 10,
+            'payment_method' => 'cash',
+            'transfer_bank_name' => null,
+            'subtotal' => 5094499,
+            'discount' => 0,
+            'created_at' => \Illuminate\Support\Carbon::parse('2026-11-05 13:00:00'),
+            'updated_at' => \Illuminate\Support\Carbon::parse('2026-11-05 13:00:00'),
+            'transactions' => collect([
+                (object) [
+                    'quantity' => 1,
+                    'item_price' => 5094499,
+                    'discount' => 0,
+                    'final_price' => 5094499,
+                    'status' => 1,
+                    'cart_type' => null,
+                ]
+            ]),
+        ];
+
+        $transactions = collect([$trxCash, $trxQris, $trxTransfer, $trxKredit]);
+
+        // 1. Calculate using BankSalesExport
+        $bankExportCash = 0;
+        $bankExportBank = 0;
+        $bankExportKredit = 0;
+
+        foreach ($transactions as $trx) {
+            $cat = BankSalesExport::resolveCategory($trx);
+            $typeGroup = \App\Exports\Report\LiphExport::TYPE_MAP[$trx->transaction_type][0] ?? 'tunai';
+            $amt = BankSalesExport::calculateTransactionAmount($trx);
+
+            if ($typeGroup === 'kredit') {
+                $bankExportKredit += $amt;
+            } elseif ($cat === 'CASH') {
+                $bankExportCash += $amt;
+            } elseif ($cat !== 'BELUM BAYAR') {
+                $bankExportBank += $amt;
+            }
+        }
+
+        $this->assertEquals(16140000, $bankExportCash);
+        // Bank = (28,585,000 - 66,000) + (11,989,000 - 4,000) = 28,519,000 + 11,985,000 = 40,504,000
+        $this->assertEquals(40504000, $bankExportBank);
+        $this->assertEquals(5094499, $bankExportKredit);
+
+        // 2. Simulate KinerjaOmzetService processing
+        $days = [
+            '2026-11-05' => [
+                'sales' => [
+                    'cash' => ['morning' => 0, 'evening' => 0],
+                    'bank' => ['morning' => 0, 'evening' => 0],
+                    'credit' => ['morning' => [], 'evening' => []],
+                    'returns' => ['morning' => 0, 'evening' => 0],
+                ],
+            ],
+        ];
+
+        foreach ($transactions as $transaction) {
+            $effectiveAt = $transaction->created_at;
+            $date = \App\Support\FinanceShift::operationalDate($effectiveAt);
+            $shift = \App\Support\FinanceShift::key($effectiveAt);
+            $amount = BankSalesExport::calculateTransactionAmount($transaction);
+            $typeGroup = \App\Exports\Report\LiphExport::TYPE_MAP[$transaction->transaction_type][0] ?? 'tunai';
+
+            if ($typeGroup === 'kredit') {
+                $debtorId = (int) ($transaction->debtor_id ?? 0);
+                $days[$date]['sales']['credit'][$shift][$debtorId] = ($days[$date]['sales']['credit'][$shift][$debtorId] ?? 0) + $amount;
+            } else {
+                $category = BankSalesExport::resolveCategory($transaction);
+                $catUpper = strtoupper(trim((string) $category));
+
+                if (in_array($catUpper, ['CASH', 'TUNAI'], true)) {
+                    $days[$date]['sales']['cash'][$shift] += $amount;
+                } elseif ($catUpper !== 'BELUM BAYAR' && $catUpper !== 'KREDIT') {
+                    $days[$date]['sales']['bank'][$shift] += $amount;
+                }
+            }
+        }
+
+        // Verify Kinerja Omzet matches BankSalesExport 100%
+        $this->assertEquals($bankExportCash, $days['2026-11-05']['sales']['cash']['morning']);
+        $this->assertEquals($bankExportBank, $days['2026-11-05']['sales']['bank']['morning']);
+        $this->assertEquals($bankExportKredit, $days['2026-11-05']['sales']['credit']['morning'][10]);
+    }
 }

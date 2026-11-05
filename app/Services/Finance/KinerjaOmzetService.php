@@ -2,6 +2,8 @@
 
 namespace App\Services\Finance;
 
+use App\Exports\Report\BankSalesExport;
+use App\Exports\Report\LiphExport;
 use App\Models\Debtors;
 use App\Models\MedicineTransactions;
 use App\Models\Receiving;
@@ -100,92 +102,45 @@ class KinerjaOmzetService
                 'debtors',
             ])
             ->whereIn('pharmacy_id', $pharmacyIds)
+            ->whereIn('transaction_type', array_keys(LiphExport::TYPE_MAP))
             ->tap(fn($q) => LiphTransactionScope::applySalesStatus($q))
             ->tap(fn($q) => LiphTransactionScope::applyPeriod($q, Carbon::parse($startDate), Carbon::parse($endDate)))
             ->orderBy('created_at')
             ->get();
 
-        // Preload metadata to match returns with their original sale
-        $returnTrx = $transactions->filter(fn($t) => in_array(mb_strtoupper(trim((string) $t->transaction_type)), ['RETUR JUAL', 'RETUR KREDIT'], true));
-        $rtDates = $returnTrx->pluck('created_at')->map(fn($c) => (string) $c)->all();
-        $itemLogs = DB::table('items_log')->whereIn('date', $rtDates)->where('type', 'RT')->get(['date', 'transaction_code'])->keyBy('date');
-        $trxCodes = $itemLogs->pluck('transaction_code')->filter()->unique()->all();
-        $trxByCode = MedicineTransactions::whereIn('transaction_code', $trxCodes)->get()->keyBy('transaction_code');
-
-        $patientIds = $returnTrx->pluck('patient_id')->filter()->unique()->all();
-        $candsByPatient = MedicineTransactions::whereIn('patient_id', $patientIds)
-            ->whereNotIn('transaction_type', ['RETUR JUAL', 'RETUR KREDIT'])
-            ->orderByDesc('id')
-            ->get(['id', 'patient_id', 'transaction_type', 'payment_method', 'debtor_id', 'created_at'])
-            ->groupBy('patient_id');
-
         foreach ($transactions as $transaction) {
-            $effectiveAt = $transaction->created_at ?? $transaction->updated_at;
+            $effectiveAt = $transaction->created_at ? Carbon::parse($transaction->created_at) : ($transaction->updated_at ? Carbon::parse($transaction->updated_at) : null);
             $date = FinanceShift::operationalDate($effectiveAt);
-            if (!$date || !isset($days[$date]))
+            if (!$date || !isset($days[$date])) {
                 continue;
-            $shift = FinanceShift::key($effectiveAt);
-            $type = mb_strtoupper(trim((string) $transaction->transaction_type));
-            $payment = mb_strtoupper(trim((string) $transaction->payment_method));
-            $isReturn = in_array($type, ['RETUR JUAL', 'RETUR KREDIT'], true);
-            $items = $transaction->transactions;
-            $itemNetto = (int) $items->sum(function ($item) {
-                $qty = (float) ($item->quantity ?? 0);
-                $price = (int) round((float) ($item->item_price ?? 0));
-                $disc = (int) round((float) ($item->discount ?? 0));
-                return (int) round((float) ($item->final_price ?? $item->total_price ?? ($price * $qty - $disc)));
-            });
-            $subtotal = is_numeric($transaction->subtotal) ? (int) round((float) $transaction->subtotal) : 0;
-            $discount = is_numeric($transaction->discount) ? (int) round((float) $transaction->discount) : 0;
-
-            if ($isReturn) {
-                $amount = $subtotal !== 0 ? abs($subtotal) : abs($itemNetto);
-            } elseif ($items->isEmpty()) {
-                $amount = max(0, $subtotal - $discount);
-            } else {
-                $amount = max(0, $itemNetto - $discount);
             }
+            $shift = FinanceShift::key($effectiveAt);
+            $amount = BankSalesExport::calculateTransactionAmount($transaction);
 
-            if ($type === 'RETUR KREDIT') {
-                $debtorId = (int) $transaction->debtor_id;
+            $typeGroup = LiphExport::TYPE_MAP[$transaction->transaction_type][0] ?? 'tunai';
+
+            if ($typeGroup === 'kredit') {
+                $debtorId = (int) ($transaction->debtor_id ?? 0);
                 $name = $transaction->debtors?->name ?: 'Debitur tidak tercatat';
-                if (!$transaction->debtors)
+                if (!$transaction->debtors && $debtorId > 0) {
                     $extraDebtors[$debtorId] = $name;
-                $days[$date]['sales']['credit'][$shift][$debtorId] = ($days[$date]['sales']['credit'][$shift][$debtorId] ?? 0) - abs($amount);
-                $days[$date]['sales']['returns'][$shift] -= abs($amount);
-            } elseif ($type === 'RETUR JUAL') {
-                // Determine original transaction's payment method and shift if retur is linked
-                $origTrx = null;
-                $log = $itemLogs->get((string) $transaction->created_at);
-                if ($log && $log->transaction_code) {
-                    $origTrx = $trxByCode->get($log->transaction_code);
                 }
-                if (!$origTrx && $transaction->patient_id) {
-                    $cands = $candsByPatient->get($transaction->patient_id);
-                    $origTrx = $cands ? $cands->first(fn($c) => $c->id < $transaction->id) : null;
-                }
-
-                $targetPayment = $origTrx ? mb_strtoupper(trim((string) $origTrx->payment_method)) : $payment;
-                $targetShift = $origTrx ? FinanceShift::key($origTrx->created_at) : $shift;
-                $targetDate = $origTrx ? FinanceShift::operationalDate($origTrx->created_at) : $date;
-                $targetDay = (isset($days[$targetDate])) ? $targetDate : $date;
-
-                if (in_array($targetPayment, ['QRIS', 'TRANSFER', 'DEBIT', 'EDC'], true)) {
-                    $days[$targetDay]['sales']['bank'][$targetShift] -= abs($amount);
-                } else {
-                    $days[$targetDay]['sales']['cash'][$targetShift] -= abs($amount);
-                }
-                $days[$targetDay]['sales']['returns'][$targetShift] -= abs($amount);
-            } elseif (in_array($type, ['KREDIT', 'RESEP KREDIT'], true)) {
-                $debtorId = (int) $transaction->debtor_id;
-                $name = $transaction->debtors?->name ?: 'Debitur tidak tercatat';
-                if (!$transaction->debtors)
-                    $extraDebtors[$debtorId] = $name;
                 $days[$date]['sales']['credit'][$shift][$debtorId] = ($days[$date]['sales']['credit'][$shift][$debtorId] ?? 0) + $amount;
-            } elseif (in_array($payment, ['QRIS', 'TRANSFER', 'DEBIT', 'EDC'], true)) {
-                $days[$date]['sales']['bank'][$shift] += $amount;
+                if ($amount < 0) {
+                    $days[$date]['sales']['returns'][$shift] += $amount;
+                }
             } else {
-                $days[$date]['sales']['cash'][$shift] += $amount;
+                $category = BankSalesExport::resolveCategory($transaction);
+                $catUpper = strtoupper(trim((string) $category));
+
+                if (in_array($catUpper, ['CASH', 'TUNAI'], true)) {
+                    $days[$date]['sales']['cash'][$shift] += $amount;
+                } elseif ($catUpper !== 'BELUM BAYAR' && $catUpper !== 'KREDIT') {
+                    $days[$date]['sales']['bank'][$shift] += $amount;
+                }
+                if ($amount < 0) {
+                    $days[$date]['sales']['returns'][$shift] += $amount;
+                }
             }
         }
 

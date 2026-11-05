@@ -45,6 +45,51 @@ class BankSalesExport implements WithMultipleSheets
         return \App\Support\PaymentMethod::label($trx->payment_method ?? null, $trx->transfer_bank_name ?? null);
     }
 
+    public static function calculateTransactionAmount(object $trx): float
+    {
+        $items = $trx->transactions ?? collect();
+        $originalMap = LiphExport::TYPE_MAP[$trx->transaction_type] ?? null;
+        $originalLabel = $originalMap[1] ?? '';
+        $isReturnTrx = in_array($originalLabel, ['Retur Tunai', 'Retur Kredit'], true)
+            || in_array(strtoupper(trim((string) ($trx->transaction_type ?? ''))), ['RETUR JUAL', 'RETUR KREDIT'], true)
+            || str_starts_with(strtoupper(trim((string) ($trx->transaction_code ?? ''))), 'RT');
+
+        $trxDiscount = (!$isReturnTrx && is_numeric($trx->discount ?? null)) ? (int) round((float) $trx->discount) : 0;
+
+        if ($items->isEmpty() || $isReturnTrx) {
+            $subtotal = is_numeric($trx->subtotal ?? null) ? (int) round((float) $trx->subtotal) : 0;
+            if ($isReturnTrx && $subtotal === 0 && $items->isNotEmpty()) {
+                $subtotal = (int) $items->sum(function ($item) {
+                    $qty = (float) ($item->quantity ?? 0);
+                    $price = (int) round((float) ($item->item_price ?? 0));
+                    $itemDisc = (int) round((float) ($item->discount ?? 0));
+                    return (int) round((float) ($item->final_price ?? ($item->total_price ?? ($qty * $price - $itemDisc))));
+                });
+            }
+            $signedSubtotal = $isReturnTrx ? -abs($subtotal) : $subtotal;
+            return (float) ($signedSubtotal - $trxDiscount);
+        }
+
+        $trxGross = 0;
+        foreach ($items as $item) {
+            $qty = (float) ($item->quantity ?? 0);
+            $price = (int) round((float) ($item->item_price ?? 0));
+            $itemDisc = (int) round((float) ($item->discount ?? 0));
+            $final = (int) round((float) ($item->final_price ?? ($item->total_price ?? ($qty * $price - $itemDisc))));
+            $effectiveType = !empty($item->cart_type)
+                ? (LiphExport::CART_TYPE_ABBR[$item->cart_type] ?? $item->cart_type)
+                : $trx->transaction_type;
+            $effectiveMap = LiphExport::TYPE_MAP[$effectiveType] ?? $originalMap;
+            $isReturn = in_array($effectiveMap[1] ?? $originalLabel, ['Retur Tunai', 'Retur Kredit'], true);
+
+            $signedFinal = $isReturn ? -abs($final) : $final;
+            $trxGross += $signedFinal;
+        }
+
+        $roundedGross = (int) $trxGross;
+        return (float) ($roundedGross - $trxDiscount);
+    }
+
     public function sheets(): array
     {
         @ini_set('memory_limit', '512M');
