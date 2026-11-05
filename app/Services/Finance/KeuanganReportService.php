@@ -14,6 +14,10 @@ class KeuanganReportService
 
     public function build(array $pharmacyIds, string $startDate, string $endDate, ?int $drawerAccountId, ?FinancePayment $opening): array
     {
+        if (in_array(1, $pharmacyIds, true) && !in_array(9, $pharmacyIds, true)) {
+            $pharmacyIds[] = 9;
+        }
+
         $openingDate = $opening?->payment_date?->toDateString();
         $calculationStart = $openingDate && $openingDate < $startDate ? $openingDate : $startDate;
         $days = [];

@@ -105,11 +105,17 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
         $rows[] = $tableHeaders;
 
         $no = 1;
-        $grandTotalStruk = 0;
-        $grandTotalQty = 0;
-        $grandTotalGross = 0;
-        $grandTotalDiscount = 0;
-        $grandTotalNet = 0;
+        $totalKasStruk = 0;
+        $totalKasQty = 0;
+        $totalKasGross = 0;
+        $totalKasDiscount = 0;
+        $totalKasNet = 0;
+
+        $totalBankStruk = 0;
+        $totalBankQty = 0;
+        $totalBankGross = 0;
+        $totalBankDiscount = 0;
+        $totalBankNet = 0;
 
         foreach ($this->allBanksData as $paymentMethod => $data) {
             $strukCount = $data['struk_count'] ?? 0;
@@ -128,18 +134,55 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
                 $netSum,
             ];
 
-            $grandTotalStruk    += $strukCount;
-            $grandTotalQty      += $qtySum;
-            $grandTotalGross    += $grossSum;
-            $grandTotalDiscount += $discSum;
-            $grandTotalNet      += $netSum;
+            $methodUpper = strtoupper(trim((string) $paymentMethod));
+            if ($methodUpper === 'CASH') {
+                $totalKasStruk    += $strukCount;
+                $totalKasQty      += $qtySum;
+                $totalKasGross    += $grossSum;
+                $totalKasDiscount += $discSum;
+                $totalKasNet      += $netSum;
+            } elseif (!in_array($methodUpper, ['KREDIT', 'BELUM BAYAR'], true)) {
+                $totalBankStruk    += $strukCount;
+                $totalBankQty      += $qtySum;
+                $totalBankGross    += $grossSum;
+                $totalBankDiscount += $discSum;
+                $totalBankNet      += $netSum;
+            }
         }
 
         if (count($this->allBanksData) === 0) {
             $rows[] = ['-', 'Tidak ada transaksi pembayaran pada periode ini', 0, 0, 0, 0, 0];
         }
 
-        // Grand Total Row
+        $grandTotalStruk    = $totalKasStruk + $totalBankStruk;
+        $grandTotalQty      = $totalKasQty + $totalBankQty;
+        $grandTotalGross    = $totalKasGross + $totalBankGross;
+        $grandTotalDiscount = $totalKasDiscount + $totalBankDiscount;
+        $grandTotalNet      = $totalKasNet + $totalBankNet;
+
+        // Total Kas Row (100% samakan dengan tipe pembayaran "CASH")
+        $rows[] = [
+            '',
+            'TOTAL KAS',
+            $totalKasStruk,
+            $totalKasQty,
+            $totalKasGross,
+            $totalKasDiscount,
+            $totalKasNet,
+        ];
+
+        // Total Bank Row (akumulasi dari semua transaksi non-cash seperti QRIS, Transfer, dan Debit)
+        $rows[] = [
+            '',
+            'TOTAL BANK',
+            $totalBankStruk,
+            $totalBankQty,
+            $totalBankGross,
+            $totalBankDiscount,
+            $totalBankNet,
+        ];
+
+        // Grand Total Row (Total Kas + Total Bank)
         $rows[] = [
             '',
             'TOTAL KESELURUHAN',
@@ -477,10 +520,21 @@ class BankSalesSheetExport implements FromArray, WithStyles, WithColumnWidths, W
                 $sheet->getStyle("E8:G{$highestRow}")->getNumberFormat()->setFormatCode('#,##0');
 
                 for ($row = 8; $row <= $highestRow; $row++) {
-                    $label = strtoupper((string) $sheet->getCell("B{$row}")->getValue());
+                    $label = strtoupper(trim((string) $sheet->getCell("B{$row}")->getValue()));
 
                     if ($label === 'KREDIT' || $label === 'CASH') {
                         $sheet->getStyle("A{$row}:G{$row}")->getFont()->setBold(true);
+                    } elseif ($label === 'TOTAL KAS') {
+                        $sheet->getStyle("A{$row}:G{$row}")->applyFromArray([
+                            'font' => ['bold' => true],
+                            'borders' => [
+                                'top' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => '94A3B8']],
+                            ],
+                        ]);
+                    } elseif ($label === 'TOTAL BANK') {
+                        $sheet->getStyle("A{$row}:G{$row}")->applyFromArray([
+                            'font' => ['bold' => true],
+                        ]);
                     }
                 }
             } else {

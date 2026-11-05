@@ -31,7 +31,7 @@ class KinerjaOmzetExport implements FromArray, WithEvents, WithStyles, WithTitle
         $this->month = $month;
         $this->year = $year;
         $this->debtorCount = count($data['debtors']);
-        $this->purchaseStart = $this->debtorStart + $this->debtorCount + 1;
+        $this->purchaseStart = $this->debtorStart + $this->debtorCount + 3;
         $this->lastColumn = $this->purchaseStart + 14;
         $this->lastRow = 6 + count($data['days']);
     }
@@ -68,6 +68,11 @@ class KinerjaOmzetExport implements FromArray, WithEvents, WithStyles, WithTitle
         $middle[3] = 'BANK';
         $middle[5] = 'TOTAL OMSET TUNAI';
         $middle[$this->debtorStart] = 'KREDIT';
+        $creditIndex = $this->debtorStart + $this->debtorCount;
+        $totalOmzetIndex = $creditIndex + 1;
+        $totalOmzetSdIndex = $creditIndex + 2;
+        $middle[$totalOmzetIndex] = 'TOTAL OMZET';
+        $middle[$totalOmzetSdIndex] = 'TOTAL OMZET S/D';
 
         $leaf = $this->blanks();
         $leaf[1] = 'PAGI';
@@ -76,7 +81,7 @@ class KinerjaOmzetExport implements FromArray, WithEvents, WithStyles, WithTitle
         $leaf[4] = 'MALAM';
         foreach ($this->data['debtors'] as $index => $debtor)
             $leaf[$this->debtorStart + $index] = $debtor['name'];
-        $leaf[$this->debtorStart + $this->debtorCount] = 'TOTAL OMSET KREDIT';
+        $leaf[$creditIndex] = 'TOTAL OMSET KREDIT';
         $purchaseLabels = ['PBF', 'KONSINYASI', 'RETUR PEMBELIAN', 'CASH', 'JUMLAH BELI', 'PPN FAKTUR', 'BELI EXC PPN', 'MARGIN EXC PPN', 'HPP %'];
         foreach ($purchaseLabels as $index => $label)
             $middle[$this->purchaseStart + $index] = $label;
@@ -105,8 +110,9 @@ class KinerjaOmzetExport implements FromArray, WithEvents, WithStyles, WithTitle
             foreach ($this->data['debtors'] as $index => $debtor) {
                 $row[$this->debtorStart + $index] = $this->number($day['sales']['credit']['morning'][$debtor['id']] ?? 0) + $this->number($day['sales']['credit']['evening'][$debtor['id']] ?? 0);
             }
-            $creditIndex = $this->debtorStart + $this->debtorCount;
             $row[$creditIndex] = $this->number($day['sales']['creditTotal'] ?? 0);
+            $row[$totalOmzetIndex] = $this->number($day['sales']['total'] ?? 0);
+            $row[$totalOmzetSdIndex] = $this->number($day['sales']['total_sd'] ?? 0);
 
             $purchaseValues = [
                 $day['purchases']['pbf'] ?? 0,
@@ -138,7 +144,7 @@ class KinerjaOmzetExport implements FromArray, WithEvents, WithStyles, WithTitle
         $total = $this->blanks();
         $total[0] = 'TOTAL PERIODE';
         $skipColumns = [
-            $this->purchaseStart + 6,
+            $totalOmzetSdIndex,
             $this->purchaseStart + 7,
             $this->purchaseStart + 8,
             $this->purchaseStart + 10,
@@ -150,8 +156,10 @@ class KinerjaOmzetExport implements FromArray, WithEvents, WithStyles, WithTitle
             if (in_array($column, $skipColumns, true)) continue;
             $total[$column] = array_sum(array_map(fn ($row) => is_numeric($row[$column] ?? null) ? (float) $row[$column] : 0, array_slice($rows, 5)));
         }
+        $lastDay = end($this->data['days']);
+        $total[$totalOmzetSdIndex] = $this->number($lastDay['sales']['total_sd'] ?? 0);
         $salesExVatTotal = array_sum(array_map(fn($d) => $this->number($d['sales']['exVat'] ?? 0), $this->data['days']));
-        $purchaseExVatTotal = $total[$this->purchaseStart + 6];
+        $purchaseExVatTotal = (float) ($total[$this->purchaseStart + 6] ?? 0);
         $total[$this->purchaseStart + 7] = $salesExVatTotal - $purchaseExVatTotal;
         $total[$this->purchaseStart + 8] = $salesExVatTotal > 0 ? $purchaseExVatTotal / $salesExVatTotal * 100 : 0;
 
@@ -173,7 +181,10 @@ class KinerjaOmzetExport implements FromArray, WithEvents, WithStyles, WithTitle
             $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($column))->setWidth(16);
         }
         $sheet->getColumnDimension('F')->setWidth(18);
-        $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($this->debtorStart + $this->debtorCount + 1))->setWidth(18);
+        $creditColIndex = $this->debtorStart + $this->debtorCount + 1;
+        $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($creditColIndex))->setWidth(18);
+        $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($creditColIndex + 1))->setWidth(18);
+        $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($creditColIndex + 2))->setWidth(18);
         for ($column = $this->purchaseStart + 10; $column <= $this->lastColumn + 1; $column++) {
             $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($column))->setWidth(18);
         }
@@ -189,6 +200,8 @@ class KinerjaOmzetExport implements FromArray, WithEvents, WithStyles, WithTitle
             $purchaseStart = Coordinate::stringFromColumnIndex($this->purchaseStart + 1);
             $purchaseEnd = Coordinate::stringFromColumnIndex($this->purchaseStart + 9);
             $creditCol = Coordinate::stringFromColumnIndex($this->debtorStart + $this->debtorCount + 1);
+            $totalOmzetCol = Coordinate::stringFromColumnIndex($this->debtorStart + $this->debtorCount + 2);
+            $totalOmzetSdCol = Coordinate::stringFromColumnIndex($this->debtorStart + $this->debtorCount + 3);
             $sheet->mergeCells("A1:{$last}1");
             $sheet->mergeCells("A2:{$last}2");
             $sheet->mergeCells('A3:A5');
@@ -198,8 +211,9 @@ class KinerjaOmzetExport implements FromArray, WithEvents, WithStyles, WithTitle
             $sheet->mergeCells('D4:E4');
             $sheet->mergeCells('F4:F5');
             $creditStart = Coordinate::stringFromColumnIndex($this->debtorStart + 1);
-            $creditEnd = Coordinate::stringFromColumnIndex($this->purchaseStart);
-            $sheet->mergeCells("{$creditStart}4:{$creditEnd}4");
+            $sheet->mergeCells("{$creditStart}4:{$creditCol}4");
+            $sheet->mergeCells("{$totalOmzetCol}4:{$totalOmzetCol}5");
+            $sheet->mergeCells("{$totalOmzetSdCol}4:{$totalOmzetSdCol}5");
             for ($column = $this->purchaseStart + 1; $column <= $this->purchaseStart + 9; $column++) {
                 $letter = Coordinate::stringFromColumnIndex($column);
                 $sheet->mergeCells("{$letter}4:{$letter}5");
@@ -223,6 +237,10 @@ class KinerjaOmzetExport implements FromArray, WithEvents, WithStyles, WithTitle
             $sheet->getStyle('B6:F' . ($this->lastRow - 1))->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF00E000');
             // Credit total column data rows highlight
             $sheet->getStyle("{$creditCol}6:{$creditCol}" . ($this->lastRow - 1))->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFE2EFDA');
+            // Total Omzet column data rows highlight
+            $sheet->getStyle("{$totalOmzetCol}6:{$totalOmzetCol}" . ($this->lastRow - 1))->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFC6EFCE');
+            // Total Omzet S/D column data rows highlight (cyan for S/D)
+            $sheet->getStyle("{$totalOmzetSdCol}6:{$totalOmzetSdCol}" . ($this->lastRow - 1))->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF00FFFF');
 
             // Data rows for extra columns: Green for Income, Expense, Saving; Cyan for S/D columns
             $colIncome = Coordinate::stringFromColumnIndex($this->purchaseStart + 10);
@@ -247,6 +265,8 @@ class KinerjaOmzetExport implements FromArray, WithEvents, WithStyles, WithTitle
             $sheet->getStyle("E{$this->lastRow}")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF00FFFF');
             $sheet->getStyle("F{$this->lastRow}")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF00E000');
             $sheet->getStyle("{$creditCol}{$this->lastRow}")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFC6EFCE');
+            $sheet->getStyle("{$totalOmzetCol}{$this->lastRow}")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF92D050');
+            $sheet->getStyle("{$totalOmzetSdCol}{$this->lastRow}")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF00FFFF');
 
             $sheet->getStyle("{$colIncome}{$this->lastRow}")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF92D050');
             $sheet->getStyle("{$colIncomeSd}{$this->lastRow}")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF00FFFF');

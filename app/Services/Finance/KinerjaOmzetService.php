@@ -17,7 +17,16 @@ class KinerjaOmzetService
     {
         return [
             'date' => $date,
-            'sales' => ['cash' => ['morning' => 0, 'evening' => 0], 'bank' => ['morning' => 0, 'evening' => 0], 'credit' => ['morning' => [], 'evening' => []], 'returns' => ['morning' => 0, 'evening' => 0]],
+            'sales' => [
+                'cash' => ['morning' => 0, 'evening' => 0],
+                'bank' => ['morning' => 0, 'evening' => 0],
+                'credit' => ['morning' => [], 'evening' => []],
+                'returns' => ['morning' => 0, 'evening' => 0],
+                'cashBankTotal' => 0.0,
+                'creditTotal' => 0.0,
+                'total' => 0.0,
+                'total_sd' => 0.0,
+            ],
             'purchases' => ['pbf' => 0, 'consignment' => 0, 'return' => 0, 'cash' => 0, 'ppn' => 0],
             'other_income' => 0.0,
             'other_income_sd' => 0.0,
@@ -185,36 +194,69 @@ class KinerjaOmzetService
             $purchasePharmacyIds[] = 9;
         }
 
-        $receivings = Receiving::query()
+        $details = \App\Models\ReceivingDetails::query()
             ->with([
-                'receiving_details.receiving_items' => fn($query) => $query->whereNotNull('batches_id'),
-                'receiving_details.creditor',
+                'receiving:id,pharmacy_id,status,date,created_at',
+                'creditor:code,ppn_type',
+                'receiving_items:id,receiving_details_id,total,raw_price,qty_received,qty',
             ])
-            ->whereIn('pharmacy_id', $purchasePharmacyIds)
-            ->whereIn('status', [1, 2, 3])
-            ->whereRaw("COALESCE(STR_TO_DATE(NULLIF(date, ''), '%d/%m/%Y'), STR_TO_DATE(NULLIF(date, ''), '%Y-%m-%d'), DATE(created_at)) BETWEEN ? AND ?", [$startDate, $endDate])
+            ->whereHas('receiving', fn($query) => $query->whereIn('pharmacy_id', $purchasePharmacyIds)->whereIn('status', [1, 2, 3]))
+            ->where(function ($q) use ($startDate, $endDate) {
+                $q->whereBetween(DB::raw('DATE(receiving_details.created_at)'), [$startDate, $endDate])
+                    ->orWhereHas('receiving', function ($rq) use ($startDate, $endDate) {
+                        $rq->whereRaw("COALESCE(STR_TO_DATE(NULLIF(date, ''), '%d/%m/%Y'), STR_TO_DATE(NULLIF(date, ''), '%Y-%m-%d'), DATE(created_at)) BETWEEN ? AND ?", [$startDate, $endDate]);
+                    });
+            })
             ->get();
-        foreach ($receivings as $receiving) {
-            $rawDate = trim((string) $receiving->date);
+
+        foreach ($details as $detail) {
+            $rawDate = trim((string) ($detail->receiving?->date ?: ''));
+            $date = null;
             if (preg_match('/^\d{2}\/\d{2}\/\d{4}$/', $rawDate)) {
-                $date = \Carbon\Carbon::createFromFormat('d/m/Y', $rawDate)->toDateString();
-            } else {
-                $date = \Carbon\Carbon::parse($rawDate ?: $receiving->created_at)->toDateString();
+                $parsed = \Carbon\Carbon::createFromFormat('d/m/Y', $rawDate)->toDateString();
+                if (isset($days[$parsed])) {
+                    $date = $parsed;
+                }
+            } elseif (!empty($rawDate)) {
+                try {
+                    $parsed = \Carbon\Carbon::parse($rawDate)->toDateString();
+                    if (isset($days[$parsed])) {
+                        $date = $parsed;
+                    }
+                } catch (\Throwable $e) {}
             }
-            if (!isset($days[$date]))
+
+            if (!$date) {
+                $detailDt = \Carbon\Carbon::parse($detail->created_at)->toDateString();
+                if (isset($days[$detailDt])) {
+                    $date = $detailDt;
+                } else {
+                    $rcvDt = \Carbon\Carbon::parse($detail->receiving?->created_at)->toDateString();
+                    $date = isset($days[$rcvDt]) ? $rcvDt : null;
+                }
+            }
+
+            if (!$date || !isset($days[$date])) {
                 continue;
-            foreach ($receiving->receiving_details as $detail) {
-                $amount = $detail->receiving_items->sum(fn($item) => $this->number($item->total));
-                $payment = mb_strtoupper(trim((string) $detail->invoice_payment));
-                $kind = match ($payment) {
-                    'KREDIT' => 'pbf',
-                    'KONSINYASI' => 'consignment',
-                    'TUNAI' => 'cash',
-                    default => null,
-                };
-                if ($kind)
-                    $this->addPurchase($days[$date], $kind, $amount, (string) ($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA'));
             }
+
+            $amount = 0.0;
+            foreach ($detail->receiving_items as $item) {
+                $lineTotal = (float) ($item->total ?? 0);
+                if ($lineTotal <= 0) {
+                    $lineTotal = (float) ($item->raw_price ?? 0) * (float) ($item->qty_received ?? $item->qty ?? 0);
+                }
+                $amount += $lineTotal;
+            }
+
+            $payment = mb_strtoupper(trim((string) $detail->invoice_payment));
+            $kind = match ($payment) {
+                'KONSINYASI' => 'consignment',
+                'TUNAI', 'CASH' => 'cash',
+                default => 'pbf',
+            };
+
+            $this->addPurchase($days[$date], $kind, $amount, (string) ($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA'));
         }
 
         $returnInvoiceMeta = DB::table('receiving_items as ri')
@@ -293,6 +335,7 @@ class KinerjaOmzetService
         $debtorRows = $debtors->map(fn($debtor) => ['id' => (int) $debtor->id, 'name' => (string) $debtor->name])->values()->all();
         foreach ($extraDebtors as $id => $name)
             $debtorRows[] = ['id' => (int) $id, 'name' => $name];
+        $omzetRunningTotal = 0.0;
         $incomeRunningTotal = 0.0;
         $expenseRunningTotal = 0.0;
         $marginRunningTotal = 0.0;
@@ -306,6 +349,9 @@ class KinerjaOmzetService
             $day['sales']['creditExVat'] = $day['sales']['creditTotal'] / 1.11;
             $day['sales']['creditPpn'] = $day['sales']['creditTotal'] - $day['sales']['creditExVat'];
             $day['sales']['total'] = $day['sales']['cashBankTotal'] + $day['sales']['creditTotal'];
+
+            $omzetRunningTotal += (float) $day['sales']['total'];
+            $day['sales']['total_sd'] = $omzetRunningTotal;
             $day['sales']['exVat'] = $day['sales']['cashBankExVat'] + $day['sales']['creditExVat'];
             $day['sales']['ppn'] = $day['sales']['cashBankPpn'] + $day['sales']['creditPpn'];
             // Purchase return amounts are already subtracted from their tender category above.

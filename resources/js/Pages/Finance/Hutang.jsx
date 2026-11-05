@@ -10,13 +10,24 @@ import {
     CreditCard, Search, Filter, Check, X, Building2,
     Calendar, CheckCircle2, AlertCircle, Eye, ChevronLeft, ChevronRight,
     ArrowLeft, Printer, Share2, MoreVertical, ChevronDown, History, Landmark, Maximize2, Download, FileSpreadsheet,
-    AlertTriangle, Clock, ArrowUp, ArrowDown, ArrowUpDown, Upload
+    AlertTriangle, Clock, ArrowUp, ArrowDown, ArrowUpDown, Upload, RotateCcw
 } from 'lucide-react';
+
+// Helper mengecek apakah faktur sudah dianggap lunas atau diretur penuh
+const isItemSettled = (item) => {
+    if (!item) return false;
+    return (
+        item.status === 'Lunas' ||
+        item.status === 'Diretur Penuh' ||
+        item.status === 'Lunas (Ada Retur)' ||
+        (Number(item.sisa) || 0) <= 0.005
+    );
+};
 
 // Helper fungsi menghitung status jatuh tempo secara presisi
 const computeDueInfo = (item) => {
     if (!item) return { isLunas: false, isOverdue: false, daysOverdue: 0, daysRemaining: 0, hasDate: false };
-    const isLunas = item.status === 'Lunas' || (Number(item.sisa) || 0) <= 0.005;
+    const isLunas = isItemSettled(item);
     const hasDate = !!item.raw_jatuh_tempo || (!!item.jatuhTempo && item.jatuhTempo !== '-');
 
     if (isLunas) {
@@ -172,11 +183,13 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
 
             let matchStatus = true;
             if (statusFilter === 'LUNAS') {
-                matchStatus = item.status === 'Lunas' || item.sisa <= 0.005;
+                matchStatus = isItemSettled(item);
             } else if (statusFilter === 'BELUM_LUNAS') {
-                matchStatus = item.status !== 'Lunas' && item.sisa > 0.005;
+                matchStatus = !isItemSettled(item);
             } else if (statusFilter === 'DIAJUKAN') {
-                matchStatus = Boolean(item.is_submitted) && item.status !== 'Lunas';
+                matchStatus = Boolean(item.is_submitted) && !isItemSettled(item);
+            } else if (statusFilter === 'RETUR') {
+                matchStatus = (Number(item.total_retur) > 0) || item.status === 'Diretur Penuh' || item.status === 'Diretur Sebagian' || item.status === 'Lunas (Ada Retur)';
             }
 
             const matchPbf = filterPbf
@@ -254,9 +267,57 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
         return detailViewHutang.items.reduce((acc, curr) => acc + (Number(curr.qty) || 0), 0);
     }, [detailViewHutang]);
 
+    // Helper status badge render
+    const renderStatusBadge = (item) => {
+        if (item.status === 'Diretur Penuh') {
+            return (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-purple-100 text-purple-800 border border-purple-200" title="Tagihan diretur penuh (Sisa Rp 0)">
+                    <RotateCcw className="w-3 h-3 text-purple-600" />
+                    <span>Diretur Penuh</span>
+                </span>
+            );
+        }
+        if (item.status === 'Diretur Sebagian') {
+            return (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-200" title="Sebagian item diretur dan memotong tagihan">
+                    <RotateCcw className="w-3 h-3 text-rose-600" />
+                    <span>Diretur Sebagian</span>
+                </span>
+            );
+        }
+        if (item.status === 'Lunas (Ada Retur)') {
+            return (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200" title="Lunas setelah pemotongan retur">
+                    <Check className="w-3 h-3 text-emerald-600" />
+                    <span>Lunas (Ada Retur)</span>
+                </span>
+            );
+        }
+        if (item.status === 'Lunas' || isItemSettled(item)) {
+            return (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700">
+                    <Check className="w-3 h-3 text-emerald-600" />
+                    <span>Lunas</span>
+                </span>
+            );
+        }
+        if (item.status === 'Dibayar Sebagian') {
+            return (
+                <span className="inline-block px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700">
+                    Dibayar Sebagian
+                </span>
+            );
+        }
+        return (
+            <span className="inline-block px-2.5 py-1 rounded-full text-[11px] font-bold bg-red-50 text-red-700">
+                Belum Dibayar
+            </span>
+        );
+    };
+
     // Handlers Checkbox
     const handleToggleHutang = (item) => {
-        if (item.status === 'Lunas' || item.sisa <= 0.005) return;
+        if (isItemSettled(item)) return;
         if (selectedHutangIds.includes(item.id)) {
             setSelectedHutangIds((prev) => prev.filter((id) => id !== item.id));
         } else {
@@ -271,7 +332,7 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
 
     const handleSelectAllHutang = (e) => {
         if (e.target.checked) {
-            const eligible = paginatedHutang.filter((item) => item.status !== 'Lunas' && item.sisa > 0.005);
+            const eligible = paginatedHutang.filter((item) => !isItemSettled(item));
             const remainingSlots = 10 - selectedHutangIds.length;
             if (remainingSlots <= 0) {
                 setSelectionWarning('Maksimal 10 faktur yang dapat dipilih sekaligus.');
@@ -513,14 +574,14 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                         <div className="flex items-center justify-between">
                             <div className="flex flex-col items-start gap-1">
                                 <span
-                                className={`inline-block px-3 py-1 text-xs font-semibold rounded-full ${detailViewHutang.status === 'Lunas'
+                                    className={`inline-block px-3 py-1 text-xs font-semibold rounded-full ${detailViewHutang.status === 'Lunas'
                                         ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'
                                         : detailViewHutang.status === 'Dibayar Sebagian'
                                             ? 'bg-amber-50 text-amber-600 border border-amber-100'
                                             : 'bg-red-50 text-red-600 border border-red-100'
-                                    }`}
-                            >
-                                {detailViewHutang.status}
+                                        }`}
+                                >
+                                    {detailViewHutang.status}
                                 </span>
                                 {detailViewHutang.status === 'Lunas' && detailViewHutang.tanggalBayar && <span className="text-[11px] font-medium text-emerald-600">Lunas pada {detailViewHutang.tanggalBayar}</span>}
                             </div>
@@ -691,9 +752,25 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                                     <span className="font-medium text-slate-800">{formatNumberOnly(detailViewHutang.ppn)}</span>
                                 </div>
                                 <div className="flex justify-between text-slate-800 font-bold pt-1">
-                                    <span>Total</span>
+                                    <span>Total Tagihan (Bruto)</span>
                                     <span>{formatNumberOnly(detailViewHutang.total)}</span>
                                 </div>
+
+                                {detailViewHutang.total_retur > 0 && (
+                                    <>
+                                        <div className="flex justify-between text-rose-600 font-semibold pt-1">
+                                            <span className="flex items-center gap-1">
+                                                <RotateCcw className="w-3 h-3" />
+                                                <span>Retur Pembelian</span>
+                                            </span>
+                                            <span>- {formatNumberOnly(detailViewHutang.total_retur)}</span>
+                                        </div>
+                                        <div className="flex justify-between text-slate-700 font-semibold pt-1 border-t border-dashed border-slate-200">
+                                            <span>Tagihan Bersih (Net)</span>
+                                            <span className="font-bold">{formatNumberOnly(detailViewHutang.net_total)}</span>
+                                        </div>
+                                    </>
+                                )}
 
                                 {detailViewHutang.terbayar > 0 && (
                                     <div className="flex justify-between text-emerald-600 font-semibold pt-1">
@@ -720,6 +797,91 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                             </div>
                         </div>
                     </div>
+
+                    {/* KARTU RIWAYAT RETUR PEMBELIAN JIKA ADA */}
+                    {detailViewHutang.returs && detailViewHutang.returs.length > 0 && (
+                        <div className="bg-white rounded-2xl border border-rose-200 p-6 shadow-xs space-y-4">
+                            <div className="flex items-center justify-between border-b border-rose-100 pb-4">
+                                <div className="flex items-center gap-2.5">
+                                    <div className="p-2 rounded-xl bg-rose-50 text-rose-600">
+                                        <RotateCcw className="w-5 h-5" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-slate-900 text-sm">
+                                            Riwayat Retur Pembelian
+                                        </h3>
+                                        <p className="text-[11px] text-slate-400">
+                                            Item obat yang diretur ke PBF/Vendor dan memotong tagihan faktur ini jika statusnya "Sudah Potong Tagihan".
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <span className="text-xs font-semibold text-slate-600">
+                                    Total Potongan Retur: <strong className="text-rose-600">- {formatRupiah(detailViewHutang.total_retur)}</strong>
+                                </span>
+                            </div>
+
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left text-xs">
+                                    <thead className="text-slate-400 bg-rose-50/40 border-b border-rose-100">
+                                        <tr>
+                                            <th className="py-2.5 px-3 font-medium">Tanggal</th>
+                                            <th className="py-2.5 px-3 font-medium">No. Retur</th>
+                                            <th className="py-2.5 px-3 font-medium">Item Obat</th>
+                                            <th className="py-2.5 px-3 font-medium">Batch / ED</th>
+                                            <th className="py-2.5 px-3 font-medium text-center">Qty Diretur</th>
+                                            <th className="py-2.5 px-3 font-medium text-right">Potongan Hutang</th>
+                                            <th className="py-2.5 px-3 font-medium text-center">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-rose-50 text-slate-700">
+                                        {detailViewHutang.returs.map((ret, idx) => (
+                                            <tr key={ret.id || idx} className="hover:bg-rose-50/30">
+                                                <td className="py-3 px-3 font-medium text-slate-900">{ret.tanggal}</td>
+                                                <td className="py-3 px-3 font-mono text-[11px] font-semibold text-rose-700">{ret.code}</td>
+                                                <td className="py-3 px-3">
+                                                    <div className="font-semibold text-slate-800">{ret.nama}</div>
+                                                    {ret.reason && ret.reason !== '-' && (
+                                                        <div className="text-[10px] text-slate-400">Alasan: {ret.reason}</div>
+                                                    )}
+                                                </td>
+                                                <td className="py-3 px-3 text-[11px] text-slate-600">
+                                                    <div>{ret.batch_number}</div>
+                                                    <div className="text-[10px] text-slate-400">ED: {ret.expired_date}</div>
+                                                </td>
+                                                <td className="py-3 px-3 text-center font-bold text-slate-700">
+                                                    {ret.qty} {ret.satuan}
+                                                </td>
+                                                <td className="py-3 px-3 text-right font-extrabold text-rose-600">
+                                                    - {formatRupiah(ret.nominal)}
+                                                </td>
+                                                <td className="py-3 px-3 text-center">
+                                                    {ret.status === 'sudah_potong' ? (
+                                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200">
+                                                            <Check className="w-3 h-3 text-purple-600" />
+                                                            <span>Sudah Potong Tagihan</span>
+                                                        </span>
+                                                    ) : ret.status === 'sudah_diambil' ? (
+                                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                                                            <span>Sudah Diambil PBF</span>
+                                                        </span>
+                                                    ) : ret.status === 'dikonfirmasi' ? (
+                                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                                                            <span>Dikonfirmasi</span>
+                                                        </span>
+                                                    ) : (
+                                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                                                            <span>{ret.status_label || ret.status}</span>
+                                                        </span>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
 
                     {/* KARTU AUDIT TRAIL / LOG PERUBAHAN DATA */}
                     <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs space-y-4">
@@ -882,6 +1044,12 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                                         Diajukan
                                     </button>
                                     <button
+                                        onClick={() => { setStatusFilter('RETUR'); setCurrentPage(1); }}
+                                        className={`px-3 py-1.5 rounded-lg font-semibold transition ${statusFilter === 'RETUR' ? 'bg-white text-rose-700 shadow-xs font-bold' : 'text-slate-500 hover:text-slate-800'}`}
+                                    >
+                                        Retur
+                                    </button>
+                                    <button
                                         onClick={() => { setStatusFilter('LUNAS'); setCurrentPage(1); }}
                                         className={`px-3 py-1.5 rounded-lg font-semibold transition ${statusFilter === 'LUNAS' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
                                     >
@@ -899,8 +1067,8 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                                         setCurrentPage(1);
                                     }}
                                     className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${sortOrder === 'asc'
-                                            ? 'bg-amber-50 border-amber-300 text-amber-800 font-bold shadow-2xs'
-                                            : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                                        ? 'bg-amber-50 border-amber-300 text-amber-800 font-bold shadow-2xs'
+                                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
                                         }`}
                                     title="Klik untuk mengubah urutan tanggal faktur"
                                 >
@@ -918,8 +1086,8 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                                         type="button"
                                         onClick={() => setIsDueDropdownOpen(!isDueDropdownOpen)}
                                         className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${dueFilter !== 'all'
-                                                ? 'bg-amber-50 border-amber-300 text-amber-800 font-bold shadow-2xs'
-                                                : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                                            ? 'bg-amber-50 border-amber-300 text-amber-800 font-bold shadow-2xs'
+                                            : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
                                             }`}
                                     >
                                         <Clock className={`w-3.5 h-3.5 ${dueFilter !== 'all' ? 'text-amber-600' : 'text-slate-500'}`} />
@@ -1061,9 +1229,9 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                                             <input
                                                 type="checkbox"
                                                 checked={
-                                                    paginatedHutang.filter(i => i.status !== 'Lunas' && i.sisa > 0.005).length > 0 &&
+                                                    paginatedHutang.filter(i => !isItemSettled(i)).length > 0 &&
                                                     paginatedHutang
-                                                        .filter(i => i.status !== 'Lunas' && i.sisa > 0.005)
+                                                        .filter(i => !isItemSettled(i))
                                                         .every(i => selectedHutangIds.includes(i.id))
                                                 }
                                                 onChange={handleSelectAllHutang}
@@ -1076,6 +1244,7 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                                         <th className="px-4 py-3.5">Vendor (PBF)</th>
                                         <th className="px-4 py-3.5">Gudang</th>
                                         <th className="px-4 py-3.5 text-right">Total Faktur</th>
+                                        <th className="px-4 py-3.5 text-right">Retur</th>
                                         <th className="px-4 py-3.5 text-right">Terbayar</th>
                                         <th className="px-4 py-3.5 text-right">Sisa Tagihan</th>
                                         <th className="px-4 py-3.5 text-center">Status</th>
@@ -1085,7 +1254,7 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                                 <tbody className="divide-y divide-slate-100">
                                     {paginatedHutang.length === 0 ? (
                                         <tr>
-                                            <td colSpan={10} className="text-center py-12 text-slate-400">
+                                            <td colSpan={11} className="text-center py-12 text-slate-400">
                                                 Tidak ada data hutang dagang yang sesuai dengan filter.
                                             </td>
                                         </tr>
@@ -1097,8 +1266,8 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                                                 className="hover:bg-blue-50/40 cursor-pointer transition group"
                                             >
                                                 <td className="px-4 py-3.5" onClick={(e) => e.stopPropagation()}>
-                                                    {item.status === 'Lunas' || item.sisa <= 0.005 ? (
-                                                        <span title="Faktur sudah lunas" className="inline-block p-0.5 text-emerald-500">
+                                                    {isItemSettled(item) ? (
+                                                        <span title="Faktur sudah lunas / diretur penuh" className="inline-block p-0.5 text-emerald-500">
                                                             <Check className="w-3.5 h-3.5" />
                                                         </span>
                                                     ) : (
@@ -1182,6 +1351,15 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                                                 <td className="px-4 py-3.5 text-right font-medium text-slate-800">
                                                     {formatNumberOnly(item.total)}
                                                 </td>
+                                                <td className="px-4 py-3.5 text-right font-medium">
+                                                    {item.total_retur > 0 ? (
+                                                        <span className="font-semibold text-rose-600" title={`Total Retur Pembelian: ${formatRupiah(item.total_retur)}`}>
+                                                            - {formatNumberOnly(item.total_retur)}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-slate-300">-</span>
+                                                    )}
+                                                </td>
                                                 <td className="px-4 py-3.5 text-right text-emerald-600 font-medium">
                                                     {formatNumberOnly(item.terbayar)}
                                                 </td>
@@ -1190,18 +1368,11 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                                                 </td>
                                                 <td className="px-4 py-3.5 text-center">
                                                     <div className="flex flex-col items-center gap-1">
-                                                        <span className={`inline-block px-2.5 py-1 rounded-full text-[11px] font-bold ${item.status === 'Lunas'
-                                                                ? 'bg-emerald-50 text-emerald-700'
-                                                                : item.status === 'Dibayar Sebagian'
-                                                                    ? 'bg-amber-50 text-amber-700'
-                                                                    : 'bg-red-50 text-red-700'
-                                                            }`}>
-                                                            {item.status}
-                                                        </span>
+                                                        {renderStatusBadge(item)}
                                                         {item.status === 'Lunas' && item.tanggalBayar && (
                                                             <span className="text-[10px] font-medium text-emerald-600">Lunas {item.tanggalBayar}</span>
                                                         )}
-                                                        {item.is_submitted && item.status !== 'Lunas' && (
+                                                        {item.is_submitted && !isItemSettled(item) && (
                                                             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700 border border-blue-200">
                                                                 Diajukan
                                                             </span>
@@ -1686,18 +1857,71 @@ export default function Hutang({ hutangDagang = [], creditors = [], kasBankAccou
                                 <span>{formatNumberOnly(item.ppn)}</span>
                             </div>
                             <div className="flex justify-between text-base font-bold text-slate-900 pt-2 border-t border-slate-200">
-                                <span>Total Tagihan:</span>
+                                <span>Total Tagihan (Bruto):</span>
                                 <span>{formatRupiah(item.total)}</span>
                             </div>
+                            {item.total_retur > 0 && (
+                                <>
+                                    <div className="flex justify-between text-rose-600 font-semibold text-xs">
+                                        <span className="flex items-center gap-1">
+                                            <RotateCcw className="w-3.5 h-3.5" />
+                                            <span>Retur Pembelian:</span>
+                                        </span>
+                                        <span>- {formatRupiah(item.total_retur)}</span>
+                                    </div>
+                                    <div className="flex justify-between text-slate-700 font-semibold text-xs pt-1 border-t border-dashed border-slate-200">
+                                        <span>Tagihan Bersih (Net):</span>
+                                        <span className="font-bold">{formatRupiah(item.net_total)}</span>
+                                    </div>
+                                </>
+                            )}
                             <div className="flex justify-between text-emerald-600 font-semibold">
                                 <span>Sudah Terbayar:</span>
                                 <span>{formatRupiah(item.terbayar)}</span>
                             </div>
-                            <div className="flex justify-between text-red-600 font-bold text-sm pt-1">
+                            <div className="flex justify-between text-red-600 font-bold text-sm pt-1 border-t border-slate-200">
                                 <span>Sisa Tagihan:</span>
                                 <span>{formatRupiah(item.sisa)}</span>
                             </div>
                         </div>
+
+                        {/* Riwayat Retur Pembelian di Drawer */}
+                        {item.returs && item.returs.length > 0 && (
+                            <div>
+                                <div className="flex items-center justify-between mb-2">
+                                    <h4 className="font-bold text-rose-700 text-xs flex items-center gap-1.5">
+                                        <RotateCcw className="w-3.5 h-3.5" />
+                                        <span>Riwayat Retur Beli ({item.returs.length})</span>
+                                    </h4>
+                                    <span className="text-[11px] font-bold text-rose-600">
+                                        - {formatRupiah(item.total_retur)}
+                                    </span>
+                                </div>
+                                <div className="space-y-2">
+                                    {item.returs.map((r, idx) => (
+                                        <div key={r.id || idx} className="p-2.5 bg-rose-50/60 border border-rose-100 rounded-xl text-xs space-y-1">
+                                            <div className="flex justify-between items-center">
+                                                <span className="font-bold text-slate-800">{r.nama}</span>
+                                                <span className="font-bold text-rose-700">- {formatRupiah(r.nominal)}</span>
+                                            </div>
+                                            <div className="flex justify-between text-[11px] text-slate-500">
+                                                <span>{r.code} • {r.qty} {r.satuan}</span>
+                                                <span>{r.tanggal}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-[10px] pt-0.5">
+                                                <span className="text-slate-400">Batch: {r.batch_number} (ED: {r.expired_date})</span>
+                                                <span className={`px-1.5 py-0.5 rounded font-semibold ${r.status === 'sudah_potong'
+                                                        ? 'bg-purple-100 text-purple-700'
+                                                        : 'bg-slate-200/70 text-slate-700'
+                                                    }`}>
+                                                    {r.status_label || r.status}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
                         {/* Riwayat Pembayaran */}
                         <div>

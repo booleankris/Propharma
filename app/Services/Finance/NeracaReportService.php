@@ -319,6 +319,33 @@ class NeracaReportService
             $pharmacyIds[] = 9;
         }
 
+        // Ambil retur pembelian (barang yang diretur ke supplier) yang tercatat sampai tanggal cutoff
+        $returnsByDetailId = [];
+        $returnsByInvoiceNo = [];
+
+        $returnItems = DB::table('purchase_return_items as pri')
+            ->join('purchase_returns as pr', 'pr.id', '=', 'pri.purchase_return_id')
+            ->where('pr.status', '!=', 'dibatalkan')
+            ->whereIn('pr.pharmacy_id', $pharmacyIds)
+            ->where(function ($dateQ) use ($asOfDate) {
+                $dateQ->whereDate('pr.created_at', '<=', $asOfDate)
+                    ->orWhereDate('pri.status_date', '<=', $asOfDate)
+                    ->orWhereDate('pri.deduction_date', '<=', $asOfDate);
+            })
+            ->select('pr.receiving_id', 'pr.invoice_number', 'pri.subtotal')
+            ->get();
+
+        foreach ($returnItems as $item) {
+            $amt = (float) ($item->subtotal ?? 0);
+            if ($item->receiving_id) {
+                $returnsByDetailId[$item->receiving_id] = ($returnsByDetailId[$item->receiving_id] ?? 0) + $amt;
+            }
+            if ($item->invoice_number) {
+                $invKey = strtoupper(trim((string) $item->invoice_number));
+                $returnsByInvoiceNo[$invKey] = ($returnsByInvoiceNo[$invKey] ?? 0) + $amt;
+            }
+        }
+
         $details = ReceivingDetails::query()
             ->with([
                 'receiving:id,pharmacy_id,status,date,created_at',
@@ -349,8 +376,21 @@ class NeracaReportService
 
             $ppnType = strtoupper(trim((string) ($detail->invoice_ppn ?? $detail->creditor?->ppn_type ?? 'TANPA')));
             $invoiceTotal = ReceivingInvoiceTotals::calculate($detail->receiving_items, $ppnType)['total'];
-            $paid = (float) $detail->payments->sum('amount');
-            $balance += max(0, $invoiceTotal - $paid);
+
+            $returFromPr = 0.0;
+            if (isset($returnsByDetailId[$detail->id])) {
+                $returFromPr = (float) $returnsByDetailId[$detail->id];
+            } elseif ($detail->invoice_number && isset($returnsByInvoiceNo[strtoupper(trim($detail->invoice_number))])) {
+                $returFromPr = (float) $returnsByInvoiceNo[strtoupper(trim($detail->invoice_number))];
+            }
+
+            // Pembayaran kas/bank & pembayaran retur
+            $paidCashBank = (float) $detail->payments->where('payment_type', '!=', 'RETUR')->sum('amount');
+            $paidRetur = (float) $detail->payments->where('payment_type', 'RETUR')->sum('amount');
+            $totalReturDeduction = max($paidRetur, $returFromPr);
+
+            // Sisa hutang faktur = nilai faktur - pembayaran - potongan retur barang
+            $balance += max(0, $invoiceTotal - $paidCashBank - $totalReturDeduction);
         }
 
         return $balance;
