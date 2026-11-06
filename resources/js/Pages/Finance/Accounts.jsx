@@ -64,6 +64,7 @@ export default function Accounts({
         'Harga Pokok Penjualan': '5-500',
         'Beban Operasional': '6-600',
         'Beban Lainnya': '8-800',
+        'Diskon Lain-lain': '8-800',
     };
 
     const getNextCodeForCategory = (cat) => {

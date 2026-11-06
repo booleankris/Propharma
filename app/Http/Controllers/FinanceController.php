@@ -898,7 +898,7 @@ class FinanceController extends Controller
 
         $targetPharmacyIds = $this->getTargetPharmacyIds();
         $biayaList = $this->getBiayaData();
-        $expenseAccounts = FinanceAccount::whereNotIn('category', ['Kas & Bank'])
+        $expenseAccounts = FinanceAccount::whereNotIn('category', ['Kas & Bank', 'Diskon Lain-lain'])
             ->where('is_active', true)
             ->orderBy('code')
             ->get(['id', 'code', 'name', 'category', 'balance']);
@@ -913,6 +913,44 @@ class FinanceController extends Controller
         return Inertia::render('Finance/Biaya', [
             'biayaList' => $biayaList,
             'expenseAccounts' => $expenseAccounts,
+            'kasBankAccounts' => $kasBankAccounts,
+            'stats' => $stats,
+            'summary' => $summary,
+            'branchContext' => $this->getBranchContext(),
+        ]);
+    }
+
+    /**
+     * Halaman Pengelolaan Diskon Off (Diskon Tambahan Pembelian Baru).
+     *
+     * Diskon off dicatat mirip fitur Biaya, namun TIDAK mengurangi saldo akun
+     * Kas & Bank karena merupakan potongan yang diterima dari supplier, bukan
+     * pengeluaran kas. Data-nya dipakai sebagai kolom "DISKON OFF" pada laporan
+     * Kinerja Omzet (mengurangi total pembelian).
+     */
+    public function diskon(Request $request)
+    {
+        if ($request->filled('pharmacy_id') && auth()->check() && (auth()->user()->hasRole('HO') || auth()->user()->hasRole('administrator') || auth()->user()->hasRole('General Manager'))) {
+            session(['ho_pharmacy_id' => (int) $request->pharmacy_id]);
+        }
+
+        $targetPharmacyIds = $this->getTargetPharmacyIds();
+        $diskonList = $this->getDiskonData();
+        $discountAccounts = FinanceAccount::where('category', 'Diskon Lain-lain')
+            ->where('is_active', true)
+            ->orderBy('code')
+            ->get(['id', 'code', 'name', 'category', 'balance']);
+        $kasBankAccounts = $this
+            ->branchKasBankAccountsQuery()
+            ->where('is_active', true)
+            ->orderBy('code')
+            ->get(['id', 'code', 'name', 'balance', 'account_number']);
+        $stats = $this->getStats(null, null, null);
+        $summary = $this->getDiskonSummary($targetPharmacyIds);
+
+        return Inertia::render('Finance/Diskon', [
+            'diskonList' => $diskonList,
+            'discountAccounts' => $discountAccounts,
             'kasBankAccounts' => $kasBankAccounts,
             'stats' => $stats,
             'summary' => $summary,
@@ -2167,6 +2205,96 @@ class FinanceController extends Controller
     }
 
     /**
+     * Helper: Ambil data transaksi diskon off.
+     */
+    protected function getDiskonData()
+    {
+        $targetPharmacyIds = $this->getTargetPharmacyIds();
+
+        return FinancePayment::with(['account', 'expenseAccount', 'creator', 'pharmacy'])
+            ->where('payment_type', 'DISKON')
+            ->where(function ($q) use ($targetPharmacyIds) {
+                $q
+                    ->whereIn('pharmacy_id', $targetPharmacyIds)
+                    ->orWhereNull('pharmacy_id');
+            })
+            ->latest('payment_date')
+            ->latest('id')
+            ->take(500)
+            ->get()
+            ->map(function ($p) {
+                return [
+                    'id' => $p->id,
+                    'reference_number' => $p->reference_number ?: ('DC-' . str_pad($p->id, 5, '0', STR_PAD_LEFT)),
+                    'payment_date' => $p->payment_date,
+                    'formatted_date' => \Carbon\Carbon::parse($p->payment_date)->format('d/m/Y'),
+                    'account_id' => $p->account_id,
+                    'account_name' => $p->account->name ?? 'Kas / Bank',
+                    'account_code' => $p->account->code ?? '-',
+                    'discount_account_id' => $p->expense_account_id,
+                    'discount_account_name' => $p->expenseAccount->name ?? 'Diskon Off',
+                    'discount_account_code' => $p->expenseAccount->code ?? '-',
+                    'discount_category' => $p->expenseAccount->category ?? 'Diskon Lain-lain',
+                    'amount' => (float) $p->amount,
+                    'recipient' => $p->recipient ?: '-',
+                    'notes' => $p->notes ?: '',
+                    'user_name' => $p->creator->name ?? 'Petugas',
+                    'pharmacy_name' => $p->pharmacy->name ?? null,
+                    'created_at' => $p->created_at ? $p->created_at->format('d/m/Y H:i') : '-',
+                ];
+            });
+    }
+
+    /**
+     * Helper: Ringkasan statistik modul diskon off.
+     */
+    protected function getDiskonSummary(array $targetPharmacyIds): array
+    {
+        $baseQuery = FinancePayment::where('payment_type', 'DISKON')
+            ->where(function ($q) use ($targetPharmacyIds) {
+                $q
+                    ->whereIn('pharmacy_id', $targetPharmacyIds)
+                    ->orWhereNull('pharmacy_id');
+            });
+
+        $startOfMonth = \Carbon\Carbon::now()->startOfMonth()->toDateString();
+        $endOfMonth = \Carbon\Carbon::now()->endOfMonth()->toDateString();
+        $today = \Carbon\Carbon::today()->toDateString();
+
+        $totalAllTime = (float) (clone $baseQuery)->sum('amount');
+        $totalMonth = (float) (clone $baseQuery)->whereBetween('payment_date', [$startOfMonth, $endOfMonth])->sum('amount');
+        $totalToday = (float) (clone $baseQuery)->whereDate('payment_date', $today)->sum('amount');
+        $countTotal = (int) (clone $baseQuery)->count();
+        $countMonth = (int) (clone $baseQuery)->whereBetween('payment_date', [$startOfMonth, $endOfMonth])->count();
+
+        // Breakdown top 5 jenis diskon
+        $topDiscounts = (clone $baseQuery)
+            ->select('expense_account_id', DB::raw('SUM(amount) as total_amount'), DB::raw('COUNT(id) as total_count'))
+            ->with('expenseAccount:id,code,name')
+            ->groupBy('expense_account_id')
+            ->orderByDesc('total_amount')
+            ->limit(5)
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'account_name' => $item->expenseAccount->name ?? 'Diskon Off',
+                    'account_code' => $item->expenseAccount->code ?? '-',
+                    'total_amount' => (float) $item->total_amount,
+                    'total_count' => (int) $item->total_count,
+                ];
+            });
+
+        return [
+            'totalAllTime' => $totalAllTime,
+            'totalMonth' => $totalMonth,
+            'totalToday' => $totalToday,
+            'countTotal' => $countTotal,
+            'countMonth' => $countMonth,
+            'topDiscounts' => $topDiscounts,
+        ];
+    }
+
+    /**
      * Helper: Ambil kategori akun.
      */
     protected function getCategories()
@@ -2185,6 +2313,7 @@ class FinanceController extends Controller
             'Harga Pokok Penjualan',
             'Beban Operasional',
             'Beban Lainnya',
+            'Diskon Lain-lain',
         ];
         $existingCategories = FinanceAccount::select('category')->distinct()->pluck('category')->toArray();
         return array_values(array_unique(array_merge($defaultCategories, $existingCategories)));
@@ -2338,6 +2467,26 @@ class FinanceController extends Controller
             ])
             ->count();
 
+        $countDiskonTotal = (int) FinancePayment::where('payment_type', 'DISKON')
+            ->where(function ($sub) use ($targetPharmacyIds) {
+                $sub
+                    ->whereIn('pharmacy_id', $targetPharmacyIds)
+                    ->orWhereNull('pharmacy_id');
+            })
+            ->count();
+
+        $countDiskonMonth = (int) FinancePayment::where('payment_type', 'DISKON')
+            ->where(function ($sub) use ($targetPharmacyIds) {
+                $sub
+                    ->whereIn('pharmacy_id', $targetPharmacyIds)
+                    ->orWhereNull('pharmacy_id');
+            })
+            ->whereBetween('payment_date', [
+                \Carbon\Carbon::now()->startOfMonth()->toDateString(),
+                \Carbon\Carbon::now()->endOfMonth()->toDateString(),
+            ])
+            ->count();
+
         $stats = [
             'totalSaldoKasBank' => $totalSaldoKasBank,
             'accountsCount' => $accountsCount,
@@ -2369,6 +2518,8 @@ class FinanceController extends Controller
             'totalBiaya' => $kasKeluarBiaya,
             'countBiayaTotal' => $countBiayaTotal,
             'countBiayaMonth' => $countBiayaMonth,
+            'countDiskonTotal' => $countDiskonTotal,
+            'countDiskonMonth' => $countDiskonMonth,
         ];
 
         Cache::put($cacheKey, $stats, 60);
@@ -3025,6 +3176,7 @@ class FinanceController extends Controller
             'Harga Pokok Penjualan' => '5-500',
             'Beban Operasional' => '6-600',
             'Beban Lainnya' => '8-800',
+            'Diskon Lain-lain' => '8-800',
         ];
 
         $prefix = $prefixMap[$category] ?? null;
@@ -3664,6 +3816,111 @@ class FinanceController extends Controller
         });
 
         return back()->with('success', 'Transaksi biaya berhasil dihapus dan saldo kas dikembalikan.');
+    }
+
+    /**
+     * Simpan transaksi diskon off baru.
+     *
+     * Catatan: Diskon off TIDAK mengurangi saldo akun Kas & Bank karena
+     * merupakan potongan yang diterima dari supplier (bukan pengeluaran kas).
+     */
+    public function storeDiskon(Request $request)
+    {
+        $validated = $request->validate([
+            'account_id' => 'required|exists:finance_accounts,id',
+            'expense_account_id' => 'required|exists:finance_accounts,id',
+            'payment_date' => 'required|date',
+            'amount' => 'required|numeric|gt:0',
+            'recipient' => 'nullable|string|max:150',
+            'reference_number' => 'nullable|string|max:100',
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        $account = $this->branchKasBankAccountsQuery()->findOrFail($validated['account_id']);
+        if ($account->category !== 'Kas & Bank') {
+            return back()->withErrors(['account_id' => 'Akun sumber dana harus berkategori Kas & Bank.']);
+        }
+
+        $discountAccount = FinanceAccount::findOrFail($validated['expense_account_id']);
+        if ($discountAccount->category !== 'Diskon Lain-lain') {
+            return back()->withErrors(['expense_account_id' => 'Jenis diskon harus akun berkategori "Diskon Lain-lain".']);
+        }
+
+        $activePharmacyId = getActivePharmacyId();
+
+        FinancePayment::create([
+            'pharmacy_id' => $activePharmacyId > 0 ? $activePharmacyId : null,
+            'account_id' => $account->id,
+            'expense_account_id' => $discountAccount->id,
+            'payment_type' => 'DISKON',
+            'payment_date' => $validated['payment_date'],
+            'amount' => $validated['amount'],
+            'recipient' => $validated['recipient'] ?? null,
+            'reference_number' => $validated['reference_number'] ?? null,
+            'notes' => $validated['notes'] ?? null,
+            'created_by' => Auth::id(),
+        ]);
+
+        // Diskon off tidak mengurangi saldo kas/bank, hanya bersihkan cache statistik.
+        $this->clearStatsCache();
+
+        return back()->with('success', 'Diskon off berhasil dicatat.');
+    }
+
+    /**
+     * Perbarui transaksi diskon off yang sudah ada.
+     */
+    public function updateDiskon(Request $request, $id)
+    {
+        $payment = FinancePayment::where('payment_type', 'DISKON')->findOrFail($id);
+
+        $validated = $request->validate([
+            'account_id' => 'required|exists:finance_accounts,id',
+            'expense_account_id' => 'required|exists:finance_accounts,id',
+            'payment_date' => 'required|date',
+            'amount' => 'required|numeric|gt:0',
+            'recipient' => 'nullable|string|max:150',
+            'reference_number' => 'nullable|string|max:100',
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        $newAccount = $this->branchKasBankAccountsQuery()->findOrFail($validated['account_id']);
+        if ($newAccount->category !== 'Kas & Bank') {
+            return back()->withErrors(['account_id' => 'Akun sumber dana harus berkategori Kas & Bank.']);
+        }
+
+        $discountAccount = FinanceAccount::findOrFail($validated['expense_account_id']);
+        if ($discountAccount->category !== 'Diskon Lain-lain') {
+            return back()->withErrors(['expense_account_id' => 'Jenis diskon harus akun berkategori "Diskon Lain-lain".']);
+        }
+
+        $payment->update([
+            'account_id' => $newAccount->id,
+            'expense_account_id' => $discountAccount->id,
+            'payment_date' => $validated['payment_date'],
+            'amount' => $validated['amount'],
+            'recipient' => $validated['recipient'] ?? null,
+            'reference_number' => $validated['reference_number'] ?? null,
+            'notes' => $validated['notes'] ?? null,
+        ]);
+
+        $this->clearStatsCache();
+
+        return back()->with('success', 'Diskon off berhasil diperbarui.');
+    }
+
+    /**
+     * Hapus transaksi diskon off. Tidak ada pengembalian saldo kas karena
+     * pencatatan diskon off tidak pernah mengurangi saldo kas/bank.
+     */
+    public function destroyDiskon($id)
+    {
+        $payment = FinancePayment::where('payment_type', 'DISKON')->findOrFail($id);
+        $payment->delete();
+
+        $this->clearStatsCache();
+
+        return back()->with('success', 'Transaksi diskon off berhasil dihapus.');
     }
 
     /**

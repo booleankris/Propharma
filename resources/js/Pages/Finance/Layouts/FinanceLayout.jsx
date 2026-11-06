@@ -19,6 +19,7 @@ import {
     ArrowDownUp,
     Undo2,
     BookOpenCheck,
+    Percent,
 } from 'lucide-react';
 
 export default function FinanceLayout({ title, subtitle, children, stats = {} }) {
@@ -137,6 +138,16 @@ export default function FinanceLayout({ title, subtitle, children, stats = {} })
             badge: stats.countBiayaTotal > 0 ? {
                 text: stats.countBiayaTotal,
                 color: 'bg-amber-100 text-amber-700',
+            } : null,
+        },
+        {
+            name: 'Diskon',
+            href: '/finance/diskon',
+            icon: Percent,
+            active: currentUrl.startsWith('/finance/diskon'),
+            badge: stats.countDiskonTotal > 0 ? {
+                text: stats.countDiskonTotal,
+                color: 'bg-indigo-100 text-indigo-700',
             } : null,
         },
         {

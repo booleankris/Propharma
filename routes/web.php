@@ -372,10 +372,11 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
     Route::get('/stock-detail', [SuppliesController::class, 'stockDetail'])->name('supplies.stockDetail');
     Route::get('/getstockdetail', [SuppliesController::class, 'getStockDetail'])->name('supplies.getStockDetail');
 
-    // Stock Detail
+    // Stock Storage
     Route::get('/stock-storage', [SuppliesController::class, 'storageSupplies'])->name('supplies.storage');
     Route::get('/getstockstorage', [SuppliesController::class, 'getStorageSupplies'])->name('supplies.getStorageSupplies');
     Route::get('/getstockstorage-batches', [SuppliesController::class, 'getStorageBatches'])->name('supplies.getStorageBatches');
+    Route::get('/export-storage-stock', [SuppliesController::class, 'printStorageStockData'])->name('supplies.printStorageStockData');
 
     // Transfers
     Route::get('/transfers/create', [TransfersController::class, 'transfersCreate'])->name('transfers.create');
@@ -484,6 +485,7 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
     // =================== Smart Order ===================
     Route::get('/orders/smart-medicines', [OrdersController::class, 'smartMedicines'])->name('orders.smartMedicines');
     Route::get('/orders/smart-medicines/export', [OrdersController::class, 'exportSmartMedicines'])->name('orders.smartMedicines.export');
+    Route::get('/orders/smart-medicines/export-rekap', [OrdersController::class, 'exportSmartOrderRecap'])->name('orders.smartMedicines.exportRecap');
     Route::post('/orders/addItemsBulk', [OrdersController::class, 'addItemsBulk'])->name('orders.addItemsBulk');
 
     // Receiving
@@ -586,6 +588,7 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
         Route::get('/kas-bank', [\App\Http\Controllers\FinanceController::class, 'kasBank'])->name('kasBank');
         Route::get('/pendapatan-lain-lain', [\App\Http\Controllers\FinanceController::class, 'pendapatanLainLain'])->name('pendapatanLainLain');
         Route::get('/biaya', [\App\Http\Controllers\FinanceController::class, 'biaya'])->name('biaya');
+        Route::get('/diskon', [\App\Http\Controllers\FinanceController::class, 'diskon'])->name('diskon');
         Route::get('/accounts', [\App\Http\Controllers\FinanceController::class, 'accounts'])->name('accounts');
 
         Route::post('/payments', [\App\Http\Controllers\FinanceController::class, 'storePayment'])->name('payments.store');
@@ -612,6 +615,9 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
         Route::put('/biaya/{id}', [\App\Http\Controllers\FinanceController::class, 'updateBiaya'])->name('biaya.update');
         Route::delete('/biaya/{id}', [\App\Http\Controllers\FinanceController::class, 'destroyBiaya'])->name('biaya.destroy');
         Route::get('/export/biaya', [\App\Http\Controllers\FinanceController::class, 'exportBiaya'])->name('export.biaya');
+        Route::post('/diskon', [\App\Http\Controllers\FinanceController::class, 'storeDiskon'])->name('diskon.store');
+        Route::put('/diskon/{id}', [\App\Http\Controllers\FinanceController::class, 'updateDiskon'])->name('diskon.update');
+        Route::delete('/diskon/{id}', [\App\Http\Controllers\FinanceController::class, 'destroyDiskon'])->name('diskon.destroy');
         Route::get('/export/piutang', [\App\Http\Controllers\FinanceController::class, 'exportPiutang'])->name('export.piutang');
         Route::get('/export/hutang', [\App\Http\Controllers\FinanceController::class, 'exportHutang'])->name('export.hutang');
         Route::get('/export/cash', [\App\Http\Controllers\FinanceController::class, 'exportCash'])->name('export.cash');

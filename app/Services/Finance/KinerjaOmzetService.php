@@ -29,7 +29,7 @@ class KinerjaOmzetService
                 'total' => 0.0,
                 'total_sd' => 0.0,
             ],
-            'purchases' => ['pbf' => 0, 'consignment' => 0, 'return' => 0, 'cash' => 0, 'ppn' => 0],
+            'purchases' => ['pbf' => 0, 'consignment' => 0, 'return' => 0, 'cash' => 0, 'discountOff' => 0, 'ppn' => 0, 'total' => 0, 'sd' => 0, 'exVat' => 0],
             'other_income' => 0.0,
             'other_income_sd' => 0.0,
             'expense' => 0.0,
@@ -194,6 +194,25 @@ class KinerjaOmzetService
             }
         }
 
+        $discounts = DB::table('finance_payments')
+            ->where('payment_type', 'DISKON')
+            ->where(function ($q) use ($pharmacyIds) {
+                $q->whereIn('pharmacy_id', $pharmacyIds);
+                if (in_array(1, $pharmacyIds, true)) {
+                    $q->orWhereNull('pharmacy_id');
+                }
+            })
+            ->whereBetween('payment_date', [$startDate, $endDate])
+            ->selectRaw('DATE(payment_date) as payment_dt, SUM(amount) as amount')
+            ->groupByRaw('DATE(payment_date)')
+            ->get();
+        foreach ($discounts as $disc) {
+            $date = (string) $disc->payment_dt;
+            if (isset($days[$date])) {
+                $days[$date]['purchases']['discountOff'] += (float) $disc->amount;
+            }
+        }
+
         $otherIncomes = DB::table('finance_payments')
             ->where('payment_type', 'PENDAPATAN')
             ->where(function ($q) use ($pharmacyIds) {
@@ -238,7 +257,7 @@ class KinerjaOmzetService
         $omzetRunningTotal = 0.0;
         $incomeRunningTotal = 0.0;
         $expenseRunningTotal = 0.0;
-        $marginRunningTotal = 0.0;
+        $purchaseRunningTotal = 0.0;
 
         foreach ($days as &$day) {
             $day['sales']['cashBankTotal'] = $day['sales']['cash']['morning'] + $day['sales']['cash']['evening'] + $day['sales']['bank']['morning'] + $day['sales']['bank']['evening'];
@@ -254,14 +273,15 @@ class KinerjaOmzetService
             $day['sales']['total_sd'] = $omzetRunningTotal;
             $day['sales']['exVat'] = $day['sales']['cashBankExVat'] + $day['sales']['creditExVat'];
             $day['sales']['ppn'] = $day['sales']['cashBankPpn'] + $day['sales']['creditPpn'];
-            // Purchase return amounts are already subtracted from their tender category above.
-            $day['purchases']['total'] = $day['purchases']['pbf'] + $day['purchases']['consignment'] + $day['purchases']['cash'];
+            // Total Pembelian = Kredit (PBF) + Tunai (CASH) + Konsinyasi - Retur - Diskon Off
+            $day['purchases']['total'] = $day['purchases']['pbf'] + $day['purchases']['consignment'] + $day['purchases']['cash'] - $day['purchases']['return'] - $day['purchases']['discountOff'];
+            $purchaseRunningTotal += (float) $day['purchases']['total'];
+            $day['purchases']['sd'] = $purchaseRunningTotal;
             $day['purchases']['exVat'] = $day['purchases']['total'] - $day['purchases']['ppn'];
 
-            $dayMargin = (float) ($day['sales']['exVat'] - $day['purchases']['exVat']);
-            $day['margin'] = $dayMargin;
-            $marginRunningTotal += $dayMargin;
-            $day['margin_sd'] = $marginRunningTotal;
+            // Margin = Total Omzet S/D - Total Pembelian S/D
+            $day['margin'] = (float) $day['sales']['total_sd'] - (float) $day['purchases']['sd'];
+            $day['margin_sd'] = $day['margin'];
 
             $incomeRunningTotal += (float) ($day['other_income'] ?? 0);
             $day['other_income_sd'] = $incomeRunningTotal;

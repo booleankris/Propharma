@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Exports\Stocks\PrintStockOpnameExport;
 use App\Exports\Stocks\StockDataExport;
 use App\Exports\Stocks\StockOpnameTemplateExport;
+use App\Exports\Stocks\StorageStockHistoryExport;
 use App\Jobs\ProcessStockDataExport;
 use App\Jobs\ProcessStockOpnameImport;
 use App\Models\Batches;
@@ -1014,6 +1015,10 @@ class SuppliesController extends Controller
     }
     public function printStockData(Request $request)
     {
+        if ($request->get('type') === 'storage') {
+            return $this->printStorageStockData($request);
+        }
+
         @ini_set('memory_limit', '512M');
         @set_time_limit(180);
 
@@ -1023,6 +1028,23 @@ class SuppliesController extends Controller
         $fileName = 'Data_Stok_' . $branch . '_' . date('Ymd_His') . '.xlsx';
 
         return Excel::download(new StockDataExport($request, $pharmacyId), $fileName);
+    }
+
+    public function printStorageStockData(Request $request)
+    {
+        @ini_set('memory_limit', '512M');
+        @set_time_limit(300);
+
+        if (!canAccessWarehouseStock()) {
+            return redirect()->route('home')->with('error', 'Akses stok gudang hanya untuk PMI dan Gudang.');
+        }
+
+        $warehouseId = getWarehousePharmacyId();
+        $pharmacy = Pharmacies::find($warehouseId);
+        $branch = $pharmacy ? preg_replace('/[^A-Za-z0-9_]/', '_', $pharmacy->name) : 'Gudang_PMI';
+        $fileName = 'Riwayat_Stok_Gudang_' . $branch . '_' . date('Ymd_His') . '.xlsx';
+
+        return Excel::download(new StorageStockHistoryExport($request, $warehouseId), $fileName);
     }
 
     public function exportStockData(Request $request)

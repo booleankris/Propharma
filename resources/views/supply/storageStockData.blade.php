@@ -103,7 +103,7 @@
                     </div>
                 </div>
 
-                <a href="{{ route('supplies.printstockdata') }}" target="_blank"
+                <a id="btnExportExcel" href="{{ route('supplies.printStorageStockData') }}" target="_blank"
                     class="inline-flex items-center gap-2 px-4 h-10 rounded-lg text-sm font-semibold text-white bg-emerald-500 hover:bg-emerald-600 transition shadow-sm shrink-0 w-fit">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -199,6 +199,14 @@
             endDate = '';
         let selectedMedicineId = '';
 
+        function updateExportUrl() {
+            let url = new URL("{{ route('supplies.printStorageStockData') }}", window.location.origin);
+            if (startDate) url.searchParams.set('start_date', startDate);
+            if (endDate) url.searchParams.set('end_date', endDate);
+            if (selectedMedicineId) url.searchParams.set('medicine_id', selectedMedicineId);
+            $('#btnExportExcel').attr('href', url.toString());
+        }
+
         function loadStorageBatches(medicineId) {
             const container = document.getElementById('batchListContainer');
             const batchCountDisplay = document.getElementById('batchCountDisplay');
@@ -250,6 +258,7 @@
         }
 
         document.addEventListener('DOMContentLoaded', function() {
+            updateExportUrl();
 
             flatpickr('#dateRange', {
                 mode: 'range',
@@ -261,6 +270,7 @@
                     } else {
                         startDate = endDate = '';
                     }
+                    updateExportUrl();
                     table.ajax.reload();
                 }
             });
@@ -293,6 +303,7 @@
             }).on('change', function() {
                 selectedMedicineId = $(this).val() || '';
                 loadStorageBatches(selectedMedicineId);
+                updateExportUrl();
                 table.ajax.reload();
             });
 

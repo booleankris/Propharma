@@ -37,7 +37,9 @@ class KinerjaOmzetTest extends TestCase
                     'consignment' => 0,
                     'return' => 0,
                     'cash' => 50000,
+                    'discountOff' => 0,
                     'total' => 250000,
+                    'sd' => 250000,
                     'ppn' => 25000,
                     'exVat' => 225000,
                 ],
@@ -46,9 +48,9 @@ class KinerjaOmzetTest extends TestCase
                 'expense' => 50000,
                 'saving' => 0,
                 'expense_sd' => 50000,
-                'margin' => 270495,
-                'margin_sd' => 270495,
-                'profit_loss_sd' => 230495,
+                'margin' => 300000,
+                'margin_sd' => 300000,
+                'profit_loss_sd' => 260000,
             ],
             [
                 'date' => '2026-10-02',
@@ -71,18 +73,20 @@ class KinerjaOmzetTest extends TestCase
                     'consignment' => 0,
                     'return' => 0,
                     'cash' => 0,
-                    'total' => 300000,
+                    'discountOff' => 100000,
+                    'total' => 200000,
+                    'sd' => 450000,
                     'ppn' => 30000,
-                    'exVat' => 270000,
+                    'exVat' => 170000,
                 ],
                 'other_income' => 5000,
                 'other_income_sd' => 15000,
                 'expense' => 40000,
                 'saving' => 0,
                 'expense_sd' => 90000,
-                'margin' => 405675,
-                'margin_sd' => 676170,
-                'profit_loss_sd' => 601170,
+                'margin' => 850000,
+                'margin_sd' => 850000,
+                'profit_loss_sd' => 775000,
             ],
         ];
 
@@ -123,6 +127,24 @@ class KinerjaOmzetTest extends TestCase
         $this->assertEquals(750000, $day2[9]); // Total Omzet = Tunai (600k) + Kredit (150k)
         $this->assertEquals(1300000, $day2[10]); // Total Omzet S/D = 550k + 750k
 
+        // Kolom pembelian (purchaseStart = 11): PBF, KONSINYASI, RETUR, CASH, DISKON OFF, TOTAL PEMBELIAN, TOTAL PEMBELIAN S/D, MARGIN, HPP %
+        $this->assertEquals(200000, $day1[11]); // PBF
+        $this->assertEquals(50000, $day1[14]); // CASH
+        $this->assertEquals(0, $day1[15]); // DISKON OFF
+        $this->assertEquals(250000, $day1[16]); // TOTAL PEMBELIAN = 200k + 50k - 0 - 0
+        $this->assertEquals(250000, $day1[17]); // TOTAL PEMBELIAN S/D
+        $this->assertEquals(300000, $day1[18]); // MARGIN = Omzet S/D (550k) - Pembelian S/D (250k)
+
+        $this->assertEquals(300000, $day2[11]); // PBF
+        $this->assertEquals(100000, $day2[15]); // DISKON OFF
+        $this->assertEquals(200000, $day2[16]); // TOTAL PEMBELIAN = 300k - 100k (diskon off)
+        $this->assertEquals(450000, $day2[17]); // TOTAL PEMBELIAN S/D = 250k + 200k
+        $this->assertEquals(850000, $day2[18]); // MARGIN = 1.3M - 450k
+
+        // HPP % = Total Pembelian S/D / Total Omzet S/D * 100
+        $this->assertEqualsWithDelta(45.4545, (float) $day1[19], 0.01); // 250k / 550k * 100
+        $this->assertEqualsWithDelta(34.6153, (float) $day2[19], 0.01); // 450k / 1.3M * 100
+
         // Check TOTAL Row
         $totalRow = $rows[7];
         $this->assertSame('TOTAL PERIODE', $totalRow[0]);
@@ -130,6 +152,10 @@ class KinerjaOmzetTest extends TestCase
         $this->assertEquals(350000, $totalRow[8]); // Total Kredit: 200k + 150k
         $this->assertEquals(1300000, $totalRow[9]); // Total Omzet: 550k + 750k = 1.3M
         $this->assertEquals(1300000, $totalRow[10]); // Total Omzet S/D: Final cumulative 1.3M
+        $this->assertEquals(450000, $totalRow[16]); // Total Pembelian periode = 250k + 200k
+        $this->assertEquals(450000, $totalRow[17]); // Total Pembelian S/D = nilai kumulatif terakhir
+        $this->assertEquals(850000, $totalRow[18]); // Margin = Omzet S/D - Pembelian S/D
+        $this->assertEqualsWithDelta(34.6153, (float) $totalRow[19], 0.01); // HPP % = Pembelian S/D / Omzet S/D * 100
     }
 
     public function test_purchase_aggregates_match_invoice_export_rules(): void
@@ -158,8 +184,10 @@ class KinerjaOmzetTest extends TestCase
             'pbf' => (float) $total1,
             'consignment' => 0.0,
             'cash' => (float) $total2,
+            'return' => 0.0,
+            'discountOff' => 0.0,
             'ppn' => (float) $expectedTotalPpn,
-            'total' => (float) ($total1 + $total2),
+            'total' => (float) ($total1 + $total2 - 0.0 - 0.0),
             'exVat' => (float) $expectedTotalDpp,
         ];
 

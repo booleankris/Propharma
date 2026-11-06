@@ -668,6 +668,7 @@ class TransfersController extends Controller
         $transfer = MedicineTransfers::with([
             'items.batches.medicines',
             'items.batches.pharmacy',
+            'items.sourceBatch.medicines',
             'items.sourceBatch.pharmacy',
             'items.requestedMedicine',
             'users.pharmacy',
