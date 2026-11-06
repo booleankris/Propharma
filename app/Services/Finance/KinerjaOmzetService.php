@@ -29,7 +29,7 @@ class KinerjaOmzetService
                 'total' => 0.0,
                 'total_sd' => 0.0,
             ],
-            'purchases' => ['pbf' => 0, 'consignment' => 0, 'return' => 0, 'cash' => 0, 'discountOff' => 0, 'ppn' => 0, 'total' => 0, 'sd' => 0, 'exVat' => 0],
+            'purchases' => ['pbf' => 0, 'consignment' => 0, 'return' => 0, 'cash' => 0, 'discountOff' => 0, 'discountOffSd' => 0, 'ppn' => 0, 'total' => 0, 'sd' => 0, 'exVat' => 0],
             'other_income' => 0.0,
             'other_income_sd' => 0.0,
             'expense' => 0.0,
@@ -258,6 +258,7 @@ class KinerjaOmzetService
         $incomeRunningTotal = 0.0;
         $expenseRunningTotal = 0.0;
         $purchaseRunningTotal = 0.0;
+        $discountOffRunningTotal = 0.0;
 
         foreach ($days as &$day) {
             $day['sales']['cashBankTotal'] = $day['sales']['cash']['morning'] + $day['sales']['cash']['evening'] + $day['sales']['bank']['morning'] + $day['sales']['bank']['evening'];
@@ -277,10 +278,12 @@ class KinerjaOmzetService
             $day['purchases']['total'] = $day['purchases']['pbf'] + $day['purchases']['consignment'] + $day['purchases']['cash'] - $day['purchases']['return'] - $day['purchases']['discountOff'];
             $purchaseRunningTotal += (float) $day['purchases']['total'];
             $day['purchases']['sd'] = $purchaseRunningTotal;
+            $discountOffRunningTotal += (float) $day['purchases']['discountOff'];
+            $day['purchases']['discountOffSd'] = $discountOffRunningTotal;
             $day['purchases']['exVat'] = $day['purchases']['total'] - $day['purchases']['ppn'];
 
-            // Margin = Total Omzet S/D - Total Pembelian S/D
-            $day['margin'] = (float) $day['sales']['total_sd'] - (float) $day['purchases']['sd'];
+            // Margin = Total Omzet S/D - Total Pembelian S/D + Diskon Off (harian)
+            $day['margin'] = (float) $day['sales']['total_sd'] - (float) $day['purchases']['sd'] + (float) $day['purchases']['discountOff'];
             $day['margin_sd'] = $day['margin'];
 
             $incomeRunningTotal += (float) ($day['other_income'] ?? 0);

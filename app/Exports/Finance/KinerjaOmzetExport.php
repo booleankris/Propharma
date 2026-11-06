@@ -32,7 +32,7 @@ class KinerjaOmzetExport implements FromArray, WithEvents, WithStyles, WithTitle
         $this->year = $year;
         $this->debtorCount = count($data['debtors']);
         $this->purchaseStart = $this->debtorStart + $this->debtorCount + 3;
-        $this->lastColumn = $this->purchaseStart + 14;
+        $this->lastColumn = $this->purchaseStart + 15;
         $this->lastRow = 6 + count($data['days']);
     }
 
@@ -82,7 +82,7 @@ class KinerjaOmzetExport implements FromArray, WithEvents, WithStyles, WithTitle
         foreach ($this->data['debtors'] as $index => $debtor)
             $leaf[$this->debtorStart + $index] = $debtor['name'];
         $leaf[$creditIndex] = 'TOTAL OMSET KREDIT';
-        $purchaseLabels = ['PBF', 'KONSINYASI', 'RETUR PEMBELIAN', 'CASH', 'DISKON OFF', 'TOTAL PEMBELIAN', 'TOTAL PEMBELIAN S/D', 'MARGIN', 'HPP %'];
+        $purchaseLabels = ['PBF', 'KONSINYASI', 'RETUR PEMBELIAN', 'CASH', 'DISKON OFF', 'DISKON OFF S/D', 'TOTAL PEMBELIAN', 'TOTAL PEMBELIAN S/D', 'MARGIN', 'HPP %'];
         foreach ($purchaseLabels as $index => $label)
             $middle[$this->purchaseStart + $index] = $label;
 
@@ -95,7 +95,7 @@ class KinerjaOmzetExport implements FromArray, WithEvents, WithStyles, WithTitle
             'R/L S/D',
         ];
         foreach ($extraLabels as $index => $label) {
-            $outer[$this->purchaseStart + 9 + $index] = $label;
+            $outer[$this->purchaseStart + 10 + $index] = $label;
         }
 
         $rows = [$title, $period, $outer, $middle, $leaf];
@@ -120,9 +120,10 @@ class KinerjaOmzetExport implements FromArray, WithEvents, WithStyles, WithTitle
                 $day['purchases']['return'] ?? 0,
                 $day['purchases']['cash'] ?? 0,
                 $day['purchases']['discountOff'] ?? 0,
+                $day['purchases']['discountOffSd'] ?? 0,
                 $day['purchases']['total'] ?? 0,
                 $day['purchases']['sd'] ?? 0,
-                $this->number($day['sales']['total_sd'] ?? 0) - $this->number($day['purchases']['sd'] ?? 0),
+                $this->number($day['sales']['total_sd'] ?? 0) - $this->number($day['purchases']['sd'] ?? 0) + $this->number($day['purchases']['discountOff'] ?? 0),
                 ($this->number($day['sales']['total_sd'] ?? 0) != 0) ? $this->number($day['purchases']['sd'] ?? 0) / $this->number($day['sales']['total_sd']) * 100 : 0,
             ];
             foreach ($purchaseValues as $index => $value)
@@ -136,7 +137,7 @@ class KinerjaOmzetExport implements FromArray, WithEvents, WithStyles, WithTitle
                 $day['expense_sd'] ?? 0,
                 $day['profit_loss_sd'] ?? 0,
             ];
-            foreach ($extraValues as $index => $value) $row[$this->purchaseStart + 9 + $index] = $this->number($value);
+            foreach ($extraValues as $index => $value) $row[$this->purchaseStart + 10 + $index] = $this->number($value);
 
             $rows[] = $row;
         }
@@ -145,13 +146,14 @@ class KinerjaOmzetExport implements FromArray, WithEvents, WithStyles, WithTitle
         $total[0] = 'TOTAL PERIODE';
         $skipColumns = [
             $totalOmzetSdIndex,
-            $this->purchaseStart + 6,
+            $this->purchaseStart + 5,
             $this->purchaseStart + 7,
             $this->purchaseStart + 8,
-            $this->purchaseStart + 10,
-            $this->purchaseStart + 12,
+            $this->purchaseStart + 9,
+            $this->purchaseStart + 11,
             $this->purchaseStart + 13,
             $this->purchaseStart + 14,
+            $this->purchaseStart + 15,
         ];
         for ($column = 1; $column <= $this->lastColumn; $column++) {
             if (in_array($column, $skipColumns, true)) continue;
@@ -159,16 +161,17 @@ class KinerjaOmzetExport implements FromArray, WithEvents, WithStyles, WithTitle
         }
         $lastDay = end($this->data['days']);
         $total[$totalOmzetSdIndex] = $this->number($lastDay['sales']['total_sd'] ?? 0);
-        $total[$this->purchaseStart + 6] = $this->number($lastDay['purchases']['sd'] ?? 0);
-        $total[$this->purchaseStart + 7] = $this->number($lastDay['sales']['total_sd'] ?? 0) - $this->number($lastDay['purchases']['sd'] ?? 0);
-        $total[$this->purchaseStart + 8] = $this->number($lastDay['sales']['total_sd'] ?? 0) != 0 ? $this->number($lastDay['purchases']['sd'] ?? 0) / $this->number($lastDay['sales']['total_sd']) * 100 : 0;
+        $total[$this->purchaseStart + 5] = $this->number($lastDay['purchases']['discountOffSd'] ?? 0);
+        $total[$this->purchaseStart + 7] = $this->number($lastDay['purchases']['sd'] ?? 0);
+        $total[$this->purchaseStart + 8] = $this->number($lastDay['sales']['total_sd'] ?? 0) - $this->number($lastDay['purchases']['sd'] ?? 0) + $this->number($lastDay['purchases']['discountOff'] ?? 0);
+        $total[$this->purchaseStart + 9] = $this->number($lastDay['sales']['total_sd'] ?? 0) != 0 ? $this->number($lastDay['purchases']['sd'] ?? 0) / $this->number($lastDay['sales']['total_sd']) * 100 : 0;
 
-        $total[$this->purchaseStart + 9] = array_sum(array_map(fn ($d) => $this->number($d['other_income'] ?? 0), $this->data['days']));
-        $total[$this->purchaseStart + 10] = $this->number($lastDay['other_income_sd'] ?? 0);
-        $total[$this->purchaseStart + 11] = array_sum(array_map(fn ($d) => $this->number($d['expense'] ?? 0), $this->data['days']));
-        $total[$this->purchaseStart + 12] = 0; // SAVING
-        $total[$this->purchaseStart + 13] = $this->number($lastDay['expense_sd'] ?? 0);
-        $total[$this->purchaseStart + 14] = $this->number($lastDay['profit_loss_sd'] ?? 0);
+        $total[$this->purchaseStart + 10] = array_sum(array_map(fn ($d) => $this->number($d['other_income'] ?? 0), $this->data['days']));
+        $total[$this->purchaseStart + 11] = $this->number($lastDay['other_income_sd'] ?? 0);
+        $total[$this->purchaseStart + 12] = array_sum(array_map(fn ($d) => $this->number($d['expense'] ?? 0), $this->data['days']));
+        $total[$this->purchaseStart + 13] = 0; // SAVING
+        $total[$this->purchaseStart + 14] = $this->number($lastDay['expense_sd'] ?? 0);
+        $total[$this->purchaseStart + 15] = $this->number($lastDay['profit_loss_sd'] ?? 0);
         $rows[] = $total;
 
         return $rows;
@@ -185,7 +188,7 @@ class KinerjaOmzetExport implements FromArray, WithEvents, WithStyles, WithTitle
         $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($creditColIndex))->setWidth(18);
         $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($creditColIndex + 1))->setWidth(18);
         $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($creditColIndex + 2))->setWidth(18);
-        for ($column = $this->purchaseStart + 10; $column <= $this->lastColumn + 1; $column++) {
+        for ($column = $this->purchaseStart + 11; $column <= $this->lastColumn + 1; $column++) {
             $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($column))->setWidth(18);
         }
         return [];
@@ -198,7 +201,7 @@ class KinerjaOmzetExport implements FromArray, WithEvents, WithStyles, WithTitle
             $last = Coordinate::stringFromColumnIndex($this->lastColumn + 1);
             $salesEnd = Coordinate::stringFromColumnIndex($this->purchaseStart);
             $purchaseStart = Coordinate::stringFromColumnIndex($this->purchaseStart + 1);
-            $purchaseEnd = Coordinate::stringFromColumnIndex($this->purchaseStart + 9);
+            $purchaseEnd = Coordinate::stringFromColumnIndex($this->purchaseStart + 10);
             $creditCol = Coordinate::stringFromColumnIndex($this->debtorStart + $this->debtorCount + 1);
             $totalOmzetCol = Coordinate::stringFromColumnIndex($this->debtorStart + $this->debtorCount + 2);
             $totalOmzetSdCol = Coordinate::stringFromColumnIndex($this->debtorStart + $this->debtorCount + 3);
@@ -214,11 +217,11 @@ class KinerjaOmzetExport implements FromArray, WithEvents, WithStyles, WithTitle
             $sheet->mergeCells("{$creditStart}4:{$creditCol}4");
             $sheet->mergeCells("{$totalOmzetCol}4:{$totalOmzetCol}5");
             $sheet->mergeCells("{$totalOmzetSdCol}4:{$totalOmzetSdCol}5");
-            for ($column = $this->purchaseStart + 1; $column <= $this->purchaseStart + 9; $column++) {
+            for ($column = $this->purchaseStart + 1; $column <= $this->purchaseStart + 10; $column++) {
                 $letter = Coordinate::stringFromColumnIndex($column);
                 $sheet->mergeCells("{$letter}4:{$letter}5");
             }
-            for ($column = $this->purchaseStart + 10; $column <= $this->lastColumn + 1; $column++) {
+            for ($column = $this->purchaseStart + 11; $column <= $this->lastColumn + 1; $column++) {
                 $letter = Coordinate::stringFromColumnIndex($column);
                 $sheet->mergeCells("{$letter}3:{$letter}5");
             }
@@ -243,12 +246,12 @@ class KinerjaOmzetExport implements FromArray, WithEvents, WithStyles, WithTitle
             $sheet->getStyle("{$totalOmzetSdCol}6:{$totalOmzetSdCol}" . ($this->lastRow - 1))->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF00FFFF');
 
             // Data rows for extra columns: Green for Income, Expense, Saving; Cyan for S/D columns
-            $colIncome = Coordinate::stringFromColumnIndex($this->purchaseStart + 10);
-            $colIncomeSd = Coordinate::stringFromColumnIndex($this->purchaseStart + 11);
-            $colExpense = Coordinate::stringFromColumnIndex($this->purchaseStart + 12);
-            $colSaving = Coordinate::stringFromColumnIndex($this->purchaseStart + 13);
-            $colExpenseSd = Coordinate::stringFromColumnIndex($this->purchaseStart + 14);
-            $colRlSd = Coordinate::stringFromColumnIndex($this->purchaseStart + 15);
+            $colIncome = Coordinate::stringFromColumnIndex($this->purchaseStart + 11);
+            $colIncomeSd = Coordinate::stringFromColumnIndex($this->purchaseStart + 12);
+            $colExpense = Coordinate::stringFromColumnIndex($this->purchaseStart + 13);
+            $colSaving = Coordinate::stringFromColumnIndex($this->purchaseStart + 14);
+            $colExpenseSd = Coordinate::stringFromColumnIndex($this->purchaseStart + 15);
+            $colRlSd = Coordinate::stringFromColumnIndex($this->purchaseStart + 16);
             $dataEnd = $this->lastRow - 1;
 
             $sheet->getStyle("{$colIncome}6:{$colIncome}{$dataEnd}")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FF92D050');
