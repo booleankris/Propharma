@@ -607,6 +607,8 @@ Route::middleware(['auth', 'role:General Manager|Kasir|Gudang PMI|HO|administrat
         Route::post('/kas-bank/backfill-penjualan-tunai', [\App\Http\Controllers\FinanceController::class, 'backfillPenjualanTunai'])->name('kasBank.backfillPenjualanTunai');
         Route::post('/kas-bank/backfill-penjualan-non-tunai', [\App\Http\Controllers\FinanceController::class, 'backfillPenjualanNonTunai'])->name('kasBank.backfillPenjualanNonTunai');
         Route::post('/pendapatan-lain-lain', [\App\Http\Controllers\FinanceController::class, 'storePendapatanLainLain'])->name('pendapatanLainLain.store');
+        Route::put('/pendapatan-lain-lain/{id}', [\App\Http\Controllers\FinanceController::class, 'updatePendapatanLainLain'])->name('pendapatanLainLain.update');
+        Route::delete('/pendapatan-lain-lain/{id}', [\App\Http\Controllers\FinanceController::class, 'destroyPendapatanLainLain'])->name('pendapatanLainLain.destroy');
         Route::post('/bulk-piutang-payments', [\App\Http\Controllers\FinanceController::class, 'bulkPiutangPayment'])->name('piutang.bulkStore');
         Route::post('/piutang/import-payments', [\App\Http\Controllers\FinanceController::class, 'importPiutangPayments'])->name('piutang.importPayments');
         Route::get('/piutang/import-template', [\App\Http\Controllers\FinanceController::class, 'downloadPiutangPaymentTemplate'])->name('piutang.importTemplate');

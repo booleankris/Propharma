@@ -940,13 +940,15 @@ class OrdersController extends Controller
             'medicines.unit',
             'medicines.content',
             'medicines.raw_price',
-            'medicines.minimal_stock'
+            'medicines.minimal_stock',
+            DB::raw("COALESCE(factories.name, '-') as factory_name")
         )
             ->selectRaw('SUM(medicine_cart.quantity) as total_sold')
             ->selectSub($batchSub, 'batch_stock')
             ->selectSub($transferSub, 'transfer_stock')
             ->join('medicine_transactions', 'medicine_transactions.id', '=', 'medicine_cart.transaction_id')
             ->join('medicines', 'medicines.id', '=', 'medicine_cart.medicine_id')
+            ->leftJoin('factories', 'factories.id', '=', 'medicines.factory_id')
             ->where('medicine_transactions.pharmacy_id', $salesPharmacyId)
             ->where('medicine_transactions.status', 1)
             ->whereBetween('medicine_transactions.created_at', ["{$dateFrom} 00:00:00", "{$dateTo} 23:59:59"])
@@ -961,7 +963,8 @@ class OrdersController extends Controller
                 'medicines.unit',
                 'medicines.content',
                 'medicines.raw_price',
-                'medicines.minimal_stock'
+                'medicines.minimal_stock',
+                'factories.name'
             );
 
         if ($sort === 'sold_desc') {
@@ -1079,8 +1082,10 @@ class OrdersController extends Controller
                 'medicine_id' => $row->medicine_id,
                 'code' => $row->code,
                 'name' => $row->name,
+                'factory_name' => $row->factory_name ?: '-',
                 'packaging' => $row->packaging,
-                'raw_price' => $row->raw_price,
+                'content' => (float) ($row->content ?: 1),
+                'raw_price' => (float) ($row->raw_price ?? 0),
                 'total_sold' => (int) $row->total_sold,
                 'min_stock' => $row->minimal_stock,
                 'stocks' => $totalStocks,
@@ -1192,6 +1197,8 @@ class OrdersController extends Controller
                 'medicines.id',
                 'medicines.name',
                 'medicines.code',
+                'medicines.content',
+                'medicines.raw_price',
                 'medicines.factory_id',
                 DB::raw("COALESCE(factories.name, 'Tanpa Pabrik') as factory_name"),
             ]);
@@ -1218,6 +1225,8 @@ class OrdersController extends Controller
                 'name' => $med->name,
                 'code' => $med->code,
                 'factory_name' => $med->factory_name,
+                'content' => (float) ($med->content ?: 1),
+                'raw_price' => (float) ($med->raw_price ?? 0),
                 'sold_1_month' => $sold1M,
                 'sold_3_months' => $sold3M,
                 'stocks' => $totalStock,

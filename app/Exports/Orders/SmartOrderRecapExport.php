@@ -53,6 +53,8 @@ class SmartOrderRecapExport extends DefaultValueBinder implements FromArray, Sho
             'E' => '#,##0',
             'F' => '#,##0',
             'G' => '#,##0',
+            'H' => '#,##0',
+            'I' => '#,##0',
         ];
     }
 
@@ -74,6 +76,8 @@ class SmartOrderRecapExport extends DefaultValueBinder implements FromArray, Sho
                 'Nama Obat',
                 'Kode Obat',
                 'Nama Pabrik',
+                'Isi',
+                'HNA',
                 'Terjual 1 Bulan',
                 'Terjual 3 Bulan',
                 'Stok Sekarang',
@@ -81,7 +85,7 @@ class SmartOrderRecapExport extends DefaultValueBinder implements FromArray, Sho
         ];
 
         if (empty($this->items)) {
-            $rows[] = ['Tidak ada data barang dengan histori penjualan.', '', '', '', '', '', ''];
+            $rows[] = ['Tidak ada data barang dengan histori penjualan.', '', '', '', '', '', '', '', ''];
             return $rows;
         }
 
@@ -104,6 +108,8 @@ class SmartOrderRecapExport extends DefaultValueBinder implements FromArray, Sho
                 (string) ($item['name'] ?? '-'),
                 (string) ($item['code'] ?? '-'),
                 (string) ($item['factory_name'] ?? 'Tanpa Pabrik'),
+                (float) ($item['content'] ?? 1),
+                (float) ($item['raw_price'] ?? 0),
                 $sold1M,
                 $sold3M,
                 $currentStock,
@@ -114,6 +120,8 @@ class SmartOrderRecapExport extends DefaultValueBinder implements FromArray, Sho
         $rows[] = [
             '',
             'TOTAL',
+            '',
+            '',
             '',
             '',
             $totalSold1Month,
@@ -128,7 +136,7 @@ class SmartOrderRecapExport extends DefaultValueBinder implements FromArray, Sho
     {
         $lastRow = $sheet->getHighestRow();
         $headerRow = $this->headerRow;
-        $lastCol = 'G';
+        $lastCol = 'I';
 
         // Title styling
         foreach (range(1, 4) as $r) {
@@ -172,7 +180,8 @@ class SmartOrderRecapExport extends DefaultValueBinder implements FromArray, Sho
             $sheet->getStyle("B{$startDataRow}:B{$lastRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
             $sheet->getStyle("C{$startDataRow}:C{$lastRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
             $sheet->getStyle("D{$startDataRow}:D{$lastRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
-            $sheet->getStyle("E{$startDataRow}:G{$lastRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+            $sheet->getStyle("E{$startDataRow}:E{$lastRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle("F{$startDataRow}:I{$lastRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
 
             // Total row styling
             $sheet->getStyle("A{$lastRow}:{$lastCol}{$lastRow}")->applyFromArray([

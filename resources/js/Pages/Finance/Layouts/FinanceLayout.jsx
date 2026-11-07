@@ -141,16 +141,6 @@ export default function FinanceLayout({ title, subtitle, children, stats = {} })
             } : null,
         },
         {
-            name: 'Diskon',
-            href: '/finance/diskon',
-            icon: Percent,
-            active: currentUrl.startsWith('/finance/diskon'),
-            badge: stats.countDiskonTotal > 0 ? {
-                text: stats.countDiskonTotal,
-                color: 'bg-indigo-100 text-indigo-700',
-            } : null,
-        },
-        {
             name: 'Akun',
             href: '/finance/accounts',
             icon: Layers,

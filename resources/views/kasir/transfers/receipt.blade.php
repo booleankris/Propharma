@@ -62,8 +62,8 @@
             width: 100%;
             border-collapse: collapse;
             margin-top: 6px;
-            font-size: 8.5px;
-            line-height: 1.15;
+            font-size: 10px;
+            line-height: 1.2;
         }
 
         table.items thead {
@@ -78,13 +78,13 @@
             text-align: left;
             font-style: italic;
             font-weight: 700;
-            font-size: 8.5px;
+            font-size: 10px;
             border-bottom: 1px solid #333;
             padding: 3px 2px;
         }
 
         table.items td {
-            font-size: 8.5px;
+            font-size: 10px;
             padding: 2.5px 2px;
             border-bottom: 1px solid #e5e5e5;
             vertical-align: middle;
@@ -95,24 +95,24 @@
             text-align: left;
         }
 
+        .qty-col {
+            width: 45px;
+            text-align: left;
+        }
+
         .satuan-col {
-            width: 48px;
+            width: 50px;
             text-align: left;
         }
 
         .batch-col {
-            width: 95px;
+            width: 100px;
             text-align: left;
         }
 
         .ed-col {
-            width: 65px;
+            width: 80px;
             text-align: left;
-        }
-
-        .qty-col {
-            text-align: left;
-            width: 50px;
         }
 
         table.signatures {
@@ -198,11 +198,11 @@
         <thead>
             <tr>
                 <th class="no-col">No</th>
-                <th>Item</th>
+                <th>Nama Item</th>
+                <th class="qty-col">Qty</th>
                 <th class="satuan-col">Satuan</th>
                 <th class="batch-col">Batch</th>
-                <th class="ed-col">ED</th>
-                <th class="qty-col">Quantity</th>
+                <th class="ed-col">Expired Date</th>
             </tr>
         </thead>
         <tbody>
@@ -218,10 +218,10 @@
             <tr>
                 <td class="no-col">{{ $index + 1 }}</td>
                 <td>{{ $itemName }}</td>
+                <td class="qty-col">{{ $qty }}</td>
                 <td class="satuan-col">{{ strtoupper($unit) }}</td>
                 <td class="batch-col">{{ $batchName }}</td>
                 <td class="ed-col">{{ $ed }}</td>
-                <td class="qty-col">{{ $qty }}</td>
             </tr>
             @endforeach
         </tbody>

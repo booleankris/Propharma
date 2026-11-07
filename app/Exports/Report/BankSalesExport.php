@@ -150,15 +150,11 @@ class BankSalesExport implements WithMultipleSheets
 
         // 2. Classify transactions by bank/category
         $grouped = [];
-        $groupedByPaymentClass = ['KREDIT' => [], 'CASH' => []];
         foreach ($allTransactions as $trx) {
             $cat = self::resolveCategory($trx) ?: 'Transfer Lainnya';
             $typeGroup = LiphExport::TYPE_MAP[$trx->transaction_type][0] ?? 'tunai';
             $paymentClass = $typeGroup === 'kredit' ? 'KREDIT' : 'CASH';
-            $groupedByPaymentClass[$paymentClass][$cat][] = $trx;
-
-            // Kredit is a transaction type, not a selected payment method.
-            // Keep those transactions out of the bank/method detail sheets.
+            // Kredit transactions are excluded from the payment recap and detail sheets.
             if ($paymentClass !== 'KREDIT') {
                 $grouped[$cat][] = $trx;
             }
@@ -167,18 +163,12 @@ class BankSalesExport implements WithMultipleSheets
         // 3. Prepare master bank list
         $activeCategories = array_keys($grouped);
         $banksList = array_values(array_unique(array_merge(self::STANDARD_BANKS, $activeCategories)));
-        // Put the aggregate Kredit row first, preserving the existing order
-        // of Cash and every payment method that follows it.
-        array_unshift($banksList, 'KREDIT');
-
-        // 4. Build one flat recap: Cash, Kredit, then each payment method once.
+        // 4. Build one flat recap from cash and payment methods only.
         $allBanksData = [];
         $activeBanksWithData = [];
 
         foreach ($banksList as $bank) {
-            $bankTransactions = $bank === 'KREDIT'
-                ? collect($groupedByPaymentClass['KREDIT'])->flatten(1)
-                : collect($grouped[$bank] ?? []);
+            $bankTransactions = collect($grouped[$bank] ?? []);
             $allBanksData[$bank] = self::summarizeTransactions($bankTransactions);
 
             if ($bank !== 'KREDIT' && ($bankTransactions->isNotEmpty() || in_array($bank, self::STANDARD_BANKS, true))) {

@@ -34,12 +34,13 @@ class SmartOrderExport implements FromArray, ShouldAutoSize, WithStyles, WithTit
     {
         return [
             'B' => NumberFormat::FORMAT_TEXT,
-            'E' => '#,##0',
             'F' => '#,##0',
             'G' => '#,##0',
+            'H' => '#,##0',
             'I' => '#,##0',
-            'J' => '#,##0',
             'K' => '#,##0',
+            'L' => '#,##0',
+            'M' => '#,##0',
         ];
     }
 
@@ -75,8 +76,10 @@ class SmartOrderExport implements FromArray, ShouldAutoSize, WithStyles, WithTit
                 'No.',
                 'Kode Obat',
                 'Nama Obat',
+                'Nama Pabrik',
                 'Kemasan',
-                'Harga Beli (HNA)',
+                'Isi',
+                'HNA',
                 'Sisa Stok',
                 'Min. Stok',
                 'Status Stok',
@@ -87,7 +90,7 @@ class SmartOrderExport implements FromArray, ShouldAutoSize, WithStyles, WithTit
         ];
 
         if (empty($this->items)) {
-            $rows[] = ['Tidak ada data rekomendasi smart order untuk filter yang dipilih.', '', '', '', '', '', '', '', '', '', ''];
+            $rows[] = ['Tidak ada data rekomendasi smart order untuk filter yang dipilih.', '', '', '', '', '', '', '', '', '', '', '', ''];
             return $rows;
         }
 
@@ -114,7 +117,9 @@ class SmartOrderExport implements FromArray, ShouldAutoSize, WithStyles, WithTit
                 $no++,
                 (string) ($item['code'] ?? '-'),
                 (string) ($item['name'] ?? '-'),
+                (string) ($item['factory_name'] ?? '-'),
                 (string) ($item['packaging'] ?? '-'),
+                (float) ($item['content'] ?? 1),
                 (float) ($item['raw_price'] ?? 0),
                 $stocks,
                 $minStock,
@@ -135,6 +140,8 @@ class SmartOrderExport implements FromArray, ShouldAutoSize, WithStyles, WithTit
             '',
             '',
             '',
+            '',
+            '',
             $totalSoldRange,
             $totalSold1Month,
             $totalSold3Months,
@@ -147,19 +154,20 @@ class SmartOrderExport implements FromArray, ShouldAutoSize, WithStyles, WithTit
     {
         $lastRow = $sheet->getHighestRow();
         $headerRow = 6;
+        $lastCol = 'M';
 
         // Title styling
-        $sheet->mergeCells("A1:K1");
-        $sheet->mergeCells("A2:K2");
-        $sheet->mergeCells("A3:K3");
-        $sheet->mergeCells("A4:K4");
+        $sheet->mergeCells("A1:{$lastCol}1");
+        $sheet->mergeCells("A2:{$lastCol}2");
+        $sheet->mergeCells("A3:{$lastCol}3");
+        $sheet->mergeCells("A4:{$lastCol}4");
 
         $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14)->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color('FF6B21A8'));
         $sheet->getStyle('A2')->getFont()->setBold(true)->setSize(11);
         $sheet->getStyle('A3:A4')->getFont()->setSize(9)->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color('FF4B5563'));
 
         // Table Header Styling
-        $sheet->getStyle("A{$headerRow}:K{$headerRow}")->applyFromArray([
+        $sheet->getStyle("A{$headerRow}:{$lastCol}{$headerRow}")->applyFromArray([
             'font' => [
                 'bold' => true,
                 'color' => ['rgb' => 'FFFFFF'],
@@ -180,7 +188,7 @@ class SmartOrderExport implements FromArray, ShouldAutoSize, WithStyles, WithTit
 
         // Data Rows Borders & Alignment
         if ($lastRow > $headerRow) {
-            $sheet->getStyle("A{$headerRow}:K{$lastRow}")->getBorders()->getAllBorders()->applyFromArray([
+            $sheet->getStyle("A{$headerRow}:{$lastCol}{$lastRow}")->getBorders()->getAllBorders()->applyFromArray([
                 'borderStyle' => Border::BORDER_THIN,
                 'color' => ['rgb' => 'E5E7EB'],
             ]);
@@ -188,14 +196,14 @@ class SmartOrderExport implements FromArray, ShouldAutoSize, WithStyles, WithTit
             // Alignment
             $sheet->getStyle("A7:A{$lastRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
             $sheet->getStyle("B7:B{$lastRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle("C7:C{$lastRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
-            $sheet->getStyle("D7:D{$lastRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle("E7:G{$lastRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
-            $sheet->getStyle("H7:H{$lastRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-            $sheet->getStyle("I7:K{$lastRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+            $sheet->getStyle("C7:D{$lastRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_LEFT);
+            $sheet->getStyle("E7:F{$lastRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle("G7:I{$lastRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+            $sheet->getStyle("J7:J{$lastRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle("K7:M{$lastRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
 
             // Total row styling
-            $sheet->getStyle("A{$lastRow}:K{$lastRow}")->applyFromArray([
+            $sheet->getStyle("A{$lastRow}:{$lastCol}{$lastRow}")->applyFromArray([
                 'font' => [
                     'bold' => true,
                 ],

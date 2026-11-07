@@ -87,8 +87,36 @@ class FinanceController extends Controller
         $recentMutasi = $this->getMutasiData(10);
         $accounts = $this->branchKasBankAccountsQuery()->orderBy('code')->get();
 
+        // Filter periode Bulan & Tahun untuk Kartu Ringkasan (default: bulan & tahun berjalan)
+        $now = \Carbon\Carbon::now();
+        $selectedMonth = (int) $request->query('month', $now->month);
+        $selectedYear = (int) $request->query('year', $now->year);
+        if ($selectedMonth < 1 || $selectedMonth > 12) {
+            $selectedMonth = $now->month;
+        }
+        if ($selectedYear < 2020 || $selectedYear > 2100) {
+            $selectedYear = $now->year;
+        }
+
+        $periodDate = \Carbon\Carbon::createFromDate($selectedYear, $selectedMonth, 1);
+        $rtStartDate = $periodDate->copy()->startOfMonth()->toDateString();
+        $rtEndDate = $periodDate->copy()->endOfMonth()->toDateString();
+        $periodLabel = $periodDate->translatedFormat('F Y');
+
+        $realtimeMetrics = $this->buildRealtimeSummaryMetrics(
+            $this->getTargetPharmacyIds(),
+            $rtStartDate,
+            $rtEndDate,
+            'monthly',
+            $periodLabel
+        );
+        $realtimeMetrics['month'] = $selectedMonth;
+        $realtimeMetrics['year'] = $selectedYear;
+
         // 5 Faktur Hutang yang mendekati atau melewati jatuh tempo
         $upcomingHutang = [];
+        $overdueHutangCount = 0;
+        $overdueHutangTotal = 0.0;
         foreach ($hutang as $h) {
             if ($h['sisa'] > 0) {
                 $dueDateStr = $h['raw_jatuh_tempo'] ?? null;
@@ -99,6 +127,10 @@ class FinanceController extends Controller
                     $now = \Carbon\Carbon::now()->startOfDay();
                     $diffDays = $now->diffInDays($due, false);
                     $isOverdue = $diffDays < 0;
+                }
+                if ($isOverdue) {
+                    $overdueHutangCount++;
+                    $overdueHutangTotal += (float) $h['sisa'];
                 }
                 $upcomingHutang[] = [
                     'id' => $h['id'],
@@ -124,7 +156,10 @@ class FinanceController extends Controller
         return Inertia::render('Finance/Dashboard', [
             'stats' => array_merge($stats, [
                 'returAlert' => $returAlertStats,
+                'overdueHutangCount' => $overdueHutangCount,
+                'overdueHutangTotal' => $overdueHutangTotal,
             ]),
+            'realtime' => $realtimeMetrics,
             'recentMutasi' => $recentMutasi,
             'upcomingHutang' => $upcomingHutang,
             'accounts' => $accounts,
@@ -477,7 +512,7 @@ class FinanceController extends Controller
     }
 
     /**
-     * Catat penerimaan di luar pelunasan piutang.
+     * Catat penerimaan di luar pelunasan piutang (termasuk Diskon Off / Diskon Lain-lain).
      */
     public function pendapatanLainLain(Request $request)
     {
@@ -491,39 +526,30 @@ class FinanceController extends Controller
         ]);
         $month = (int) ($validated['month'] ?? now()->month);
         $year = (int) ($validated['year'] ?? now()->year);
-        $accounts = $this->branchKasBankAccountsQuery()->orderBy('code')->get();
+
         $targetPharmacyIds = $this->getTargetPharmacyIds();
-        $periodStart = \Carbon\Carbon::createFromDate($year, $month, 1)->startOfMonth()->toDateString();
-        $periodEnd = \Carbon\Carbon::createFromDate($year, $month, 1)->endOfMonth()->toDateString();
-        $pendapatan = FinancePayment::with(['account', 'incomeAccount', 'creator', 'pharmacy'])
-            ->where('payment_type', 'PENDAPATAN')
-            ->whereIn('pharmacy_id', $targetPharmacyIds)
-            ->whereBetween('payment_date', [$periodStart, $periodEnd])
-            ->latest('payment_date')
-            ->latest('id')
-            ->take(500)
-            ->get()
-            ->map(fn($payment) => [
-                'id' => $payment->id,
-                'payment_date' => $payment->payment_date?->format('Y-m-d'),
-                'formatted_date' => $payment->payment_date?->format('d/m/Y'),
-                'account_id' => $payment->account_id,
-                'account_name' => $payment->account->name ?? 'Kas / Bank',
-                'income_account_id' => $payment->income_account_id,
-                'income_account_name' => $payment->incomeAccount->name ?? 'Pendapatan',
-                'amount' => (float) $payment->amount,
-                'recipient' => $payment->recipient ?: '-',
-                'reference_number' => $payment->reference_number ?: ('PL-' . str_pad($payment->id, 5, '0', STR_PAD_LEFT)),
-                'notes' => $payment->notes ?: '',
-                'user_name' => $payment->creator->name ?? 'Petugas',
-            ]);
+        $pendapatanList = $this->getPendapatanData();
+        $incomeAccounts = FinanceAccount::whereIn('category', ['Pendapatan', 'Diskon Lain-lain'])
+            ->where('is_active', true)
+            ->orderBy('code')
+            ->get(['id', 'code', 'name', 'category', 'balance']);
+        $kasBankAccounts = $this
+            ->branchKasBankAccountsQuery()
+            ->where('is_active', true)
+            ->orderBy('code')
+            ->get(['id', 'code', 'name', 'balance', 'account_number']);
+        $stats = $this->getStats(null, null, null);
+        $summary = $this->getPendapatanSummary($targetPharmacyIds);
 
         return Inertia::render('Finance/PendapatanLainLain', [
-            'accounts' => $accounts,
-            'incomeAccounts' => FinanceAccount::where('category', 'Pendapatan')->where('is_active', true)->orderBy('code')->get(['id', 'code', 'name']),
-            'pendapatan' => $pendapatan,
+            'pendapatanList' => $pendapatanList,
+            'pendapatan' => $pendapatanList,
+            'incomeAccounts' => $incomeAccounts,
+            'kasBankAccounts' => $kasBankAccounts,
+            'accounts' => $kasBankAccounts,
             'filters' => ['month' => $month, 'year' => $year],
-            'stats' => $this->getStats(null, null, null),
+            'stats' => $stats,
+            'summary' => $summary,
             'branchContext' => $this->getBranchContext(),
         ]);
     }
@@ -655,7 +681,7 @@ class FinanceController extends Controller
     public function storePendapatanLainLain(Request $request)
     {
         $validated = $request->validate([
-            'account_id' => 'required|exists:finance_accounts,id',
+            'account_id' => 'nullable|exists:finance_accounts,id',
             'income_account_id' => 'required|exists:finance_accounts,id',
             'payment_date' => 'required|date',
             'amount' => 'required|numeric|gt:0',
@@ -664,16 +690,32 @@ class FinanceController extends Controller
             'notes' => 'nullable|string|max:500',
         ]);
 
-        $account = $this->branchKasBankAccountsQuery()->findOrFail($validated['account_id']);
-        $incomeAccount = FinanceAccount::where('category', 'Pendapatan')->where('is_active', true)->findOrFail($validated['income_account_id']);
+        $incomeAccount = FinanceAccount::whereIn('category', ['Pendapatan', 'Diskon Lain-lain'])
+            ->where('is_active', true)
+            ->findOrFail($validated['income_account_id']);
+        $isDiskon = $incomeAccount->category === 'Diskon Lain-lain';
+
+        if (!$isDiskon && empty($validated['account_id'])) {
+            return back()->withErrors(['account_id' => 'Pilih akun tujuan Kas & Bank.']);
+        }
+
+        $account = !$isDiskon
+            ? $this->branchKasBankAccountsQuery()->findOrFail($validated['account_id'])
+            : ($this->branchKasBankAccountsQuery()->find($validated['account_id'] ?? null) ?? $this->branchKasBankAccountsQuery()->orderBy('code')->first());
+
+        if (!$account) {
+            return back()->withErrors(['account_id' => 'Akun Kas & Bank tidak ditemukan untuk cabang ini.']);
+        }
+
         $activePharmacyId = getActivePharmacyId();
 
-        DB::transaction(function () use ($validated, $account, $incomeAccount, $activePharmacyId) {
+        DB::transaction(function () use ($validated, $account, $incomeAccount, $isDiskon, $activePharmacyId) {
             FinancePayment::create([
                 'pharmacy_id' => $activePharmacyId > 0 ? $activePharmacyId : null,
                 'account_id' => $account->id,
                 'income_account_id' => $incomeAccount->id,
-                'payment_type' => 'PENDAPATAN',
+                'expense_account_id' => $isDiskon ? $incomeAccount->id : null,
+                'payment_type' => $isDiskon ? 'DISKON' : 'PENDAPATAN',
                 'payment_date' => $validated['payment_date'],
                 'amount' => $validated['amount'],
                 'recipient' => $validated['recipient'] ?? null,
@@ -682,14 +724,114 @@ class FinanceController extends Controller
                 'created_by' => Auth::id(),
             ]);
 
-            $opening = FinancePayment::where('payment_type', 'SALDO AWAL')->where('account_id', $account->id)->first();
-            if (!$opening || $validated['payment_date'] >= $opening->payment_date->format('Y-m-d')) {
-                FinanceAccount::whereKey($account->id)->increment('balance', $validated['amount']);
+            if (!$isDiskon) {
+                $opening = FinancePayment::where('payment_type', 'SALDO AWAL')->where('account_id', $account->id)->first();
+                if (!$opening || $validated['payment_date'] >= $opening->payment_date->format('Y-m-d')) {
+                    FinanceAccount::whereKey($account->id)->increment('balance', $validated['amount']);
+                }
             }
             $this->clearStatsCache();
         });
 
-        return back()->with('success', 'Pendapatan lain-lain berhasil dicatat.');
+        return back()->with('success', $isDiskon ? 'Diskon off berhasil dicatat.' : 'Pendapatan lain-lain berhasil dicatat.');
+    }
+
+    /**
+     * Perbarui transaksi pendapatan lain-lain (termasuk diskon off) yang sudah ada.
+     */
+    public function updatePendapatanLainLain(Request $request, $id)
+    {
+        $payment = FinancePayment::whereIn('payment_type', ['PENDAPATAN', 'DISKON'])->findOrFail($id);
+
+        $validated = $request->validate([
+            'account_id' => 'nullable|exists:finance_accounts,id',
+            'income_account_id' => 'required|exists:finance_accounts,id',
+            'payment_date' => 'required|date',
+            'amount' => 'required|numeric|gt:0',
+            'recipient' => 'nullable|string|max:150',
+            'reference_number' => 'nullable|string|max:100',
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        $incomeAccount = FinanceAccount::whereIn('category', ['Pendapatan', 'Diskon Lain-lain'])
+            ->where('is_active', true)
+            ->findOrFail($validated['income_account_id']);
+        $isDiskon = $incomeAccount->category === 'Diskon Lain-lain';
+
+        if (!$isDiskon && empty($validated['account_id'])) {
+            return back()->withErrors(['account_id' => 'Pilih akun tujuan Kas & Bank.']);
+        }
+
+        $newAccount = !$isDiskon
+            ? $this->branchKasBankAccountsQuery()->findOrFail($validated['account_id'])
+            : ($this->branchKasBankAccountsQuery()->find($validated['account_id'] ?? $payment->account_id) ?? $this->branchKasBankAccountsQuery()->orderBy('code')->first());
+
+        if (!$newAccount || $newAccount->category !== 'Kas & Bank') {
+            return back()->withErrors(['account_id' => 'Akun tujuan harus berkategori Kas & Bank.']);
+        }
+
+        DB::transaction(function () use ($payment, $validated, $newAccount, $incomeAccount, $isDiskon) {
+            $wasPendapatan = $payment->payment_type === 'PENDAPATAN';
+
+            if ($wasPendapatan && $payment->account_id) {
+                $oldOpening = FinancePayment::where('payment_type', 'SALDO AWAL')->where('account_id', $payment->account_id)->first();
+                $oldDate = $payment->payment_date instanceof \Carbon\Carbon
+                    ? $payment->payment_date->format('Y-m-d')
+                    : (string) $payment->payment_date;
+                if (!$oldOpening || $oldDate >= $oldOpening->payment_date->format('Y-m-d')) {
+                    FinanceAccount::whereKey($payment->account_id)->decrement('balance', $payment->amount);
+                }
+            }
+
+            if (!$isDiskon) {
+                $newOpening = FinancePayment::where('payment_type', 'SALDO AWAL')->where('account_id', $newAccount->id)->first();
+                if (!$newOpening || $validated['payment_date'] >= $newOpening->payment_date->format('Y-m-d')) {
+                    FinanceAccount::whereKey($newAccount->id)->increment('balance', $validated['amount']);
+                }
+            }
+
+            $payment->update([
+                'account_id' => $newAccount->id,
+                'income_account_id' => $incomeAccount->id,
+                'expense_account_id' => $isDiskon ? $incomeAccount->id : null,
+                'payment_type' => $isDiskon ? 'DISKON' : 'PENDAPATAN',
+                'payment_date' => $validated['payment_date'],
+                'amount' => $validated['amount'],
+                'recipient' => $validated['recipient'] ?? null,
+                'reference_number' => $validated['reference_number'] ?? null,
+                'notes' => $validated['notes'] ?? null,
+            ]);
+
+            $this->clearStatsCache();
+        });
+
+        return back()->with('success', $isDiskon ? 'Diskon off berhasil diperbarui.' : 'Pendapatan lain-lain berhasil diperbarui.');
+    }
+
+    /**
+     * Hapus transaksi pendapatan lain-lain / diskon off (dan sesuaikan saldo kas/bank bila PENDAPATAN).
+     */
+    public function destroyPendapatanLainLain($id)
+    {
+        $payment = FinancePayment::whereIn('payment_type', ['PENDAPATAN', 'DISKON'])->findOrFail($id);
+
+        DB::transaction(function () use ($payment) {
+            if ($payment->payment_type === 'PENDAPATAN' && $payment->account_id) {
+                $opening = FinancePayment::where('payment_type', 'SALDO AWAL')->where('account_id', $payment->account_id)->first();
+                $oldDate = $payment->payment_date instanceof \Carbon\Carbon
+                    ? $payment->payment_date->format('Y-m-d')
+                    : (string) $payment->payment_date;
+                if (!$opening || $oldDate >= $opening->payment_date->format('Y-m-d')) {
+                    FinanceAccount::whereKey($payment->account_id)->decrement('balance', $payment->amount);
+                }
+            }
+
+            $payment->delete();
+
+            $this->clearStatsCache();
+        });
+
+        return back()->with('success', 'Transaksi berhasil dihapus.');
     }
 
     private function calculateBalanceFromOpening(int $accountId, FinancePayment $opening, string $asOfDate): float
@@ -2295,6 +2437,113 @@ class FinanceController extends Controller
     }
 
     /**
+     * Helper: Ambil data transaksi pendapatan lain-lain (termasuk Diskon Off / Diskon Lain-lain).
+     */
+    protected function getPendapatanData()
+    {
+        $targetPharmacyIds = $this->getTargetPharmacyIds();
+
+        return FinancePayment::with(['account', 'incomeAccount', 'expenseAccount', 'creator', 'pharmacy'])
+            ->whereIn('payment_type', ['PENDAPATAN', 'DISKON'])
+            ->where(function ($q) use ($targetPharmacyIds) {
+                $q
+                    ->whereIn('pharmacy_id', $targetPharmacyIds)
+                    ->orWhereNull('pharmacy_id');
+            })
+            ->latest('payment_date')
+            ->latest('id')
+            ->take(500)
+            ->get()
+            ->map(function ($p) {
+                $isDiskon = $p->payment_type === 'DISKON' || ($p->incomeAccount?->category === 'Diskon Lain-lain');
+                $targetIncomeAccount = $p->incomeAccount ?? $p->expenseAccount;
+                $defaultPrefix = $isDiskon ? 'DC-' : 'PL-';
+
+                return [
+                    'id' => $p->id,
+                    'payment_type' => $p->payment_type,
+                    'is_diskon' => $isDiskon,
+                    'reference_number' => $p->reference_number ?: ($defaultPrefix . str_pad($p->id, 5, '0', STR_PAD_LEFT)),
+                    'payment_date' => $p->payment_date instanceof \Carbon\Carbon ? $p->payment_date->format('Y-m-d') : $p->payment_date,
+                    'formatted_date' => \Carbon\Carbon::parse($p->payment_date)->format('d/m/Y'),
+                    'account_id' => $isDiskon ? null : $p->account_id,
+                    'account_name' => $isDiskon ? 'Tidak Masuk Kas/Bank' : ($p->account->name ?? 'Kas / Bank'),
+                    'account_code' => $isDiskon ? '-' : ($p->account->code ?? '-'),
+                    'income_account_id' => $p->income_account_id ?? $p->expense_account_id,
+                    'income_account_name' => $targetIncomeAccount->name ?? ($isDiskon ? 'Diskon Off' : 'Pendapatan'),
+                    'income_account_code' => $targetIncomeAccount->code ?? '-',
+                    'income_category' => $targetIncomeAccount->category ?? ($isDiskon ? 'Diskon Lain-lain' : 'Pendapatan'),
+                    'amount' => (float) $p->amount,
+                    'recipient' => $p->recipient ?: '-',
+                    'notes' => $p->notes ?: '',
+                    'user_name' => $p->creator->name ?? 'Petugas',
+                    'pharmacy_name' => $p->pharmacy->name ?? null,
+                    'created_at' => $p->created_at ? $p->created_at->format('d/m/Y H:i') : '-',
+                ];
+            });
+    }
+
+    /**
+     * Helper: Ringkasan statistik modul pendapatan lain-lain (termasuk Diskon Off).
+     */
+    protected function getPendapatanSummary(array $targetPharmacyIds): array
+    {
+        $baseQuery = FinancePayment::whereIn('payment_type', ['PENDAPATAN', 'DISKON'])
+            ->where(function ($q) use ($targetPharmacyIds) {
+                $q
+                    ->whereIn('pharmacy_id', $targetPharmacyIds)
+                    ->orWhereNull('pharmacy_id');
+            });
+
+        $startOfMonth = \Carbon\Carbon::now()->startOfMonth()->toDateString();
+        $endOfMonth = \Carbon\Carbon::now()->endOfMonth()->toDateString();
+        $today = \Carbon\Carbon::today()->toDateString();
+
+        $totalAllTime = (float) (clone $baseQuery)->sum('amount');
+        $totalMonth = (float) (clone $baseQuery)->whereBetween('payment_date', [$startOfMonth, $endOfMonth])->sum('amount');
+        $totalToday = (float) (clone $baseQuery)->whereDate('payment_date', $today)->sum('amount');
+        $countTotal = (int) (clone $baseQuery)->count();
+        $countMonth = (int) (clone $baseQuery)->whereBetween('payment_date', [$startOfMonth, $endOfMonth])->count();
+
+        // Breakdown top 5 jenis pendapatan (termasuk Diskon Off)
+        $rawGroups = (clone $baseQuery)
+            ->select(
+                DB::raw('COALESCE(income_account_id, expense_account_id) as target_account_id'),
+                DB::raw('SUM(amount) as total_amount'),
+                DB::raw('COUNT(id) as total_count')
+            )
+            ->groupBy(DB::raw('COALESCE(income_account_id, expense_account_id)'))
+            ->orderByDesc('total_amount')
+            ->limit(5)
+            ->get();
+
+        $accountIds = $rawGroups->pluck('target_account_id')->filter()->unique()->values()->all();
+        $accountsById = FinanceAccount::whereIn('id', $accountIds)
+            ->get(['id', 'code', 'name', 'category'])
+            ->keyBy('id');
+
+        $topIncomes = $rawGroups->map(function ($item) use ($accountsById) {
+            $acc = $accountsById->get($item->target_account_id);
+            return [
+                'account_name' => $acc->name ?? 'Pendapatan Lain-lain',
+                'account_code' => $acc->code ?? '-',
+                'account_category' => $acc->category ?? 'Pendapatan',
+                'total_amount' => (float) $item->total_amount,
+                'total_count' => (int) $item->total_count,
+            ];
+        });
+
+        return [
+            'totalAllTime' => $totalAllTime,
+            'totalMonth' => $totalMonth,
+            'totalToday' => $totalToday,
+            'countTotal' => $countTotal,
+            'countMonth' => $countMonth,
+            'topIncomes' => $topIncomes,
+        ];
+    }
+
+    /**
      * Helper: Ambil kategori akun.
      */
     protected function getCategories()
@@ -2317,6 +2566,108 @@ class FinanceController extends Controller
         ];
         $existingCategories = FinanceAccount::select('category')->distinct()->pluck('category')->toArray();
         return array_values(array_unique(array_merge($defaultCategories, $existingCategories)));
+    }
+
+    /**
+     * Helper: Hitung metrik kartu Tipe Real-Time untuk halaman Ringkasan Keuangan.
+     *
+     * 1. Penjualan: 100% sesuai LIPH (melalui LiphTransactionScope & BankSalesExport::calculateTransactionAmount)
+     * 2. Pembelian: 100% sesuai Laporan Pembelian Faktur (InvoiceSingleSheetExport::queryDailyInvoices) dikurangi Retur Pembelian
+     * 3. Biaya: Data dari Finance > Biaya (payment_type = BIAYA)
+     * 4. Pendapatan: Data dari Finance > Pendapatan Lain-lain (payment_type IN [PENDAPATAN, DISKON])
+     * 5. Laba: Penjualan - Pembelian - Biaya + Pendapatan
+     */
+    protected function buildRealtimeSummaryMetrics(
+        array $pharmacyIds,
+        string $startDate,
+        string $endDate,
+        string $preset,
+        string $periodLabel
+    ): array {
+        $kinerjaService = new KinerjaOmzetService();
+        $kinerja = $kinerjaService->build($pharmacyIds, $startDate, $endDate);
+        $days = $kinerja['days'] ?? [];
+
+        $penjualanTotal = 0.0;
+        $penjualanTunaiBank = 0.0;
+        $penjualanKredit = 0.0;
+
+        $pembelianBruto = 0.0;
+        $pembelianPbf = 0.0;
+        $pembelianCash = 0.0;
+        $pembelianKonsinyasi = 0.0;
+        $pembelianRetur = 0.0;
+
+        $biayaTotal = 0.0;
+        $pendapatanLainTotal = 0.0;
+        $diskonOffTotal = 0.0;
+
+        foreach ($days as $day) {
+            $penjualanTotal += (float) ($day['sales']['total'] ?? 0);
+            $penjualanTunaiBank += (float) ($day['sales']['cashBankTotal'] ?? 0);
+            $penjualanKredit += (float) ($day['sales']['creditTotal'] ?? 0);
+
+            $pbf = (float) ($day['purchases']['pbf'] ?? 0);
+            $cash = (float) ($day['purchases']['cash'] ?? 0);
+            $cons = (float) ($day['purchases']['consignment'] ?? 0);
+            $ret = (float) ($day['purchases']['return'] ?? 0);
+
+            $pembelianPbf += $pbf;
+            $pembelianCash += $cash;
+            $pembelianKonsinyasi += $cons;
+            $pembelianBruto += ($pbf + $cash + $cons);
+            $pembelianRetur += $ret;
+
+            $biayaTotal += (float) ($day['expense'] ?? 0);
+            $pendapatanLainTotal += (float) ($day['other_income'] ?? 0);
+            $diskonOffTotal += (float) ($day['purchases']['discountOff'] ?? 0);
+        }
+
+        // Pembelian sesuai Laporan Pembelian Faktur dikurangi Retur Pembelian
+        // (Diskon Off dipisahkan dan dihitung di dalam kartu Pendapatan)
+        $pembelianNetto = $pembelianBruto - $pembelianRetur;
+
+        // Pendapatan = Pendapatan Lain-lain + Diskon Off
+        $pendapatanTotal = $pendapatanLainTotal + $diskonOffTotal;
+
+        // Laba = Penjualan - Pembelian - Biaya + Pendapatan
+        $labaTotal = $penjualanTotal - $pembelianNetto - $biayaTotal + $pendapatanTotal;
+
+        $marginPersen = $penjualanTotal > 0
+            ? round(($labaTotal / $penjualanTotal) * 100, 1)
+            : 0.0;
+
+        return [
+            'preset' => $preset,
+            'startDate' => $startDate,
+            'endDate' => $endDate,
+            'periodLabel' => $periodLabel,
+            'penjualan' => [
+                'total' => round($penjualanTotal, 2),
+                'tunaiBank' => round($penjualanTunaiBank, 2),
+                'kredit' => round($penjualanKredit, 2),
+            ],
+            'pembelian' => [
+                'total' => round($pembelianNetto, 2),
+                'fakturBruto' => round($pembelianBruto, 2),
+                'retur' => round($pembelianRetur, 2),
+                'pbf' => round($pembelianPbf, 2),
+                'cash' => round($pembelianCash, 2),
+                'konsinyasi' => round($pembelianKonsinyasi, 2),
+            ],
+            'biaya' => [
+                'total' => round($biayaTotal, 2),
+            ],
+            'pendapatan' => [
+                'total' => round($pendapatanTotal, 2),
+                'pendapatanLain' => round($pendapatanLainTotal, 2),
+                'diskonOff' => round($diskonOffTotal, 2),
+            ],
+            'laba' => [
+                'total' => round($labaTotal, 2),
+                'marginPersen' => $marginPersen,
+            ],
+        ];
     }
 
     /**
